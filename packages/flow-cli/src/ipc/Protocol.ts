@@ -51,6 +51,25 @@ export type ClientCommand = {
 export type DaemonResponse =
 	{ type: 'execution_started'; executionId: string } | { type: 'error'; message: string; code: string };
 
+/**
+ * One live worker, as reported to `flow worker list`.
+ *
+ * Describes connections only. A declared source with no connection does not appear here,
+ * because a live connection is the sole proof of availability (D#4) -- listing intent
+ * beside reality would suggest capacity that cannot receive a step.
+ */
+export interface WorkerSummary {
+	workerId: string;
+	pid: number;
+	state: 'idle' | 'busy';
+	sourceId?: string;
+	labels: string[];
+	attachedProjects: string[];
+	hasUserInterface: boolean;
+	/** True when this daemon created the worker, so it exits when the daemon idles down. */
+	ephemeral: boolean;
+}
+
 export type DaemonToWorker =
 	| {
 			type: 'assign';

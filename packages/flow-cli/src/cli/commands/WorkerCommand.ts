@@ -1,4 +1,5 @@
 import { ConfigDir } from '@wadeck-app/shared-cli';
+import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import { StepRunner } from 'flow-engine';
 import type { StepRunnerConfig } from 'flow-engine';
@@ -9,7 +10,7 @@ import { WebSocket } from 'ws';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { FlowConfigLoader } from '../../config/FlowConfig';
-import type { AssignmentScopedMessage, DaemonToWorker, WorkerToDaemon } from '../../ipc/Protocol';
+import type { AssignmentScopedMessage, DaemonToWorker, WorkerSummary, WorkerToDaemon } from '../../ipc/Protocol';
 import type { McpServerConfig } from '../../worker/McpServer';
 import { WorkerAdapter } from '../../worker/WorkerAdapter';
 import { buildRegistration, reconnectDelayMs, resolveDaemonWsUrl, resolveWorkerToken } from '../../worker/WorkerLaunch';
@@ -49,6 +50,8 @@ function report(prefix: '[fail]' | '[wait]' | '[warn]', message: string): void {
  * only kind of worker that can serve an interactive step (D#32).
  */
 export function registerWorkerCommand(worker: Command): void {
+	registerListCommand(worker);
+
 	worker
 		.command('start', { isDefault: true })
 		.description('Run a worker in this terminal, serving the current project')
@@ -64,6 +67,58 @@ export function registerWorkerCommand(worker: Command): void {
 			try {
 				runWorker(options);
 			} catch (err) {
+				report('[fail]', normalizeError(err).message);
+				process.exit(1);
+			}
+		});
+}
+
+/**
+ * `flow worker list` -- the live workers this daemon can currently dispatch to.
+ *
+ * Deliberately not a view of declared sources: only a connection proves availability
+ * (D#4), so a declared source with nothing attached is absent rather than shown as idle
+ * capacity. Use `flow worker source list` to see what has been declared.
+ */
+function registerListCommand(worker: Command): void {
+	worker
+		.command('list')
+		.description('List the workers currently connected to the daemon')
+		.option('--json', 'Output as JSON')
+		.action(async (options: { json?: boolean }) => {
+			const daemonDir = ConfigDir.get('flow');
+			try {
+				// The command is declared optional and left unimplemented on purpose: a local
+				// handler here would be used as an in-process fallback and would answer with
+				// its own empty list, so `flow worker list` would report "no workers" while a
+				// daemon with live workers was running.
+				const client = createDaemonClient<{ workers?: () => Promise<WorkerSummary[]> }>({
+					configDir: daemonDir,
+					commands: {},
+				});
+				const workers = (await client.send('workers', undefined)) as WorkerSummary[];
+
+				if (options.json) {
+					console.log(JSON.stringify(workers, null, 2));
+					return;
+				}
+				if (workers.length === 0) {
+					console.log('No workers connected. Start one with "flow worker" in a project directory.');
+					return;
+				}
+				for (const w of workers) {
+					const labels = w.labels.length > 0 ? w.labels.join(',') : '-';
+					const origin = w.ephemeral ? 'daemon-forked' : (w.sourceId ?? 'external');
+					console.log(
+						`${w.workerId}\t${w.state}\tpid=${String(w.pid)}\t${origin}\tlabels=${labels}\tinteractive=${String(w.hasUserInterface)}`
+					);
+				}
+			} catch (err) {
+				if (err instanceof DaemonNotRunningError) {
+					// Not an error state: no daemon simply means no live workers.
+					console.log('No daemon running, so no workers are connected. Start one with "flow start".');
+					return;
+				}
 				report('[fail]', normalizeError(err).message);
 				process.exit(1);
 			}

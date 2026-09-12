@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 
-import type { DaemonToWorker, WorkerReady } from '../ipc/Protocol';
+import type { DaemonToWorker, WorkerReady, WorkerSummary } from '../ipc/Protocol';
 
 type WorkerState = 'idle' | 'busy';
 
@@ -88,6 +88,20 @@ export class WorkerRegistry {
 
 	remove(ws: WebSocket): void {
 		this.workers.delete(ws);
+	}
+
+	/** Every live worker, for `flow worker list`. */
+	summarize(): WorkerSummary[] {
+		return [...this.workers.values()].map(worker => ({
+			workerId: worker.workerId,
+			pid: worker.pid,
+			state: worker.state,
+			...(worker.sourceId !== undefined ? { sourceId: worker.sourceId } : {}),
+			labels: worker.labels,
+			attachedProjects: worker.attachedProjects,
+			hasUserInterface: worker.hasUserInterface,
+			ephemeral: worker.ephemeral,
+		}));
 	}
 
 	/** Live workers belonging to one source, for enforcing its cap (D#64). */

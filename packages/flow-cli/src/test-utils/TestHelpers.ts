@@ -8,7 +8,11 @@ import { Daemon } from '../daemon/Daemon';
 import type { DaemonResponse, ExecutionState } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 
-type FlowTestCommands = { run: (payload: unknown) => Promise<DaemonResponse> };
+type FlowTestCommands = {
+	run: (payload: unknown) => Promise<DaemonResponse>;
+	/** Live worker summaries, for `flow worker list` (Q#9). */
+	workers?: () => Promise<unknown>;
+};
 
 export interface TestDaemonContext {
 	daemonDir: string;

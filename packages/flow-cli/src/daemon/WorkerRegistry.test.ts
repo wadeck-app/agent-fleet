@@ -181,6 +181,71 @@ describe('WorkerRegistry - ephemeral vs externally launched workers', () => {
 	});
 });
 
+// Backs `flow worker list` (Q#9): live connections only, since only a connection proves
+// a step can actually reach a worker (D#4).
+describe('WorkerRegistry - summarize', () => {
+	it('reports nothing when no worker is connected', () => {
+		expect(new WorkerRegistry().summarize()).toEqual([]);
+	});
+
+	it('reports what each worker declared, plus its dispatch state', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(
+			ws,
+			{
+				pid: 4242,
+				sourceId: 'laptop',
+				labels: ['gpu'],
+				attachedProjects: ['C:/proj'],
+				hasUserInterface: true,
+			},
+			{ ephemeral: false }
+		);
+
+		const [summary] = registry.summarize();
+		expect(summary?.pid).toBe(4242);
+		expect(summary?.sourceId).toBe('laptop');
+		expect(summary?.labels).toEqual(['gpu']);
+		expect(summary?.attachedProjects).toEqual(['C:/proj']);
+		expect(summary?.hasUserInterface).toBe(true);
+		expect(summary?.state).toBe('idle');
+		expect(summary?.ephemeral).toBe(false);
+		expect(summary?.workerId).toBe(registry.describe(ws)?.workerId);
+	});
+
+	it('reflects the busy state so the list is not misread as free capacity', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal);
+		registry.markBusy(ws);
+
+		expect(registry.summarize()[0]?.state).toBe('busy');
+	});
+
+	it('distinguishes a daemon-forked worker from one launched externally', () => {
+		const registry = new WorkerRegistry();
+		registry.register(fakeWorker(), minimal, { ephemeral: true });
+		registry.register(fakeWorker(), minimal, { ephemeral: false });
+
+		expect(
+			registry
+				.summarize()
+				.map(w => w.ephemeral)
+				.sort()
+		).toEqual([false, true]);
+	});
+
+	it('drops a worker from the list as soon as it disconnects', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal);
+		registry.remove(ws);
+
+		expect(registry.summarize()).toEqual([]);
+	});
+});
+
 describe('WorkerRegistry - sending', () => {
 	it('sends a serialised message to an open connection', () => {
 		const registry = new WorkerRegistry();

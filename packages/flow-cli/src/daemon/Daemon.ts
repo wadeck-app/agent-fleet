@@ -220,6 +220,9 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				const flowHooks = loadFlowHooks(cmd.cwd);
 				return commandHandler.handleRun(cmd, new HookDispatcher(flowHooks));
 			},
+			// Live connections only: a declared source with nothing connected is not
+			// capacity, and reporting it as available would suggest a step could reach it (D#4).
+			workers: (): unknown => workerRegistry.summarize(),
 		},
 		health: () => ({
 			status: 'ok' as const,
