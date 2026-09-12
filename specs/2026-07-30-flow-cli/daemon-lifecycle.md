@@ -22,9 +22,9 @@ flow run ./my-flow.yml
    read ~/.flow-daemon/config.port
    check PID alive + mtime fresh
 
-   YES → POST /run to daemon, receive execution-id, exit
+   YES -> POST /run to daemon, receive execution-id, exit
 
-   NO  → call createDaemon({ configDir: ~/.flow-daemon, commands, idleTimeout: null })
+   NO  -> call createDaemon({ configDir: ~/.flow-daemon, commands, idleTimeout: null })
                daemon binds TCP port on ...
                writes config.port + health_token
                load ~/.flow-config.yaml (queue config)
@@ -43,8 +43,8 @@ Config directory
 
 ```
 ~/.flow-daemon/
-  config.port      ← port file (singleton-daemon-kit)
-  health_token     ← auth token (singleton-daemon-kit)
+  config.port      <- port file (singleton-daemon-kit)
+  health_token     <- auth token (singleton-daemon-kit)
 ```
 
 `~/.flow-daemon/` must exist before first run. The CLI creates it on first invocation if absent.

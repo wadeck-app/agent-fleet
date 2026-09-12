@@ -519,12 +519,12 @@ describe('LoopHandler', () => {
 
 				const result = handler.handleLoop(mockStep, 'step0', mockDAG, completed, iterations);
 
-				// stepB is skipped (skipOnLoop=true) — stays in completed
+				// stepB is skipped (skipOnLoop=true) -- stays in completed
 				expect(result.skippedSteps).toContain('stepB');
 				expect(result.invalidatedSteps).not.toContain('stepB');
 				expect(completed.has('stepB')).toBe(true);
 
-				// stepC is invalidated (normal step) — removed from completed
+				// stepC is invalidated (normal step) -- removed from completed
 				expect(result.invalidatedSteps).toContain('stepC');
 				expect(result.skippedSteps).not.toContain('stepC');
 				expect(completed.has('stepC')).toBe(false);

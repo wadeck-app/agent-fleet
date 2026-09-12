@@ -33,12 +33,12 @@ const log = createLogger('OrchestratorEventBridge');
  * - Handle task lifecycle events (created/updated/deleted)
  *
  * Event Mapping:
- * - StateEvent.WORKER_CONNECTED    → B2F_WORKER_CONNECTED + B2F_WORKERS_UPDATED
- * - StateEvent.WORKER_DISCONNECTED → B2F_WORKER_DISCONNECTED + B2F_WORKERS_UPDATED
- * - StateEvent.WORKER_TASK_ASSIGNED → B2F_WORKERS_UPDATED (worker state changed)
- * - StateEvent.TASK_CREATED        → B2F_TASKS_UPDATED
- * - StateEvent.TASK_UPDATED        → B2F_TASKS_UPDATED
- * - StateEvent.TASK_DELETED        → B2F_TASKS_UPDATED
+ * - StateEvent.WORKER_CONNECTED    -> B2F_WORKER_CONNECTED + B2F_WORKERS_UPDATED
+ * - StateEvent.WORKER_DISCONNECTED -> B2F_WORKER_DISCONNECTED + B2F_WORKERS_UPDATED
+ * - StateEvent.WORKER_TASK_ASSIGNED -> B2F_WORKERS_UPDATED (worker state changed)
+ * - StateEvent.TASK_CREATED        -> B2F_TASKS_UPDATED
+ * - StateEvent.TASK_UPDATED        -> B2F_TASKS_UPDATED
+ * - StateEvent.TASK_DELETED        -> B2F_TASKS_UPDATED
  *
  * Note on aggregate events:
  * - B2F_TASKS_UPDATED and B2F_WORKERS_UPDATED are broadcast with empty payloads

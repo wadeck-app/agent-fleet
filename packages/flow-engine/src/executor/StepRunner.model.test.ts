@@ -1,6 +1,6 @@
 /**
  * Tests for model step log: parameter behavior.
- * Uses vi.mock for ClaudeLauncher — no real Claude calls.
+ * Uses vi.mock for ClaudeLauncher -- no real Claude calls.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -260,7 +260,7 @@ describe('model step — log: parameter', () => {
 
 			await runner.executeStep(makeStep('polling'), testWorkspace, testContext, undefined, onLogEntry);
 
-			// polling: entries are flushed — at minimum they must arrive
+			// polling: entries are flushed -- at minimum they must arrive
 			expect(onLogEntry).toHaveBeenCalled();
 		});
 	});

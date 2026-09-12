@@ -19,13 +19,13 @@ Tested with `PUT /api/v4/projects/:id/packages/generic/:name/:version/:filename`
 | `read_package_registry`  | valid          | **403** | Auth OK, format OK, scope KO               |
 | `write_package_registry` | valid + body   | **201** | All OK, file created                       |
 
-**Key finding:** GitLab validates **auth → format → scope**. Using invalid version formats bypasses scope checking (returns 400 regardless of scope). There is no non-destructive probe for `write_package_registry` scope.
+**Key finding:** GitLab validates **auth -> format -> scope**. Using invalid version formats bypasses scope checking (returns 400 regardless of scope). There is no non-destructive probe for `write_package_registry` scope.
 
 ---
 
 ## Confirmed behavior of `write_package_registry` deploy token
 
-Tested with full PUT → GET → DELETE cycle:
+Tested with full PUT -> GET -> DELETE cycle:
 
 | Operation             | Endpoint                                 | HTTP    | Result                                           |
 | --------------------- | ---------------------------------------- | ------- | ------------------------------------------------ |
@@ -39,7 +39,7 @@ Tested with full PUT → GET → DELETE cycle:
 
 **Probe idempotency:** PUT to a fixed path (`ci-write-probe/0.0.1/probe.txt`) overwrites the existing file. Each CI run results in exactly ONE package with ONE version and ONE file (5 bytes). No proliferation occurs.
 
-**To delete when needed:** GitLab UI → Project → Packages and Registries → Package Registry → `ci-write-probe` → delete.
+**To delete when needed:** GitLab UI -> Project -> Packages and Registries -> Package Registry -> `ci-write-probe` -> delete.
 
 ---
 
@@ -81,8 +81,8 @@ No bootstrap, no cleanup, no artifacts.
 
 ## Current probe strategy (CI workflows)
 
-1. **READ token**: `GET /packages/npm/@wadeck/singleton-daemon-kit` → 200 OK (no artifact)
-2. **WRITE token**: `POST /packages/pypi` (empty body) → 400 OK (non-destructive, nothing created)
+1. **READ token**: `GET /packages/npm/@wadeck/singleton-daemon-kit` -> 200 OK (no artifact)
+2. **WRITE token**: `POST /packages/pypi` (empty body) -> 400 OK (non-destructive, nothing created)
 3. **npmrc**: both READ and WRITE tokens written to the same `.npmrc` local file; WRITE token appended last so it wins on duplicate key
 
 ---
@@ -105,8 +105,8 @@ echo "${REGISTRY}:_authToken=${READ_TOKEN}" >> .npmrc
 echo "${REGISTRY}:_authToken=${WRITE_TOKEN}" >> .npmrc
 ```
 
-**Pattern that works (violations-framework):** Both steps append to the same file. WRITE token is last → wins.
-**Pattern that fails:** READ in `~/.npmrc` + WRITE in `.npmrc` local → unpredictable which token npm uses for publish.
+**Pattern that works (violations-framework):** Both steps append to the same file. WRITE token is last -> wins.
+**Pattern that fails:** READ in `~/.npmrc` + WRITE in `.npmrc` local -> unpredictable which token npm uses for publish.
 
 ---
 
@@ -114,7 +114,7 @@ echo "${REGISTRY}:_authToken=${WRITE_TOKEN}" >> .npmrc
 
 `PUT /api/v4/projects/:id/packages/npm/@scope%2fpkg-name` with `write_package_registry`:
 
-- With valid npm tarball body → publishes package
-- With malformed body (`{}`) → creates a **broken npm package entry** in the registry that persists
+- With valid npm tarball body -> publishes package
+- With malformed body (`{}`) -> creates a **broken npm package entry** in the registry that persists
 
 **Warning:** Do NOT use the npm registry endpoint as a write probe -- it creates broken packages.

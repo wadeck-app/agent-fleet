@@ -49,11 +49,11 @@ describe('useProjectsV2State', () => {
 			// This test reproduces the REAL production bug:
 			// 1. User on project1 with workspace1
 			// 2. User clicks project2
-			// 3. setProjectId('project2') + setWorkspaceId(null) → queued for flush
-			// 4. Microtask flushes → URL updates to projectId=project2 (workspace removed)
-			// 5. searchParams changes → all hooks re-render
-			// 6. Auto-selection effect sees project2 has workspaces → setWorkspaceId(workspace2)
-			// 7. NEW flush triggered, but it reads OLD searchParams (closure) → reverts to project1!
+			// 3. setProjectId('project2') + setWorkspaceId(null) -> queued for flush
+			// 4. Microtask flushes -> URL updates to projectId=project2 (workspace removed)
+			// 5. searchParams changes -> all hooks re-render
+			// 6. Auto-selection effect sees project2 has workspaces -> setWorkspaceId(workspace2)
+			// 7. NEW flush triggered, but it reads OLD searchParams (closure) -> reverts to project1!
 
 			const pinnedProjects: Project[] = [
 				{
@@ -135,9 +135,9 @@ describe('useProjectsV2State', () => {
 			//
 			// SCENARIO:
 			// 1. User loads page with projectId=jz52yz1uq AND workspaceId=workspace-1 in URL
-			// 2. pinnedProjects loads asynchronously (empty → 2 projects)
+			// 2. pinnedProjects loads asynchronously (empty -> 2 projects)
 			// 3. User clicks on second project (wwuypfn8p)
-			// 4. BUG: workspaceId resets → both hooks update URL → race condition → projectId reverts
+			// 4. BUG: workspaceId resets -> both hooks update URL -> race condition -> projectId reverts
 
 			// Start with EMPTY pinnedProjects (simulates async loading)
 			let pinnedProjects: Project[] = [];
@@ -186,9 +186,9 @@ describe('useProjectsV2State', () => {
 
 			// User clicks on "Agent Fleet" tab
 			// This triggers:
-			//   1. setProjectId('wwuypfn8p') → projectId useUrlState sync effect runs
-			//   2. workspaceId sees parentValue changed → resets to null → workspaceId useUrlState sync effect runs
-			//   3. RACE: Both effects read old searchParams and call setSearchParams → second call overwrites first!
+			//   1. setProjectId('wwuypfn8p') -> projectId useUrlState sync effect runs
+			//   2. workspaceId sees parentValue changed -> resets to null -> workspaceId useUrlState sync effect runs
+			//   3. RACE: Both effects read old searchParams and call setSearchParams -> second call overwrites first!
 			act(() => {
 				result.current.setActiveProject('wwuypfn8p');
 			});

@@ -14,7 +14,7 @@
  * - Immutable transformations (no side effects)
  * - Composable modifiers (chain them sequentially)
  * - Type-safe query building
- * - Predictable data flow: modifiers → query → fetch
+ * - Predictable data flow: modifiers -> query -> fetch
  *
  * ===========================================================================================
  */

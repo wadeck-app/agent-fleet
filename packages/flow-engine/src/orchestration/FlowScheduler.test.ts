@@ -38,7 +38,7 @@ describe('FlowScheduler', () => {
 	describe('isTerminal()', () => {
 		it('is false before start() is called', () => {
 			const scheduler = new FlowScheduler(makeContext());
-			// Nothing started — no steps, no failures
+			// Nothing started -- no steps, no failures
 			expect(scheduler.isTerminal()).toBe(false);
 		});
 
@@ -139,7 +139,7 @@ describe('FlowScheduler', () => {
 
 	describe('loop (onFailure.goto)', () => {
 		it('triggers loop: re-enqueues target step when maxIterations not exceeded', () => {
-			// a → b (onFailure.goto = a)
+			// a -> b (onFailure.goto = a)
 			const a = makeStep('a');
 			const b = makeLoopStep('b', { goto: 'a', maxIterations: 3 }, ['a']);
 			const scheduler = new FlowScheduler(makeContext());
@@ -151,7 +151,7 @@ describe('FlowScheduler', () => {
 			scheduler.acknowledge('b');
 
 			const afterBFail = fail(scheduler, 'b');
-			// Loop → a becomes ready again
+			// Loop -> a becomes ready again
 			expect(afterBFail.map(r => r.stepId)).toContain('a');
 			expect(scheduler.hasFailed()).toBe(false);
 		});
@@ -191,7 +191,7 @@ describe('FlowScheduler', () => {
 		});
 
 		it('invalidates loop target and its descendants', () => {
-			// a → b → c, b loops to a (b fails)
+			// a -> b -> c, b loops to a (b fails)
 			const steps = [
 				makeStep('a'),
 				makeLoopStep('b', { goto: 'a', maxIterations: 3 }, ['a']),
@@ -271,8 +271,8 @@ describe('FlowScheduler', () => {
 
 	describe('stale complete() after loop invalidation', () => {
 		it('discards the outcome when complete() is called for an invalidated in-flight step', () => {
-			// a → b (both ready), a loops back to itself somehow — or:
-			// a → c, b → c, b loops to a. Both a and b in first batch.
+			// a -> b (both ready), a loops back to itself somehow -- or:
+			// a -> c, b -> c, b loops to a. Both a and b in first batch.
 			// After complete(a, success), loop triggered by complete(b, fail) invalidates a.
 			// Then calling complete(a, success) again is stale.
 			const steps = [makeStep('a'), makeLoopStep('b', { goto: 'a', maxIterations: 3 })];
@@ -286,7 +286,7 @@ describe('FlowScheduler', () => {
 			// a completes successfully
 			succeed(scheduler, 'a', { x: 1 });
 
-			// b fails → loop to a → a is invalidated
+			// b fails -> loop to a -> a is invalidated
 			fail(scheduler, 'b');
 			expect(scheduler.hasFailed()).toBe(false);
 

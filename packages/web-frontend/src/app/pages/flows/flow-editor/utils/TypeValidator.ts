@@ -13,13 +13,13 @@ export function areTypesCompatible(sourceType: VariableType, targetType: Variabl
 	if (targetType === 'string') return true; // Everything can convert to string
 	if (targetType === 'object') return true; // Everything can be wrapped in object
 
-	// number → boolean (truthy/falsy)
+	// number -> boolean (truthy/falsy)
 	if (sourceType === 'number' && targetType === 'boolean') return true;
 
-	// string → number (if parseable)
+	// string -> number (if parseable)
 	if (sourceType === 'string' && targetType === 'number') return true;
 
-	// string → boolean (if 'true'/'false')
+	// string -> boolean (if 'true'/'false')
 	if (sourceType === 'string' && targetType === 'boolean') return true;
 
 	// No other conversions allowed

@@ -85,8 +85,8 @@ export type SortingContract = FeatureContract<SortingState>;
  * - sortConfigs: Persisted to localStorage (user preference)
  *
  * Sort Cycle:
- * - Regular click: asc → desc → none (replaces all sorts)
- * - Shift+click: asc → desc → remove (adds to multi-sort)
+ * - Regular click: asc -> desc -> none (replaces all sorts)
+ * - Shift+click: asc -> desc -> remove (adds to multi-sort)
  *
  * @param options - Configuration options
  * @returns SortingContract with state, fstate, actions, fillQuery

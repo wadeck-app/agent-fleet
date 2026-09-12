@@ -26,7 +26,7 @@ export interface SubStepStrategy {
 	onChildFailure(ctx: SubStepStrategyContext): SubStepAction;
 	/**
 	 * Called when all children are terminal (last one just completed or failed via a
-	 * preceding onChildFailure→wait cycle). A `wait` result means: proceed with the
+	 * preceding onChildFailure->wait cycle). A `wait` result means: proceed with the
 	 * normal deferred parent completion. A `restart-parent` result triggers a re-run.
 	 */
 	onAllChildrenTerminal(ctx: Omit<SubStepStrategyContext, 'failedChildId' | 'error'>): SubStepAction;
@@ -42,21 +42,21 @@ export const RestartOnFirstFailure: SubStepStrategy = {
 		return { type: 'restart-parent', errors: [ctx.error] };
 	},
 	onAllChildrenTerminal(_ctx): SubStepAction {
-		// Reached only when all children of the current run passed — fire normal completion.
+		// Reached only when all children of the current run passed -- fire normal completion.
 		return { type: 'wait' };
 	},
 };
 
 /**
  * Waits for ALL children to reach a terminal state before acting.
- * - If any failed → re-run the parent with ALL accumulated errors.
- * - If all passed → fire normal deferred parent completion.
+ * - If any failed -> re-run the parent with ALL accumulated errors.
+ * - If all passed -> fire normal deferred parent completion.
  */
 export const WaitAll: SubStepStrategy = {
 	name: 'wait-all',
 	onChildFailure(ctx): SubStepAction {
 		if (ctx.pendingChildren.size > 0) {
-			// More children still in-flight — accumulate and wait.
+			// More children still in-flight -- accumulate and wait.
 			return { type: 'wait' };
 		}
 		// All children are now terminal and at least one failed.
@@ -66,7 +66,7 @@ export const WaitAll: SubStepStrategy = {
 		if (ctx.failedChildren.size > 0) {
 			return { type: 'restart-parent', errors: [...ctx.failedChildren.values()] };
 		}
-		// All children passed — proceed with normal deferred completion.
+		// All children passed -- proceed with normal deferred completion.
 		return { type: 'wait' };
 	},
 };

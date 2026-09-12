@@ -3,7 +3,7 @@
  *
  * CREATE_NO_WINDOW (windowsHide:true) removes the console handle from the spawned
  * process, breaking the inheritance chain. Children of consoleless workers call
- * AllocConsole() → Windows Terminal shows a visible tab (regression).
+ * AllocConsole() -> Windows Terminal shows a visible tab (regression).
  *
  * obtainWorker() must NOT set windowsHide so workers inherit the daemon's hidden
  * WT console (created via wscript.exe SW_HIDE in spawnDaemonBackground).

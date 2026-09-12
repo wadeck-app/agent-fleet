@@ -21,7 +21,7 @@ export class DependencyOrderValidator {
 	 * Validate dependency order for all variable references
 	 */
 	public validateDependencyOrder(flow: FlowDefinition): void {
-		// Build transitive dependency map (stepId → Set<ancestorStepIds>)
+		// Build transitive dependency map (stepId -> Set<ancestorStepIds>)
 		const dependencyMap = this.buildTransitiveDependencyMap(flow.steps);
 
 		// Extract all variable references

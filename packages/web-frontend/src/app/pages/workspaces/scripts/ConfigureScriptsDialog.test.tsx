@@ -252,7 +252,7 @@ describe('ConfigureScriptsDialog', () => {
 			expect(screen.getByText('build')).toBeInTheDocument();
 		});
 
-		// 4. Click left arrow (←) to add "build" script
+		// 4. Click left arrow (<-) to add "build" script
 		const addBuildButton = screen.getByRole('button', { name: 'Add build' });
 		await user.click(addBuildButton);
 

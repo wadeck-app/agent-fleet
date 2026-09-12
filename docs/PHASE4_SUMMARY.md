@@ -34,7 +34,7 @@ Phase 4 successfully integrated the Flow Engine with the Orchestrator, creating 
 ## How It Works
 
 ```
-User → REST API → TaskManager → WebSocket → FlowWorker
+User -> REST API -> TaskManager -> WebSocket -> FlowWorker
                       ↓                          ↓
                   FlowRegistry              FlowExecutor
                                                ↓

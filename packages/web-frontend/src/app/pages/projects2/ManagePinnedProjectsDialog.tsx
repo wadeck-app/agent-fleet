@@ -13,7 +13,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
  * Dialog for managing pinned projects with drag & drop reordering.
  * Now uses OptimisticDualListDialog for all state management.
  *
- * Reduced from 232 lines → ~80 lines (65% reduction!)
+ * Reduced from 232 lines -> ~80 lines (65% reduction!)
  *
  * All optimistic update logic is handled by OptimisticDualListDialog:
  * - Optimistic pin/unpin with immediate visual feedback

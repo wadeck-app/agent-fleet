@@ -170,7 +170,7 @@ Full Development Flow
 ```yaml
 dev-full:
     name: 'Full Development Cycle'
-    description: 'Analysis → Validation → Implementation → Quality → Review'
+    description: 'Analysis -> Validation -> Implementation -> Quality -> Review'
 
     workspace:
         mode: isolated
@@ -324,7 +324,7 @@ Brainstorming Flow
 ```yaml
 brainstorm:
     name: 'Iterative Brainstorming'
-    description: 'Analysis → Questions → Refinement (loop)'
+    description: 'Analysis -> Questions -> Refinement (loop)'
 
     workspace:
         mode: shared
@@ -480,10 +480,10 @@ interface Workspace {
 
 Allocation Rules:
 
-. Isolated + never reuse → Always create new workspace
-. Shared + always reuse → Find or create in pool
-. Check compatibility → Same concurrencyKey, git state, not locked
-. Lock for writes → Set `locked: true` during modifications
+. Isolated + never reuse -> Always create new workspace
+. Shared + always reuse -> Find or create in pool
+. Check compatibility -> Same concurrencyKey, git state, not locked
+. Lock for writes -> Set `locked: true` during modifications
 
 ---
 

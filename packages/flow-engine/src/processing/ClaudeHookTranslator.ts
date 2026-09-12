@@ -86,7 +86,7 @@ export class ClaudeHookTranslator {
 						// outer double-quoted node -e "..." shell command without escaping.
 						let condition = `i.toLowerCase().includes('${argsStr}')`;
 						if (toolPattern !== undefined) {
-							// AND the tool name check (glob → regex)
+							// AND the tool name check (glob -> regex)
 							const regexSource = globToRegexSource(toolPattern);
 							condition += `&&process.env.CLAUDE_TOOL_NAME&&/^${regexSource}$/.test(process.env.CLAUDE_TOOL_NAME)`;
 						}

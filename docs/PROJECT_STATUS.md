@@ -94,7 +94,7 @@ Orchestrator Integration (Phase )
 - FlowWorker (`src/workers/flow-worker.ts`) NEW
     - Executes flows via FlowExecutor
     - Integrates WorkspaceManager for workspace allocation
-    - Full lifecycle management (allocate → execute → release)
+    - Full lifecycle management (allocate -> execute -> release)
     - Automatic workspace cleanup on completion
 
 - Enhanced Task Type (`src/shared/types.ts`)

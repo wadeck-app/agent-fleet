@@ -1,11 +1,11 @@
 /**
- * FlowScheduler — sub-step strategy tests.
+ * FlowScheduler -- sub-step strategy tests.
  *
  * Covers:
- * 1. wait-all: single child fails → wait (not restart), second child fails → restart with both errors
- * 2. wait-all: one child fails, one child passes → restart with only the failed error
- * 3. wait-all: both children pass → normal deferred completion (no restart)
- * 4. restart-on-first-failure: first child fails → immediate restart (default strategy)
+ * 1. wait-all: single child fails -> wait (not restart), second child fails -> restart with both errors
+ * 2. wait-all: one child fails, one child passes -> restart with only the failed error
+ * 3. wait-all: both children pass -> normal deferred completion (no restart)
+ * 4. restart-on-first-failure: first child fails -> immediate restart (default strategy)
  * 5. Custom strategy injection via extraStrategies
  */
 import { describe, expect, it } from 'vitest';
@@ -30,7 +30,7 @@ function fail(scheduler: FlowScheduler, stepId: string, error = 'step-error'): R
 	return scheduler.complete(stepId, { type: 'failed', error });
 }
 
-// ─── wait-all strategy ────────────────────────────────────────────────────────
+// --- wait-all strategy --------------------------------------------------------
 
 describe('FlowScheduler — wait-all strategy', () => {
 	it('does not restart parent when first of two children fails (waits for the second)', () => {
@@ -50,7 +50,7 @@ describe('FlowScheduler — wait-all strategy', () => {
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
 
-		// child-a fails — child-b still pending → wait
+		// child-a fails -- child-b still pending -> wait
 		const ready = fail(scheduler, 'child-a', 'error-a');
 		expect(scheduler.hasFailed()).toBe(false);
 		expect(ready.some(r => r.stepId === 'parent')).toBe(false);
@@ -70,10 +70,10 @@ describe('FlowScheduler — wait-all strategy', () => {
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
 
-		// child-a fails → wait
+		// child-a fails -> wait
 		fail(scheduler, 'child-a', 'error-a');
 
-		// child-b fails → all children terminal → restart with both errors
+		// child-b fails -> all children terminal -> restart with both errors
 		const ready = fail(scheduler, 'child-b', 'error-b');
 		expect(scheduler.hasFailed()).toBe(false);
 		expect(ready.some(r => r.stepId === 'parent')).toBe(true);
@@ -96,10 +96,10 @@ describe('FlowScheduler — wait-all strategy', () => {
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
 
-		// child-a fails → wait (child-b still pending)
+		// child-a fails -> wait (child-b still pending)
 		fail(scheduler, 'child-a', 'only-this-error');
 
-		// child-b succeeds → all terminal, child-a failed → restart with only child-a error
+		// child-b succeeds -> all terminal, child-a failed -> restart with only child-a error
 		const ready = succeed(scheduler, 'child-b');
 		expect(scheduler.hasFailed()).toBe(false);
 		expect(ready.some(r => r.stepId === 'parent')).toBe(true);
@@ -124,7 +124,7 @@ describe('FlowScheduler — wait-all strategy', () => {
 		succeed(scheduler, 'child-a');
 		succeed(scheduler, 'child-b');
 
-		// Both passed → normal deferred completion fires → terminal
+		// Both passed -> normal deferred completion fires -> terminal
 		expect(scheduler.hasFailed()).toBe(false);
 		expect(scheduler.isTerminal()).toBe(true);
 		expect(scheduler.getSubStepErrors('parent')).toHaveLength(0);
@@ -132,13 +132,13 @@ describe('FlowScheduler — wait-all strategy', () => {
 
 	it('respects maxSubStepIterations when restarting via wait-all', () => {
 		const scheduler = new FlowScheduler(makeContext());
-		// maxSubStepIterations: 1 → fails after 1 restart attempt
+		// maxSubStepIterations: 1 -> fails after 1 restart attempt
 		scheduler.start(
 			[makeStep('parent', [], { subStepStrategy: 'wait-all', maxSubStepIterations: 1 })],
 			new Map([['parent', []]])
 		);
 
-		// First cycle: both children fail → restart (iterations = 1 <= 1)
+		// First cycle: both children fail -> restart (iterations = 1 <= 1)
 		scheduler.acknowledge('parent');
 		scheduler.inject([
 			makeStep('child-a0', [], { parent: 'parent' }),
@@ -152,7 +152,7 @@ describe('FlowScheduler — wait-all strategy', () => {
 		expect(scheduler.hasFailed()).toBe(false);
 		expect(ready1.some(r => r.stepId === 'parent')).toBe(true);
 
-		// Second cycle: both children fail → iterations = 2 > 1 → parent fails terminally
+		// Second cycle: both children fail -> iterations = 2 > 1 -> parent fails terminally
 		scheduler.acknowledge('parent');
 		scheduler.inject([
 			makeStep('child-a1', [], { parent: 'parent' }),
@@ -169,7 +169,7 @@ describe('FlowScheduler — wait-all strategy', () => {
 	});
 });
 
-// ─── restart-on-first-failure strategy ───────────────────────────────────────
+// --- restart-on-first-failure strategy ---------------------------------------
 
 describe('FlowScheduler — restart-on-first-failure strategy (default)', () => {
 	it('restarts parent immediately on first child failure', () => {
@@ -185,7 +185,7 @@ describe('FlowScheduler — restart-on-first-failure strategy (default)', () => 
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
 
-		// child-a fails → immediate restart, no waiting for child-b
+		// child-a fails -> immediate restart, no waiting for child-b
 		const ready = fail(scheduler, 'child-a', 'first-error');
 		expect(scheduler.hasFailed()).toBe(false);
 		expect(ready.some(r => r.stepId === 'parent')).toBe(true);
@@ -215,7 +215,7 @@ describe('FlowScheduler — restart-on-first-failure strategy (default)', () => 
 	});
 });
 
-// ─── Custom strategy injection ────────────────────────────────────────────────
+// --- Custom strategy injection ------------------------------------------------
 
 describe('FlowScheduler — custom strategy via extraStrategies', () => {
 	it('uses an injected custom strategy by name', () => {
@@ -243,7 +243,7 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 		scheduler.acknowledge('child-x');
 		fail(scheduler, 'child-x', 'child-error');
 
-		// Custom strategy returned fail-parent → parent should be failed terminally
+		// Custom strategy returned fail-parent -> parent should be failed terminally
 		expect(scheduler.hasFailed()).toBe(true);
 		expect(scheduler.isTerminal()).toBe(true);
 		expect(callLog).toContain('onChildFailure:child-x');
@@ -266,7 +266,7 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 		const overrideLog: string[] = [];
 
 		const override: SubStepStrategy = {
-			// Same name as built-in — should shadow it
+			// Same name as built-in -- should shadow it
 			name: 'restart-on-first-failure',
 			onChildFailure(ctx) {
 				overrideLog.push(ctx.failedChildId);
@@ -286,7 +286,7 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child-y');
 
-		// Override returns wait → no restart despite using default strategy name
+		// Override returns wait -> no restart despite using default strategy name
 		const ready = fail(scheduler, 'child-y', 'err');
 		expect(ready.some(r => r.stepId === 'parent')).toBe(false);
 		expect(overrideLog).toContain('child-y');

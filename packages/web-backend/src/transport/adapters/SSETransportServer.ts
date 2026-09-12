@@ -2,7 +2,7 @@
  * Server-Sent Events (SSE) Transport Server
  *
  * Server-side implementation for SSE transport with:
- * - Unidirectional real-time events (Server → Client)
+ * - Unidirectional real-time events (Server -> Client)
  * - Cookie-based authentication
  * - Automatic heartbeat to detect dead connections
  * - Message queue for events during disconnection

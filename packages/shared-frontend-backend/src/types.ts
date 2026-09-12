@@ -75,13 +75,13 @@ export const ALL_API_ROUTES = {
  * ROUTES BY BASE URL - For backend lazy loading
  * ===========================================================================================
  *
- * Automatically maps baseUrl → routes for each contract.
+ * Automatically maps baseUrl -> routes for each contract.
  * This allows the backend to retrieve routes without importing controllers.
  *
  * When multiple contracts have the same baseUrl, their routes are merged.
  *
  * Example:
- *   ROUTES_BY_BASE_URL['/api/books'] → BOOKS_API_ROUTES
+ *   ROUTES_BY_BASE_URL['/api/books'] -> BOOKS_API_ROUTES
  *
  * ===========================================================================================
  */

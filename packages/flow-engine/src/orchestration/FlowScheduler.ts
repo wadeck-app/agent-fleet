@@ -69,7 +69,7 @@ export class FlowScheduler {
 	private readonly steps = new Map<string, SchedulerStep>();
 	/** Original dep set per step -- used when rebuilding after loop invalidation */
 	private readonly originalDeps = new Map<string, Set<string>>();
-	/** stepId → set of stepIds that depend on it */
+	/** stepId -> set of stepIds that depend on it */
 	private readonly reverseDeps = new Map<string, Set<string>>();
 	/** Remaining unmet deps per step. Entry removed when step is dispatched (all deps met). */
 	private readonly pendingDeps = new Map<string, Set<string>>();
@@ -82,9 +82,9 @@ export class FlowScheduler {
 	private readonly outputs = new Map<string, Record<string, unknown>>();
 	private started = false;
 
-	/** parentId → set of child stepIds (current-run children only, reset when parent is re-queued) */
+	/** parentId -> set of child stepIds (current-run children only, reset when parent is re-queued) */
 	private readonly parentToChildren = new Map<string, Set<string>>();
-	/** childId → parentId */
+	/** childId -> parentId */
 	private readonly childToParent = new Map<string, string>();
 	/** Stores outcome for parent steps whose completion is deferred waiting for children to settle. */
 	private readonly deferredOutcomes = new Map<string, { type: 'completed'; outputs: Record<string, unknown> }>();
@@ -110,7 +110,7 @@ export class FlowScheduler {
 	/**
 	 * Static children declared at flow start (via start()). On parent restart these are
 	 * re-queued automatically so the sub-step validates the fresh parent output.
-	 * Dynamic children (injected via inject()) are NOT tracked here — callers re-inject
+	 * Dynamic children (injected via inject()) are NOT tracked here -- callers re-inject
 	 * them after each parent run as needed (e.g., MCP provideSteps pattern).
 	 */
 	private readonly staticChildren = new Map<string, Set<string>>();
@@ -132,7 +132,7 @@ export class FlowScheduler {
 
 	/**
 	 * Load all steps. Returns initially ready items.
-	 * Call sequence: start() → acknowledge(stepId) → dispatch → complete(stepId, outcome)
+	 * Call sequence: start() -> acknowledge(stepId) -> dispatch -> complete(stepId, outcome)
 	 */
 	start(steps: SchedulerStep[], depends: Map<string, string[]>): ReadyItem[] {
 		this.started = true;
@@ -195,7 +195,7 @@ export class FlowScheduler {
 			this.outputs.set(stepId, outcome.outputs);
 			this.context.stepOutputs.set(stepId, outcome.outputs);
 
-			// Check if this step has pending children — defer completion until they all settle
+			// Check if this step has pending children -- defer completion until they all settle
 			const children = this.parentToChildren.get(stepId);
 			if (children && children.size > 0) {
 				const hasPending = [...children].some(
@@ -310,7 +310,7 @@ export class FlowScheduler {
 			const maxIterations = parentStep?.maxSubStepIterations ?? 3;
 
 			if (iterations > maxIterations) {
-				// Budget exhausted — fail child and parent terminally
+				// Budget exhausted -- fail child and parent terminally
 				this.failedSteps.add(stepId);
 				this.deferredOutcomes.delete(parentId);
 				return this.complete(parentId, {
@@ -319,7 +319,7 @@ export class FlowScheduler {
 				});
 			}
 
-			// Mark child as superseded (not a terminal flow failure — parent will address it)
+			// Mark child as superseded (not a terminal flow failure -- parent will address it)
 			this.supersededSteps.add(stepId);
 
 			// Record errors so the parent's next execution can reference them via
@@ -331,7 +331,7 @@ export class FlowScheduler {
 			}
 			subStepErrors.set(parentId, accumulated);
 
-			// Remove the deferred outcome — parent will re-run
+			// Remove the deferred outcome -- parent will re-run
 			this.deferredOutcomes.delete(parentId);
 			this.subStepLoopIterations.set(parentId, iterations);
 			// Reset per-run failure tracking for the next parent run
@@ -355,7 +355,7 @@ export class FlowScheduler {
 			// output. Dynamic (inject()-based) children are re-injected by the caller.
 			this.requeueChildrenForParent(parentId);
 
-			// Clear parent's previous outputs — it must re-execute to produce new ones
+			// Clear parent's previous outputs -- it must re-execute to produce new ones
 			this.outputs.delete(parentId);
 			this.context.stepOutputs.delete(parentId);
 
@@ -365,7 +365,7 @@ export class FlowScheduler {
 			return this.collectReady();
 		}
 
-		// No parent re-run — mark step as failed terminally
+		// No parent re-run -- mark step as failed terminally
 		this.failedSteps.add(stepId);
 		return [];
 	}
@@ -435,7 +435,7 @@ export class FlowScheduler {
 	/**
 	 * Register a parent-child relationship.
 	 * Public so external callers (tests, CommandHandler) can register relationships explicitly.
-	 * Emits a warning to stderr if the parent is already completed — the sub-step is still registered
+	 * Emits a warning to stderr if the parent is already completed -- the sub-step is still registered
 	 * but will not re-defer the parent.
 	 */
 	registerParentChild(childId: string, parentId: string): void {
@@ -528,8 +528,8 @@ export class FlowScheduler {
 	 *              (available in both bare and ${{ }} forms)
 	 *
 	 * Dot-notation for hyphenated IDs is supported transparently:
-	 *   `outputs.get-status.field` → converted to `outputs['get-status'].field`
-	 *   `steps.get-status.outputs.field` → converted to `steps['get-status'].outputs.field`
+	 *   `outputs.get-status.field` -> converted to `outputs['get-status'].field`
+	 *   `steps.get-status.outputs.field` -> converted to `steps['get-status'].outputs.field`
 	 *
 	 * Both bare expressions and ${{ }} wrapper are supported.
 	 */
@@ -542,7 +542,7 @@ export class FlowScheduler {
 		}
 
 		// Convert dot-notation segments with hyphens to bracket notation
-		// e.g. steps.get-status.outputs.x → steps['get-status'].outputs.x
+		// e.g. steps.get-status.outputs.x -> steps['get-status'].outputs.x
 		condition = FlowScheduler.normalizeDotNotation(condition);
 
 		const depIds = Array.from(this.originalDeps.get(stepId) ?? []);
@@ -582,8 +582,8 @@ export class FlowScheduler {
 
 	/**
 	 * Convert dot-notation path segments that are not valid JS identifiers to bracket notation.
-	 * Handles `outputs.get-status.field` → `outputs['get-status'].field`
-	 * and `steps.get-status.outputs.field` → `steps['get-status'].outputs.field`
+	 * Handles `outputs.get-status.field` -> `outputs['get-status'].field`
+	 * and `steps.get-status.outputs.field` -> `steps['get-status'].outputs.field`
 	 */
 	private static normalizeDotNotation(condition: string): string {
 		// Match any dot-access segment that contains a hyphen or starts with a digit
@@ -703,7 +703,7 @@ export class FlowScheduler {
 	 * Re-queue static children (declared at start()) for the next run of a restarted parent.
 	 * Two-phase: first clear all static children from terminal sets, then rebuild their
 	 * pendingDeps (always waiting for the parent dep, plus any sibling deps that haven't
-	 * completed yet). Dynamic children (inject()-based) are not touched — callers
+	 * completed yet). Dynamic children (inject()-based) are not touched -- callers
 	 * re-inject them after each parent run as needed.
 	 */
 	private requeueChildrenForParent(parentId: string): void {

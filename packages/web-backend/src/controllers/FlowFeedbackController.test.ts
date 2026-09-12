@@ -87,7 +87,7 @@ describe('FlowFeedbackController', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// configureRoutes — route registration
+	// configureRoutes -- route registration
 	// -------------------------------------------------------------------------
 
 	describe('configureRoutes - route registration', () => {

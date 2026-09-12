@@ -20,7 +20,7 @@ interface WorkspaceProvider {
 CLI implementation (`DeclaredWorkspaceProvider`):
 
 - Reads `workspace` field from flow definition or `--workspace` flag
-- If flow declares `mode: isolated` or a git strategy → throws `UnsupportedOperationError`
+- If flow declares `mode: isolated` or a git strategy -> throws `UnsupportedOperationError`
 - Otherwise returns the declared path as-is
 
 The full `WorkspaceManager` implementation satisfies this interface for orchestrator/web contexts.

@@ -60,12 +60,12 @@ const log = createLogger('TicketsService');
  * - Type-safe event emission using EventBroadcaster
  *
  * B2F Event routing per operation (see B2FEventConstants.ts for full semantics):
- * - createTicket()  → B2F_TICKET_CREATED + B2F_TICKETS_UPDATED
- * - updateTicket()  → B2F_TICKET_UPDATED (always, filtered by ticketId for detail page)
+ * - createTicket()  -> B2F_TICKET_CREATED + B2F_TICKETS_UPDATED
+ * - updateTicket()  -> B2F_TICKET_UPDATED (always, filtered by ticketId for detail page)
  *                     B2F_TICKETS_UPDATED (only when title/status/labels changed)
  *                     B2F_TICKET_STATUS_CHANGED (additionally when status changes)
- * - deleteTicket()  → B2F_TICKET_DELETED + B2F_TICKETS_UPDATED
- * - reorderTicket() → B2F_TICKETS_UPDATED only (order not visible in detail page)
+ * - deleteTicket()  -> B2F_TICKET_DELETED + B2F_TICKETS_UPDATED
+ * - reorderTicket() -> B2F_TICKETS_UPDATED only (order not visible in detail page)
  *
  * ===========================================================================================
  */
@@ -628,9 +628,9 @@ export class TicketsService {
 	 * Creates ticket immediately with placeholder, generates real title in background.
 	 *
 	 * B2F WebSocket flow:
-	 * 1. createTicket() → B2F_TICKET_CREATED + B2F_TICKETS_UPDATED  (list shows placeholder)
+	 * 1. createTicket() -> B2F_TICKET_CREATED + B2F_TICKETS_UPDATED  (list shows placeholder)
 	 * 2. HTTP response returned to client immediately
-	 * 3. generateAndUpdateTitle() → B2F_TICKET_UPDATED + B2F_TICKETS_UPDATED  (list shows real title)
+	 * 3. generateAndUpdateTitle() -> B2F_TICKET_UPDATED + B2F_TICKETS_UPDATED  (list shows real title)
 	 *
 	 * Internal EventBus flow:
 	 * - 'ticket.created' is NOT emitted at step 1 (placeholder title is meaningless for consumers)

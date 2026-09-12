@@ -140,9 +140,9 @@ export function useCacheControl2(options?: UseCacheControl2Options): CacheContro
 	 * Only includes cacheId if enabled (via effectiveCacheId in fstate).
 	 *
 	 * ANTIFRAGILE PATTERN:
-	 * - If enabled=false: effectiveCacheId=undefined → fillQuery doesn't change when cacheId changes
-	 * - If enabled=true: effectiveCacheId=cacheId → fillQuery changes when cacheId changes
-	 * - If enabled changes: effectiveCacheId changes → fillQuery changes (correctly triggers refetch)
+	 * - If enabled=false: effectiveCacheId=undefined -> fillQuery doesn't change when cacheId changes
+	 * - If enabled=true: effectiveCacheId=cacheId -> fillQuery changes when cacheId changes
+	 * - If enabled changes: effectiveCacheId changes -> fillQuery changes (correctly triggers refetch)
 	 *
 	 * This prevents unnecessary refetches when feature is disabled but cacheId increments.
 	 *

@@ -18,7 +18,7 @@ import { useConfigureScriptsState } from './useConfigureScriptsState';
  * Features:
  * - Two-column layout: Configured (left) and Available (right) scripts
  * - Drag & drop to reorder configured scripts
- * - Arrow buttons (→ to remove, ← to add)
+ * - Arrow buttons (-> to remove, <- to add)
  * - Search functionality in available scripts
  * - Auto-save: changes persist immediately to the server
  * - Optimistic updates with rollback on error

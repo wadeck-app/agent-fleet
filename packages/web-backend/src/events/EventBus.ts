@@ -90,7 +90,7 @@ type EventListener<T extends InternalEventName> = (payload: InternalEventMap[T])
  * ===========================================================================================
  *
  * In-process typed event bus for server-side domain events.
- * Used to decouple services (e.g. TicketsService → integration worker dispatch).
+ * Used to decouple services (e.g. TicketsService -> integration worker dispatch).
  *
  * Unlike EventBroadcaster (which sends events to connected frontend clients),
  * EventBus handles internal backend-to-backend routing.

@@ -1,5 +1,5 @@
+import { join } from 'node:path';
 import { TraceChunkStorage } from 'orchestrator';
-import { join } from 'path';
 import { createLogger } from 'shared-common/logger';
 
 import type { ScriptLogEntry } from '@app/shared/api/workspaceScripts.contract';
@@ -16,10 +16,10 @@ const log = createLogger('ScriptLogsStorage');
  *
  * Storage structure:
  * ./data/workspace-scripts/{scriptId}/logs/
- * ├── metadata.json          - Total entries, chunks metadata
- * ├── chunk-0.json           - First 500 log entries
- * ├── chunk-1.json           - Next 500 log entries
- * └── ...
+ * |-- metadata.json          - Total entries, chunks metadata
+ * |-- chunk-0.json           - First 500 log entries
+ * |-- chunk-1.json           - Next 500 log entries
+ * \-- ...
  *
  * Features:
  * - Chunk-based storage (500 entries per chunk)

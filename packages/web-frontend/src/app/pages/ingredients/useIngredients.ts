@@ -86,8 +86,8 @@ export function useIngredients(params?: UseIngredientsParams): UseIngredientsRes
 	 * Load ingredients from the API with pagination/sorting support
 	 *
 	 * Note: useCallback is necessary here because this function is used in useEffect dependencies.
-	 * Without it, we get an infinite loop: useEffect runs → state updates → component re-renders
-	 * → new loadIngredients function created → useEffect sees dependency changed → runs again → loop.
+	 * Without it, we get an infinite loop: useEffect runs -> state updates -> component re-renders
+	 * -> new loadIngredients function created -> useEffect sees dependency changed -> runs again -> loop.
 	 *
 	 * React Compiler does NOT stabilize functions used in useEffect dependencies.
 	 */

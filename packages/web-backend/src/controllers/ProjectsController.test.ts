@@ -21,7 +21,7 @@ import ProjectsController from './ProjectsController';
  * ===========================================================================================
  *
  * Test Strategy:
- * - Mock ProjectsService (unit test — no Fastify instance)
+ * - Mock ProjectsService (unit test -- no Fastify instance)
  * - Capture route handlers via a mock `add` function
  * - Invoke handlers directly with synthetic request objects
  * - Assert delegation to service and correct response shape
@@ -153,7 +153,7 @@ describe('ProjectsController', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// GET /api/projects/ — without pagination → getProjectsData
+	// GET /api/projects/ -- without pagination -> getProjectsData
 	// -------------------------------------------------------------------------
 
 	describe('GET /api/projects/ — list projects', () => {
@@ -200,7 +200,7 @@ describe('ProjectsController', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// POST /api/projects/ — create
+	// POST /api/projects/ -- create
 	// -------------------------------------------------------------------------
 
 	describe('POST /api/projects/ — create project', () => {
@@ -218,7 +218,7 @@ describe('ProjectsController', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// DELETE /api/projects/ — bulk delete
+	// DELETE /api/projects/ -- bulk delete
 	// -------------------------------------------------------------------------
 
 	describe('DELETE /api/projects/ — bulk delete', () => {
@@ -242,7 +242,7 @@ describe('ProjectsController', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// GET /api/projects/:id — get one
+	// GET /api/projects/:id -- get one
 	// -------------------------------------------------------------------------
 
 	describe('GET /api/projects/:id — get project by ID', () => {
@@ -267,7 +267,7 @@ describe('ProjectsController', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// PATCH /api/projects/:id — update
+	// PATCH /api/projects/:id -- update
 	// -------------------------------------------------------------------------
 
 	describe('PATCH /api/projects/:id — update project', () => {
@@ -285,7 +285,7 @@ describe('ProjectsController', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// DELETE /api/projects/:id — single delete
+	// DELETE /api/projects/:id -- single delete
 	// -------------------------------------------------------------------------
 
 	describe('DELETE /api/projects/:id — delete project', () => {

@@ -50,9 +50,9 @@ export interface EventDispatchCriteria {
  * dispatch Tasks to the appropriate workers.
  *
  * Registration lifecycle:
- * 1. Worker connects → announces flows (including triggers)
+ * 1. Worker connects -> announces flows (including triggers)
  * 2. FlowDiscoveryRegistry calls `register()` for each triggered flow
- * 3. Worker disconnects → `unregisterWorker()` removes all subscriptions
+ * 3. Worker disconnects -> `unregisterWorker()` removes all subscriptions
  *
  * Dispatch lifecycle:
  * 1. TicketsService emits 'ticket.status.changed' to EventBus

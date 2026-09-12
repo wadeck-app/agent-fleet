@@ -8,7 +8,7 @@ import { PluginLoader } from './PluginLoader.js';
 
 // Resolve the real extension-points.json from the monorepo root
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-// From packages/flow-cli/src/config/ → packages/extension-points/extension-points.json (3 up)
+// From packages/flow-cli/src/config/ -> packages/extension-points/extension-points.json (3 up)
 const REGISTRY_PATH = resolve(__dirname, '..', '..', '..', 'extension-points', 'extension-points.json');
 
 const tmpBase = join(tmpdir(), `plugin-loader-test-${Date.now()}`);

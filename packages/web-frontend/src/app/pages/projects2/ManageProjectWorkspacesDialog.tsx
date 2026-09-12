@@ -15,7 +15,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
  * Dialog for managing workspaces associated with a project with drag & drop reordering.
  * Now uses OptimisticDualListDialog for all state management.
  *
- * Reduced from 339 lines → ~120 lines (65% reduction!)
+ * Reduced from 339 lines -> ~120 lines (65% reduction!)
  *
  * All optimistic update logic is handled by OptimisticDualListDialog:
  * - Optimistic associate/dissociate with immediate visual feedback

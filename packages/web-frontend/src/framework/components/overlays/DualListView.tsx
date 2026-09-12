@@ -38,7 +38,7 @@ const emptyListCls = 'flex items-center justify-center rounded border border-das
  * Benefits:
  * - 100% testable without mocks (pure UI)
  * - Reusable across different layouts (Dialog, Grid, Table)
- * - Easy to swap interaction patterns (DnD → arrows)
+ * - Easy to swap interaction patterns (DnD -> arrows)
  * - Clear visual testing (opacity, classes, rendering)
  *
  * Usage:

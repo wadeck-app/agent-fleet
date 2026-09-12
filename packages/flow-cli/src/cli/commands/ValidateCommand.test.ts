@@ -35,7 +35,7 @@ describe('ValidateCommand', () => {
 		try {
 			program.parse(['node', 'test', 'validate', ...args]);
 		} catch {
-			// process.exit throws — that is expected
+			// process.exit throws -- that is expected
 		}
 	};
 

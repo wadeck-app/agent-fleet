@@ -1,12 +1,12 @@
 /**
- * FlowScheduler — parent-blocking sub-step unit tests.
+ * FlowScheduler -- parent-blocking sub-step unit tests.
  *
  * Covers:
  * 1. Step with `parent` in initial steps defers parent completion until child settles
  * 2. Parent completes when child completes
  * 3. Child failure re-queues parent (not immediate fail) with error context, up to maxSubStepIterations
  * 4. After maxSubStepIterations, parent is failed terminally
- * 5. Inject with `parent` after parent already completed → warning to stderr + still registers
+ * 5. Inject with `parent` after parent already completed -> warning to stderr + still registers
  * 6. handleLoop on parent while child is pending clears deferral state correctly
  * 7. Multiple children: parent deferred until ALL children settle
  * 8. isTerminal() is false while parent is deferred
@@ -32,7 +32,7 @@ function fail(scheduler: FlowScheduler, stepId: string, error = 'step-error'): R
 	return scheduler.complete(stepId, { type: 'failed', error });
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------------------------
 
 /** Start a two-step flow: parent (no deps), child (parent: 'parent'). */
 function startParentChildFlow(scheduler: FlowScheduler): void {
@@ -45,7 +45,7 @@ function startParentChildFlow(scheduler: FlowScheduler): void {
 	scheduler.start(steps, depends);
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+// --- Tests --------------------------------------------------------------------
 
 describe('FlowScheduler — parent-blocking sub-steps', () => {
 	describe('initial start() with parent declared', () => {
@@ -57,7 +57,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 			scheduler.acknowledge('parent');
 			scheduler.acknowledge('child');
 
-			// Parent completes — child is still in-flight → deferred
+			// Parent completes -- child is still in-flight -> deferred
 			const ready = succeed(scheduler, 'parent');
 			expect(ready).toHaveLength(0);
 			expect(scheduler.isTerminal()).toBe(false);
@@ -73,7 +73,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 			succeed(scheduler, 'parent');
 			// Now child completes
 			const ready = succeed(scheduler, 'child');
-			// The child completion should trigger tryFireDeferredParent → parent completes
+			// The child completion should trigger tryFireDeferredParent -> parent completes
 			// collectReady() after parent completes returns [] (no remaining pending steps)
 			expect(scheduler.isTerminal()).toBe(true);
 			// ready items include results of parent's downstream propagation (none here)
@@ -100,7 +100,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 
 			scheduler.acknowledge('parent');
 
-			// Parent completes — no children yet → completes immediately
+			// Parent completes -- no children yet -> completes immediately
 			succeed(scheduler, 'parent');
 			expect(scheduler.isTerminal()).toBe(true);
 		});
@@ -116,12 +116,12 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 			// its parent, so it is only dispatchable once the parent reports its outcome.
 			scheduler.inject([makeStep('child1', [], { parent: 'parent' })]);
 
-			// Parent completes — child1 still pending → deferred, child1 released
+			// Parent completes -- child1 still pending -> deferred, child1 released
 			const ready = succeed(scheduler, 'parent');
 			expect(ready.some(r => r.stepId === 'child1')).toBe(true);
 			expect(scheduler.isTerminal()).toBe(false);
 
-			// Child completes → parent fires
+			// Child completes -> parent fires
 			scheduler.acknowledge('child1');
 			succeed(scheduler, 'child1');
 			expect(scheduler.isTerminal()).toBe(true);
@@ -175,7 +175,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 			expect(scheduler.isTerminal()).toBe(false);
 			scheduler.acknowledge('child1');
 
-			// Child fails → parent should be re-queued, not failed
+			// Child fails -> parent should be re-queued, not failed
 			const ready = fail(scheduler, 'child1', 'child error');
 			expect(scheduler.hasFailed()).toBe(false);
 			// Parent is re-queued: should appear in ready list
@@ -206,7 +206,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 
 			let iteration = 0;
 
-			// Run parent → inject child → child fails → parent re-runs, repeat 3 times
+			// Run parent -> inject child -> child fails -> parent re-runs, repeat 3 times
 			for (let i = 0; i < 3; i++) {
 				scheduler.acknowledge('parent');
 				scheduler.inject([makeStep(`child-run-${i}`, [], { parent: 'parent' })]);
@@ -225,7 +225,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 			const steps: SchedulerStep[] = [makeStep('parent')];
 			scheduler.start(steps, new Map([['parent', []]]));
 
-			// Run 3 re-run cycles (iterations 1, 2, 3) — all re-queued
+			// Run 3 re-run cycles (iterations 1, 2, 3) -- all re-queued
 			for (let i = 0; i < 3; i++) {
 				scheduler.acknowledge('parent');
 				scheduler.inject([makeStep(`child-${i}`, [], { parent: 'parent' })]);
@@ -236,7 +236,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 				expect(ready.some(r => r.stepId === 'parent')).toBe(true);
 			}
 
-			// 4th child failure (iteration 4 > maxIterations 3) → parent fails terminally
+			// 4th child failure (iteration 4 > maxIterations 3) -> parent fails terminally
 			scheduler.acknowledge('parent');
 			scheduler.inject([makeStep('child-final', [], { parent: 'parent' })]);
 			succeed(scheduler, 'parent');
@@ -249,11 +249,11 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 
 		it('respects custom maxSubStepIterations on the parent step', () => {
 			const scheduler = new FlowScheduler(makeContext());
-			// maxSubStepIterations: 1 → fails after just 1 re-run attempt
+			// maxSubStepIterations: 1 -> fails after just 1 re-run attempt
 			const steps: SchedulerStep[] = [makeStep('parent', [], { maxSubStepIterations: 1 })];
 			scheduler.start(steps, new Map([['parent', []]]));
 
-			// First child failure: iteration 1, maxIterations 1 → re-queued (1 <= 1)
+			// First child failure: iteration 1, maxIterations 1 -> re-queued (1 <= 1)
 			scheduler.acknowledge('parent');
 			scheduler.inject([makeStep('child-a', [], { parent: 'parent' })]);
 			succeed(scheduler, 'parent');
@@ -262,7 +262,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 			expect(scheduler.hasFailed()).toBe(false);
 			expect(ready1.some(r => r.stepId === 'parent')).toBe(true);
 
-			// Second child failure: iteration 2, 2 > 1 → parent fails terminally
+			// Second child failure: iteration 2, 2 > 1 -> parent fails terminally
 			scheduler.acknowledge('parent');
 			scheduler.inject([makeStep('child-b', [], { parent: 'parent' })]);
 			succeed(scheduler, 'parent');
@@ -293,11 +293,11 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 			scheduler.acknowledge('child-a');
 			scheduler.acknowledge('child-b');
 
-			// child-a completes — child-b still pending
+			// child-a completes -- child-b still pending
 			succeed(scheduler, 'child-a');
 			expect(scheduler.isTerminal()).toBe(false);
 
-			// child-b completes — all children done → parent fires
+			// child-b completes -- all children done -> parent fires
 			succeed(scheduler, 'child-b');
 			expect(scheduler.isTerminal()).toBe(true);
 		});
@@ -327,14 +327,14 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 			scheduler.inject([makeStep('child1', [], { parent: 'parent' })]);
 			succeed(scheduler, 'parent'); // parent deferred, child1 released
 
-			// Now check also starts (depends on parent, which is deferred — but parent deps are propagated)
+			// Now check also starts (depends on parent, which is deferred -- but parent deps are propagated)
 			// Actually, parent is NOT in completedSteps yet (deferred), so check waits for parent.
 			// Let's complete child1 to fire parent, then proceed to check
 			scheduler.acknowledge('child1');
 			succeed(scheduler, 'child1'); // fires parent
 
 			scheduler.acknowledge('check');
-			// check fails → loop → invalidates setup, parent, check
+			// check fails -> loop -> invalidates setup, parent, check
 			fail(scheduler, 'check', 'check error');
 
 			// Loop should have cleared deferredOutcomes for parent
@@ -344,7 +344,7 @@ describe('FlowScheduler — parent-blocking sub-steps', () => {
 	});
 });
 
-// ─── Static child re-queue on parent restart ──────────────────────────────────
+// --- Static child re-queue on parent restart ----------------------------------
 
 describe('FlowScheduler — static child re-queue on parent restart', () => {
 	it('re-queues a static child after the parent is restarted due to child failure', () => {
@@ -362,10 +362,10 @@ describe('FlowScheduler — static child re-queue on parent restart', () => {
 		// Run 1: parent dispatched, completes (deferred since child is pending)
 		scheduler.acknowledge('parent');
 		const afterParent1 = succeed(scheduler, 'parent');
-		// child's dep on parent is released → child becomes ready
+		// child's dep on parent is released -> child becomes ready
 		expect(afterParent1.some(r => r.stepId === 'child')).toBe(true);
 
-		// Child fails → restart-on-first-failure → parent re-queued, child re-queued
+		// Child fails -> restart-on-first-failure -> parent re-queued, child re-queued
 		scheduler.acknowledge('child');
 		const afterChildFail = fail(scheduler, 'child', 'validation error');
 		expect(scheduler.hasFailed()).toBe(false);
@@ -376,7 +376,7 @@ describe('FlowScheduler — static child re-queue on parent restart', () => {
 		const afterParent2 = succeed(scheduler, 'parent');
 		expect(afterParent2.some(r => r.stepId === 'child')).toBe(true);
 
-		// Child succeeds on second run → tryFireDeferredParent → flow completes
+		// Child succeeds on second run -> tryFireDeferredParent -> flow completes
 		scheduler.acknowledge('child');
 		succeed(scheduler, 'child');
 		expect(scheduler.isTerminal()).toBe(true);
@@ -399,24 +399,24 @@ describe('FlowScheduler — static child re-queue on parent restart', () => {
 		]);
 		scheduler.start(steps, depends);
 
-		// Run 1: parent → (write becomes ready, check still waits on write)
+		// Run 1: parent -> (write becomes ready, check still waits on write)
 		scheduler.acknowledge('parent');
 		const r1 = succeed(scheduler, 'parent');
 		expect(r1.some(ri => ri.stepId === 'write')).toBe(true);
 		expect(r1.some(ri => ri.stepId === 'check')).toBe(false);
 
-		// write completes → check becomes ready
+		// write completes -> check becomes ready
 		scheduler.acknowledge('write');
 		const r2 = succeed(scheduler, 'write');
 		expect(r2.some(ri => ri.stepId === 'check')).toBe(true);
 
-		// check fails → restart (restart-on-first-failure)
+		// check fails -> restart (restart-on-first-failure)
 		scheduler.acknowledge('check');
 		const afterCheckFail = fail(scheduler, 'check', 'taskid-error');
 		expect(scheduler.hasFailed()).toBe(false);
 		expect(afterCheckFail.some(ri => ri.stepId === 'parent')).toBe(true);
 
-		// Run 2: parent re-runs → write re-queued → check re-queued (both static)
+		// Run 2: parent re-runs -> write re-queued -> check re-queued (both static)
 		scheduler.acknowledge('parent');
 		const r3 = succeed(scheduler, 'parent');
 		expect(r3.some(ri => ri.stepId === 'write')).toBe(true);
@@ -445,7 +445,7 @@ describe('FlowScheduler — static child re-queue on parent restart', () => {
 		]);
 		scheduler.start(steps, depends);
 
-		// Run 1: child fails → iterations=1, maxIterations=1 → still re-queued (1 <= 1)
+		// Run 1: child fails -> iterations=1, maxIterations=1 -> still re-queued (1 <= 1)
 		scheduler.acknowledge('parent');
 		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child');
@@ -453,7 +453,7 @@ describe('FlowScheduler — static child re-queue on parent restart', () => {
 		expect(scheduler.hasFailed()).toBe(false);
 		expect(r1.some(ri => ri.stepId === 'parent')).toBe(true);
 
-		// Run 2: child fails again → iterations=2 > maxIterations=1 → terminal failure
+		// Run 2: child fails again -> iterations=2 > maxIterations=1 -> terminal failure
 		scheduler.acknowledge('parent');
 		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child');

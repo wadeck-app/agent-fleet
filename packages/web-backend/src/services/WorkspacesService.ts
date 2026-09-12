@@ -332,7 +332,7 @@ export class WorkspacesService {
 				gitBranch,
 			});
 
-			// Map to API format (newly created → no worker connected yet → idle)
+			// Map to API format (newly created -> no worker connected yet -> idle)
 			// gitBranch is stored in entity so WorkspaceMapper uses entity.gitBranch as fallback
 			const workspace = WorkspaceMapper.mapEntityToApi(entity);
 
@@ -451,7 +451,7 @@ export class WorkspacesService {
 	/**
 	 * Resolve git branches for entities that have no stored gitBranch and no connected worker.
 	 * Reads the filesystem synchronously (awaited) so the current response can include the branch.
-	 * Returns a map of entity ID → resolved branch name.
+	 * Returns a map of entity ID -> resolved branch name.
 	 */
 	private async resolveLazyGitBranches(
 		entities: WorkspaceMetadataEntity[],
@@ -480,8 +480,8 @@ export class WorkspacesService {
 
 	/**
 	 * Fire-and-forget: persist gitBranch changes to the metadata store.
-	 * - Worker gitBranch differs from entity → update
-	 * - Lazy-resolved branch → persist for future responses
+	 * - Worker gitBranch differs from entity -> update
+	 * - Lazy-resolved branch -> persist for future responses
 	 */
 	private refreshGitBranchesAsync(
 		entities: WorkspaceMetadataEntity[],

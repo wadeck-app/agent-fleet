@@ -4,9 +4,9 @@
  * Centralized management of connection IDs (connId) for multi-tab support.
  *
  * Why window.name instead of sessionStorage?
- * - sessionStorage is COPIED when duplicating tabs → same connId → bug!
- * - window.name is NOT copied when duplicating tabs → unique connId
- * - window.name persists across page refresh → same connId after F5
+ * - sessionStorage is COPIED when duplicating tabs -> same connId -> bug!
+ * - window.name is NOT copied when duplicating tabs -> unique connId
+ * - window.name persists across page refresh -> same connId after F5
  *
  * Architecture:
  * - Single source of truth for connId management

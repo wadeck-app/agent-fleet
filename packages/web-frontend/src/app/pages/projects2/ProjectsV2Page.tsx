@@ -49,7 +49,7 @@ import { WorkspaceTabs } from './WorkspaceTabs';
  * - Uses useProjectsV2State hook for active state persistence
  * - Pure composition - minimal logic in page
  *
- * Grade: B- → A (after refactoring)
+ * Grade: B- -> A (after refactoring)
  *
  * ===========================================================================================
  */
@@ -98,7 +98,7 @@ export function ProjectsV2Page() {
 	// Track previous projectId to detect changes
 	const prevProjectId = useRef<string | null>(null);
 
-	// One-time auto-selection on mount and when projectId changes (URL → State, not bidirectional)
+	// One-time auto-selection on mount and when projectId changes (URL -> State, not bidirectional)
 	useEffect(() => {
 		// Reset hasAutoSelected when projectId changes
 		if (prevProjectId.current !== projectId) {
@@ -158,7 +158,7 @@ export function ProjectsV2Page() {
 		logPrefix: 'ProjectsV2Page',
 	});
 
-	// Handlers - explicit URL updates (User Action → URL)
+	// Handlers - explicit URL updates (User Action -> URL)
 	const handleProjectSelect = async (newProjectId: string) => {
 		const project = projects.find(p => p.id === newProjectId);
 		if (!project) return;

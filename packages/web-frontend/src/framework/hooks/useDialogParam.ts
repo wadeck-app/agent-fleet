@@ -6,7 +6,7 @@ import { useUrlState } from './useUrlState';
  * Thin wrapper around useUrlState for dialog open/close state synced with URL.
  *
  * Only one dialog can be open at a time (correct for modals).
- * URL result: ?dialog=create-workspace → dialog opens. On refresh, param persists → dialog re-opens.
+ * URL result: ?dialog=create-workspace -> dialog opens. On refresh, param persists -> dialog re-opens.
  *
  * @param dialogName - Unique identifier for this dialog (e.g., 'create-workspace')
  */

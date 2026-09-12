@@ -32,7 +32,7 @@ function extractAfterBody(js: string): string {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function runHandlerBody(body: string, input: Record<string, unknown>, output: Record<string, unknown>): void {
-	// new Function creates a function in the global scope — safe for unit test evaluation
+	// new Function creates a function in the global scope -- safe for unit test evaluation
 	// eslint-disable-next-line no-new-func
 	const fn = new Function('input', 'output', body);
 	fn(input, output);
@@ -163,15 +163,15 @@ describe('OpenCodeHookTranslator', () => {
 		const js = OpenCodeHookTranslator.toPluginJs(hooks);
 		const beforeBody = extractBeforeBody(js);
 
-		// Static content check — no tool equality check, only args check
+		// Static content check -- no tool equality check, only args check
 		expect(beforeBody).toContain('JSON.stringify(output.args ?? {}).toLowerCase().includes("regedit")');
 		expect(beforeBody).not.toContain('input.tool ===');
 
-		// Behavioral: args contain the string → denied
+		// Behavioral: args contain the string -> denied
 		expect(() => runHandlerBody(beforeBody, {}, { args: { command: 'regedit /v key' } })).toThrow(
 			'Tool denied: regedit forbidden'
 		);
-		// Behavioral: args do not contain the string → allowed
+		// Behavioral: args do not contain the string -> allowed
 		expect(() => runHandlerBody(beforeBody, {}, { args: { command: 'ls -la' } })).not.toThrow();
 	});
 
@@ -202,13 +202,13 @@ describe('OpenCodeHookTranslator', () => {
 		expect(beforeBody).toContain('JSON.stringify(output.args ?? {}).toLowerCase().includes("regedit")');
 		expect(beforeBody).toContain('input.tool === "Bash"');
 
-		// Behavioral: tool matches AND args contain → denied
+		// Behavioral: tool matches AND args contain -> denied
 		expect(() => runHandlerBody(beforeBody, { tool: 'Bash' }, { args: { command: 'regedit /v key' } })).toThrow(
 			'Tool denied: regedit via bash only'
 		);
-		// Behavioral: tool matches but args do NOT contain → allowed
+		// Behavioral: tool matches but args do NOT contain -> allowed
 		expect(() => runHandlerBody(beforeBody, { tool: 'Bash' }, { args: { command: 'ls -la' } })).not.toThrow();
-		// Behavioral: args contain but tool does NOT match → allowed
+		// Behavioral: args contain but tool does NOT match -> allowed
 		expect(() =>
 			runHandlerBody(beforeBody, { tool: 'Write' }, { args: { command: 'regedit /v key' } })
 		).not.toThrow();

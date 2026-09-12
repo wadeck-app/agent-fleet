@@ -57,13 +57,13 @@ describe('AutoDiscovery leak regression', () => {
 			],
 		});
 
-		// Validate flow A first — should auto-discover extra_param and other_param
+		// Validate flow A first -- should auto-discover extra_param and other_param
 		validator.validate(flowA);
 		expect(flowA._autoDiscoveredInputs).toBeDefined();
 		expect(Object.keys(flowA._autoDiscoveredInputs!)).toContain('extra_param');
 		expect(Object.keys(flowA._autoDiscoveredInputs!)).toContain('other_param');
 
-		// Validate flow B — should NOT contain extra_param or other_param
+		// Validate flow B -- should NOT contain extra_param or other_param
 		validator.validate(flowB);
 		expect(flowB._autoDiscoveredInputs).toBeDefined();
 		const flowBInputNames = Object.keys(flowB._autoDiscoveredInputs!);

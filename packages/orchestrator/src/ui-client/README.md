@@ -1,6 +1,6 @@
 # UI Client Module
 
-This module contains the protocol definition and infrastructure for Web UI ↔ Orchestrator communication.
+This module contains the protocol definition and infrastructure for Web UI <-> Orchestrator communication.
 
 ## Purpose
 
@@ -10,7 +10,7 @@ Provide a **completely separate protocol** from the worker protocol, with strong
 
 ### `types.ts`
 
-Protocol definition for UI ↔ Orchestrator WebSocket communication.
+Protocol definition for UI <-> Orchestrator WebSocket communication.
 
 **Key exports:**
 

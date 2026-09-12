@@ -60,9 +60,9 @@ export function defineRoutes<const T extends ApiRoutes>(routes: T): T & { __base
 
 	// Strategy: find the longest common prefix of all routes by comparing path segments
 	// This handles cases like:
-	// - ['/api/auth/login', '/api/auth/refresh'] → '/api/auth'
-	// - ['/api/books/', '/api/books/:id'] → '/api/books'
-	// - ['/api/ingredients/', '/api/ingredients/:id'] → '/api/ingredients'
+	// - ['/api/auth/login', '/api/auth/refresh'] -> '/api/auth'
+	// - ['/api/books/', '/api/books/:id'] -> '/api/books'
+	// - ['/api/ingredients/', '/api/ingredients/:id'] -> '/api/ingredients'
 
 	// Normalize paths: remove params and trailing slashes
 	const normalizedPaths = paths.map(p => p.replace(/\/:[^/]+.*$/, '').replace(/\/$/, ''));

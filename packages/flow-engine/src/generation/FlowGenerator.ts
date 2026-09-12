@@ -277,7 +277,7 @@ export class FlowGenerator {
 	}
 
 	/**
-	 * Generate linear pipeline steps (A → B → C)
+	 * Generate linear pipeline steps (A -> B -> C)
 	 */
 	private generateLinearPipelineSteps(requirements: IdeaRequirements, constraints?: FlowConstraints): FlowStep[] {
 		const steps: FlowStep[] = [];
@@ -325,7 +325,7 @@ export class FlowGenerator {
 	}
 
 	/**
-	 * Generate build pipeline steps (checkout → build → test → deploy)
+	 * Generate build pipeline steps (checkout -> build -> test -> deploy)
 	 */
 	private generateBuildPipelineSteps(_requirements: IdeaRequirements, _constraints?: FlowConstraints): FlowStep[] {
 		const steps: FlowStep[] = [];
@@ -382,7 +382,7 @@ export class FlowGenerator {
 	}
 
 	/**
-	 * Generate ETL pipeline steps (Extract → Transform → Load)
+	 * Generate ETL pipeline steps (Extract -> Transform -> Load)
 	 */
 	private generateETLPipelineSteps(requirements: IdeaRequirements, constraints?: FlowConstraints): FlowStep[] {
 		const steps: FlowStep[] = [];
@@ -427,7 +427,7 @@ export class FlowGenerator {
 	}
 
 	/**
-	 * Generate diamond pattern steps (A → {B,C} → D)
+	 * Generate diamond pattern steps (A -> {B,C} -> D)
 	 */
 	private generateDiamondSteps(requirements: IdeaRequirements, constraints?: FlowConstraints): FlowStep[] {
 		const steps: FlowStep[] = [];
@@ -488,7 +488,7 @@ export class FlowGenerator {
 	}
 
 	/**
-	 * Generate retry loop steps (A → B → fail → A)
+	 * Generate retry loop steps (A -> B -> fail -> A)
 	 */
 	private generateRetryLoopSteps(requirements: IdeaRequirements, constraints?: FlowConstraints): FlowStep[] {
 		const steps: FlowStep[] = [];
@@ -528,7 +528,7 @@ export class FlowGenerator {
 	}
 
 	/**
-	 * Generate conditional steps (A → B if X, C if Y)
+	 * Generate conditional steps (A -> B if X, C if Y)
 	 */
 	private generateConditionalSteps(requirements: IdeaRequirements, constraints?: FlowConstraints): FlowStep[] {
 		const steps: FlowStep[] = [];

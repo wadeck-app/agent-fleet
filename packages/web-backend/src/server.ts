@@ -40,8 +40,8 @@ const log = createLogger('BackendServer');
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load env files in order: root .env → root .env.local (workspace overrides) → backend/.env
-// __dirname = packages/web-backend/src → ../../../ = project root
+// Load env files in order: root .env -> root .env.local (workspace overrides) -> backend/.env
+// __dirname = packages/web-backend/src -> ../../../ = project root
 const rootEnvPath = path.join(__dirname, '../../../.env');
 dotenv.config({ path: rootEnvPath });
 const rootEnvLocalPath = path.join(__dirname, '../../../.env.local');
@@ -242,7 +242,7 @@ if (process.env.DISABLE_AUTH_DEV === 'true') {
  * ===========================================================================================
  *
  * Architecture:
- * - Controllers (HTTP layer) → Services (business logic) → Repositories (data access) → Storage
+ * - Controllers (HTTP layer) -> Services (business logic) -> Repositories (data access) -> Storage
  *
  * Benefits:
  *  Separation of concerns (controller / service / repository / storage)
@@ -261,10 +261,10 @@ if (process.env.DISABLE_AUTH_DEV === 'true') {
 // Note: Fastify instance is created inside start() function to allow retry on EADDRINUSE
 
 // Calculate ports from PROJECT_ID for parallel development between projects
-// PROJECT_ID=0 → Backend:3000 | PROJECT_ID=1 → Backend:3100 | PROJECT_ID=3,WORKSPACE_ID=1 → Backend:3310
+// PROJECT_ID=0 -> Backend:3000 | PROJECT_ID=1 -> Backend:3100 | PROJECT_ID=3,WORKSPACE_ID=1 -> Backend:3310
 const projectId = parseInt(process.env.PROJECT_ID || '0', 10);
 // Calculate PORT from WORKSPACE_ID for parallel development
-// WORKSPACE_ID=0 → 3000, WORKSPACE_ID=1 → 3010, WORKSPACE_ID=2 → 3020, etc.
+// WORKSPACE_ID=0 -> 3000, WORKSPACE_ID=1 -> 3010, WORKSPACE_ID=2 -> 3020, etc.
 const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
 const calculatedPort = 3000 + projectId * 100 + workspaceId * 10;
 const PORT = parseInt(process.env.PORT || calculatedPort.toString(), 10);
@@ -317,7 +317,7 @@ function getNetworkAddresses(): string[] {
 // // Health check route
 // fastify.get('/health', async () => ({
 // 	status: 'ok',
-// 	architecture: 'layered (controller → service → repository → storage)',
+// 	architecture: 'layered (controller -> service -> repository -> storage)',
 // 	storage: 'in-memory',
 // 	timestamp: new Date().toISOString(),
 // }));
@@ -649,7 +649,7 @@ async function start(): Promise<void> {
 				prefix: '/',
 			});
 
-			// SPA fallback: all non-API routes → index.html
+			// SPA fallback: all non-API routes -> index.html
 			// This ensures React Router handles client-side routing
 			fastify.setNotFoundHandler((request, reply) => {
 				// If request is for API route, return 404 JSON

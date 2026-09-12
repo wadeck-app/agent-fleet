@@ -55,7 +55,7 @@ export class WorkspaceMapper {
 
 	/**
 	 * Extract workspace name from path
-	 * Example: /home/user/projects/my-app → my-app
+	 * Example: /home/user/projects/my-app -> my-app
 	 */
 	static extractWorkspaceName(workspacePath: string): string {
 		return workspacePath.split(/[/\\]/).filter(Boolean).pop() || 'Workspace';

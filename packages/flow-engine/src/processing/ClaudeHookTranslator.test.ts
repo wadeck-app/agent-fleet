@@ -105,7 +105,7 @@ describe('ClaudeHookTranslator', () => {
 
 		expect(settings.hooks.PreToolUse).toBeDefined();
 		const entry = settings.hooks.PreToolUse![0];
-		// toolPattern becomes the Claude matcher — Claude handles tool filtering
+		// toolPattern becomes the Claude matcher -- Claude handles tool filtering
 		expect(entry.matcher).toBe('rm');
 		expect(entry.hooks[0].command).toContain('process.exit(2)');
 		expect(entry.hooks[0].command).toContain('Tool denied: no rm');
@@ -188,12 +188,12 @@ describe('ClaudeHookTranslator', () => {
 
 		expect(settings.hooks.PreToolUse).toBeDefined();
 		const entry = settings.hooks.PreToolUse![0];
-		// matcher must be '*' — Claude fires the command for every tool
+		// matcher must be '*' -- Claude fires the command for every tool
 		expect(entry.matcher).toBe('*');
 		const command = entry.hooks[0].command;
 		// Command must check CLAUDE_TOOL_INPUT (not just exit 2 unconditionally)
 		expect(command).toContain('CLAUDE_TOOL_INPUT');
-		// Single quotes used inside the double-quoted node -e "..." command — no escaping needed
+		// Single quotes used inside the double-quoted node -e "..." command -- no escaping needed
 		expect(command).toContain("'regedit'");
 		expect(command).toContain('process.exit(2)');
 		expect(command).toContain('Tool denied: regedit forbidden');
@@ -207,12 +207,12 @@ describe('ClaudeHookTranslator', () => {
 		const command = settings.hooks.PreToolUse![0].hooks[0].command;
 		const expression = extractNodeExpression(command);
 
-		// Args contain 'regedit' → should exit 2
+		// Args contain 'regedit' -> should exit 2
 		const blocked = runNodeExpression(expression, { CLAUDE_TOOL_INPUT: '{"command":"regedit /v key"}' });
 		expect(blocked.status).toBe(2);
 		expect(blocked.stderr).toContain('Tool denied: regedit forbidden');
 
-		// Args do NOT contain 'regedit' → should exit 0
+		// Args do NOT contain 'regedit' -> should exit 0
 		const allowed = runNodeExpression(expression, { CLAUDE_TOOL_INPUT: '{"command":"ls -la"}' });
 		expect(allowed.status).toBe(0);
 	});
@@ -262,21 +262,21 @@ describe('ClaudeHookTranslator', () => {
 		const command = settings.hooks.PreToolUse![0].hooks[0].command;
 		const expression = extractNodeExpression(command);
 
-		// Both match → denied
+		// Both match -> denied
 		const bothMatch = runNodeExpression(expression, {
 			CLAUDE_TOOL_INPUT: '{"command":"regedit /v key"}',
 			CLAUDE_TOOL_NAME: 'Bash',
 		});
 		expect(bothMatch.status).toBe(2);
 
-		// Args match but wrong tool → allowed
+		// Args match but wrong tool -> allowed
 		const wrongTool = runNodeExpression(expression, {
 			CLAUDE_TOOL_INPUT: '{"command":"regedit /v key"}',
 			CLAUDE_TOOL_NAME: 'Write',
 		});
 		expect(wrongTool.status).toBe(0);
 
-		// Right tool but args don't match → allowed
+		// Right tool but args don't match -> allowed
 		const noArgs = runNodeExpression(expression, {
 			CLAUDE_TOOL_INPUT: '{"command":"ls -la"}',
 			CLAUDE_TOOL_NAME: 'Bash',

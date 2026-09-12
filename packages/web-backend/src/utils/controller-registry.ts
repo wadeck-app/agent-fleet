@@ -17,7 +17,7 @@
  */
 
 /**
- * Global registry: baseUrl → initialization function
+ * Global registry: baseUrl -> initialization function
  *
  * Example:
  *   CONTROLLER_REGISTRY.set('/api/books', async () => { ... initialize books controller ... });

@@ -32,7 +32,7 @@ import { adaptCol } from '../_framework/adaptCol';
  * Modes:
  * - Dialog: Standard modal dialog via ProductDialogAdapter
  * - Inline Actions: Edit/Delete buttons per row (opens dialog)
- * - Form Below: Row click → ProductForm appears below table
+ * - Form Below: Row click -> ProductForm appears below table
  *
  * Architecture:
  * - Data2 + Table2 with search and pagination hooks

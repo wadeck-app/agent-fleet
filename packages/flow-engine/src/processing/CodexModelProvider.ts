@@ -84,7 +84,7 @@ function buildSpawnParams(
 	pluginPath?: string
 ): SpawnParams {
 	const command = commandParts[0]!;
-	// commandParts[1..] are prefix args (e.g. ['node', '/path/mock.mjs'] → command='node', prefix=['mock.mjs'])
+	// commandParts[1..] are prefix args (e.g. ['node', '/path/mock.mjs'] -> command='node', prefix=['mock.mjs'])
 	const args: string[] = [...commandParts.slice(1), 'exec'];
 
 	// Codex exec requires the prompt as a positional arg

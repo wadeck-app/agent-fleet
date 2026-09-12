@@ -927,7 +927,7 @@ describe('StepRunner', () => {
 
 			const trace = await runner.executeStep(step, testWorkspace, context);
 
-			// ScriptExecutor called exactly once — FlowScheduler handles retries, not StepRunner
+			// ScriptExecutor called exactly once -- FlowScheduler handles retries, not StepRunner
 			expect(ScriptExecutor.prototype.execute).toHaveBeenCalledTimes(1);
 			expect(trace.error).toBeDefined();
 			expect(trace.exitCode).toBe(1);
@@ -1142,7 +1142,7 @@ describe('StepRunner', () => {
 			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
 			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
 
-			// Background mode mock — stream-json provides session_id and cost via onStreamEvent
+			// Background mode mock -- stream-json provides session_id and cost via onStreamEvent
 			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async opts => {
 				// Simulate stream events: system:init with session_id and result with cost
 				if (opts.onStreamEvent) {
@@ -1212,7 +1212,7 @@ describe('StepRunner', () => {
 
 			const meta = trace.meta as any;
 			expect(meta.session_id).toBe('sess-xyz');
-			// session_file should be derived from memory_paths.auto: strip /memory/ → add /conversations/<id>.jsonl
+			// session_file should be derived from memory_paths.auto: strip /memory/ -> add /conversations/<id>.jsonl
 			expect(meta.session_file).toMatch(/sess-xyz\.jsonl$/);
 			expect(meta.session_file).toContain('my-project');
 		});

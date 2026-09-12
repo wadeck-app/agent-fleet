@@ -398,7 +398,7 @@ custom-flow:
 							id: 'step1',
 							name: 'Step 1',
 							prompt: 'Test',
-							// Missing required 'type' field — parseFlowDefinition throws
+							// Missing required 'type' field -- parseFlowDefinition throws
 						},
 					],
 				},
@@ -786,7 +786,7 @@ custom-flow:
 				},
 			});
 
-			// Empty steps is a validation error — flow is loaded but marked invalid.
+			// Empty steps is a validation error -- flow is loaded but marked invalid.
 			await registry.loadProjectFlows();
 			expect(registry.getFlow('empty-steps')).toBeDefined();
 			expect(registry.getFlowValidationResult('empty-steps')?.valid).toBe(false);
@@ -1163,7 +1163,7 @@ custom-flow:
 				throw new Error('Unexpected yaml.load call');
 			});
 
-			// parseFlowDefinition throws when external file lacks the flow ID —
+			// parseFlowDefinition throws when external file lacks the flow ID --
 			// the error is logged but not rethrown; the flow is simply not loaded.
 			await registry.loadProjectFlows();
 			expect(registry.getFlow('custom-flow')).toBeUndefined();
@@ -1410,7 +1410,7 @@ custom-flow:
 				},
 			});
 
-			// parseFlowDefinition throws on missing version — logged, not rethrown; flow not loaded.
+			// parseFlowDefinition throws on missing version -- logged, not rethrown; flow not loaded.
 			await registry.loadProjectFlows();
 			expect(registry.getFlow('no-version')).toBeUndefined();
 		});
@@ -1445,7 +1445,7 @@ custom-flow:
 				},
 			});
 
-			// parseFlowDefinition throws on invalid semver — logged, not rethrown; flow not loaded.
+			// parseFlowDefinition throws on invalid semver -- logged, not rethrown; flow not loaded.
 			await registry.loadProjectFlows();
 			expect(registry.getFlow('invalid-version')).toBeUndefined();
 		});
@@ -1545,7 +1545,7 @@ custom-flow:
 				},
 			});
 
-			// parseFlowDefinition throws on invalid input type — logged, not rethrown; flow not loaded.
+			// parseFlowDefinition throws on invalid input type -- logged, not rethrown; flow not loaded.
 			await registry.loadProjectFlows();
 			expect(registry.getFlow('test-invalid')).toBeUndefined();
 		});

@@ -47,7 +47,7 @@ function shouldRunIntegration(): boolean {
 	if (process.env['CLAUDE_INTEGRATION']) return true;
 	const current = currentClaudeVersion();
 	const stored = storedVersion();
-	// Auto-run only if we have a baseline AND it's stale — never on first install
+	// Auto-run only if we have a baseline AND it's stale -- never on first install
 	return current !== null && stored !== null && current !== stored;
 }
 

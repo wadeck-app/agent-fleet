@@ -9,7 +9,7 @@ import { tags } from '@lezer/highlight';
 import type { CodeEditorProps, LineSelection } from './CodeEditorTypes';
 import { getLanguageExtension } from './languageDetection';
 
-// ── Theme factory ─────────────────────────────────────────────────────────
+// -- Theme factory ---------------------------------------------------------
 // Creates editor theme per mode. CSS variables handle backgrounds/foreground.
 // Line number colors are hardcoded per mode to match GitHub exactly.
 
@@ -88,7 +88,7 @@ function createAppTheme(isDark: boolean) {
 	});
 }
 
-// ── Syntax highlighting ──────────────────────────────────────────────────
+// -- Syntax highlighting --------------------------------------------------
 // Two palettes: GitHub-light for light mode, GitHub-dark for dark mode.
 
 // @formatter:off
@@ -187,7 +187,7 @@ const darkHighlightStyle = HighlightStyle.define([
 ]);
 // @formatter:on
 
-// ── Dark mode detection (reactive) ───────────────────────────────────────
+// -- Dark mode detection (reactive) ---------------------------------------
 
 function useDarkMode(): boolean {
 	const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
@@ -206,7 +206,7 @@ function useDarkMode(): boolean {
 	return isDark;
 }
 
-// ── Line selection state management ──────────────────────────────────────
+// -- Line selection state management --------------------------------------
 
 const setSelectedLinesEffect = StateEffect.define<LineSelection | null>();
 
@@ -238,7 +238,7 @@ const selectedLinesField = StateField.define<DecorationSet>({
 	provide: f => EditorView.decorations.from(f),
 });
 
-// ── Component ────────────────────────────────────────────────────────────
+// -- Component ------------------------------------------------------------
 
 /**
  * CodeMirror 6 editor implementation.
@@ -275,7 +275,7 @@ export function CodeMirrorEditor({
 		onLineSelectRef.current = onLineSelect;
 	}, [onLineSelect]);
 
-	// ── Editor initialisation ────────────────────────────────────────────────
+	// -- Editor initialisation ------------------------------------------------
 
 	useEffect(() => {
 		if (!editorRef.current) return;
@@ -345,7 +345,7 @@ export function CodeMirrorEditor({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isDark, language, readOnly, showLineNumbers, onChange]);
 
-	// ── Sync content from prop ───────────────────────────────────────────────
+	// -- Sync content from prop -----------------------------------------------
 
 	useEffect(() => {
 		const view = viewRef.current;
@@ -359,7 +359,7 @@ export function CodeMirrorEditor({
 		}
 	}, [value]);
 
-	// ── Sync line selection from prop ────────────────────────────────────────
+	// -- Sync line selection from prop ----------------------------------------
 
 	const selectedFrom = selectedLines?.from ?? null;
 	const selectedTo = selectedLines?.to ?? null;

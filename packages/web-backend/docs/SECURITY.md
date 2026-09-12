@@ -319,7 +319,7 @@ Scenario: Attacker's website tries to make request
 
 Result: Request fails because:
 
-. Request is cross-origin (attacker.com → yourapp.com)
+. Request is cross-origin (attacker.com -> yourapp.com)
 . Browser doesn't send cookies due to sameSite=strict
 . Backend rejects unauthenticated request
 

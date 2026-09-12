@@ -175,7 +175,7 @@ describe('FlowFeedbackSection', () => {
 				/>
 			);
 
-			// Wait for loading to complete (getFeedbackByFlow returns empty → form shown)
+			// Wait for loading to complete (getFeedbackByFlow returns empty -> form shown)
 			await waitFor(() => {
 				expect(screen.getByText('Submit Flow Execution Feedback')).toBeInTheDocument();
 			});

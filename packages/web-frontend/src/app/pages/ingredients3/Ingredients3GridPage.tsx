@@ -47,9 +47,9 @@ export function Ingredients3GridPage() {
 	const navigate = useNavigate();
 	const { id, mode } = useParams<{ id?: string; mode?: 'new' | 'edit' }>();
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 	// HEADLESS FEATURES - Each is independent and composable
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 
 	// Pagination feature: manages page state and converts to backend query
 	// Page size = 9 for 3x3 grid layout (instead of 10 for table)
@@ -103,9 +103,9 @@ export function Ingredients3GridPage() {
 		return fields;
 	}, [fieldVisibility.visibleColumns, fieldOrder.columnOrder]);
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 	// DATA FETCHING - Wrapper around existing service
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 
 	/**
 	 * Fetch ingredients using the composed query from all features.
@@ -140,9 +140,9 @@ export function Ingredients3GridPage() {
 		[] // No dependencies - ingredientsService and setIngredients are stable
 	);
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 	// ACTIONS - Domain-specific operations
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 
 	// Store fetched ingredients for dialog and version lookups
 	const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -278,9 +278,9 @@ export function Ingredients3GridPage() {
 		}
 	};
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 	// RENDER
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 
 	return (
 		<Page>

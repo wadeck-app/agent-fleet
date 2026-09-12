@@ -199,18 +199,18 @@ Tests should be organized by level:
 
 ```
 . Unit Tests
-    packages/frontend/src/features/form/FormContainer.test.tsx → UI states (isSubmitting prop)
-    packages/frontend/src/features/form/useFormState.test.ts → Hook logic
-    packages/frontend/src/features/form/BookForm.test.tsx → Component wiring
+    packages/frontend/src/features/form/FormContainer.test.tsx -> UI states (isSubmitting prop)
+    packages/frontend/src/features/form/useFormState.test.ts -> Hook logic
+    packages/frontend/src/features/form/BookForm.test.tsx -> Component wiring
 
 . Integration Tests  (Use createControllablePromise here)
-    packages/frontend/src/features/form/FormContainer.test.tsx → FormContainer + useFormState
+    packages/frontend/src/features/form/FormContainer.test.tsx -> FormContainer + useFormState
         Loading state transitions
         Error handling
         Button state management
 
 . Feature Tests
-    packages/frontend/src/features/form/BookForm.test.tsx → Data flow verification
+    packages/frontend/src/features/form/BookForm.test.tsx -> Data flow verification
 ```
 
 Key principle: Test at the lowest possible level. Integration tests for `FormContainer` + `useFormState` are more valuable than testing through `BookForm` because they prove the generic pattern works.

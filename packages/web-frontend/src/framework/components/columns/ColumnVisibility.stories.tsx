@@ -387,8 +387,8 @@ export const InTableContext: Story = {
  * - Global "Reset to Default" still available
  *
  * In this example:
- * - Phone was hidden (default visible) → shows modified indicator
- * - Address was shown (default hidden) → shows modified indicator
+ * - Phone was hidden (default visible) -> shows modified indicator
+ * - Address was shown (default hidden) -> shows modified indicator
  */
 export const WithModifiedColumns: Story = {
 	args: {

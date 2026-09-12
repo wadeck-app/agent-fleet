@@ -44,8 +44,8 @@ Zone-gated steps become eligible for the ready-step pool at this point.
 
 Two categories of errors caught before any step runs:
 
-1. A step declares `zone: production` but no zone `production` is defined in `.flows/zones.yml` → validation error.
-2. A step declares `zone: production`, the zone requires attestation `tests-passed`, but no step in the flow graph declares it produces `tests-passed` → validation error.
+1. A step declares `zone: production` but no zone `production` is defined in `.flows/zones.yml` -> validation error.
+2. A step declares `zone: production`, the zone requires attestation `tests-passed`, but no step in the flow graph declares it produces `tests-passed` -> validation error.
 
 **Why:** Fail fast. A flow that can never satisfy its zone requirements should not start.
 
@@ -59,7 +59,7 @@ secrets:
       zone: production
 ```
 
-A step outside zone `production` that references `PROD_API_KEY` → static validation error at load time. The engine never injects a secret into a context where the active zone does not match.
+A step outside zone `production` that references `PROD_API_KEY` -> static validation error at load time. The engine never injects a secret into a context where the active zone does not match.
 
 **Why:** Structural enforcement. The author cannot access zone-restricted secrets by writing clever YAML -- the engine refuses at scheduling time.
 

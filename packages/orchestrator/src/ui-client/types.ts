@@ -10,11 +10,11 @@ import type { MetricsData, OrchestratorStatusData } from 'shared-orch-worker/Sta
 import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 
 /**
- * Message types for UI ↔ Orchestrator communication
+ * Message types for UI <-> Orchestrator communication
  */
 export enum UIMessageType {
 	// ============================================
-	// UI → Orchestrator (Commands)
+	// UI -> Orchestrator (Commands)
 	// ============================================
 
 	/** Initial connection request from UI */
@@ -54,7 +54,7 @@ export enum UIMessageType {
 	UPDATE_CONFIG = 'ui_update_config',
 
 	// ============================================
-	// Orchestrator → UI (Updates & Responses)
+	// Orchestrator -> UI (Updates & Responses)
 	// ============================================
 
 	/** Connection accepted, welcome message */
@@ -91,7 +91,7 @@ export interface BaseUIMessage {
 }
 
 // ============================================
-// Command Messages (UI → Orchestrator)
+// Command Messages (UI -> Orchestrator)
 // ============================================
 
 /**
@@ -206,7 +206,7 @@ export interface UIPingMessage extends BaseUIMessage {
 }
 
 // ============================================
-// Response Messages (Orchestrator → UI)
+// Response Messages (Orchestrator -> UI)
 // ============================================
 
 /**
@@ -355,7 +355,7 @@ export function parseUIMessage(json: string): UIMessage {
 }
 
 /**
- * Type guard to check if a message is a command (UI → Orchestrator)
+ * Type guard to check if a message is a command (UI -> Orchestrator)
  */
 export function isUICommand(message: UIMessage): boolean {
 	return [
@@ -376,7 +376,7 @@ export function isUICommand(message: UIMessage): boolean {
 }
 
 /**
- * Type guard to check if a message is a response (Orchestrator → UI)
+ * Type guard to check if a message is a response (Orchestrator -> UI)
  */
 export function isUIResponse(message: UIMessage): boolean {
 	return [

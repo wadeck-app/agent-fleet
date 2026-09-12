@@ -9,14 +9,14 @@ import type { Product } from '@shared/api/products.contract';
  *
  * Connects to the backend WebSocket endpoint and maintains a live list of products.
  *
- * Protocol (server → client):
+ * Protocol (server -> client):
  * - products:snapshot -- Initial list of all products (sent on connect)
  * - product:created   -- New product created
  * - product:updated   -- Existing product updated
  * - product:deleted   -- Product deleted by id
  *
- * Protocol (client → server):
- * - ping → pong (keepalive)
+ * Protocol (client -> server):
+ * - ping -> pong (keepalive)
  *
  * WS endpoint: /api/products/events
  *

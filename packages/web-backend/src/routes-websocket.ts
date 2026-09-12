@@ -22,12 +22,12 @@ const log = createLogger('ProductsWebSocket');
  * 4. Client can send ping messages to keep connection alive
  *
  * Protocol:
- * - Client → Server: { type: 'ping' }
- * - Server → Client: { type: 'pong' }
- * - Server → Client: { type: 'products:snapshot', products: Product[] }
- * - Server → Client: { type: 'product:created', product: Product }
- * - Server → Client: { type: 'product:updated', product: Product }
- * - Server → Client: { type: 'product:deleted', id: string }
+ * - Client -> Server: { type: 'ping' }
+ * - Server -> Client: { type: 'pong' }
+ * - Server -> Client: { type: 'products:snapshot', products: Product[] }
+ * - Server -> Client: { type: 'product:created', product: Product }
+ * - Server -> Client: { type: 'product:updated', product: Product }
+ * - Server -> Client: { type: 'product:deleted', id: string }
  *
  * ===========================================================================================
  */

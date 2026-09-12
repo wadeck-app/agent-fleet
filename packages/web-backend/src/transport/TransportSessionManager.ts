@@ -18,11 +18,11 @@
  * - Transport type detection and tracking (WebSocket, SSE, Long Polling, HTTP, Mock)
  *
  * Security flow:
- * 1. Connection upgrade → Parse cookies from HTTP headers
+ * 1. Connection upgrade -> Parse cookies from HTTP headers
  * 2. Validate access_token using AuthService
- * 3. Create session in memory (connId → userId + token + expiry + transportType)
- * 4. Each request → Fast validation (check expiry only)
- * 5. HTTP token refresh → Update ALL sessions for that user
+ * 3. Create session in memory (connId -> userId + token + expiry + transportType)
+ * 4. Each request -> Fast validation (check expiry only)
+ * 5. HTTP token refresh -> Update ALL sessions for that user
  *
  * Anti-fragility:
  * - Each transport type is independent
@@ -54,7 +54,7 @@ export interface BaseSession {
 	lastActivity: number;
 	// Track which events this client is subscribed to
 	subscribedEvents: Set<string>;
-	// Track filters for each event (event → filters)
+	// Track filters for each event (event -> filters)
 	eventFilters: Map<string, Record<string, unknown>>;
 }
 
@@ -120,13 +120,13 @@ export interface TransportSessionStats {
  * ```
  */
 export class TransportSessionManager {
-	// connId → session info
+	// connId -> session info
 	private sessions = new Map<string, BaseSession>();
 
-	// userId → Set of connIds (multi-device support)
+	// userId -> Set of connIds (multi-device support)
 	private userSessions = new Map<string, Set<string>>();
 
-	// connId → transport type
+	// connId -> transport type
 	private transportTypes = new Map<string, TransportType>();
 
 	// Cleanup timer

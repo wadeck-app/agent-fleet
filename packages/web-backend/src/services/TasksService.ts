@@ -47,12 +47,12 @@ const log = createLogger('TasksService');
  * - Type-safe event emission using EventBroadcaster
  *
  * CRUD Operations:
- * - createTask() → emit 'task:created'
- * - updateTask() → emit 'task:updated'
- * - deleteTask() → emit 'task:deleted'
- * - updateTaskStatus() → emit 'task:status_changed'
- * - assignTask() → emit 'task:assigned'
- * - updateTaskPriority() → emit 'task:priority_changed'
+ * - createTask() -> emit 'task:created'
+ * - updateTask() -> emit 'task:updated'
+ * - deleteTask() -> emit 'task:deleted'
+ * - updateTaskStatus() -> emit 'task:status_changed'
+ * - assignTask() -> emit 'task:assigned'
+ * - updateTaskPriority() -> emit 'task:priority_changed'
  *
  * ===========================================================================================
  */
@@ -381,7 +381,7 @@ export class TasksService {
 				throw new Error(errors.join(', '));
 			}
 
-			// Map CreateTask to Task fields (assignedTo → assignedWorker)
+			// Map CreateTask to Task fields (assignedTo -> assignedWorker)
 			const task = await this.tasksRepository.create({
 				description: data.description,
 				status: 'backlog',

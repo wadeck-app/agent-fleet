@@ -1,8 +1,8 @@
 import { FlowRegistry } from 'flow-engine';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { Orchestrator } from 'orchestrator';
 import { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
-import * as path from 'path';
 import { getOrchestratorRestUrl } from 'shared-common/PortCalculator';
 import { createLogger } from 'shared-common/logger';
 
@@ -369,7 +369,7 @@ export class DataStoreFactory {
 	}
 
 	/**
-	 * Get or create FlowRegistry (shared instance — used by both FlowProposalsService and FlowsService)
+	 * Get or create FlowRegistry (shared instance -- used by both FlowProposalsService and FlowsService)
 	 */
 	private getFlowRegistry(): FlowRegistry {
 		if (!this.flowRegistry) {
@@ -733,10 +733,10 @@ export class DataStoreFactory {
 			await handler.handleOrchestratorEvent(event, data);
 		});
 
-		// Wire EventBus → EventSubscriptionRegistry → TaskManager → WorkerCoordinator
+		// Wire EventBus -> EventSubscriptionRegistry -> TaskManager -> WorkerCoordinator
 		this.eventBus.on('ticket.status.changed', async payload => {
 			const registry = this.orchestrator.getEventSubscriptionRegistry();
-			// NOTE: projectId is intentionally omitted — worker uses package.json name ("agent-fleet")
+			// NOTE: projectId is intentionally omitted -- worker uses package.json name ("agent-fleet")
 			// while payload uses DB project ID ("9zonezaue"). Single-project-per-server
 			// architecture means there is no cross-project leakage risk here.
 			const matches = registry.findMatching({
@@ -761,7 +761,7 @@ export class DataStoreFactory {
 
 		this.eventBus.on('ticket.created', async payload => {
 			const registry = this.orchestrator.getEventSubscriptionRegistry();
-			// NOTE: projectId omitted — see ticket.status.changed comment above
+			// NOTE: projectId omitted -- see ticket.status.changed comment above
 			const matches = registry.findMatching({
 				event: 'ticket.created',
 				payload: {},

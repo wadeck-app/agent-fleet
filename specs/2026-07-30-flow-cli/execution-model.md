@@ -30,10 +30,10 @@ Execution ID format: -character alphanumeric strings (base). The `|` separator i
 Execution states
 
 ```
-QUEUED → RUNNING → COMPLETED
-                 → FAILED
-         RUNNING → FAILED     (worker WebSocket closed, non-idempotent step -- D)
-         RUNNING → RE-QUEUED  (worker WebSocket closed, idempotent step -- D, same execution ID, step re-queued)
+QUEUED -> RUNNING -> COMPLETED
+                 -> FAILED
+         RUNNING -> FAILED     (worker WebSocket closed, non-idempotent step -- D)
+         RUNNING -> RE-QUEUED  (worker WebSocket closed, idempotent step -- D, same execution ID, step re-queued)
 ```
 
 Responsibility split
@@ -48,8 +48,8 @@ The daemon owns all execution intelligence. Workers are dumb step executors.
 | Assigning a step to a free worker (via WebSocket) | Daemon                      |
 | Writing execution state to disk                   | Daemon (single writer)      |
 | Executing a step (Claude, script, subflow)        | Worker                      |
-| Streaming log entries                             | Worker → Daemon (WebSocket) |
-| Reporting step completion/failure                 | Worker → Daemon (WebSocket) |
+| Streaming log entries                             | Worker -> Daemon (WebSocket) |
+| Reporting step completion/failure                 | Worker -> Daemon (WebSocket) |
 | Liveness signal                                   | WebSocket connection health |
 | Crash detection and idempotency decision          | Daemon                      |
 
@@ -84,7 +84,7 @@ Daemon                              Worker (child process)
   |  < ready { pid }   |
   |                                       |
   +- assign(stepId, stepConfig,           |  (via WebSocket)
-  |          executionContext) > |  ← first message carries executionId
+  |          executionContext) > |  <- first message carries executionId
   |                                       +- execute step
   |  < log entry   |
   |  < log entry   |
@@ -112,7 +112,7 @@ Worker    Worker    Worker    CLI subprocess
   +- call CLI binary > |
   |          +- call CLI  | (finds daemon starting)
   |          |          +- call CLI  | (finds daemon up)
-  |          |          |    first: createDaemon() inline → this process is the daemon
+  |          |          |    first: createDaemon() inline -> this process is the daemon
   |          |          |
   +- WS reconnect + flush buffered logs (in order)
              +- WS reconnect + flush buffered logs

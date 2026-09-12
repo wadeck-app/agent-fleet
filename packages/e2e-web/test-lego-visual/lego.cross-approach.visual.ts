@@ -177,7 +177,7 @@ async function setupMockApi(page: Page): Promise<void> {
 	// Health check: return OK so the circuit breaker stays in CLOSED state.
 	// Without this, any unmocked request to e2e-backend-placeholder opens the circuit
 	// and queues ALL subsequent API calls indefinitely (the health check never succeeds
-	// → circuit never closes → products fetch is queued forever → table never renders).
+	// -> circuit never closes -> products fetch is queued forever -> table never renders).
 	// NOTE: health check endpoint = `${API_BASE_URL}/health` (no /api prefix).
 	// See services.ts: createCircuitBreaker({ healthCheckEndpoint: `${API_BASE_URL}/health` })
 	await page.route(
@@ -234,7 +234,7 @@ async function setupMockApi(page: Page): Promise<void> {
 	// Products WebSocket (S_WS scenario): useProductsWebSocket connects to
 	// ws://${window.location.host}/api/products/events (Vite dev server proxy).
 	// This is a DIFFERENT URL from the global transport WebSocket above.
-	// - ws.onopen fires → status becomes 'connected' (no send needed for status)
+	// - ws.onopen fires -> status becomes 'connected' (no send needed for status)
 	// - products:snapshot message populates the table so waitForTable resolves
 	await page.routeWebSocket(
 		url => url.pathname === '/api/products/events',

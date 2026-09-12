@@ -3,7 +3,7 @@
  *
  * The daemon must escape the calling Job Object (from Claude Code / orchestrator)
  * without using DETACHED_PROCESS (which removes the console handle and forces
- * children to call AllocConsole() → WT visible tabs).
+ * children to call AllocConsole() -> WT visible tabs).
  *
  * Solution: spawn wscript.exe with detached:true (escapes Job Object), then let
  * wscript.exe start node.exe via oShell.Run SW_HIDE. The daemon gets a hidden
@@ -15,7 +15,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// Read the source file directly — the runtime path selection is platform-specific
+// Read the source file directly -- the runtime path selection is platform-specific
 // and cannot be exercised in a unit test. Inspecting the source is the reliable way
 // to guard against accidental regressions (windowsHide removed from wscript spawn,
 // wscript replaced with direct node spawn, etc.).
@@ -36,7 +36,7 @@ describe('Daemon spawn — Windows wscript.exe approach', () => {
 
 	it('spawnDaemonBackground() uses detached:true on wscript.exe to escape Job Object', () => {
 		// wscript.exe itself must be detached so it escapes Claude Code's Job Object.
-		// The node daemon started by wscript via oShell.Run is NOT detached — it
+		// The node daemon started by wscript via oShell.Run is NOT detached -- it
 		// inherits a hidden WT console from wscript (GUI parent + SW_HIDE).
 		const wscriptSpawnBlock = RUN_COMMAND_SRC.slice(
 			RUN_COMMAND_SRC.indexOf("spawn('wscript.exe'"),

@@ -18,9 +18,9 @@ Migrates existing tasks from orchestrator's file-based storage to backend storag
 
 #### Key Transformations
 
-- `assignedTo` → `assignedWorker` (field rename)
-- `metadata.projectId` → `projectId` (extract to top level)
-- `metadata.workspaceId` → `workspaceId` (extract to top level)
+- `assignedTo` -> `assignedWorker` (field rename)
+- `metadata.projectId` -> `projectId` (extract to top level)
+- `metadata.workspaceId` -> `workspaceId` (extract to top level)
 - Add `version: 1` field (for optimistic locking)
 - Remove orchestrator-specific fields (comments, history, metadata, etc.)
 

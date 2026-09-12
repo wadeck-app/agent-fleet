@@ -17,7 +17,7 @@ import { ArrowRight, Circle, CircleDot, GripVertical, X } from 'lucide-react';
  * - Drag handle with visual feedback (GripVertical icon)
  * - Script name display (font-mono)
  * - Status badge (running/stopped)
- * - Arrow right button (→) to remove the script
+ * - Arrow right button (->) to remove the script
  * - Visual feedback during drag (opacity, transform)
  * - Touch-friendly (supports dnd-kit touch sensors)
  *

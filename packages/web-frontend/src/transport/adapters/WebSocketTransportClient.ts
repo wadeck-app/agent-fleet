@@ -109,7 +109,7 @@ export class WebSocketTransportClient implements ITransportClient {
 	private eventFilters = new Map<string, Record<string, unknown>>();
 
 	/**
-	 * Component subscription tracking (componentId → subscriptions)
+	 * Component subscription tracking (componentId -> subscriptions)
 	 * Used for state-based subscription management
 	 */
 	private componentSubscriptions = new Map<string, Array<{ event: string; filters?: Record<string, unknown> }>>();

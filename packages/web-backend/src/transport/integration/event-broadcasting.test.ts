@@ -14,8 +14,8 @@ import { MockTransportServer } from '../adapters/MockTransportServer';
  * Integration tests for event broadcasting with subscription filtering.
  *
  * Test scenarios:
- * - Create task → Verify broadcast to subscribed clients
- * - Update task → Verify only subscribed clients receive event
+ * - Create task -> Verify broadcast to subscribed clients
+ * - Update task -> Verify only subscribed clients receive event
  * - Test subscription filtering (server-side)
  * - Test unsubscribe
  * - Multi-device event delivery

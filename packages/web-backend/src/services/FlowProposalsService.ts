@@ -172,8 +172,8 @@ export class FlowProposalsService {
 	/**
 	 * Approve a pending proposal.
 	 * - Saves the flow to FlowRegistry (writes flows-custom.yml)
-	 * - Updates ticket: flowId set, status → flow_approved
-	 * - Updates proposal: status → approved
+	 * - Updates ticket: flowId set, status -> flow_approved
+	 * - Updates proposal: status -> approved
 	 */
 	async approveProposal(ticketId: string, proposalId: string): Promise<FlowProposal> {
 		const proposal = await this.getProposal(ticketId, proposalId);

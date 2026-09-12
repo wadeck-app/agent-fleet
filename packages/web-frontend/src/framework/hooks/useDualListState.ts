@@ -150,7 +150,7 @@ export function useDualListState<T>({
 	// ACTIONS
 	// =========================================================================
 
-	// Handle associate (right → left)
+	// Handle associate (right -> left)
 	const handleAssociate = async (itemId: string) => {
 		// 1. Optimistic update: move immediately
 		setOptimisticAssociations(prev => new Set(prev).add(itemId));
@@ -187,7 +187,7 @@ export function useDualListState<T>({
 		}
 	};
 
-	// Handle dissociate (left → right)
+	// Handle dissociate (left -> right)
 	const handleDissociate = async (itemId: string) => {
 		// 1. Optimistic update: move immediately
 		setOptimisticDissociations(prev => new Set(prev).add(itemId));

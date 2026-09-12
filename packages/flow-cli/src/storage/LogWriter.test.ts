@@ -96,7 +96,7 @@ describe('LogWriter', () => {
 				fs.writeFileSync(path.join(tmpDir, `${date}.ndjson`), '{"old":true}\n', 'utf8');
 			}
 
-			// Call write() once — this triggers rotate() internally
+			// Call write() once -- this triggers rotate() internally
 			const entry = makeEntry({ message: 'trigger rotation' });
 			rotatingWriter.write('exec03', 'step-c', entry);
 

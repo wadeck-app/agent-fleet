@@ -74,7 +74,7 @@ describe('WorkspacesService', () => {
 
 			expect(data.workspaces).toHaveLength(1);
 			expect(data.workspaces[0].path).toBe(testWorkspacePath);
-			// Worker connected → active
+			// Worker connected -> active
 			expect(data.workspaces[0].status).toBe('active');
 			expect(data.workspaces[0].activeWorkerId).toBe('worker-1');
 		});
@@ -117,7 +117,7 @@ describe('WorkspacesService', () => {
 
 			const data = await workspacesService.getWorkspacesData();
 
-			// Worker reports 'main', entity has 'old-branch' → worker wins
+			// Worker reports 'main', entity has 'old-branch' -> worker wins
 			const ws = data.workspaces.find(w => w.path === testWorkspacePath);
 			expect(ws?.gitBranch).toBe('main');
 		});

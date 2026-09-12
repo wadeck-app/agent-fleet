@@ -4,7 +4,7 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-// Real integration tests — no mocks of execFile or http.request.
+// Real integration tests -- no mocks of execFile or http.request.
 
 let tempFile: string | null = null;
 

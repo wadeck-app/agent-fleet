@@ -14,7 +14,7 @@
  *
  * Benefits:
  * - Frontend knows EXACTLY what backend expects and returns
- * - Refactor backend contract → instant frontend errors
+ * - Refactor backend contract -> instant frontend errors
  * - Impossible to send wrong data
  * - Early bug detection with validation modes
  *

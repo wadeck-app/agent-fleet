@@ -163,7 +163,7 @@ runUpdater({
 				return { defer: true, retryIn: 2 * 60_000 };
 			}
 		} catch {
-			// Daemon unreachable, config files missing, or JSON parse error → apply now.
+			// Daemon unreachable, config files missing, or JSON parse error -> apply now.
 		}
 		return 'apply-now';
 	},

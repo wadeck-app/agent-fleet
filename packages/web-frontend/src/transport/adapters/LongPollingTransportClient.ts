@@ -20,7 +20,7 @@
  * 5. If timeout without events, server responds empty, client retries
  *
  * Limitations:
- * - Unidirectional: Server → Client only (like SSE)
+ * - Unidirectional: Server -> Client only (like SSE)
  * - Higher latency than WebSocket/SSE
  * - Cannot send requests via long polling (use REST API instead)
  * - request() method throws error (not supported)

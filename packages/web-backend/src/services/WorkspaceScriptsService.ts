@@ -52,9 +52,9 @@ const MAX_SCRIPTS_PER_WORKSPACE = 10;
  * - Type-safe event emission using EventBroadcaster
  *
  * CRUD Operations:
- * - createScript() → emit B2F_WORKSPACE_SCRIPT_CREATED
- * - updateScript() → emit B2F_WORKSPACE_SCRIPT_UPDATED
- * - deleteScript() → emit B2F_WORKSPACE_SCRIPT_DELETED
+ * - createScript() -> emit B2F_WORKSPACE_SCRIPT_CREATED
+ * - updateScript() -> emit B2F_WORKSPACE_SCRIPT_UPDATED
+ * - deleteScript() -> emit B2F_WORKSPACE_SCRIPT_DELETED
  *
  * ===========================================================================================
  */

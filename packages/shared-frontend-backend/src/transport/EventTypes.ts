@@ -224,8 +224,8 @@ export type EventType = keyof EventTypes;
  * @template T - Event type string
  *
  * @example
- * type TaskCreatedData = EventData<'task:created'>; // → Task
- * type HeartbeatData = EventData<'worker:heartbeat'>; // → { workerId: string; timestamp: number; status: string }
+ * type TaskCreatedData = EventData<'task:created'>; // -> Task
+ * type HeartbeatData = EventData<'worker:heartbeat'>; // -> { workerId: string; timestamp: number; status: string }
  */
 export type EventData<T extends EventType> = EventTypes[T];
 
@@ -255,8 +255,8 @@ export type EventFilter = EventType | EventType[];
  * Extract resource name from event type
  *
  * @example
- * ResourceName<'task:created'> // → 'task'
- * ResourceName<'worker:heartbeat'> // → 'worker'
+ * ResourceName<'task:created'> // -> 'task'
+ * ResourceName<'worker:heartbeat'> // -> 'worker'
  */
 export type ResourceName<T extends EventType> = T extends `${infer R}:${string}` ? R : never;
 
@@ -266,6 +266,6 @@ export type ResourceName<T extends EventType> = T extends `${infer R}:${string}`
  *
  * @example
  * type TaskEvents = EventsForResource<'task'>;
- * // → 'task:created' | 'task:updated' | 'task:deleted' | 'task:status_changed' | 'task:assigned' | 'task:priority_changed'
+ * // -> 'task:created' | 'task:updated' | 'task:deleted' | 'task:status_changed' | 'task:assigned' | 'task:priority_changed'
  */
 export type EventsForResource<R extends string> = Extract<EventType, `${R}:${string}`>;

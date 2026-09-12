@@ -36,7 +36,7 @@ import { CrudDialog } from './CrudDialog';
  * - ManagePinnedProjectsDialog.tsx (252 lines)
  * - ManageProjectWorkspacesDialog.tsx (344 lines)
  *
- * Total reduction: 596 lines → ~150 lines (with this component)
+ * Total reduction: 596 lines -> ~150 lines (with this component)
  *
  * Usage:
  *   <DualListDialog

@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PluginResolver } from './PluginResolver.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-// From packages/flow-cli/src/config/ → packages/extension-points/... (3 up)
+// From packages/flow-cli/src/config/ -> packages/extension-points/... (3 up)
 const REGISTRY_PATH = resolve(__dirname, '..', '..', '..', 'extension-points', 'extension-points.json');
-// From packages/flow-cli/src/config/ → packages/ (3 up)
+// From packages/flow-cli/src/config/ -> packages/ (3 up)
 const PACKAGES_DIR = resolve(__dirname, '..', '..', '..');
 
 const tmp = join(tmpdir(), `plugin-resolver-test-${Date.now()}`);

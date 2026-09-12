@@ -1,4 +1,4 @@
-// Orchestrator → Worker (O2W) messages
+// Orchestrator -> Worker (O2W) messages
 import type { ProtocolMessage, createMessageInternal_Timestamp } from 'shared-common/protocol';
 import { createMessageInternal } from 'shared-common/protocol';
 
@@ -7,7 +7,7 @@ import type { Task } from './domain-types';
 export interface O2WBaseMessage extends ProtocolMessage<O2WMessageType> {}
 
 export enum O2WMessageType {
-	// O2W Messages (Orchestrator → Worker)
+	// O2W Messages (Orchestrator -> Worker)
 	WORKER_WELCOME = 'o2w:worker:welcome',
 	ASSIGN_TASK = 'o2w:task:assign',
 	KILL_CLAUDE = 'o2w:claude:kill',
@@ -99,7 +99,7 @@ export type O2WMessage =
 	| ErrorMessage;
 
 /**
- * Type map for Orchestrator → Worker messages.
+ * Type map for Orchestrator -> Worker messages.
  * Maps each O2WMessageType to its corresponding message interface.
  */
 export interface O2WMessageMap {
@@ -117,7 +117,7 @@ export interface O2WMessageMap {
 }
 
 /**
- * Creates a typed Orchestrator → Worker message.
+ * Creates a typed Orchestrator -> Worker message.
  *
  * @template T - The message type (inferred from the type parameter)
  * @param type - The O2W message type

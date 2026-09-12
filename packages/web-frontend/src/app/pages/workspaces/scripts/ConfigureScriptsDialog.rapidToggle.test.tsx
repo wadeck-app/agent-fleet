@@ -48,7 +48,7 @@ describe('ConfigureScriptsDialog - Rapid Toggle Regression', () => {
 			expect(screen.getByRole('button', { name: 'Add build' })).toBeInTheDocument();
 		});
 
-		// Step 1: ADD (RIGHT → LEFT) - API is slow, doesn't complete
+		// Step 1: ADD (RIGHT -> LEFT) - API is slow, doesn't complete
 		const addButton = screen.getByRole('button', { name: 'Add build' });
 		await user.click(addButton);
 
@@ -57,7 +57,7 @@ describe('ConfigureScriptsDialog - Rapid Toggle Regression', () => {
 			expect(screen.getByRole('button', { name: 'Remove build' })).toBeInTheDocument();
 		});
 
-		// Step 2: Immediately try to REMOVE (LEFT → RIGHT) while ADD is still in progress
+		// Step 2: Immediately try to REMOVE (LEFT -> RIGHT) while ADD is still in progress
 		const removeButton = screen.getByRole('button', { name: 'Remove build' });
 
 		// CRITICAL: Button should be DISABLED (preventing the remove operation)
@@ -138,7 +138,7 @@ describe('ConfigureScriptsDialog - Rapid Toggle Regression', () => {
 			expect(screen.getByText('build:orchestrator')).toBeInTheDocument();
 		});
 
-		// Step 1: Remove the script (LEFT → RIGHT)
+		// Step 1: Remove the script (LEFT -> RIGHT)
 		const removeButton = screen.getByRole('button', { name: 'Remove build:orchestrator' });
 		await user.click(removeButton);
 
@@ -147,7 +147,7 @@ describe('ConfigureScriptsDialog - Rapid Toggle Regression', () => {
 			expect(screen.queryByRole('button', { name: 'Remove build:orchestrator' })).not.toBeInTheDocument();
 		});
 
-		// Step 2: Try to add it back immediately (RIGHT → LEFT) while delete is still pending
+		// Step 2: Try to add it back immediately (RIGHT -> LEFT) while delete is still pending
 		const addButton = screen.getByRole('button', { name: 'Add build:orchestrator' });
 
 		// CRITICAL: This click should be PREVENTED or show error immediately

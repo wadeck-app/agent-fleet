@@ -128,7 +128,7 @@ describe('CommandHandler — parent-blocking sub-steps', () => {
 				} as never,
 			]);
 
-			// Parent completes — but child1 is still pending, so execution must remain active
+			// Parent completes -- but child1 is still pending, so execution must remain active
 			handler.onStepCompleted(executionId, 'parent', { result: 'parent done' });
 
 			// Execution must still be active (completion was deferred)
@@ -152,11 +152,11 @@ describe('CommandHandler — parent-blocking sub-steps', () => {
 				} as never,
 			]);
 
-			// Parent completes — deferred because child1 is still pending
+			// Parent completes -- deferred because child1 is still pending
 			handler.onStepCompleted(executionId, 'parent', { result: 'parent done' });
 			expect(handler.hasActiveExecutions()).toBe(true);
 
-			// Child completes — should fire parent's deferred completion → execution ends
+			// Child completes -- should fire parent's deferred completion -> execution ends
 			handler.onStepCompleted(executionId, 'child1', { result: 'child done' });
 			expect(handler.hasActiveExecutions()).toBe(false);
 		});
@@ -178,11 +178,11 @@ describe('CommandHandler — parent-blocking sub-steps', () => {
 				} as never,
 			]);
 
-			// Parent completes — deferred because child1 is still pending
+			// Parent completes -- deferred because child1 is still pending
 			handler.onStepCompleted(executionId, 'parent', { result: 'parent done' });
 			expect(handler.hasActiveExecutions()).toBe(true);
 
-			// Child fails — parent should be re-queued (not execution failed)
+			// Child fails -- parent should be re-queued (not execution failed)
 			handler.onStepFailed(executionId, 'child1', 'child error');
 
 			// Execution must still be active (parent re-queued for re-run)
@@ -221,7 +221,7 @@ steps:
 			expect(result.type).toBe('execution_started');
 			const executionId = (result as { executionId: string }).executionId;
 
-			// Iteration 1: parent runs → inject child → child fails → parent re-queued (1 <= 1)
+			// Iteration 1: parent runs -> inject child -> child fails -> parent re-queued (1 <= 1)
 			handler.injectSteps(executionId, [
 				{ id: 'child-0', type: 'script', script: 'echo x', parent: 'parent' } as never,
 			]);
@@ -230,7 +230,7 @@ steps:
 			expect(handler.hasActiveExecutions()).toBe(true);
 			expect(mockExecStore.markExecutionFailed).not.toHaveBeenCalled();
 
-			// Iteration 2: parent re-runs → inject child → child fails → 2 > 1 → parent fails
+			// Iteration 2: parent re-runs -> inject child -> child fails -> 2 > 1 -> parent fails
 			handler.injectSteps(executionId, [
 				{ id: 'child-1', type: 'script', script: 'echo x', parent: 'parent' } as never,
 			]);
@@ -256,10 +256,10 @@ steps:
 				parent: 'parent',
 			} as never;
 
-			// First injection — should succeed
+			// First injection -- should succeed
 			expect(() => handler.injectSteps(executionId, [subStep])).not.toThrow();
 
-			// Second injection of the same step (loop re-run) — must be a no-op, not throw
+			// Second injection of the same step (loop re-run) -- must be a no-op, not throw
 			expect(() => handler.injectSteps(executionId, [subStep])).not.toThrow();
 
 			// Execution still active

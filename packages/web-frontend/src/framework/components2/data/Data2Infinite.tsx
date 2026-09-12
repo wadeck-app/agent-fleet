@@ -7,9 +7,9 @@ import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisp
 import { Data2, type Data2Props } from './Data2';
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════════════════
+ * =======================================================================================
  * DATA2 INFINITE - Decorator Pattern for Infinite Scroll
- * ═══════════════════════════════════════════════════════════════════════════════════════
+ * =======================================================================================
  *
  * Philosophy: Wrap Data2 without modifying it. Use a decorator hook to intercept
  *             and transform data after Data2 fetches it.
@@ -21,8 +21,8 @@ import { Data2, type Data2Props } from './Data2';
  * - Easy to add more decorators (caching, throttling, filtering)
  *
  * Architecture:
- * Data2 fetches data (page N) → useDataAccumulator decorator intercepts
- * → Accumulates with previous data → Children receive accumulated data
+ * Data2 fetches data (page N) -> useDataAccumulator decorator intercepts
+ * -> Accumulates with previous data -> Children receive accumulated data
  *
  * Pattern: Decorator
  * Composability: 9/10
@@ -119,9 +119,9 @@ export function Data2Infinite<T>({
 	children,
 	...data2Props
 }: Data2InfiniteProps<T>) {
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 	// ADAPTER: Convert infinite pagination to regular pagination contract
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 
 	const paginationAdapter = useMemo(
 		() => ({
@@ -142,9 +142,9 @@ export function Data2Infinite<T>({
 		[infinitePagination]
 	);
 
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 	// RENDER: Wrap Data2 with decorator
-	// ═══════════════════════════════════════════════════════════════════════════════════════
+	// =======================================================================================
 
 	return (
 		<Data2 {...data2Props} pagination={paginationAdapter}>

@@ -58,7 +58,7 @@ function makeValidClaudeOutput() {
 	return '```json\n' + makeValidFlowJson() + '\n```';
 }
 
-/** Evaluator response — plain JSON (no code block needed) */
+/** Evaluator response -- plain JSON (no code block needed) */
 function makeEvaluatorOutput(score: number) {
 	return JSON.stringify({ score, reasoning: 'Looks good.' });
 }
@@ -260,7 +260,7 @@ describe('FlowDesignerAgent', () => {
 					{
 						id: 'cmt-2',
 						ticketId: 'ticket-1',
-						// Non-intake comment — must NOT appear in the intake section
+						// Non-intake comment -- must NOT appear in the intake section
 						content: 'Please prioritize security',
 						author: 'alice',
 						createdAt: '2026-01-01T00:00:00Z',
@@ -468,7 +468,7 @@ describe('FlowDesignerAgent', () => {
 	describe('multi-axis confidence evaluation', () => {
 		it('uses average of 3 evaluator scores as confidenceScore for fresh designs', async () => {
 			// Call 1: main design (score in JSON is 85, should be ignored)
-			// Calls 2-4: evaluators returning 70, 80, 90 → average = 80
+			// Calls 2-4: evaluators returning 70, 80, 90 -> average = 80
 			let callCount = 0;
 			const evaluatorScores = [70, 80, 90];
 			spawnMock.mockImplementation(() => {
@@ -538,7 +538,7 @@ describe('FlowDesignerAgent', () => {
 				if (callCount === 1) {
 					stdout = makeValidClaudeOutput();
 				} else if (callCount === 2) {
-					// Invalid evaluator response — non-numeric score
+					// Invalid evaluator response -- non-numeric score
 					stdout = JSON.stringify({ score: 'high', reasoning: 'invalid' });
 				} else {
 					stdout = makeEvaluatorOutput(90);
@@ -548,7 +548,7 @@ describe('FlowDesignerAgent', () => {
 
 			const result = await agent.designFlow(makeInput());
 
-			// axis 1 falls back to 50, axes 2 and 3 return 90 → average of [50, 90, 90] = ~77
+			// axis 1 falls back to 50, axes 2 and 3 return 90 -> average of [50, 90, 90] = ~77
 			expect(result.confidenceScore).toBe(77);
 		});
 
@@ -568,7 +568,7 @@ describe('FlowDesignerAgent', () => {
 
 			const result = await agent.designFlow(makeInput());
 
-			// axis 1 falls back to 50, axes 2 and 3 return 90 → average of [50, 90, 90] = ~77
+			// axis 1 falls back to 50, axes 2 and 3 return 90 -> average of [50, 90, 90] = ~77
 			expect(result.confidenceScore).toBe(77);
 		});
 
@@ -590,7 +590,7 @@ describe('FlowDesignerAgent', () => {
 
 			const result = await agent.designFlow(makeInput());
 
-			// axis 1 clamped to 100, axes 2 and 3 return 80 → average of [100, 80, 80] = 87
+			// axis 1 clamped to 100, axes 2 and 3 return 80 -> average of [100, 80, 80] = 87
 			expect(result.confidenceScore).toBe(87);
 		});
 
@@ -610,15 +610,15 @@ describe('FlowDesignerAgent', () => {
 
 			const result = await agent.designFlow(makeInput());
 
-			// All 3 evaluators return 70 → average = 70
+			// All 3 evaluators return 70 -> average = 70
 			expect(result.confidenceScore).toBe(70);
 		});
 	});
 
 	describe('validation retry loop', () => {
 		it('retries once on invalid flow then succeeds', async () => {
-			// Call 1: main design → invalid flow (validateFlow fails first time)
-			// Call 2: correction → valid flow (validateFlow passes second time)
+			// Call 1: main design -> invalid flow (validateFlow fails first time)
+			// Call 2: correction -> valid flow (validateFlow passes second time)
 			// Calls 3-5: evaluators
 			let callCount = 0;
 			spawnMock.mockImplementation(() => {
@@ -761,7 +761,7 @@ describe('FlowDesignerAgent', () => {
 		});
 
 		it('logs a warning when redesigned flow is missing step IDs from original', async () => {
-			// The LLM drops "step2" and "step3" — only a review thread about "step2" exists
+			// The LLM drops "step2" and "step3" -- only a review thread about "step2" exists
 			const redesignedFlow = {
 				...JSON.parse(makeValidFlowJson()),
 				proposedFlow: {
@@ -771,7 +771,7 @@ describe('FlowDesignerAgent', () => {
 					description: 'A test flow',
 					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
 					inputs: { taskDescription: 'string' },
-					// LLM kept only step1 — dropped step2 and step3 (step3 was NOT in review thread)
+					// LLM kept only step1 -- dropped step2 and step3 (step3 was NOT in review thread)
 					steps: [{ type: 'model', id: 'step1', name: 'Step 1', model: 'haiku', prompt: 'Do the thing' }],
 				},
 			};
@@ -810,7 +810,7 @@ describe('FlowDesignerAgent', () => {
 				})
 			);
 
-			// step3 was NOT in any review thread — the warning should fire
+			// step3 was NOT in any review thread -- the warning should fire
 			// (step2 is referenced via selectedText, so it is OK to change)
 			// Note: the warning is logged via pino (log.warn), not console.warn,
 			// so we just verify no exception was thrown (audit is non-blocking)

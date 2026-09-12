@@ -241,8 +241,8 @@ export class OrchestratorEventHandler {
 			log.info(`Task completed: ${data.taskId}, success: ${data.success}`);
 
 			// Determine final status based on success/failure
-			// - success === true → 'review' (completed successfully, awaiting human review)
-			// - success === false → 'cancelled' (failed)
+			// - success === true -> 'review' (completed successfully, awaiting human review)
+			// - success === false -> 'cancelled' (failed)
 			const finalStatus = data.success ? 'review' : 'cancelled';
 
 			await this.tasksService.updateTaskStatus(data.taskId, finalStatus);

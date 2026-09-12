@@ -17,7 +17,7 @@ describe('ScriptExecutor - Multiline Scripts (Integration)', () => {
 
 	/**
 	 * On Windows a multiline script is written to a temp .sh file and executed with
-	 * bash (Git Bash / MSYS2), not cmd.exe — see ScriptExecutor.execute(). The scripts
+	 * bash (Git Bash / MSYS2), not cmd.exe -- see ScriptExecutor.execute(). The scripts
 	 * below therefore use bash syntax, not cmd batch syntax.
 	 */
 	describeWindows('Windows multiline scripts', () => {

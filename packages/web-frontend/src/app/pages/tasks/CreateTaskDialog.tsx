@@ -269,7 +269,12 @@ export function CreateTaskDialog({
 			case 'string':
 			case 'boolean':
 			case 'object':
+				return <TextField {...commonProps} />;
+			// violations-suppress: ts/no-switch-default-break inputDef.type comes from a flow's YAML at runtime, not an internal enum; throwing would blank the dialog on one mistyped input, so the type is reported and a text field rendered
 			default:
+				console.warn(
+					`[CreateTaskDialog] Unknown flow input type "${String(inputDef.type)}" for "${inputName}" -- rendering a plain text field. Check the flow definition.`
+				);
 				return <TextField {...commonProps} />;
 		}
 	};
@@ -405,7 +410,7 @@ export function CreateTaskDialog({
 		try {
 			const createdTask = await tasksService.createTask(createTaskData);
 			showToast('Task created successfully', 'success');
-			// Only navigate — do NOT call onSuccess/onOpenChange as they use
+			// Only navigate -- do NOT call onSuccess/onOpenChange as they use
 			// setSearchParams({ replace: true }) which overrides the navigation
 			navigate(`/tasks/${createdTask.id}`);
 		} catch (error) {
@@ -612,7 +617,7 @@ export function CreateTaskDialog({
 							{/* Dynamic Flow Inputs Section */}
 							{selectedFlow?.inputs && Object.keys(selectedFlow.inputs).length > 0 && (
 								<div className="space-y-4">
-									<h4 className="text-sm font-semibold text-foreground">Paramètres</h4>
+									<h4 className="text-sm font-semibold text-foreground">Parameters</h4>
 									<div className="space-y-3">
 										{Object.entries(selectedFlow.inputs).map(([inputName, inputDef]) => (
 											<div key={inputName} className="flex items-start gap-2">

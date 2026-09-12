@@ -30,7 +30,7 @@ const log = createLogger('EventBroadcaster');
  * - Automatic fallback to message queue if delivery fails
  *
  * Architecture:
- * Service → EventBroadcaster → [WebSocket, SSE, LongPolling] → Clients
+ * Service -> EventBroadcaster -> [WebSocket, SSE, LongPolling] -> Clients
  *
  * @example
  * ```typescript

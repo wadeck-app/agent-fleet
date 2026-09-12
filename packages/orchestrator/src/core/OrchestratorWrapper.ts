@@ -8,7 +8,7 @@
  *
  * Features:
  * - Worker coordination and communication
- * - EventEmitter integration for O→B events
+ * - EventEmitter integration for O->B events
  * - Flow definition requests
  * - Type-safe method delegation
  * - No network overhead
@@ -223,11 +223,11 @@ export class OrchestratorWrapper {
 	}
 
 	// ===========================================================================================
-	// O→B EVENT SUBSCRIPTION (Direct EventEmitter integration)
+	// O->B EVENT SUBSCRIPTION (Direct EventEmitter integration)
 	// ===========================================================================================
 
 	/**
-	 * Subscribe to an O→B event
+	 * Subscribe to an O->B event
 	 * Maps StateManager events to O2B event types
 	 */
 	on<T extends O2BEventType>(event: T, handler: (data: O2BEventData<T>) => void): void {
@@ -364,7 +364,7 @@ export class OrchestratorWrapper {
 	}
 
 	/**
-	 * Unsubscribe from an O→B event
+	 * Unsubscribe from an O->B event
 	 */
 	off<T extends O2BEventType>(event: T, handler: (data: O2BEventData<T>) => void): void {
 		const taskManager = this.orchestrator.getTaskManager();

@@ -2,7 +2,7 @@
  * Long Polling Transport Server
  *
  * Server-side implementation for HTTP Long Polling with:
- * - Unidirectional events (Server → Client)
+ * - Unidirectional events (Server -> Client)
  * - Cookie-based authentication
  * - Connection held open until events available or timeout
  * - Message queue for offline event storage

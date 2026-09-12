@@ -26,7 +26,7 @@ export interface FlowConfigData {
 		retainDays: number;
 	};
 	worker: {
-		/** WebSocket port for worker↔daemon communication. null = auto (httpPort+1). Default: null. */
+		/** WebSocket port for worker<->daemon communication. null = auto (httpPort+1). Default: null. */
 		wsPort: number | null;
 	};
 	security: {

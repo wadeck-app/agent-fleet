@@ -521,7 +521,7 @@ export class CommandHandler {
 		if (stepsToInject.length === 0) return;
 
 		const context = this.executionContexts.get(executionId)!;
-		// Pass `parent` through — FlowScheduler.inject() registers parent-child relationships natively
+		// Pass `parent` through -- FlowScheduler.inject() registers parent-child relationships natively
 		const newReady = scheduler.inject(stepsToInject as SchedulerStep[]);
 		this.enqueueReadyItems(executionId, newReady, context);
 	}

@@ -40,12 +40,12 @@ const log = createLogger('WorkersService');
  * - Type-safe event emission using EventBroadcaster
  *
  * Future CRUD Operations (when implemented):
- * - createWorker() → emit 'b2f:worker:created'
- * - updateWorker() → emit 'b2f:worker:updated'
- * - deleteWorker() → emit 'b2f:worker:deleted'
- * - updateWorkerStatus() → emit 'b2f:worker:status_changed'
- * - recordHeartbeat() → emit 'b2f:worker:heartbeat'
- * - updateWorkerCapacity() → emit 'b2f:worker:capacity_changed'
+ * - createWorker() -> emit 'b2f:worker:created'
+ * - updateWorker() -> emit 'b2f:worker:updated'
+ * - deleteWorker() -> emit 'b2f:worker:deleted'
+ * - updateWorkerStatus() -> emit 'b2f:worker:status_changed'
+ * - recordHeartbeat() -> emit 'b2f:worker:heartbeat'
+ * - updateWorkerCapacity() -> emit 'b2f:worker:capacity_changed'
  *
  * ===========================================================================================
  */

@@ -212,10 +212,10 @@ describe('ProjectsV2Page', () => {
 		it('DOUBLE FLUSH BUG: should NOT revert to first project when clicking second project and switching tabs', async () => {
 			// This test reproduces the EXACT scenario from production:
 			// 1. Page load with projectId=jz52yz1uq
-			// 2. User clicks Agent Fleet → projectId changes to wwuypfn8p
+			// 2. User clicks Agent Fleet -> projectId changes to wwuypfn8p
 			// 3. Auto-selection triggers for workspace
 			// 4. Scripts tab opens (because view=scripts in URL)
-			// 5. User clicks Tasks tab → view changes to tasks
+			// 5. User clicks Tasks tab -> view changes to tasks
 			// 6. BUG: Multiple flushes with stale closures cause projectId to revert
 
 			// Setup: Two pinned projects with workspaces
@@ -589,8 +589,8 @@ describe('ProjectsV2Page', () => {
 
 	describe('BUG: Edit dialog re-opens after background workspace refresh', () => {
 		// Root cause: loadWorkspaces() called setLoading(true) on every refresh (including WebSocket).
-		// This caused: loading=true → skeleton → WorkspacePanel unmounts → URL cleanup effect skipped
-		// → WorkspacePanel remounts reading stale ?dialog=edit-workspace → modal re-opens.
+		// This caused: loading=true -> skeleton -> WorkspacePanel unmounts -> URL cleanup effect skipped
+		// -> WorkspacePanel remounts reading stale ?dialog=edit-workspace -> modal re-opens.
 		// Fix: loading skeleton only when workspaces.length === 0 (initial load, no data yet).
 
 		const bgProjects: Project[] = [

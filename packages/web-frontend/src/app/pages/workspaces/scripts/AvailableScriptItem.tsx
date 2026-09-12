@@ -13,7 +13,7 @@ import { ArrowLeft } from 'lucide-react';
  * Features:
  * - Script name display (font-medium)
  * - Command display (text-xs text-muted-foreground)
- * - Arrow left button (←) to add the script
+ * - Arrow left button (<-) to add the script
  * - Hover effect
  * - Loading state during API calls
  *

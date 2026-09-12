@@ -11,7 +11,7 @@ import { startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
 
 // Check that the binary exists AND launches without module-level errors.
-// Passes no FLOW_WS_PORT so the worker exits with "not set" — that's fine.
+// Passes no FLOW_WS_PORT so the worker exits with "not set" -- that's fine.
 // If the binary has CJS/ESM issues (Dynamic require errors) it is treated as absent.
 function isWorkerRunnable(): boolean {
 	if (!fs.existsSync(workerBinary)) return false;

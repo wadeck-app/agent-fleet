@@ -10,7 +10,7 @@
  * Core Principles:
  * - **fstate**: Frozen state (memoized reference) - the single source of truth
  * - **actions**: All state-modifying functions
- * - **fillQuery**: Converts feature state → backend query parameters
+ * - **fillQuery**: Converts feature state -> backend query parameters
  *
  * Why only fstate?
  * Object dependencies in useEffect cause infinite loops if not stable references.

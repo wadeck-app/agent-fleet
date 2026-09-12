@@ -16,8 +16,8 @@
  * and ensure the file has execute permission (chmod +x) on Unix.
  *
  * REQUIREMENT: Every provider feature must have 1-2 automated flow tests here using mocks.
- * - Use OPENCODE_MOCK_PATH → src/testing/opencode-mock.mjs for OpenCode steps
- * - Use CLAUDE_MOCK_PATH → src/testing/claude-mock.mjs for Claude steps
+ * - Use OPENCODE_MOCK_PATH -> src/testing/opencode-mock.mjs for OpenCode steps
+ * - Use CLAUDE_MOCK_PATH -> src/testing/claude-mock.mjs for Claude steps
  * - Never use real APIs in automated tests
  * See also: StepRunner.model.integration.test.ts for the Claude equivalent.
  */
@@ -67,7 +67,7 @@ function shouldRunIntegration(): boolean {
 	if (process.env['OPENCODE_INTEGRATION']) return true;
 	const current = currentOpenCodeVersion();
 	const stored = storedVersion();
-	// Auto-run only if we have a baseline AND it's stale — never on first install
+	// Auto-run only if we have a baseline AND it's stale -- never on first install
 	return current !== null && stored !== null && current !== stored;
 }
 
@@ -528,7 +528,7 @@ describe('Flow-level feature tests (mock providers)', () => {
 				expect(toolEvent.data['status']).toBe('completed');
 				expect(toolEvent.data['output']).toBe('tool result output');
 
-				// Final result must still arrive — step_finish(tool-calls) must NOT terminate execution
+				// Final result must still arrive -- step_finish(tool-calls) must NOT terminate execution
 				const resultEvent = capturedEvents.find(e => e.type === 'result');
 				expect(resultEvent).toBeDefined();
 				expect(resultEvent!.data['result']).toBe('Done with tool.');
@@ -608,7 +608,7 @@ describe('Flow-level feature tests (mock providers)', () => {
 		async () => {
 			// The standard mock scenario emits a `text` event with the response text.
 			// With the streaming fix in place, that text event must flow through
-			// onStreamEvent → StreamEventMapper.map('text') → onLogEntry.
+			// onStreamEvent -> StreamEventMapper.map('text') -> onLogEntry.
 			const prevMockPath = process.env['OPENCODE_MOCK_PATH'];
 			process.env['OPENCODE_MOCK_PATH'] = MOCK_PATH;
 
@@ -966,7 +966,7 @@ describe('Flow-level feature tests (mock providers)', () => {
 	);
 });
 
-// ─── Helpers for sub-step retry integration tests ────────────────────────────
+// --- Helpers for sub-step retry integration tests ----------------------------
 
 /**
  * Build a counter-based multi-response mock .mjs script.
@@ -1018,7 +1018,7 @@ function makeOrchestrator(): FlowOrchestrator {
 	return new FlowOrchestrator(runner);
 }
 
-// ─── Sub-step retry loop: classify validation (01_triage concept) ────────────
+// --- Sub-step retry loop: classify validation (01_triage concept) ------------
 
 describe('Sub-step retry loop: classify validation (01_triage concept)', () => {
 	const SUBSTEP_TIMEOUT = 60_000;
@@ -1058,11 +1058,11 @@ describe('Sub-step retry loop: classify validation (01_triage concept)', () => {
 					name: 'Classify',
 					type: 'model',
 					provider: 'opencode',
-					// On first run subSteps is absent → {% if %} evaluates to false (non-strict condition)
-					// On re-runs subSteps.classify_validate.status.failed is true → ERROR block included
+					// On first run subSteps is absent -> {% if %} evaluates to false (non-strict condition)
+					// On re-runs subSteps.classify_validate.status.failed is true -> ERROR block included
 					prompt: 'Classify: ${{ inputs.description }} {% if subSteps.classify_validate.status.failed %}ERROR: ${{ subSteps.classify_validate.outputs.stderr }}{% endif %}',
 					output: {
-						// No 'from' → uses rawOutput (the full model response text), trimmed
+						// No 'from' -> uses rawOutput (the full model response text), trimmed
 						taskType: { type: 'string', transform: 'trim' },
 					},
 					maxSubStepIterations,
@@ -1147,7 +1147,7 @@ describe('Sub-step retry loop: classify validation (01_triage concept)', () => {
 	it(
 		'Scenario C (max iterations exceeded): mock always returns "garbage" → all retries fail → flow fails',
 		async () => {
-			// maxSubStepIterations: 2 → 3 total classify calls, all produce garbage
+			// maxSubStepIterations: 2 -> 3 total classify calls, all produce garbage
 			writeFileSync(mockPath, buildMultiResponseMock(['garbage', 'garbage', 'garbage'], counterFile));
 			process.env['OPENCODE_MOCK_PATH'] = mockPath;
 
@@ -1174,7 +1174,7 @@ describe('Sub-step retry loop: classify validation (01_triage concept)', () => {
 	);
 });
 
-// ─── Sub-step retry loop: generate-flow check-taskid (02_refine concept) ────
+// --- Sub-step retry loop: generate-flow check-taskid (02_refine concept) ----
 
 describe('Sub-step retry loop: generate-flow check-taskid (02_refine concept)', () => {
 	const SUBSTEP_TIMEOUT = 60_000;
@@ -1204,7 +1204,7 @@ describe('Sub-step retry loop: generate-flow check-taskid (02_refine concept)', 
 	});
 
 	function makeGenerateFlowFlow(): FlowDefinition {
-		// outputFile is captured in closure — safe for inline flow definition
+		// outputFile is captured in closure -- safe for inline flow definition
 		const safeOutputFile = outputFile;
 		return {
 			id: 'test-generate-flow-retry',
@@ -1286,8 +1286,8 @@ describe('Sub-step retry loop: generate-flow check-taskid (02_refine concept)', 
 	it(
 		'Scenario B (retry): mock first output contains "test123" → check-taskid fails → parent restarts with error context → second output clean → check-taskid passes',
 		async () => {
-			// First call: YAML with hardcoded task ID → check-taskid fails
-			// Second call: clean YAML → check-taskid passes
+			// First call: YAML with hardcoded task ID -> check-taskid fails
+			// Second call: clean YAML -> check-taskid passes
 			writeFileSync(
 				mockPath,
 				buildMultiResponseMock(

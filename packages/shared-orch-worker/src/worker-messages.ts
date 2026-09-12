@@ -1,11 +1,11 @@
-// Worker → Orchestrator (W2O) messages
+// Worker -> Orchestrator (W2O) messages
 import type { ProtocolMessage, createMessageInternal_Timestamp } from 'shared-common/protocol';
 import { createMessageInternal } from 'shared-common/protocol';
 
 import type { FlowMetadata, TaskStatus, TicketStatus } from './domain-types';
 
 export enum W2OMessageType {
-	// W2O Messages (Worker → Orchestrator)
+	// W2O Messages (Worker -> Orchestrator)
 	WORKER_READY = 'w2o:worker:ready',
 	WORKER_HEARTBEAT = 'w2o:worker:heartbeat',
 	REQUEST_TASK = 'w2o:task:request',
@@ -27,7 +27,7 @@ export enum W2OMessageType {
 	// Intervention messages
 	INTERVENTION_REQUESTED = 'w2o:intervention:requested',
 
-	// Hook → Orchestrator (via Worker) - TODO: Deprecated?
+	// Hook -> Orchestrator (via Worker) - TODO: Deprecated?
 	/** TODO Deprecated no?*/
 	STOP_REQUESTED = 'stop_requested',
 	/** TODO Deprecated no?*/
@@ -244,7 +244,7 @@ export type W2OMessage =
 	| W2OErrorMessage;
 
 /**
- * Type map for Worker → Orchestrator messages.
+ * Type map for Worker -> Orchestrator messages.
  * Maps each W2OMessageType to its corresponding message interface.
  */
 export interface W2OMessageMap {
@@ -274,7 +274,7 @@ export interface W2OMessageMap {
 }
 
 /**
- * Creates a typed Worker → Orchestrator message.
+ * Creates a typed Worker -> Orchestrator message.
  *
  * @template T - The message type (inferred from the type parameter)
  * @param type - The W2O message type

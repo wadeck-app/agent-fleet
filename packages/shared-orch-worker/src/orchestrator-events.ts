@@ -1,9 +1,9 @@
 /**
  * ===========================================================================================
- * ORCHESTRATOR-TO-BACKEND (O→B) EVENT TYPES
+ * ORCHESTRATOR-TO-BACKEND (O->B) EVENT TYPES
  * ===========================================================================================
  *
- * Type-safe event protocol for Orchestrator → Backend communication.
+ * Type-safe event protocol for Orchestrator -> Backend communication.
  * All event types are prefixed with O2B_ for clarity and discoverability.
  *
  * Events supported:
@@ -163,11 +163,11 @@ export const O2B_TaskStatusChangedEventSchema = z.object({
 export type O2B_TaskStatusChangedEvent = z.infer<typeof O2B_TaskStatusChangedEventSchema>;
 
 // ===========================================================================================
-// UNION TYPE FOR ALL O→B EVENTS
+// UNION TYPE FOR ALL O->B EVENTS
 // ===========================================================================================
 
 /**
- * Union type for all O→B events
+ * Union type for all O->B events
  */
 export type O2BEvent =
 	| O2B_WorkerStatusEvent

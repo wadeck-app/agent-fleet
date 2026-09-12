@@ -5,14 +5,14 @@ Scope: Accidental disclosure prevention. Not adversarial-proof. An attacker with
 Trust boundaries
 
 ```
-CLI process          → daemon (HTTP/. loopback)     [no secret values]
-Daemon process       → worker (WebSocket assign msg)  [no secret values -- URIs only]
-Worker process       → SecretProvider                 [resolves URI → plaintext, in-process only]
-Worker process       → Claude subprocess              [env vars, explicit only]
-Worker process       → script subprocess              [env vars, explicit only]
-Worker process       → daemon (log/result WebSocket)  [masked before send]
-Worker process       → disk (executions/.json)       [masked before write]
-Worker process       → disk (logs/.ndjson)           [masked before write]
+CLI process          -> daemon (HTTP/. loopback)     [no secret values]
+Daemon process       -> worker (WebSocket assign msg)  [no secret values -- URIs only]
+Worker process       -> SecretProvider                 [resolves URI -> plaintext, in-process only]
+Worker process       -> Claude subprocess              [env vars, explicit only]
+Worker process       -> script subprocess              [env vars, explicit only]
+Worker process       -> daemon (log/result WebSocket)  [masked before send]
+Worker process       -> disk (executions/.json)       [masked before write]
+Worker process       -> disk (logs/.ndjson)           [masked before write]
 ```
 
 Provider hierarchy
@@ -83,7 +83,7 @@ Why no padding: trailing `=` belongs to the outer encoding when a secret is embe
 
 Why base shifts: a secret embedded inside a larger base-encoded blob encodes differently depending on its byte-offset (, , or ) within the -byte base block boundary. All variants must be registered.
 
-Slice calculation: offset- prepends null byte → `ceil(/) = ` leading base chars encode the padding, slice() removes them. Offset- prepends null bytes → `ceil(/) = ` leading chars, slice(). Slicing in both cases (prior error) removes a full -byte block and cancels the shift entirely.
+Slice calculation: offset- prepends null byte -> `ceil(/) = ` leading base chars encode the padding, slice() removes them. Offset- prepends null bytes -> `ceil(/) = ` leading chars, slice(). Slicing in both cases (prior error) removes a full -byte block and cancels the shift entirely.
 
 Masking applies to ALL output paths:
 
@@ -126,7 +126,7 @@ flow run ./deploy.yml --input deploy_key=file://./secrets/deploy_key
 flow run ./deploy.yml --input deploy_key=env://MY_DEPLOY_KEY
 ```
 
-The CLI validates that inputs declared as `type: secret` receive a recognized URI scheme (`env://`, `file://`). Literal values are rejected at CLI validation time. The URI travels through CLI→daemon→worker as a string. The worker resolves it via `SecretProvider` -- the plaintext never leaves the worker process. The trust boundary holds.
+The CLI validates that inputs declared as `type: secret` receive a recognized URI scheme (`env://`, `file://`). Literal values are rejected at CLI validation time. The URI travels through CLI->daemon->worker as a string. The worker resolves it via `SecretProvider` -- the plaintext never leaves the worker process. The trust boundary holds.
 
 Interactive TTY collection is not supported. The CLI is non-interactive by design.
 
@@ -141,8 +141,8 @@ Result: error -- move to `secrets:` block.
 Pass -- Shannon entropy scan (warning):
 `H = -Σ p(c) × log₂(p(c))`. For values with length ≥ :
 
-- Base charset entropy > . → warning
-- Hex charset entropy > . → warning
+- Base charset entropy > . -> warning
+- Hex charset entropy > . -> warning
 
 Human-readable config scores < .. Random tokens score > .. Threshold matches detect-secrets and Gitleaks defaults.
 
@@ -191,7 +191,7 @@ Known residual risks
 | Absolute file:// default                  | Mitigated                | Default is error; warn requires explicit config opt-in                                                                                                              |
 | NOTHING default env                       | By design                | Operator must declare PATH and all required vars explicitly; no fallback                                                                                            |
 | Hex-encoded secret in output              | Mitigated                | Hex variant registered with masker                                                                                                                                  |
-| `vars:` value containing a secret         | Mitigated                | Entropy scan + prefix scan at validate time; known prefixes → error, high entropy → warning                                                                         |
+| `vars:` value containing a secret         | Mitigated                | Entropy scan + prefix scan at validate time; known prefixes -> error, high entropy -> warning                                                                         |
 | `charset: none` + multi-line secret       | Partial                  | Masking does NOT work for multi-line values regardless of charset setting -- line-based masker cannot match across line boundaries. Warning explicitly states this. |
 | `vars:` resolved values unmasked          | Mitigated                | `vars:` values sourced via `env://`/`file://`/`input://` are also registered with the masker at worker startup                                                      |
 | `input://` secret literal at CLI          | Mitigated                | CLI rejects literal values for `type: secret` inputs -- only URI schemes accepted                                                                                   |

@@ -23,7 +23,7 @@
  * - Long Polling: Server holds connection until events available or timeout
  *
  * Limitations:
- * - Unidirectional: Server → Client only (like SSE)
+ * - Unidirectional: Server -> Client only (like SSE)
  * - Higher latency than WebSocket/SSE/Long Polling (depends on poll interval)
  * - More overhead (frequent connections)
  * - Cannot send requests via polling (use REST API instead)

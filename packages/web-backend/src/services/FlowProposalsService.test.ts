@@ -277,7 +277,7 @@ describe('FlowProposalsService', () => {
 			vi.mocked(stubs.ticketsRepository.findById).mockResolvedValue(ticket);
 			vi.mocked(stubs.proposalsRepository.findByTicketId).mockResolvedValue([proposal]);
 			vi.mocked(stubs.proposalsRepository.update).mockResolvedValue(rejectedProposal);
-			// designFlow is called async — stub it to resolve eventually
+			// designFlow is called async -- stub it to resolve eventually
 			vi.mocked(stubs.designerAgent.designFlow).mockResolvedValue(makeDesignOutput());
 			vi.mocked(stubs.proposalsRepository.create).mockResolvedValue(makeProposal({ id: 'prop-2', version: 2 }));
 			vi.mocked(stubs.ticketsRepository.update).mockResolvedValue(ticket);
@@ -428,7 +428,7 @@ describe('FlowProposalsService', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// resolveThread (backward compat — delegates to updateThread)
+	// resolveThread (backward compat -- delegates to updateThread)
 	// ---------------------------------------------------------------------------
 
 	describe('resolveThread', () => {

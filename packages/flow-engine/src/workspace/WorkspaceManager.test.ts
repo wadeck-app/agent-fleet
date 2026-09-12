@@ -491,9 +491,9 @@ describe('WorkspaceManager', () => {
 			makeWorkspaceDir('ws-b', 2000);
 			makeWorkspaceDir('ws-c', 1000);
 			await manager.pruneOldWorkspaces({ retainDays: 999, maxWorkspaces: 2 });
-			// ws-a is oldest — should be pruned
+			// ws-a is oldest -- should be pruned
 			expect(fs.existsSync(path.join(workspacesDir, 'ws-a'))).toBe(false);
-			// ws-b and ws-c are the 2 most recent — kept
+			// ws-b and ws-c are the 2 most recent -- kept
 			expect(fs.existsSync(path.join(workspacesDir, 'ws-b'))).toBe(true);
 			expect(fs.existsSync(path.join(workspacesDir, 'ws-c'))).toBe(true);
 		});

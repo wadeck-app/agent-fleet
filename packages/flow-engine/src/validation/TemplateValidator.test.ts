@@ -333,12 +333,12 @@ describe('TemplateValidator', () => {
 				],
 			};
 
-			// Validate flow A first — "extra_param" gets auto-discovered
+			// Validate flow A first -- "extra_param" gets auto-discovered
 			validator.validateTemplates(flowA, new Set(['step1']), new Set<string>());
 			const autoAfterA = validator.getAutoDiscoveredInputs();
 			expect(autoAfterA.has('extra_param')).toBe(true);
 
-			// Validate flow B — auto-discovered inputs should reset, "extra_param" must NOT leak
+			// Validate flow B -- auto-discovered inputs should reset, "extra_param" must NOT leak
 			validator.validateTemplates(flowB, new Set(['step1']), new Set(['task']));
 			const autoAfterB = validator.getAutoDiscoveredInputs();
 			expect(autoAfterB.has('extra_param')).toBe(false);

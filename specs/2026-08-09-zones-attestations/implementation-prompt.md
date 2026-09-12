@@ -17,24 +17,24 @@ Cross-cutting constraints from the flow-cli spec:
 ```
 packages/flow-engine/src/
   validation/
-    FlowValidator.ts        ← entry point; constructor takes (flowRegistry?: FlowRegistry)
+    FlowValidator.ts        <- entry point; constructor takes (flowRegistry?: FlowRegistry)
     SchemaValidator.ts
     SemanticValidator.ts
     TemplateValidator.ts
-    ValidationTypes.ts      ← ValidationCode enum, ValidationIssue interface
+    ValidationTypes.ts      <- ValidationCode enum, ValidationIssue interface
   executor/
     FlowExecutor.ts
     FlowOrchestrator.ts
     StepRunner.ts
     ScriptExecutor.ts
-  types.ts                  ← FlowDefinition, ScriptFlowStep shapes live here
+  types.ts                  <- FlowDefinition, ScriptFlowStep shapes live here
 ```
 
 Read `types.ts` and `ValidationTypes.ts` before writing any code -- their shapes define what you extend and produce.
 
 ## V1 scope
 
-V1 delivers static validation only. Runtime concerns (attestation production, zone activation, secret injection) depend on D23 (WebSocket worker↔daemon) which is deferred to v2. Do not implement anything in the "v2" section below.
+V1 delivers static validation only. Runtime concerns (attestation production, zone activation, secret injection) depend on D23 (WebSocket worker<->daemon) which is deferred to v2. Do not implement anything in the "v2" section below.
 
 ## What you must implement (V1)
 
@@ -94,20 +94,20 @@ Constructor takes `(issueCollector: IssueCollector, scopeConfig: ZonesScopeConfi
 
 **Secret reference pattern:** The template syntax is `${{ secrets.<id> }}` where `<id>` matches `[A-Za-z_][A-Za-z0-9_]*` (no hyphens). Match with regex `/\$\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g`. An env value may contain multiple references.
 
-**Check Z4-1:** For each step with `zone: X` -- if zone `X` is not a key in `scopeConfig.zones` (including when `scopeConfig.zones` is absent or empty) → `ZONE_UNDEFINED` error with message: `"Step '<stepId>' references undefined zone '<X>'"`. A step that declares a zone always requires that zone to exist in the scope config.
+**Check Z4-1:** For each step with `zone: X` -- if zone `X` is not a key in `scopeConfig.zones` (including when `scopeConfig.zones` is absent or empty) -> `ZONE_UNDEFINED` error with message: `"Step '<stepId>' references undefined zone '<X>'"`. A step that declares a zone always requires that zone to exist in the scope config.
 
-**Check Z4-2:** For each zone `X` referenced by any step -- for each attestation `A` in `zone.requires` -- if no step in the flow declares `produces` containing `{ attestation: A }` → `ZONE_ATTESTATION_UNSATISFIABLE` error with message: `"Zone '<X>' requires attestation '<A>' but no step produces it"`. Multiple steps producing the same attestation name is allowed (Z4-2 requires at least one). A zone with an empty or absent `requires` array has no unsatisfiable attestations -- no error.
+**Check Z4-2:** For each zone `X` referenced by any step -- for each attestation `A` in `zone.requires` -- if no step in the flow declares `produces` containing `{ attestation: A }` -> `ZONE_ATTESTATION_UNSATISFIABLE` error with message: `"Zone '<X>' requires attestation '<A>' but no step produces it"`. Multiple steps producing the same attestation name is allowed (Z4-2 requires at least one). A zone with an empty or absent `requires` array has no unsatisfiable attestations -- no error.
 
 **Check Z5:** For each step (all steps, not only zoned steps) -- scan all `env` values for secret references matching the pattern above. For each match `<id>`:
 
-- If `<id>` is not found in `scopeConfig.secrets` → `SECRET_ZONE_MISMATCH` error with message: `"Secret '<id>' is not declared in scope config"`
-- If `<id>` is found with `zone: Y` and the step does not declare `zone: Y` → `SECRET_ZONE_MISMATCH` error with message: `"Secret '<id>' requires zone 'Y' but step '<stepId>' is not in zone 'Y'"`
+- If `<id>` is not found in `scopeConfig.secrets` -> `SECRET_ZONE_MISMATCH` error with message: `"Secret '<id>' is not declared in scope config"`
+- If `<id>` is found with `zone: Y` and the step does not declare `zone: Y` -> `SECRET_ZONE_MISMATCH` error with message: `"Secret '<id>' requires zone 'Y' but step '<stepId>' is not in zone 'Y'"`
 
 Note: `SecretConfig.zone` is a required field. Every secret in `scopeConfig.secrets` must have a zone. There is no "unzoned secret" concept -- if a secret does not need zone restriction, it should not appear in `.flows/zones.yml` at all and references to it will fail Z5's "not declared" check.
 
 **D31 vs. zone secrets:** Flow-level `secrets:` (D31 -- `env://`, `file://` URI schemes, declared in the flow YAML) are independent of zone-scoped secrets (declared in `.flows/zones.yml`). Z5 only checks references in `env` values against `scopeConfig.secrets` from `.flows/zones.yml`. D31 flow-level secrets are resolved by a different mechanism and are not subject to zone validation.
 
-**Check Z5-ext:** For each secret in `scopeConfig.secrets` -- if `secret.zone` is not a key in `scopeConfig.zones` → `ZONE_UNDEFINED` error on the secret declaration itself. Also validate that secret `id` values are unique in `scopeConfig.secrets`; duplicates → `DUPLICATE_ID` error (reuse existing code). Also validate that `produces` within a single step has no duplicate `attestation` values; duplicates within the same step → `DUPLICATE_ID` error.
+**Check Z5-ext:** For each secret in `scopeConfig.secrets` -- if `secret.zone` is not a key in `scopeConfig.zones` -> `ZONE_UNDEFINED` error on the secret declaration itself. Also validate that secret `id` values are unique in `scopeConfig.secrets`; duplicates -> `DUPLICATE_ID` error (reuse existing code). Also validate that `produces` within a single step has no duplicate `attestation` values; duplicates within the same step -> `DUPLICATE_ID` error.
 
 Add new `ValidationCode` values to `ValidationTypes.ts`:
 
@@ -160,10 +160,10 @@ Use the flow YAML and scope config from `scenarios.md` as test fixtures.
 
 V1 covers static validation only. Scenarios 2 and 3 in `scenarios.md` describe runtime behavior (zone activation, secret injection) -- those are V2 concerns. Map them to their static-validation equivalent for V1 tests:
 
-- Scenario 1a → step declares undefined zone → `ZONE_UNDEFINED`
-- Scenario 1b → secret used outside its zone → `SECRET_ZONE_MISMATCH`
-- Scenario 2 → use the shared flow YAML from scenarios.md but remove the `produces` block from `run-tests` to simulate a flow where zone `production` requires an attestation no step produces → `ZONE_ATTESTATION_UNSATISFIABLE`
-- Scenario 3 → the shared flow YAML from scenarios.md exactly as written → no errors (flow is statically valid)
+- Scenario 1a -> step declares undefined zone -> `ZONE_UNDEFINED`
+- Scenario 1b -> secret used outside its zone -> `SECRET_ZONE_MISMATCH`
+- Scenario 2 -> use the shared flow YAML from scenarios.md but remove the `produces` block from `run-tests` to simulate a flow where zone `production` requires an attestation no step produces -> `ZONE_ATTESTATION_UNSATISFIABLE`
+- Scenario 3 -> the shared flow YAML from scenarios.md exactly as written -> no errors (flow is statically valid)
 
 Minimum coverage: 90% for `ZoneValidator` and `ZonesScopeConfigLoader`.
 
@@ -179,7 +179,7 @@ Minimum coverage: 90% for `ZoneValidator` and `ZonesScopeConfigLoader`.
 
 ## V2 -- Runtime (do not implement now)
 
-The following sections depend on D23 (WebSocket worker↔daemon) which is deferred to v2.
+The following sections depend on D23 (WebSocket worker<->daemon) which is deferred to v2.
 
 **Attestation production** -- `ScriptExecutor` sends `attestation_produced` WebSocket message to daemon after step completes. Daemon is sole writer (D21). File: `~/.flow-daemon/attestations/<executionId>-<attestationId>.json`.
 

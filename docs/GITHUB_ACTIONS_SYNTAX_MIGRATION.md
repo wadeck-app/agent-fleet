@@ -286,9 +286,9 @@ To migrate existing flows:
 
 1.  Update all `${...}` to `${{ ... }}`
 2.  Add explicit context prefixes:
-    - `${var}` → `${{ inputs.var }}`
-    - `${step.var}` → `${{ steps.step.outputs.var }}`
-    - `${task.prop}` → `${{ task.prop }}`
+    - `${var}` -> `${{ inputs.var }}`
+    - `${step.var}` -> `${{ steps.step.outputs.var }}`
+    - `${task.prop}` -> `${{ task.prop }}`
 3.  Update conditional expressions if needed
 4.  Test all flows
 5.  Update documentation

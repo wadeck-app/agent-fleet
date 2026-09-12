@@ -15,11 +15,11 @@ interface HoldEntry {
  * enabling reliable visual screenshots of in-flight loading states.
  *
  * Example flow:
- * 1. Test calls register("PATCH /api/tickets") → server will pause any matching incoming request
+ * 1. Test calls register("PATCH /api/tickets") -> server will pause any matching incoming request
  * 2. Test triggers browser action
- * 3. Browser request arrives → preHandler sees match → awaits the release promise
+ * 3. Browser request arrives -> preHandler sees match -> awaits the release promise
  * 4. Test takes screenshot during loading state
- * 5. Test calls release(id) → server resolves promise → request proceeds
+ * 5. Test calls release(id) -> server resolves promise -> request proceeds
  * 6. Test takes screenshot of final state
  *
  * NOTE: This service should NEVER be active in production (NODE_ENV === 'production')

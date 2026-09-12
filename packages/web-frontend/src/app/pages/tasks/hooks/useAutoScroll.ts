@@ -30,12 +30,12 @@ export function useAutoScroll<T extends BaseLogEntry>(
 		const { scrollTop, scrollHeight, clientHeight } = container;
 		const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
 
-		// User scrolled up → disable auto-scroll
+		// User scrolled up -> disable auto-scroll
 		if (scrollTop < lastScrollTopRef.current && !isAtBottom) {
 			setIsAutoScrollEnabled(false);
 		}
 
-		// User scrolled to bottom → re-enable auto-scroll
+		// User scrolled to bottom -> re-enable auto-scroll
 		if (isAtBottom && !isAutoScrollEnabled) {
 			setIsAutoScrollEnabled(true);
 		}

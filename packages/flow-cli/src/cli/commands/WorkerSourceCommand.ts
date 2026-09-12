@@ -68,6 +68,7 @@ export function registerWorkerSourceCommand(program: Command): void {
 				console.log(`     Declaring a source does not create a worker. It records how one can be`);
 				console.log(`     obtained; a worker only becomes usable once it connects.`);
 			} catch (err) {
+				// violations-suppress: security/no-raw-err-in-cli these are authored, actionable messages from WorkerSourceRegistry (duplicate id, invalid maxWorkers), and a filesystem error like EACCES is itself the actionable detail a CLI user needs
 				console.error(`[fail] ${normalizeError(err).message}`);
 				process.exit(1);
 			}
@@ -101,6 +102,7 @@ export function registerWorkerSourceCommand(program: Command): void {
 				console.log('');
 				console.log('Declared sources describe intent. Use "flow worker list" to see live workers.');
 			} catch (err) {
+				// violations-suppress: security/no-raw-err-in-cli these are authored, actionable messages from WorkerSourceRegistry (duplicate id, invalid maxWorkers), and a filesystem error like EACCES is itself the actionable detail a CLI user needs
 				console.error(`[fail] ${normalizeError(err).message}`);
 				process.exit(1);
 			}
@@ -118,6 +120,7 @@ export function registerWorkerSourceCommand(program: Command): void {
 				}
 				console.log(`[ok] Removed worker source '${sourceId}'`);
 			} catch (err) {
+				// violations-suppress: security/no-raw-err-in-cli these are authored, actionable messages from WorkerSourceRegistry (duplicate id, invalid maxWorkers), and a filesystem error like EACCES is itself the actionable detail a CLI user needs
 				console.error(`[fail] ${normalizeError(err).message}`);
 				process.exit(1);
 			}

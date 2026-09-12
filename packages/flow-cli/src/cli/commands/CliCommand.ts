@@ -62,7 +62,7 @@ function formatLogLine(raw: string): string {
 	try {
 		parsed = JSON.parse(trimmed);
 	} catch {
-		// Not valid JSON — return as-is
+		// Not valid JSON -- return as-is
 		return raw;
 	}
 
@@ -81,7 +81,7 @@ function formatLogLine(raw: string): string {
 		return `${time} [${level}] ${obj.msg}`;
 	}
 
-	// Unknown shape — return raw
+	// Unknown shape -- return raw
 	return raw;
 }
 

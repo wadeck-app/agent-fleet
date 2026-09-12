@@ -46,7 +46,7 @@ interface LogLine {
 	message: string;
 }
 
-// TODO(Option B): replace file-tail with WebSocket Channel 3 (CLI→Daemon) for real-time
+// TODO(Option B): replace file-tail with WebSocket Channel 3 (CLI->Daemon) for real-time
 // streaming without polling delay. See docs/architecture.md for Channel 3 spec.
 export function tailLogFile(
 	logFile: string,

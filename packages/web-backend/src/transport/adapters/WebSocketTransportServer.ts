@@ -42,7 +42,7 @@ const log = createLogger('WebSocketTransportServer');
  * Message types:
  * - Connection: connected, auth_error, token_expired, token_expiring_soon
  * - Subscription: subscription, subscription_updated
- * - Request/Response: TransportRequest → TransportResponse
+ * - Request/Response: TransportRequest -> TransportResponse
  * - Event: TransportEvent
  *
  * Security flow:

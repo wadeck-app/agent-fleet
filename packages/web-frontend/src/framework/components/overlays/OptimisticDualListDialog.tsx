@@ -18,9 +18,9 @@ import { DualListView, type DualListViewProps } from './DualListView';
  * Architecture:
  * ```
  * OptimisticDualListDialog (composition)
- *   ├─ Dialog (Radix UI - modal wrapper)
- *   ├─ useDualListState (logic hook - optimistic updates)
- *   └─ DualListView (pure view - rendering)
+ *   |- Dialog (Radix UI - modal wrapper)
+ *   |- useDualListState (logic hook - optimistic updates)
+ *   \- DualListView (pure view - rendering)
  * ```
  *
  * Usage:

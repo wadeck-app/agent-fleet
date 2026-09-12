@@ -34,7 +34,7 @@ import type { SortingFeatureHook } from './useSortingFeature';
  * Contrast:
  * - A1: Widget owns state (internal hooks)
  * - A2: Context owns state (shared via provider)
- * - A3: Page owns hooks (passed as props) ← This approach
+ * - A3: Page owns hooks (passed as props) <- This approach
  *
  * ===========================================================================================
  * DESIGN NOTES - Approach A3 Trade-offs

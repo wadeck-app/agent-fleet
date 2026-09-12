@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// agent-fleet root (4 levels up from src/cli/: src/cli → src → flow-cli → packages → agent-fleet)
+// agent-fleet root (4 levels up from src/cli/: src/cli -> src -> flow-cli -> packages -> agent-fleet)
 const agentFleetRoot = path.resolve(__dirname, '../../../..');
 const bundlePath = path.resolve(agentFleetRoot, 'packages/flow-cli/dist-bundle/flow.cjs');
 const updaterBundlePath = path.resolve(agentFleetRoot, 'packages/flow-cli/dist-bundle/flow-updater.cjs');

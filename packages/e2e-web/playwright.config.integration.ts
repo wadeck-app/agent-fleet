@@ -9,7 +9,7 @@ const runId = process.env.RUN_ID || `${Date.now()}-${process.pid}`;
 process.env.RUN_ID = runId;
 
 // Calculate base E2E frontend port from WORKSPACE_ID for parallel testing
-// WORKSPACE_ID=0 → 5050, WORKSPACE_ID=1 → 5150, WORKSPACE_ID=2 → 5250, etc.
+// WORKSPACE_ID=0 -> 5050, WORKSPACE_ID=1 -> 5150, WORKSPACE_ID=2 -> 5250, etc.
 const workspaceId = parseInt(process.env.WORKSPACE_ID || '0', 10);
 const e2eFrontendPort = 5050 + workspaceId * 100;
 

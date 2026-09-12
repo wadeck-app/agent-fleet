@@ -1,5 +1,5 @@
 /**
- * FlowScheduler characterization tests — lock down scheduling behavior.
+ * FlowScheduler characterization tests -- lock down scheduling behavior.
  * Originally written as a spec against FlowOrchestrator, now targeting FlowScheduler directly.
  * Renamed to regression.test.ts after Phase 1 is complete (kept as .characterization for traceability).
  */
@@ -92,7 +92,7 @@ describe('FlowScheduler — characterization (scheduling behavior)', () => {
 		});
 
 		it('skips step and downstream steps still run (skip propagates as completion)', () => {
-			// a → b (when: false, skipped) → c (should still run)
+			// a -> b (when: false, skipped) -> c (should still run)
 			const steps = [makeStep('a'), makeStepWithWhen('b', 'false', ['a']), makeStep('c', ['b'])];
 			const deps = new Map([
 				['b', ['a']],
@@ -172,7 +172,7 @@ describe('FlowScheduler — characterization (scheduling behavior)', () => {
 			const ready = scheduler.start([makeStep('a'), makeStep('b')], new Map());
 			expect(ready).toHaveLength(2);
 
-			// Acknowledge a — it is in-flight; collectReady triggered by completing b should not include a
+			// Acknowledge a -- it is in-flight; collectReady triggered by completing b should not include a
 			scheduler.acknowledge('a');
 			// If we inject a step with no deps, it is ready; a should NOT appear again
 			const injected = scheduler.inject([makeStep('c')]);

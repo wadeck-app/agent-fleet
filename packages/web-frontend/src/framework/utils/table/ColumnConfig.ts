@@ -10,7 +10,7 @@ import type { TableColumn } from '@framework/components/table/Table';
  * Eliminates duplication by using table column definitions as the single source of truth.
  *
  * Purpose:
- * - Convert TableColumn[] → ColumnDef[] for ColumnVisibility component
+ * - Convert TableColumn[] -> ColumnDef[] for ColumnVisibility component
  * - Extract column IDs for useColumnVisibility hook
  * - Extract default visible columns from TableColumn definitions
  *

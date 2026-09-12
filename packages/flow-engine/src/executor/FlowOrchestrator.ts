@@ -146,7 +146,7 @@ export class FlowOrchestrator {
 
 		while (!scheduler.isTerminal()) {
 			if (readyItems.length === 0) {
-				// No ready steps, no in-flight steps → deadlock (shouldn't happen after DAG validation)
+				// No ready steps, no in-flight steps -> deadlock (shouldn't happen after DAG validation)
 				const remaining = flow.steps.filter((s: FlowStep) => !stepOutputs.has(s.id));
 				throw new OrchestrationError(
 					`No steps ready to execute, but ${remaining.length} steps remain: ${remaining

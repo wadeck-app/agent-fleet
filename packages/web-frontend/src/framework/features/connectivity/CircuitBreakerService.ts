@@ -5,7 +5,7 @@
  * Implements a circuit breaker pattern to prevent overwhelming the backend
  * when it's unreachable. Features:
  * - Automatic failure detection (3 consecutive failures)
- * - Exponential backoff (1s → 2s → 4s → ... → 30s max)
+ * - Exponential backoff (1s -> 2s -> 4s -> ... -> 30s max)
  * - Request queueing with deduplication by endpoint
  * - Automatic health checks and recovery
  * - Timeline-based time control for deterministic testing

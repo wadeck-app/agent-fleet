@@ -13,8 +13,8 @@ import type { LazyController } from '../utils/lazy-controller-plugin';
  * Routes live under /api/flow-feedback because they are feedback-ID-scoped operations.
  *
  * Handled routes:
- * - PUT    /api/flow-feedback/:feedbackId  → updateFeedback
- * - DELETE /api/flow-feedback/:feedbackId  → deleteFeedback
+ * - PUT    /api/flow-feedback/:feedbackId  -> updateFeedback
+ * - DELETE /api/flow-feedback/:feedbackId  -> deleteFeedback
  *
  * Note: Creation (POST) and retrieval routes are handled in TicketsController and
  * FlowsController respectively; those are ticket-scoped or flow-scoped subresources.

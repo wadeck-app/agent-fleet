@@ -216,7 +216,7 @@ The BF system supports multiple transports for maximum compatibility:
 ```typescript
 // All transports share the same event API
 eventBroadcaster.broadcast('bf:task:created', taskData);
-// → Automatically sent via all active transports
+// -> Automatically sent via all active transports
 ```
 
 Connection Flow

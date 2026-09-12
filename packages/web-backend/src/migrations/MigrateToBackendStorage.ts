@@ -22,9 +22,9 @@ const log = createLogger('MigrateToBackendStorage');
  *   npm run migrate               # Actually migrate
  *
  * Transformations:
- * - assignedTo → assignedWorker (field rename)
- * - metadata.projectId → projectId (extract to top level)
- * - metadata.workspaceId → workspaceId (extract to top level)
+ * - assignedTo -> assignedWorker (field rename)
+ * - metadata.projectId -> projectId (extract to top level)
+ * - metadata.workspaceId -> workspaceId (extract to top level)
  * - version: 1 (add version field for optimistic locking)
  * - Remove orchestrator-specific fields (comments, history, metadata, etc.)
  *
@@ -117,7 +117,7 @@ function transformTask(orchestratorTask: OrchestratorTask): BackendTask {
 		version: 1, // Add version for optimistic locking
 		createdAt: orchestratorTask.createdAt,
 		updatedAt: orchestratorTask.updatedAt,
-		// Rename assignedTo → assignedWorker
+		// Rename assignedTo -> assignedWorker
 		assignedWorker: orchestratorTask.assignedTo,
 		// Extract from metadata to top level
 		projectId,

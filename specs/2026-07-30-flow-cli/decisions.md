@@ -2,7 +2,7 @@ Architecture Decisions
 
 V scope
 
-v ships the minimum to execute the scenario: `task new` → elaborate → review → execute.
+v ships the minimum to execute the scenario: `task new` -> elaborate -> review -> execute.
 
 In scope for v: D-D, D-D, D-D, D, D, D-D
 Deferred to v: D (crash recovery), D (observation commands), D-D (worker reconnection), D (subflow expansion), D (flow cancel)
@@ -84,8 +84,8 @@ Why: `user_intervention` steps require a UI or interactive channel. The CLI has 
 
 D -- Log output format is context-aware
 
-- TTY detected → human-readable
-- No TTY (piped, agent) → JSON
+- TTY detected -> human-readable
+- No TTY (piped, agent) -> JSON
 - `--json` flag forces JSON explicitly
 - `--quiet` suppresses all streaming output; only the execution ID is returned
 
@@ -123,8 +123,8 @@ steps:
 
 When the worker WebSocket connection closes unexpectedly mid-step, the daemon inspects the step that was running:
 
-- `idempotent: true` → daemon re-runs that step from scratch (same execution ID, step retried)
-- `idempotent: false` (default) → execution moves to FAILED; no automatic retry
+- `idempotent: true` -> daemon re-runs that step from scratch (same execution ID, step retried)
+- `idempotent: false` (default) -> execution moves to FAILED; no automatic retry
 
 `onFailure.goto` is orthogonal: `onFailure.goto` is flow-control on clean failure (step ran and returned an error). `idempotent` is crash recovery (step was killed before it could report any result). Both can coexist on the same step. `onFailure` takes precedence for clean failures.
 
@@ -267,7 +267,7 @@ Worker    Worker    Worker    CLI subprocess
   +- call CLI > |
   |          +- call CLI  | (waits for daemon)
   |          |          +- call CLI  | (finds daemon)
-  |          |          |    first: createDaemon() inline → becomes daemon
+  |          |          |    first: createDaemon() inline -> becomes daemon
   |          |          |
   +- WS reconnect + flush buffered logs (in order)
              +- WS reconnect + flush buffered logs
@@ -288,7 +288,7 @@ On startup, the daemon reads `executions/.json`, counts steps with `status: runn
 
 Timeout: `worker.reconnectTimeoutMs` (default: s) -- same as the max exponential backoff value workers use, so a surviving worker will always attempt at least one reconnect before the window closes.
 
-Workers reconnecting within the window reclaim their pool slot and resume. Workers that do not appear within the window are declared dead -- D applies (idempotent → retry, non-idempotent → FAILED).
+Workers reconnecting within the window reclaim their pool slot and resume. Workers that do not appear within the window are declared dead -- D applies (idempotent -> retry, non-idempotent -> FAILED).
 
 Why hold assignments: Prevents assigning new steps into slots about to be reclaimed by reconnecting workers, which would temporarily exceed `queue.concurrency`.
 
@@ -296,7 +296,7 @@ Test scenarios required:
 
 - Worker survives daemon crash, reconnects within window, flushes buffered logs in order -- no log loss
 - Multiple workers survive crash, all reconnect -- pool correctly restored
-- Worker dies with daemon -- not seen in window → D applies
+- Worker dies with daemon -- not seen in window -> D applies
 - Worker reconnects after window expires -- treated as new, slot granted if available
 - Daemon restarts with running steps -- no window, immediate normal operation
 - Two workers call CLI simultaneously on crash -- D ensures only one becomes daemon
@@ -323,7 +323,7 @@ Why not a non-blocking child execution: Requiring the flow author to explicitly 
 
 Namespace prefix: Subflow step IDs in logs and execution state appear as `<subflow-step-id>.<original-step-id>`. This makes them distinguishable without ambiguity.
 
-Recursive subflows: Depth-limited. Maximum nesting depth is configurable (`queue.maxSubflowDepth`, default: ). Exceeding depth → step fails immediately.
+Recursive subflows: Depth-limited. Maximum nesting depth is configurable (`queue.maxSubflowDepth`, default: ). Exceeding depth -> step fails immediately.
 
 D -- Flow inputs: schema in YAML, values via CLI, validation in daemon
 
@@ -369,7 +369,7 @@ Validation: The daemon validates required inputs and the full flow graph before 
 
 Exception -- `type: secret` inputs: the CLI reads the flow YAML to identify which inputs are `type: secret`, then validates that their `--input` values are URI schemes (`env://`, `file://`). Literal values are rejected at CLI time with exit . This is the only pre-validation the CLI performs -- all other validation stays in the daemon.
 
-Why this exception: a literal secret value would travel through the CLI→daemon HTTP channel in plaintext. The CLI must intercept it before it leaves the process.
+Why this exception: a literal secret value would travel through the CLI->daemon HTTP channel in plaintext. The CLI must intercept it before it leaves the process.
 
 `ClientCommand.run` includes `cwd`: the CLI passes `process.cwd()` so the daemon can resolve relative `flowFile` paths and use it as the default workspace directory.
 
@@ -385,7 +385,7 @@ The daemon idle-exit check (D) treats `CANCELLED` as a terminal state.
 
 D -- Flow design skill: global, user-home scope
 
-A Claude skill installed at `~/.claude/` teaches any agent in any project the design→validate→approve→execute pattern for Flow CLI. Not project-scoped -- no assumptions about workspace paths or project config.
+A Claude skill installed at `~/.claude/` teaches any agent in any project the design->validate->approve->execute pattern for Flow CLI. Not project-scoped -- no assumptions about workspace paths or project config.
 
 Content depends on the YAML schema (D). The skill will include: step type reference, the two-phase interaction pattern (design+validate before execute), a minimal working template, and what NOT to do (no execution without user approval, no `user_intervention` steps).
 
@@ -399,9 +399,9 @@ Base fields (all steps): `id`, `name`, `depends`, `when`, `retry`, `onFailure`, 
 
 Approved exceptions (carry over as throws):
 
-- `user_intervention` → `UnsupportedOperationError` (D)
-- `workspace.mode: isolated` / git strategies → `UnsupportedOperationError` (D)
-- `${{ task. }}` expressions → resolve to undefined (no task concept in CLI); documented behavior, not an error
+- `user_intervention` -> `UnsupportedOperationError` (D)
+- `workspace.mode: isolated` / git strategies -> `UnsupportedOperationError` (D)
+- `${{ task. }}` expressions -> resolve to undefined (no task concept in CLI); documented behavior, not an error
 
 New fields added by Flow CLI on top of flow-engine (not in current engine):
 
@@ -483,10 +483,10 @@ Masking applies to every output path: Claude subprocess stdout/stderr, script su
 
 Security constraints enforced at validation
 
-- `value://` in `secrets:` → error
-- Absolute `file:///` paths → error by default (configurable to warn via `validation.absoluteSecretPath: warn`)
-- `${{ secrets.x }}` in script text → error (secrets only via env: mapping, never interpolated into script content)
-- `input://` in `secrets:` → caller must pass a URI scheme (`env://`, `file://`) via `--input name=env://X` at invocation time; literal values rejected at CLI validation
+- `value://` in `secrets:` -> error
+- Absolute `file:///` paths -> error by default (configurable to warn via `validation.absoluteSecretPath: warn`)
+- `${{ secrets.x }}` in script text -> error (secrets only via env: mapping, never interpolated into script content)
+- `input://` in `secrets:` -> caller must pass a URI scheme (`env://`, `file://`) via `--input name=env://X` at invocation time; literal values rejected at CLI validation
 
 What the operator is responsible for
 
@@ -528,8 +528,8 @@ Storage layout (project-local):
 
 ```
 .flows/tasks/
-  index.json          ← { tasks: [{ id, title, status, createdAt }] }
-  <taskId>.json       ← full task: description, history, generated steps, status transitions
+  index.json          <- { tasks: [{ id, title, status, createdAt }] }
+  <taskId>.json       <- full task: description, history, generated steps, status transitions
 ```
 
 Commands:
@@ -538,7 +538,7 @@ Commands:
 task new <description>        create task, trigger on-task-created hook
 task list                     read index.json
 task show <id>                read <taskId>.json
-task approve <id>             set status → approved, trigger on-status-change hook
+task approve <id>             set status -> approved, trigger on-status-change hook
 task set-status <id> <status>  general status transition, triggers on-status-change hook
 ```
 
@@ -604,7 +604,7 @@ All other commands are deferred to v: `attach`, `logs`, `list` (pure file-tail o
 
 Known error codes: `VALIDATION_FAILED`, `DAEMON_START_FAILED`, `PORT_CONFLICT`, `FLOW_NOT_FOUND`, `MISSING_INPUT`.
 
-Why only two: the v scenario (`task new` → elaborate → review → execute) requires only `flow run` (called by hooks) and `flow validate` (called by the deterministic validation step). Observation commands and lifecycle management are v concerns.
+Why only two: the v scenario (`task new` -> elaborate -> review -> execute) requires only `flow run` (called by hooks) and `flow validate` (called by the deterministic validation step). Observation commands and lifecycle management are v concerns.
 
 D -- Dynamic step injection: `provideSteps` tool, `parent` field, recursive hierarchy
 
@@ -631,7 +631,7 @@ Why unbounded recursion with a limit: policy engine steps need to inject feedbac
 
 UI representation: `parent`/child relationships render as nested sub-steps under the parent, preserving a high-level flow view. Only top-level steps (no `parent`) appear at the root level.
 
-Policy engine use cases: a policy step can inject missing feedback loops (e.g. "no security scan detected → inject one"), or validate that required loops exist before allowing execution to proceed.
+Policy engine use cases: a policy step can inject missing feedback loops (e.g. "no security scan detected -> inject one"), or validate that required loops exist before allowing execution to proceed.
 
 D -- `.flows/config.yml` schema
 
@@ -685,7 +685,7 @@ Why `execution.maxChildDepth` here: configurable safety ceiling per D, applies p
 
 D -- First implementation milestone
 
-Smallest working slice: a single `script` step flow, no model, no MCP. Validates the full plumbing: daemon startup → `/run` → queue → worker spawn → WebSocket `assign` → step executes → WebSocket `result` → execution file written → daemon idle exit.
+Smallest working slice: a single `script` step flow, no model, no MCP. Validates the full plumbing: daemon startup -> `/run` -> queue -> worker spawn -> WebSocket `assign` -> step executes -> WebSocket `result` -> execution file written -> daemon idle exit.
 
 Build on, don't rewrite: reuse flow-engine's `GraphValidator`, `OutputExtractor`, `TemplateRenderer`, `StreamJsonParser`, `ClaudeLauncher`. New code: daemon (HTTP + WebSocket), worker process, CLI binary.
 
@@ -714,11 +714,11 @@ interface InjectedStep {
 
 Validation at injection time (throws, returns MCP error to Claude):
 
-- `id` already exists in the graph → error
-- `parent` references a non-existent step → error
-- `depends` references a non-existent step → error
-- `type: user_intervention` → error
-- `maxChildDepth` exceeded → error (D)
+- `id` already exists in the graph -> error
+- `parent` references a non-existent step -> error
+- `depends` references a non-existent step -> error
+- `type: user_intervention` -> error
+- `maxChildDepth` exceeded -> error (D)
 
 On success: MCP tool returns `{ "injected": ["step-id-", "step-id-"] }`. Claude continues.
 

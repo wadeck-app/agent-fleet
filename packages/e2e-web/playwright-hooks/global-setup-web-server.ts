@@ -164,7 +164,7 @@ async function startServerOnAvailablePort(
 				// Set PROJECT_ID (should remain fixed for the project)
 				PROJECT_ID: process.env.PROJECT_ID || '',
 				// Set unique WORKER_ID per EE worker to ensure each gets its own Orchestrator WebSocket port
-				// Worker  → WORKER_ID= → Orch WS port , Worker  → WORKER_ID= → Orch WS port , etc.
+				// Worker  -> WORKER_ID= -> Orch WS port , Worker  -> WORKER_ID= -> Orch WS port , etc.
 				WORKER_ID: workerId.toString(),
 				// Pass RUN_ID to backend so it can identify which test run it belongs to
 				RUN_ID: process.env.RUN_ID || 'unknown',
@@ -560,7 +560,7 @@ async function globalSetupWebServer(config: FullConfig) {
 	console.log(' Backend built successfully (dist/server-test)');
 
 	// Calculate base port from WORKSPACE_ID for parallel testing across workspaces
-	// WORKSPACE_ID= → -, WORKSPACE_ID= → -, WORKSPACE_ID= → -, etc.
+	// WORKSPACE_ID= -> -, WORKSPACE_ID= -> -, WORKSPACE_ID= -> -, etc.
 	const workspaceId = parseInt(process.env.WORKSPACE_ID || '', );
 	const basePort =  + workspaceId  ;
 

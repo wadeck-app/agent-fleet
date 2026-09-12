@@ -59,7 +59,7 @@ describe('FlowProposalsRepository', () => {
 	describe('create', () => {
 		it('persists a proposal with version=1 and returns it unchanged', async () => {
 			const proposal = makeProposal({ version: 1 });
-			// InMemoryStorage returns the entity with version=1 — matches proposal.version, no fix needed
+			// InMemoryStorage returns the entity with version=1 -- matches proposal.version, no fix needed
 			vi.mocked(mockBase.create).mockResolvedValue(proposal);
 
 			const result = await repository.create(proposal);

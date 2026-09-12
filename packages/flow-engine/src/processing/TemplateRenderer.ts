@@ -229,12 +229,12 @@ export class TemplateRenderer {
 			const namespace = parts[2]!;
 			const subStep = context.subSteps?.get(stepId);
 			if (!subStep) {
-				// Sub-step not in context (first run or no failure yet) — return neutral values
+				// Sub-step not in context (first run or no failure yet) -- return neutral values
 				return namespace === 'status' ? false : '';
 			}
 			if (namespace === 'outputs') {
 				const varName = parts[3]!;
-				// Missing output key — return empty string rather than crashing the parent
+				// Missing output key -- return empty string rather than crashing the parent
 				return varName in subStep.outputs ? subStep.outputs[varName] : '';
 			} else {
 				// namespace === 'status'

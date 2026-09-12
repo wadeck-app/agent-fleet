@@ -125,10 +125,10 @@ export interface ITransportClient extends ITransport {
 	 * Subscribe to connection state changes
 	 *
 	 * Inherited from ITransport. Called when connection state transitions:
-	 * - disconnected → connecting → connected
-	 * - connected → reconnecting → connected (on reconnection)
-	 * - connected → disconnected (on disconnect)
-	 * - * → error (on fatal error)
+	 * - disconnected -> connecting -> connected
+	 * - connected -> reconnecting -> connected (on reconnection)
+	 * - connected -> disconnected (on disconnect)
+	 * - * -> error (on fatal error)
 	 *
 	 * @param handler - Connection state change handler
 	 * @returns Unsubscribe function

@@ -3,8 +3,8 @@
  * Configures each worker to communicate with its own backend
  *
  * Approach: One backend server per worker for complete isolation
- * - Worker 0 → Backend port 4000
- * - Worker 1 → Backend port 4010
+ * - Worker 0 -> Backend port 4000
+ * - Worker 1 -> Backend port 4010
  * - etc.
  *
  * Redirects all frontend API requests (to port 3001) to the worker's backend port

@@ -24,7 +24,7 @@ const handlePin = async (projectId: string) => {
 
 **Expected Behavior:**
 
-1. Click ← on "Project Gamma" in Available (right) panel
+1. Click <- on "Project Gamma" in Available (right) panel
 2. **IMMEDIATELY:** Project Gamma should appear in Pinned (left) panel
 3. **IMMEDIATELY:** Project Gamma should show opacity-50 + pointer-events-none (loading state)
 4. **WAIT 2 seconds**
@@ -40,7 +40,7 @@ const handlePin = async (projectId: string) => {
 
 **Expected Behavior:**
 
-1. Click → on "Project Alpha" in Pinned (left) panel
+1. Click -> on "Project Alpha" in Pinned (left) panel
 2. **IMMEDIATELY:** Project Alpha should appear in Available (right) panel
 3. **IMMEDIATELY:** Project Alpha should show opacity-50 (loading state)
 4. **WAIT 2 seconds**

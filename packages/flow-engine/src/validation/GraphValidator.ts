@@ -262,7 +262,7 @@ export class GraphValidator {
 	 * Detect circular dependencies in SubFlowStep chains
 	 *
 	 * This performs a depth-first search through the flow composition graph to detect cycles.
-	 * Example: Flow A calls Flow B, which calls Flow C, which calls Flow A → circular!
+	 * Example: Flow A calls Flow B, which calls Flow C, which calls Flow A -> circular!
 	 *
 	 * @param flowId - The flow ID to check (starting point)
 	 * @param targetFlowId - The flow ID we're looking for (to detect a cycle)

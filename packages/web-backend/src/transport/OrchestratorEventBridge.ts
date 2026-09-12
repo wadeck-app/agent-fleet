@@ -25,7 +25,7 @@ const log = createLogger('OrchestratorEventBridge');
  * - Handle errors gracefully without crashing the server
  *
  * Architecture:
- * OrchestratorClient (O2B events) → OrchestratorEventBridge → EventBroadcaster (B2F events) → WebSocket clients
+ * OrchestratorClient (O2B events) -> OrchestratorEventBridge -> EventBroadcaster (B2F events) -> WebSocket clients
  *
  * Lifecycle:
  * 1. Create bridge with OrchestratorClient and EventBroadcaster

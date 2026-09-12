@@ -19,14 +19,14 @@ const log = createLogger('TransportRouter');
  * Responsibilities:
  * - Parse TransportRequest from WebSocket message
  * - Match path to registered routes from ALL_API_ROUTES
- * - Extract params from path (e.g., /api/tasks/:id → { id: '123' })
+ * - Extract params from path (e.g., /api/tasks/:id -> { id: '123' })
  * - Call appropriate controller method
  * - Return TransportResponse
  * - Handle errors gracefully
  * - Add userId to request context from session
  *
  * Architecture:
- * WebSocket → TransportRouter → Controller → Service → Repository
+ * WebSocket -> TransportRouter -> Controller -> Service -> Repository
  *
  * @example
  * ```typescript
@@ -116,7 +116,7 @@ export class TransportRouter {
 	 * Extracts parameter names for later extraction
 	 *
 	 * @example
-	 * '/api/tasks/:id' → { pattern: /^\/api\/tasks\/([^/]+)$/, paramNames: ['id'] }
+	 * '/api/tasks/:id' -> { pattern: /^\/api\/tasks\/([^/]+)$/, paramNames: ['id'] }
 	 */
 	private pathToRegex(path: string): { pattern: RegExp; paramNames: string[] } {
 		const paramNames: string[] = [];
@@ -163,7 +163,7 @@ export class TransportRouter {
 	 * Controllers are cached after first load
 	 */
 	private async getController(path: string): Promise<LazyController<any> | null> {
-		// Determine base path (e.g., /api/tasks/:id → /api/tasks)
+		// Determine base path (e.g., /api/tasks/:id -> /api/tasks)
 		const basePath = this.getBasePath(path);
 
 		// Check cache
@@ -183,10 +183,10 @@ export class TransportRouter {
 
 	/**
 	 * Extract base path from full path
-	 * /api/tasks/:id → /api/tasks
-	 * /api/tasks → /api/tasks
-	 * /api/auth/session → /api/auth
-	 * /api/workspaces/ → /api/workspaces
+	 * /api/tasks/:id -> /api/tasks
+	 * /api/tasks -> /api/tasks
+	 * /api/auth/session -> /api/auth
+	 * /api/workspaces/ -> /api/workspaces
 	 */
 	private getBasePath(path: string): string {
 		// Remove trailing slash first
@@ -371,7 +371,7 @@ export class TransportRouter {
 	 * path: '/api/tasks/task-123'
 	 * pattern: /^\/api\/tasks\/([^/]+)$/
 	 * paramNames: ['id']
-	 * → { id: 'task-123' }
+	 * -> { id: 'task-123' }
 	 */
 	private extractParams(path: string, pattern: RegExp, paramNames: string[]): Record<string, string> {
 		const match = pattern.exec(path);

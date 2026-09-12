@@ -1,5 +1,5 @@
 /**
- * Storage Tests — backward compat shim (delegates to KnowledgeStorage)
+ * Storage Tests -- backward compat shim (delegates to KnowledgeStorage)
  * Tests only the knowledge-related functionality that remains in Storage/KnowledgeStorage.
  * Task/Intervention storage is tested via InMemoryOrchestratorStorage.test.ts
  */

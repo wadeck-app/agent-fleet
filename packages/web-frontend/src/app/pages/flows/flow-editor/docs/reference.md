@@ -22,8 +22,8 @@ useFlowEditor.ts Main hook
 useFlowValidation.ts Validation hook
 index.ts
 utils/
-flowToReactFlow.ts Serialization YAML → Xyflow
-reactFlowToFlow.ts Serialization Xyflow → YAML
+flowToReactFlow.ts Serialization YAML -> Xyflow
+reactFlowToFlow.ts Serialization Xyflow -> YAML
 layoutAlgorithms.ts Layout algorithms
 cn.ts Classnames utility
 README.md This documentation
@@ -73,7 +73,7 @@ All nodes display :
 
   Serialization
 
- FlowDefinition → React Flow
+ FlowDefinition -> React Flow
 
 ```typescript
 const { nodes, edges } = flowDefinitionToReactFlow(flowDefinition);
@@ -84,7 +84,7 @@ const { nodes, edges } = flowDefinitionToReactFlow(flowDefinition);
 - Converts `onFailure.goto` to loop edges
 - Automatically calculates positions
 
-React Flow → FlowDefinition
+React Flow -> FlowDefinition
 
 ```typescript
 const flowDefinition = reactFlowToFlowDefinition(nodes, edges, metadata);

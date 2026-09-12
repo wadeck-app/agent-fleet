@@ -15,8 +15,8 @@ export interface UseDocumentTitleOptions {
  * @param {UseDocumentTitleOptions} options - Optional configuration
  *
  * @example
- * useDocumentTitle('Ingredients'); // WORKSPACE_ID=0 → "Ingredients - Boilerplate"
- * useDocumentTitle('Ingredients'); // WORKSPACE_ID=2 → "[WS2] Ingredients - Boilerplate"
+ * useDocumentTitle('Ingredients'); // WORKSPACE_ID=0 -> "Ingredients - Boilerplate"
+ * useDocumentTitle('Ingredients'); // WORKSPACE_ID=2 -> "[WS2] Ingredients - Boilerplate"
  */
 export function useDocumentTitle(title: string, options: UseDocumentTitleOptions = {}) {
 	const { workspacePrefix = true, appName = 'Boilerplate' } = options;

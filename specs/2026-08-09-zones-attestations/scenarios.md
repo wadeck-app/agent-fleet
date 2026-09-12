@@ -85,7 +85,7 @@ steps:
 
 **Setup:** Run the full flow but make `run-tests` fail (exit code non-zero).
 
-**Expected:** `run-tests` fails → attestation `tests-passed` is not produced → zone `production` never becomes active → `dummy-deploy` is never scheduled → execution fails.
+**Expected:** `run-tests` fails -> attestation `tests-passed` is not produced -> zone `production` never becomes active -> `dummy-deploy` is never scheduled -> execution fails.
 
 Log line NOT emitted: `[abc1|__zone] production ACTIVE`
 
@@ -104,7 +104,7 @@ Log line NOT emitted: `[abc1|__zone] production ACTIVE`
 3. Engine detects all required attestations for zone `production` are satisfied
 4. Log line emitted: `[abc1|__zone] production ACTIVE`
 5. `PROD_API_KEY` injected into `dummy-deploy` execution context
-6. `dummy-deploy` script finds `$PROD_API_KEY` set → exits 0 → prints "OK"
+6. `dummy-deploy` script finds `$PROD_API_KEY` set -> exits 0 -> prints "OK"
 7. Execution completes: `[abc1|__execution] COMPLETED`
 
 **What is validated:** Full zone lifecycle -- attestation production, zone activation, secret injection, step execution.

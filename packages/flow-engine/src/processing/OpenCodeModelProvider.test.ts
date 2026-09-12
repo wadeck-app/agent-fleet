@@ -557,7 +557,7 @@ describe('OpenCodeModelProvider', () => {
 		});
 
 		it('does not fire result event when onStreamEvent is not set', async () => {
-			// Should not throw — just skip event firing
+			// Should not throw -- just skip event firing
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 
 			setImmediate(() => {
@@ -690,7 +690,7 @@ describe('OpenCodeModelProvider', () => {
 
 		it('falls back to "opencode" when OPENCODE_MOCK_PATH is not set and where/which fails', async () => {
 			delete process.env['OPENCODE_MOCK_PATH'];
-			// child_process is mocked — execSync returns undefined → throws → fallback
+			// child_process is mocked -- execSync returns undefined -> throws -> fallback
 
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
@@ -702,7 +702,7 @@ describe('OpenCodeModelProvider', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// copyGlobalConfig — no-op when no config exists
+	// copyGlobalConfig -- no-op when no config exists
 	// -------------------------------------------------------------------------
 
 	describe('copyGlobalConfig', () => {
@@ -718,7 +718,7 @@ describe('OpenCodeModelProvider', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// buildOpenCodeConfig — Windows path conversion
+	// buildOpenCodeConfig -- Windows path conversion
 	// -------------------------------------------------------------------------
 
 	describe('buildOpenCodeConfig Windows path conversion', () => {
@@ -752,7 +752,7 @@ describe('OpenCodeModelProvider', () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// launchInteractive — toolHooks injection
+	// launchInteractive -- toolHooks injection
 	// -------------------------------------------------------------------------
 
 	describe('launchInteractive', () => {

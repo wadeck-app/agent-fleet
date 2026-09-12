@@ -685,7 +685,7 @@ curl https://yourdomain.com/api/monitoring/transport/stats | jq
 
  . Heap snapshot
 node --inspect dist/server.js
- Chrome DevTools → Memory → Take snapshot
+ Chrome DevTools -> Memory -> Take snapshot
 ```
 
 Common Causes:

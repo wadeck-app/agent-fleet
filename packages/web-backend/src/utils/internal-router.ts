@@ -10,7 +10,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
  * Example:
  *   Contract: '/api/ingredients/:id'
  *   BaseUrl: '/api/ingredients'
- *   Relative Path: '/:id'  ← Used for matching!
+ *   Relative Path: '/:id'  <- Used for matching!
  *
  * Benefits:
  *   - 60% less memory (shorter keys in Map)
@@ -97,7 +97,7 @@ export class InternalRouter<Routes> {
 
 	/**
 	 * Convert full path to relative path
-	 * Example: '/api/ingredients/:id' → '/:id'
+	 * Example: '/api/ingredients/:id' -> '/:id'
 	 */
 	private toRelativePath(fullPath: string): string {
 		if (!fullPath.startsWith(this.baseUrl)) {
@@ -144,7 +144,7 @@ export class InternalRouter<Routes> {
 
 	/**
 	 * Convert path pattern to RegExp
-	 * Example: '/:id' → /^\/(?<id>[^/]+)$/
+	 * Example: '/:id' -> /^\/(?<id>[^/]+)$/
 	 */
 	private pathToRegex(relativePath: string): { pattern: RegExp; paramNames: string[] } {
 		const paramNames: string[] = [];

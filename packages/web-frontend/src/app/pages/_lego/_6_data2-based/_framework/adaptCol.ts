@@ -4,7 +4,7 @@ import type { ColumnDef } from '@framework/lego/types/ColTypes';
 
 /**
  * ===========================================================================================
- * ADAPT COL - Lego ColumnDef → Table2Column Adapter
+ * ADAPT COL - Lego ColumnDef -> Table2Column Adapter
  * ===========================================================================================
  *
  * Adapts a lego ColumnDef (from col.text(), col.enum(), etc.) to Table2Column format.

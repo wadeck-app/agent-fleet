@@ -164,7 +164,7 @@ describe('ConfigureScriptsDialog - Visual Pending States', () => {
 			expect(screen.getByText('new-script')).toBeInTheDocument();
 		});
 
-		// Find and click the add button (←) for new-script
+		// Find and click the add button (<-) for new-script
 		const addButton = screen.getByRole('button', { name: 'Add new-script' });
 		await user.click(addButton);
 

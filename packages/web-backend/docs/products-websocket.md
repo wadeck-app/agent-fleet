@@ -20,7 +20,7 @@ Upgrades to WebSocket connection.
 
 ## Message Protocol
 
-### Client → Server Messages
+### Client -> Server Messages
 
 #### Ping
 
@@ -38,7 +38,7 @@ Server responds with:
 }
 ```
 
-### Server → Client Messages
+### Server -> Client Messages
 
 #### Initial Snapshot
 

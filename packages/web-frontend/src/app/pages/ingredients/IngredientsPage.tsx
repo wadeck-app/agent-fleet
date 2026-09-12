@@ -46,12 +46,12 @@ import { useIngredients } from './useIngredients';
  * - Dialog-based form with URL routing support
  *
  * Data Flow:
- * API → Service → Hook → Page → Components
+ * API -> Service -> Hook -> Page -> Components
  *
  * Routing:
- * - /ingredients → List view
- * - /ingredients/new → Create dialog
- * - /ingredients/:id/edit → Edit dialog
+ * - /ingredients -> List view
+ * - /ingredients/new -> Create dialog
+ * - /ingredients/:id/edit -> Edit dialog
  *
  * ===========================================================================================
  */

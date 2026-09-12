@@ -54,7 +54,7 @@ describe('SimulationValidator', () => {
 	// ---------------------------------------------------------------------------
 
 	describe('template expression validation (whitelist)', () => {
-		// --- VALID — should produce NO INVALID_TEMPLATE_SYNTAX errors ---
+		// --- VALID -- should produce NO INVALID_TEMPLATE_SYNTAX errors ---
 
 		it('should accept inputs.simple-name', () => {
 			const { flow, stepIds } = makeFlow('Value: ${{ inputs.simple-name }}');
@@ -110,7 +110,7 @@ describe('SimulationValidator', () => {
 			expect(syntaxErrors(issueCollector)).toHaveLength(0);
 		});
 
-		// --- INVALID — should produce INVALID_TEMPLATE_SYNTAX error ---
+		// --- INVALID -- should produce INVALID_TEMPLATE_SYNTAX error ---
 
 		it('should flag arithmetic with spaces: steps.x.outputs.count + 1', () => {
 			const { flow, stepIds } = makeFlow('Count is ${{ steps.x.outputs.count + 1 }}');
@@ -169,7 +169,7 @@ describe('SimulationValidator', () => {
 		});
 
 		it('should flag empty expression', () => {
-			// ${{  }} — two spaces inside, trimmed to empty string
+			// ${{  }} -- two spaces inside, trimmed to empty string
 			const { flow, stepIds } = makeFlow('Value: ${{  }}');
 			validator.validateSimulation(flow, stepIds);
 			const errors = syntaxErrors(issueCollector);
@@ -185,7 +185,7 @@ describe('SimulationValidator', () => {
 			expect(errors[0].severity).toBe('error');
 		});
 
-		// --- context.* — runtime execution context variables ---
+		// --- context.* -- runtime execution context variables ---
 
 		it('should accept context.cwd', () => {
 			const { flow, stepIds } = makeFlow('Dir: ${{ context.cwd }}');

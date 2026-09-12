@@ -44,10 +44,10 @@ const log = createLogger('ScriptProcessService');
  * - Log updates use scriptId filter for targeted delivery
  *
  * Process Lifecycle:
- * 1. startProcess() → create process record → spawn process → emit B2F_SCRIPT_PROCESS_STARTED
- * 2. Process running → logs stored incrementally → emit B2F_SCRIPT_PROCESS_LOG_UPDATED
- * 3. stopProcess() → kill process → update status → emit B2F_SCRIPT_PROCESS_STOPPED
- * 4. Process crash → mark as crashed → emit B2F_SCRIPT_PROCESS_ERROR
+ * 1. startProcess() -> create process record -> spawn process -> emit B2F_SCRIPT_PROCESS_STARTED
+ * 2. Process running -> logs stored incrementally -> emit B2F_SCRIPT_PROCESS_LOG_UPDATED
+ * 3. stopProcess() -> kill process -> update status -> emit B2F_SCRIPT_PROCESS_STOPPED
+ * 4. Process crash -> mark as crashed -> emit B2F_SCRIPT_PROCESS_ERROR
  *
  * ===========================================================================================
  */

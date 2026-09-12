@@ -623,7 +623,7 @@ export interface ModelFlowStep extends BaseFlowStep {
 
 	/**
 	 * Controls when Claude output is sent as log entries.
-	 * - streaming: each assistant text chunk → log entry in real-time
+	 * - streaming: each assistant text chunk -> log entry in real-time
 	 * - end: all entries sent after model completes (default)
 	 * - none: output suppressed from logs
 	 * - polling: entries flushed every 500ms
@@ -634,8 +634,8 @@ export interface ModelFlowStep extends BaseFlowStep {
 	 * Controls whether tool calls are shown in logs.
 	 * Only applies when log is 'streaming' or 'polling'.
 	 * - none: no tool call events (default)
-	 * - name: show tool name only (→ Bash)
-	 * - full: show tool name + input + result (→ Bash: sleep 5 / ← Bash: ...)
+	 * - name: show tool name only (-> Bash)
+	 * - full: show tool name + input + result (-> Bash: sleep 5 / <- Bash: ...)
 	 */
 	toolLog?: 'none' | 'name' | 'full';
 
@@ -684,7 +684,7 @@ export interface ScriptFlowStep extends BaseFlowStep {
 	/** Optional environment variables */
 	env?: Record<string, string>;
 
-	/** Named stdout output variable (e.g. 'stdout' → steps.x.outputs.stdout), or true for default capture */
+	/** Named stdout output variable (e.g. 'stdout' -> steps.x.outputs.stdout), or true for default capture */
 	captureOutput?: string | boolean;
 }
 

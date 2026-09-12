@@ -35,7 +35,7 @@ vi.mock('@framework/features/toast/ToastContext', () => ({
 	useToast: () => ({ showToast: mockShowToast }),
 }));
 
-// Mock useTransport — FlowProposalSection subscribes to B2F_TICKET_UPDATED (r2 fix)
+// Mock useTransport -- FlowProposalSection subscribes to B2F_TICKET_UPDATED (r2 fix)
 vi.mock('@/transport/useTransport', () => ({
 	useTransport: () => ({
 		transport: {
@@ -308,7 +308,7 @@ describe('FlowProposalSection', () => {
 
 			await user.click(screen.getByRole('button', { name: /Add review thread/i }));
 
-			// There are two number inputs with placeholder "1" — first is startLine, second is endLine
+			// There are two number inputs with placeholder "1" -- first is startLine, second is endLine
 			const numberInputs = screen.getAllByPlaceholderText('1');
 			await user.clear(numberInputs[0]);
 			await user.type(numberInputs[0], '2');
@@ -369,7 +369,7 @@ describe('FlowProposalSection', () => {
 				</MemoryRouter>
 			);
 
-			// The approved timestamp is displayed via toLocaleString() — just check "Approved at" label exists
+			// The approved timestamp is displayed via toLocaleString() -- just check "Approved at" label exists
 			expect(screen.getByText(/Approved at/i)).toBeInTheDocument();
 		});
 
@@ -527,7 +527,7 @@ describe('FlowProposalSection', () => {
 		});
 
 		it('does NOT render adaptations section when reusedFromFlowId is set but version=1 (ba/ce fix: version must be > 1)', () => {
-			// ba/ce fix: reusedFromFlowId alone is not enough — version must be > 1
+			// ba/ce fix: reusedFromFlowId alone is not enough -- version must be > 1
 			const reusedV1WithAdaptations: FlowProposal = {
 				...mockProposal,
 				version: 1,
@@ -651,7 +651,7 @@ describe('FlowProposalSection', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// K fix: Open in Flow Editor — disabled for non-approved, active link when approved
+	// K fix: Open in Flow Editor -- disabled for non-approved, active link when approved
 	// ---------------------------------------------------------------------------
 	describe('k — open in flow editor link', () => {
 		it('shows enabled "Visualize" button (not a link) for non-approved proposals', () => {

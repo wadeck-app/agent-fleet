@@ -148,9 +148,9 @@ export class TemplateValidator {
 	 * Parse a variable expression into its components
 	 *
 	 * Examples:
-	 * - "inputs.foo" → { type: 'input', path: ['foo'] }
-	 * - "steps.bar.outputs.baz" → { type: 'step', path: ['bar', 'outputs', 'baz'] }
-	 * - "task.priority" → { type: 'task', path: ['priority'] }
+	 * - "inputs.foo" -> { type: 'input', path: ['foo'] }
+	 * - "steps.bar.outputs.baz" -> { type: 'step', path: ['bar', 'outputs', 'baz'] }
+	 * - "task.priority" -> { type: 'task', path: ['priority'] }
 	 *
 	 * @param expression - Variable expression to parse
 	 * @returns Parsed expression or null if invalid format

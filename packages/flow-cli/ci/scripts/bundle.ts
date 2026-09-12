@@ -80,7 +80,7 @@ await Promise.all([
 		outfile: updaterOutfile,
 		// No externals -- all dependencies must be inlined
 		external: [],
-		// top-level await in ESM → wrapped in async IIFE for CJS
+		// top-level await in ESM -> wrapped in async IIFE for CJS
 		supported: { 'top-level-await': false },
 		define: sharedDefine,
 		banner: sharedBanner,

@@ -328,7 +328,7 @@ export const toAppError = (error: unknown): AppError => {
 		return error;
 	}
 
-	// Standard Error — use normalizeError(error).message to get the bare message
+	// Standard Error -- use normalizeError(error).message to get the bare message
 	// (String(error) would produce "Error: <msg>", double-prefixing when displayed)
 	if (error instanceof Error) {
 		return new AppError(normalizeError(error).message, ErrorCode.UNKNOWN_ERROR, {

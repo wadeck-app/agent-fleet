@@ -14,8 +14,8 @@ import { OptimisticDualListDialog } from './OptimisticDualListDialog';
  * - Dialog wrapper works
  * - Props flow correctly
  *
- * Heavy logic testing → useDualListState.test.ts
- * Heavy visual testing → DualListView.test.tsx
+ * Heavy logic testing -> useDualListState.test.ts
+ * Heavy visual testing -> DualListView.test.tsx
  *
  * ===========================================================================================
  */

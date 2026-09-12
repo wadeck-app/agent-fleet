@@ -26,7 +26,7 @@ import { adaptCol } from '../_framework/adaptCol';
  * Selection synced to URL via useSearchParams.
  *
  * Features:
- * - Click row → select item → detail panel shows item details
+ * - Click row -> select item -> detail panel shows item details
  * - Selected item ID synced to URL: ?id=xxx
  * - Keyboard ↑/↓ arrows: navigate selection
  * - Re-clicking already selected row refreshes detail panel

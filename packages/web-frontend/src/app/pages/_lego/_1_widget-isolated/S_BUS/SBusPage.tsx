@@ -8,7 +8,7 @@
  * Re-clicking the same row refreshes the detail panel.
  *
  * Features:
- * - Click row to select → detail panel shows item details
+ * - Click row to select -> detail panel shows item details
  * - Selected item ID synced to URL: ?id=xxx
  * - Event bus for widget communication
  * - Re-clicking selected row reloads detail panel

@@ -1367,7 +1367,7 @@ if (isMainModule) {
 	const entryLog = createLogger('FlowWorker:main');
 	entryLog.info('Starting Flow Worker...');
 
-	// Load environment variables in order: root .env → root .env.local (workspace overrides) → package .env
+	// Load environment variables in order: root .env -> root .env.local (workspace overrides) -> package .env
 	// root .env.local contains WORKSPACE_ID per workspace (same pattern as web-backend/src/server.ts)
 	// Calculate paths relative to the worker's source directory structure:
 	// __dirname = packages/worker/src/flow

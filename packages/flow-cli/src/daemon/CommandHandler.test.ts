@@ -404,7 +404,7 @@ describe('CommandHandler — scheduling via FlowScheduler', () => {
 		// s1 was dispatched on handleRun
 		expect(dispatchedSteps).toContain('s1');
 
-		// Complete s1 — s2 should be enqueued and dispatched
+		// Complete s1 -- s2 should be enqueued and dispatched
 		handler.onStepCompleted(executionId, 's1', { val: 'done' });
 		handler.tryDispatch();
 		expect(dispatchedSteps).toContain('s2');
@@ -464,13 +464,13 @@ steps:
 		handler.onStepCompleted(executionId, 'a', {});
 		handler.tryDispatch();
 
-		// b skipped → c should be dispatched
+		// b skipped -> c should be dispatched
 		expect(dispatched).not.toContain('b');
 		expect(dispatched).toContain('c');
 	});
 
 	it('onStepFailed removes pending steps for that execution from readyQueue', async () => {
-		// Two independent steps: s1 and s2. Fail s1 → s2 should not be dispatched.
+		// Two independent steps: s1 and s2. Fail s1 -> s2 should not be dispatched.
 		const twoIndependentYaml = `\
 id: two-ind
 version: "1.0.0"
@@ -546,7 +546,7 @@ steps:
 		expect(dispatched).toContain('s1');
 		expect(handler.hasActiveExecutions()).toBe(true);
 
-		// First attempt fails — retry config allows 1 more attempt
+		// First attempt fails -- retry config allows 1 more attempt
 		handler.onStepFailed(executionId, 's1', 'transient error');
 
 		// Execution must still be active (retry pending, not terminal failure)
@@ -555,7 +555,7 @@ steps:
 		// s1 must have been re-dispatched (retry re-enqueued it)
 		expect(dispatched.filter(id => id === 's1')).toHaveLength(2);
 
-		// Second attempt succeeds — execution completes
+		// Second attempt succeeds -- execution completes
 		handler.onStepCompleted(executionId, 's1', { result: 'ok' });
 		expect(handler.hasActiveExecutions()).toBe(false);
 	});
@@ -616,7 +616,7 @@ steps:
 		expect(dispatched).toContain('attempt');
 		expect(handler.hasActiveExecutions()).toBe(true);
 
-		// First failure — loop should re-queue attempt, NOT terminate execution
+		// First failure -- loop should re-queue attempt, NOT terminate execution
 		handler.onStepFailed(executionId, 'attempt', 'not ready yet');
 
 		// Execution must still be active (loop pending)
@@ -628,13 +628,13 @@ steps:
 		// attempt must have been re-dispatched (loop re-enqueued it)
 		expect(dispatched.filter(id => id === 'attempt')).toHaveLength(2);
 
-		// Second attempt succeeds — done becomes ready
+		// Second attempt succeeds -- done becomes ready
 		handler.onStepCompleted(executionId, 'attempt', { result: 'ok' });
 		handler.tryDispatch();
 		// done should now be dispatched
 		expect(dispatched).toContain('done');
 
-		// Complete done — execution fully done
+		// Complete done -- execution fully done
 		handler.onStepCompleted(executionId, 'done', {});
 		expect(handler.hasActiveExecutions()).toBe(false);
 	});

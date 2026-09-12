@@ -28,7 +28,7 @@ Performed by automated agent after brainstorm session decisions D1-D24.
 
 10. **D11 not marked superseded** -- Fixed (see item 1).
 11. **D21 used "IPC" for worker communication** -- Fixed: "IPC" replaced with "WebSocket" throughout.
-12. **`ipc-protocol.md` "internal IPC" section title** -- Fixed: section renamed "Worker↔Daemon (WebSocket)".
+12. **`ipc-protocol.md` "internal IPC" section title** -- Fixed: section renamed "Worker<->Daemon (WebSocket)".
 
 ### Gaps filled
 

@@ -25,7 +25,7 @@ export class WebSocketServer {
 		this.wss = new WsServer({ server: this.httpServer, maxPayload: 1024 * 1024 });
 		this.wss.on('connection', (ws: WebSocket) => this.handleConnection(ws));
 		// ws re-emits httpServer errors; without a handler Node.js throws unhandled 'error'
-		// and crashes the daemon. EADDRINUSE during port scan is handled by tryBind — suppress here.
+		// and crashes the daemon. EADDRINUSE during port scan is handled by tryBind -- suppress here.
 		this.wss.on('error', () => {});
 	}
 

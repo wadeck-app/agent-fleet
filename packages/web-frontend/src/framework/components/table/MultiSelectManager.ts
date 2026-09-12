@@ -9,10 +9,10 @@
  * Gmail-like Shift+Click behavior:
  * - Normal click: Sets anchor point and resets range end
  * - Shift+click:
- *   - If range not fully selected → select the range
+ *   - If range not fully selected -> select the range
  *   - If range fully selected:
- *     - If shrinking (click between anchor and last range end) → deselect from click to range end
- *     - Otherwise → deselect the entire range [anchor, click]
+ *     - If shrinking (click between anchor and last range end) -> deselect from click to range end
+ *     - Otherwise -> deselect the entire range [anchor, click]
  *
  * ===========================================================================================
  */
@@ -137,7 +137,7 @@ export class MultiSelectManager<T> {
 
 			const next = new Set(this.selectedIds);
 			if (allSelected) {
-				// All selected → deselecting behavior
+				// All selected -> deselecting behavior
 				// Check if we're "shrinking" an existing range (Gmail behavior)
 				const lastRangeEnd = this.lastRangeEnd;
 

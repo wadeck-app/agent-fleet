@@ -851,7 +851,7 @@ describe('TicketsController', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// PATCH .../review-threads/:threadId — update thread
+	// PATCH .../review-threads/:threadId -- update thread
 	// ---------------------------------------------------------------------------
 
 	describe('PATCH .../review-threads/:threadId — update thread', () => {
@@ -892,7 +892,7 @@ describe('TicketsController', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// DELETE .../review-threads/:threadId — delete thread
+	// DELETE .../review-threads/:threadId -- delete thread
 	// ---------------------------------------------------------------------------
 
 	describe('DELETE .../review-threads/:threadId — delete thread', () => {
@@ -926,7 +926,7 @@ describe('TicketsController', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// DELETE .../review-threads/:threadId/comments/:commentId — delete comment
+	// DELETE .../review-threads/:threadId/comments/:commentId -- delete comment
 	// ---------------------------------------------------------------------------
 
 	describe('DELETE .../review-threads/:threadId/comments/:commentId — delete comment', () => {
@@ -980,7 +980,7 @@ describe('TicketsController', () => {
 	});
 
 	// ---------------------------------------------------------------------------
-	// PATCH .../review-threads/:threadId/comments/:commentId — update comment
+	// PATCH .../review-threads/:threadId/comments/:commentId -- update comment
 	// ---------------------------------------------------------------------------
 
 	describe('PATCH .../review-threads/:threadId/comments/:commentId — update comment', () => {

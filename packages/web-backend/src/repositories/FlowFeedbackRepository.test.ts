@@ -13,7 +13,7 @@ import { FlowFeedbackRepository } from './FlowFeedbackRepository';
 function makeRepository(): FlowFeedbackRepository {
 	const storage = new InMemoryStorage();
 	// StoredFlowFeedback / StoredFlowRetrospective are internal types in FlowFeedbackRepository.
-	// Casting to `any` here is intentional — InMemoryStorage satisfies the constraint at runtime.
+	// Casting to `any` here is intentional -- InMemoryStorage satisfies the constraint at runtime.
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const feedbackBase = new BaseRepository<any>('flow-feedback', storage);
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,7 +69,7 @@ describe('FlowFeedbackRepository', () => {
 	let repository: FlowFeedbackRepository;
 
 	beforeEach(() => {
-		// Fresh storage for each test — no shared state
+		// Fresh storage for each test -- no shared state
 		repository = makeRepository();
 	});
 
@@ -285,7 +285,7 @@ describe('FlowFeedbackRepository', () => {
 		});
 
 		it('returns the first retrospective when multiple exist for the same ticket (at-most-one invariant)', async () => {
-			// The implementation returns results[0] — verify the first inserted item is returned
+			// The implementation returns results[0] -- verify the first inserted item is returned
 			const retro1 = makeRetrospective({ id: 'retro-first', ticketId: TICKET_A });
 			const retro2 = makeRetrospective({ id: 'retro-second', ticketId: TICKET_A });
 

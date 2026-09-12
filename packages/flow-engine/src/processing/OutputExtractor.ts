@@ -195,7 +195,7 @@ export class OutputExtractor {
 			throw new OutputExtractionError(`Invalid jsonpath '${jsonpath}': must start with '$.'`, varName, stepId);
 		}
 
-		// normalize bracket array notation: $.tags[0] → $.tags.0
+		// normalize bracket array notation: $.tags[0] -> $.tags.0
 		const normalizedPath = jsonpath.replace(/\[(\d+)\]/g, '.$1');
 		const parts = normalizedPath.slice(2).split('.');
 		let current: unknown = parsed;
@@ -318,7 +318,7 @@ export class OutputExtractor {
 	 * Convert value to target type
 	 */
 	private convertType(value: any, targetType: VariableType | undefined, varName: string, stepId: string): any {
-		// No type declared — return value as-is
+		// No type declared -- return value as-is
 		if (!targetType) {
 			return value;
 		}

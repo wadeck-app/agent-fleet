@@ -256,7 +256,7 @@ describe('WorkerAdapter', () => {
 			expect(types).toContain('assistant_text');
 			expect(types).toContain('tool_use');
 			expect(types).not.toContain('tool_result');
-			// name mode: → Tool: Name(input...) truncated to 80 chars
+			// name mode: -> Tool: Name(input...) truncated to 80 chars
 			const toolCall = logCalls.find((m: any) => m.entry.eventType === 'tool_use');
 			expect(toolCall.entry.message).toMatch(/^→ Tool: Bash/);
 		});
@@ -269,7 +269,7 @@ describe('WorkerAdapter', () => {
 			expect(types).toContain('assistant_text');
 			expect(types).toContain('tool_use');
 			expect(types).toContain('tool_result');
-			// full mode: message has → prefix
+			// full mode: message has -> prefix
 			const toolCall = logCalls.find((m: any) => m.entry.eventType === 'tool_use');
 			expect(toolCall.entry.message).toMatch(/^→ /);
 			const toolResult = logCalls.find((m: any) => m.entry.eventType === 'tool_result');

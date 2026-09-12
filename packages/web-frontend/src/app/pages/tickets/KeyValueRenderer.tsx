@@ -17,9 +17,9 @@ export function KeyValueRenderer({
 	/** undefined = newly added row (not from saved ticket) */
 	originalKey?: string;
 }) {
-	// New row: originalKey not in map → ring on CARD
-	// Existing row key changed → ring on KEY input
-	// Existing row value changed → ring on VALUE input
+	// New row: originalKey not in map -> ring on CARD
+	// Existing row key changed -> ring on KEY input
+	// Existing row value changed -> ring on VALUE input
 	const isAddedRow = originalKey === undefined;
 	const isKeyModified = !isAddedRow && item.key !== originalKey;
 	const isValueModified =

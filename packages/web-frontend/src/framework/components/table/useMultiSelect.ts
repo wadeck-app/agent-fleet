@@ -188,7 +188,7 @@ export function useMultiSelect<T>({
 
 				const next = new Set(selectedIds);
 				if (allSelected) {
-					// All selected → deselecting behavior
+					// All selected -> deselecting behavior
 					// Check if we're "shrinking" an existing range (Gmail behavior)
 					const lastRangeEnd = lastRangeEndRef.current;
 

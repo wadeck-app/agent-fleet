@@ -161,7 +161,7 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 	const handleSendReply = async () => {
 		if (!replyContent.trim() || sending) return;
 
-		// User sends → always scroll to bottom when their message appears
+		// User sends -> always scroll to bottom when their message appears
 		wasAtBottomRef.current = true;
 		setSending(true);
 		try {

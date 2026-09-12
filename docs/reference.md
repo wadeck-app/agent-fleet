@@ -14,13 +14,13 @@ _Moved from README -- see [README](../README.md) for the overview._
 ```
 shared-common           (no local deps)
 shared-orch-worker      (no local deps)
-flow-engine          ←  shared-common, shared-orch-worker
-orchestrator         ←  flow-engine, shared-common, shared-orch-worker
-worker               ←  flow-engine, shared-common, shared-orch-worker
-shared-frontend-backend ← shared-common
-web-backend          ←  orchestrator, shared-common, shared-frontend-backend, shared-orch-worker
-web-frontend         ←  shared-frontend-backend
-legacy-cli           ←  orchestrator, shared-common, shared-orch-worker
+flow-engine          <-  shared-common, shared-orch-worker
+orchestrator         <-  flow-engine, shared-common, shared-orch-worker
+worker               <-  flow-engine, shared-common, shared-orch-worker
+shared-frontend-backend <- shared-common
+web-backend          <-  orchestrator, shared-common, shared-frontend-backend, shared-orch-worker
+web-frontend         <-  shared-frontend-backend
+legacy-cli           <-  orchestrator, shared-common, shared-orch-worker
 ```
 
 ## Quick start

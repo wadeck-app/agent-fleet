@@ -16,7 +16,7 @@
 - [ ] Should successfully connect to WebSocket server
 - [ ] Should fail connection with authentication error
 - [ ] Should timeout if no response within 10s
-- [ ] Should emit connection state changes (disconnected → connecting → connected)
+- [ ] Should emit connection state changes (disconnected -> connecting -> connected)
 
 #### 1.2 Disconnection
 

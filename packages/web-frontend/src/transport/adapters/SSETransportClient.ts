@@ -13,7 +13,7 @@
  * - Lightweight compared to WebSocket (events-only)
  *
  * Limitations:
- * - Unidirectional: Server → Client only
+ * - Unidirectional: Server -> Client only
  * - Cannot send requests via SSE (use REST API instead)
  * - request() method throws error (not supported)
  *

@@ -56,7 +56,7 @@ describe('unknown command handler', () => {
 			timeout: 30000,
 			env: { ...process.env },
 		});
-		// flow logs now shows either log file content (NDJSON) or "no log file" — either way non-empty stdout
+		// flow logs now shows either log file content (NDJSON) or "no log file" -- either way non-empty stdout
 		// (the command also creates a log entry for itself, so there will always be a file after the first run)
 		const combined = (result.stdout ?? '') + (result.stderr ?? '');
 		expect(combined.length).toBeGreaterThan(0);

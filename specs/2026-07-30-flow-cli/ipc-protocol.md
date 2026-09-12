@@ -2,13 +2,13 @@
 
 Two separate communication channels exist. They must not be confused.
 
-## Channel 1 -- CLI↔Daemon (singleton-daemon-kit, HTTP/1.1 loopback)
+## Channel 1 -- CLI<->Daemon (singleton-daemon-kit, HTTP/1.1 loopback)
 
 Used by: human callers, agent callers. Workers use Channel 1 only for crash recovery fallback (v2 only, D23/D34).
 
 Transport: TCP `127.0.0.1`, plain HTTP/1.1 with JSON bodies. Port discovered from `~/.flow-daemon/config.port`. Auth: `Authorization: Bearer <token>` from `~/.flow-daemon/health_token`.
 
-### CLI → Daemon commands
+### CLI -> Daemon commands
 
 ```typescript
 type ClientCommand = {
@@ -29,7 +29,7 @@ type ClientCommand = {
 
 **`worker-register` (Channel 1 fallback only):** This command is used exclusively during crash recovery (D23). In normal operation, workers connect directly via Channel 2 (WebSocket). `stepId` is the step the worker was executing when the crash occurred -- used by the daemon for re-adoption. In normal operation, only the WebSocket `ready` message (Channel 2) is used.
 
-### Daemon → CLI responses
+### Daemon -> CLI responses
 
 ```typescript
 type DaemonResponse =
@@ -40,7 +40,7 @@ type DaemonResponse =
 
 ---
 
-## Channel 2 -- Worker↔Daemon (WebSocket)
+## Channel 2 -- Worker<->Daemon (WebSocket)
 
 Workers use Channel 2 exclusively in normal operation. Channel 1 is only used during crash recovery fallback (D23).
 
@@ -50,7 +50,7 @@ Transport: WebSocket on a separate port from the daemon's HTTP server. Workers c
 
 **Port discovery:** The WebSocket port is passed to the worker as the `FLOW_WS_PORT` environment variable at spawn time. Default: HTTP port + 1. This port is also present in the daemon config schema as `worker.wsPort`.
 
-### Daemon → Worker messages
+### Daemon -> Worker messages
 
 ```typescript
 type DaemonToWorker =
@@ -60,7 +60,7 @@ type DaemonToWorker =
 	| { type: 'done' }; // no more steps, worker should exit
 ```
 
-### Worker → Daemon messages
+### Worker -> Daemon messages
 
 ```typescript
 type WorkerToDaemon =

@@ -29,7 +29,7 @@ import { Button } from '../primitives/Button';
  * - AvailableWorkspaceItem.tsx (94 lines)
  * - SortableAssociatedWorkspaceItem.tsx (155 lines)
  *
- * Total reduction: 442 lines → ~100 lines
+ * Total reduction: 442 lines -> ~100 lines
  *
  * Usage:
  *   // Available item (with pin/associate button)

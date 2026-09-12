@@ -47,12 +47,12 @@ import { useBooks } from './useBooks';
  * - Dialog-based form with URL routing support
  *
  * Data Flow:
- * API → Service → Hook → Page → Components
+ * API -> Service -> Hook -> Page -> Components
  *
  * Routing:
- * - /books → List view
- * - /books/new → Create dialog
- * - /books/:id/edit → Edit dialog
+ * - /books -> List view
+ * - /books/new -> Create dialog
+ * - /books/:id/edit -> Edit dialog
  *
  * ===========================================================================================
  */

@@ -10,7 +10,7 @@ import type { ColumnDef } from '@framework/components/columns/ColumnVisibility';
  * Eliminates duplication by using table column definitions as the single source of truth.
  *
  * Purpose:
- * - Convert Table2Column[] → ColumnDef[] for ColumnVisibility component
+ * - Convert Table2Column[] -> ColumnDef[] for ColumnVisibility component
  * - Extract column IDs for useColumnVisibility hook
  * - Extract default visible columns from Table2Column definitions
  * - Extract constraints (canHide, canReorder) from Table2Column definitions

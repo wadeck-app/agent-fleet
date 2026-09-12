@@ -2,7 +2,7 @@
  * HTTP Polling Transport Server (Short Polling)
  *
  * Server-side implementation for HTTP short polling with:
- * - Unidirectional events (Server → Client)
+ * - Unidirectional events (Server -> Client)
  * - Cookie-based authentication
  * - Immediate response (no connection hold, unlike long polling)
  * - Message queue for all event delivery

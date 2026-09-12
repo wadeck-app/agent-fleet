@@ -97,7 +97,7 @@ function buildSpawnParams(
 	pluginPath?: string
 ): SpawnParams {
 	const command = commandParts[0]!;
-	// commandParts[1..] are prefix args (e.g. ['node', '/path/mock.mjs'] → command='node', prefix=['mock.mjs'])
+	// commandParts[1..] are prefix args (e.g. ['node', '/path/mock.mjs'] -> command='node', prefix=['mock.mjs'])
 	const args: string[] = [...commandParts.slice(1), 'run'];
 
 	// OpenCode always requires the prompt as a positional arg to `opencode run`.
@@ -519,7 +519,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 			} catch (err) {
 				console.warn(
 					`[OpenCodeModelProvider] Failed to load config ${resolvedPath}:`,
-					err instanceof Error ? err.message : String(err)
+					normalizeError(err).message
 				);
 			}
 		}
@@ -586,10 +586,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 				const content = fs.readFileSync(src, 'utf8');
 				config = JSON.parse(content) as Record<string, unknown>;
 			} catch (err) {
-				console.warn(
-					`[OpenCodeModelProvider] Failed to load global config:`,
-					err instanceof Error ? err.message : String(err)
-				);
+				console.warn(`[OpenCodeModelProvider] Failed to load global config:`, normalizeError(err).message);
 				return;
 			}
 		}
