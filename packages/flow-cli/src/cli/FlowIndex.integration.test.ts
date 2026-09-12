@@ -20,16 +20,19 @@ const updaterBundlePath = path.resolve(agentFleetRoot, 'packages/flow-cli/dist-b
 const TEST_VERSION = '0.0.0-test-integration';
 
 beforeAll(() => {
-	// Build the bundle with a test version
+	// `bundle` runs esbuild over dist/, so src must be compiled first or the bundle under test is
+	// whatever stale dist/ happens to be on disk.
 	// Use shell: true so npm resolves correctly on Windows (npm.cmd)
-	execFileSync('npm', ['run', 'bundle', '--workspace', 'packages/flow-cli'], {
-		cwd: agentFleetRoot,
-		encoding: 'utf-8',
-		timeout: 120000,
-		env: { ...process.env, BUNDLE_VERSION: TEST_VERSION },
-		shell: true,
-	});
-}, 120000);
+	for (const script of ['build', 'bundle']) {
+		execFileSync('npm', ['run', script, '--workspace', 'packages/flow-cli'], {
+			cwd: agentFleetRoot,
+			encoding: 'utf-8',
+			timeout: 120000,
+			env: { ...process.env, BUNDLE_VERSION: TEST_VERSION },
+			shell: true,
+		});
+	}
+}, 180000);
 
 afterAll(() => {
 	// Clean up the test bundle to avoid stale artifacts
@@ -78,21 +81,38 @@ describe('flow cli self-check -- no duplicate output', () => {
 
 describe('flow cli update -- produces output', () => {
 	it('writes at least one line to stdout when UPDATER_FORCE=1', () => {
-		// Use a temp configDir so no real npm registry is called (current version = up to date sentinel)
 		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-update-test-'));
 		try {
-			// Point the updater at a non-existent registry endpoint so it hits network error quickly
-			// OR we rely on the fact that BUNDLE_VERSION=0.0.0-test-integration means it's up to date
-			// relative to whatever latest is. Either way the updater must print something with force=1.
+			// FLOW_CONFIG_DIR is the only env var the updater honours for its config dir: ConfigDir.get
+			// reads XDG_CONFIG_HOME or os.homedir(), and os.homedir() ignores $HOME on Windows, so
+			// overriding HOME/APPDATA/XDG_DATA_HOME would leak into the developer's real ~/.config/flow.
+			//
+			// NPM_CONFIG_USERCONFIG replaces ~/.npmrc so the developer's `@wadeck-app:registry` and auth
+			// token cannot apply. Both the default and the scoped registry point at a closed port, so
+			// `npm view` fails fast: the run is offline, deterministic, and installs nothing globally.
+			const npmrcPath = path.join(tmpDir, 'npmrc');
+			const deadRegistry = 'http://127.0.0.1:1/';
+			fs.writeFileSync(
+				npmrcPath,
+				`registry=${deadRegistry}\n@wadeck-app:registry=${deadRegistry}\nfetch-retries=0\n`
+			);
+
+			// Running under npm/npx exports NPM_CONFIG_USERCONFIG pointing at the real ~/.npmrc.
+			// Windows env vars are case-insensitive while JS object keys are not, so adding a
+			// lowercase `npm_config_userconfig` would leave a duplicate that the real path wins.
+			// Drop every case variant first, then set exactly one canonical key.
+			const childEnv: Record<string, string | undefined> = {};
+			for (const [key, value] of Object.entries(process.env)) {
+				if (!/^npm_config_userconfig$/i.test(key)) childEnv[key] = value;
+			}
+
 			const result = spawnSync(process.execPath, [updaterBundlePath], {
 				env: {
-					...process.env,
+					...childEnv,
 					UPDATER_FORCE: '1',
 					UPDATER_PKG_NAME: '@wadeck-app/flow-cli',
-					// Override configDir to a fresh temp dir (no stale lock files)
-					XDG_DATA_HOME: tmpDir,
-					APPDATA: tmpDir,
-					HOME: tmpDir,
+					FLOW_CONFIG_DIR: tmpDir,
+					NPM_CONFIG_USERCONFIG: npmrcPath,
 				},
 				timeout: 30000,
 				encoding: 'utf-8',
@@ -103,6 +123,9 @@ describe('flow cli update -- produces output', () => {
 				combined.trim().length,
 				`Expected output from updater but got none. stdout: "${result.stdout}" stderr: "${result.stderr}"`
 			).toBeGreaterThan(0);
+			// The outcome must be attributed to the updater and name the failure, not just be non-empty.
+			expect(combined).toContain('[flow-updater]');
+			expect(combined).toContain('version fetch failed');
 		} finally {
 			try {
 				fs.rmSync(tmpDir, { recursive: true, force: true });

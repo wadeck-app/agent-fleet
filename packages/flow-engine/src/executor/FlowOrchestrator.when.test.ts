@@ -178,7 +178,9 @@ describe('FlowOrchestrator - when condition', () => {
 					createMockScriptStep({
 						id: 'calculate',
 						name: 'Calculate',
-						script: 'set /a next=${{ inputs.count }}-1 >nul\necho next=%next%\nif %next% GEQ 0 (echo continue=true) else (echo continue=false)',
+						// Multiline scripts on Windows run through bash (see ScriptExecutor),
+						// so this uses bash syntax rather than cmd batch syntax.
+						script: 'next=$((${{ inputs.count }} - 1))\necho "next=$next"\nif [ "$next" -ge 0 ]; then echo "continue=true"; else echo "continue=false"; fi',
 						output: {
 							next: { type: 'string', pattern: 'next=(.*)' },
 							continue: { type: 'string', pattern: 'continue=(.*)' },

@@ -40,12 +40,12 @@ describe('ValidateCommand', () => {
 	};
 
 	describe('human-readable output (default)', () => {
-		it('prints ✓ Flow is valid and exits 0 for a valid flow', () => {
+		it('prints [ok] Flow is valid and exits 0 for a valid flow', () => {
 			mockValidateFlowFile.mockReturnValue({ exit: 0 });
 
 			runValidate(['/some/flow.yml']);
 
-			expect(consoleLogMock).toHaveBeenCalledWith('✓ Flow is valid');
+			expect(consoleLogMock).toHaveBeenCalledWith('[ok] Flow is valid');
 			expect(exitMock).toHaveBeenCalledWith(0);
 		});
 
@@ -57,7 +57,9 @@ describe('ValidateCommand', () => {
 
 			runValidate(['/some/flow.yml']);
 
-			expect(consoleErrorMock).toHaveBeenCalledWith(expect.stringContaining('✗ Flow has 1 error'));
+			expect(consoleErrorMock).toHaveBeenCalledWith(expect.stringContaining('[fail] Flow has 1 error'));
+			// The per-error detail line must still surface message + path
+			expect(consoleErrorMock).toHaveBeenCalledWith('  - Bad field [steps[0]]');
 			expect(exitMock).toHaveBeenCalledWith(1);
 		});
 
@@ -69,7 +71,7 @@ describe('ValidateCommand', () => {
 
 			runValidate(['/foo']);
 
-			expect(consoleErrorMock).toHaveBeenCalledWith('✗ File not found: /foo');
+			expect(consoleErrorMock).toHaveBeenCalledWith('[fail] File not found: /foo');
 			expect(exitMock).toHaveBeenCalledWith(1);
 		});
 	});

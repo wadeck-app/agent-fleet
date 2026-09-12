@@ -15,6 +15,11 @@ describe('ScriptExecutor - Multiline Scripts (Integration)', () => {
 	// Only run on Windows where multiline handling is special
 	const describeWindows = process.platform === 'win32' ? describe : describe.skip;
 
+	/**
+	 * On Windows a multiline script is written to a temp .sh file and executed with
+	 * bash (Git Bash / MSYS2), not cmd.exe — see ScriptExecutor.execute(). The scripts
+	 * below therefore use bash syntax, not cmd batch syntax.
+	 */
 	describeWindows('Windows multiline scripts', () => {
 		it('should execute multiline script with multiple echo commands', async () => {
 			const script = `echo Line 1
@@ -31,9 +36,9 @@ echo Line 3`;
 		});
 
 		it('should execute multiline script with variables', async () => {
-			const script = `set /a next=5-1 >nul
-echo next=%next%
-if %next% GEQ 0 (echo continue=true) else (echo continue=false)`;
+			const script = `next=$((5 - 1))
+echo "next=$next"
+if [ "$next" -ge 0 ]; then echo "continue=true"; else echo "continue=false"; fi`;
 
 			const result = await executor.execute({ script });
 
@@ -44,12 +49,12 @@ if %next% GEQ 0 (echo continue=true) else (echo continue=false)`;
 		});
 
 		it('should execute multiline script with conditional logic', async () => {
-			const script = `set value=10
-if %value% GTR 5 (
-  echo Value is greater than 5
-) else (
-  echo Value is 5 or less
-)`;
+			const script = `value=10
+if [ "$value" -gt 5 ]; then
+  echo "Value is greater than 5"
+else
+  echo "Value is 5 or less"
+fi`;
 
 			const result = await executor.execute({ script });
 
@@ -59,11 +64,11 @@ if %value% GTR 5 (
 		});
 
 		it('should execute multiline script with comments', async () => {
-			const script = `REM This is a comment
-echo Starting test
-REM Another comment
-set testvar=success
-echo Result: %testvar%`;
+			const script = `# This is a comment
+echo "Starting test"
+# Another comment
+testvar=success
+echo "Result: $testvar"`;
 
 			const result = await executor.execute({ script });
 
@@ -74,9 +79,9 @@ echo Result: %testvar%`;
 		});
 
 		it('should handle multiline script with error', async () => {
-			const script = `echo First line
-exit /b 1
-echo This should not print`;
+			const script = `echo "First line"
+exit 1
+echo "This should not print"`;
 
 			const result = await executor.execute({ script });
 

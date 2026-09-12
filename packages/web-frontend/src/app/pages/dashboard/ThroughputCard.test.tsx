@@ -32,24 +32,21 @@ describe('ThroughputCard', () => {
 		render(<ThroughputCard tasksPerHour={10} successRate={95} avgTaskDuration={180000} />);
 
 		const successRateText = screen.getByText('95%');
-		// violations-suppress: tailwind/no-raw-color-class test fixture
-		expect(successRateText).toHaveClass('text-green-600');
+		expect(successRateText).toHaveClass('text-success');
 	});
 
 	it('should color success rate orange when >= 70% and < 90%', () => {
 		render(<ThroughputCard tasksPerHour={10} successRate={75} avgTaskDuration={180000} />);
 
 		const successRateText = screen.getByText('75%');
-		// violations-suppress: tailwind/no-raw-color-class test fixture
-		expect(successRateText).toHaveClass('text-orange-600');
+		expect(successRateText).toHaveClass('text-warning');
 	});
 
 	it('should color success rate red when < 70%', () => {
 		render(<ThroughputCard tasksPerHour={10} successRate={50} avgTaskDuration={180000} />);
 
 		const successRateText = screen.getByText('50%');
-		// violations-suppress: tailwind/no-raw-color-class test fixture
-		expect(successRateText).toHaveClass('text-red-600');
+		expect(successRateText).toHaveClass('text-danger');
 	});
 
 	it('should handle zero values', () => {

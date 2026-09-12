@@ -66,6 +66,7 @@ describe('WorkerAdapter', () => {
 	let adapter: WorkerAdapter;
 	let sendMessage: SendMessageFn;
 	let mockExecuteStep: ReturnType<typeof vi.fn>;
+	let mockSetOnRenderedPrompt: ReturnType<typeof vi.fn>;
 	let mockFactory: StepRunnerFactory;
 
 	beforeEach(() => {
@@ -74,7 +75,9 @@ describe('WorkerAdapter', () => {
 		mockMcpStart.mockResolvedValue({ port: 54321, mcpServer: mockMcpServer });
 		mockMcpStop.mockResolvedValue(undefined);
 		mockExecuteStep = vi.fn().mockResolvedValue({ outputs: { result: 'ok' } });
-		const mockRunner = { executeStep: mockExecuteStep };
+		// Mirrors StepRunner.setOnRenderedPrompt: registers the callback, invoked later by executeStep
+		mockSetOnRenderedPrompt = vi.fn();
+		const mockRunner = { executeStep: mockExecuteStep, setOnRenderedPrompt: mockSetOnRenderedPrompt };
 		// Factory returns a fresh mock runner for each call
 		mockFactory = vi.fn().mockReturnValue(mockRunner) as unknown as StepRunnerFactory;
 		adapter = new WorkerAdapter(mockFactory);

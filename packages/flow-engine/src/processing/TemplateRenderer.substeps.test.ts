@@ -29,24 +29,25 @@ describe('TemplateRenderer — subSteps namespace', () => {
 			expect(renderer.render('${{ subSteps.generate-flow_validate.outputs.stderr }}', ctx)).toBe('invalid yaml');
 		});
 
-		it('throws when sub-step id is not found', () => {
+		// Missing sub-step / missing output resolve to '' instead of throwing: on the first
+		// parent run no sub-step has failed yet, and throwing would crash the parent (7e520e1).
+		it('resolves to empty string when sub-step id is not found', () => {
 			const ctx = makeCtx(new Map());
-			expect(() => renderer.render('${{ subSteps.missing-step.outputs.stderr }}', ctx)).toThrow(
-				TemplateRenderError
-			);
+			expect(renderer.render('[${{ subSteps.missing-step.outputs.stderr }}]', ctx)).toBe('[]');
 		});
 
-		it('throws when output var is not found in sub-step', () => {
+		it('resolves to empty string when output var is not found in sub-step', () => {
 			const ctx = makeCtx(new Map([['validate', { outputs: { stdout: 'ok' }, status: 'failed' }]]));
-			expect(() => renderer.render('${{ subSteps.validate.outputs.nonexistent }}', ctx)).toThrow(
-				TemplateRenderError
-			);
+			expect(renderer.render('[${{ subSteps.validate.outputs.nonexistent }}]', ctx)).toBe('[]');
 		});
 
-		it('throws when subSteps context is absent', () => {
-			expect(() => renderer.render('${{ subSteps.validate.outputs.stderr }}', baseContext)).toThrow(
-				TemplateRenderError
-			);
+		it('resolves to empty string when subSteps context is absent', () => {
+			expect(renderer.render('[${{ subSteps.validate.outputs.stderr }}]', baseContext)).toBe('[]');
+		});
+
+		it('still throws for a malformed subSteps expression', () => {
+			const ctx = makeCtx(new Map());
+			expect(() => renderer.render('${{ subSteps.validate.oops.stderr }}', ctx)).toThrow(TemplateRenderError);
 		});
 	});
 

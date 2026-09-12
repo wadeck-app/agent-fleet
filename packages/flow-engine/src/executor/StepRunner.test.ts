@@ -670,7 +670,9 @@ describe('StepRunner', () => {
 
 			const trace = await runner.executeStep(step, testWorkspace, context);
 
-			expect(trace.error).toBe('Unexpected error');
+			// StepRunner stringifies the error (project convention, see
+			// shared-common getErrorMessage) which keeps the "Error: " prefix.
+			expect(trace.error).toBe('Error: Unexpected error');
 		});
 
 		it('should pass taskMetadata and claudeEnv to subflow', async () => {

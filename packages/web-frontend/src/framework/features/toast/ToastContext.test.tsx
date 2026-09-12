@@ -117,8 +117,7 @@ describe('ToastContext', () => {
 
 		await waitFor(() => {
 			const toast = screen.getByText('Default message').closest('div')!.parentElement;
-			// violations-suppress: tailwind/no-raw-color-class test fixture
-			expect(toast).toHaveClass('bg-green-600');
+			expect(toast).toHaveClass('bg-success');
 		});
 	});
 });

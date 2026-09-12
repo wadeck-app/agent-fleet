@@ -64,40 +64,35 @@ describe('TasksCard', () => {
 			render(<TasksCard total={20} active={5} review={0} done={0} blocked={0} failed={0} />);
 
 			const activeElement = screen.getByText('5');
-			// violations-suppress: tailwind/no-raw-color-class test fixture
-			expect(activeElement.className).toContain('text-blue-600');
+			expect(activeElement.className).toContain('text-info');
 		});
 
 		it('should apply purple color to review tasks', () => {
 			render(<TasksCard total={20} active={0} review={3} done={0} blocked={0} failed={0} />);
 
 			const reviewElement = screen.getByText('3');
-			// violations-suppress: tailwind/no-raw-color-class test fixture
-			expect(reviewElement.className).toContain('text-purple-600');
+			expect(reviewElement.className).toContain('text-info');
 		});
 
 		it('should apply green color to done tasks', () => {
 			render(<TasksCard total={20} active={0} review={0} done={10} blocked={0} failed={0} />);
 
 			const doneElement = screen.getByText('10');
-			// violations-suppress: tailwind/no-raw-color-class test fixture
-			expect(doneElement.className).toContain('text-green-600');
+			expect(doneElement.className).toContain('text-success');
 		});
 
 		it('should apply orange color to blocked tasks', () => {
 			render(<TasksCard total={20} active={0} review={0} done={0} blocked={1} failed={0} />);
 
 			const blockedElement = screen.getByText('1');
-			// violations-suppress: tailwind/no-raw-color-class test fixture
-			expect(blockedElement.className).toContain('text-orange-600');
+			expect(blockedElement.className).toContain('text-warning');
 		});
 
 		it('should apply red color to failed tasks', () => {
 			render(<TasksCard total={20} active={0} review={0} done={0} blocked={0} failed={1} />);
 
 			const failedElement = screen.getByText('1');
-			// violations-suppress: tailwind/no-raw-color-class test fixture
-			expect(failedElement.className).toContain('text-red-600');
+			expect(failedElement.className).toContain('text-danger');
 		});
 	});
 });

@@ -42,10 +42,13 @@ describe('FlowScheduler — wait-all strategy', () => {
 			makeStep('child-a', [], { parent: 'parent' }),
 			makeStep('child-b', [], { parent: 'parent' }),
 		]);
+		// Injected sub-steps implicitly depend on their parent: they only become
+		// dispatchable once the parent reports its outcome.
+		const readyAfterParent = succeed(scheduler, 'parent');
+		expect(readyAfterParent.some(r => r.stepId === 'child-a')).toBe(true);
+		expect(readyAfterParent.some(r => r.stepId === 'child-b')).toBe(true);
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
-
-		succeed(scheduler, 'parent');
 
 		// child-a fails — child-b still pending → wait
 		const ready = fail(scheduler, 'child-a', 'error-a');
@@ -63,10 +66,9 @@ describe('FlowScheduler — wait-all strategy', () => {
 			makeStep('child-a', [], { parent: 'parent' }),
 			makeStep('child-b', [], { parent: 'parent' }),
 		]);
+		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
-
-		succeed(scheduler, 'parent');
 
 		// child-a fails → wait
 		fail(scheduler, 'child-a', 'error-a');
@@ -90,10 +92,9 @@ describe('FlowScheduler — wait-all strategy', () => {
 			makeStep('child-a', [], { parent: 'parent' }),
 			makeStep('child-b', [], { parent: 'parent' }),
 		]);
+		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
-
-		succeed(scheduler, 'parent');
 
 		// child-a fails → wait (child-b still pending)
 		fail(scheduler, 'child-a', 'only-this-error');
@@ -117,10 +118,9 @@ describe('FlowScheduler — wait-all strategy', () => {
 			makeStep('child-a', [], { parent: 'parent' }),
 			makeStep('child-b', [], { parent: 'parent' }),
 		]);
+		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
-
-		succeed(scheduler, 'parent');
 		succeed(scheduler, 'child-a');
 		succeed(scheduler, 'child-b');
 
@@ -144,9 +144,9 @@ describe('FlowScheduler — wait-all strategy', () => {
 			makeStep('child-a0', [], { parent: 'parent' }),
 			makeStep('child-b0', [], { parent: 'parent' }),
 		]);
+		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child-a0');
 		scheduler.acknowledge('child-b0');
-		succeed(scheduler, 'parent');
 		fail(scheduler, 'child-a0', 'err-a0');
 		const ready1 = fail(scheduler, 'child-b0', 'err-b0');
 		expect(scheduler.hasFailed()).toBe(false);
@@ -158,9 +158,9 @@ describe('FlowScheduler — wait-all strategy', () => {
 			makeStep('child-a1', [], { parent: 'parent' }),
 			makeStep('child-b1', [], { parent: 'parent' }),
 		]);
+		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child-a1');
 		scheduler.acknowledge('child-b1');
-		succeed(scheduler, 'parent');
 		fail(scheduler, 'child-a1', 'err-a1');
 		fail(scheduler, 'child-b1', 'err-b1');
 
@@ -181,10 +181,9 @@ describe('FlowScheduler — restart-on-first-failure strategy (default)', () => 
 			makeStep('child-a', [], { parent: 'parent' }),
 			makeStep('child-b', [], { parent: 'parent' }),
 		]);
+		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
-
-		succeed(scheduler, 'parent');
 
 		// child-a fails → immediate restart, no waiting for child-b
 		const ready = fail(scheduler, 'child-a', 'first-error');
@@ -205,10 +204,9 @@ describe('FlowScheduler — restart-on-first-failure strategy (default)', () => 
 			makeStep('child-a', [], { parent: 'parent' }),
 			makeStep('child-b', [], { parent: 'parent' }),
 		]);
+		succeed(scheduler, 'parent');
 		scheduler.acknowledge('child-a');
 		scheduler.acknowledge('child-b');
-
-		succeed(scheduler, 'parent');
 		succeed(scheduler, 'child-a');
 		succeed(scheduler, 'child-b');
 
@@ -240,9 +238,9 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 
 		scheduler.acknowledge('parent');
 		scheduler.inject([makeStep('child-x', [], { parent: 'parent' })]);
-		scheduler.acknowledge('child-x');
 
 		succeed(scheduler, 'parent');
+		scheduler.acknowledge('child-x');
 		fail(scheduler, 'child-x', 'child-error');
 
 		// Custom strategy returned fail-parent → parent should be failed terminally
@@ -257,9 +255,9 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 
 		scheduler.acknowledge('parent');
 		scheduler.inject([makeStep('child-x', [], { parent: 'parent' })]);
-		scheduler.acknowledge('child-x');
 
 		succeed(scheduler, 'parent');
+		scheduler.acknowledge('child-x');
 
 		expect(() => fail(scheduler, 'child-x', 'err')).toThrow('unknown sub-step strategy "nonexistent"');
 	});
@@ -284,9 +282,9 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 
 		scheduler.acknowledge('parent');
 		scheduler.inject([makeStep('child-y', [], { parent: 'parent' })]);
-		scheduler.acknowledge('child-y');
 
 		succeed(scheduler, 'parent');
+		scheduler.acknowledge('child-y');
 
 		// Override returns wait → no restart despite using default strategy name
 		const ready = fail(scheduler, 'child-y', 'err');

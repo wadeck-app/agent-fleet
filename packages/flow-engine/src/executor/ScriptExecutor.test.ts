@@ -255,7 +255,9 @@ describe('ScriptExecutor', () => {
 
 			await expect(executePromise).rejects.toThrow(ScriptExecutionError);
 			await expect(executePromise).rejects.toMatchObject({
-				message: 'Failed to execute script: Command not found',
+				// ScriptExecutor stringifies the error (project convention, see
+				// shared-common getErrorMessage) which keeps the "Error: " prefix.
+				message: 'Failed to execute script: Error: Command not found',
 				exitCode: -1,
 			});
 		});
@@ -547,7 +549,7 @@ describe('ScriptExecutor', () => {
 
 			await expect(executePromise).rejects.toThrow(ScriptExecutionError);
 			await expect(executePromise).rejects.toMatchObject({
-				message: 'Failed to execute script: Execution failed',
+				message: 'Failed to execute script: Error: Execution failed',
 			});
 		});
 

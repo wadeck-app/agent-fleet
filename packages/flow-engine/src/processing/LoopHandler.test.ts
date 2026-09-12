@@ -551,7 +551,8 @@ describe('LoopHandler', () => {
 
 				handler.handleLoop(mockStep, 'step0', mockDAG, completed, iterations);
 
-				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('🔄 [LOOP]'));
+				// Emoji were removed from CLI output by the no-emoji violations rule (06a48e5)
+				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('[LOOP]'));
 				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Step 'step1' failed"));
 				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("returning to 'step0'"));
 				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('iteration 1/5'));
@@ -570,7 +571,7 @@ describe('LoopHandler', () => {
 
 				handler.handleLoop(mockStep, 'step0', mockDAG, completed, iterations);
 
-				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('📝 Invalidated 2 step(s)'));
+				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Invalidated 2 step(s)'));
 				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('step0, step2'));
 			});
 
@@ -593,7 +594,7 @@ describe('LoopHandler', () => {
 
 				handler.handleLoop(mockStep, 'step0', mockDAG, completed, iterations);
 
-				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('⏭️  Skipped 1 step(s)'));
+				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Skipped 1 step(s)'));
 				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('skipOnLoop=true'));
 				expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('step2'));
 			});
@@ -604,7 +605,7 @@ describe('LoopHandler', () => {
 
 				handler.handleLoop(mockStep, 'step0', mockDAG, completed, iterations);
 
-				const skipLogCall = consoleLogSpy.mock.calls.find((call: any[]) => call[0].includes('⏭️'));
+				const skipLogCall = consoleLogSpy.mock.calls.find((call: any[]) => call[0].includes('Skipped'));
 				expect(skipLogCall).toBeUndefined();
 			});
 
@@ -807,7 +808,7 @@ describe('LoopHandler', () => {
 
 			handler.handleResetOnSuccess('step0', allSteps, iterations);
 
-			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('🔄 Reset iteration counter'));
+			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Reset iteration counter'));
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("'step1'"));
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(was 5)'));
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('resetOnSuccess'));

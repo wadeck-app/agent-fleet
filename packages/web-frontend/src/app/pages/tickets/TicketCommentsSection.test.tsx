@@ -12,7 +12,7 @@ vi.mock('./tickets.api', () => ({
 	},
 }));
 
-vi.mock('@/transport', () => ({
+vi.mock('@/transport/useTransport', () => ({
 	useTransport: vi.fn(() => ({
 		transport: {
 			subscribe: vi.fn(() => vi.fn()),

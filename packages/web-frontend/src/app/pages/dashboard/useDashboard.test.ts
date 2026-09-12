@@ -24,8 +24,8 @@ vi.mock('../../hooks/useOrchestratorWebSocket', () => ({
 	})),
 }));
 
-// Mock useTransport
-vi.mock('@/transport', () => ({
+// Mock useTransport — must match the exact import path used in useDashboard.ts
+vi.mock('@/transport/useTransport', () => ({
 	useTransport: vi.fn(() => ({
 		connectionState: 'disconnected',
 		request: vi.fn(),

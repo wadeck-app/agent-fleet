@@ -37,7 +37,7 @@ const mockSubscribe = vi.fn((_, handler: () => void) => {
 });
 
 // FlowFeedbackSection subscribes to B2F_TICKET_FEEDBACK_SUBMITTED via useTransport
-vi.mock('@/transport', () => ({
+vi.mock('@/transport/useTransport', () => ({
 	useTransport: () => ({
 		transport: {
 			subscribe: mockSubscribe,

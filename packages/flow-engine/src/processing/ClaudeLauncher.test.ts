@@ -31,8 +31,10 @@ describe('ClaudeLauncher', () => {
 			const path = manager.findClaudePath();
 
 			expect(path).toBe('C:\\Users\\test\\AppData\\Local\\claude.cmd');
+			// windowsHide:true suppresses the console flash of this non-interactive lookup (b256c19)
 			expect(child_process.execSync).toHaveBeenCalledWith('where claude', {
 				encoding: 'utf8',
+				windowsHide: true,
 			});
 		});
 
@@ -45,6 +47,7 @@ describe('ClaudeLauncher', () => {
 			expect(path).toBe('/usr/local/bin/claude');
 			expect(child_process.execSync).toHaveBeenCalledWith('which claude', {
 				encoding: 'utf8',
+				windowsHide: true,
 			});
 		});
 

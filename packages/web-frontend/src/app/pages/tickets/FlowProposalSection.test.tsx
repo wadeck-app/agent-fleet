@@ -36,7 +36,7 @@ vi.mock('@framework/features/toast/ToastContext', () => ({
 }));
 
 // Mock useTransport — FlowProposalSection subscribes to B2F_TICKET_UPDATED (r2 fix)
-vi.mock('@/transport', () => ({
+vi.mock('@/transport/useTransport', () => ({
 	useTransport: () => ({
 		transport: {
 			subscribe: vi.fn(() => () => {}),
