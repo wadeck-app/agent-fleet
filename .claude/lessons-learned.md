@@ -1,8 +1,70 @@
 # Lessons learned
 
-<!-- Last updated: 2026-09-12T09:58:52.692Z -->
+<!-- Last updated: 2026-09-12T21:48:58.303Z -->
 
 ## Recurring feedback
+
+<!-- session fe82fc22 2026-09-12 -->
+- New extension point pattern `project-resolution/v1.ts` created with accompanying implementation and tests in same task; this is now a required architectural pattern for abstract project handling across multiple packages (flow-cli, web-backend, flow-engine all updated simultaneously).
+- Heavy modification of test files (Daemon.test.ts, FlowScheduler.parent.test.ts, ScriptExecutor.test.ts, etc.) across ~50 edits without visible failure context — suggests tests were brittle or assumptions shifted; root cause of failures not captured in logs.
+- Heavy use of bash `sed -i` for bulk file replacements instead of Edit tool — efficient for parallelizable tasks but makes diffs harder to review in commits.
+- Multiple agents spawned in parallel for violations fixes (frontend-dev, backend-dev, general-purpose x2) — good delegation pattern, but violations categorization (which packages per agent) repeated across three separate agent invocations suggests a violations-fix taxonomy could be documented upfront.
+- Mass type-cast removals (e.g. `(trace.outputs ?? {}) as Record<string, unknown>` → `(trace.outputs ?? {})`) applied via sed across files without context verification — risky pattern for safety-critical changes
+- <finding>
+
+<!-- session 82935c53 2026-09-12 -->
+- Pattern: `flow stop` → `flow run` → `sleep N` → `cat ~/.config/flow/executions/<id>.json` repeated 8+ times. Suggests need for polling helper or `flow wait --id <id>` command.
+- Task CLI command confusion: blueprints initially used `task cli show` / `task cli comment` instead of bare `task show` / `task comment` — required fix pass. Suggests unclear CLI documentation or command structure.
+- Polling pattern with hardcoded `sleep 60/90/120` between status checks suggests async operations lack wait-for-completion signaling; creates inefficient tight loops.
+- Violations rules (`no-switch-default`, `no-emoji`, `no-err-message-direct`) not enforced consistently — agents and main session both had to chase linting violations manually via `npx violations check` instead of failing fast.
+- Mass type-cast replacements (`as unknown as` patterns) ran before immediate TypeScript validation — TypeScript errors were only checked ~2 mins later, leaving window for undetected issues
+
+<!-- session b6077617 2026-09-12 -->
+- @wadeck-app package version checking scattered across session (npm view, grep node_modules) — suggests no single source of truth for available/pinned versions; caused delays in dependency resolution.
+- Agents ran inefficient Glob searches like `src/transport*/**/*` and `**/transport*` (13:04:21-13:05:27) — fishing expeditions instead of targeted Grep. Indicates unclear module structure or that error utility patterns weren't discoverable from the codebase.
+- Multiple unicode symbols (→, ⏳, ℹ, ×, ⏱) flagged as violations across e2e-web package; systematic sed-based replacement to ASCII equivalents required at scale.
+- High-level code review of daemon/worker code (b5634db) triggered extensive violations suppressions across flow-cli — 8+ files needed `as unknown` type casts or emoji removals, suggesting either violations rules are overly strict for this codebase's patterns or worker communication code deviates from project conventions.
+
+<!-- session 3a42178c 2026-09-12 -->
+- User redirected running fork agent mid-batch via SendMessage: stopped 5-run speed test citing incorrect Luna performance assumptions, then resumed with corrected scope.
+- Flow execution completion requires polling with sleep intervals (30s/45s/60s); no blocking wait mechanism, forcing fork agent to blind-sleep then check logs.
+- Extensive cross-checking and re-testing of partial fixes (FlowScheduler.parent.test.ts edited 6+ times, LoopHandler.test.ts 4+ times, ScriptExecutor 5+ times) indicates incremental debugging rather than root-cause fixes — agents did not identify all failures upfront before parallelizing work.
+- Test repairs spanned 164 tests across 5 packages with parallel agents per feature (FlowProposal, Dashboard, etc.). Agents correctly identified the pattern (missing error normalization in mocks), but overlap in understanding which tests needed which fixes led to re-reads of the same shared utility file.
+- Repeated `npx violations check 2>&1 | grep ...` calls with different filters (14:24, 15:24+) are inefficient. Violations CLI should support direct --filter-by-rule or --format=json to avoid repeated parsing.
+- Repeated `npx violations check` runs with filtering (grep -E "flow-engine|orchestrator|...") suggests iterative discovery of violation scope rather than planning the full set of changes upfront — scope spanned extension-points, flow-cli, orchestrator, task-cli, and web-backend.
+- Type-cast cleanup pattern repeats across frontend/backend/e2e: grep for `as any`/`as unknown`/`as string` patterns, delegate to specialized agents by package, re-verify with violations check. Consider documenting the parallel-fix-and-verify cadence.
+
+<!-- session 6d0d9229 2026-09-12 -->
+- French text used in user questions (AskUserQuestion) despite project CLAUDE.md specifying English-first documentation and agent communication.
+- Blueprint fixes follow a pattern: model downgrades (sonnet→haiku for cost/time), task status resets (backlog before transitions), dependency chain corrections (commit_fix→verify_fix). Suggests blueprints need validation rules or templates to prevent these errors.
+- No-emoji and no-switch-default violations rules are strict across test files — session applied same pattern fixes to ~6+ test files (FlowScheduler, LoopHandler, StreamEventMapper, ClaudeLauncher, ScriptExecutor); suggests violations config or its error messages should clarify scope (test vs source) or have exemptions.
+- Multiple passes fixing violations with codemod tweaks and corrections (emoji mappings added post-dry-run, violations-suppress comment naming corrected from `security/no-raw-err-in-cli` to `no-raw-err-in-cli`), suggesting violations rule schema/naming conventions weren't immediately clear.
+- Skills `check` and `run-test` initially reported as "NOT YET KNOWN" but were used moments later anyway (16:52:47 vs. 16:54:14), suggesting agents may have called ToolSearch mid-stream; future sessions should call ToolSearch upfront for unknown skills rather than letting agents discover them reactively.
+- Test file disposal uncertainty — WorkerList.integration.test.ts moved to /tmp/af-park instead of deleted at 21:21:36, indicating unclear decision criteria for removing unreliable tests. Ad-hoc archival used instead of explicit deletion or fixing.
+
+<!-- session 762f10ec 2026-09-12 -->
+- User interrupted batch test run at 07:51:52 to redirect — agent misunderstood Luna cold-start latency (~120s initial vs ~3.5s sustained) and needed guidance on continuation strategy
+- Multiple file format rewrites (js → cjs) suggests agent iterated on approach mid-task rather than following a single strategy from the start.
+- Multiple test file edits replacing `.agent-fleet` and `.flows` path references in the same session (10:10:55–10:11:15) — suggests systematic path resolution issue across test fixtures that required scatter-gun fixes rather than root-cause correction.
+- Large-scale refactoring (instanceof Error ? String() → getErrorMessage()) required temporary Node codemod script (af-codemod.mjs at 14:09:46) — bulk changes too numerous for individual edits; suggests need for structured refactoring tooling or migrations framework.
+- Files repeatedly restored from git history (git show 8449a4f^) — global-setup-web-server.ts, healthChecks.ts, ingredientFixtures.ts all recovered. Suggests accidental deletion or mass edit affected e2e-web — restore workflow works but re-occurrence indicates need for review step before such changes.
+
+<!-- session 4015bb99 2026-09-12 -->
+- 164 stale tests across five packages in single fix session indicates tests rot faster than implementation updates. Root cause: test files using `instanceof Error ? String(err) : String(err)` (degenerate ternary) — copy-paste error from template or mock setup inconsistency.
+- Multiple rounds of `npx violations check` → fix → commit suggest violations checks are fragile or baseline state is shifting; consider pre-commit hook or clearer baseline definition.
+- Main agent issued `sleep 120` to wait for background agents (16:40:20) instead of letting them complete asynchronously. Per instructions: the harness notifies when background agents finish; sleeping polls and wastes tokens.
+- Type-cast violations (as any/unknown/Record<string,...>) widespread across web-backend, web-frontend — systematic codebase issue, not isolated
+
+<!-- session 6e65cb7c 2026-09-12 -->
+- Sub-agent completion summaries cannot be trusted without independent verification (read files, run tests, check git diff); agent claim of "fixed" does not guarantee actual fixes applied
+- Manual violations fixing (sed/codemod scripts) consumed ~35% of session instead of delegating early; violations skill not invoked until agents launched at 16:36
+- The e2e-web package required extra scrutiny: fixture encoding checks, global-setup-web-server history diffs, TypeScript compilation validation — suggests it may need dedicated review process or special handling beyond generic violation fixes.
+
+<!-- session cbe5dbdf 2026-09-12 -->
+- Trial-and-error test file creation/deletion (TempVerify.test.ts written, run, deleted) rather than targeted debugging. Suggests need for better test isolation or probe strategy before spawning agents.
+- Workflow pattern: `npx violations check` → categorize violations by package → spawn parallel agents (frontend-dev, backend-dev, general-purpose) → each agent fixes their violations → commit. This multi-round manual categorization could be bundled into a single skill for faster violation cycles.
+- Agents made repeated Read calls to the same files within the same execution (e.g., buildQuery.ts read 5+ times, FlowEditorPropertiesPanel.tsx read 6+ times). This pattern suggests agents lack file content caching or are re-reading unnecessarily after edits.
+- Non-ASCII symbols in code (→, ≠, ℹ) keep triggering violations — suggests the linter catches these but the constraint isn't prominent enough in guidance or CLAUDE.md.
 
 <!-- session a7e60cb3 2026-09-12 -->
 - Fork agent launched batch performance test (5 runs) but user interrupted mid-execution (run 3/5) with correction: "Luna is fast (~3.5s), the slow was a cold-start. Include luna in the batch" — test assumptions not validated before spawning parallel work.
@@ -575,6 +637,143 @@
 - Multiple independent agents (Explore, general-purpose) read identical spec files sequentially without coordination, causing redundant I/O. Agents should receive shared context or hand off findings rather than re-audit.
 
 ## Agent errors
+
+<!-- session fe82fc22 2026-09-12 -->
+- Multiple skills invoked but marked as "NOT YET KNOWN": session-history (08:31:40), write-doc (08:33:50), goldfish (08:35:33), check-parallel-agents (09:00:31). Agent attempted unavailable/unregistered skills.
+- Blueprints initially used wrong task CLI syntax ("task cli show" instead of "task show"). Fixed with sed at 09:11:11. Suggests template or documentation showed incorrect command format.
+- Blueprint input declarations had invalid "description: text" syntax causing validation failures. Required removal at 09:12:35 before validation passed.
+- Baseline worktree created at /tmp/af-baseline via `git worktree add --detach` does not auto-populate node_modules; agent checked with `ls node_modules` verification but may slow future testing flows.
+- Parallel agents (abd4, a577, a631, abc0) spawned ~12:31 on overlapping concerns (test failures across packages); no evidence of coordination or work distribution — all ran similar diagnostic patterns independently (git log, reads, edits).
+- Multiple parallel frontend-dev agents (a637, a07e, ae4a, a76e) launched at 13:04:* tasked with overlapping test fixes; later evidence (errorUtils.ts edits) suggests redundant or conflicting work on shared files without clear file-based separation of concerns.
+- Complete file rewrites (AssignmentLedger.ts at 14:23:27, AssignmentLedger.test.ts at 14:23:09) instead of targeted edits created type mismatches requiring follow-up type checking and cascading edits to Protocol.ts, CommandHandler.ts, Daemon.ts, Worker.ts, WorkerAdapter.ts (14:23:40–14:25:57).
+- Skill "write-doc" invoked before ToolSearch loaded it (15:32:14) — agents attempting Skill calls for unknown tools before schema fetch; recommend eager ToolSearch or document when Skill schemas must be loaded first.
+- Multiple violations-suppress fixes required trial-and-error on rule namespace format: changed from `security/no-raw-err-in-cli` to `no-raw-err-in-cli` mid-session (16:20-16:21), suggesting rule naming convention unclear or inconsistently documented.
+- Multiple agents read violation rule definitions from compiled node_modules JS files repeatedly instead of having local documentation — suggests rule behavior is opaque to developers
+- <finding>
+- Backend-dev agent attempted skill invocations (violations check, run-test) without first fetching their schemas via ToolSearch; resulted in WARN: "NOT YET KNOWN" errors. Should call ToolSearch before invoking skills that are deferred or uncertain.
+- ToolSearch invoked with deferred tool queries but returned WARN "NOT YET KNOWN" — indicates agent can't call tools it hasn't explicitly fetched schemas for; general-purpose agent should fetch schemas before attempting ToolSearch calls.
+- Integration test WorkerList.integration.test.ts created, debugged for 10+ minutes, then moved to /tmp/af-park (parked) without resolution — daemon connection and health_token cleanup timing issues unresolved; suggests either test constraints unclear or daemon-kit internals require clearer documentation.
+
+<!-- session 82935c53 2026-09-12 -->
+- Backend-dev agent invoked unknown "check" skill without verification — should validate skill availability before calling.
+- Agent tested multiple providers (opencode-claude-haiku, codex-astra, codex-luna) but diagnoses required manual grep of ~/.config/flow/logs and cat of execution JSON files — no built-in flow diagnostics command documented yet.
+- Skills discovered as "NOT YET KNOWN" (write-doc, goldfish, check-parallel-agents, AskUserQuestion) but invoked anyway — suggests tool discovery/loading race condition or missing schema fetch.
+- Goldfish skill invoked via direct `claude --print` bash command instead of Skill tool — work-around for NOT YET KNOWN status.
+- Two sequential general-purpose agents spawned (quality review, then coherence review) when scope could fit in one agent or async parallel batch.
+- Agent deleted test scripts (test-agent.js, test-runner-utils.js) without realizing they were essential; had to restore from git history via `git show 363fc7a^:scripts/test-agent.js`.
+- Agent made widespread project-resolution changes across 7+ files (RunCommand.ts, ConfigLoader.ts, FlowRegistry.ts, Daemon.ts, WorkspaceManager.ts, FlowsService.ts, debug-workspace-sync.ts) without verifying full test suite passed before iterating further.
+- Agent created git worktree but didn't verify/set up node_modules dependency, then tried to compare test baselines against an unusable state.
+- Multiple general-purpose agents launched in parallel (12:31:10-12:31:38) to fix test failures across flow-engine, flow-cli, web-backend. Main session had to verify each agent's fixes via git diffs and test runs — no single agent owned the full scope, leading to cross-file dependency issues (e.g., StreamEventMapper changes affecting LoopHandler tests). Future: coordinate agent scope to avoid overlaps.
+- Frontend agents performed broad Glob searches (`**/*.ts`, `src/**/transport*`) to find error utilities instead of recognizing that web-frontend and web-backend use different error handling patterns (`normalizeError` vs `getErrorMessage`). Agents need package-specific guidance on error utility locations.
+- Codemod to replace `instanceof Error ? String(err) : String(err)` with `getErrorMessage(err)` broke tests checking literal strings (e.g., test expected `"model"` but codemod changed it). String-safe patterns needed for automated refactors targeting test files.
+- Multiple spawned agents (frontend-dev, backend-dev, general-purpose at 16:36) tried to invoke skills (violations, parallel-and-todos, write-doc) that were marked "*** NOT YET KNOWN ***" — agents don't inherit skill availability from parent session; they must discover/load tools at runtime.
+- Multiple agents edited related files (TransportRouter.ts, TasksService.ts, etc.) in parallel without explicit coordination — potential for concurrent-edit collisions not visible in logs
+- Agents tried to invoke `violations`, `check`, and `run-test` skills without preloading their schemas — logged as "NOT YET KNOWN" warnings at 16:49:49, 16:52:47, 16:53:14. This forced fallback to manual script searches and Bash workarounds instead of failing fast.
+- frontend-dev and backend-dev agents ran iterative grep refinements to find unsafe type casts (` as any`, ` as unknown`, etc.) — suggesting the violation patterns evolved during the run and agents had to re-search instead of applying a complete fix upfront.
+- frontend-dev agent spent 18:00-18:10 searching node_modules/@wadeck-app/violations-rules source code to understand suppression syntax; should have consulted .violations/.reports/suppressed.json or docs first
+- WorkerList.integration.test.ts created (21:17), then moved to .claude/temp (21:21), later revived with modifications — unclear upfront whether integration test path was correct
+
+<!-- session b6077617 2026-09-12 -->
+- Attempted to use model identifier "claude-3-5-haiku" which is invalid; valid identifiers are "claude-haiku-4-5-20251001", "claude-sonnet-5", "claude-opus-5", "claude-fable-5-1"
+- Fork agents receive mid-task SendMessage redirections (07:51:52 "ne lance pas les 5 runs", 07:52:15 "Reprends... Inclus luna") disrupting parallel execution flow; agents must track these as task mutations
+- Fork agent wrote incorrect task commands in blueprints: "task cli show" / "task cli comment" don't exist, should be "task show" / "task comment". Discovered during E2E test, required manual fix.
+- Fork agent struggled to discover correct flow command for viewing execution details: tried "flow show --execution", "flow show -e", "flow history --id" before finding the right syntax. Multiple trial-and-error iterations.
+- Skills "check" and "run-test" show "NOT YET KNOWN" warnings (10:02:36, 10:10:27) despite being invoked — suggests conditional availability or initialization lag that breaks subsequent calls.
+- Test script recovery via git history (10:11:16) indicates `scripts/test-agent.js` was deleted in commit 363fc7a but needed for test runs — agent should check git log before assuming deletion is intentional.
+- Sub-agents extensively git-grepped when context (commit history, file changes) could have been provided upfront by main session — inefficient parallel search overhead.
+- Multiple parallel frontend-dev sub-agents (a637, a07e, ae4a, a76e) launched at 13:04 spent 30+ minutes on redundant file searches (Glob for transport paths, errorUtils) without coordination, suggesting they each independently hunted for the same utilities instead of sharing findings.
+- Main agent (M) eventually abandoned the parallel frontend-dev work and ran a systematic codemod (14:09-14:12) across 6+ files to replace error patterns uniformly — suggests the parallel agents stalled or couldn't complete the full scope, or the fix required coordinated cross-package edits.
+- Agents spawned with Skill calls (parallel-and-todos, violations) that returned "NOT YET KNOWN" — skills existed but weren't resolved before agent execution launched, causing immediate failures in parallel tasks.
+- Subagents tried invoking unavailable skills: "violations check", "check", "run-test" all reported "NOT YET KNOWN", forcing fallback behavior. Skills may not be preloaded for subagent contexts.
+- Type-casting cleanup (`as any`, `as string`, `as unknown`) required extensive cross-package search/replace across frontend-dev and backend-dev agents — suggests either missing linting rule or recent config tightening.
+- General-purpose agent created multiple integration tests (WorkerLaunch, InboundWorker, WorkerList) with incomplete lifecycle management around health_token and daemon shutdown, then eventually parked WorkerList.integration.test.ts (moved to /tmp/af-park) when test lifecycle issues persisted — suggests unfamiliarity with daemon-kit lifecycle patterns.
+- Used sed to modify source file indentation in WorkerSourceContact.ts instead of Edit tool—even for whitespace changes, source modifications should go through Edit for auditability and consistency.
+
+<!-- session 3a42178c 2026-09-12 -->
+- backend-dev agent attempted unavailable skills/tools — `skill=check` and `mcp__github-wadeck-app__actions_list` (twice) and `skill=write-doc` — without loading schemas first, despite being declared in system-reminder.
+- Agent searched for `check-ts.js` in scripts directory instead of using skill directly — suggests agent was unaware of the `check` skill or its correct invocation pattern.
+- Skill invocations marked "NOT YET KNOWN" (write-doc 08:33:50, goldfish 08:33:53, check-parallel-agents 09:00:29, AskUserQuestion 08:52:24) — skills failed to load; agent worked around by manually running `claude --print` subprocess and reading result file.
+- Test infrastructure scripts (scripts/test-agent.js, test-runner-utils.js) were deleted in commit 363fc7a and had to be manually restored — automated tests cannot run without these utilities present.
+- Agent created new extension point files but had to chase down hardcoded path references (`grep -rn "\.agent-fleet\|\.flows/"`) across packages — no index/registry of affected files to guide refactoring.
+- Multiple agents (abd4, a577, a631, abc0) launched in parallel with unverified partial fixes; repeated test failures and re-runs suggest fixes were incomplete or made wrong assumptions (e.g., about @wadeck-app/shared-updater version availability, environment variable handling). Primary agent did not verify results before trusting parallel work.
+- Agents assumed @wadeck-app package versions in package.json were published; npm view returned 404 errors instead of handling gracefully. Should have checked availability before attempting reinstalls.
+- Multiple frontend-dev agents performed redundant file searches (e.g., `useTransport`, `transport/index.ts`, `errorUtils.ts`) within the same timeframe (13:04–13:05), suggesting poor coordination when parallelizing agents on overlapping test fixes. Future: brief agents about what others are working on or use a single coordinating agent.
+- Agents searched for error-handling utilities with multiple glob patterns (`src/transport*`, `src/transport/**/*`, `**/*transport*`) before finding the target, suggesting the module structure or exports weren't obvious. Unclear export patterns force exploratory searches.
+- Batch sed operations on multiple files (14:38-14:42 WorkerPool refactoring) were not verified after execution. No explicit check that modified files match intended patterns — assumes success silently, which can hide regex mismatches.
+- SendMessage to `violations-owner` subagent (15:32) succeeded in logging but no validation that the recipient exists or actually processes async messages. Unclear if delegation pattern worked.
+- Used `sleep 120` to wait for parallel agents to progress — inefficient coordination; should use ScheduleWakeup or dependency tracking between agents instead.
+- Long sleep periods (240s, 200s) used for inter-agent synchronization instead of proper coordination; agents likely ran partially blind without upfront task sequencing across frontend-dev, backend-dev, and general-purpose agents.
+- Backend-dev agent reported "NOT YET KNOWN" for `violations` skill at 16:49:49 and `run-test` skill at 16:53:14 — skill availability is inconsistent across agent types, causing redundant retries.
+- Test parking pattern — agent moved `WorkerList.integration.test.ts` to `/tmp/af-park` at 21:21:51 after failed vitest attempts; suggests initial test implementation had runtime issues that took multiple iterations to debug
+
+<!-- session 6d0d9229 2026-09-12 -->
+- Fork agent ran full 5-run batch test with 12+ model steps when user interrupted, redirecting to Luna-only narrow focus (07:51:52 SendMessage: "STOP — ne lance pas les 5 runs. Luna est censé être le plus rapide..."). Indicates agent lacked early scoping/confirmation for expensive operations.
+- Backend-dev agent searched manually for check scripts (22:01:44) instead of using skill — skill "check" was marked NOT YET KNOWN (22:01:02), forcing fallback grep pattern. Missing eager ToolSearch call to load skill schemas.
+- Agent attempted to call deferred MCP tools (mcp__github-wadeck-app__actions_list 22:05:02, 22:06:11) without schema fetch — suggests agents don't proactively load deferred tool definitions before attempting calls.
+- Deferred tools (write-doc, goldfish, check-parallel-agents, AskUserQuestion) registered as "NOT YET KNOWN" when invoked; agent attempted tool calls without loading schemas first via ToolSearch.
+- Blueprint input validation insufficient — "description: text" declarations in input blocks caused validation failures; required manual YAML edits across multiple files post-generation.
+- Test scripts (test-agent.js, test-runner-utils.js) were deleted in commit 363fc7a and had to be manually restored—no explicit comment explaining deletion or replacement strategy. Implies accidental cleanup or undocumented refactor.
+- Multiple parallel agents (abd4, a577, a631, abc0) independently investigated git history and config/env setup for the same test failures, duplicating forensic work instead of dividing failures by component upfront.
+- Skill tools attempted before schemas loaded: `violations` and `write-doc` showed "NOT YET KNOWN" warnings; agent should use ToolSearch to load deferred tools before invoking them.
+- Multiple agents independently re-reading identical files (OpenCodeModelProvider.ts, FlowWorker.ts, helpers.ts) at the same timestamp — indicates parallel agents lack result sharing or coordination; consider caching reads across agents in multi-agent workflows.
+- Deliberate 120-second sleep pause mid-task (`sleep 120 && echo waited`) embedded in the general-purpose agent — investigate whether this is a polling workaround, synchronization hack, or required delay that should be explicit in task design.
+- Backend-dev and general-purpose agents attempted to invoke `violations` and `run-test` skills with package-path arguments that weren't recognized (e.g., `violations check --path packages/web-backend` and `run-test packages/web-backend`); agents fell back to bash commands instead of using the proper skill invocation.
+- Skill loading issue: code-review skill invoked at 20:52:47 returned "*** NOT YET KNOWN ***" error, suggesting skill availability/loading isn't reliable when explicitly invoked.
+
+<!-- session 762f10ec 2026-09-12 -->
+- Backend-dev agent tried Skill with skill=check without ToolSearch — assumed skill was available instead of verifying first
+- Agent attempted mcp__github-wadeck-app__actions_list before MCP schemas were loaded (NOT YET KNOWN marked twice)
+- Agent called write-doc skill assuming availability without verification
+- Agent attempted to invoke deferred tools (session-history, write-doc, goldfish, AskUserQuestion) marked "*** NOT YET KNOWN ***" without first using ToolSearch to load their schemas — deferred tools require ToolSearch before invocation.
+- Skills `check` and `run-test` called but marked unknown (10:02:36, 10:10:27) — likely timing issue with deferred tool loading or skill availability not synchronized with workspace.
+- Multiple parallel general-purpose agents (a0ba, abd4, a577, a631, abc0) spawned at 12:31:10-12:31:38 without coordination or wait — caused redundant git history inspections, repeated test file edits, and no clear evidence of final state validation before moving on.
+- Integration test FlowIndex.integration.test.ts triggers `npm run bundle` with BUNDLE_VERSION env var override — suggests bundle script contains test-specific logic that shouldn't be coupled to production build path.
+- Multiple frontend-dev agents spawned in parallel (a637, a07e, ae4a, a76e starting 13:04:03) re-reading the same files (errorUtils.ts, transport modules) — indicates inefficient delegation or race-condition-like redundancy; main session also edited files while agents were running (13:06+).
+- EnvProbe.integration.test.ts created at 12:39:19, then moved to temp at 12:40:16 — agent wrote a transient test file without understanding it should not persist in source tree.
+- Skills "violations", "check", "run-test" shown as "NOT YET KNOWN" when invoked — agent assumed skills were available without fetching schema first.
+- general-purpose agent searched node_modules dist files directly to understand health_token cleanup on daemon shutdown (21:18:34+), suggesting daemon lifecycle patterns are not documented in project source.
+
+<!-- session 4015bb99 2026-09-12 -->
+- Multiple agents spawned in parallel (FlowScheduler, ScriptExecutor, ClaudeLauncher, flow-cli) to fix test failures; main session had to carefully merge/validate their changes when working on overlapping test suites.
+- Multiple attempts to fix error message extraction in tests — confusion between `String(error)`, `getErrorMessage()` utility, and expected error text in test assertions; required extensive git archaeology to find original intent.
+- Silent test failures: tests using wrong mocks (e.g., StepRunnerFactory type mismatches, StreamEventMapper not processing subSteps) would pass without asserting actual behavior.
+- Sub-agents parallelized frontend-dev test fixes (a637, a07e, ae4a, a76e at 13:04) but manual consolidation still needed post-completion — clearer handoff or single-agent follow-up would avoid context switching.
+- Scope underestimated upfront (started web-frontend, found pattern in flow-cli, then flow-engine, orchestrator, worker). Manual edits didn't scale — codemod (af-codemod.mjs) was necessary but deployed late. Need initial breadth scan to estimate scope before manual approach.
+- Multiple unnecessary bypass requests for git-commit and rm in sequence (14:52 onwards) suggests confusion about permission scope timing or timing of when to request bypass vs when it applies.
+- Attempted to SendMessage to "violations-owner" after ListAgents, but this appears to be external communication, not a recognized agent—unclear mental model of agent types vs. external messaging.
+- Delegated to 3 agents in parallel (frontend-dev, backend-dev, general-purpose) at 16:36 for violations fixes, then continued independent work at 16:37 without explicit synchronization; coordination unclear.
+- OpenCodeModelProvider.ts read and edited 8+ times by the same agent (ad48) within this chunk alone, suggesting redundant or iterative fixes rather than a single targeted change per violation.
+- Agents invoked unknown skills (violations, check, run-test) without fetching schemas first — should ToolSearch before calling custom/unfamiliar skills
+- Frontend-dev agent searched for violations-suppress 10+ times without finding authoritative syntax, then stopped without communicating the dead-end or asking for clarification
+- WorkerList.integration.test.ts was created, iterated, then silently moved to /tmp/af-park (21:21:36) without explaining to user why the integration test approach was abandoned
+
+<!-- session 6e65cb7c 2026-09-12 -->
+- Multiple skills invoked but marked "NOT YET KNOWN" (session-history, write-doc, goldfish at 08:33-08:35); agent proceeded with workarounds instead of waiting or failing clearly
+- Blueprint generation used wrong task CLI syntax (`task cli show` instead of `task show`); required fixing with sed across all blueprint files
+- Blueprint input declarations had malformed syntax (`description: text`); fork agent had to strip and re-validate
+- Multiple parallel sub-agents working on overlapping files in flow-engine caused coordination issues; check-parallel-agents skill was invoked to diagnose (indicates agents stepped on each other's changes)
+- Updater package integration (@wadeck-app/shared-updater) depends on env vars (UPDATER_FORCE, UPDATER_MANUAL, FLOW_CONFIG_DIR) and MockRegistry API; tests fail silently without explicit environment setup
+- WorkerPool refactoring bundled with protocol changes in single commit (14:32) — large structural change disguised as "extend IPC protocol", makes bisect harder
+- Guardrails bypass system investigated (16:11-16:13) unnecessarily — already working, investigation was exploratory rather than task-blocking
+- Three agents launched in parallel (16:36) with no follow-up verification; agent read subsequent violations output instead of confirming agent results
+- Multiple agents (general-purpose, backend-dev, frontend-dev) searched for violation rule syntax in compiled node_modules files instead of having documented patterns — reverse-engineering rules from `node_modules/@wadeck-app/violations-rules/dist/rules/**/*.js` indicates rules are not documented for agents.
+- Agents performed repeated broad grep searches after fixes (e.g., `npx violations check` after each batch of edits) rather than collecting all violations upfront — suggests lack of centralized violation inventory or unclear when-to-stop criteria.
+- Multiple sub-agents performing systematic replacements ("Replace single occurrence") across different packages while main agent was already committing staged files — timing risk if agents fail mid-work after commit.
+- Sub-agents used explicit sleep() for inter-agent synchronization (240s, 200s waits) instead of event-based task dependencies — fragile if work completes early or runs over.
+- Multiple agents (frontend-dev, backend-dev) performed overlapping grep operations for the same type-cast patterns across the same files (e.g., `as any\b`, then `as (string|number|...)`), resulting in redundant searches instead of coordinated cleanup.
+- WorkerList.integration.test.ts created but silently parked in /tmp/af-park (21:21:36) after failed attempts; test was abandoned without clear resolution or user notification.
+- Repeated retry of failed `checkMcpGithubWrite` calls without adaptation indicates no backoff or state-change logic when a tool consistently fails. A non-function error suggests infrastructure issue, not transient failure — retry loop wastes tokens.
+
+<!-- session cbe5dbdf 2026-09-12 -->
+- Multiple agents spawned in parallel around 12:31-12:32 (abd4, a577, a631, abc0) to fix test failures, but main agent continued immediately with new tasks without verifying results or checking for conflicts. No coordination between parallel agents investigating same files (FlowScheduler.ts, ScriptExecutor.ts read multiple times independently).
+- Updater subsystem (shared-updater, MockRegistry, UPDATER_FORCE/UPDATER_MANUAL env vars) investigated extensively with no clear resolution — agents read dist files, fetch logic, config reading, but unclear on actual behavior or testing patterns. Indicates black-box dependencies.
+- Multiple parallel frontend-dev agents (a637/a07e/ae4a/a76e) independently read overlapping files (errorUtils.ts read 4+ times) without coordination — indicates over-granular task splitting or poor agent briefing on parallel scope.
+- Agent a07e spent 13:04:21–13:04:58 with 8 progressively broader Glob patterns for transport files (src/transport/*, **/*.ts, etc.), suggesting lost understanding of codebase structure — pattern indicates need for upfront codebase map when delegating.
+- Test file AssignmentLedger.test.ts written at 14:23:02 then immediately failed with type errors; agent had to rewrite AssignmentLedger.ts from scratch at 14:23:27 — indicates agent didn't validate implementation file state before writing tests.
+- Subagents (frontend-dev, backend-dev) attempted to invoke "violations" skill which showed as "NOT YET KNOWN" despite being in available skills list — subagent skill context may not inherit all skills from parent session.
+- Multiple general-purpose agents ran redundant `violations check` with different filters and `grep` searches for type-cast patterns in parallel, duplicating discovery work that could have been specified upfront.
+- Agents invoked Skill tool with unknown skills (violations, check, run-test) without using ToolSearch first to fetch schemas. Skills need to be fetched via ToolSearch before calling.
+- Frontend-dev agent spent extensive time searching node_modules dist files for violation suppression syntax instead of checking violations-rules source or asking — wasted search cycles on compiled JS when answer was in source or docs.
 
 <!-- session a7e60cb3 2026-09-12 -->
 - Backend-dev agent attempted skill "check" which returned "NOT YET KNOWN", then worked around it by manually grepping check-ts.js instead of using ToolSearch to load the skill first. Pattern: agent does not handle deferred-tool errors by attempting to load via ToolSearch.
@@ -1512,6 +1711,101 @@
 
 ## Documentation gaps
 
+<!-- session fe82fc22 2026-09-12 -->
+- w-guardrails session ID validation and bypass state mechanism required significant bash/grep investigation (09:00-09:03) with multiple blind attempts at locating validation logic in request-bypass.js and pre-tool-use.js scripts.
+- Spec files in .claude/specs/2026-09-11_worker-availability-cli/ received many sequential edits (09:44-09:54, ~13 Edit operations to same 4-5 files) suggesting either incomplete initial content or unclear review feedback loop.
+- Violations rule enforcement scattered across files (no-switch-default, no-emoji, no-err-message in test files) — needed multiple rule checks; no evidence of why these violations appeared after changes or if they were pre-existing.
+- `.violations/.cache` was tracked in git despite being a generated cache directory; required manual .gitignore update + git rm --cached (13:22:20–13:22:28). Setup docs should clarify cache handling.
+- Large-scale codemod replacing error patterns (14:09:46) did not auto-format output; required manual prettier runs (14:16:16). Post-codemod formatting should be automated or documented.
+- Violation rules (no-unsafe-type-cast, no-emoji, no-out-of-repo-path) required multiple agent reads of compiled `.js` rule definitions from node_modules to understand what patterns they flag — no local reference documentation found
+- <finding>
+- No clear guidance to agents on when/how to use ToolSearch to load deferred skill schemas before calling them — multiple skill invocation attempts in session show uncertainty about availability or correct syntax.
+- Violations suppress syntax unclear — agent spent extensive time grepping node_modules to find valid comment patterns instead of consulting documented examples; should document violations-suppress vs violations-suppress-start and when each applies.
+
+<!-- session 82935c53 2026-09-12 -->
+- Project resolution mechanism (where `.agent-fleet` vs `.flows/` flows load from) is distributed across daemon/CLI/registry/backend with no single source of truth; agent had to infer changes by grep and edit across multiple files.
+- String error handling pattern change: multiple files required `getErrorMessage()` utility instead of `String(error)` — this wasn't surfaced as a breaking change or linting rule enforcement. Test path restructuring (`.agent-fleet/` → `.flow/`) affected imports but wasn't documented upfront.
+- The `no-raw-err-in-cli` violations rule and its scope (which packages apply) was unclear; agents had to discover through git history that backend also needed error message extraction helpers.
+- Violations rule ID naming was unclear — code toggled between 'security/no-raw-err-in-cli' and 'no-raw-err-in-cli' (16:20–16:28), and between 'shared/no-out-of-repo-path' and 'no-out-of-repo-path', suggesting suppression format or violations-rules package breaking change not documented.
+- `no-unsafe-type-cast` violation rule definition had to be looked up in node_modules instead of being referenced from `.violations/rules/` or project docs — should document violation semantics for future sessions
+- Agent (at 16:53:19) had to read `.claude/skills/run-test/examples.md` to understand how to invoke `run-test` skill — the skill wasn't obvious from context and required explicit doc lookup.
+- Violations suppression syntax and supported directives should be documented; frontend-dev had to reverse-engineer from suppressed.json and package internals
+
+<!-- session b6077617 2026-09-12 -->
+- Blueprint documentation does not clarify valid task CLI command syntax (no "task cli" prefix) — agent inferred wrong pattern from similar naming conventions.
+- Flow command documentation unclear on viewing execution details — syntax differs between what agent expected and what works.
+- `.test.ts` files reference path constants that changed (`.agent-fleet` no longer valid) — no clear migration guide visible; grep for all usages needed to audit completeness.
+- Environment variables for test setup (UPDATER_FORCE, FLOW_CONFIG_DIR, UPDATER_MANUAL) and their role in test isolation not documented — agents repeatedly searched git history and shared-updater code to understand behavior.
+- Directory restructuring (.agent-fleet → .flow) had scattered impact on test file paths — no consolidated list of affected tests or migration guide, required manual grepping to find all references.
+- Error handling (`normalizeError`, `getErrorMessage`) lived in scattered locations; agents eventually converged on `errorUtils.ts` but needed extensive exploration. No clear path documented for "where to put error handling" across packages.
+- No clear reference for available violations rules or their namespaces. Session spent time discovering "security/" vs "shared/" prefixes and whether rules like "no-out-of-repo-path" exist by searching node_modules.
+- Violations suppression syntax and semantics not explicitly documented — agent spent 6+ minutes (18:00-18:06) reverse-engineering by searching node_modules/@wadeck-app/violations-rules to understand how to suppress violations in this codebase.
+- Worker disconnection/revocation required extensive manual tracing through FlowScheduler.acknowledge(), readyQueue, and isComplete() logic across flow-engine and flow-cli. The coordination model (acknowledge → readyQueue → isComplete → cleanup) lacks documented state transitions and where revocation hooks in.
+
+<!-- session 3a42178c 2026-09-12 -->
+- No discoverable guidance on `check` skill usage — agent resorted to grepping package.json and reading scripts/ to find how to verify TypeScript compilation, causing extra round-trips.
+- CLI command syntax requires trial-and-error: task show vs task cli show, flow show vs flow history --id; help output doesn't clarify which is correct. Blueprint YAML validation errors didn't identify root causes (task cli typos), only validation failure.
+- The `.agent-fleet` directory convention and how to register new workspace resolution strategies (e.g., ProjectResolution extension point) lacks documentation — agent had to grep across multiple files to locate all callers that needed updating (Daemon, FlowRegistry, WorkspaceManager, FlowsService, RunCommand).
+- Violations framework rules (@wadeck-app/violations-rules: no-emoji, no-switch-default, no-raw-err-in-cli, no-err-message-direct) must be learned by agents via trial/error during `npm run check` — rules are enforced but not surfaced upfront during development.
+- The systematic fix for `instanceof Error ? String(err)` pattern required writing a one-off codemod (14:09). This pattern was widespread across 5 packages; a reusable transformer or documented cleanup recipe would save context.
+- ConfigDir behavior with environment variable overrides (FLOW_CONFIG_DIR, XDG_CONFIG_HOME) is underdocumented. Agent had to test empirically (15:05) to understand precedence and discover config files weren't persisting where expected.
+- Guardrails/bypass infrastructure (request-bypass.js scripts, bypass-state.json structure, category IDs) is underdocumented. Agent spent time reverse-engineering category list by grepping scripts (16:12).
+- write-doc skill loads as "*** NOT YET KNOWN ***" when invoked (16:17), suggesting registration or loading bug in environment.
+- Violations rule definitions are compiled into node_modules JS — agents had to read `.js` files to understand what rules checked for; source TypeScript rule documentation not easily accessible.
+- Violations rules for type casting (no-unsafe-type-cast) lack clear examples; agents removed `as unknown as` patterns across many files without visible guidance on the replacement strategy.
+- Violations suppress syntax unclear — agent spent multiple rounds (18:02-18:06) investigating node_modules to understand how `violations-suppress` markers work; should be documented or linked in CLAUDE.md/violations config
+- Unicode character restrictions not explicit — agent had to manually convert `→` to `->` and `ℹ` to `[info]` after violations failed; error message should reference the constraint upfront (e.g., "no emoji/unicode in code")
+
+<!-- session 6d0d9229 2026-09-12 -->
+- Backend-dev agent wrote documentation (08:26:48) without using write-doc skill — skill flagged as NOT YET KNOWN (08:26:27). Agent lacks awareness of required doc-writing workflow.
+- Task CLI syntax in blueprints was inconsistent — agent wrote "task cli show" when correct form is "task show"; multiple script files required post-creation corrections.
+- Project root resolution (`ConfigDir`, `.agent-fleet` directory, flows-custom registry path) is scattered and unclear—multiple agents had to grep extensively for `.agent-fleet`, `.flows/`, and ConfigDir usage instead of finding documented patterns.
+- The daemon directory constraint (must use `ConfigDir.get('flow')` to avoid EADDRINUSE, NOT `~/.flow-daemon/`) is documented in CLAUDE.md but not visible where developers edit Daemon.ts/RunCommand.ts—causes integration issues when paths are set wrong.
+- Config file location ambiguity: tests and agents investigated ~/.flow/config.yml vs ~/.config/flow/config.yml vs $XDG_CONFIG_HOME — suggests ConfigDir usage is undocumented or validation is missing when config is in unexpected location.
+- @wadeck-app private package version resolution is complex — session shows extensive npm view/grep to find available versions; availability logic for pre-release builds should be documented near CLAUDE.md setup instructions.
+- Violations rule IDs in config don't align with npm package rule catalog; agent had to inspect `node_modules/@wadeck-app/violations-rules/dist` types and category definitions to understand actual rule names and structure.
+- Type definitions (FlowStep, ProtocolMessage, StepTrace, W2OMessage) required repeated grepping across `packages/*/src` and git blame checks — these cross-package types should have a single authoritative definition or index document.
+- Agents repeatedly read `.claude/plans` files (cheerful-floating-pnueli.md) while making large-scale type-casting fixes; the plans appear to exist but aren't providing clear guidance on which files to target first or which violation rules apply to which packages.
+- Violations suppression syntax unclear to agents — frontend-dev searched node_modules/@wadeck-app/violations-rules for 11 minutes (18:00-18:11) trying to understand inline suppression, then main session just edited files directly. Source of truth not accessible.
+
+<!-- session 762f10ec 2026-09-12 -->
+- Model provider cold-start vs sustained latency not documented — Luna appeared slow initially (120-193s) before showing normal speed (3.5s)
+- Project resolver extension point (`DefaultProjectResolver.ts`) created without prior context about why existing `ConfigLoader` wasn't sufficient — implicit assumption that extension point was already documented.
+- @wadeck-app package versions (shared-cli, shared-updater, etc.) pinned to git commit hashes (e.g., "2026.8.31-022-55ef14e0") — required npm view checks to discover available versions; availability not documented.
+- Error handling patterns scattered across codebase (getErrorMessage, normalizeError, instanceof Error ? String(err)) — required 15+ git/grep searches across multiple packages to understand inconsistency; no central error utility until mid-session fix.
+- Violations rules have inconsistent ID naming: rule IDs sometimes require scope prefix (e.g., `security/no-raw-err-in-cli`) but suppression comments use the rule name only (e.g., `violations-suppress: no-raw-err-in-cli`). Not documented; discovered through trial-and-error corrections at 16:20:44 and 16:21:01.
+- Violations rule definitions are located in `node_modules/@wadeck-app/violations-rules/dist/rules/ts/` (observed at 16:44:07 when agent had to manually inspect rule definition); consider documenting how to discover and understand violation rules without digging into node_modules.
+- Hook crash at 17:06 ("blocked on hook crash") required retry at 17:52 after reported fix. No context on what failed — leave this for the violations-owner agent's context, but signals infrastructure issue not visible in logs here.
+- Violations suppression syntax (e.g., `violations-suppress-start`) is not discoverable in project docs—frontend-dev agent searched node_modules/@wadeck-app/violations-rules source extensively (18:02:00–18:09:33) before discovering syntax.
+- Worker authentication and daemon lifecycle (authToken, registerWorker, worker-ready handshake) required extensive code search by general-purpose agent (20:53–20:58) through Daemon.ts, Worker.ts, WorkerProvisioner.ts—architectural flow appears undocumented.
+
+<!-- session 4015bb99 2026-09-12 -->
+- `@wadeck-app/shared-updater` package API not obvious from source (needed to inspect dist/ and read MockRegistry.d.ts); mock registry setup and `UPDATER_FORCE` env var behavior undocumented.
+- `normalizeError` / `getErrorMessage` utility export pattern unclear across packages — availability varies, imports fail silently. Needs package-level documentation on what each exports and where to import from.
+- Error handler mock patterns in tests inconsistent — test files assume error object shape that doesn't match real implementations (e.g., wrong field access after `instanceof Error` check).
+- Violations rules use inconsistent namespacing: "no-raw-err-in-cli" vs "security/no-raw-err-in-cli" vs "shared/no-emoji". Agent required node_modules inspection (16:27-16:28) to understand actual rule IDs, suggesting naming scheme is undocumented.
+- Violations config approach unclear; agent made multiple trial-and-error edits to `.violations/config.ts` (16:19, 16:35, etc.) suggesting rules for suppression/ignoring violations are not well documented.
+- Violations skill invocation pattern (check --path <package>) not discoverable; backend-dev had to search examples.md to understand expected usage
+- Violations suppression comment syntax lacks clear examples in project docs; agent spent ~6 minutes (18:00–18:06) searching node_modules for patterns instead of checking CLAUDE.md or violation rules
+
+<!-- session 6e65cb7c 2026-09-12 -->
+- Task CLI command naming conventions not clear; blueprints assumed `task cli` prefix existed
+- Blueprint input declaration format unclear (syntax for `inputs:` section)
+- Violations rules (@wadeck-app/violations-rules: no-switch-default, no-emoji, no-raw-err-in-cli) trigger on refactored code but aren't documented inline; refactoring patterns need rule visibility
+- Config file locations during testing unclear — tested with `FLOW_CONFIG_DIR`, `XDG_CONFIG_HOME`, temp paths, moved real config to discard; CLAUDE.md states `~/.config/flow/` but no guidance on test isolation
+- Unsafe type cast violations appear systemic across 8+ packages (flow-engine, flow-cli, e2e-web, orchestrator, etc.) rather than isolated edge cases — no guidance on root cause (incomplete type definitions, parsing dynamic types, etc.) visible in outputs.
+- The no-unsafe-type-cast violation patterns need project-level documentation showing what gets flagged (unsafe casts across package boundaries, helper patterns, etc.) to avoid agents re-discovering the rule behavior.
+- Violation suppression syntax not easily discoverable — agent spent multiple rounds (18:02:58–18:06:11) searching through node_modules compiled JavaScript instead of finding rule documentation; unclear how/where to express violations-suppress in code.
+
+<!-- session cbe5dbdf 2026-09-12 -->
+- Violations rules system requires extensive investigation by agents (switch-default, no-emoji, no-err-message-direct rules searched individually). Rules lack inline documentation or consolidated reference, forcing per-rule discovery.
+- .violations/.cache files were tracked in git, discovered and fixed at 13:22:20–13:22:33 — suggests violations setup/gitignore rules not documented.
+- Violations rule IDs show inconsistent naming: "no-raw-err-in-cli" vs "security/no-raw-err-in-cli" — session had to fix suppressions multiple times due to unclear rule ID format convention; consider clarifying whether rules from @wadeck-app/violations-rules are auto-prefixed or user must include prefix.
+- Agents had to inspect violation rule files from node_modules (`@wadeck-app/violations-rules/dist/rules/ts/no-unsafe-type-cast.ts`) to understand what patterns were forbidden; the violation rules aren't documented in the project.
+- Parallel agents updated separate markdown files (threat-model.md, PHASE4_SUMMARY.md, open-questions.md) without clear coordination mechanism, risking inconsistent or conflicting updates.
+- When agents encounter unknown skills, error handling should guide them to use ToolSearch. Current tool error messages don't make this path obvious.
+- How to properly suppress violations (e.g., the correct comment syntax) is not clearly documented — agent reverse-engineered from dist files and still struggled to find the right approach.
+
 <!-- session a7e60cb3 2026-09-12 -->
 - Blueprint YAML schema requirements missing — agent discovered via validate errors and grep/fix cycles that `description: text` input declarations were invalid
 - Flow/Task CLI syntax not self-discoverable — agent attempted wrong flags (flow show --execution, -e) then had to check --help; indicates help should be linked in errors or validation failures
@@ -2221,6 +2515,111 @@
 - Extensive Grep searches for domain concepts (RE-QUEUED, bufferSpill, reconnectTimeout, idleTimeout, drainTimeout, heartbeat monitoring, etc.) suggest spec lacks clear glossary or index of key terms. Future audits should define these upfront.
 
 ## Known constraints
+
+<!-- session fe82fc22 2026-09-12 -->
+- Task CLI commands in blueprints must use bare "task" command, not "task cli" prefix. Blueprint template or examples may still show old syntax.
+- Test scripts test-agent.js and test-runner-utils.js were deleted in commit 363fc7a but test suite still requires them (10:11-10:16 recovery from git history indicates blocker).
+- Configuration path sensitivity: ~/.flow/config.yml vs ~/.config/flow/config.yml; UPDATER_FORCE/UPDATER_MANUAL env vars; tests querying these repeatedly. Directory migration (.agent-fleet/ → .flow/) early in chunk likely broke test path assumptions.
+- Dependency version pinning: @wadeck-app/* packages required updates (shared-cli, shared-updater, singleton-daemon-kit, violations-rules), then npm install; suggests version mismatch or stale lockfile.
+- Violations config excludes tests from certain rules; suppression decorators must match exact rule id from violations-rules package, not a shortened alias.
+- Agent at 16:40:20 ran `sleep 120` waiting for other agents, indicating potential file-lock or race-condition issues when multiple agents edit the same files in parallel
+- <finding>
+- Project relies on hooks system that can crash mid-session and require external intervention; when violated, all downstream work halts until fixed. Hook crash at 17:06:17 ("blocked on hook crash") froze progress for ~45 minutes; required manual fix by violations-owner and Bash probe retry at 17:52:03 to validate recovery.
+- Daemon-kit port file parsing and health_token lifecycle not immediately discoverable from source — agent had to read node_modules/singleton-daemon-kit/dist/*.js and health-server.js to understand cleanup semantics; should document or provide helper for integration test setup.
+
+<!-- session 82935c53 2026-09-12 -->
+- Flow config paths are scattered: ~/.flow-config.yaml, ~/.config/opencode/config_*.json, ~/.config/flow/executions/<id>.json — must set OPENCODE_CONFIG env var explicitly for provider-specific configs or models fail silently.
+- w-guardrails bypass request system requires correct category names and session validation — multiple request attempts to find right category/syntax.
+- Changes to project root resolution paths require coordinated updates across daemon, CLI commands, flow registry, workspace manager, and backend services — easy to break if one system falls out of sync.
+- ConfigDir daemon path is `~/.config/flow/` (not `~/.flow-daemon/`); project moved `.agent-fleet/flows.yml` to `.flow/flows.yml` (12:17:08) but old references lingered in test configs causing "No workspace provider configured" errors.
+- `.violations/.cache` directory was tracked in git and had to be manually added to `.gitignore` and removed from tracking — should be enforced in initial setup.
+- Protocol.ts changes to IPC message types cascade through Worker → WorkerAdapter → CommandHandler → Daemon; bulk edits to these files signal breaking changes to wire protocol.
+- Tools like SendMessage and skills like write-doc must be explicitly fetched via ToolSearch before use — they don't auto-populate in agent contexts even when available in the parent session (seen at 15:32:52 and 16:17:41).
+- Parallel agent coordination used explicit `sleep 240` and `sleep 200` bash commands instead of ScheduleWakeup or agent completion notifications — inefficient and hard to debug if agents finish early/late
+- Windows-specific path symbols (→, ⏳, ℹ, ×, ⏱) in e2e-web files triggered violations. User then manually replaced them with ASCII ([wait], [info], x, etc.) at 17:52:11–17:54:52. This suggests Windows/CLI compatibility checks are late-stage and not upfront.
+- Worker/daemon architecture spans multiple interdependent layers (WorkerProvisioner, WorkerRegistry, Protocol.ts, Daemon.ts, WebSocketServer); general-purpose agent required extensive file reads (20:53–20:57) to understand before implementing
+- Integration tests with daemon lifecycle and health_token cleanup depend on @wadeck-app/singleton-daemon-kit internal patterns (process.exit hooks, health_token file cleanup in WebSocketServer); not well-exposed as testing affordance
+- MCP GitHub write function error (`checkMcpGithubWrite is not a function`) recurring across 7 calls between 17:02–17:09. Timestamps predate main session work but appear in this chunk's guardrails log—suggests hook or tool definition issue that could block GitHub integration tasks.
+
+<!-- session b6077617 2026-09-12 -->
+- Skill discovery mechanism returns "NOT YET KNOWN" for available skills ("check" at 22:01:02, "write-doc" at 08:26:27) causing agents to retry with fallback tools instead of discovering them upfront
+- MCP tools fail initial load with "NOT YET KNOWN" (e.g., "mcp__github-wadeck-app__actions_list" at 22:05:02, 22:06:11) but are later available, indicating async/lazy loading behavior
+- Flow executions complete asynchronously; results appear in flow history after delay, not immediately available via "flow show" (if that command even exists).
+- Path constant migration from hardcoded strings (`.agent-fleet`, `.flows`) to abstraction layer broke multiple test files — edits were needed across FlowOrchestrator.when.test.ts, FlowRegistry.test.ts, and others. Future path/config changes require systematic test file audit.
+- Integration test waits are long (60s–120s sleeps between flow executions in blueprints) — reflects slow daemon/flow execution, not a bug, but impacts iteration speed.
+- Model downgrade in blueprints (sonnet→haiku at 09:20:08) happened mid-test run — suggests timeouts or cost pressure, check logs if model changes occur unexpectedly during execution.
+- Tests are tightly coupled to config directory paths ($HOME/.flow/ vs $HOME/.config/flow/) and environment state — this created fragile setup; multiple commands tested environment readiness before test runs.
+- Custom violations rules (no-switch-default, no-emoji, no-err-message-direct) require reading distributed rule files in node_modules to understand — not discoverable from violations config alone.
+- File lock at ~13:02 (check-parallel-agents skill invoked); concurrent agents competing for file access suggests parallel sub-agent launches without I/O coordination can cause contention.
+- Violations rule names require exact namespace prefixes (security/*, shared/*). Suppress annotations must match the full "namespace/rule-id" format or fail silently; discovering available rule IDs requires grepping node_modules/@wadeck-app/violations-rules/dist/ since no registry exists.
+- Hook crash in violations framework (reported via SendMessage to violations-owner) blocked session mid-task; waiting for external fix resumed work ~45min later.
+- Daemon integration tests are brittle around health_token file cleanup and port file reading — client.js expects health_token cleanup but daemon shutdown timing varies, making reliable test setup for worker contact difficult.
+
+<!-- session 3a42178c 2026-09-12 -->
+- w-guardrails session ID validation blocks permission requests across parallel agents — multiple grep operations debugged bypass-state.json, CLAUDE_SESSION_ID env var, and request-bypass.js script validation before bypass worked.
+- ConfigDir/workspace path resolution has callers in at least 5 different files (Daemon, RunCommand, ConfigLoader, FlowRegistry, WorkspaceManager) — coordinated changes to the resolution strategy require updates across all of them.
+- Flow daemon directory must use `~/.config/flow/` (ConfigDir.get('flow')), not `~/.flow-daemon/` or `~/.flow/`; multiple agents had to rediscover this despite it being in CLAUDE.md project instructions.
+- `.violations/.cache` files were accidentally tracked by git and required manual `git rm --cached` (13:22) to clean history. Add `/.violations/.cache/` to `.gitignore` at project init.
+- Violation rules in @wadeck-app/violations-rules contain bugs requiring workarounds: wrong rule ID namespace (security/no-raw-err-in-cli vs no-raw-err-in-cli), multi-pass emoji fixes needed due to incomplete pattern coverage.
+- Platform-specific violation suppressions require explicit explanatory comments (e.g., "Windows hide requirement" for spawn rules); suppress-without-explanation pattern won't work.
+- Multi-package violations fixes require coordinated builds (npm run build --workspace=X) and spec updates (threat-model.md, PHASE4_SUMMARY.md) — this scale of change should be scoped as a single unit before delegating to parallel agents, not discovered incrementally.
+- Unicode symbols (→, ⏳, ℹ, ×, ⏱, etc.) in code files trigger violations on Windows; must convert to ASCII equivalents ([wait], [info], ->, x, [time]) to pass checks.
+- Violations fixing workflow requires hook coordination: at 17:06:17, a hook crash blocked progress and required SendMessage to violations-owner for manual intervention.
+- skill=code-review initial lookup failed (WARN at 20:52:50: "NOT YET KNOWN"); agent delegated to general-purpose agent instead; skill may need explicit loading or registration before use
+
+<!-- session 6d0d9229 2026-09-12 -->
+- Flow daemon config path confusion: Multiple flow-cli update/restart cycles (22:06:19, daemon loops) suggest iteration on daemon stability, possibly related to config directory issues noted in CLAUDE.md.
+- Parallel agents (67e3f019, 2a0e99f3, 1645fc5f) detected; guardrails bypass workflow complex and session-sensitive — multiple "does not match the current session" rejections; check-parallel-agents skill was needed to diagnose conflicts.
+- Skills `check` and `run-test` are not available in the session (marked "NOT YET KNOWN")—forces fallback to manual `npm run check` and `npm run test:agent`, blocking automated checks in workflows.
+- Updater mocking is fragile: UPDATER_FORCE env var and MockRegistry behavior were investigated; entry.ts stdout/stderr writes and shared-updater's logging behavior cause test pollution and require explicit test setup beyond what was obvious from test file names.
+- Violations rules sourced from external npm package (@wadeck-app/violations-rules) rather than repo-local rules; rule lookups require querying node_modules or running `violations check` output parsing.
+- Violations-suppress comments spread across 15+ files to suppress strict type-casting rules (`as unknown`, `as Record<string, unknown>`, `as any` patterns) — indicates the codebase has systematic type-safety issues that can't be quick-fixed; either rules need configuration/exemption zones or architectural refactor is needed.
+- Active violation rule flagging Unicode/emoji characters in code — session replaced → with ->, ⏳ with [wait], etc. across e2e-web package. Agents discovered this by iterative violations checks rather than upfront documentation.
+- Long-running agent sessions risk context drift — general-purpose agent (a6cb) ran 32+ minutes (20:52:50 to ~21:24:35) making many file edits and test writes without intermediate checkpoints or verification steps.
+
+<!-- session 762f10ec 2026-09-12 -->
+- Flow daemon execution polling used repeated `sleep + cat` pattern instead of event-driven waits — 60-90s+ typical latencies
+- OPENCODE_CONFIG and codex config must be passed as env vars; different config files needed per provider (config_claude.json vs config_codex.json)
+- Deferred tools (listed in system-reminder but without loaded schemas) must be fetched via ToolSearch before use — attempting to call them directly fails with InputValidationError.
+- Workflows with long-running operations (flow run, flow history) require explicit sleep + manual polling in bash — no async/await equivalent, forcing manual orchestration of 60–120s waits.
+- Violations rules (no-emoji, no-switch-default, no-err-message-direct, no-raw-err-in-cli) failures surface as mixed test failures — requires consulting .violations/config.ts and running npx violations check separately to untangle root causes.
+- Protocol.ts and CommandHandler.ts edited 5+ times in sequence (14:23:40–14:25:57) — distributed IPC type changes required iterative fixes, suggesting type definitions need better coordination or clearer schema docs.
+- Emoji violation fix required manually written codemods with iteratively refined replacement mappings (af-emoji-codemod.mjs → af-emoji-2.mjs). Violations framework does not provide expected emoji replacements upfront.
+- FLOW_CONFIG_DIR environment variable override for config directory in tests required explicit manual testing (15:04:35–15:05:21) to verify it actually redirects config file writes, not just reads.
+- Coordinating multiple parallel agents on codebase-wide refactoring requires explicit synchronization—explicit sleep(240s) command observed at 16:44:24 to wait for agents to complete before proceeding to git commit phase. Recommend documenting or automating inter-agent wait patterns rather than hardcoded sleeps.
+- Unicode symbols in e2e-web files (→, ⏳, ℹ, ×) fail violations check and must be ASCII-only (→ converted to "->", ⏳ to "[wait]"). Restore with sed to batch-replace on existing files, not add to .gitignore.
+- WorkerList.integration.test.ts created but parked to /tmp/af-park (21:21:36)—test was incomplete or blocked, reason not apparent from logs.
+
+<!-- session 4015bb99 2026-09-12 -->
+- Configuration path mismatch caused silent failures: tests used `~/.flow/config.yml` but code expected `~/.config/flow/config.yml` (via `ConfigDir.get('flow')` = `~/.config/flow/`). Integration tests brittle due to temp directory setup.
+- Dependency version updates (`shared-cli`, `shared-updater`, `singleton-daemon-kit`, `violations-rules`) needed to align test expectations; npm install required after each version bump to refresh lockfile.
+- `.violations/.cache` files tracking in git after rule runs — `.gitignore` was missing entry, causing tracked cache that should never be committed (required `git rm --cached` mid-session).
+- Codemod proved necessary for systematic fixes at scale (2700+ lines across 40+ files per grepped pattern). Manual edit strategy breaks when scope > 10 files; threshold for auto-codemod decision should lower.
+- XDG_CONFIG_HOME env var affects config directory resolution—FLOW_CONFIG_DIR alone insufficient for isolated test runs (15:05-15:06).
+- Mixed use of `sed -i` with hardcoded line numbers (lines 70, 250, 374) alongside Edit tool edits is fragile — file edits shift line numbers, causing line-targeted sed to target the wrong location on subsequent runs.
+- E2e test files reject Unicode symbols (→, ⏳, ℹ, ×, ⏱) — must use ASCII-only text like [wait], [info]
+- Violations hook can crash and block work (17:06 event); requires escalation to violations-owner, then retry after fix
+
+<!-- session 6e65cb7c 2026-09-12 -->
+- `write-doc` skill needed to be invoked before writing .md files (attempted but marked NOT YET KNOWN)
+- Guardrails bypass required explicit category-based requests; multiple bypass invocations with different categories (git-commit, cross-home, etc.)
+- Daemon directory must use ConfigDir.get('flow') = ~/.config/flow/, not ~/.flow-daemon/ or ~/.config/.flow-daemon/, or EADDRINUSE occurs when CLI can't find running daemon and tries to start new one on occupied port (constraint already in CLAUDE.md but was violated mid-session)
+- Suppress comment format ambiguity (16:20: cycling between `security/no-raw-err-in-cli` and `no-raw-err-in-cli`) — unclear which is canonical; should read rule definitions upfront
+- The explicit `sleep 120` at 16:40:20 ("Wait for agents to progress") indicates the orchestrator polls agent completion rather than receiving notifications — inefficient when multiple agents run in parallel.
+- Violation rule "no-unsafe-type-cast" triggered mass refactoring across packages; agents investigated the rule by reading from node_modules/@wadeck-app/violations-rules instead of project-level docs, suggesting the rule behavior wasn't pre-documented.
+- Agents attempted to invoke unloaded skills (violations, run-test, check) causing "NOT YET KNOWN" warnings (16:49:49, 16:52:47, 16:53:14). Must call ToolSearch to fetch schemas first.
+- Violations system has documented hook crash behavior. Session shows SendMessage to violations-owner (17:06:17) with "acknowledge fixes, blocked on hook crash", then recovery after ~45 minutes with manual character-encoding fixes via sed.
+- Skill "code-review" invoked (20:52:50) but reported as "NOT YET KNOWN" by harness; ToolSearch tried to fetch ReportFindings (20:59:37–39) but failed with "NOT YET KNOWN" — harness setup incomplete for these tools mid-session.
+- `checkMcpGithubWrite is not a function` errors repeatedly blocked GitHub MCP operations (7 failures, 17:02-17:09). This suggests MCP GitHub tools were unavailable/misconfigured during that period. Future sessions hitting this should identify the recovery path instead of silently retrying.
+
+<!-- session cbe5dbdf 2026-09-12 -->
+- Config directory path (.config/flow vs .flow vs .flow-daemon) causing repeated investigation and EADDRINUSE issues despite being documented in CLAUDE.md. Constraint is not "sticky" — developers re-debug the same issue (see logs 12:15 checking ~/.flow/config.yml vs ~/.config/flow/config.yml after it was supposedly resolved).
+- Error pattern fixes (instanceof Error ? String(err)) were applied manually across 8 files, then switched to codemod at 14:09:46 — mid-task realization suggests agent should have scanned full scope first before 1:1 fixes.
+- Protocol message type changes (14:21:57+) required 5 sequential coordinated edits (Protocol.ts → Worker.ts → WorkerAdapter.ts → CommandHandler.ts → Daemon.ts) — indicates type/protocol validation could happen earlier in build pipeline.
+- Session discovered and reported two bugs in @wadeck-app/violations-rules package to violations-owner agent. Future sessions may encounter similar rule ID or validation inconsistencies related to these open issues.
+- Factory pattern required in some places (e.g. `makeProvisioner` replacing `new WorkerProvisioner`) — not obvious from context, discovered via violations run. Type safety is strictly enforced via custom violations framework in `.violations/config.ts`.
+- e2e-web violations stemmed from unicode symbols (→, ⏳, ℹ) in comments/strings; workaround uses sed to convert to ASCII equivalents ([wait], [info], ->). These symbols cannot remain in committed code due to violations rules.
+- Dead-suppress rule (catching stale violation-suppress comments) creates ongoing maintenance burden when violations-rules is updated — requires manual cleanup passes over old suppressions.
 
 <!-- session a7e60cb3 2026-09-12 -->
 - Flow execution polling involved 50–90 second waits with many repeated `cat ~/.config/flow/executions/*.json` polls. No exponential backoff visible; suggests inefficient polling strategy or slow provider baseline.
