@@ -14,7 +14,7 @@ Trusted steps are defined at org/sub-org/project scope. The flow author referenc
 
 ### Attestation thresholds
 
-Deferred to post-V1. Thresholds allow zones to require specific claim values (e.g. coverage ≥ 90%). Design not decided.
+Deferred to post-V1. Thresholds allow zones to require specific claim values (e.g. coverage >= 90%). Design not decided.
 
 ### Zone grouping block syntax
 
@@ -22,7 +22,7 @@ Multiple steps sharing the same zone can be grouped to avoid repetition. Deferre
 
 ### Nested zones
 
-`production` ⊃ `production.critical-data` -- entry into the inner zone requires a second attestation on top of the outer one.
+`production` is a superset of `production.critical-data` -- entry into the inner zone requires a second attestation on top of the outer one.
 
 ### Attestation expiration mid-execution
 

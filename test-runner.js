@@ -2,7 +2,8 @@ const { execSync } = require('node:child_process');
 
 try {
 	const result = execSync('npm test -- usePanelLayout.test.tsx', {
-		cwd: 'C:\\Workspace_Tooling\\agent-fleet',
+		// This script lives at the repository root, so __dirname is the repo root
+		cwd: __dirname,
 		encoding: 'utf-8',
 		stdio: 'pipe',
 		windowsHide: true,

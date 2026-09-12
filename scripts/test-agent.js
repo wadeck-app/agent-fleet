@@ -118,6 +118,7 @@ function runTestSuite(suite, filters) {
 		// Build command string with proper spacing (kept for reference but not used)
 		const command = suite.command + args.map(arg => ` ${arg}`).join('');
 
+		// violations-suppress: cli/no-spawn-without-windows-hide spawns npm test suites that start their own webapp/backend/storybook servers - windowsHide strips the console handle and those grandchildren would each open a visible console (see commit d032e7e)
 		const proc = spawn(command, {
 			shell: true,
 			cwd: process.cwd(),

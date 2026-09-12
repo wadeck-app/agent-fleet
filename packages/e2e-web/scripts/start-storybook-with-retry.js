@@ -23,7 +23,7 @@ const tempFolder = path.resolve(projectRoot, 'packages/e2e-web/temp');
 
 /**
  * Kill a process and all its children (process tree)
- * CRITICAL: spawn('npm run ...', {shell: true}) creates parent npm + child processes
+ * CRITICAL: spawning `npm run ...` with shell:true creates parent npm + child processes
  * proc.kill() only kills npm, leaving children as zombies!
  */
 async function killProcessTree(proc) {
@@ -115,6 +115,7 @@ function tryStartStorybook(port) {
 
 		const command = `npx serve "${staticDir}" -l ${port} --single --no-clipboard`;
 		const storybookProcess = spawn(command, {
+			windowsHide: true,
 			// Run from project root
 			cwd: projectRoot,
 			env: {
@@ -126,7 +127,6 @@ function tryStartStorybook(port) {
 			stdio: ['inherit', 'pipe', 'pipe'],
 			// Use shell on Windows to resolve npm
 			shell: isWindows,
-			windowsHide: true,
 		});
 
 		let output = '';

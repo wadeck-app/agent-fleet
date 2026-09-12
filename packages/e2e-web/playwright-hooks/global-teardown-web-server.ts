@@ -30,7 +30,7 @@ async function globalTeardownWebServer() {
 		try {
 			data = await readFile(filename, 'utf-8');
 		} catch (error) {
-			console.log(`ℹ  No backend servers file found for RUN_ID: ${runId}, nothing to stop.`);
+			console.log(`[info] No backend servers file found for RUN_ID: ${runId}, nothing to stop.`);
 			return;
 		}
 

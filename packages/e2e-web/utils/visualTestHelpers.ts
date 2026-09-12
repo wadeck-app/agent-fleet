@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
 
+import type { BrowserContextWithOptions } from './e2eTypes';
+
 /**
  * Utilities for auto-generated Visual E2E tests
  */
@@ -28,7 +30,7 @@ export async function ensureStoryExists(page: Page, storyId: string, timeout: nu
 	const startTime = Date.now();
 
 	// Get baseURL from Playwright's context (set in playwright.config.storybook.ts)
-	const baseURL = (page.context() as any)._options?.baseURL || 'http://localhost:6100';
+	const baseURL = (page.context() as BrowserContextWithOptions)._options?.baseURL || 'http://localhost:6100';
 
 	// Retry loop with exponential backoff
 	let lastError: Error | undefined;

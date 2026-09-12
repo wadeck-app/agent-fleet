@@ -15,6 +15,7 @@ const noWatchMode = process.argv.includes('--no-watch');
 // Use tsx to run the TypeScript file
 const args = noWatchMode ? [orchestratorPath] : ['watch', orchestratorPath];
 
+// violations-suppress: cli/no-spawn-without-windows-hide stdio:'inherit' launcher - windowsHide strips the console handle so tsx grandchildren allocate their own visible console (see commit d032e7e)
 const child = spawn('tsx', args, {
 	stdio: 'inherit',
 	shell: true,

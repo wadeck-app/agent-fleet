@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
 
+import type { E2eWindow, PageWithBackendPort } from './e2eTypes';
+
 /**
  * Utilities for E2E tests
  */
@@ -42,7 +44,7 @@ import type { Page } from '@playwright/test';
  */
 export async function disableMSWForThisTest(page: Page): Promise<void> {
 	await page.addInitScript(() => {
-		(window as any).__DISABLE_MSW__ = true;
+		(window as E2eWindow).__DISABLE_MSW__ = true;
 	});
 }
 
@@ -95,7 +97,7 @@ export async function waitForToastMessage(page: Page, message: string, timeout: 
  */
 export async function clearAllData(page: Page, maxRetries: number = 3): Promise<void> {
 	// Get the backend port from the page context (set by hooks-web-server.ts)
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const url = `http://localhost:${backendPort}/api/test/clear-data`;
 
 	for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -271,7 +273,7 @@ export async function fillWithRetry(
 export async function waitForSuccessToastEvent(page: Page, timeout: number = 10000): Promise<void> {
 	await page.waitForFunction(
 		() => {
-			const toast = (window as any).__lastToast;
+			const toast = (window as E2eWindow).__lastToast;
 			return toast && toast.type === 'success' && Date.now() - toast.timestamp < 5000;
 		},
 		{ timeout }
@@ -284,7 +286,7 @@ export async function waitForSuccessToastEvent(page: Page, timeout: number = 100
 export async function waitForErrorToastEvent(page: Page, timeout: number = 10000): Promise<void> {
 	await page.waitForFunction(
 		() => {
-			const toast = (window as any).__lastToast;
+			const toast = (window as E2eWindow).__lastToast;
 			return toast && toast.type === 'error' && Date.now() - toast.timestamp < 5000;
 		},
 		{ timeout }
@@ -301,7 +303,7 @@ export async function waitForToastEventWithMessage(
 ): Promise<void> {
 	await page.waitForFunction(
 		expectedMessage => {
-			const toast = (window as any).__lastToast;
+			const toast = (window as E2eWindow).__lastToast;
 			return toast && toast.message.includes(expectedMessage) && Date.now() - toast.timestamp < 5000;
 		},
 		message,
@@ -315,8 +317,8 @@ export async function waitForToastEventWithMessage(
  */
 export async function clearToastEvents(page: Page): Promise<void> {
 	await page.evaluate(() => {
-		(window as any).__toastEvents = [];
-		(window as any).__lastToast = undefined;
+		(window as E2eWindow).__toastEvents = [];
+		(window as E2eWindow).__lastToast = undefined;
 	});
 }
 

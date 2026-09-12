@@ -35,11 +35,11 @@ Phase 4 successfully integrated the Flow Engine with the Orchestrator, creating 
 
 ```
 User -> REST API -> TaskManager -> WebSocket -> FlowWorker
-                      ↓                          ↓
+                      v                          v
                   FlowRegistry              FlowExecutor
-                                               ↓
+                                               v
                                          WorkspaceManager
-                                               ↓
+                                               v
                                           Git Workspace
 ```
 

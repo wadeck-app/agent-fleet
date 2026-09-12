@@ -23,6 +23,7 @@ const __dirname = dirname(__filename);
 function runCheck(scriptName, displayName) {
 	return new Promise(resolve => {
 		const command = `node scripts/${scriptName}`;
+		// violations-suppress: cli/no-spawn-without-windows-hide stdio:'inherit' so the child check scripts write to this terminal - windowsHide would strip the console handle and their own tsc/eslint children would each open a visible console (see commit d032e7e)
 		const check = spawn(command, {
 			cwd: process.cwd(),
 			shell: true,

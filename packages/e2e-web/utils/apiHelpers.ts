@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
 
+import type { PageWithBackendPort } from './e2eTypes';
+
 /**
  * API Helpers for creating test data via the API instead of the UI.
  * Used for test setup, NOT for testing the creation itself.
@@ -22,7 +24,7 @@ export async function createIngredientViaAPI(
 		servingSize: number;
 	}
 ) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.post(`http://localhost:${backendPort}/api/ingredients`, {
 		data: ingredient,
 		headers: { 'Content-Type': 'application/json' },
@@ -73,7 +75,7 @@ export async function createRecipeViaAPI(
 		instructions?: string;
 	}
 ) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.post(`http://localhost:${backendPort}/api/recipes`, {
 		data: recipe,
 		headers: { 'Content-Type': 'application/json' },
@@ -125,7 +127,7 @@ export async function updateIngredientViaAPI(
 		servingSize: number;
 	}>
 ) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.put(`http://localhost:${backendPort}/api/ingredients/${id}`, {
 		data: updates,
 		headers: { 'Content-Type': 'application/json' },
@@ -145,7 +147,7 @@ export async function updateIngredientViaAPI(
  * @param id - Ingredient ID
  */
 export async function deleteIngredientViaAPI(page: Page, id: string) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.delete(`http://localhost:${backendPort}/api/ingredients/${id}`, {
 		timeout: 10000,
 	});
@@ -161,7 +163,7 @@ export async function deleteIngredientViaAPI(page: Page, id: string) {
  * @param id - Recipe ID
  */
 export async function deleteRecipeViaAPI(page: Page, id: string) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.delete(`http://localhost:${backendPort}/api/recipes/${id}`, {
 		timeout: 10000,
 	});
@@ -177,7 +179,7 @@ export async function deleteRecipeViaAPI(page: Page, id: string) {
  * @returns The list of ingredients
  */
 export async function getIngredientsViaAPI(page: Page) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.get(`http://localhost:${backendPort}/api/ingredients`, {
 		timeout: 10000,
 	});
@@ -195,7 +197,7 @@ export async function getIngredientsViaAPI(page: Page) {
  * @returns The list of recipes
  */
 export async function getRecipesViaAPI(page: Page) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.get(`http://localhost:${backendPort}/api/recipes`, {
 		timeout: 10000,
 	});
@@ -215,7 +217,7 @@ export async function getRecipesViaAPI(page: Page) {
  * @returns The chat response with conversationId and message
  */
 export async function sendChatMessageViaAPI(page: Page, message: string, conversationId?: string) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.post(`http://localhost:${backendPort}/api/chat/message`, {
 		data: { message, conversationId },
 		headers: { 'Content-Type': 'application/json' },
@@ -235,7 +237,7 @@ export async function sendChatMessageViaAPI(page: Page, message: string, convers
  * @returns The list of conversations
  */
 export async function getConversationsViaAPI(page: Page) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.get(`http://localhost:${backendPort}/api/chat/conversations`, {
 		timeout: 10000,
 	});
@@ -254,7 +256,7 @@ export async function getConversationsViaAPI(page: Page) {
  * @returns The conversation with its messages
  */
 export async function getConversationViaAPI(page: Page, conversationId: string) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.get(
 		`http://localhost:${backendPort}/api/chat/conversations/${conversationId}`,
 		{
@@ -275,7 +277,7 @@ export async function getConversationViaAPI(page: Page, conversationId: string) 
  * @param conversationId - Conversation ID
  */
 export async function deleteConversationViaAPI(page: Page, conversationId: string) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.delete(
 		`http://localhost:${backendPort}/api/chat/conversations/${conversationId}`,
 		{
@@ -296,7 +298,7 @@ export async function deleteConversationViaAPI(page: Page, conversationId: strin
  * @returns The created conversation
  */
 export async function createConversationViaAPI(page: Page, title?: string, type: 'general' | 'contextual' = 'general') {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.post(`http://localhost:${backendPort}/api/chat/conversations`, {
 		data: { title, type },
 		headers: { 'Content-Type': 'application/json' },
@@ -326,7 +328,7 @@ export async function saveMemoryViaAPI(
 	value: string,
 	category: 'tool' | 'database' | 'preference' | 'fact' | 'custom' = 'custom'
 ) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.post(
 		`http://localhost:${backendPort}/api/chat/conversations/${conversationId}/memories`,
 		{
@@ -350,7 +352,7 @@ export async function saveMemoryViaAPI(
  * @returns The list of memories
  */
 export async function getMemoriesViaAPI(page: Page, conversationId: string) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.get(
 		`http://localhost:${backendPort}/api/chat/conversations/${conversationId}/memories`,
 		{
@@ -372,7 +374,7 @@ export async function getMemoriesViaAPI(page: Page, conversationId: string) {
  * @param memoryId - Memory ID
  */
 export async function deleteMemoryViaAPI(page: Page, memoryId: string) {
-	const backendPort = (page as any).backendPort || 3000;
+	const backendPort = (page as PageWithBackendPort).backendPort || 3000;
 	const response = await page.request.delete(`http://localhost:${backendPort}/api/chat/memories/${memoryId}`, {
 		timeout: 10000,
 	});

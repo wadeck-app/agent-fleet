@@ -41,6 +41,11 @@ const PACKAGES = [
 	'orchestrator',
 	'worker',
 	'cli',
+	// Was absent, which is how three of its files stayed corrupted and unnoticed:
+	// `npm run check` never typechecked them.
+	'e2e-web',
+	'task-cli',
+	'extension-points',
 ];
 
 /**
@@ -65,6 +70,7 @@ function checkPackageWithConfig(packageName, config = 'tsconfig.json') {
 
 		const command = `npx tsc --noEmit --project ${config}`;
 		const tsc = spawn(command, {
+			windowsHide: true,
 			cwd: packagePath,
 			shell: true,
 			stdio: ['ignore', 'pipe', 'pipe'],
@@ -144,7 +150,7 @@ function checkDirectory(label, dirPath) {
 		}
 
 		const command = `npx tsc --noEmit --project tsconfig.json`;
-		const tsc = spawn(command, { cwd: dirPath, shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+		const tsc = spawn(command, { windowsHide: true, cwd: dirPath, shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
 
 		let stdout = '';
 		let stderr = '';

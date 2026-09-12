@@ -57,6 +57,7 @@ function checkPackage(packageName) {
 
 		const command = 'npm run lint';
 		const eslint = spawn(command, {
+			windowsHide: true,
 			cwd: packagePath,
 			shell: true,
 			stdio: ['ignore', 'pipe', 'pipe'],

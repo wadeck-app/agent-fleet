@@ -6,8 +6,12 @@ export default {
 		'**/node_modules/**',
 		'**/dist/**',
 		'**/dist-types/**',
+		// Bundled CLI output (packages/*/dist-bundle, git-ignored): generated, not source
+		'**/dist-bundle/**',
 		'**/*.test.ts',
+		'**/*.test.tsx',
 		'**/*.spec.ts',
+		'**/*.spec.tsx',
 		'**/*.stories.ts',
 		'**/*.stories.tsx',
 		'suppress-unsafe-casts.*',

@@ -139,7 +139,7 @@ Matches against unambiguous secret prefixes: `ghp_`, `github_pat_`, `gho_`, `ghs
 Result: error -- move to `secrets:` block.
 
 Pass -- Shannon entropy scan (warning):
-`H = -Σ p(c) × log₂(p(c))`. For values with length ≥ :
+`H = -Σ p(c) * log₂(p(c))`. For values with length >= :
 
 - Base charset entropy > . -> warning
 - Hex charset entropy > . -> warning
@@ -165,7 +165,7 @@ secrets:
          none: no restriction -- warning emitted for values outside printable-ascii
 ```
 
-Why `minLength: `: short values (≤ chars) appear naturally in logs, producing false-positive redactions that make output unreadable. chars is the industry-validated threshold.
+Why `minLength: `: short values (<= chars) appear naturally in logs, producing false-positive redactions that make output unreadable. chars is the industry-validated threshold.
 
 Why charset restriction: masking is regex/line-based. A secret containing `\n` splits across log lines -- undetectable. A secret containing `\`, `"`, `` can break the regex pattern. Control characters may be transformed by JSON serializers or terminal emulators before the masker sees them.
 

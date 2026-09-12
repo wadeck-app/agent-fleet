@@ -38,6 +38,7 @@ function checkFormat() {
 	return new Promise((resolve, reject) => {
 		const command = 'npx prettier --check .';
 		const prettier = spawn(command, {
+			windowsHide: true,
 			shell: true,
 			stdio: ['ignore', 'pipe', 'pipe'],
 		});

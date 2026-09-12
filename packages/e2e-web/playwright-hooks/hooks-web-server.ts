@@ -15,6 +15,8 @@ import { test as base } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import type { PageWithBackendPort } from '../utils/e2eTypes';
+
 interface ServerInfo {
 	port: number;
 	pid: number;
@@ -165,7 +167,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 		debug && console.log(`    Assigned backend #${backendIndex} (port ${backendPort})`);
 
 		// Store backend port in page context for use by helper functions
-		(page as any).backendPort = backendPort;
+		(page as PageWithBackendPort).backendPort = backendPort;
 
 		// DEFENSE-IN-DEPTH: Verify workspace ID before running tests
 		await verifyWorkspaceId(backendPort);

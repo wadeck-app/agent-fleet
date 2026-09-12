@@ -1,12 +1,13 @@
-import Type { CreateIngredient } from 'shared-frontend-backend/src/api/ingredients.contract';
+import type { CreateIngredient } from 'shared-frontend-backend/src/api/ingredients.contract';
 
-/** Fixtures for tests d'ingredients
+/**
+ * Fixtures pour les tests d'ingredients
  */
 
 export const validIngredients: Record<string, CreateIngredient> = {
 	chicken: {
-		name: 'Chicken',
-		Calories: 165,
+		name: 'Poulet',
+		calories: 165,
 		protein: 31.0,
 		carbs: 0.0,
 		fat: 3.6,
@@ -14,7 +15,7 @@ export const validIngredients: Record<string, CreateIngredient> = {
 	},
 	rice: {
 		name: 'Riz blanc',
-		Calories: 130,
+		calories: 130,
 		protein: 2.7,
 		carbs: 28.2,
 		fat: 0.3,
@@ -22,7 +23,7 @@ export const validIngredients: Record<string, CreateIngredient> = {
 	},
 	broccoli: {
 		name: 'Brocoli',
-		Calories: 34,
+		calories: 34,
 		protein: 2.8,
 		carbs: 7.0,
 		fat: 0.4,
@@ -30,15 +31,15 @@ export const validIngredients: Record<string, CreateIngredient> = {
 	},
 	oliveoil: {
 		name: "Huile d'olive",
-		Calories: 884,
+		calories: 884,
 		protein: 0.0,
 		carbs: 0.0,
 		fat: 100.0,
 		servingSize: 100,
 	},
 	eggs: {
-		name: 'Eggs',
-		Calories: 155,
+		name: 'Œufs',
+		calories: 155,
 		protein: 13.0,
 		carbs: 1.1,
 		fat: 11.0,
@@ -46,7 +47,7 @@ export const validIngredients: Record<string, CreateIngredient> = {
 	},
 	salmon: {
 		name: 'Saumon',
-		Calories: 208,
+		calories: 208,
 		protein: 20.0,
 		carbs: 0.0,
 		fat: 13.0,
@@ -54,15 +55,15 @@ export const validIngredients: Record<string, CreateIngredient> = {
 	},
 	pasta: {
 		name: 'Pates',
-		Calories: 371,
+		calories: 371,
 		protein: 13.0,
 		carbs: 75.0,
 		fat: 1.5,
 		servingSize: 100,
 	},
 	tomato: {
-		name: 'Tomato',
-		Calories: 18,
+		name: 'Tomate',
+		calories: 18,
 		protein: 0.9,
 		carbs: 3.9,
 		fat: 0.2,
@@ -73,7 +74,7 @@ export const validIngredients: Record<string, CreateIngredient> = {
 export const invalidIngredients = {
 	emptyName: {
 		name: '',
-		Calories: 100,
+		calories: 100,
 		protein: 10.0,
 		carbs: 20.0,
 		fat: 5.0,
@@ -81,7 +82,7 @@ export const invalidIngredients = {
 	},
 	negativeCalories: {
 		name: 'Ingredient negatif',
-		Calories: -100,
+		calories: -100,
 		protein: 10.0,
 		carbs: 20.0,
 		fat: 5.0,
@@ -89,7 +90,7 @@ export const invalidIngredients = {
 	},
 	negativeProtein: {
 		name: 'Proteines negatives',
-		Calories: 100,
+		calories: 100,
 		protein: -10.0,
 		carbs: 20.0,
 		fat: 5.0,
@@ -97,7 +98,7 @@ export const invalidIngredients = {
 	},
 	zeroServingSize: {
 		name: 'Portion zero',
-		Calories: 100,
+		calories: 100,
 		protein: 10.0,
 		carbs: 20.0,
 		fat: 5.0,
