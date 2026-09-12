@@ -4,6 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import type { ApprovalProvider, ApprovalRequest, ChoiceRequest, InputRequest } from './approval/v1.js';
+import type { StepDistributionProvider } from './step-distribution/v1.js';
+import type {
+	StepPlacement,
+	WorkerAcceptanceProvider,
+	WorkerAcceptanceRequest,
+	WorkerCandidate,
+} from './worker-acceptance/v1.js';
 import type { WorkspaceHandle, WorkspaceProvider, WorkspaceRequest } from './workspace/v1.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -70,6 +77,38 @@ describe('extension-points interfaces compile correctly', () => {
 		expect(req.choices).toHaveLength(2);
 		expect(req.choices[0]!.description).toBeUndefined();
 		expect(req.choices[1]!.description).toBe('The second option');
+	});
+
+	it('WorkerAcceptanceProvider shape is satisfied by a mock implementation', () => {
+		const provider: WorkerAcceptanceProvider = {
+			accepts: ({ step, worker }: WorkerAcceptanceRequest) => worker.labels.includes(step.labels[0] ?? ''),
+		};
+		const worker: WorkerCandidate = {
+			workerId: 'w1',
+			labels: ['gpu'],
+			attachedProjects: ['C:/proj'],
+			hasUserInterface: true,
+			ephemeral: false,
+		};
+		const step: StepPlacement = { stepId: 's1', labels: ['gpu'], requiresUserInterface: false };
+
+		expect(provider.accepts({ step, worker })).toBe(true);
+	});
+
+	// The contract that keeps a preference from becoming a cap (D#24).
+	it('StepDistributionProvider returns the candidates it was given', () => {
+		const provider: StepDistributionProvider = {
+			order: candidates => [...candidates].reverse(),
+		};
+		const candidates: WorkerCandidate[] = ['a', 'b'].map(workerId => ({
+			workerId,
+			labels: [],
+			attachedProjects: [],
+			hasUserInterface: false,
+			ephemeral: true,
+		}));
+
+		expect(provider.order(candidates).map(candidate => candidate.workerId)).toEqual(['b', 'a']);
 	});
 
 	it('ApprovalRequest allows optional context', () => {

@@ -118,11 +118,18 @@ export class WorkerRegistry {
 		return this.workers.get(ws);
 	}
 
-	getIdle(): WebSocket | undefined {
+	/**
+	 * Every idle worker with the connection to reach it, in registration order.
+	 *
+	 * Returns all of them rather than the first, because which one may run a given step is
+	 * a routing decision this class deliberately knows nothing about (see `StepRouter`).
+	 */
+	listIdle(): { ws: WebSocket; worker: RegisteredWorker }[] {
+		const idle: { ws: WebSocket; worker: RegisteredWorker }[] = [];
 		for (const [ws, worker] of this.workers) {
-			if (worker.state === 'idle') return ws;
+			if (worker.state === 'idle') idle.push({ ws, worker });
 		}
-		return undefined;
+		return idle;
 	}
 
 	markBusy(ws: WebSocket): void {

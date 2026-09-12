@@ -1,5 +1,5 @@
 import type { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
-import type { ApprovalProvider, WorkspaceHandle, WorkspaceProvider } from 'extension-points';
+import type { ApprovalProvider, StepPlacement, WorkspaceHandle, WorkspaceProvider } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
 import { FlowValidator, WorkspaceManager } from 'flow-engine';
 import { FlowScheduler } from 'flow-engine';
@@ -10,7 +10,7 @@ import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
+import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
@@ -18,6 +18,8 @@ import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, I
 import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { AssignmentLedger } from './AssignmentLedger.js';
+import { assertStepLabels } from './LabelMatcher.js';
+import { StepRouter } from './StepRouter.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 
@@ -61,6 +63,15 @@ export class CommandHandler {
 	private readonly dispatched = new Map<string, ReadyStep>();
 	/** Re-dispatches spent per step, so a step nobody ever starts cannot loop forever (D#62) */
 	private readonly redispatchCounts = new Map<string, number>();
+	/**
+	 * Project each execution belongs to, for routing (D#9).
+	 *
+	 * Absent for a run started outside any project (D#10), which is why routing treats a
+	 * missing entry as "only daemon-created workers apply" rather than defaulting.
+	 */
+	private readonly executionProjects = new Map<string, string>();
+	/** Chooses which live worker a step goes to (S3, S4) */
+	private readonly router = new StepRouter();
 	/** Per-execution hook dispatchers */
 	private readonly executionHooks = new Map<string, HookDispatcher>();
 	/** Per-execution plugin workspace handles (only when workspaceProvider is set) */
@@ -287,6 +298,9 @@ export class CommandHandler {
 					'info'
 				);
 			}
+			// Also kept in memory: routing consults it per dispatch, and a worker the daemon
+			// did not create only serves the projects it declared (D#9).
+			if (projectRoot !== undefined) this.executionProjects.set(executionId, projectRoot);
 			this.executionStore.create({ executionId, flowFile, flowId, stepIds, projectRoot });
 		} catch (err) {
 			// Execution setup failed after workspace was allocated - release before propagating
@@ -443,7 +457,7 @@ export class CommandHandler {
 			if (started) {
 				// It may already have changed something, so the author's retry/onFailure
 				// decides rather than us silently replaying a half-run step.
-				this.failInterruptedStep(
+				this.failStep(
 					executionId,
 					stepId,
 					`the worker running this step disconnected while it was executing. It was not retried automatically because it may have already had an effect; re-run the flow, or declare "retry" on the step if it is safe to repeat.`
@@ -455,7 +469,7 @@ export class CommandHandler {
 			const spent = (this.redispatchCounts.get(key) ?? 0) + 1;
 			if (step === undefined) {
 				// Nothing to re-send, so waiting for this step would hang the execution.
-				this.failInterruptedStep(
+				this.failStep(
 					executionId,
 					stepId,
 					`the worker holding this step disconnected before starting it, and the daemon no longer has the assignment to re-send. Please report this.`
@@ -463,7 +477,7 @@ export class CommandHandler {
 				continue;
 			}
 			if (spent > MAX_REDISPATCHES) {
-				this.failInterruptedStep(
+				this.failStep(
 					executionId,
 					stepId,
 					`no worker started this step: it was handed out ${String(MAX_REDISPATCHES + 1)} times and every worker disconnected first. Check that a worker stays connected ("flow worker list") and that it serves this project.`
@@ -554,13 +568,14 @@ export class CommandHandler {
 	}
 
 	/**
-	 * Fails a step whose worker vanished, with the same treatment a reported failure gets.
+	 * Fails a step the daemon itself decided cannot proceed, with the same treatment a
+	 * failure reported by a worker gets.
 	 *
 	 * The store write and the hook are not optional extras: a step left `running` in the
 	 * execution store shows up in `flow history` as still running forever, and a hook that
-	 * fires for a script failure but not for a lost worker is a gap the author cannot see.
+	 * fires for a failing script but not for a lost worker is a gap the author cannot see.
 	 */
-	private failInterruptedStep(executionId: string, stepId: string, reason: string): void {
+	private failStep(executionId: string, stepId: string, reason: string): void {
 		this.executionStore.markStepFailed(executionId, stepId, reason);
 		this.logWriter.writeExecution(executionId, `Step ${stepId} failed: ${reason}`, 'error');
 		this.onStepFailed(executionId, stepId, reason);
@@ -628,11 +643,33 @@ export class CommandHandler {
 		this.enqueueReadyItems(executionId, newReady, context);
 	}
 
+	/**
+	 * Hands out as many queued steps as current capacity allows.
+	 *
+	 * Every queued step is considered, not just the head: which workers may run a step now
+	 * depends on the step (labels, project, interactivity), so stopping at the first
+	 * unplaceable one would let a single unsatisfiable label stall independent work behind
+	 * it. Steps that find no worker keep their place in the queue.
+	 */
 	tryDispatch(): void {
+		/** Steps nothing could run this pass, put back in order once the pass ends. */
+		const unplaced: ReadyStep[] = [];
+
 		while (this.readyQueue.length > 0) {
-			const idleWorker = this.registry.getIdle();
+			const step = this.readyQueue.shift()!;
+
+			let placement: StepPlacement;
+			try {
+				placement = this.placementFor(step);
+			} catch (err) {
+				// A step whose routing cannot even be described is never placeable, so
+				// leaving it queued would stall the flow with no explanation.
+				this.failStep(step.executionContext.executionId, step.stepId, normalizeError(err).message);
+				continue;
+			}
+
+			const idleWorker = this.router.select(placement, this.registry.listIdle());
 			if (idleWorker) {
-				const step = this.readyQueue.shift()!;
 				const scheduler = this.schedulers.get(step.executionContext.executionId);
 
 				// Before dispatching, sync sub-step errors and sub-step outputs from the scheduler
@@ -688,19 +725,46 @@ export class CommandHandler {
 					this.readyQueue.unshift(step);
 					continue;
 				}
-			} else if (this.provisioner.canProvision()) {
-				// Obtaining a worker is asynchronous by contract (D#66), and dispatch resumes
-				// when it registers -- so this is deliberately not awaited. A failure is
-				// reported rather than swallowed: the queue would otherwise stall silently.
-				void this.provisioner.provision().catch((err: unknown) => {
-					process.stderr.write(`[CommandHandler] failed to obtain a worker: ${getErrorMessage(err)}\n`);
-				});
-				// continue so we request one worker per queued step (up to the limit)
-				continue;
 			} else {
-				break;
+				// Nothing live can take it. Ask for a worker if we are allowed one -- obtaining
+				// it is asynchronous by contract (D#66) and dispatch resumes when it registers,
+				// so this is deliberately not awaited. One request per queued step, up to the
+				// limit. A failure is reported rather than swallowed: the queue would otherwise
+				// stall silently.
+				if (this.provisioner.canProvision()) {
+					void this.provisioner.provision().catch((err: unknown) => {
+						process.stderr.write(`[CommandHandler] failed to obtain a worker: ${getErrorMessage(err)}\n`);
+					});
+				}
+				unplaced.push(step);
 			}
 		}
+
+		this.readyQueue.unshift(...unplaced);
+	}
+
+	/**
+	 * Describes a step for routing.
+	 *
+	 * @throws when the step's `labels` are not a list. Schema validation already refuses
+	 *         such a flow before it starts (D#7), so this covers the path that skips it --
+	 *         a step injected at runtime. Reported as a step failure by the caller, because
+	 *         an unmatchable label set means no worker is ever eligible and presenting that
+	 *         as "waiting for capacity" would hide the mistake forever.
+	 */
+	private placementFor(step: ReadyStep): StepPlacement {
+		const labels = (step.stepConfig as { labels?: unknown }).labels;
+		assertStepLabels(labels, step.stepId);
+		return {
+			stepId: step.stepId,
+			labels: labels ?? [],
+			// The step type is the only signal for this: there is no step-level
+			// `interactive` field, by design (D#60).
+			requiresUserInterface: step.stepConfig.type === 'user_intervention',
+			...(this.executionProjects.get(step.executionContext.executionId) !== undefined
+				? { projectRoot: this.executionProjects.get(step.executionContext.executionId)! }
+				: {}),
+		};
 	}
 
 	private enqueueReadyItems(executionId: string, items: ReadyItem[], context: ExecutionContext): void {
@@ -727,6 +791,7 @@ export class CommandHandler {
 		this.schedulers.delete(executionId);
 		this.executionContexts.delete(executionId);
 		this.stepCounts.delete(executionId);
+		this.executionProjects.delete(executionId);
 		this.activeExecutionCount--;
 		// Per-step re-dispatch budgets die with the execution they were counted for.
 		for (const key of this.redispatchCounts.keys()) {

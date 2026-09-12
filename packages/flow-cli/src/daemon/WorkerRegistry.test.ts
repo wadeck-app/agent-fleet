@@ -15,7 +15,7 @@ describe('WorkerRegistry - membership', () => {
 		const ws = fakeWorker();
 		registry.register(ws, minimal);
 
-		expect(registry.getIdle()).toBe(ws);
+		expect(registry.listIdle().map(candidate => candidate.ws)).toEqual([ws]);
 		expect(registry.liveCount).toBe(1);
 	});
 
@@ -25,7 +25,7 @@ describe('WorkerRegistry - membership', () => {
 		registry.register(ws, minimal);
 		registry.remove(ws);
 
-		expect(registry.getIdle()).toBeUndefined();
+		expect(registry.listIdle()).toEqual([]);
 		expect(registry.liveCount).toBe(0);
 	});
 
@@ -46,7 +46,7 @@ describe('WorkerRegistry - idle/busy state', () => {
 		registry.register(ws, minimal);
 		registry.markBusy(ws);
 
-		expect(registry.getIdle()).toBeUndefined();
+		expect(registry.listIdle()).toEqual([]);
 	});
 
 	it('returns the worker again once it goes back to idle', () => {
@@ -56,7 +56,7 @@ describe('WorkerRegistry - idle/busy state', () => {
 		registry.markBusy(ws);
 		registry.markIdle(ws);
 
-		expect(registry.getIdle()).toBe(ws);
+		expect(registry.listIdle().map(candidate => candidate.ws)).toEqual([ws]);
 	});
 
 	it('reports whether any worker is busy', () => {

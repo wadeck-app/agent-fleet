@@ -49,6 +49,18 @@
 			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
 		},
 		{
+			"id": "worker-acceptance",
+			"status": "stable",
+			"description": "Decides whether a worker may run a step (project attachment, labels, interactivity). Routing only, never an authorization boundary.",
+			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
+		},
+		{
+			"id": "step-distribution",
+			"status": "stable",
+			"description": "Orders the workers eligible for a step so the daemon takes the first. Ordering only -- an implementation must never drop a candidate, which would cap parallelism.",
+			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
+		},
+		{
 			"id": "worker-source",
 			"status": "stable",
 			"description": "Obtains live workers for a source -- contacting one that already runs, or creating one on demand. Which of the two is the implementation's business.",

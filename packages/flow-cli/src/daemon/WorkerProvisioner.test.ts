@@ -312,7 +312,7 @@ describe('WorkerProvisioner - registration admission', () => {
 		const ws = fakeWorker();
 
 		expect(provisioner.registerWorker(ws, { pid: 42 })).toBe(true);
-		expect(registry.getIdle()).toBe(ws);
+		expect(registry.listIdle().map(candidate => candidate.ws)).toEqual([ws]);
 	});
 
 	// Until token authentication lands, provenance is the only signal available -- an

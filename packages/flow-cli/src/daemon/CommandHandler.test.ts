@@ -30,13 +30,34 @@ vi.mock('flow-engine', async importOriginal => {
 	};
 });
 
+/** A daemon-forked worker, which the default acceptance rules let take any step. */
+function forkedWorker(ws: unknown) {
+	return {
+		ws,
+		worker: {
+			state: 'idle',
+			workerId: 'w-test',
+			pid: 1,
+			labels: [] as string[],
+			attachedProjects: [] as string[],
+			hasUserInterface: false,
+			ephemeral: true,
+		},
+	};
+}
+
 /** Stands in for both WorkerRegistry and WorkerProvisioner, which CommandHandler now takes. */
 function createMockWorkerPool() {
-	return {
+	// listIdle() is derived from getIdle() so a test only has to say which socket is idle.
+	const pool = {
 		// WorkerRegistry surface
 		describe: vi.fn().mockReturnValue({ workerId: 'w-test', sourceId: 'built-in:fork' }),
 		remove: vi.fn(),
 		getIdle: vi.fn().mockReturnValue(undefined),
+		listIdle: vi.fn((): unknown[] => {
+			const ws: unknown = pool.getIdle();
+			return ws === undefined ? [] : [forkedWorker(ws)];
+		}),
 		markBusy: vi.fn(),
 		markIdle: vi.fn(),
 		hasBusyWorkers: vi.fn().mockReturnValue(false),
@@ -48,6 +69,7 @@ function createMockWorkerPool() {
 		provision: vi.fn().mockResolvedValue(undefined),
 		registerWorker: vi.fn().mockReturnValue(true),
 	};
+	return pool;
 }
 
 const VALID_FLOW_YAML = `\
@@ -888,6 +910,98 @@ describe('CommandHandler — plugin workspace provider', () => {
 		expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('release failed'));
 
 		warnSpy.mockRestore();
+	});
+});
+
+describe('CommandHandler — routing steps to workers (D#22, D#24)', () => {
+	const LABELLED_FLOW_YAML = `\
+id: labelled-flow
+version: "1.0.0"
+name: Labelled Flow
+description: label routing
+workspace:
+  mode: manual
+  gitStrategy: any
+  reusePolicy: if-available
+inputs: {}
+steps:
+  - id: needs-gpu
+    name: Needs GPU
+    type: script
+    script: echo gpu
+    labels: [gpu]
+  - id: plain
+    name: Plain
+    type: script
+    script: echo plain
+`;
+
+	function handlerFor(yamlText: string, idle: unknown[]) {
+		const flowFile = path.join(tmpDir, 'routing.yml');
+		fs.writeFileSync(flowFile, yamlText);
+
+		const workerPool = createMockWorkerPool();
+		const dispatched: string[] = [];
+		workerPool.listIdle.mockReturnValue(idle);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
+			dispatched.push((msg as { stepId: string }).stepId);
+			return true;
+		});
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		return { handler, dispatched, flowFile, workerPool };
+	}
+
+	it('does not dispatch a labelled step to a worker without the label', async () => {
+		const worker = forkedWorker({});
+		const { handler, dispatched, flowFile } = handlerFor(LABELLED_FLOW_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).not.toContain('needs-gpu');
+	});
+
+	it('dispatches a labelled step to a worker carrying the label', async () => {
+		const worker = forkedWorker({});
+		worker.worker.labels = ['gpu'];
+		const { handler, dispatched, flowFile } = handlerFor(LABELLED_FLOW_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).toContain('needs-gpu');
+	});
+
+	// The two steps have no dependency between them, so a step nothing can run must not
+	// hold up one that can -- otherwise one unsatisfiable label stalls the whole flow.
+	it('still dispatches a placeable step queued behind an unplaceable one', async () => {
+		const worker = forkedWorker({});
+		const { handler, dispatched, flowFile } = handlerFor(LABELLED_FLOW_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).toContain('plain');
+	});
+
+	// A malformed `labels:` can never be matched, so it must not present as "still waiting
+	// for capacity". Schema validation catches it before the run starts (D#7), which is the
+	// earliest and clearest place -- the run is refused rather than hanging.
+	it('refuses to start a flow whose labels are not a list', async () => {
+		const malformed = LABELLED_FLOW_YAML.replace('labels: [gpu]', 'labels: gpu');
+		const worker = forkedWorker({});
+		const { handler, dispatched, flowFile } = handlerFor(malformed, [worker]);
+
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect((result as { type: string }).type).toBe('error');
+		expect(JSON.stringify(result)).toMatch(/labels/i);
+		expect(dispatched).toEqual([]);
 	});
 });
 

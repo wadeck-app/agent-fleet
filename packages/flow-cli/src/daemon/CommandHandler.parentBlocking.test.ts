@@ -21,11 +21,32 @@ vi.mock('flow-engine', async importOriginal => {
 
 /** Stands in for both WorkerRegistry and WorkerProvisioner, which CommandHandler now takes. */
 function createMockWorkerPool() {
-	return {
+	// listIdle() is derived from getIdle() so a test only has to say which socket is idle.
+	// The worker is daemon-created, which the default acceptance rules let take any step.
+	const pool = {
 		// WorkerRegistry surface
 		describe: vi.fn().mockReturnValue({ workerId: 'w-test', sourceId: 'built-in:fork' }),
 		remove: vi.fn(),
 		getIdle: vi.fn().mockReturnValue(undefined),
+		listIdle: vi.fn((): unknown[] => {
+			const ws: unknown = pool.getIdle();
+			return ws === undefined
+				? []
+				: [
+						{
+							ws,
+							worker: {
+								state: 'idle',
+								workerId: 'w-test',
+								pid: 1,
+								labels: [] as string[],
+								attachedProjects: [] as string[],
+								hasUserInterface: false,
+								ephemeral: true,
+							},
+						},
+					];
+		}),
 		markBusy: vi.fn(),
 		markIdle: vi.fn(),
 		hasBusyWorkers: vi.fn().mockReturnValue(false),
@@ -37,6 +58,7 @@ function createMockWorkerPool() {
 		provision: vi.fn().mockResolvedValue(undefined),
 		registerWorker: vi.fn().mockReturnValue(true),
 	};
+	return pool;
 }
 
 const mockExecStore = {

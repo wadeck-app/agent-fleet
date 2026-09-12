@@ -151,9 +151,23 @@ export function declaresPlugins(configPath: string): boolean {
 	return raw?.['plugins'] !== undefined;
 }
 
-/** True when a config file declares a `plugins.authentication` section. */
-function declaresAuthenticationPlugin(configPath: string): boolean {
-	if (!fs.existsSync(configPath)) return false;
+/**
+ * Extension points the daemon declares but does not resolve from config yet: it
+ * constructs the built-in implementation directly.
+ *
+ * Configuring one has to be an error. Loading the section and ignoring it would leave the
+ * user believing their own implementation was in force when it never ran -- and for
+ * routing in particular, the flow would keep working, just not the way they asked.
+ */
+const UNRESOLVED_PLUGIN_POINTS: Record<string, string> = {
+	authentication: 'the built-in shared-token authenticator',
+	workerAcceptance: 'the built-in permissive acceptance rules',
+	stepDistribution: 'the built-in registered-workers-first order',
+};
+
+/** Names the unresolved plugin sections a config file declares, if any. */
+function declaresUnresolvedPlugins(configPath: string): string[] {
+	if (!fs.existsSync(configPath)) return [];
 	let raw: Record<string, unknown> | null;
 	try {
 		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
@@ -162,12 +176,13 @@ function declaresAuthenticationPlugin(configPath: string): boolean {
 		> | null;
 	} catch {
 		// declaresPlugins already reports a parse failure with the path; do not double-report.
-		return false;
+		return [];
 	}
 	const plugins = raw?.['plugins'];
-	if (typeof plugins !== 'object' || plugins === null) return false;
+	if (typeof plugins !== 'object' || plugins === null) return [];
 	// violations-suppress: ts/no-unsafe-type-cast parsed YAML has no static shape; the plugins key is checked before use
-	return (plugins as Record<string, unknown>)['authentication'] !== undefined;
+	const declared = plugins as Record<string, unknown>;
+	return Object.keys(UNRESOLVED_PLUGIN_POINTS).filter(point => declared[point] !== undefined);
 }
 
 /**
@@ -201,14 +216,11 @@ async function tryResolvePlugins(): Promise<{
 		return {};
 	}
 
-	// The authentication point is declared but has no resolution path yet: the daemon
-	// constructs the built-in shared-token implementation directly. Saying so is required
-	// -- loading a plugin section and ignoring it would leave the user believing their own
-	// authenticator was in force when it never ran.
 	for (const configPath of [globalConfigPath, projectConfigPath]) {
-		if (configPath !== null && declaresAuthenticationPlugin(configPath)) {
+		if (configPath === null) continue;
+		for (const point of declaresUnresolvedPlugins(configPath)) {
 			throw new Error(
-				`"${configPath}" configures plugins.authentication, but the daemon does not load an authentication plugin yet -- it uses the built-in shared-token implementation. Remove that section, or track the work to make it pluggable, rather than assuming it is active.`
+				`"${configPath}" configures plugins.${point}, but the daemon does not load a ${point} plugin yet -- it uses ${UNRESOLVED_PLUGIN_POINTS[point] ?? 'a built-in implementation'}. Remove that section, or track the work to make it pluggable, rather than assuming it is active.`
 			);
 		}
 	}
