@@ -4,6 +4,7 @@ export type { WorkspaceProvider, WorkspaceRequest, WorkspaceHandle } from './wor
 export type { ApprovalProvider, InputRequest, ChoiceRequest, ApprovalRequest } from './approval/v1.js';
 export type { ProjectResolutionProvider, ProjectResolution } from './project-resolution/v1.js';
 export type { WorkerSourceProvider, WorkerRequest } from './worker-source/v1.js';
+export type { AuthenticationProvider, AuthenticationRequest, AuthenticationResult } from './authentication/v1.js';
 export type { PluginManifest, PluginImplementation } from './manifest.js';
 export { SENSITIVE_FIELDS } from './sensitiveFields.js';
 export {

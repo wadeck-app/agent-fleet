@@ -63,6 +63,7 @@ function queryDaemonHealth(port: number, token: string, timeoutMs: number): Prom
 				});
 				res.on('end', () => {
 					try {
+					// violations-suppress: ts/no-unsafe-type-cast an HTTP response body is untyped at the boundary
 						resolve(JSON.parse(body) as Record<string, unknown>);
 					} catch {
 						resolve(null);

@@ -146,7 +146,7 @@ export class WorkerAdapter {
 									return;
 								}
 								if (entry.eventType === 'tool_use' && (toolLog === 'name' || toolLog === 'full')) {
-									const base = `→ ${entry.message}`;
+									const base = `-> ${entry.message}`;
 									const displayEntry = {
 										...entry,
 										message:
@@ -167,7 +167,7 @@ export class WorkerAdapter {
 										type: 'log',
 										executionId: context.executionId,
 										stepId: step.id,
-										entry: { ...entry, message: `← ${entry.message}` },
+										entry: { ...entry, message: `<- ${entry.message}` },
 									});
 								}
 							};
@@ -193,7 +193,7 @@ export class WorkerAdapter {
 				}
 				// trace.outputs is undefined for model steps that produce no structured output --
 				// an empty map is the correct representation (no outputs to propagate to dependents).
-				return { output: (trace.outputs ?? {}) as Record<string, unknown>, meta: trace.meta };
+				return { output: (trace.outputs ?? {}), meta: trace.meta };
 			} finally {
 				// Suppress stop errors so they do not shadow the original executeStep error.
 				try {
@@ -212,11 +212,11 @@ export class WorkerAdapter {
 			// to the scheduler for ${{ subSteps.xxx.outputs.stderr }} in parent prompts.
 			// violations-suppress: ts/no-unsafe-type-cast same pattern as step_completed output cast below
 			const err = Object.assign(new Error(trace.error), {
-				stepOutputs: (trace.outputs ?? {}) as Record<string, unknown>,
+				stepOutputs: (trace.outputs ?? {}),
 			});
 			throw err;
 		}
 		// trace.outputs is undefined for script steps without captureOutput -- empty map is correct.
-		return { output: (trace.outputs ?? {}) as Record<string, unknown>, meta: trace.meta };
+		return { output: (trace.outputs ?? {}), meta: trace.meta };
 	}
 }

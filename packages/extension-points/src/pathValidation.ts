@@ -10,7 +10,7 @@ const GIT_REF_ALLOWLIST = /^[a-zA-Z0-9._-]+$/;
 function isDriveRoot(resolved: string): boolean {
 	// Unix root: "/"
 	if (resolved === '/') return true;
-	// Windows root: "C:\" or "C:/"
+	// Windows root: a drive letter followed by a separator, e.g. the root reported by path.parse()
 	const parsed = parse(resolved);
 	return parsed.root === resolved && parsed.dir === resolved;
 }

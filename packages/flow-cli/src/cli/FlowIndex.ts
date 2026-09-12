@@ -85,6 +85,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 				});
 				wscript.unref();
 			} else {
+				// violations-suppress: cli/no-spawn-without-windows-hide this is the non-Windows branch (win32 uses wscript.exe above), where windowsHide has no effect
 				const child = spawn(process.execPath, [bundlePath], {
 					stdio: 'ignore',
 					env: { ...process.env, FLOW_DAEMON_MODE: '1' },
@@ -191,6 +192,7 @@ async function printDaemonPid(): Promise<void> {
 async function main(): Promise<void> {
 	// Daemon-only mode: spawned by `flow start`, keeps the daemon running without any CLI command.
 	if (process.env['FLOW_DAEMON_MODE'] === '1') {
+		// violations-suppress: shared/no-out-of-repo-path the global flow config lives in the user's home by design; a repo-relative path would make it per-checkout
 		const config = FlowConfigLoader.load(path.join(os.homedir(), '.flow-config.yaml'));
 		await Daemon.start(config, DAEMON_DIR);
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).

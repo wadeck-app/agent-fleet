@@ -19,7 +19,9 @@ import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
+import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WebSocketServer } from './WebSocketServer';
+import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
 
@@ -219,7 +221,14 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				});
 				workerRegistry = new WorkerRegistry();
 				const forkSource = new ForkWorkerSource(port, () => wsServer.port, claudePath);
-				workerProvisioner = new WorkerProvisioner(config.queue.concurrency, workerRegistry, forkSource);
+				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir);
+				workerProvisioner = new WorkerProvisioner(
+					config.queue.concurrency,
+					workerRegistry,
+					forkSource,
+					new SharedTokenAuthenticator(resolvedDaemonDir, sourceRegistry),
+					sourceRegistry
+				);
 				commandHandler = new CommandHandler(
 					resolvedDaemonDir,
 					workerRegistry,
@@ -352,7 +361,10 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 			!commandHandler.hasActiveExecutions() &&
 			!workerRegistry.hasBusyWorkers()
 		) {
-			workerRegistry.broadcast({ type: 'done' });
+			// Only the workers this daemon forked. A worker the user launched in a terminal
+			// must survive an idle period: it is registered, not owned (D#51), and telling
+			// it to exit here is what made `flow worker` unusable (D#48).
+			workerRegistry.broadcastToEphemeral({ type: 'done' });
 			wsServer.close();
 			writeDaemonLog(logsDir, 'info', 'Daemon stopped (idle)');
 			void daemonHandle.stop('idle');

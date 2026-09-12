@@ -138,6 +138,49 @@ describe('WorkerRegistry - registration metadata', () => {
 	});
 });
 
+// D#51-D#55: the daemon may idle down freely, but telling every connected worker to
+// exit destroys the one the user launched in a terminal -- the core deliverable (D#48).
+describe('WorkerRegistry - ephemeral vs externally launched workers', () => {
+	it('defaults a worker to non-ephemeral, so an unknown worker is never killed', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal);
+
+		expect(registry.describe(ws)?.ephemeral).toBe(false);
+	});
+
+	it('records a daemon-created worker as ephemeral', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal, { ephemeral: true });
+
+		expect(registry.describe(ws)?.ephemeral).toBe(true);
+	});
+
+	it('broadcastToEphemeral reaches only the workers the daemon created', () => {
+		const registry = new WorkerRegistry();
+		const forked = fakeWorker();
+		const launchedByUser = fakeWorker();
+		registry.register(forked, minimal, { ephemeral: true });
+		registry.register(launchedByUser, minimal, { ephemeral: false });
+
+		registry.broadcastToEphemeral({ type: 'done' });
+
+		expect(forked.send).toHaveBeenCalledWith(JSON.stringify({ type: 'done' }));
+		expect(launchedByUser.send).not.toHaveBeenCalled();
+	});
+
+	it('re-registering keeps the ephemeral flag when not restated', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal, { ephemeral: true });
+		// A forked worker sends `ready` again after each step.
+		registry.register(ws, minimal);
+
+		expect(registry.describe(ws)?.ephemeral).toBe(true);
+	});
+});
+
 describe('WorkerRegistry - sending', () => {
 	it('sends a serialised message to an open connection', () => {
 		const registry = new WorkerRegistry();

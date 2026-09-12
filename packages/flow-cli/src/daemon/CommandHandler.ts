@@ -106,6 +106,7 @@ export class CommandHandler {
 		const flowFile = path.isAbsolute(cmd.flowFile) ? cmd.flowFile : path.resolve(cmd.cwd, cmd.flowFile);
 
 		if (!this.allowAbsolutePaths) {
+			// violations-suppress: shared/no-out-of-repo-path homedir is deliberately an allowed root for the flow-file path restriction, so flows under the user's home are runnable
 			const allowedRoots = [path.resolve(cmd.cwd), path.resolve(os.homedir())];
 			let realFlowFile: string;
 			try {

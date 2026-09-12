@@ -67,6 +67,7 @@ function formatLogLine(raw: string): string {
 	}
 
 	if (typeof parsed !== 'object' || parsed === null) return raw;
+	// violations-suppress: ts/no-unsafe-type-cast parsed YAML has no static shape; the fields are validated below rather than trusted
 	const obj = parsed as Record<string, unknown>;
 
 	if (isStepLogEntry(obj)) {

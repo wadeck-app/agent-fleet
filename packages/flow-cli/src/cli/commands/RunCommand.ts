@@ -247,6 +247,7 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 		});
 		wscript.unref();
 	} else {
+		// violations-suppress: cli/no-spawn-without-windows-hide this is the non-Windows branch (win32 uses wscript.exe above), where windowsHide has no effect
 		const child = spawn(process.execPath, [resolvedBundle], {
 			stdio: 'ignore',
 			env: { ...process.env, FLOW_DAEMON_MODE: '1' },
@@ -371,6 +372,7 @@ export function registerRunCommand(program: Command): void {
 					}
 				}
 
+				// violations-suppress: shared/no-out-of-repo-path the global flow config lives in the user's home by design; a repo-relative path would make it per-checkout
 				const config = FlowConfigLoader.load(path.join(os.homedir(), '.flow-config.yaml'));
 
 				const cmd: Extract<ClientCommand, { type: 'run' }> = {
@@ -433,15 +435,14 @@ export function registerRunCommand(program: Command): void {
 							try {
 								return yaml.load(fs.readFileSync(flowFile, 'utf8'), {
 									schema: yaml.JSON_SCHEMA,
-								}) as any;
+								}) as { steps?: { log?: string }[] };
 							} catch {
 								return null;
 							}
 						})()
 					: null;
-				const fastPoll = Array.isArray(flowYaml?.steps)
-					? (flowYaml.steps as any[]).some((s: any) => s.log === 'streaming' || s.log === 'polling')
-					: false;
+				const fastPoll =
+					flowYaml?.steps?.some(s => s.log === 'streaming' || s.log === 'polling') ?? false;
 
 				let finalState: ExecutionState;
 				try {

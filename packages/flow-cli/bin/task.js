@@ -32,6 +32,7 @@ if (!tsx) {
 	process.exit(1);
 }
 
+// violations-suppress: cli/no-spawn-without-windows-hide a foreground CLI launcher with stdio inherit -- windowsHide would strip the console the user is typing into
 const child = spawn(process.execPath, [tsx, cli, ...process.argv.slice(2)], {
 	stdio: 'inherit',
 });

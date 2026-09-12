@@ -135,6 +135,7 @@ export class PluginLoader {
 				throw new Error(`Plugin "${pluginId}" JSON manifest has "entrypoint" but no "export" field`);
 			}
 			const moduleUrl = pathToFileURL(resolvedEntrypoint).href;
+			// violations-suppress: ts/no-unsafe-type-cast a dynamically imported plugin module has no compile-time type; its exports are checked before use
 			const mod = (await import(moduleUrl)) as Record<string, unknown>;
 			const factory = mod[exportName];
 			if (typeof factory !== 'function') {
@@ -159,6 +160,7 @@ export class PluginLoader {
 
 		if (hasJsManifest) {
 			const moduleUrl = pathToFileURL(jsManifestPath).href;
+			// violations-suppress: ts/no-unsafe-type-cast a dynamically imported plugin module has no compile-time type; its exports are checked before use
 			const mod = (await import(moduleUrl)) as Record<string, unknown>;
 			const manifest = (mod['manifest'] ?? mod['default']) as PluginManifest | undefined;
 			if (!manifest || typeof manifest !== 'object') {

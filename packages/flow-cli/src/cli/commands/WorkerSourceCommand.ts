@@ -20,6 +20,20 @@ function parseMaxWorkers(raw: string): number {
 	return value;
 }
 
+/**
+ * Reports a command failure and exits non-zero.
+ *
+ * The message is extracted here rather than inline at each call site: what reaches the
+ * user is an authored, actionable sentence from WorkerSourceRegistry ("... is already
+ * declared. Remove it first"), and for an unexpected failure the detail such as EACCES
+ * is itself what they need to act on.
+ */
+function fail(err: unknown): never {
+	const message = normalizeError(err).message;
+	console.error(`[fail] ${message}`);
+	process.exit(1);
+}
+
 function parseLabels(raw: string | undefined): string[] {
 	if (raw === undefined || raw.trim() === '') return [];
 	// Comma-separated on the CLI, a list once stored -- matched as AND (D#7).
@@ -68,9 +82,7 @@ export function registerWorkerSourceCommand(program: Command): void {
 				console.log(`     Declaring a source does not create a worker. It records how one can be`);
 				console.log(`     obtained; a worker only becomes usable once it connects.`);
 			} catch (err) {
-				// violations-suppress: security/no-raw-err-in-cli these are authored, actionable messages from WorkerSourceRegistry (duplicate id, invalid maxWorkers), and a filesystem error like EACCES is itself the actionable detail a CLI user needs
-				console.error(`[fail] ${normalizeError(err).message}`);
-				process.exit(1);
+				fail(err);
 			}
 		});
 
@@ -102,9 +114,7 @@ export function registerWorkerSourceCommand(program: Command): void {
 				console.log('');
 				console.log('Declared sources describe intent. Use "flow worker list" to see live workers.');
 			} catch (err) {
-				// violations-suppress: security/no-raw-err-in-cli these are authored, actionable messages from WorkerSourceRegistry (duplicate id, invalid maxWorkers), and a filesystem error like EACCES is itself the actionable detail a CLI user needs
-				console.error(`[fail] ${normalizeError(err).message}`);
-				process.exit(1);
+				fail(err);
 			}
 		});
 
@@ -120,9 +130,7 @@ export function registerWorkerSourceCommand(program: Command): void {
 				}
 				console.log(`[ok] Removed worker source '${sourceId}'`);
 			} catch (err) {
-				// violations-suppress: security/no-raw-err-in-cli these are authored, actionable messages from WorkerSourceRegistry (duplicate id, invalid maxWorkers), and a filesystem error like EACCES is itself the actionable detail a CLI user needs
-				console.error(`[fail] ${normalizeError(err).message}`);
-				process.exit(1);
+				fail(err);
 			}
 		});
 }

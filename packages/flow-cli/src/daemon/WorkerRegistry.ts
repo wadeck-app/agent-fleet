@@ -20,6 +20,16 @@ export interface RegisteredWorker {
 	labels: string[];
 	attachedProjects: string[];
 	hasUserInterface: boolean;
+	/**
+	 * True when this daemon created the worker, so it exists only to serve this daemon
+	 * and may be told to exit once there is nothing left to run.
+	 *
+	 * False for a worker launched outside the daemon -- a terminal the user opened, or
+	 * another machine. Such a worker outlives the daemon by design (D#51): its
+	 * persistence comes from being registered, not from holding the daemon open, and
+	 * killing it on idle is exactly what made the core deliverable unusable (D#48).
+	 */
+	ephemeral: boolean;
 }
 
 /**
@@ -52,13 +62,21 @@ export class WorkerRegistry {
 	 * Adds a worker as idle, or refreshes an existing one. Re-registering the same
 	 * connection is normal: a forked worker sends `ready` again after each step.
 	 */
-	register(ws: WebSocket, registration: Omit<WorkerReady, 'type'>): void {
+	/**
+	 * @param options.ephemeral - whether this daemon created the worker. Defaults to the
+	 *        value already recorded, then to false: an unrecognised worker is never
+	 *        treated as disposable, because being wrong in that direction kills a
+	 *        worker the user launched.
+	 */
+	register(ws: WebSocket, registration: Omit<WorkerReady, 'type'>, options?: { ephemeral?: boolean }): void {
 		// A re-registering connection keeps its id, so provenance stays stable across the
 		// `ready` a forked worker sends after every step.
-		const workerId = this.workers.get(ws)?.workerId ?? randomUUID();
+		const existing = this.workers.get(ws);
+		const workerId = existing?.workerId ?? randomUUID();
 		this.workers.set(ws, {
 			state: 'idle',
 			workerId,
+			ephemeral: options?.ephemeral ?? existing?.ephemeral ?? false,
 			pid: registration.pid,
 			sourceId: registration.sourceId,
 			// Documented defaults rather than inference: a worker that claims nothing is
@@ -71,6 +89,15 @@ export class WorkerRegistry {
 
 	remove(ws: WebSocket): void {
 		this.workers.delete(ws);
+	}
+
+	/** Live workers belonging to one source, for enforcing its cap (D#64). */
+	countForSource(sourceId: string): number {
+		let count = 0;
+		for (const worker of this.workers.values()) {
+			if (worker.sourceId === sourceId) count++;
+		}
+		return count;
 	}
 
 	/** What this worker declared, or undefined when it is not registered. */
@@ -109,6 +136,18 @@ export class WorkerRegistry {
 	broadcast(message: DaemonToWorker): void {
 		for (const ws of this.workers.keys()) {
 			this.send(ws, message);
+		}
+	}
+
+	/**
+	 * Sends only to workers this daemon created.
+	 *
+	 * Used for the idle shutdown notice. A worker launched in a terminal must not receive
+	 * it: it would exit, and the user would have to relaunch it after every idle period.
+	 */
+	broadcastToEphemeral(message: DaemonToWorker): void {
+		for (const [ws, worker] of this.workers) {
+			if (worker.ephemeral) this.send(ws, message);
 		}
 	}
 
