@@ -66,6 +66,7 @@ export const feedbackApi = {
 	deleteFeedback: (feedbackId: string): Promise<void> => {
 		return managementTypedFetch('DELETE', '/api/flow-feedback/:feedbackId', {
 			params: { feedbackId },
+		// violations-suppress: ts/no-unsafe-type-cast managementTypedFetch returns a typed response; DELETE endpoint returns no body but type system requires Promise<void> at this boundary
 		}) as unknown as Promise<void>;
 	},
 } as const;

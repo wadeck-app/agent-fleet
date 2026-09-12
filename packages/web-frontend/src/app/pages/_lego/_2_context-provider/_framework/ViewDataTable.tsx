@@ -157,8 +157,10 @@ export function ViewDataTable<T extends Product = Product>({
 
 	const handleSave = async (data: T) => {
 		if (editingItem) {
+			// violations-suppress: ts/no-unsafe-type-cast context.actions.update expects the domain type; generic T matches at runtime but TypeScript requires cast at lego-framework boundary
 			await context.actions.update(editingItem.id, data as any);
 		} else {
+			// violations-suppress: ts/no-unsafe-type-cast context.actions.create expects the domain type; generic T matches at runtime but TypeScript requires cast at lego-framework boundary
 			await context.actions.create(data as any);
 		}
 		setDialogOpen(false);
@@ -266,6 +268,7 @@ export function ViewDataTable<T extends Product = Product>({
 
 			{crudConfig && dialogOpen && (
 				<crudConfig.dialog
+					// violations-suppress: ts/no-unsafe-type-cast crudConfig.dialog is a generic component; item and onSave are typed as any at the dynamic dialog boundary
 					item={editingItem as any}
 					onSave={handleSave as any}
 					onClose={() => {

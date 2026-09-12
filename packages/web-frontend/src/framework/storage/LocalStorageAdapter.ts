@@ -55,6 +55,7 @@ export class LocalStorageAdapter implements StorageAdapter {
 			if (item === null) {
 				return null;
 			}
+			// violations-suppress: ts/no-unsafe-type-cast JSON.parse returns any; generic storage adapter requires cast to caller-specified type T
 			return JSON.parse(item) as T;
 		} catch (error) {
 			console.warn('[LocalStorageAdapter] Failed to get:', key, error);

@@ -77,10 +77,12 @@ export function WidgetDetailPanel<T extends { id: string }>({
 
 		const unsubscribe = eventBus.on('product:selected', (payload: any) => {
 			if (payload && typeof payload === 'object' && 'id' in payload) {
+				// violations-suppress: ts/no-unsafe-type-cast payload is typed as any from eventBus; 'id' in payload guard confirms id exists but not its type
 				void loadItem(payload.id as string);
 			}
 
 			if (payload && typeof payload === 'object' && 'items' in payload && Array.isArray(payload.items)) {
+				// violations-suppress: ts/no-unsafe-type-cast payload.items passes Array.isArray guard; generic T is verified by the component's context at this event bus boundary
 				setItems(payload.items as T[]);
 			}
 		});

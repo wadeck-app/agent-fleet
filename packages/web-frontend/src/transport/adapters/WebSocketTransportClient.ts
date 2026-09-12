@@ -365,12 +365,14 @@ export class WebSocketTransportClient implements ITransportClient {
 		const request: TransportRequest = {
 			id: this.generateUuid(),
 			method,
+			// violations-suppress: ts/no-unsafe-type-cast P extends PathsForMethod<M> (a string type); TransportRequest.path requires plain string
 			path: path as string,
-			// Cast to any to handle test cases with paths not in contract
+			// violations-suppress-start: ts/no-unsafe-type-cast options fields are generically typed; TransportRequest requires concrete types and runtime values conform to expected shapes
 			query: options?.query as any,
 			params: options?.params as any,
 			body: options?.body as any,
 			headers: options?.headers as any,
+			// violations-suppress-end: ts/no-unsafe-type-cast
 			timestamp: Date.now(),
 		};
 

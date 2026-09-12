@@ -196,6 +196,7 @@ export function ColumnVisibility({
 		const { active, over } = event;
 
 		if (over && active.id !== over.id && onReorderColumns) {
+			// violations-suppress: ts/no-unsafe-type-cast dnd-kit UniqueIdentifier is string|number; column IDs are always strings
 			onReorderColumns(active.id as string, over.id as string);
 		}
 	};

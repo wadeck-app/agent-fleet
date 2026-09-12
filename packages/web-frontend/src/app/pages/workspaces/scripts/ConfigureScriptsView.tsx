@@ -13,7 +13,7 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import { Button } from '@framework/components/primitives/Button';
 import { SearchBar } from '@framework/features/search/SearchBar';
 import type { AvailableScript } from '@shared/api/workspaceScripts.contract';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 
 import { AvailableScriptItem } from './AvailableScriptItem';
 import { SortableConfiguredScriptItem } from './SortableConfiguredScriptItem';
@@ -130,7 +130,9 @@ export function ConfigureScriptsView({
 					<h3 className="text-sm font-semibold">
 						Configured Scripts ({configuredScripts.length}/{maxScripts})
 					</h3>
-					<p className="text-xs text-muted-foreground">Drag to reorder, click → to remove</p>
+					<p className="text-xs text-muted-foreground">
+						Drag to reorder, click <ArrowRight className="inline size-3" aria-hidden="true" /> to remove
+					</p>
 				</div>
 
 				{configuredScripts.length === 0 ? (
@@ -180,7 +182,9 @@ export function ConfigureScriptsView({
 							Discover
 						</Button>
 					</div>
-					<p className="text-xs text-muted-foreground">Click ← to add</p>
+					<p className="text-xs text-muted-foreground">
+						Click <ArrowLeft className="inline size-3" aria-hidden="true" /> to add
+					</p>
 				</div>
 
 				{/* Search Bar */}

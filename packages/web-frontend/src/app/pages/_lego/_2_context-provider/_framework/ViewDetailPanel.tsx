@@ -78,6 +78,7 @@ export function ViewDetailPanel<T extends Product = Product>({ columns, features
 	 */
 	const handleSave = async () => {
 		if (selectedItem && editData) {
+			// violations-suppress: ts/no-unsafe-type-cast editData is Record<string,unknown>; context.actions.update expects the domain type at lego-framework boundary
 			await context.actions.update(selectedItem.id, editData as any);
 			setIsEditing(false);
 			setEditData({});
@@ -121,6 +122,7 @@ export function ViewDetailPanel<T extends Product = Product>({ columns, features
 		}
 
 		if (col.type === 'date') {
+			// violations-suppress: ts/no-unsafe-type-cast column value is typed as unknown; date column type guarantees string|number|Date at this point
 			return value ? new Date(value as string | number | Date).toISOString().slice(0, 10) : '-';
 		}
 

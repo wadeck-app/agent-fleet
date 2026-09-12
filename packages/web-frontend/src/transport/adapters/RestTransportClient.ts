@@ -154,12 +154,14 @@ export class RestTransportClient implements ITransportClient {
 		// Build URL with params
 		if (options?.params) {
 			Object.entries(options.params).forEach(([key, value]) => {
+				// violations-suppress: ts/no-unsafe-type-cast params values are typed as unknown; URL param substitution requires string conversion at request boundary
 				url = url.replace(`:${key}`, encodeURIComponent(value as string));
 			});
 		}
 
 		// Add query parameters
 		if (options?.query) {
+			// violations-suppress: ts/no-unsafe-type-cast options.query is typed generically; URLSearchParams accepts Record<string,string> which the actual values conform to at runtime
 			const queryString = new URLSearchParams(options.query as any).toString();
 			if (queryString) {
 				url += `?${queryString}`;

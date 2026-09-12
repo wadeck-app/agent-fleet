@@ -24,6 +24,7 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 	const timestamp = new Date(log.timestamp).toISOString().slice(11, 19);
 
 	// Detect stream-json event types
+	// violations-suppress: ts/no-unsafe-type-cast log.metadata is Record<string,any>; eventType cast required to use it as a string discriminant
 	const eventType = log.metadata?.eventType as string | undefined;
 	const isToolUse = eventType === 'tool_use';
 

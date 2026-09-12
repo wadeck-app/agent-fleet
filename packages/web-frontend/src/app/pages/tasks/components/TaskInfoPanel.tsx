@@ -97,7 +97,7 @@ export function TaskInfoPanel({ task }: TaskInfoPanelProps) {
 					<div className="flex items-center gap-2">
 						{task.metadata?.triggerEvent && (
 							<Badge variant="outline" className="font-mono text-xs">
-								{task.metadata.triggerEvent as string}
+								{String(task.metadata.triggerEvent)}
 							</Badge>
 						)}
 						<Link

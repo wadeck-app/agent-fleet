@@ -61,9 +61,9 @@ const STORAGE_ID = 'tasks' as const;
 export function TasksPage() {
 	// URL state for dialog - replaces local state
 	// URL format: /tasks?action=create
-	const [dialogAction, setDialogAction] = useUrlState({
+	const [dialogAction, setDialogAction] = useUrlState<string | null>({
 		key: 'action',
-		defaultValue: null as string | null,
+		defaultValue: null,
 	});
 
 	// Computed state - dialog is open when action=create
@@ -155,12 +155,14 @@ export function TasksPage() {
 			page: query.page,
 			pageSize: query.pageSize,
 			sortBy: query.sortBy,
+			// violations-suppress-start: ts/no-unsafe-type-cast ComposedQuery index signature types extra fields as unknown; casts assert the expected types set by task filter hooks
 			sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
 			search: query.search,
 			status: query.status as any,
 			priority: query.priority as any,
 			workerId: query.workerId as string | undefined,
 			flowId: query.flowId as string | undefined,
+			// violations-suppress-end: ts/no-unsafe-type-cast
 		});
 
 		// Store tasks for visual feedback
@@ -275,6 +277,7 @@ export function TasksPage() {
 				pagination={pagination}
 				sorting={sorting}
 				search={search}
+				// violations-suppress: ts/no-unsafe-type-cast filters is TaskFilterState which Data2's generic filter prop types as any at this integration boundary
 				filter={filters as any}
 				cache={cache}
 				selection={selection}

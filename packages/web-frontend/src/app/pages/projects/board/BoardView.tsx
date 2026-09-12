@@ -45,6 +45,7 @@ export function BoardView({ tasksByStatus, onTaskStatusChange }: BoardViewProps)
 		// Ignore if dropped outside a column or in the same column
 		if (!over) return;
 
+		// violations-suppress: ts/no-unsafe-type-cast dnd-kit UniqueIdentifier is string|number; board task IDs are always strings, column IDs are always TaskStatus strings
 		const taskId = active.id as string;
 		const newStatus = over.id as TaskStatus;
 

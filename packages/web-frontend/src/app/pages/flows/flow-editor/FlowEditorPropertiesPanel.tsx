@@ -281,6 +281,7 @@ export function FlowEditorPropertiesPanel({
 	}
 
 	const handleUpdate = (field: string, value: string) => {
+		// violations-suppress: ts/no-unsafe-type-cast dynamic field name prevents TypeScript from verifying FlowStep compatibility; field names are controlled by the calling component
 		onUpdateNode(selectedNode.id, { [field]: value } as Partial<FlowStep>);
 	};
 
@@ -637,6 +638,7 @@ export function FlowEditorPropertiesPanel({
 									value={step.workspaceStrategy || 'inherit'}
 									onValueChange={value =>
 										onUpdateNode(selectedNode.id, {
+											// violations-suppress: ts/no-unsafe-type-cast Select.onValueChange returns string; options are constrained to 'inherit'|'separate' in the JSX above
 											workspaceStrategy: value as 'inherit' | 'separate',
 										} as Partial<FlowStep>)
 									}
@@ -676,6 +678,7 @@ export function FlowEditorPropertiesPanel({
 									value={step.interventionType}
 									onValueChange={value =>
 										onUpdateNode(selectedNode.id, {
+											// violations-suppress: ts/no-unsafe-type-cast Select.onValueChange returns string; options are constrained to 'approval'|'question'|'choice' in the JSX above
 											interventionType: value as 'approval' | 'question' | 'choice',
 										} as Partial<FlowStep>)
 									}
@@ -705,7 +708,7 @@ export function FlowEditorPropertiesPanel({
 										checked={step.blocking ?? true}
 										onCheckedChange={checked =>
 											onUpdateNode(selectedNode.id, {
-												blocking: checked as boolean,
+												blocking: typeof checked === 'boolean' ? checked : false,
 											} as Partial<FlowStep>)
 										}
 									/>
@@ -755,7 +758,8 @@ export function FlowEditorPropertiesPanel({
 												timeout: step.timeout?.minutes
 													? {
 															...step.timeout,
-															onTimeout: value as 'fail' | 'continue' | 'default',
+															// violations-suppress: ts/no-unsafe-type-cast Select.onValueChange returns string; options are constrained to 'fail'|'continue'|'default' in the JSX above
+													onTimeout: value as 'fail' | 'continue' | 'default',
 														}
 													: undefined,
 											} as Partial<FlowStep>)
@@ -860,7 +864,7 @@ export function FlowEditorPropertiesPanel({
 													onUpdateNode(selectedNode.id, {
 														approval: {
 															...step.approval,
-															allowReject: checked as boolean,
+															allowReject: typeof checked === 'boolean' ? checked : false,
 														},
 													} as Partial<FlowStep>)
 												}
@@ -923,7 +927,8 @@ export function FlowEditorPropertiesPanel({
 												onUpdateNode(selectedNode.id, {
 													question: {
 														...step.question,
-														responseType: value as 'text' | 'number' | 'boolean',
+														// violations-suppress: ts/no-unsafe-type-cast Select.onValueChange returns string; options are constrained to 'text'|'number'|'boolean' in the JSX above
+												responseType: value as 'text' | 'number' | 'boolean',
 													},
 												} as Partial<FlowStep>)
 											}
@@ -1035,7 +1040,7 @@ export function FlowEditorPropertiesPanel({
 													onUpdateNode(selectedNode.id, {
 														choice: {
 															...step.choice,
-															allowMultiple: checked as boolean,
+															allowMultiple: typeof checked === 'boolean' ? checked : false,
 														},
 													} as Partial<FlowStep>)
 												}
@@ -1112,7 +1117,7 @@ export function FlowEditorPropertiesPanel({
 											checked={step.skipOnLoop ?? false}
 											onCheckedChange={checked =>
 												onUpdateNode(selectedNode.id, {
-													skipOnLoop: checked as boolean,
+													skipOnLoop: typeof checked === 'boolean' ? checked : false,
 												} as Partial<FlowStep>)
 											}
 										/>

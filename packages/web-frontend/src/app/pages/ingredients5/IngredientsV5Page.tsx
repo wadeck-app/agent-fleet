@@ -204,6 +204,7 @@ export function IngredientsV5Page() {
 					// Add comment above the target line, not at the end
 					// Wrapper to ensure correct return type for BulkDeleteWorkflow
 					const result = await crud.operations.bulkDeleteItems(ids);
+					// violations-suppress: ts/no-unsafe-type-cast bulkDeleteItems return type diverges from BulkDeleteWorkflow's expected shape at this lego-layer boundary
 					return result as unknown as {
 						deleted: string[];
 						failed: { id: string; reason: string; code: string }[];

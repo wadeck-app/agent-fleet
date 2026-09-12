@@ -268,7 +268,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 	): Promise<ResponseType<M, P>> {
 		throw new Error(
 			'[HttpPolling] request() is not supported by HTTP Polling transport. ' +
-				'HTTP Polling is unidirectional (server→client only). ' +
+				'HTTP Polling is unidirectional (server->client only). ' +
 				'Use REST API for requests.'
 		);
 	}

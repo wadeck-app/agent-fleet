@@ -109,7 +109,8 @@ export function useFlowEditor(flowId: string | undefined) {
 		setSelectedNodeId(null);
 		try {
 			const flow = await flowsApi.getFlowById(id);
-			setFlowDefinition(flow as unknown as FlowDefinition); // Cast to FlowDefinition type
+			// violations-suppress: ts/no-unsafe-type-cast flowsApi.getFlowById returns a typed API response; cast to FlowDefinition required because the API response type diverges from the internal FlowDefinition model
+			setFlowDefinition(flow as unknown as FlowDefinition);
 			setIsDirty(false);
 			setFitViewTrigger(prev => prev + 1);
 		} catch (err) {
@@ -230,6 +231,7 @@ export function useFlowEditor(flowId: string | undefined) {
 		let manualDataFlowEdges: FlowEdge[] = [];
 		if (storedDataFlowEdges) {
 			try {
+				// violations-suppress: ts/no-unsafe-type-cast JSON.parse returns any; stored value was written as FlowEdge[] by this same code path
 				manualDataFlowEdges = JSON.parse(storedDataFlowEdges) as FlowEdge[];
 			} catch (err) {
 				console.error('Failed to parse stored data flow edges:', err);
@@ -401,6 +403,7 @@ export function useFlowEditor(flowId: string | undefined) {
 					},
 				};
 
+				// violations-suppress: ts/no-unsafe-type-cast constantNode is a ConstantNode subtype of FlowNode; ReactFlow's setNodes requires the generic FlowNode type
 				setNodes(nds => [...nds, constantNode as unknown as FlowNode]);
 				setIsDirty(true);
 				return;

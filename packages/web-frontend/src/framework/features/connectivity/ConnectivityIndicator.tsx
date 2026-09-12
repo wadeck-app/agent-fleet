@@ -1,6 +1,9 @@
+import type { ReactNode } from 'react';
+
 import { Badge } from '@framework/components/primitives/Badge';
 import { Button } from '@framework/components/primitives/Button';
 import { cn } from '@framework/lib/utils';
+import { RefreshCw, Wifi, WifiLow, WifiOff } from 'lucide-react';
 
 import { type ConnectivityStatus, useConnectivity } from './ConnectivityContext';
 
@@ -35,11 +38,11 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 		return `${minutes}m`;
 	};
 
-	// Status icons
-	const icons: Record<ConnectivityStatus, string> = {
-		connected: '●',
-		degraded: '◐',
-		disconnected: '○',
+	// Status icons mapped to Lucide components
+	const icons: Record<ConnectivityStatus, ReactNode> = {
+		connected: <Wifi className="size-3" aria-hidden="true" />,
+		degraded: <WifiLow className="size-3" aria-hidden="true" />,
+		disconnected: <WifiOff className="size-3" aria-hidden="true" />,
 	};
 
 	// Badge variants
@@ -51,9 +54,7 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 
 	return (
 		<Badge variant={badgeVariants[status]} className={cn('gap-1', className)}>
-			<span className="text-sm" aria-hidden="true">
-				{icons[status]}
-			</span>
+			{icons[status]}
 			{status === 'connected' && <span>Connected</span>}
 			{status === 'degraded' && (
 				<>
@@ -82,7 +83,7 @@ export function ConnectivityIndicator({ showWhenConnected = false, className }: 
 						title="Retry now"
 						aria-label="Retry connection now"
 					>
-						↻
+						<RefreshCw className="size-3" aria-hidden="true" />
 					</Button>
 				</>
 			)}

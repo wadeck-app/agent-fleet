@@ -50,6 +50,7 @@ export function SForkFeatPage() {
 		const stored = localStorage.getItem(BOOKMARKS_KEY);
 		if (stored) {
 			try {
+				// violations-suppress: ts/no-unsafe-type-cast JSON.parse returns any; stored value was written as string[] by this same component
 				return new Set(JSON.parse(stored) as string[]);
 			} catch {
 				return new Set();

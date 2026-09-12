@@ -32,10 +32,12 @@ function renderEventDescription(entry: TicketHistoryEntry): string {
 		case 'ticket.created':
 			return 'Ticket created';
 		case 'ticket.transitioned': {
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const from = entry.data.from as string | undefined;
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const to = entry.data.to as string | undefined;
 			if (from && to) {
-				return `Status: ${from.replace(/_/g, ' ')} → ${to.replace(/_/g, ' ')}`;
+				return `Status: ${from.replace(/_/g, ' ')} -> ${to.replace(/_/g, ' ')}`;
 			}
 			return 'Status changed';
 		}
@@ -43,6 +45,7 @@ function renderEventDescription(entry: TicketHistoryEntry): string {
 			return 'Comment';
 		}
 		case 'ticket.updated': {
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const changes = entry.data.changes as Record<string, unknown> | undefined;
 			if (changes) {
 				const fields = Object.keys(changes).filter(f => f !== 'version');

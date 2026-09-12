@@ -31,6 +31,7 @@ export function ViewDetailPanelNav<T extends { id: string }>({ columns }: ViewDe
 
 	const item = context.selectedItem as T | null;
 	const loading = context.selectedItemLoading;
+	// violations-suppress: ts/no-unsafe-type-cast context.items is typed broadly in ProductDomainContext; generic component parameter T narrows it at usage site
 	const items = context.items as unknown as T[];
 
 	const renderFieldValue = (col: ColumnDef<T>) => {

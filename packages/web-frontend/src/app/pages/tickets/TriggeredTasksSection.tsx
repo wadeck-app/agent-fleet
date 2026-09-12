@@ -123,7 +123,7 @@ export function TriggeredTasksSection({
 							</Badge>
 							{task.metadata?.triggerEvent && (
 								<span className="font-mono text-muted-foreground">
-									{task.metadata.triggerEvent as string}
+									{String(task.metadata.triggerEvent)}
 								</span>
 							)}
 							<span className="text-muted-foreground">{formatRelativeTime(task.createdAt)}</span>

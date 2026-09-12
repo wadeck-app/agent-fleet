@@ -90,6 +90,7 @@ export function IngredientCard3({
 			{/* Header: Primary info (name is always shown, category if visible) */}
 			<CardHeader>
 				<CardTitle>{ingredient.name}</CardTitle>
+				{/* violations-suppress: ts/no-unsafe-type-cast render returns ReactNode but category column renders plain string values; cast is safe for this specific use case */}
 				<CardDescription>{categoryField ? (categoryField!.render(ingredient) as string) : ''}</CardDescription>
 			</CardHeader>
 

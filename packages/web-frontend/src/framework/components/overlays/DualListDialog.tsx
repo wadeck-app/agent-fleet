@@ -187,6 +187,7 @@ export function DualListDialog<TLeft, TRight>({
 		}
 
 		try {
+			// violations-suppress: ts/no-unsafe-type-cast dnd-kit UniqueIdentifier is string|number; list item IDs are always strings
 			await onReorder(active.id as string, over.id as string);
 		} catch (error) {
 			console.error('Failed to reorder items:', error);

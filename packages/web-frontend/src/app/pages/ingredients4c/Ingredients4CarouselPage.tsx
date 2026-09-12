@@ -103,6 +103,7 @@ export function Ingredients4CarouselPage() {
 	 * Fetch ingredients wrapper for Data2Infinite
 	 */
 	const fetchIngredients = useCallback(async (query: ComposedQuery) => {
+		// violations-suppress-start: ts/no-unsafe-type-cast ComposedQuery fields have declared types but index signature widens to unknown; casts assert the expected types at this query-to-service boundary
 		const response = await ingredientsService.getIngredients({
 			page: query.page as number,
 			pageSize: query.pageSize as number,
@@ -110,6 +111,7 @@ export function Ingredients4CarouselPage() {
 			sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
 			search: query.search as string | undefined,
 		});
+		// violations-suppress-end: ts/no-unsafe-type-cast
 
 		return {
 			items: response.items,

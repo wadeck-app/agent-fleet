@@ -83,6 +83,7 @@ export class CookieAdapter implements StorageAdapter {
 				const c = cookie.trim();
 				if (c.startsWith(name)) {
 					const value = decodeURIComponent(c.substring(name.length));
+					// violations-suppress: ts/no-unsafe-type-cast JSON.parse returns any; generic cookie adapter requires cast to caller-specified type T
 					return JSON.parse(value) as T;
 				}
 			}

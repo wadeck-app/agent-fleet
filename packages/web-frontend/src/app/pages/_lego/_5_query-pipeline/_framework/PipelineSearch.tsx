@@ -18,7 +18,7 @@ export function PipelineSearch() {
 
 	return (
 		<SearchInput
-			value={(query.search as string) ?? ''}
+			value={query.search ?? ''}
 			onChange={setSearch}
 			placeholder="Search..."
 			className="flex-1"

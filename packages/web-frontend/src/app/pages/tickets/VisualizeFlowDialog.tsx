@@ -27,6 +27,7 @@ export function VisualizeFlowDialog({ proposal }: VisualizeFlowDialogProps) {
 	let nodes: FlowNode[] = [];
 	let edges: FlowEdge[] = [];
 	try {
+		// violations-suppress: ts/no-unsafe-type-cast proposal.proposedFlow is an untyped API payload; cast to flowDefinitionToReactFlow parameter type required at deserialization boundary
 		const converted = flowDefinitionToReactFlow(
 			proposal.proposedFlow as unknown as Parameters<typeof flowDefinitionToReactFlow>[0]
 		);

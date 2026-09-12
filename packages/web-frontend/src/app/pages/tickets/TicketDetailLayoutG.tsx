@@ -19,7 +19,7 @@ import { useListItems } from '@framework/hooks2/form/useListItems';
 import { cn } from '@framework/lib/utils';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
-import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Loader2, X } from 'lucide-react';
 
 import { FlowFeedbackSection } from './FlowFeedbackSection';
 import { FlowProposalSection } from './FlowProposalSection';
@@ -516,7 +516,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 													onClick={() => handleRemoveLabel(label)}
 													className="ml-1 h-auto p-0 text-muted-foreground hover:text-foreground"
 												>
-													×
+													<X className="size-3" aria-hidden="true" />
 												</Button>
 											</Badge>
 										);

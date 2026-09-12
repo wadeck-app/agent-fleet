@@ -15,7 +15,7 @@ import { useToast } from '@framework/features/toast/ToastContext';
 import { useListItems } from '@framework/hooks2/form/useListItems';
 import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 import type { Ticket, TicketStatus } from '@shared/api/tickets.contract';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, X } from 'lucide-react';
 
 import { KeyValueRendererBasic } from './KeyValueRendererBasic';
 import { TicketAuditLogSection } from './TicketAuditLogSection';
@@ -341,7 +341,7 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 									onClick={() => handleRemoveLabel(label)}
 									className="ml-2 h-auto p-0 text-muted-foreground hover:text-foreground"
 								>
-									×
+									<X className="size-3" aria-hidden="true" />
 								</Button>
 							</Badge>
 						))}

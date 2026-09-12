@@ -298,7 +298,7 @@ export class LongPollingTransportClient implements ITransportClient {
 	): Promise<ResponseType<M, P>> {
 		throw new Error(
 			'[LongPolling] request() is not supported by Long Polling transport. ' +
-				'Long Polling is unidirectional (server→client only). ' +
+				'Long Polling is unidirectional (server->client only). ' +
 				'Use REST API for requests.'
 		);
 	}

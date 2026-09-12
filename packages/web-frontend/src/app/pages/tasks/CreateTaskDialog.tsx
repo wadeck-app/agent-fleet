@@ -357,7 +357,7 @@ export function CreateTaskDialog({
 		value: flow.id,
 		label: flow.isValid
 			? flow.name || flow.id
-			: `${flow.name || flow.id} ❌ Invalid (${flow.validationErrors?.length || 0} errors)`,
+			: `${flow.name || flow.id} [Invalid: ${flow.validationErrors?.length || 0} error(s)]`,
 		disabled: !flow.isValid, // Disable invalid flows
 	}));
 

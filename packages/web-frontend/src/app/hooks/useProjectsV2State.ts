@@ -48,15 +48,15 @@ export interface UseProjectsV2StateResult {
  */
 export function useProjectsV2State({ pinnedProjects }: UseProjectsV2StateOptions): UseProjectsV2StateResult {
 	// Project ID (simple independent parameter)
-	const [projectId, setProjectId] = useUrlState({
+	const [projectId, setProjectId] = useUrlState<string | null>({
 		key: 'projectId',
-		defaultValue: null as string | null,
+		defaultValue: null,
 	});
 
 	// Workspace ID (nested under project - will be reset manually when project changes)
-	const [workspaceId, setWorkspaceId] = useUrlState({
+	const [workspaceId, setWorkspaceId] = useUrlState<string | null>({
 		key: 'workspaceId',
-		defaultValue: null as string | null,
+		defaultValue: null,
 		// NOTE: Not using parentGroupId/parentValue here to avoid race condition
 		// Instead, we reset workspaceId manually in setActiveProject
 	});

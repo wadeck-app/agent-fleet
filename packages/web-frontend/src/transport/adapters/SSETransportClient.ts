@@ -190,6 +190,7 @@ export class SSETransportClient implements ITransportClient {
 
 			// Handle 'connected' event for authentication confirmation
 			this.eventSource.addEventListener('connected', event => {
+				// violations-suppress: ts/no-unsafe-type-cast EventSource.addEventListener types events as Event; SSE events are always MessageEvent at runtime
 				const data = JSON.parse((event as MessageEvent).data);
 				clearTimeout(timeout);
 				this.updateConnectionState('connected');
@@ -212,6 +213,7 @@ export class SSETransportClient implements ITransportClient {
 
 			// Handle 'auth_error' event
 			this.eventSource.addEventListener('auth_error', event => {
+				// violations-suppress: ts/no-unsafe-type-cast EventSource.addEventListener types events as Event; SSE events are always MessageEvent at runtime
 				const data = JSON.parse((event as MessageEvent).data);
 				clearTimeout(timeout);
 				reject(new Error(data.message || 'Authentication failed'));
@@ -235,6 +237,7 @@ export class SSETransportClient implements ITransportClient {
 
 			// Handle 'subscription_updated' event
 			this.eventSource.addEventListener('subscription_updated', event => {
+				// violations-suppress: ts/no-unsafe-type-cast EventSource.addEventListener types events as Event; SSE events are always MessageEvent at runtime
 				const data = JSON.parse((event as MessageEvent).data);
 				console.log(`[SSE] ${debugRan} Subscription ${data.action}:`, data.events);
 			});
@@ -361,7 +364,7 @@ export class SSETransportClient implements ITransportClient {
 	): Promise<ResponseType<M, P>> {
 		throw new Error(
 			'[SSE] request() is not supported by SSE transport. ' +
-				'SSE is unidirectional (server→client only). ' +
+				'SSE is unidirectional (server->client only). ' +
 				'Use REST API for requests.'
 		);
 	}

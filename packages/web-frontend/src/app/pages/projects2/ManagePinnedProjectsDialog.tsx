@@ -95,8 +95,8 @@ export function ManagePinnedProjectsDialog({
 			)}
 			leftEmptyState={<DualListEmptyState message="No pinned projects" />}
 			rightEmptyState={<DualListEmptyState message="All projects are pinned" />}
-			leftHelpText="Drag to reorder, click → to unpin"
-			rightHelpText="Click ← to pin"
+			leftHelpText="Drag to reorder, click -> to unpin"
+			rightHelpText="Click <- to pin"
 			// Search
 			searchPlaceholder="Search projects..."
 			searchFilter={(project, query) =>

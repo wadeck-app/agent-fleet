@@ -6,7 +6,7 @@ import { Button } from '@framework/components/primitives/Button';
 import { formatRelativeTime } from '@framework/utils/formatting/DateFormat';
 import type { TicketHistoryEntry } from '@shared/api/tickets.contract';
 import { B2F_TASKS_UPDATED, B2F_TICKET_COMMENT_ADDED, B2F_TICKET_UPDATED } from '@shared/transport';
-import { Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
 
 import { useTransport } from '@/transport/useTransport';
@@ -28,6 +28,7 @@ function getAuditEntryData(
 
 	switch (entry.event) {
 		case 'ticket.created': {
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const status = entry.data.status as string | undefined;
 			return {
 				label: 'Ticket created',
@@ -39,19 +40,23 @@ function getAuditEntryData(
 			};
 		}
 		case 'ticket.transitioned': {
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const from = entry.data.from as string | undefined;
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const to = entry.data.to as string | undefined;
 			return {
 				label: 'Status changed',
 				content: (
 					<span>
-						<strong>{from?.replace(/_/g, ' ') ?? '?'}</strong> →{' '}
+						<strong>{from?.replace(/_/g, ' ') ?? '?'}</strong>
+						<ArrowRight className="mx-0.5 inline size-3" aria-hidden="true" />
 						<strong>{to?.replace(/_/g, ' ') ?? '?'}</strong>
 					</span>
 				),
 			};
 		}
 		case 'ticket.comment_created': {
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const content = entry.data.content as string | undefined;
 			if (!content) {
 				return { label: 'Comment added', content: null };
@@ -81,7 +86,9 @@ function getAuditEntryData(
 			};
 		}
 		case 'ticket.updated': {
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const changes = entry.data.changes as Record<string, { from: unknown; to: unknown }> | undefined;
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const fields = entry.data.fields as string[] | undefined;
 
 			if (changes) {
@@ -164,9 +171,13 @@ function getAuditEntryData(
 			return { label: 'Ticket updated', content: null };
 		}
 		case 'flow.feedback_submitted': {
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const rating = entry.data.rating as number | undefined;
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const wentWell = entry.data.wentWell as string[] | undefined;
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const wentWrong = entry.data.wentWrong as string[] | undefined;
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const suggestions = entry.data.suggestions as string[] | undefined;
 			return {
 				label: 'Flow feedback submitted',
@@ -261,7 +272,9 @@ export function TicketAuditLogSection({
 		if (!entries) return [];
 		const filtered = entries.filter(entry => {
 			if (entry.event !== 'ticket.updated') return true;
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const changes = entry.data.changes as Record<string, unknown> | undefined;
+			// violations-suppress: ts/no-unsafe-type-cast entry.data is Record<string,unknown> per TicketHistoryEntrySchema; cast required at payload boundary
 			const fields = entry.data.fields as string[] | undefined;
 			if (changes) {
 				const nonVersionKeys = Object.keys(changes).filter(k => k !== 'version');

@@ -32,6 +32,7 @@ export function areTypesCompatible(sourceType: VariableType, targetType: Variabl
 export function getHandleType(handleId: string, node: FlowNode): VariableType | null {
 	// Check if it's a constant node
 	if (node.type === 'constant') {
+		// violations-suppress: ts/no-unsafe-type-cast ReactFlow node.data is typed as unknown; type='constant' discriminant guarantees ConstantNodeData shape at runtime
 		return (node.data as unknown as ConstantNodeData).type;
 	}
 

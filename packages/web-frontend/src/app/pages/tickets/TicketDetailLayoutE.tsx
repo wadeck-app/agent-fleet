@@ -318,7 +318,7 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 													</Badge>
 													{item.data.metadata?.triggerEvent && (
 														<Badge variant="outline" className="font-mono text-xs">
-															{item.data.metadata.triggerEvent as string}
+															{String(item.data.metadata.triggerEvent)}
 														</Badge>
 													)}
 													<span className="ml-auto text-xs text-muted-foreground">

@@ -116,6 +116,7 @@ export class AppError extends Error {
 		this.timestamp = new Date();
 
 		// Maintains proper stack trace for where our error was thrown (only available on V8)
+		// violations-suppress: ts/no-unsafe-type-cast Error.captureStackTrace is a non-standard V8 extension not in TypeScript's lib.d.ts; cast is required to access it
 		const ErrorConstructor = Error as unknown as {
 			captureStackTrace?: (target: object, constructor: Function) => void;
 		};

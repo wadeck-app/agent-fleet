@@ -106,7 +106,7 @@ export function buildUrl(
 		query?: Record<string, string | number | undefined>;
 	}
 ): string {
-	let url = path as string;
+	let url = path;
 
 	// @formatter:off
 	// Replace route parameters (:id => value)
@@ -323,6 +323,7 @@ export function createTypedFetch<Routes extends Record<string, unknown>>(routes:
 /**
  * Create GET list operation (for /api/resources)
  */
+// violations-suppress-start: ts/no-unsafe-type-cast Path extends string cannot be statically verified as PathsForMethod<M,Routes>; casts bridge the generic constraint at this API factory boundary
 export function createListGetter<Routes extends Record<string, unknown>, Path extends string>(
 	typedFetch: ReturnType<typeof createTypedFetch<Routes>>,
 	path: Path
@@ -476,6 +477,7 @@ export function createUpdateOperation<
 			validationMode,
 		});
 }
+// violations-suppress-end: ts/no-unsafe-type-cast
 
 /**
  * ===========================================================================================

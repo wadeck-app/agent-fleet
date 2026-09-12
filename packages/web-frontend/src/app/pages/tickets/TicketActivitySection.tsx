@@ -219,7 +219,7 @@ export function TicketActivitySection({ ticketId, sortOrder }: TicketActivitySec
 									</Badge>
 									{item.data.metadata?.triggerEvent && (
 										<Badge variant="outline" className="font-mono text-xs">
-											{item.data.metadata.triggerEvent as string}
+											{String(item.data.metadata.triggerEvent)}
 										</Badge>
 									)}
 									<span className="ml-auto text-xs text-muted-foreground">
@@ -252,6 +252,7 @@ export function TicketActivitySection({ ticketId, sortOrder }: TicketActivitySec
 										{formatRelativeTime(item.data.timestamp)}
 									</span>
 								</div>
+								{/* violations-suppress-start: ts/no-unsafe-type-cast item.data.data is typed as unknown in the feedback payload; casts are required at API boundary */}
 								{(item.data.data.rating as number) > 0 && (
 									<p className="text-sm">
 										Rating: <strong>{item.data.data.rating as number}/5</strong>
@@ -293,6 +294,7 @@ export function TicketActivitySection({ ticketId, sortOrder }: TicketActivitySec
 										</ul>
 									</div>
 								) : null}
+								{/* violations-suppress-end: ts/no-unsafe-type-cast */}
 							</div>
 						)}
 					</div>

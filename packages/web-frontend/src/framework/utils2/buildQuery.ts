@@ -186,6 +186,7 @@ export function buildQuery(...queryFillers: Array<QueryFiller | undefined | null
 		}
 	}
 
+	// violations-suppress: ts/no-unsafe-type-cast result is assembled from ComposedQuery-compatible fields; cast bridges the dynamic Record<string,unknown> accumulator to the typed ComposedQuery return type
 	return result as ComposedQuery;
 }
 
@@ -272,6 +273,7 @@ export class QueryBuilder {
 			),
 		};
 
+		// violations-suppress: ts/no-unsafe-type-cast result is assembled from ComposedQuery-compatible fields; cast bridges the dynamic Record<string,unknown> accumulator to the typed ComposedQuery return type
 		return result as ComposedQuery;
 	}
 }

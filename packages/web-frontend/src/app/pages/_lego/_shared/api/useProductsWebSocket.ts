@@ -71,6 +71,7 @@ export function useProductsWebSocket(): UseProductsWebSocketResult {
 
 		ws.onmessage = event => {
 			try {
+				// violations-suppress: ts/no-unsafe-type-cast WebSocket.onmessage event.data is typed as any; JSON.parse result cast to ProductEvent required at WebSocket message boundary
 				const data = JSON.parse(event.data as string) as ProductEvent;
 
 				switch (data.type) {

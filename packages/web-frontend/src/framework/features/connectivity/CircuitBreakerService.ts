@@ -31,6 +31,7 @@ export interface TimeScheduler {
  */
 export class RealTimeScheduler implements TimeScheduler {
 	schedule(callback: () => void, delay: number): number {
+		// violations-suppress: ts/no-unsafe-type-cast window.setTimeout return type varies by environment; browser always returns number
 		return window.setTimeout(callback, delay) as unknown as number;
 	}
 

@@ -105,8 +105,8 @@ export function ManageProjectWorkspacesDialog({
 			}}
 			leftEmptyState={<DualListEmptyState message="No associated workspaces" />}
 			rightEmptyState={<DualListEmptyState message="All workspaces are associated" />}
-			leftHelpText="Drag to reorder, click → to dissociate"
-			rightHelpText="Click ← to associate"
+			leftHelpText="Drag to reorder, click -> to dissociate"
+			rightHelpText="Click <- to associate"
 			// Search
 			searchPlaceholder="Search workspaces..."
 			searchFilter={(workspace, query) => {
