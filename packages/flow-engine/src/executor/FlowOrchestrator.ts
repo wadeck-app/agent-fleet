@@ -6,6 +6,7 @@
  * Scheduling logic (dependency resolution, when:, retry, loop) is delegated to FlowScheduler.
  */
 import type { ApprovalProvider } from 'extension-points';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { v4 as uuidv4 } from 'uuid';
 
 import { FlowScheduler } from '../orchestration/FlowScheduler';
@@ -99,7 +100,7 @@ export class FlowOrchestrator {
 			trace.status = 'failed';
 			trace.endTime = Date.now();
 
-			const errorMessage = error instanceof Error ? String(error) : String(error);
+			const errorMessage = normalizeError(error).message;
 
 			return {
 				success: false,

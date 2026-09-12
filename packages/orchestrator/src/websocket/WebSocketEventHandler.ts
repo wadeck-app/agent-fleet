@@ -1,4 +1,5 @@
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
@@ -293,7 +294,7 @@ export class WebSocketEventHandler {
 				this.connectionManager.sendMessage(
 					worker.socket,
 					createO2WMessage(O2WMessageType.ERROR, {
-						error: error instanceof Error ? String(error) : 'Failed to create intervention',
+						error: error instanceof Error ? normalizeError(error).message : 'Failed to create intervention',
 					})
 				);
 			}

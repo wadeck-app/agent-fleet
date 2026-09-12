@@ -1,4 +1,5 @@
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type {
 	CreateTask,
@@ -300,7 +301,7 @@ export class TasksService {
 			} catch (error) {
 				failed.push({
 					id,
-					reason: error instanceof Error ? String(error) : 'Unknown error',
+					reason: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 					code: 'DELETE_FAILED',
 				});
 			}

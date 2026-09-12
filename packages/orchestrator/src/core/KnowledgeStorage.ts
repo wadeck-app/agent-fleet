@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 const log = createLogger('KnowledgeStorage');
 
@@ -33,7 +34,7 @@ export class KnowledgeStorage {
 			await this.ensureDirectoryExists(KNOWLEDGE_DIR);
 		} catch (error) {
 			log.error('Failed to initialize directories:', error);
-			throw new Error(`Failed to initialize storage: ${error instanceof Error ? String(error) : String(error)}`);
+			throw new Error(`Failed to initialize storage: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -50,9 +51,7 @@ export class KnowledgeStorage {
 			await fs.promises.appendFile(filePath, line, 'utf8');
 		} catch (error) {
 			log.error(`Failed to add knowledge to ${category}:`, error);
-			throw new Error(
-				`Failed to add knowledge to ${category}: ${error instanceof Error ? String(error) : String(error)}`
-			);
+			throw new Error(`Failed to add knowledge to ${category}: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -69,9 +68,7 @@ export class KnowledgeStorage {
 				return [];
 			}
 			log.error(`Failed to read knowledge from ${category}:`, error);
-			throw new Error(
-				`Failed to read knowledge from ${category}: ${error instanceof Error ? String(error) : String(error)}`
-			);
+			throw new Error(`Failed to read knowledge from ${category}: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -82,9 +79,7 @@ export class KnowledgeStorage {
 			return dir;
 		} catch (error) {
 			log.error(`Failed to get context directory for task ${taskId}:`, error);
-			throw new Error(
-				`Failed to get context directory for task ${taskId}: ${error instanceof Error ? String(error) : String(error)}`
-			);
+			throw new Error(`Failed to get context directory for task ${taskId}: ${normalizeError(error).message}`);
 		}
 	}
 

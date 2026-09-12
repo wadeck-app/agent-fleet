@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import type { OutputExtractor } from '../processing/OutputExtractor';
@@ -235,7 +236,7 @@ export async function executeModelStep(
 		if (pollingInterval) clearInterval(pollingInterval);
 		stepTrace.endTime = Date.now();
 		stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-		stepTrace.error = error instanceof Error ? String(error) : String(error);
+		stepTrace.error = normalizeError(error).message;
 		return stepTrace;
 	}
 }

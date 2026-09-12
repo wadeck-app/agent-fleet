@@ -4,7 +4,7 @@ import { load as parseYaml } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
-import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
+import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { DefaultProjectResolver } from './DefaultProjectResolver.js';
 import type {
@@ -66,7 +66,7 @@ function loadYamlFile<T>(filePath: string): T | null {
 	try {
 		return parseYaml(content) as T;
 	} catch (err: unknown) {
-		const message = err instanceof Error ? String(err) : String(err);
+		const message = normalizeError(err).message;
 		throw new Error(`Failed to parse YAML config at "${filePath}": ${message}`);
 	}
 }

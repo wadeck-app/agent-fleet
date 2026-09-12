@@ -1,4 +1,5 @@
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import type { Task } from 'shared-orch-worker/domain-types';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
@@ -161,7 +162,7 @@ export class WorkerCoordinator {
 			});
 		} catch (error) {
 			log.error(
-				`[WorkerCoordinator] Failed to send task ${task.id} to worker ${workerId}: ${error instanceof Error ? String(error) : String(error)}`
+				`[WorkerCoordinator] Failed to send task ${task.id} to worker ${workerId}: ${normalizeError(error).message}`
 			);
 			// Re-enqueue task
 			this.globalBacklog.unshift(task);

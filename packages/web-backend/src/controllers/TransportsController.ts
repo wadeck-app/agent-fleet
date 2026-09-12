@@ -33,6 +33,7 @@
  */
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { MessageQueue } from '../transport/MessageQueue';
 import type { TransportSessionManager } from '../transport/TransportSessionManager';
@@ -151,7 +152,7 @@ export class TransportsController {
 			log.error('Batch subscription failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
-				message: error instanceof Error ? String(error) : 'Unknown error',
+				message: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 			});
 		}
 	}
@@ -230,7 +231,7 @@ export class TransportsController {
 			log.error('Subscribe to event failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
-				message: error instanceof Error ? String(error) : 'Unknown error',
+				message: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 			});
 		}
 	}
@@ -288,7 +289,7 @@ export class TransportsController {
 			log.error('Unsubscribe from event failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
-				message: error instanceof Error ? String(error) : 'Unknown error',
+				message: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 			});
 		}
 	}
@@ -338,7 +339,7 @@ export class TransportsController {
 			log.error('Get subscriptions failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
-				message: error instanceof Error ? String(error) : 'Unknown error',
+				message: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 			});
 		}
 	}
@@ -394,7 +395,7 @@ export class TransportsController {
 			log.error('Get status failed:', error);
 			reply.code(500).send({
 				error: 'Internal server error',
-				message: error instanceof Error ? String(error) : 'Unknown error',
+				message: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 			});
 		}
 	}

@@ -8,6 +8,7 @@ import * as yaml from 'js-yaml';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type {
 	FlowDefinition,
@@ -247,10 +248,7 @@ export class FlowRegistry {
 					this.flowValidationResults.set(id, validationResult);
 				} catch (error) {
 					// Parsing errors still prevent loading (can't create FlowDefinition)
-					console.error(
-						`\n Failed to parse flow '${id}':`,
-						error instanceof Error ? String(error) : String(error)
-					);
+					console.error(`\n Failed to parse flow '${id}':`, normalizeError(error).message);
 					console.error(`    This flow will NOT be loaded.\n`);
 				}
 			}
@@ -543,10 +541,7 @@ export class FlowRegistry {
 					this.flows.set(id, flow);
 					this.flowValidationResults.set(id, validationResult);
 				} catch (error) {
-					console.error(
-						`\n Failed to parse flow '${id}' from ${filePath}:`,
-						error instanceof Error ? String(error) : String(error)
-					);
+					console.error(`\n Failed to parse flow '${id}' from ${filePath}:`, normalizeError(error).message);
 				}
 			}
 		} catch (error) {

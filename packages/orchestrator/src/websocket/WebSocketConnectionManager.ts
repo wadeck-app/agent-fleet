@@ -1,5 +1,6 @@
 import { createLogger } from 'shared-common/logger';
 import { serializeMessage } from 'shared-common/protocol';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import { StateEvent } from 'shared-orch-worker/StateManager';
 import type { WorkerInfo } from 'shared-orch-worker/domain-types';
@@ -364,9 +365,7 @@ export class WebSocketConnectionManager {
 					);
 				}
 			} else {
-				log.error(
-					`[WS] Error updating flows for worker ${workerId}: ${error instanceof Error ? String(error) : String(error)}`
-				);
+				log.error(`[WS] Error updating flows for worker ${workerId}: ${normalizeError(error).message}`);
 			}
 		}
 	}

@@ -12,6 +12,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type {
 	LaunchOptions,
@@ -410,7 +411,7 @@ export class CodexModelProvider implements ModelProvider {
 				this.currentProcess.kill();
 			}
 		} catch (err) {
-			console.warn('[CodexModelProvider] kill() failed:', err instanceof Error ? String(err) : String(err));
+			console.warn('[CodexModelProvider] kill() failed:', normalizeError(err).message);
 		}
 	}
 

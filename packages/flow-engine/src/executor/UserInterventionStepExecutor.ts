@@ -1,4 +1,5 @@
 import type { ApprovalProvider } from 'extension-points';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { OutputExtractor } from '../processing/OutputExtractor';
 import type { TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
@@ -83,7 +84,7 @@ async function executeViaApprovalProvider(
 	} catch (error) {
 		stepTrace.endTime = Date.now();
 		stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-		stepTrace.error = error instanceof Error ? String(error) : String(error);
+		stepTrace.error = normalizeError(error).message;
 		return stepTrace;
 	}
 }
@@ -172,7 +173,7 @@ async function executeViaInterventionHandler(
 	} catch (error) {
 		stepTrace.endTime = Date.now();
 		stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-		stepTrace.error = error instanceof Error ? String(error) : String(error);
+		stepTrace.error = normalizeError(error).message;
 		console.error(`[StepRunner] UserInterventionStep ${step.id} error:`, stepTrace.error);
 		return stepTrace;
 	}

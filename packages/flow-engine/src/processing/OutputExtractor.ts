@@ -10,6 +10,7 @@
  * - Required field validation
  */
 import { load as yamlLoad } from 'js-yaml';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { OutputVariableConfig, StepOutput, TransformFunction, VariableType } from '../types';
 
@@ -285,7 +286,7 @@ export class OutputExtractor {
 			}
 		} catch (error) {
 			throw new OutputExtractionError(
-				`Transform '${transform}' failed: ${error instanceof Error ? String(error) : String(error)}`,
+				`Transform '${transform}' failed: ${normalizeError(error).message}`,
 				varName,
 				stepId
 			);
@@ -390,7 +391,7 @@ export class OutputExtractor {
 			}
 		} catch (error) {
 			throw new OutputExtractionError(
-				`Type conversion to '${targetType}' failed: ${error instanceof Error ? String(error) : String(error)}`,
+				`Type conversion to '${targetType}' failed: ${normalizeError(error).message}`,
 				varName,
 				stepId
 			);

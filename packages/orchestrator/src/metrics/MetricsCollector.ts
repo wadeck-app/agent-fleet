@@ -1,4 +1,5 @@
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { MetricsData, StateManager } from 'shared-orch-worker/StateManager';
 import type { Task } from 'shared-orch-worker/domain-types';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
@@ -99,10 +100,7 @@ export class MetricsCollector {
 			// 	}
 			// );
 		} catch (error) {
-			log.error(
-				'MetricsCollector',
-				`Failed to collect metrics: ${error instanceof Error ? String(error) : String(error)}`
-			);
+			log.error('MetricsCollector', `Failed to collect metrics: ${normalizeError(error).message}`);
 		}
 	}
 

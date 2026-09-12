@@ -15,6 +15,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type {
 	LaunchOptions,
@@ -435,7 +436,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 				this.currentProcess.kill();
 			}
 		} catch (err) {
-			console.warn('[OpenCodeModelProvider] kill() failed:', err instanceof Error ? String(err) : String(err));
+			console.warn('[OpenCodeModelProvider] kill() failed:', normalizeError(err).message);
 		}
 	}
 

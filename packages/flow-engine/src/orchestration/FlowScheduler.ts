@@ -1,3 +1,5 @@
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
+
 import { ConditionEvaluationError } from '../processing/ConditionEvaluator';
 import type { FailureConfig, RetryConfig } from '../types';
 import { RestartOnFirstFailure, WaitAll } from './FlowScheduler.subStepStrategies';
@@ -571,7 +573,7 @@ export class FlowScheduler {
 		} catch (err) {
 			if (err instanceof ConditionEvaluationError) throw err;
 			throw new ConditionEvaluationError(
-				`Failed to evaluate condition: ${err instanceof Error ? String(err) : String(err)}`,
+				`Failed to evaluate condition: ${normalizeError(err).message}`,
 				condition,
 				stepId
 			);

@@ -32,6 +32,7 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { EventData, EventType, TransportEvent } from '@app/shared/transport';
 
@@ -227,7 +228,7 @@ export class SSETransportServer implements ITransportServer {
 			});
 
 			this.sendSSEEvent(reply, 'auth_error', {
-				message: error instanceof Error ? String(error) : 'Authentication failed',
+				message: error instanceof Error ? normalizeError(error).message : 'Authentication failed',
 			});
 
 			reply.raw.end();

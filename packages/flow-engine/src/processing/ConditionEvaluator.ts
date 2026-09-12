@@ -16,6 +16,8 @@
 /**
  * Condition evaluation error
  */
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
+
 export class ConditionEvaluationError extends Error {
 	constructor(
 		message: string,
@@ -76,7 +78,7 @@ export class ConditionEvaluator {
 			}
 
 			throw new ConditionEvaluationError(
-				`Failed to evaluate condition: ${error instanceof Error ? String(error) : String(error)}`,
+				`Failed to evaluate condition: ${normalizeError(error).message}`,
 				condition,
 				stepId
 			);

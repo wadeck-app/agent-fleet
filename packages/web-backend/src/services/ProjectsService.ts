@@ -1,5 +1,6 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type {
 	AddWorkspacesToProject,
@@ -342,7 +343,7 @@ export class ProjectsService {
 				const errorCode = error instanceof HttpException ? error.code : ERROR_CODES.INTERNAL_SERVER_ERROR;
 				failed.push({
 					id,
-					reason: error instanceof Error ? String(error) : 'Unknown error',
+					reason: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 					code: errorCode,
 				});
 			}

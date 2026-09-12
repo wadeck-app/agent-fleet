@@ -1,6 +1,7 @@
 import { lstat, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { DirectoryListing, FileContent } from '@app/shared/api/workspaceFiles.contract';
 import { BadRequestException, ERROR_CODES } from '@app/shared/exceptions/http-exceptions';
@@ -107,7 +108,7 @@ export class WorkspaceFileService {
 		} catch (error) {
 			log.error('Failed to list directory', { workspacePath, relativePath, error });
 			throw new BadRequestException(
-				`Failed to list directory: ${error instanceof Error ? String(error) : 'Unknown error'}`,
+				`Failed to list directory: ${error instanceof Error ? normalizeError(error).message : 'Unknown error'}`,
 				ERROR_CODES.BAD_REQUEST
 			);
 		}
@@ -164,7 +165,7 @@ export class WorkspaceFileService {
 			}
 
 			throw new BadRequestException(
-				`Failed to read file: ${error instanceof Error ? String(error) : 'Unknown error'}`,
+				`Failed to read file: ${error instanceof Error ? normalizeError(error).message : 'Unknown error'}`,
 				ERROR_CODES.BAD_REQUEST
 			);
 		}
@@ -202,7 +203,7 @@ export class WorkspaceFileService {
 		} catch (error) {
 			log.error('Failed to write file', { workspacePath, relativePath, error });
 			throw new BadRequestException(
-				`Failed to write file: ${error instanceof Error ? String(error) : 'Unknown error'}`,
+				`Failed to write file: ${error instanceof Error ? normalizeError(error).message : 'Unknown error'}`,
 				ERROR_CODES.BAD_REQUEST
 			);
 		}

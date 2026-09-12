@@ -1,3 +1,5 @@
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
+
 import type { Intervention, InterventionsQuery } from '@app/shared/api/interventions.contract';
 
 import type { BaseRepository } from './BaseRepository';
@@ -236,7 +238,7 @@ export class InterventionsRepository {
 			} catch (error) {
 				failed.push({
 					id,
-					error: error instanceof Error ? String(error) : 'Unknown error',
+					error: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 				});
 			}
 		}

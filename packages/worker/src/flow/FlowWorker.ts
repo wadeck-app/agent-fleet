@@ -21,8 +21,6 @@ import type { FlowMetadata, Workspace } from 'flow-engine/types';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import * as yaml from 'js-yaml';
 import type { ChildProcess } from 'node:child_process';
-// normalizeError(...).message yields the bare message; String(error) would prefix it with "Error: ".
-import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -32,6 +30,8 @@ import { getOrchestratorWsUrl } from 'shared-common/PortCalculator';
 import type { Shutdownable } from 'shared-common/Shutdownable';
 import { type Logger, createLogger } from 'shared-common/logger';
 import { parseMessage, serializeMessage } from 'shared-common/protocol';
+// normalizeError(...).message yields the bare message; String(error) would prefix it with "Error: ".
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { type Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import {
 	type AssignTaskMessage,
@@ -169,10 +169,7 @@ export class FlowWorker implements Shutdownable {
 					const message = parseMessage(data.toString()) as O2WMessage;
 					this.handleMessage(message);
 				} catch (error) {
-					this.logger.error(
-						` Error parsing message:`,
-						normalizeError(error).message
-					);
+					this.logger.error(` Error parsing message:`, normalizeError(error).message);
 				}
 			});
 

@@ -38,6 +38,7 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { EventData, EventType, TransportEvent } from '@app/shared/transport';
 
@@ -177,7 +178,7 @@ export class HttpPollingTransportServer implements ITransportServer {
 			log.error('Authentication failed:', error);
 			reply.code(401).send({
 				error: 'Authentication failed',
-				message: error instanceof Error ? String(error) : 'Unauthorized',
+				message: error instanceof Error ? normalizeError(error).message : 'Unauthorized',
 			});
 		}
 	}

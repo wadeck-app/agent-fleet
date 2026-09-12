@@ -1,5 +1,6 @@
 import type { IOrchestratorStorage } from 'orchestrator/storage/IOrchestratorStorage';
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { Intervention, InterventionStatus, Task } from 'shared-orch-worker/domain-types';
 
 import type { DataStorage } from '../storage/DataStorage';
@@ -42,9 +43,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			}
 		} catch (error) {
 			log.error(`Failed to save task ${task.id}:`, error);
-			throw new Error(
-				`Failed to save task ${task.id}: ${error instanceof Error ? String(error) : String(error)}`
-			);
+			throw new Error(`Failed to save task ${task.id}: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -60,7 +59,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			return task as Task;
 		} catch (error) {
 			log.error(`Failed to load task ${taskId}:`, error);
-			throw new Error(`Failed to load task ${taskId}: ${error instanceof Error ? String(error) : String(error)}`);
+			throw new Error(`Failed to load task ${taskId}: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -71,7 +70,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			return entities.map(({ version: _v, ...task }) => task as Task);
 		} catch (error) {
 			log.error('Failed to list tasks:', error);
-			throw new Error(`Failed to list tasks: ${error instanceof Error ? String(error) : String(error)}`);
+			throw new Error(`Failed to list tasks: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -84,9 +83,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 				return;
 			}
 			log.error(`Failed to delete task ${taskId}:`, error);
-			throw new Error(
-				`Failed to delete task ${taskId}: ${error instanceof Error ? String(error) : String(error)}`
-			);
+			throw new Error(`Failed to delete task ${taskId}: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -118,9 +115,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			}
 		} catch (error) {
 			log.error(`Failed to save intervention ${intervention.id}:`, error);
-			throw new Error(
-				`Failed to save intervention ${intervention.id}: ${error instanceof Error ? String(error) : String(error)}`
-			);
+			throw new Error(`Failed to save intervention ${intervention.id}: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -135,9 +130,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			return intervention as Intervention;
 		} catch (error) {
 			log.error(`Failed to load intervention ${id}:`, error);
-			throw new Error(
-				`Failed to load intervention ${id}: ${error instanceof Error ? String(error) : String(error)}`
-			);
+			throw new Error(`Failed to load intervention ${id}: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -148,7 +141,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 			return entities.map(({ version: _v, ...intervention }) => intervention as Intervention);
 		} catch (error) {
 			log.error('Failed to list interventions:', error);
-			throw new Error(`Failed to list interventions: ${error instanceof Error ? String(error) : String(error)}`);
+			throw new Error(`Failed to list interventions: ${normalizeError(error).message}`);
 		}
 	}
 
@@ -161,9 +154,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 				return;
 			}
 			log.error(`Failed to delete intervention ${id}:`, error);
-			throw new Error(
-				`Failed to delete intervention ${id}: ${error instanceof Error ? String(error) : String(error)}`
-			);
+			throw new Error(`Failed to delete intervention ${id}: ${normalizeError(error).message}`);
 		}
 	}
 

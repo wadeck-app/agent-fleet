@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { logger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 /**
  * Only available when NOT in production mode
@@ -58,7 +59,7 @@ async function clearDataHandler(request: FastifyRequest, reply: FastifyReply) {
 		logger.error('Error clearing in-memory data:', error);
 		return reply.status(500).send({
 			error: 'Failed to clear in-memory data',
-			details: error instanceof Error ? String(error) : 'Unknown error',
+			details: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 		});
 	}
 }

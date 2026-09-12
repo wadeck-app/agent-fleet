@@ -2,6 +2,7 @@ import type { FlowRegistry } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine/src/types';
 import { randomUUID } from 'node:crypto';
 import { createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type {
 	AddReviewComment,
@@ -346,7 +347,7 @@ export class FlowProposalsService {
 			log.error('Async redesign failed after rejection', {
 				ticketId,
 				rejectedProposalId,
-				error: err instanceof Error ? String(err) : String(err),
+				error: normalizeError(err).message,
 			});
 		}
 	}

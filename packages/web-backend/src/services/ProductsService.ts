@@ -1,3 +1,5 @@
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
+
 import type {
 	CreateProduct,
 	Product,
@@ -175,7 +177,7 @@ export class ProductsService {
 				} else {
 					failed.push({
 						id,
-						reason: error instanceof Error ? String(error) : 'Unknown error',
+						reason: error instanceof Error ? normalizeError(error).message : 'Unknown error',
 						code: ERROR_CODES.INTERNAL_SERVER_ERROR,
 					});
 				}
