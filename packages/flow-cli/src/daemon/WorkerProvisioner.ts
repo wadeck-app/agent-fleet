@@ -47,7 +47,13 @@ export class WorkerProvisioner {
 		const decision = this.provisioning.decide({
 			unmetDemand,
 			waitingMs,
-			declaredSources: this.sources.list().map(source => source.sourceId),
+			// Only the sources that have produced nothing. A source with a worker connected is
+			// not what the wait is for, and naming it in the warning would send the user to
+			// inspect a machine that is doing its job (D#25).
+			declaredSources: this.sources
+				.list()
+				.filter(source => this.registry.countForSource(source.sourceId) === 0)
+				.map(source => source.sourceId),
 			allowance,
 		});
 		// The limit is the daemon's to enforce, not the plugin's to respect: an
@@ -93,7 +99,10 @@ export class WorkerProvisioner {
 		// a step -- destroying the worker the user launched, which is the failure D#48
 		// exists to prevent. The socket was authenticated when it first joined.
 		if (this.registry.describe(ws) !== undefined) {
-			this.registry.register(ws, registration);
+			// Labels are re-applied, not carried over: this refresh replaces the recorded
+			// registration, so skipping inheritance here would silently strip a worker's source
+			// labels after its first step and stop it matching the steps it was declared for.
+			this.registry.register(ws, this.withSourceLabels(registration));
 			return true;
 		}
 
@@ -128,8 +137,8 @@ export class WorkerProvisioner {
 		}
 
 		// A worker naming no source is the zero-config path: `flow worker` in a terminal,
-		// authenticated with the daemon's own token over loopback. Caps apply per declared
-		// source, so there is nothing to count for it.
+		// authenticated with the daemon's own token over loopback. Caps and inherited labels
+		// apply per declared source, so there is nothing to look up for it.
 		if (sourceId !== undefined && sourceId !== '') {
 			const source = this.sources.find(sourceId);
 			if (source === undefined) {
@@ -149,8 +158,33 @@ export class WorkerProvisioner {
 			}
 		}
 
-		this.registry.register(ws, registration, { ephemeral: false });
+		this.registry.register(ws, this.withSourceLabels(registration), { ephemeral: false });
 		return true;
+	}
+
+	/**
+	 * Adds the labels the worker's source declared to the ones it declared itself (D#30).
+	 *
+	 * Applied by the daemon rather than trusted from the worker: the source entry is the
+	 * operator's statement about that machine, so a source declaring `--labels gpu` must affect
+	 * routing whether or not each worker remembers to repeat it.
+	 *
+	 * A union, not a replacement -- the source says what the operator knows, `--labels` says
+	 * what the machine knows about itself -- and de-duplicated, because a worker re-registers
+	 * after every step and a growing list would be a slow leak.
+	 */
+	private withSourceLabels(registration: Omit<WorkerReady, 'type'>): Omit<WorkerReady, 'type'> {
+		const { sourceId } = registration;
+		if (sourceId === undefined || sourceId === '') return registration;
+
+		const inherited = this.sources.find(sourceId)?.labels ?? [];
+		if (inherited.length === 0) return registration;
+
+		const labels = [...(registration.labels ?? [])];
+		for (const label of inherited) {
+			if (!labels.includes(label)) labels.push(label);
+		}
+		return { ...registration, labels };
 	}
 
 	private refuse(ws: WebSocket, reason: string): false {

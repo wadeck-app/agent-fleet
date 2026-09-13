@@ -148,7 +148,15 @@ export class CommandHandler {
 		private readonly daemonSideApprovalProviderUnused?: ApprovalProvider,
 		private readonly resolvePerFlowWorkspaceProvider?: (
 			section: NonNullable<FlowPluginOverrides['workspace']>
-		) => Promise<WorkspaceProvider>
+		) => Promise<WorkspaceProvider>,
+		/**
+		 * Asks every declared source for a worker (D#66).
+		 *
+		 * Injected because contacting a source needs the daemon's own wiring -- the host
+		 * registry, the published endpoint -- which this class deliberately knows nothing
+		 * about. Optional so the many tests that never exercise provisioning stay unchanged.
+		 */
+		private readonly requestFromDeclaredSources?: () => void
 	) {
 		this.executionStore = executionStore ?? new ExecutionStore(path.join(daemonDir, 'executions'));
 		this.logWriter = logWriter ?? new LogWriter(path.join(daemonDir, 'logs'));
@@ -833,7 +841,15 @@ export class CommandHandler {
 		}
 
 		const now = Date.now();
+		const isNewEpisode = this.unmetDemandSince === undefined;
 		this.unmetDemandSince ??= now;
+
+		// Ask the declared sources first, and exactly once for this episode (D#66). Before this
+		// they were contacted only at daemon startup, which made the S8 wait a wait for something
+		// nobody had been asked for -- and put remote capacity out of reach of any run that began
+		// later. Once per episode, not once per pass: the re-check fires several times a second.
+		if (isNewEpisode) this.requestFromDeclaredSources?.();
+
 		const plan = this.provisioner.planProvisioning(unmetDemand, now - this.unmetDemandSince);
 
 		// Checked rather than trusted: this runs from a timer as well as from a message, and an

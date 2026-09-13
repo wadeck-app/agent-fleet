@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { admitTransport, resolveBindAddress, resolveSharedSecret } from './TransportPolicy.js';
@@ -102,5 +105,39 @@ describe('resolveSharedSecret (D#44)', () => {
 	it('refuses an empty value instead of treating it as "no secret"', () => {
 		expect(() => resolveSharedSecret('')).toThrow();
 		expect(() => resolveSharedSecret('   ')).toThrow();
+	});
+
+	// The other permitted indirection, and the one an operator is most likely to use for a
+	// long-lived secret. It was implemented and never exercised.
+	it('reads a secret from a file', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'shared-secret-'));
+		try {
+			const file = join(dir, 'token');
+			writeFileSync(file, 'from-file\n', 'utf8');
+
+			expect(resolveSharedSecret(`file:${file}`)).toBe('from-file');
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('names the missing file rather than continuing without a secret', () => {
+		const missing = join(tmpdir(), 'definitely-not-here-4b2a');
+
+		expect(() => resolveSharedSecret(`file:${missing}`)).toThrow(/definitely-not-here-4b2a/);
+	});
+
+	// An empty file is a configuration mistake, not an empty credential: accepting it would
+	// authenticate a peer that presented nothing.
+	it('refuses an empty file', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'shared-secret-'));
+		try {
+			const file = join(dir, 'token');
+			writeFileSync(file, '\n  \n', 'utf8');
+
+			expect(() => resolveSharedSecret(`file:${file}`)).toThrow(/empty/i);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 });

@@ -21,7 +21,19 @@ export interface TestDaemonContext {
 	[Symbol.asyncDispose](): Promise<void>;
 }
 
-export async function startTestDaemon(): Promise<TestDaemonContext> {
+export interface TestDaemonOptions {
+	/**
+	 * Concurrency limit for the test daemon.
+	 *
+	 * Zero is useful on purpose: it stops the daemon forking workers of its own, so a test
+	 * about a *registered* worker cannot silently pass because a forked one did the work.
+	 * Admission is unaffected -- an external worker still joins, since the limit governs how
+	 * many workers the daemon creates, not who may connect.
+	 */
+	concurrency?: number;
+}
+
+export async function startTestDaemon(options: TestDaemonOptions = {}): Promise<TestDaemonContext> {
 	const daemonDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-e2e-'));
 	let handle: DaemonHandle;
 	try {
@@ -32,8 +44,14 @@ export async function startTestDaemon(): Promise<TestDaemonContext> {
 		const config: FlowConfig = {
 			...FlowConfigLoader.DEFAULT,
 			worker: { ...FlowConfigLoader.DEFAULT.worker, wsPort: 0 },
+			...(options.concurrency !== undefined
+				? { queue: { ...FlowConfigLoader.DEFAULT.queue, concurrency: options.concurrency } }
+				: {}),
 		};
-		handle = await Daemon.start(config, daemonDir);
+		// Port 0 for the command server too: the standard port is a fixed number shared with
+		// the user's own daemon and with every other test daemon, so whoever loses the race
+		// publishes a port file nothing is listening on and every client gets ECONNREFUSED.
+		handle = await Daemon.start(config, daemonDir, { port: 0 });
 	} catch (err) {
 		fs.rmSync(daemonDir, { recursive: true, force: true });
 		throw err;

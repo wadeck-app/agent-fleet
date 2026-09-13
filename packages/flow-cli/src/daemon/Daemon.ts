@@ -231,7 +231,23 @@ async function tryResolvePlugins(): Promise<{
 	return PluginResolver.create().resolveAll();
 }
 
-async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemonDir?: string): Promise<DaemonHandle> {
+export interface StartDaemonOptions {
+	/**
+	 * Port for the daemon's command server. Omitted means the standard one, which is how a
+	 * user's daemon becomes discoverable.
+	 *
+	 * Zero asks the OS for a free port, which is what tests need: the standard port is a
+	 * fixed number shared with the user's own running daemon and with every other test
+	 * daemon, so they collide and the loser writes a port file nothing is listening on.
+	 */
+	port?: number;
+}
+
+async function startDaemon(
+	config: FlowConfig = FlowConfigLoader.DEFAULT,
+	daemonDir?: string,
+	options: StartDaemonOptions = {}
+): Promise<DaemonHandle> {
 	const resolvedDaemonDir = daemonDir ?? ConfigDir.get('flow');
 	const executionsDir = path.join(resolvedDaemonDir, 'executions');
 	const logsDir = path.join(resolvedDaemonDir, 'logs');
@@ -244,6 +260,8 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 	let hostRegistry: HostRegistry;
 	let workerProvisioner: WorkerProvisioner;
 	let wsServer: WebSocketServer;
+	/** The port workers must dial, known only once the listener has bound. */
+	let workerListenerPort: number | undefined;
 	let commandHandler: CommandHandler;
 	let executionStore: ExecutionStore;
 	let logWriter: LogWriter;
@@ -252,6 +270,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 
 	const daemonHandle = await createDaemon({
 		configDir: resolvedDaemonDir,
+		...(options.port !== undefined ? { port: options.port } : {}),
 		idleTimeout: null,
 		commands: {
 			run: async (payload: unknown): Promise<unknown> => {
@@ -296,7 +315,11 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				wsServer
 					.start()
 					.then(boundPort => {
-						// Published because the retry above means the bound port is not always
+						// Recorded so nothing has to read the port before it means anything: the
+						// getter reports the *requested* port until the listener binds, and the
+						// retry above means that request is often wrong.
+						workerListenerPort = boundPort;
+						// Published because the retry means the bound port is not always
 						// `httpPort + 1`. A client that assumed the offset would dial whatever
 						// else holds that port, so the real one is written down for them.
 						publishWorkerPort(resolvedDaemonDir, boundPort);
@@ -306,7 +329,11 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 						process.stderr.write(`[daemon] WebSocket server failed to start: ${String(err)}\n`);
 					});
 				workerRegistry = new WorkerRegistry();
-				const forkSource = new ForkWorkerSource(port, () => wsServer.port, claudePath);
+				// Reads the bound port, not the requested one, for the same reason as above: a
+				// forked worker handed a port the listener moved away from can never register.
+				// It falls back to the getter only if a fork somehow precedes the bind, where
+				// the old behaviour is still the best guess available.
+				const forkSource = new ForkWorkerSource(port, () => workerListenerPort ?? wsServer.port, claudePath);
 				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir);
 				// Hosts are tracked apart from workers because the two roles carry different
 				// credentials and neither may stand in for the other (T-04, T-11).
@@ -330,16 +357,36 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 					config.limits.maxStepsPerExecution,
 					pluginProviders.workspaceProvider,
 					pluginProviders.approvalProvider,
-					perFlowWorkspaceResolver
+					perFlowWorkspaceResolver,
+					// D#66: asked again whenever demand appears, not only at startup.
+					//
+					// Skipped while the listener is still binding, rather than falling back to
+					// the port the listener *asked* for: a source handed that number would
+					// create a worker that dials nothing, or worse something else. The startup
+					// contact fires the moment the bind completes, so nothing is lost.
+					() => {
+						if (workerListenerPort === undefined) {
+							writeDaemonLog(
+								logsDir,
+								'info',
+								'demand arrived before the worker listener was bound; sources will be contacted when it is'
+							);
+							return;
+						}
+						contactSources(workerListenerPort);
+					}
 				);
 
-				// D#54: ask each declared source to produce a worker. The daemon pushes; a
-				// worker never polls. Fire-and-forget on purpose -- nothing waits for a worker
-				// to appear (D#51, D#66), and dispatch only ever targets a live connection
-				// (D#4), so a source that produces nothing simply has no capacity here.
+				// Asks each declared source to produce a worker. The daemon pushes; a worker
+				// never polls. Fire-and-forget on purpose -- nothing waits for a worker to
+				// appear (D#51, D#66), and dispatch only ever targets a live connection (D#4),
+				// so a source that produces nothing simply has no capacity here.
 				//
-				// Runs only once the listener is bound (see start() above): a source told to
-				// dial a port nothing is listening on produces a worker that cannot join.
+				// Called twice over: once when the listener binds (D#54), so a waiting
+				// `flow worker` is reachable straight away, and again whenever dispatch finds
+				// demand nothing can serve (D#66). A source told to dial a port nothing is
+				// listening on would produce a worker that cannot join, which is why the
+				// startup call waits for the bind.
 				function contactSources(boundPort: number): void {
 					void contactDeclaredSources(
 						sourceRegistry.list(),
@@ -538,7 +585,11 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 }
 
 export class Daemon {
-	static async start(config: FlowConfig = FlowConfigLoader.DEFAULT, daemonDir?: string): Promise<DaemonHandle> {
-		return startDaemon(config, daemonDir);
+	static async start(
+		config: FlowConfig = FlowConfigLoader.DEFAULT,
+		daemonDir?: string,
+		options?: StartDaemonOptions
+	): Promise<DaemonHandle> {
+		return startDaemon(config, daemonDir, options);
 	}
 }

@@ -1137,6 +1137,71 @@ describe('CommandHandler — covering unmet demand (S8, D#25)', () => {
 		return { handler, workerPool };
 	}
 
+	// D#66: the daemon calls each declared source's single S1 method and waits. Asking only at
+	// startup would mean the S8 wait waits for something nobody was asked for, and remote
+	// capacity could never be used for a run that began later.
+	it('asks the declared sources when demand appears', async () => {
+		const flowFile = path.join(tmpDir, 'demand-sources.yml');
+		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
+		const workerPool = createMockWorkerPool();
+		workerPool.listIdle.mockReturnValue([]);
+		workerPool.planProvisioning.mockReturnValue({ fork: 0 });
+		const askedSources = vi.fn();
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never,
+			false,
+			20,
+			50,
+			undefined,
+			undefined,
+			undefined,
+			askedSources
+		);
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		handler.stopBackgroundWork();
+
+		expect(askedSources).toHaveBeenCalledTimes(1);
+	});
+
+	// Once per episode, not once per pass: the re-check runs several times a second, and asking
+	// a remote machine that often would be a denial of service aimed at your own fleet.
+	it('asks them once per episode of unmet demand, not once per attempt', async () => {
+		const flowFile = path.join(tmpDir, 'demand-once.yml');
+		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
+		const workerPool = createMockWorkerPool();
+		workerPool.listIdle.mockReturnValue([]);
+		workerPool.planProvisioning.mockReturnValue({ fork: 0 });
+		const askedSources = vi.fn();
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never,
+			false,
+			20,
+			50,
+			undefined,
+			undefined,
+			undefined,
+			askedSources
+		);
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		handler.tryDispatch();
+		handler.tryDispatch();
+		handler.stopBackgroundWork();
+
+		expect(askedSources).toHaveBeenCalledTimes(1);
+	});
+
 	it('asks S8 how much unmet demand there is, and how long it has gone unserved', async () => {
 		const { workerPool } = await runWithNoWorker({ fork: 0 });
 

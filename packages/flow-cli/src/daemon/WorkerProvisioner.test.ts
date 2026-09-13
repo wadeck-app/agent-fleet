@@ -99,12 +99,104 @@ function denyAll(reason = 'bad token') {
 	return { authenticate: vi.fn().mockReturnValue({ ok: false, reason }) };
 }
 
-function sourceCaps(caps: Record<string, number>) {
+function sourceCaps(caps: Record<string, number>, labels: Record<string, string[]> = {}) {
 	return {
-		find: (sourceId: string) => (caps[sourceId] === undefined ? undefined : { maxWorkers: caps[sourceId] }),
-		list: () => Object.keys(caps).map(sourceId => ({ sourceId, maxWorkers: caps[sourceId]! })),
+		find: (sourceId: string) =>
+			caps[sourceId] === undefined
+				? undefined
+				: { maxWorkers: caps[sourceId], labels: labels[sourceId] ?? [], sourceId },
+		list: () =>
+			Object.keys(caps).map(sourceId => ({
+				sourceId,
+				maxWorkers: caps[sourceId]!,
+				labels: labels[sourceId] ?? [],
+			})),
 	};
 }
+
+describe('WorkerProvisioner - source labels (D#30)', () => {
+	// Labels are declared once on the source and every worker from it carries them. Without
+	// this, `flow worker source add gpu-box --labels gpu` has no effect on routing at all and
+	// each worker would have to re-declare them, which is what D#30 rules out.
+	it('gives a worker the labels its source declared', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			5,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			allowAll(),
+			sourceCaps({ 'gpu-box': 2 }, { 'gpu-box': ['gpu', 'linux'] })
+		);
+		const ws = fakeWorker();
+
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't' });
+
+		expect(registry.describe(ws)?.labels).toEqual(['gpu', 'linux']);
+	});
+
+	// A worker may still add its own; the source's are not a replacement for what the machine
+	// knows about itself.
+	it('keeps the labels the worker declared as well', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			5,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			allowAll(),
+			sourceCaps({ 'gpu-box': 2 }, { 'gpu-box': ['gpu'] })
+		);
+		const ws = fakeWorker();
+
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't', labels: ['fast'] });
+
+		expect(registry.describe(ws)?.labels.sort()).toEqual(['fast', 'gpu']);
+	});
+
+	it('does not repeat a label the worker already declared', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			5,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			allowAll(),
+			sourceCaps({ 'gpu-box': 2 }, { 'gpu-box': ['gpu'] })
+		);
+		const ws = fakeWorker();
+
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't', labels: ['gpu'] });
+
+		expect(registry.describe(ws)?.labels).toEqual(['gpu']);
+	});
+
+	// A worker naming no source has nothing to inherit -- the zero-config `flow worker` case.
+	it('leaves a sourceless worker with only its own labels', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(5, registry, fakeSource({ hasSpawned: () => false }));
+		const ws = fakeWorker();
+
+		provisioner.registerWorker(ws, { pid: 1, authToken: 't', labels: ['mine'] });
+
+		expect(registry.describe(ws)?.labels).toEqual(['mine']);
+	});
+
+	// Re-registration happens after every step. Inheriting again must not accumulate.
+	it('does not accumulate labels across re-registrations', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			5,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			allowAll(),
+			sourceCaps({ 'gpu-box': 2 }, { 'gpu-box': ['gpu'] })
+		);
+		const ws = fakeWorker();
+
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't' });
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't' });
+
+		expect(registry.describe(ws)?.labels).toEqual(['gpu']);
+	});
+});
 
 describe('WorkerProvisioner - provisioning plan (S8)', () => {
 	it('offers the S8 provider the room left under the concurrency limit', () => {
@@ -121,6 +213,25 @@ describe('WorkerProvisioner - provisioning plan (S8)', () => {
 		registry.register(fakeWorker(), { pid: 1 });
 
 		expect(provisioner.planProvisioning(5, 10_000).fork).toBe(0);
+	});
+
+	// The warning exists to name the absentee (D#25). A source that did deliver is not one,
+	// and naming it would send the user to check a machine that is working.
+	it('offers only the sources with nothing connected', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			4,
+			registry,
+			fakeSource(),
+			allowAll(),
+			sourceCaps({ delivered: 1, absent: 1 })
+		);
+		registry.register(fakeWorker(), { pid: 1, sourceId: 'delivered' });
+
+		const warning = provisioner.planProvisioning(1, 60_000).warning ?? '';
+
+		expect(warning).toContain('absent');
+		expect(warning).not.toContain('delivered');
 	});
 
 	// The declared sources are what the default implementation waits for, so they have to
