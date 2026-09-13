@@ -117,22 +117,51 @@ describe('CodexModelProvider', () => {
 			expect(args[modelIdx + 1]).toBe('astra');
 		});
 
-		it('passes --auto when skipPermissions is true', async () => {
+		// `--auto` does not exist in codex: the flag for approving without prompting is
+		// `--approve-for-me`, which keeps the workspace-write sandbox. Sending `--auto` made
+		// codex exit on a usage error, so every skipPermissions step failed.
+		it('passes --approve-for-me when skipPermissions is true', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions({ skipPermissions: true }));
 			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
-			expect(args).toContain('--auto');
+			expect(args).toContain('--approve-for-me');
+			expect(args).not.toContain('--auto');
 		});
 
-		it('does NOT pass --auto when skipPermissions is false', async () => {
+		it('does NOT pass an approval flag when skipPermissions is false', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions({ skipPermissions: false }));
 			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args).not.toContain('--approve-for-me');
 			expect(args).not.toContain('--auto');
+		});
+
+		// Resuming is a subcommand now (`codex exec resume <id> [prompt]`), not a flag. The old
+		// `--resume <id>` form is rejected outright.
+		it('resumes through the exec subcommand, with the session id before the prompt', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({ prompt: 'continue please', resumeSessionId: 'abc-123' })
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args.slice(0, 4)).toEqual(['exec', 'resume', 'abc-123', 'continue please']);
+			expect(args).not.toContain('--resume');
+		});
+
+		it('keeps the plain exec form when no session is being resumed', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ prompt: 'fresh start' }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args.slice(0, 2)).toEqual(['exec', 'fresh start']);
+			expect(args).not.toContain('resume');
 		});
 
 		it('returns stdout, stderr, exitCode', async () => {

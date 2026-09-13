@@ -22,7 +22,9 @@ import { describe, expect, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MOCK_PATH = join(__dirname, '../testing/claude-mock.mjs');
-const VERSION_FILE = join(__dirname, '../../../../../.claude/claude-version-tested.json');
+// Four levels up from src/executor is the repo root. Five pointed at the parent of the repo,
+// where no baseline has ever lived, so the drift check below silently never ran.
+const VERSION_FILE = join(__dirname, '../../../../.claude/claude-version-tested.json');
 const INTEGRATION_TIMEOUT = 60_000;
 
 function currentClaudeVersion(): string | null {
@@ -46,9 +48,12 @@ function storedVersion(): string | null {
 function shouldRunIntegration(): boolean {
 	if (process.env['CLAUDE_INTEGRATION']) return true;
 	const current = currentClaudeVersion();
-	const stored = storedVersion();
-	// Auto-run only if we have a baseline AND it's stale -- never on first install
-	return current !== null && stored !== null && current !== stored;
+	// No CLI installed is the one honest reason to skip: there is nothing to compare against.
+	if (current === null) return false;
+	// A missing baseline used to mean "skip forever" -- combined with a wrong path that is
+	// exactly what happened, and a provider flag drifted unnoticed for months. An installed CLI
+	// with no baseline now runs, so the first run establishes one instead of disabling the check.
+	return current !== storedVersion();
 }
 
 function runProcess(
@@ -159,9 +164,12 @@ describe.skipIf(!shouldRunIntegration())('Claude real vs mock compatibility', ()
 			expect(mockResult.exitCode).toBe(0);
 			const mockEvents = parseNdjson(mockResult.stdout);
 
+			// --verbose is not optional here: claude refuses stream-json output without it under
+			// --print, and the provider always pairs them for that reason. Leaving it out made
+			// this check compare the mock against an empty stream from a usage error.
 			const realResult = await runProcess(
 				realClaudePath,
-				['--dangerously-skip-permissions', '--output-format', 'stream-json', '-p'],
+				['--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose', '-p'],
 				prompt
 			);
 			const realEvents = parseNdjson(realResult.stdout);
@@ -215,24 +223,18 @@ describe.skipIf(!shouldRunIntegration())('Claude real vs mock compatibility', ()
 
 	// --- VERSION STALENESS CHECK (always runs, warns only) ---
 
-	it('warns when Claude version changed since last integration test', () => {
+	// Fails rather than warns, for the same reason as the opencode equivalent: nobody reads a
+	// console.warn inside a passing suite, and that is how a stale baseline stayed invisible.
+	it('has verified the mock against the installed Claude', () => {
 		const current = currentClaudeVersion();
-		const stored = storedVersion();
 		if (!current) {
-			console.warn('Claude not found on PATH — cannot check version');
-			return;
+			throw new Error('Could not read the installed Claude version, so the mock cannot be verified against it');
 		}
-		if (!stored) {
-			console.warn('No claude-version-tested.json — run with CLAUDE_INTEGRATION=1 to baseline');
-			return;
-		}
-		if (stored !== current) {
-			console.warn(
-				`⚠  Claude version changed: ${stored} → ${current}. Integration test will auto-run next session.`
-			);
-		} else {
-			console.log(`✓ Mock last verified against Claude ${stored}`);
-		}
-		expect(stored).toBeTruthy();
+
+		const stored = storedVersion();
+		expect(
+			stored,
+			`No baseline for Claude ${current}. Run "CLAUDE_INTEGRATION=1 npx vitest run StepRunner.model.integration" to verify the mock against it and record one.`
+		).toBe(current);
 	});
 });

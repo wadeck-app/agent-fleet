@@ -42,12 +42,25 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const MOCK_PATH = join(__dirname, '../testing/opencode-mock.mjs');
 const CLAUDE_MOCK_FILE = join(__dirname, '../testing/claude-mock.mjs');
 const CODEX_MOCK_FILE = join(__dirname, '../testing/codex-mock.mjs');
-const VERSION_FILE = join(__dirname, '../../../../../.claude/opencode-version-tested.json');
+// Four levels up from src/executor is the repo root. Five pointed at the parent of the repo,
+// where no baseline has ever lived, so the drift check below silently never ran.
+const VERSION_FILE = join(__dirname, '../../../../.claude/opencode-version-tested.json');
 const INTEGRATION_TIMEOUT = 60_000;
 
+/**
+ * The installed opencode version, or null when it is not installed.
+ *
+ * `--version`, not `version`: there is no `version` subcommand, so `opencode version` was read
+ * as a project *path* -- opencode tried to `cd version`, printed its banner and still exited 0.
+ * That garbage was then stored and compared as if it were a version, which is why the drift
+ * check never noticed anything.
+ */
 function currentOpenCodeVersion(): string | null {
 	try {
-		return execSync('opencode version', { encoding: 'utf8' }).trim();
+		const output = execSync('opencode --version', { encoding: 'utf8' }).trim();
+		// A version is a single short token; anything else means the probe did not do what we think.
+		const version = output.split('\n').at(-1)?.trim() ?? '';
+		return /^\d+\.\d+\.\d+/.test(version) ? version : null;
 	} catch {
 		return null;
 	}
@@ -62,13 +75,16 @@ function storedVersion(): string | null {
 	}
 }
 
-/** Run when OPENCODE_INTEGRATION=1 OR when a baseline exists AND current opencode version ≠ it. */
+/** Run when OPENCODE_INTEGRATION=1, or when the installed opencode differs from the baseline. */
 function shouldRunIntegration(): boolean {
 	if (process.env['OPENCODE_INTEGRATION']) return true;
 	const current = currentOpenCodeVersion();
-	const stored = storedVersion();
-	// Auto-run only if we have a baseline AND it's stale -- never on first install
-	return current !== null && stored !== null && current !== stored;
+	// No CLI installed is the one honest reason to skip: there is nothing to compare against.
+	if (current === null) return false;
+	// A missing baseline used to mean "skip forever" -- and with the wrong path above, that is
+	// exactly what happened: `--resume` drifted to `--session` in opencode and nothing noticed.
+	// An installed CLI with no baseline now runs, establishing one instead of disabling the check.
+	return current !== storedVersion();
 }
 
 function runProcess(
@@ -351,25 +367,23 @@ describe.skipIf(!shouldRunIntegration())('OpenCode real vs mock compatibility', 
 
 	// --- VERSION STALENESS CHECK (always runs, warns only) ---
 
-	it('warns when opencode version changed since last integration test', () => {
+	// Fails rather than warns. A warning is what this was, and it is why three flags drifted
+	// unnoticed: nobody reads a console.warn in a passing suite. Runs after the verification
+	// test above, which records the baseline when the mock matches the real CLI -- so reaching
+	// here with a stale or missing baseline means that verification did not happen.
+	it('has verified the mock against the installed opencode', () => {
 		const current = currentOpenCodeVersion();
-		const stored = storedVersion();
 		if (!current) {
-			console.warn('opencode not found on PATH — cannot check version');
-			return;
+			// The file-level gate already skips when opencode is absent; reaching here without it
+			// means the probe itself broke, which is exactly what hid the drift before.
+			throw new Error('Could not read the installed opencode version, so the mock cannot be verified against it');
 		}
-		if (!stored) {
-			console.warn('No opencode-version-tested.json — run with OPENCODE_INTEGRATION=1 to baseline');
-			return;
-		}
-		if (stored !== current) {
-			console.warn(
-				`⚠  opencode version changed: ${stored} → ${current}. Integration test will auto-run next session.`
-			);
-		} else {
-			console.log(`✓ Mock last verified against opencode ${stored}`);
-		}
-		expect(stored).toBeTruthy();
+
+		const stored = storedVersion();
+		expect(
+			stored,
+			`No baseline for opencode ${current}. Run "OPENCODE_INTEGRATION=1 npx vitest run StepRunner.opencode.integration" to verify the mock against it and record one.`
+		).toBe(current);
 	});
 });
 

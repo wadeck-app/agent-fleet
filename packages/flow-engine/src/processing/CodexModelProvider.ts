@@ -1,7 +1,7 @@
 /**
  * CodexModelProvider -- implements ModelProvider for the Codex CLI.
  *
- * Invocation: codex exec [message] --json [--auto] [-m model]
+ * Invocation: codex exec [resume <sessionId>] [message] --json [--approve-for-me] [-m model]
  * MCP config: Same as OpenCode (OPENCODE_CONFIG_CONTENT or OPENCODE_CONFIG)
  * Env isolation: only options.env is forwarded; process.env is never inherited.
  * Prompt limit: 32KB -- throws PromptTooLargeError if exceeded.
@@ -99,6 +99,14 @@ function buildSpawnParams(
 	// commandParts[1..] are prefix args (e.g. ['node', '/path/mock.mjs'] -> command='node', prefix=['mock.mjs'])
 	const args: string[] = [...commandParts.slice(1), 'exec'];
 
+	// Resuming is a subcommand, not a flag: `codex exec resume <sessionId> [prompt]`. It has to
+	// come before the prompt, since both are positionals. Verified against the installed codex:
+	// `codex exec resume --help` documents [SESSION_ID] [PROMPT] in that order, and the old
+	// `--resume <id>` flag is rejected.
+	if (options.resumeSessionId) {
+		args.push('resume', options.resumeSessionId);
+	}
+
 	// Codex exec requires the prompt as a positional arg
 	if (options.prompt) {
 		args.push(options.prompt);
@@ -110,19 +118,18 @@ function buildSpawnParams(
 	// Always skip git repo check -- flow can be run from any directory
 	args.push('--skip-git-repo-check');
 
-	// --auto enables auto-approval of permissions
+	// Approve without prompting. `--auto` does not exist in codex -- sending it exited on a
+	// usage error -- and `--approve-for-me` is the flag that does this while keeping the
+	// workspace-write sandbox. The full escape hatch is
+	// `--dangerously-bypass-approvals-and-sandbox`, deliberately not used here: it drops the
+	// sandbox too, which is more than a step asking not to be prompted has asked for.
 	if (options.skipPermissions === true) {
-		args.push('--auto');
+		args.push('--approve-for-me');
 	}
 
 	// -m provider/model
 	if (options.model) {
 		args.push('-m', options.model);
-	}
-
-	// --resume sessionId
-	if (options.resumeSessionId) {
-		args.push('--resume', options.resumeSessionId);
 	}
 
 	// Env isolation: forward infrastructure env vars

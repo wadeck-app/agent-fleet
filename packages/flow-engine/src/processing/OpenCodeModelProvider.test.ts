@@ -96,6 +96,30 @@ describe('OpenCodeModelProvider', () => {
 			expect(args[1]).toBe('hello world');
 		});
 
+		// OpenCode names this flag `--session`; `--resume` is Claude's. Sending Claude's flag
+		// made OpenCode print its help and exit 1, so every session-continuing step failed
+		// before the model was ever reached.
+		it('continues a session with --session, the flag OpenCode actually has', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ resumeSessionId: 'ses_abc123' }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			const idx = args.indexOf('--session');
+			expect(idx).toBeGreaterThan(-1);
+			expect(args[idx + 1]).toBe('ses_abc123');
+			expect(args).not.toContain('--resume');
+		});
+
+		it('omits the session flag entirely when no session is being continued', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args).not.toContain('--session');
+		});
+
 		it('always includes --format json', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));

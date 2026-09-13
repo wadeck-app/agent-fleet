@@ -132,9 +132,12 @@ function buildSpawnParams(
 		args.push('-m', options.model);
 	}
 
-	// --resume sessionId
+	// OpenCode calls this `--session`; `--resume` is Claude's name for it. Sending Claude's
+	// flag made OpenCode print its help and exit 1, so a session-continuing step failed before
+	// the model was reached. Verified against opencode 1.18.30: `opencode run --help` lists
+	// `-s, --session <id>` and no `--resume`.
 	if (options.resumeSessionId) {
-		args.push('--resume', options.resumeSessionId);
+		args.push('--session', options.resumeSessionId);
 	}
 
 	// Env isolation: forward infrastructure env vars required for any subprocess to function,

@@ -199,6 +199,15 @@ export class ClaudeLauncher {
 		}
 
 		if (options?.streamJson) {
+			// Claude refuses this combination outright: "When using --print,
+			// --output-format=stream-json requires --verbose" (verified on 2.1.270). Emitting it
+			// anyway means the step dies on a usage error with no events, so the contradiction is
+			// reported here where the caller can see which setting to change.
+			if (options.verbose === false) {
+				throw new Error(
+					'This step asks for stream-json output with verbose disabled, which claude rejects: --output-format=stream-json requires --verbose. Remove "verbose: false" from the step, or set "streamJson: false" to use plain output.'
+				);
+			}
 			args.push('--output-format', 'stream-json');
 		}
 
