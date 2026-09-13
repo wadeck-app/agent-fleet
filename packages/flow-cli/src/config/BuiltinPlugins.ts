@@ -1,5 +1,6 @@
 import type { PluginManifest } from 'extension-points';
 import { manifest as cliApprovalManifest } from 'plugin-cli-approval/plugin.config';
+import { manifest as fileApprovalManifest } from 'plugin-file-approval/plugin.config';
 import { manifest as noneManifest } from 'plugin-none/plugin.config';
 import { manifest as worktreeManifest } from 'plugin-worktree/plugin.config';
 
@@ -20,5 +21,6 @@ import { manifest as worktreeManifest } from 'plugin-worktree/plugin.config';
 export const BUILTIN_PLUGIN_MANIFESTS: Record<string, PluginManifest> = {
 	none: noneManifest as PluginManifest,
 	'cli-approval': cliApprovalManifest as PluginManifest,
+	'file-approval': fileApprovalManifest as PluginManifest,
 	worktree: worktreeManifest as PluginManifest,
 };

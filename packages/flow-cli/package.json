@@ -31,6 +31,7 @@
 		"flow-engine": "file:../flow-engine",
 		"js-yaml": "^4.1.1",
 		"plugin-cli-approval": "file:../plugin-cli-approval",
+		"plugin-file-approval": "file:../plugin-file-approval",
 		"plugin-none": "file:../plugin-none",
 		"plugin-worktree": "file:../plugin-worktree",
 		"shared-common": "file:../shared-common",

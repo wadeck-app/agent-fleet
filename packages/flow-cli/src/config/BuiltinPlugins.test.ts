@@ -6,7 +6,12 @@ describe('BUILTIN_PLUGIN_MANIFESTS', () => {
 	// These are the plugins the CLI is useless without: `none` is the default workspace provider,
 	// and `cli-approval` is the only thing that makes a worker interactive.
 	it('carries the plugins the CLI cannot function without', () => {
-		expect(Object.keys(BUILTIN_PLUGIN_MANIFESTS).sort()).toEqual(['cli-approval', 'none', 'worktree']);
+		expect(Object.keys(BUILTIN_PLUGIN_MANIFESTS).sort()).toEqual([
+			'cli-approval',
+			'file-approval',
+			'none',
+			'worktree',
+		]);
 	});
 
 	// Imported statically so the bundler inlines them. A manifest reached through the filesystem
@@ -33,5 +38,11 @@ describe('BUILTIN_PLUGIN_MANIFESTS', () => {
 	it('provides the workspace point from none and the approval point from cli-approval', () => {
 		expect(BUILTIN_PLUGIN_MANIFESTS['none']?.implementations['workspace']?.['default']).toBeDefined();
 		expect(BUILTIN_PLUGIN_MANIFESTS['cli-approval']?.implementations['approval']?.['default']).toBeDefined();
+	});
+
+	// The TTY-free counterpart: without it a user_intervention step can only be answered by a human
+	// sitting at a terminal.
+	it('provides the approval point from file-approval too', () => {
+		expect(BUILTIN_PLUGIN_MANIFESTS['file-approval']?.implementations['approval']?.['default']).toBeDefined();
 	});
 });

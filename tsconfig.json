@@ -6,6 +6,7 @@
 		{ "path": "packages/plugin-none" },
 		{ "path": "packages/plugin-worktree" },
 		{ "path": "packages/plugin-cli-approval" },
+		{ "path": "packages/plugin-file-approval" },
 		{ "path": "packages/e2e-web" },
 		{ "path": "packages/flow-cli" },
 		{ "path": "packages/task-cli" },
