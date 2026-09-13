@@ -42,9 +42,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const MOCK_PATH = join(__dirname, '../testing/opencode-mock.mjs');
 const CLAUDE_MOCK_FILE = join(__dirname, '../testing/claude-mock.mjs');
 const CODEX_MOCK_FILE = join(__dirname, '../testing/codex-mock.mjs');
-// Four levels up from src/executor is the repo root. Five pointed at the parent of the repo,
-// where no baseline has ever lived, so the drift check below silently never ran.
-const VERSION_FILE = join(__dirname, '../../../../.claude/opencode-version-tested.json');
 const INTEGRATION_TIMEOUT = 60_000;
 
 /**
@@ -52,8 +49,6 @@ const INTEGRATION_TIMEOUT = 60_000;
  *
  * `--version`, not `version`: there is no `version` subcommand, so `opencode version` was read
  * as a project *path* -- opencode tried to `cd version`, printed its banner and still exited 0.
- * That garbage was then stored and compared as if it were a version, which is why the drift
- * check never noticed anything.
  */
 function currentOpenCodeVersion(): string | null {
 	try {
@@ -66,25 +61,21 @@ function currentOpenCodeVersion(): string | null {
 	}
 }
 
-function storedVersion(): string | null {
-	if (!existsSync(VERSION_FILE)) return null;
-	try {
-		return (JSON.parse(readFileSync(VERSION_FILE, 'utf8')) as { testedVersion: string }).testedVersion;
-	} catch {
-		return null;
-	}
-}
-
-/** Run when OPENCODE_INTEGRATION=1, or when the installed opencode differs from the baseline. */
+/**
+ * Runs on request, locally, never in CI.
+ *
+ * This deliberately keeps no "last tested version" file. That mechanism is what failed: the
+ * baseline path pointed outside the repo, so it read as "no baseline", which the gate treated
+ * as "skip forever" -- and three provider flags drifted unnoticed. Asking the CLI itself is the
+ * only check that cannot rot, which is what `ProviderFlagContract.test.ts` does on every run.
+ *
+ * CI never runs this: the CLIs are not installed there, and a suite that talks to real models
+ * has no business in an automated pipeline.
+ */
 function shouldRunIntegration(): boolean {
-	if (process.env['OPENCODE_INTEGRATION']) return true;
-	const current = currentOpenCodeVersion();
-	// No CLI installed is the one honest reason to skip: there is nothing to compare against.
-	if (current === null) return false;
-	// A missing baseline used to mean "skip forever" -- and with the wrong path above, that is
-	// exactly what happened: `--resume` drifted to `--session` in opencode and nothing noticed.
-	// An installed CLI with no baseline now runs, establishing one instead of disabling the check.
-	return current !== storedVersion();
+	if (process.env['CI']) return false;
+	if (!process.env['OPENCODE_INTEGRATION']) return false;
+	return currentOpenCodeVersion() !== null;
 }
 
 function runProcess(
@@ -277,19 +268,8 @@ describe.skipIf(!shouldRunIntegration())('OpenCode real vs mock compatibility', 
 					expect(usage['opencode'].inputTokens).toBeGreaterThan(0);
 					expect(usage['opencode'].outputTokens).toBeGreaterThan(0);
 
-					// Store tested version
-					const version = currentOpenCodeVersion();
-					if (version) {
-						writeFileSync(
-							VERSION_FILE,
-							JSON.stringify(
-								{ testedVersion: version, testedAt: new Date().toISOString().slice(0, 10) },
-								null,
-								2
-							)
-						);
-						console.log(`✓ OpenCode mock compatible with opencode ${version}`);
-					}
+					// Reported, not recorded: a "last tested version" file is what rotted last time.
+					console.log(`✓ OpenCode mock compatible with opencode ${currentOpenCodeVersion() ?? 'unknown'}`);
 				} else {
 					console.warn(
 						`opencode-mock.mjs exited with code ${result.exitCode} — on Windows, set OPENCODE_MOCK_PATH to a .cmd wrapper`
@@ -371,19 +351,14 @@ describe.skipIf(!shouldRunIntegration())('OpenCode real vs mock compatibility', 
 	// unnoticed: nobody reads a console.warn in a passing suite. Runs after the verification
 	// test above, which records the baseline when the mock matches the real CLI -- so reaching
 	// here with a stale or missing baseline means that verification did not happen.
-	it('has verified the mock against the installed opencode', () => {
+	// Says which opencode these results describe. No comparison against a stored version: the
+	// flags this suite depends on are checked against the CLI itself in
+	// ProviderFlagContract.test.ts, which runs on every commit and cannot go stale.
+	it('reports the opencode it ran against', () => {
 		const current = currentOpenCodeVersion();
-		if (!current) {
-			// The file-level gate already skips when opencode is absent; reaching here without it
-			// means the probe itself broke, which is exactly what hid the drift before.
-			throw new Error('Could not read the installed opencode version, so the mock cannot be verified against it');
-		}
 
-		const stored = storedVersion();
-		expect(
-			stored,
-			`No baseline for opencode ${current}. Run "OPENCODE_INTEGRATION=1 npx vitest run StepRunner.opencode.integration" to verify the mock against it and record one.`
-		).toBe(current);
+		expect(current, 'the file-level gate should have skipped this suite when opencode is absent').not.toBeNull();
+		console.log(`✓ verified against opencode ${current ?? 'unknown'}`);
 	});
 });
 
