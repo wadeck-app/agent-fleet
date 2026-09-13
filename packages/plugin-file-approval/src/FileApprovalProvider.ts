@@ -65,6 +65,50 @@ export function resolveApprovalDir(dir?: string): string {
 	return path.join(ConfigDir.get('flow'), 'approvals');
 }
 
+/**
+ * Validates the untyped `options:` block a config file declared for this plugin.
+ *
+ * The loader passes it through as `unknown`, so without this a typo like `timeoutMS` would be
+ * accepted and ignored -- the plugin would run on its defaults while the config file claimed
+ * otherwise, which is the hardest kind of configuration bug to see.
+ */
+export function parseFileApprovalOptions(raw: unknown): FileApprovalOptions {
+	if (raw === undefined || raw === null) return {};
+	if (typeof raw !== 'object' || Array.isArray(raw)) {
+		throw new Error(`[file-approval] options must be an object, found ${describeFound(raw)}`);
+	}
+
+	const entries = Object.entries(raw as Record<string, unknown>);
+	const known = ['dir', 'timeoutMs', 'pollIntervalMs', 'settleMs'] as const;
+	type KnownOption = (typeof known)[number];
+	const isKnown = (key: string): key is KnownOption => (known as readonly string[]).includes(key);
+	const parsed: FileApprovalOptions = {};
+
+	for (const [key, value] of entries) {
+		if (!isKnown(key)) {
+			throw new Error(
+				`[file-approval] Unknown option "${key}". Supported options: ${known.join(', ')}. ` +
+					'Nothing was applied, so fix the name rather than assuming a default took effect.'
+			);
+		}
+		if (key === 'dir') {
+			if (typeof value !== 'string') {
+				throw new Error(`[file-approval] Option "dir" must be a string, found ${describeFound(value)}`);
+			}
+			parsed.dir = value;
+			continue;
+		}
+		if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+			throw new Error(
+				`[file-approval] Option "${key}" must be a positive number of milliseconds, found ${describeFound(value)}`
+			);
+		}
+		parsed[key] = value;
+	}
+
+	return parsed;
+}
+
 /** File-system safe rendering of an ISO timestamp, used to keep every answered pair distinct. */
 function fileStamp(date: Date): string {
 	return date.toISOString().replace(/[:.]/g, '-');

@@ -70,6 +70,10 @@ export class WorkerAdapter {
 		// Build TemplateContext for flow-engine
 		// stepOutputs is a Map in TemplateContext (not a plain object)
 		const templateContext: TemplateContext = {
+			// Identifies the run to anything that has to address it from outside, above all an
+			// approval request: without it every request was published as "unknown_<stepId>", so two
+			// concurrent flows shared one filename and an answer could satisfy the wrong step.
+			taskId: context.executionId,
 			inputs: context.inputs,
 			stepOutputs: new Map(Object.entries(context.stepOutputs)),
 			stepMeta: new Map(Object.entries(context.stepMeta)) as unknown as Map<string, Record<string, unknown>>,

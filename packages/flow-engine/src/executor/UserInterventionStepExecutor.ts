@@ -41,7 +41,16 @@ async function executeViaApprovalProvider(
 	services: { templateRenderer: TemplateRenderer; outputExtractor: OutputExtractor }
 ): Promise<StepTrace> {
 	const { templateRenderer, outputExtractor } = services;
-	const taskId = context.taskId || 'unknown';
+	// Not defaulted to a placeholder: an approval provider addresses a request by taskId, so two
+	// runs both calling themselves "unknown" share one address and an answer can satisfy the wrong
+	// step. A caller that did not identify its run has a bug, and it must be visible here.
+	const taskId = context.taskId;
+	if (taskId === undefined || taskId === '') {
+		throw new Error(
+			`Step "${step.id}" needs an intervention, but the execution context carries no taskId to address the request with. ` +
+				'Whoever runs the step must set context.taskId (the worker uses the execution id).'
+		);
+	}
 
 	stepTrace.interventionType = step.interventionType;
 	stepTrace.interventionBlocking = step.blocking !== false;

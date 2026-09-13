@@ -94,6 +94,17 @@ describe('WorkerAdapter', () => {
 		);
 	});
 
+	// The bug this pins down: nothing set taskId, so every approval request was published as
+	// "unknown_<stepId>" -- two concurrent flows would then fight over one request file, and an
+	// answer could satisfy the wrong step. The execution id is the identifier both sides can trace
+	// back to a run with `flow history --id`.
+	it('identifies the run in the template context, so an approval request is traceable', async () => {
+		await adapter.execute(makeScriptStep(), makeContext(), sendMessage);
+
+		const [, , templateContext] = mockExecuteStep.mock.calls[0] as [unknown, unknown, { taskId?: string }];
+		expect(templateContext.taskId).toBe('testexec');
+	});
+
 	it('returns outputs for a script step', async () => {
 		const result = await adapter.execute(makeScriptStep(), makeContext(), sendMessage);
 		expect(result.output).toEqual({ result: 'ok' });
