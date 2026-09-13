@@ -348,7 +348,14 @@ async function startDaemon(
 					workerRegistry,
 					forkSource,
 					new SharedTokenAuthenticator(resolvedDaemonDir, sourceRegistry, launchTokens),
-					sourceRegistry
+					sourceRegistry,
+					undefined,
+					// To the log, not to stderr: this process is detached with stdio ignored, so a
+					// refusal written there is lost -- and a refused worker is exactly what someone
+					// debugging "why is nothing connected" needs to see.
+					message => {
+						writeDaemonLog(logsDir, 'error', message);
+					}
 				);
 				commandHandler = new CommandHandler(
 					resolvedDaemonDir,

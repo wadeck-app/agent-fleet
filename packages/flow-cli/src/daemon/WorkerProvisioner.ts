@@ -23,7 +23,16 @@ export class WorkerProvisioner {
 		private readonly forkSource: ForkWorkerSource,
 		private readonly authenticator: AuthenticationProvider,
 		private readonly sources: Pick<WorkerSourceRegistry, 'find' | 'list'>,
-		private readonly provisioning: ProvisioningProvider = new DefaultProvisioning()
+		private readonly provisioning: ProvisioningProvider = new DefaultProvisioning(),
+		/**
+		 * Where a refusal is reported.
+		 *
+		 * Injected because the default -- `process.stderr` -- goes nowhere: the daemon runs detached
+		 * with `stdio: 'ignore'`. Every refusal was therefore invisible, and a worker presenting a
+		 * stale credential (which every worker does once the daemon rotates its token on restart)
+		 * retried forever against a silent wall while `flow worker list` showed nothing connected.
+		 */
+		private readonly report: (message: string) => void = message => process.stderr.write(`${message}\n`)
 	) {}
 
 	/** Workers connected or already requested. */
@@ -188,7 +197,7 @@ export class WorkerProvisioner {
 	}
 
 	private refuse(ws: WebSocket, reason: string): false {
-		process.stderr.write(`[WorkerProvisioner] ${reason}\n`);
+		this.report(`[WorkerProvisioner] ${reason}`);
 		ws.terminate();
 		return false;
 	}

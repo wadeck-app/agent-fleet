@@ -188,6 +188,24 @@ export function reconnectDelayMs(attempt: number): number {
 }
 
 /**
+ * The registration to send now, with the credential re-read rather than remembered.
+ *
+ * The daemon rewrites `health_token` every time it starts, so a worker that resolved its credential
+ * once at launch presented a dead one after any restart: it connected, was refused, and retried
+ * forever -- invisibly, since a refusal went to the daemon's discarded stderr. A worker outliving
+ * the daemon (D#51) is only useful if its credential does too.
+ *
+ * A resolver that fails is left to throw: registering with no credential is refused anyway, and
+ * swallowing the reason is how this went unnoticed in the first place.
+ */
+export function withFreshToken(
+	registration: Omit<WorkerReady, 'type'>,
+	resolveToken: () => string
+): Omit<WorkerReady, 'type'> {
+	return { ...registration, authToken: resolveToken() };
+}
+
+/**
  * Timer that carries the worker across a daemon outage.
  *
  * Deliberately NOT unref'd: while the socket is down this timer is the only handle left, so an

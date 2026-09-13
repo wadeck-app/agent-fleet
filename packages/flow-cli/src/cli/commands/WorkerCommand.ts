@@ -28,6 +28,7 @@ import {
 	resolveSourceId,
 	resolveWorkerToken,
 	scheduleReconnectTimer,
+	withFreshToken,
 } from '../../worker/WorkerLaunch';
 import { describeNoLiveWorkers } from '../../worker/WorkerListing';
 
@@ -241,7 +242,9 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	}
 
 	const display = new WorkerDisplay(options.verbose === true ? 'verbose' : 'summary');
-	connect(daemonDir, config.worker.wsPort, registration, 0, display, approvalProvider);
+	connect(daemonDir, config.worker.wsPort, registration, 0, display, approvalProvider, () =>
+		resolveWorkerToken({ token: options.token, sourceId }, daemonDir)
+	);
 }
 
 /**
@@ -292,7 +295,9 @@ function connect(
 	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>,
 	attempt: number,
 	display: WorkerDisplay,
-	approvalProvider: ApprovalProvider | undefined
+	approvalProvider: ApprovalProvider | undefined,
+	/** Re-read on every attempt: the daemon rotates its own token each time it starts. */
+	resolveToken: () => string
 ): void {
 	let wsUrl: string;
 	try {
@@ -300,7 +305,15 @@ function connect(
 	} catch (err) {
 		// The daemon may simply not be up yet; report and keep waiting rather than exiting.
 		report('[wait]', normalizeError(err).message);
-		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1, display, approvalProvider);
+		scheduleReconnect(
+			daemonDir,
+			configuredWsPort,
+			registration,
+			attempt + 1,
+			display,
+			approvalProvider,
+			resolveToken
+		);
 		return;
 	}
 
@@ -321,7 +334,7 @@ function connect(
 	};
 
 	ws.on('open', () => {
-		send({ type: 'ready', ...registration });
+		send({ type: 'ready', ...withFreshToken(registration, resolveToken) });
 	});
 
 	ws.on('message', (data: Buffer) => {
@@ -342,7 +355,15 @@ function connect(
 
 	ws.on('close', () => {
 		console.log('[wait] daemon connection closed; waiting to re-register');
-		scheduleReconnect(daemonDir, configuredWsPort, registration, attempt + 1, display, approvalProvider);
+		scheduleReconnect(
+			daemonDir,
+			configuredWsPort,
+			registration,
+			attempt + 1,
+			display,
+			approvalProvider,
+			resolveToken
+		);
 	});
 }
 
@@ -352,7 +373,9 @@ function scheduleReconnect(
 	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>,
 	attempt: number,
 	display: WorkerDisplay,
-	approvalProvider: ApprovalProvider | undefined
+	approvalProvider: ApprovalProvider | undefined,
+	/** Re-read on every attempt: the daemon rotates its own token each time it starts. */
+	resolveToken: () => string
 ): void {
 	// Two ways to learn the daemon is back, whichever comes first: it publishes worker.port when
 	// its listener is bound, and the backoff covers the case where that notification never arrives
@@ -367,7 +390,7 @@ function scheduleReconnect(
 		fired = true;
 		if (timer !== undefined) clearTimeout(timer);
 		stopWatching?.();
-		connect(daemonDir, configuredWsPort, registration, attempt, display, approvalProvider);
+		connect(daemonDir, configuredWsPort, registration, attempt, display, approvalProvider, resolveToken);
 	};
 
 	timer = scheduleReconnectTimer(reconnectDelayMs(attempt), reconnect);
@@ -419,6 +442,8 @@ async function handleMessage(
 				});
 				display.stepFailed(stepId, error);
 			}
+			// No credential refresh here: this socket is already authenticated, and re-reading a
+			// token mid-connection would only matter if the daemon re-checked it, which it does not.
 			send({ type: 'ready', ...registration });
 			break;
 		}

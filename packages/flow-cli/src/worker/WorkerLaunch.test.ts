@@ -11,6 +11,7 @@ import {
 	resolveSourceId,
 	resolveWorkerToken,
 	scheduleReconnectTimer,
+	withFreshToken,
 } from './WorkerLaunch.js';
 
 let dir: string;
@@ -299,5 +300,58 @@ describe('worker configuration from the environment', () => {
 		process.env['FLOW_DAEMON_WS_URL'] = 'ws://10.0.0.5:4101';
 
 		expect(resolveDaemonWsUrl('C:/nonexistent-daemon-dir', 4242)).toBe('ws://127.0.0.1:4242');
+	});
+});
+
+describe('withFreshToken', () => {
+	// The bug this pins down: the daemon rewrites health_token every time it starts, and the worker
+	// resolved its credential once at launch. So after any daemon restart the worker connected,
+	// was refused, and retried forever with the same dead token -- silently, since a refusal went to
+	// the daemon's discarded stderr. D#51 wants the worker to outlive the daemon; its credential has
+	// to as well.
+	it('sends the credential as it is now, not as it was at launch', () => {
+		const registration = buildRegistration({
+			projectRoot: 'C:/p',
+			isTty: false,
+			canPrompt: false,
+			pid: 1,
+			token: 'stale',
+		});
+
+		const refreshed = withFreshToken(registration, () => 'rotated');
+
+		expect(refreshed.authToken).toBe('rotated');
+	});
+
+	it('leaves the rest of the registration untouched', () => {
+		const registration = buildRegistration({
+			projectRoot: 'C:/p',
+			extraProjects: ['C:/other'],
+			isTty: false,
+			canPrompt: false,
+			pid: 7,
+			labels: ['gpu'],
+			sourceId: 'laptop',
+			token: 'stale',
+		});
+
+		const refreshed = withFreshToken(registration, () => 'rotated');
+
+		expect(refreshed.attachedProjects).toEqual(['C:/p', 'C:/other']);
+		expect(refreshed.labels).toEqual(['gpu']);
+		expect(refreshed.sourceId).toBe('laptop');
+		expect(refreshed.pid).toBe(7);
+	});
+
+	// A credential that cannot be re-read must not silently downgrade to none: registering without
+	// one is refused anyway, and the reason would be lost.
+	it('propagates the failure when the credential can no longer be resolved', () => {
+		const registration = buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: false, pid: 1 });
+
+		expect(() =>
+			withFreshToken(registration, () => {
+				throw new Error('health_token is gone');
+			})
+		).toThrow(/health_token/);
 	});
 });

@@ -498,3 +498,35 @@ describe('WorkerProvisioner - registration admission', () => {
 		expect(registry.describe(ws)?.hasUserInterface).toBe(true);
 	});
 });
+
+describe('WorkerProvisioner - reporting a refusal', () => {
+	// The bug this pins down: a refusal went to process.stderr, and the daemon runs detached with
+	// stdio 'ignore'. So a worker holding a stale credential -- which every worker does after the
+	// daemon rotates its token on restart -- was refused in complete silence and retried forever,
+	// while `flow worker list` simply showed nothing connected.
+	it('reports through the injected reporter rather than stderr', () => {
+		const reported: string[] = [];
+		const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		const provisioner = new WorkerProvisioner(
+			2,
+			new WorkerRegistry(),
+			// Not spawned by this daemon, so it takes the authenticated external path.
+			fakeSource({ hasSpawned: () => false }),
+			{ authenticate: () => ({ ok: false, reason: 'credential rejected' }) },
+			{ find: () => undefined, list: () => [] },
+			undefined,
+			message => reported.push(message)
+		);
+
+		const admitted = provisioner.registerWorker(fakeWorker(), {
+			pid: 1,
+			attachedProjects: ['C:/p'],
+			labels: [],
+			authToken: 'stale',
+		} as never);
+
+		expect(admitted).toBe(false);
+		expect(reported.join('\n')).toMatch(/credential rejected/);
+		expect(stderr).not.toHaveBeenCalled();
+	});
+});
