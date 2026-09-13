@@ -19,6 +19,13 @@ export interface ModelStepConfig {
 	executionConfig?: ExecutionConfig;
 	/** Called with the fully-rendered prompt before the model CLI is launched. Use for debug logging. */
 	onRenderedPrompt?: (prompt: string) => void;
+	/**
+	 * The step's model after family names like "sonnet" have been resolved for this provider.
+	 *
+	 * Resolved by the caller because that is where the provider is known (see `ModelAliases`).
+	 * Absent means "use `step.model` as written", which is what every existing caller does.
+	 */
+	resolvedModel?: string;
 }
 
 export async function executeModelStep(
@@ -36,9 +43,14 @@ export async function executeModelStep(
 	const { templateRenderer, outputExtractor } = services;
 	const provider = config.provider;
 
+	// What actually gets called. Recorded rather than the step's wording so the trace answers
+	// "which model ran this?" -- a step saying `model: sonnet` otherwise leaves no record of
+	// which sonnet it was.
+	const effectiveModel = config.resolvedModel ?? step.model;
+
 	const renderedPrompt = templateRenderer.render(step.prompt, context, true);
 	stepTrace.prompt = renderedPrompt;
-	stepTrace.model = step.model;
+	stepTrace.model = effectiveModel;
 
 	// Emit the rendered prompt before launching the model so callers can forward it
 	// to the execution log. The format starts with "[rendered prompt]\n" for easy filtering.
@@ -108,7 +120,7 @@ export async function executeModelStep(
 		workingDir: workspacePath,
 		prompt: renderedPrompt,
 		stepId: step.id,
-		model: step.model,
+		model: effectiveModel,
 		env: (() => {
 			const merged = { ...(config.claudeEnv ?? {}), ...(step.env ?? {}) };
 			return Object.keys(merged).length > 0 ? merged : undefined;
@@ -161,7 +173,7 @@ export async function executeModelStep(
 	};
 
 	const buildModelMeta = (): ModelStepMeta => ({
-		model: step.model ?? '',
+		model: effectiveModel ?? '',
 		session_id: capturedSessionId,
 		session_file: capturedSessionFile,
 		ttft_ms: capturedTtftMs,

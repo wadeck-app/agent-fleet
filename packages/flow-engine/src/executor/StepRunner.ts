@@ -11,6 +11,7 @@ import type { ApprovalProvider } from 'extension-points';
 
 import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
 import { CodexModelProvider } from '../processing/CodexModelProvider';
+import { resolveModelAlias } from '../processing/ModelAliases';
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import { OpenCodeModelProvider } from '../processing/OpenCodeModelProvider';
 import { OutputExtractor } from '../processing/OutputExtractor';
@@ -178,6 +179,10 @@ export class StepRunner {
 						onClaudeProcessStarted: this.config.onClaudeProcessStarted,
 						executionConfig: this.config.executionConfig,
 						onRenderedPrompt: this.config.onRenderedPrompt,
+						// Resolved here because this is where the provider is known: "sonnet" means a
+						// different id for opencode than for claude, and nothing for codex. An id
+						// that is not a family name passes through untouched.
+						resolvedModel: resolveModelAlias(providerName, modelStep.model),
 					},
 					services,
 					onLogEntry

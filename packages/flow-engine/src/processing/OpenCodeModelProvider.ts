@@ -119,6 +119,22 @@ function buildSpawnParams(
 		args.push(options.prompt);
 	}
 
+	// Run against an already-running opencode server instead of starting a private one.
+	//
+	// This is what makes a step watchable: with a shared server, a human can
+	// `opencode attach <url> -c` from their own terminal, see the session as it happens and send
+	// messages into it. Read from the step's env rather than a new step field so a flow can set
+	// it per step, or globally, with nothing else to plumb.
+	const attachUrl = options.env?.['OPENCODE_ATTACH_URL'];
+	if (attachUrl !== undefined) {
+		if (attachUrl.trim() === '') {
+			throw new Error(
+				'OPENCODE_ATTACH_URL is set but empty. Give the URL of a running opencode server (e.g. http://127.0.0.1:4096), or remove the variable to let the step start its own.'
+			);
+		}
+		args.push('--attach', attachUrl.trim());
+	}
+
 	// --format json (always required)
 	args.push('--format', 'json');
 

@@ -111,6 +111,37 @@ describe('OpenCodeModelProvider', () => {
 			expect(args).not.toContain('--resume');
 		});
 
+		// Lets a step run against a server the human is also attached to, which is the only way
+		// to watch a session live and send messages into it.
+		it('attaches to a running server when the step names one', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({ env: { OPENCODE_ATTACH_URL: 'http://127.0.0.1:4096' } })
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			const idx = args.indexOf('--attach');
+			expect(idx).toBeGreaterThan(-1);
+			expect(args[idx + 1]).toBe('http://127.0.0.1:4096');
+		});
+
+		it('runs its own server when no attach url is given', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args).not.toContain('--attach');
+		});
+
+		// A blank value is a mistake, not a request to attach to nothing.
+		it('refuses a blank attach url instead of sending an empty flag', async () => {
+			await expect(
+				provider.launchBackground(makeBaseOptions({ env: { OPENCODE_ATTACH_URL: '   ' } }))
+			).rejects.toThrow(/OPENCODE_ATTACH_URL/);
+		});
+
 		it('omits the session flag entirely when no session is being continued', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
