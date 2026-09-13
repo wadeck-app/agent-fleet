@@ -1,9 +1,15 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildRegistration, reconnectDelayMs, resolveDaemonWsUrl, resolveWorkerToken } from './WorkerLaunch.js';
+import {
+	buildRegistration,
+	reconnectDelayMs,
+	resolveDaemonWsUrl,
+	resolveWorkerToken,
+	scheduleReconnectTimer,
+} from './WorkerLaunch.js';
 
 let dir: string;
 
@@ -190,6 +196,31 @@ describe('buildRegistration', () => {
 		expect(() =>
 			buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: false, pid: 1, labels: ['  '] })
 		).toThrow(/empty/i);
+	});
+});
+
+describe('scheduleReconnectTimer', () => {
+	// The bug this pins down: the timer used to be unref'd, so once the socket closed nothing kept
+	// the event loop alive and `flow worker` exited with code 0 while printing "waiting to
+	// re-register". A worker that quietly disappears takes every user_intervention step with it.
+	it('keeps the process alive while waiting to re-register', () => {
+		const timer = scheduleReconnectTimer(60_000, () => undefined);
+
+		try {
+			expect(timer.hasRef()).toBe(true);
+		} finally {
+			clearTimeout(timer);
+		}
+	});
+
+	it('runs the reconnect callback it was given', async () => {
+		let called = false;
+		const timer = scheduleReconnectTimer(1, () => {
+			called = true;
+		});
+
+		await vi.waitFor(() => expect(called).toBe(true), { interval: 1, timeout: 1000 });
+		clearTimeout(timer);
 	});
 });
 

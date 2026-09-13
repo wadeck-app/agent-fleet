@@ -150,3 +150,15 @@ export function reconnectDelayMs(attempt: number): number {
 	const delay = BASE_RECONNECT_DELAY_MS * 2 ** Math.min(attempt, 10);
 	return Math.min(delay, MAX_RECONNECT_DELAY_MS);
 }
+
+/**
+ * Timer that carries the worker across a daemon outage.
+ *
+ * Deliberately NOT unref'd: while the socket is down this timer is the only handle left, so an
+ * unref'd one lets Node exit immediately -- the worker printed "waiting to re-register" and then
+ * died with code 0, taking every user_intervention step with it. Waiting is the whole point (D#51),
+ * and waiting requires holding the event loop open.
+ */
+export function scheduleReconnectTimer(delayMs: number, reconnect: () => void): NodeJS.Timeout {
+	return setTimeout(reconnect, delayMs);
+}

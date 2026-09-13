@@ -16,7 +16,13 @@ import type { AssignmentScopedMessage, DaemonToWorker, WorkerSummary, WorkerToDa
 import type { McpServerConfig } from '../../worker/McpServer';
 import { WorkerAdapter } from '../../worker/WorkerAdapter';
 import { WorkerDisplay } from '../../worker/WorkerDisplay';
-import { buildRegistration, reconnectDelayMs, resolveDaemonWsUrl, resolveWorkerToken } from '../../worker/WorkerLaunch';
+import {
+	buildRegistration,
+	reconnectDelayMs,
+	resolveDaemonWsUrl,
+	resolveWorkerToken,
+	scheduleReconnectTimer,
+} from '../../worker/WorkerLaunch';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -50,8 +56,9 @@ function report(prefix: '[fail]' | '[wait]' | '[warn]', message: string): void {
  * The difference from the worker the daemon forks is deliberate and is the whole point
  * of the feature: this process does **not** exit when the socket closes. The daemon may
  * idle down or restart freely (D#51), and this worker waits and re-registers, so the
- * terminal the user opened keeps serving steps. Because it has a TTY, it is also the
- * only kind of worker that can serve an interactive step (D#32).
+ * terminal the user opened keeps serving steps. It is also the only kind of worker that can
+ * serve an interactive step (D#32) -- whether it needs a TTY to do so is up to the configured
+ * approval plugin, not to this process.
  *
  * PRIVILEGE NOTE (T-08). A forked worker receives an allow-listed environment; this one
  * inherits the whole shell it was launched from -- PATH, credentials, agent sockets,
@@ -287,10 +294,9 @@ function scheduleReconnect(
 	display: WorkerDisplay,
 	approvalProvider: ApprovalProvider | undefined
 ): void {
-	const delay = reconnectDelayMs(attempt);
-	setTimeout(() => {
+	scheduleReconnectTimer(reconnectDelayMs(attempt), () => {
 		connect(daemonDir, configuredWsPort, registration, attempt, display, approvalProvider);
-	}, delay).unref?.();
+	});
 }
 
 async function handleMessage(
