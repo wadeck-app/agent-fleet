@@ -152,7 +152,7 @@ export class CommandHandler {
 		/**
 		 * Asks every declared source for a worker (D#66).
 		 *
-		 * Injected because contacting a source needs the daemon's own wiring -- the host
+		 * Injected because contacting a source needs the daemon's own wiring -- the relay
 		 * registry, the published endpoint -- which this class deliberately knows nothing
 		 * about. Optional so the many tests that never exercise provisioning stay unchanged.
 		 */

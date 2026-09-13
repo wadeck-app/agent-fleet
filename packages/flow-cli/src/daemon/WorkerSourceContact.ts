@@ -2,19 +2,19 @@ import type { WorkerRequest, WorkerSourceProvider } from 'extension-points';
 import { spawn } from 'node:child_process';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
-import type { RegisteredHost } from './HostRegistry.js';
-import { HostWorkerSource } from './HostWorkerSource.js';
+import type { RegisteredRelay } from './RelayRegistry.js';
+import { RelayWorkerSource } from './RelayWorkerSource.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
 /** The S1 implementations that ship with flow. */
 const BUILT_IN_INBOUND = 'built-in:inbound';
 const BUILT_IN_COMMAND = 'built-in:command';
-const BUILT_IN_HOST = 'built-in:host';
+const BUILT_IN_RELAY = 'built-in:relay';
 
 /** What an implementation may need from the daemon to reach its source. */
 export interface SourceProviderDependencies {
-	/** Looks up the live connection for a source, for the host provider (D#17). */
-	findHost?: (sourceId: string) => RegisteredHost | undefined;
+	/** Looks up the live connection for a source, for the relay provider (D#17). */
+	findRelay?: (sourceId: string) => RegisteredRelay | undefined;
 	/**
 	 * Mints the one-shot credential a launched worker registers with (T-09).
 	 *
@@ -131,21 +131,21 @@ export function resolveSourceProvider(
 			return new InboundWorkerSource();
 		case BUILT_IN_COMMAND:
 			return new CommandWorkerSource(options, dependencies.issueLaunchToken);
-		case BUILT_IN_HOST: {
-			const { findHost } = dependencies;
-			if (findHost === undefined) {
-				// Refused rather than degraded: a host source with no way to reach hosts would
-				// silently produce nothing, which is indistinguishable from a machine that is
+		case BUILT_IN_RELAY: {
+			const { findRelay } = dependencies;
+			if (findRelay === undefined) {
+				// Refused rather than degraded: a relay source with no way to reach relays would
+				// silently produce nothing, which is indistinguishable from a relay that is
 				// merely offline.
 				throw new Error(
-					`provider ${BUILT_IN_HOST} needs the daemon's host registry, which was not supplied. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
+					`provider ${BUILT_IN_RELAY} needs the daemon's relay registry, which was not supplied. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
 				);
 			}
-			return new HostWorkerSource(findHost);
+			return new RelayWorkerSource(findRelay);
 		}
 		default:
 			throw new Error(
-				`unknown worker source provider "${provider}". Supported in v1: ${BUILT_IN_INBOUND}, ${BUILT_IN_COMMAND}, ${BUILT_IN_HOST}.`
+				`unknown worker source provider "${provider}". Supported in v1: ${BUILT_IN_INBOUND}, ${BUILT_IN_COMMAND}, ${BUILT_IN_RELAY}.`
 			);
 	}
 }

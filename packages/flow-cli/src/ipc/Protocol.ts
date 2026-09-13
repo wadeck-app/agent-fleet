@@ -88,50 +88,50 @@ export type DaemonToWorker =
 	| { type: 'done' };
 
 /**
- * A machine that supplies workers, connected to the daemon (D#17, D#19).
+ * A relay that supplies workers, connected to the daemon (D#17, D#19).
  *
- * Inbound only: the host dials the daemon, so the daemon never holds credentials for
+ * Inbound only: the relay dials the daemon, so the daemon never holds credentials for
  * logging into it and there is no credential store to compromise (D#18).
  */
 export interface SourceReady {
 	type: 'source_ready';
-	/** The declared source this host is claiming to be. */
+	/** The declared source this relay is claiming to be. */
 	sourceId: string;
 	/**
 	 * Credential for registering *as a source*, which is not a worker credential (T-04,
 	 * T-11): a fake source manufactures capacity wholesale rather than absorbing one step.
 	 */
 	sourceToken: string;
-	/** How many workers this host is willing to run. The daemon never exceeds it (D#19). */
+	/** How many workers this relay is willing to run. The daemon never exceeds it (D#19). */
 	capacity: number;
 }
 
 /**
- * What the daemon may say to a host.
+ * What the daemon may say to a relay.
  *
  * Nothing here is executable, and nothing names a command, a path, or a script: the daemon
- * asks for a worker, and *how* one comes into being is the host's business, decided from
+ * asks for a worker, and *how* one comes into being is the relay's business, decided from
  * recipes it holds locally (D#19, D#20). That is what stops a compromised daemon from
- * owning every connected machine (T-13).
+ * owning every connected relay (T-13).
  */
 export type DaemonToSource = {
 	type: 'provide_worker';
-	/** Correlates the host's answer with this request. */
+	/** Correlates the relay's answer with this request. */
 	requestId: string;
-	/** Projects the worker would serve, so the host can decline what it cannot reach (D#9). */
+	/** Projects the worker would serve, so the relay can decline what it cannot reach (D#9). */
 	projects: string[];
 	/** Labels the resulting worker is expected to carry (D#30). */
 	labels: string[];
 };
 
-/** What a host may say back. */
+/** What a relay may say back. */
 export type SourceToDaemon =
 	| SourceReady
 	| {
 			type: 'provide_worker_ack';
 			requestId: string;
 			/**
-			 * Whether the host will try to produce a worker.
+			 * Whether the relay will try to produce a worker.
 			 *
 			 * Accepting is **not** a promise that one appears: only a live connection proves a
 			 * worker exists (D#4). Declining is normal -- at capacity, or unable to serve the

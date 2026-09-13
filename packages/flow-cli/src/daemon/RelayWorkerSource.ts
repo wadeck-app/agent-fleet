@@ -3,51 +3,51 @@ import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 
 import type { DaemonToSource, SourceToDaemon } from '../ipc/Protocol';
-import type { RegisteredHost } from './HostRegistry.js';
+import type { RegisteredRelay } from './RelayRegistry.js';
 
-/** How long a host has to answer before the daemon gives up on it. */
-const DEFAULT_HOST_TIMEOUT_MS = 10_000;
+/** How long a relay has to answer before the daemon gives up on it. */
+const DEFAULT_RELAY_TIMEOUT_MS = 10_000;
 
-export interface HostWorkerSourceOptions {
+export interface RelayWorkerSourceOptions {
 	/**
-	 * Bound on the wait for a host's answer.
+	 * Bound on the wait for a relay's answer.
 	 *
 	 * Not a bound on the worker appearing -- nothing waits for that (D#4, D#66). This only
-	 * stops one unresponsive machine from holding up provisioning for everyone else.
+	 * stops one unresponsive relay from holding up provisioning for everyone else.
 	 */
 	timeoutMs?: number;
 }
 
 /**
- * S1 for a remote host: asks a machine that is already connected to produce a worker.
+ * S1 for a remote relay: asks a relay that is already connected to produce a worker.
  *
  * This is the daemon-side half that D#52 and D#53 require. The *creation mechanism* lives on
- * the host (D#20) -- this only carries the ask, through S1's single method, so contact-or-create
+ * the relay (D#20) -- this only carries the ask, through S1's single method, so contact-or-create
  * stays entirely the plugin's business.
  *
  * What travels is demand and nothing else: how many, for which projects, with which labels.
  * No command, no script, no path (D#19). That is what contains T-13: a compromised daemon can
- * inflate demand, bounded by each host's own declared capacity, but it cannot make a host run
+ * inflate demand, bounded by each relay's own declared capacity, but it cannot make a relay run
  * something of the daemon's choosing.
  *
- * Resolving means the host accepted the ask, not that a worker exists. Only a live connection
+ * Resolving means the relay accepted the ask, not that a worker exists. Only a live connection
  * proves that (D#4), and the caller bounds its own wait separately (S8).
  */
-export class HostWorkerSource implements WorkerSourceProvider {
+export class RelayWorkerSource implements WorkerSourceProvider {
 	private readonly timeoutMs: number;
 
 	constructor(
-		private readonly findHost: (sourceId: string) => RegisteredHost | undefined,
-		options: HostWorkerSourceOptions = {}
+		private readonly findRelay: (sourceId: string) => RegisteredRelay | undefined,
+		options: RelayWorkerSourceOptions = {}
 	) {
-		this.timeoutMs = options.timeoutMs ?? DEFAULT_HOST_TIMEOUT_MS;
+		this.timeoutMs = options.timeoutMs ?? DEFAULT_RELAY_TIMEOUT_MS;
 	}
 
 	async obtainWorker(request: WorkerRequest): Promise<void> {
-		const host = this.findHost(request.sourceId);
-		if (host === undefined) {
+		const relay = this.findRelay(request.sourceId);
+		if (relay === undefined) {
 			throw new Error(
-				`source "${request.sourceId}" has no host connected, so it cannot be asked for a worker. A host dials the daemon itself -- start it on that machine and check it registered with "flow worker source list".`
+				`source "${request.sourceId}" has no relay connected, so it cannot be asked for a worker. A relay dials the daemon itself -- start it on that machine and check it registered with "flow worker source list".`
 			);
 		}
 
@@ -59,7 +59,7 @@ export class HostWorkerSource implements WorkerSourceProvider {
 			labels: [],
 		};
 
-		const answer = await this.askHost(host.ws, requestId, demand, request.sourceId);
+		const answer = await this.askRelay(relay.ws, requestId, demand, request.sourceId);
 		if (!answer.accepted) {
 			const because = answer.reason === undefined || answer.reason === '' ? 'it gave no reason' : answer.reason;
 			throw new Error(`source "${request.sourceId}" declined to provide a worker: ${because}`);
@@ -70,10 +70,10 @@ export class HostWorkerSource implements WorkerSourceProvider {
 	 * Sends the ask and waits for the matching answer.
 	 *
 	 * Answers are matched on `requestId` and anything else is ignored rather than treated as a
-	 * reply: a host serving several asks at once will interleave them, and taking the first
+	 * reply: a relay serving several asks at once will interleave them, and taking the first
 	 * message to arrive would attribute one ask's refusal to another.
 	 */
-	private askHost(
+	private askRelay(
 		ws: WebSocket,
 		requestId: string,
 		demand: DaemonToSource,
@@ -101,7 +101,7 @@ export class HostWorkerSource implements WorkerSourceProvider {
 				settle(() => {
 					reject(
 						new Error(
-							`source "${sourceId}" did not answer within ${String(this.timeoutMs)} ms. The host is connected but unresponsive; the daemon stopped waiting rather than holding up the queue.`
+							`source "${sourceId}" did not answer within ${String(this.timeoutMs)} ms. The relay is connected but unresponsive; the daemon stopped waiting rather than holding up the queue.`
 						)
 					);
 				});

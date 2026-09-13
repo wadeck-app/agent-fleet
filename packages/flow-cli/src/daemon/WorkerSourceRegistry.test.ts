@@ -267,3 +267,79 @@ describe('WorkerSourceRegistry - a worker that declared itself', () => {
 		expect(new WorkerSourceRegistry(dir).pruneDead()).toEqual([]);
 	});
 });
+
+/**
+ * `built-in:host` was the relay provider's name before the rename. It is refused rather than
+ * aliased: it never had a relay process to talk to, so an entry naming it never worked, and
+ * quietly mapping it onto `built-in:relay` would present capacity that is not there.
+ */
+describe('WorkerSourceRegistry - the retired built-in:host provider', () => {
+	it('refuses a declaration naming it, pointing at built-in:relay', () => {
+		const registry = new WorkerSourceRegistry(dir);
+
+		expect(() => registry.declare({ ...declaration, provider: 'built-in:host' })).toThrow(/built-in:relay/);
+	});
+
+	it('tells the user to re-declare the source rather than edit anything', () => {
+		const registry = new WorkerSourceRegistry(dir);
+
+		expect(() => registry.declare({ ...declaration, provider: 'built-in:host' })).toThrow(
+			/flow worker source add laptop --provider built-in:relay/
+		);
+	});
+
+	// The entry may already sit in the file from before the rename; reading must not pass it on.
+	it('refuses an entry already persisted with it, on any read', () => {
+		writeFileSync(
+			join(dir, 'worker-sources.json'),
+			JSON.stringify({
+				sources: [
+					{
+						sourceId: 'build-box',
+						provider: 'built-in:host',
+						labels: [],
+						maxWorkers: 1,
+						tokenHash: 'x',
+						createdAt: '2026-01-01T00:00:00.000Z',
+					},
+				],
+			}),
+			'utf8'
+		);
+		const registry = new WorkerSourceRegistry(dir);
+
+		expect(() => registry.list()).toThrow(/built-in:relay/);
+		expect(() => registry.find('build-box')).toThrow(/built-in:relay/);
+		expect(() => registry.verifySourceToken('build-box', 'anything')).toThrow(/built-in:relay/);
+	});
+
+	// Removal is the remedy the error names, so it must not be blocked by the entry it removes.
+	it('still lets the stale entry be removed', () => {
+		writeFileSync(
+			join(dir, 'worker-sources.json'),
+			JSON.stringify({
+				sources: [
+					{
+						sourceId: 'build-box',
+						provider: 'built-in:host',
+						labels: [],
+						maxWorkers: 1,
+						tokenHash: 'x',
+						createdAt: '2026-01-01T00:00:00.000Z',
+					},
+				],
+			}),
+			'utf8'
+		);
+		const registry = new WorkerSourceRegistry(dir);
+
+		expect(registry.remove('build-box')).toBe(true);
+		expect(registry.list()).toEqual([]);
+	});
+
+	it('accepts built-in:relay', () => {
+		const registry = new WorkerSourceRegistry(dir);
+
+		expect(registry.declare({ ...declaration, provider: 'built-in:relay' }).entry.provider).toBe('built-in:relay');
+	});
+});

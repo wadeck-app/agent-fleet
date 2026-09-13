@@ -1,9 +1,9 @@
 /**
- * A host supplying workers, exercised over a real WebSocket (Phase 4b).
+ * A relay supplying workers, exercised over a real WebSocket (Phase 4b).
  *
- * The peer is a second *process-less* participant on loopback, not a second machine. That
- * limit is real and worth naming: it proves the protocol, the credential separation and the
- * refusal paths, but it cannot prove anything about reaching another host over a network.
+ * The peer is a second *process-less* participant on loopback, not a relay on another machine.
+ * That limit is real and worth naming: it proves the protocol, the credential separation and the
+ * refusal paths, but it cannot prove anything about reaching a relay over a network.
  * The encrypted-transport half is covered separately (`WebSocketServer.test.ts`).
  */
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -12,8 +12,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
-import { HostRegistry } from '../daemon/HostRegistry';
-import { HostWorkerSource } from '../daemon/HostWorkerSource';
+import { RelayRegistry } from '../daemon/RelayRegistry';
+import { RelayWorkerSource } from '../daemon/RelayWorkerSource';
 import { WebSocketServer } from '../daemon/WebSocketServer';
 import { WorkerSourceRegistry } from '../daemon/WorkerSourceRegistry';
 import type { SourceToDaemon } from '../ipc/Protocol';
@@ -23,7 +23,7 @@ let server: WebSocketServer | undefined;
 let client: WebSocket | undefined;
 
 beforeEach(() => {
-	dir = mkdtempSync(join(tmpdir(), 'host-source-'));
+	dir = mkdtempSync(join(tmpdir(), 'relay-source-'));
 });
 
 afterEach(() => {
@@ -36,14 +36,14 @@ afterEach(() => {
 
 /** Stands up the daemon side and a connected peer, returning both ends. */
 async function connectPeer(): Promise<{
-	hosts: HostRegistry;
+	relays: RelayRegistry;
 	sources: WorkerSourceRegistry;
 	peer: WebSocket;
 	peerMessages: Record<string, unknown>[];
 	serverSocketFor: () => Promise<void>;
 }> {
 	const sources = new WorkerSourceRegistry(dir);
-	const hosts = new HostRegistry(sources);
+	const relays = new RelayRegistry(sources);
 	const received: { ws: unknown; message: Record<string, unknown> }[] = [];
 
 	server = new WebSocketServer(
@@ -52,11 +52,11 @@ async function connectPeer(): Promise<{
 			received.push({ ws, message: message as unknown as Record<string, unknown> });
 			const asSource = message as unknown as { type?: string };
 			if (asSource.type === 'source_ready') {
-				const admission = hosts.register(ws, message as never);
+				const admission = relays.register(ws, message as never);
 				if (!admission.ok) ws.terminate();
 			}
 		},
-		ws => hosts.remove(ws)
+		ws => relays.remove(ws)
 	);
 	const port = await server.start();
 
@@ -70,7 +70,7 @@ async function connectPeer(): Promise<{
 	client = peer;
 
 	return {
-		hosts,
+		relays,
 		sources,
 		peer,
 		peerMessages,
@@ -80,29 +80,29 @@ async function connectPeer(): Promise<{
 	};
 }
 
-describe('a host registering as a source', () => {
+describe('a relay registering as a source', () => {
 	it('is admitted with the source token and appears as reachable', async () => {
-		const { hosts, sources, peer } = await connectPeer();
+		const { relays, sources, peer } = await connectPeer();
 		const { sourceToken } = sources.declare({
 			sourceId: 'build-box',
-			provider: 'built-in:host',
+			provider: 'built-in:relay',
 			labels: [],
 			maxWorkers: 2,
 		});
 
 		peer.send(JSON.stringify({ type: 'source_ready', sourceId: 'build-box', sourceToken, capacity: 2 }));
-		await vi.waitFor(() => expect(hosts.find('build-box')).toBeDefined());
+		await vi.waitFor(() => expect(relays.find('build-box')).toBeDefined());
 
-		expect(hosts.find('build-box')?.capacity).toBe(2);
+		expect(relays.find('build-box')?.capacity).toBe(2);
 	});
 
 	// The property the credential split exists for, end to end: the worker token is useless
 	// for claiming to *be* the source (T-04, T-11).
 	it('is refused and disconnected when it presents the worker token', async () => {
-		const { hosts, sources, peer } = await connectPeer();
+		const { relays, sources, peer } = await connectPeer();
 		const { token } = sources.declare({
 			sourceId: 'build-box',
-			provider: 'built-in:host',
+			provider: 'built-in:relay',
 			labels: [],
 			maxWorkers: 2,
 		});
@@ -111,57 +111,57 @@ describe('a host registering as a source', () => {
 		peer.send(JSON.stringify({ type: 'source_ready', sourceId: 'build-box', sourceToken: token, capacity: 2 }));
 		await closed;
 
-		expect(hosts.find('build-box')).toBeUndefined();
+		expect(relays.find('build-box')).toBeUndefined();
 	});
 
 	it('is refused when the source was never declared', async () => {
-		const { hosts, peer } = await connectPeer();
+		const { relays, peer } = await connectPeer();
 		const closed = new Promise<void>(resolve => peer.once('close', () => resolve()));
 
 		peer.send(JSON.stringify({ type: 'source_ready', sourceId: 'ghost', sourceToken: 'anything', capacity: 1 }));
 		await closed;
 
-		expect(hosts.liveCount).toBe(0);
+		expect(relays.liveCount).toBe(0);
 	});
 });
 
-describe('asking a registered host for a worker', () => {
-	/** Registers the peer as a host and returns the pieces needed to ask it for a worker. */
-	async function registeredHost() {
+describe('asking a registered relay for a worker', () => {
+	/** Registers the peer as a relay and returns the pieces needed to ask it for a worker. */
+	async function registeredRelay() {
 		const context = await connectPeer();
 		const { sourceToken } = context.sources.declare({
 			sourceId: 'build-box',
-			provider: 'built-in:host',
+			provider: 'built-in:relay',
 			labels: [],
 			maxWorkers: 2,
 		});
 		context.peer.send(JSON.stringify({ type: 'source_ready', sourceId: 'build-box', sourceToken, capacity: 2 }));
-		await vi.waitFor(() => expect(context.hosts.find('build-box')).toBeDefined());
+		await vi.waitFor(() => expect(context.relays.find('build-box')).toBeDefined());
 		return context;
 	}
 
-	it('reaches the host, which can accept', async () => {
-		const { hosts, peer, peerMessages } = await registeredHost();
+	it('reaches the relay, which can accept', async () => {
+		const { relays, peer, peerMessages } = await registeredRelay();
 		peer.on('message', (data: Buffer) => {
 			const message = JSON.parse(data.toString()) as { type: string; requestId: string };
 			if (message.type !== 'provide_worker') return;
 			const ack: SourceToDaemon = { type: 'provide_worker_ack', requestId: message.requestId, accepted: true };
 			peer.send(JSON.stringify(ack));
 		});
-		const source = new HostWorkerSource(id => hosts.find(id), { timeoutMs: 2_000 });
+		const source = new RelayWorkerSource(id => relays.find(id), { timeoutMs: 2_000 });
 
 		await expect(
 			source.obtainWorker({ daemonEndpoint: 'ws://127.0.0.1:0', sourceId: 'build-box', projects: ['C:/proj'] })
 		).resolves.toBeUndefined();
 
-		// What the host received carries demand only: no command, no script, no path (D#19).
+		// What the relay received carries demand only: no command, no script, no path (D#19).
 		const demand = peerMessages.find(m => m['type'] === 'provide_worker');
 		expect(demand).toBeDefined();
 		expect(Object.keys(demand!).sort()).toEqual(['labels', 'projects', 'requestId', 'type']);
 	});
 
-	it('surfaces the host declining, rather than reporting capacity that is not coming', async () => {
-		const { hosts, peer } = await registeredHost();
+	it('surfaces the relay declining, rather than reporting capacity that is not coming', async () => {
+		const { relays, peer } = await registeredRelay();
 		peer.on('message', (data: Buffer) => {
 			const message = JSON.parse(data.toString()) as { type: string; requestId: string };
 			if (message.type !== 'provide_worker') return;
@@ -174,31 +174,31 @@ describe('asking a registered host for a worker', () => {
 				})
 			);
 		});
-		const source = new HostWorkerSource(id => hosts.find(id), { timeoutMs: 2_000 });
+		const source = new RelayWorkerSource(id => relays.find(id), { timeoutMs: 2_000 });
 
 		await expect(
 			source.obtainWorker({ daemonEndpoint: 'ws://127.0.0.1:0', sourceId: 'build-box', projects: [] })
 		).rejects.toThrow(/all builders busy/);
 	});
 
-	// One unresponsive machine must not hold up provisioning for everyone else (D#66).
-	it('gives up on a host that stays silent', async () => {
-		const { hosts } = await registeredHost();
-		const source = new HostWorkerSource(id => hosts.find(id), { timeoutMs: 60 });
+	// One unresponsive relay must not hold up provisioning for everyone else (D#66).
+	it('gives up on a relay that stays silent', async () => {
+		const { relays } = await registeredRelay();
+		const source = new RelayWorkerSource(id => relays.find(id), { timeoutMs: 60 });
 
 		await expect(
 			source.obtainWorker({ daemonEndpoint: 'ws://127.0.0.1:0', sourceId: 'build-box', projects: [] })
 		).rejects.toThrow(/did not answer/);
 	});
 
-	it('reports a host that has disconnected as unreachable, not as unproductive', async () => {
-		const { hosts, peer } = await registeredHost();
+	it('reports a relay that has disconnected as unreachable, not as unproductive', async () => {
+		const { relays, peer } = await registeredRelay();
 		peer.close();
-		await vi.waitFor(() => expect(hosts.find('build-box')).toBeUndefined());
-		const source = new HostWorkerSource(id => hosts.find(id), { timeoutMs: 500 });
+		await vi.waitFor(() => expect(relays.find('build-box')).toBeUndefined());
+		const source = new RelayWorkerSource(id => relays.find(id), { timeoutMs: 500 });
 
 		await expect(
 			source.obtainWorker({ daemonEndpoint: 'ws://127.0.0.1:0', sourceId: 'build-box', projects: [] })
-		).rejects.toThrow(/no host connected/);
+		).rejects.toThrow(/no relay connected/);
 	});
 });

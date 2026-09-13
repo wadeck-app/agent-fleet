@@ -6320,3 +6320,37 @@ Two-part fix:
 - node.exe with pipe/NUL handles does not call AllocConsole; only console-app children spawned from a consoleless parent trigger WT.
 - Job Objects (from Claude Code, orch daemon, etc.) kill non-detached children. Use wscript.exe + detached:true to escape; all subsequent spawns can be non-detached.
 - Validate with atomic PoCs via queue dispatch: `cmd /c exit 0` = 0 terminal; `cmd /c node --version` = 1 terminal (before fix), 0 terminal (after fix).
+
+## A failure written to a stream nobody reads does not exist (2026-09-13)
+
+Five bugs cost an afternoon for one shared reason: the failure was reported to a discarded stream.
+Check this first when something "just does nothing".
+
+- **`WorkerProvisioner.refuse()` wrote to `process.stderr`** while the daemon runs detached with
+  `stdio: 'ignore'`. Every refused worker was invisible: no log line, `flow worker list` showing
+  nothing, and a worker looping forever. Refusals now go to the daemon log.
+- **queue-cli captures a subscriber's stdout/stderr and drops it**, keeping only
+  `exited with code N`. Three distinct `flow run` failures were indistinguishable. Diagnose by
+  appending `> file 2>&1` to the subscriber command.
+- **The daemon spawns its own daemon and workers with `stdio: 'ignore'`**, so anything printed
+  before the log writer exists is lost. To see a daemon crash: `FLOW_DAEMON_MODE=1 flow` in the
+  foreground.
+
+## Traps found in the worker/daemon seam (2026-09-13)
+
+- **The daemon rewrites `health_token` on every start.** Any credential a long-lived worker resolved
+  once is dead after a restart. Re-read it per connection attempt, or the worker is refused forever.
+- **`FLOW_DAEMON_MODE=1` turns any process carrying it into a daemon regardless of its arguments.**
+  A `built-in:command` source inheriting the daemon's env therefore spawned daemons, which contacted
+  their sources and spawned more: 21 orphans from one run. Strip daemon-only vars from any child.
+- **An unref'd `setTimeout` cannot hold a process open.** The worker's reconnect timer was unref'd,
+  so it printed "waiting to re-register" and exited 0 while the socket was down.
+- **esbuild only traces literal specifiers.** `createRequire(...)('pkg/file.json')` stays a runtime
+  lookup, which the standalone bundle (no `node_modules`) cannot resolve. Static-import it instead.
+- **Testing a bundle in place proves nothing**: `createRequire` still resolves through the
+  workspace's own `node_modules`. Copy the bundle outside the repo first.
+- **`plugin.config.ts` and `plugin.config.js` twins drift.** The `.js` one is what the loader
+  resolves; it silently dropped configured options after the `.ts` one was fixed. Keep both as
+  one-line re-exports of a single module under `src/`.
+- **Stopping a background shell does not kill a detached worker.** `flow worker` survives its
+  wrapper; check `wmic process where "name='node.exe'" get processid,commandline` before assuming.

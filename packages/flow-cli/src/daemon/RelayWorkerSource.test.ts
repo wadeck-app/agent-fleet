@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 
-import type { RegisteredHost } from './HostRegistry.js';
-import { HostWorkerSource } from './HostWorkerSource.js';
+import type { RegisteredRelay } from './RelayRegistry.js';
+import { RelayWorkerSource } from './RelayWorkerSource.js';
 
 const request = { daemonEndpoint: 'wss://daemon:4101', sourceId: 'build-box', projects: ['C:/proj'] };
 
-/** A host whose answer to `provide_worker` the test controls. */
-function fakeHost(answer: { accepted: boolean; reason?: string } | 'silent'): {
-	host: RegisteredHost;
+/** A relay whose answer to `provide_worker` the test controls. */
+function fakeRelay(answer: { accepted: boolean; reason?: string } | 'silent'): {
+	relay: RegisteredRelay;
 	sent: Record<string, unknown>[];
 } {
 	const sent: Record<string, unknown>[] = [];
@@ -38,13 +38,13 @@ function fakeHost(answer: { accepted: boolean; reason?: string } | 'silent'): {
 		removeListener: vi.fn(),
 	} as unknown as WebSocket;
 
-	return { host: { ws, sourceId: 'build-box', capacity: 2 }, sent };
+	return { relay: { ws, sourceId: 'build-box', capacity: 2 }, sent };
 }
 
-describe('HostWorkerSource - asking a host for a worker (D#52, D#53)', () => {
-	it('asks the connected host and resolves when it accepts', async () => {
-		const { host, sent } = fakeHost({ accepted: true });
-		const source = new HostWorkerSource(() => host, { timeoutMs: 500 });
+describe('RelayWorkerSource - asking a relay for a worker (D#52, D#53)', () => {
+	it('asks the connected relay and resolves when it accepts', async () => {
+		const { relay, sent } = fakeRelay({ accepted: true });
+		const source = new RelayWorkerSource(() => relay, { timeoutMs: 500 });
 
 		await expect(source.obtainWorker(request)).resolves.toBeUndefined();
 		expect(sent).toHaveLength(1);
@@ -52,10 +52,10 @@ describe('HostWorkerSource - asking a host for a worker (D#52, D#53)', () => {
 	});
 
 	// D#19/D#20/T-13: the daemon publishes demand. It never says how to make a worker, so a
-	// compromised daemon cannot make every connected machine run something of its choosing.
+	// compromised daemon cannot make every connected relay run something of its choosing.
 	it('sends nothing executable -- no command, script or path', async () => {
-		const { host, sent } = fakeHost({ accepted: true });
-		const source = new HostWorkerSource(() => host, { timeoutMs: 500 });
+		const { relay, sent } = fakeRelay({ accepted: true });
+		const source = new RelayWorkerSource(() => relay, { timeoutMs: 500 });
 
 		await source.obtainWorker(request);
 
@@ -63,9 +63,9 @@ describe('HostWorkerSource - asking a host for a worker (D#52, D#53)', () => {
 		expect(Object.keys(message).sort()).toEqual(['labels', 'projects', 'requestId', 'type']);
 	});
 
-	it('tells the host which projects the worker must serve', async () => {
-		const { host, sent } = fakeHost({ accepted: true });
-		const source = new HostWorkerSource(() => host, { timeoutMs: 500 });
+	it('tells the relay which projects the worker must serve', async () => {
+		const { relay, sent } = fakeRelay({ accepted: true });
+		const source = new RelayWorkerSource(() => relay, { timeoutMs: 500 });
 
 		await source.obtainWorker(request);
 
@@ -74,33 +74,33 @@ describe('HostWorkerSource - asking a host for a worker (D#52, D#53)', () => {
 
 	// Declining is normal -- at capacity, or cannot reach the project -- but it must not look
 	// like success, or the caller would count capacity that is never coming.
-	it('rejects when the host declines, carrying its reason', async () => {
-		const { host } = fakeHost({ accepted: false, reason: 'at capacity' });
-		const source = new HostWorkerSource(() => host, { timeoutMs: 500 });
+	it('rejects when the relay declines, carrying its reason', async () => {
+		const { relay } = fakeRelay({ accepted: false, reason: 'at capacity' });
+		const source = new RelayWorkerSource(() => relay, { timeoutMs: 500 });
 
 		await expect(source.obtainWorker(request)).rejects.toThrow(/at capacity/);
 	});
 
 	it('names the source in its failure, since several may be declared', async () => {
-		const { host } = fakeHost({ accepted: false, reason: 'nope' });
-		const source = new HostWorkerSource(() => host, { timeoutMs: 500 });
+		const { relay } = fakeRelay({ accepted: false, reason: 'nope' });
+		const source = new RelayWorkerSource(() => relay, { timeoutMs: 500 });
 
 		await expect(source.obtainWorker(request)).rejects.toThrow(/build-box/);
 	});
 
-	// The wait is bounded so one unresponsive machine cannot hold up provisioning (D#66).
-	it('gives up when the host never answers', async () => {
-		const { host } = fakeHost('silent');
-		const source = new HostWorkerSource(() => host, { timeoutMs: 20 });
+	// The wait is bounded so one unresponsive relay cannot hold up provisioning (D#66).
+	it('gives up when the relay never answers', async () => {
+		const { relay } = fakeRelay('silent');
+		const source = new RelayWorkerSource(() => relay, { timeoutMs: 20 });
 
 		await expect(source.obtainWorker(request)).rejects.toThrow(/did not answer|timed out/i);
 	});
 
-	// A declared host that is simply not connected is the ordinary case, not a crash: the
+	// A declared relay that is simply not connected is the ordinary case, not a crash: the
 	// registry records intent, and only a connection proves reachability (D#4).
-	it('rejects with something actionable when no host is connected for the source', async () => {
-		const source = new HostWorkerSource(() => undefined, { timeoutMs: 500 });
+	it('rejects with something actionable when no relay is connected for the source', async () => {
+		const source = new RelayWorkerSource(() => undefined, { timeoutMs: 500 });
 
-		await expect(source.obtainWorker(request)).rejects.toThrow(/not connected|no host/i);
+		await expect(source.obtainWorker(request)).rejects.toThrow(/not connected|no relay/i);
 	});
 });

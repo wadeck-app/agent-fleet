@@ -4,6 +4,17 @@ import { join } from 'node:path';
 
 const REGISTRY_FILE = 'worker-sources.json';
 
+/**
+ * The provider name `built-in:relay` used to carry, before the concept was renamed.
+ *
+ * "host" read as a machine; the thing is a relay -- a process that holds a connection to the
+ * daemon and launches a worker locally when asked. No alias is accepted for it: the old name
+ * never had a counterpart process to talk to, so nothing could have worked under it, and
+ * silently rewriting it would hide a config the user still believes in.
+ */
+const RETIRED_RELAY_PROVIDER = 'built-in:host';
+const RELAY_PROVIDER = 'built-in:relay';
+
 /** A declared source of workers. Persisted; never proof that a worker exists. */
 export interface WorkerSourceEntry {
 	sourceId: string;
@@ -122,7 +133,9 @@ export class WorkerSourceRegistry {
 
 	/** Returns false when the source was not declared, so the caller can report it. */
 	remove(sourceId: string): boolean {
-		const sources = this.read();
+		// Reads without the retired-provider check on purpose: removal is the remedy the error
+		// tells the user to apply, so an entry naming the old provider must still be removable.
+		const sources = this.parse();
 		const remaining = sources.filter(s => s.sourceId !== sourceId);
 		if (remaining.length === sources.length) return false;
 		this.write(remaining);
@@ -208,7 +221,28 @@ export class WorkerSourceRegistry {
 				);
 			}
 		}
+		this.rejectRetiredProvider(declaration.sourceId, declaration.provider);
 		this.validateCommandOptions(declaration);
+	}
+
+	/**
+	 * Refuses the pre-rename provider name, here rather than at each call site.
+	 *
+	 * Every path into the registry goes through `declare` or `read`, so both a `--provider
+	 * built-in:host` argument and an entry already sitting in the file are caught. Deliberately
+	 * not aliased to the new name: an alias would make a source the user must re-declare look
+	 * like one that already works.
+	 */
+	private rejectRetiredProvider(sourceId: string, provider: string): void {
+		if (provider !== RETIRED_RELAY_PROVIDER) return;
+
+		throw new Error(
+			`Worker source "${sourceId}" uses provider "${RETIRED_RELAY_PROVIDER}", which no longer exists: the concept is now called a relay. ` +
+				`Re-declare the source: "flow worker source remove ${sourceId}" then ` +
+				`"flow worker source add ${sourceId} --provider ${RELAY_PROVIDER}". ` +
+				`Its entry is in "${this.filePath}". ` +
+				'This is not a silent upgrade because a new source token is issued, and the old name never had a relay to talk to.'
+		);
 	}
 
 	/**
@@ -239,12 +273,26 @@ export class WorkerSourceRegistry {
 	}
 
 	/**
+	 * Reads the registry and refuses any entry naming a provider that no longer exists.
+	 *
+	 * The check sits here so every reader -- list, find, token verification, startup contact --
+	 * gets it, instead of each one deciding for itself.
+	 */
+	private read(): WorkerSourceEntry[] {
+		const sources = this.parse();
+		for (const source of sources) {
+			this.rejectRetiredProvider(source.sourceId, source.provider);
+		}
+		return sources;
+	}
+
+	/**
 	 * Reads the registry, treating a damaged file as an error.
 	 *
 	 * A corrupt file is never read as "nothing declared": that would silently discard
 	 * every source the user set up and look like a configuration that never existed.
 	 */
-	private read(): WorkerSourceEntry[] {
+	private parse(): WorkerSourceEntry[] {
 		if (!existsSync(this.filePath)) return [];
 
 		let parsed: unknown;

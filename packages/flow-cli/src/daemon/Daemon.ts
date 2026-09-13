@@ -19,8 +19,8 @@ import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
-import { HostRegistry } from './HostRegistry.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
+import { RelayRegistry } from './RelayRegistry.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WebSocketServer } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
@@ -258,7 +258,7 @@ async function startDaemon(
 	const perFlowWorkspaceResolver = await PluginResolver.create().createPerFlowWorkspaceResolver();
 
 	let workerRegistry: WorkerRegistry;
-	let hostRegistry: HostRegistry;
+	let relayRegistry: RelayRegistry;
 	let launchTokens: LaunchTokenIssuer;
 	let workerProvisioner: WorkerProvisioner;
 	let wsServer: WebSocketServer;
@@ -337,9 +337,9 @@ async function startDaemon(
 				// the old behaviour is still the best guess available.
 				const forkSource = new ForkWorkerSource(port, () => workerListenerPort ?? wsServer.port, claudePath);
 				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir);
-				// Hosts are tracked apart from workers because the two roles carry different
+				// Relays are tracked apart from workers because the two roles carry different
 				// credentials and neither may stand in for the other (T-04, T-11).
-				hostRegistry = new HostRegistry(sourceRegistry);
+				relayRegistry = new RelayRegistry(sourceRegistry);
 				// One issuer, shared: the credential a launched worker presents has to be the one
 				// this daemon minted for it, and it is only ever valid here, once (T-09).
 				launchTokens = new LaunchTokenIssuer();
@@ -418,11 +418,11 @@ async function startDaemon(
 							process.stderr.write(`[daemon] ${message}\n`);
 							writeDaemonLog(logsDir, 'error', message);
 						},
-						// A host source is reached through its live connection, so the provider
+						// A relay source is reached through its live connection, so the provider
 						// needs to look one up. At startup none has dialled in yet, which reports
-						// as "no host connected" rather than pretending capacity exists.
+						// as "no relay connected" rather than pretending capacity exists.
 						{
-							findHost: (sourceId: string) => hostRegistry.find(sourceId),
+							findRelay: (sourceId: string) => relayRegistry.find(sourceId),
 							// A worker this daemon launches cannot present the source's registration
 							// token -- only its hash is stored (T-09) -- so it is given a credential
 							// minted for that launch alone.
@@ -437,7 +437,7 @@ async function startDaemon(
 	});
 
 	function handleWorkerMessage(ws: WebSocket, message: WorkerToDaemon): void {
-		// A host registering as a source arrives on the same listener but is not a worker: it
+		// A relay registering as a source arrives on the same listener but is not a worker: it
 		// presents a different credential and is never dispatched to (T-04, T-11).
 		if ((message as { type?: string }).type === 'source_ready') {
 			handleSourceRegistration(ws, message as unknown as SourceReady);
@@ -549,23 +549,23 @@ async function startDaemon(
 	}
 
 	/**
-	 * Admits or refuses a machine claiming to be a declared source (D#17, T-11).
+	 * Admits or refuses a relay claiming to be a declared source (D#17, T-11).
 	 *
 	 * A refusal closes the socket: an unauthenticated peer must not stay connected, and it is
 	 * told why, because the honest case -- a mistyped source id or the worker token used by
 	 * mistake -- is indistinguishable from an attack at this point.
 	 */
 	function handleSourceRegistration(ws: WebSocket, ready: SourceReady): void {
-		const admission = hostRegistry.register(ws, ready);
+		const admission = relayRegistry.register(ws, ready);
 		if (!admission.ok) {
 			process.stderr.write(`[daemon] ${admission.reason}\n`);
 			writeDaemonLog(logsDir, 'error', admission.reason);
 			ws.terminate();
 			return;
 		}
-		const note = `host registered for source "${admission.host.sourceId}" with capacity ${String(admission.host.capacity)}`;
+		const note = `relay registered for source "${admission.relay.sourceId}" with capacity ${String(admission.relay.capacity)}`;
 		writeDaemonLog(logsDir, 'info', note);
-		// Registering a host creates no capacity by itself: it is a machine that *can* make
+		// Registering a relay creates no capacity by itself: it is a process that *can* make
 		// workers, and only a worker's own connection proves one exists (D#4). Dispatch is
 		// therefore not retried here.
 	}
@@ -578,10 +578,10 @@ async function startDaemon(
 		// Only dispatch once this socket is out of the registry, or a re-queued step could
 		// go straight back to the worker that just vanished.
 		workerRegistry.remove(ws);
-		// The same listener carries hosts. Dropping one costs no in-flight work -- a host runs
+		// The same listener carries relays. Dropping one costs no in-flight work -- a relay runs
 		// no steps -- but leaving it recorded would have the daemon ask a dead socket for
 		// workers and report the source as merely unproductive.
-		hostRegistry.remove(ws);
+		relayRegistry.remove(ws);
 		commandHandler.tryDispatch();
 		checkShutdown();
 	}

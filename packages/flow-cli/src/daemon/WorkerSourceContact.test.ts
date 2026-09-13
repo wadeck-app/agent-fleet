@@ -116,16 +116,16 @@ describe('resolveSourceProvider', () => {
 		expect(() => resolveSourceProvider('built-in:telepathy', {})).toThrow(/built-in:telepathy/);
 	});
 
-	it('builds the host provider when the daemon supplies its host registry', () => {
-		const provider = resolveSourceProvider('built-in:host', {}, { findHost: () => undefined });
+	it('builds the relay provider when the daemon supplies its relay registry', () => {
+		const provider = resolveSourceProvider('built-in:relay', {}, { findRelay: () => undefined });
 
 		expect(typeof provider.obtainWorker).toBe('function');
 	});
 
-	// Refused rather than degraded: a host provider with no way to reach hosts would produce
-	// nothing, which reads exactly like a machine that happens to be offline.
-	it('refuses the host provider when it cannot reach hosts, and says it is a wiring bug', () => {
-		expect(() => resolveSourceProvider('built-in:host', {})).toThrow(/report it/i);
+	// Refused rather than degraded: a relay provider with no way to reach relays would produce
+	// nothing, which reads exactly like a relay that happens to be offline.
+	it('refuses the relay provider when it cannot reach relays, and says it is a wiring bug', () => {
+		expect(() => resolveSourceProvider('built-in:relay', {})).toThrow(/report it/i);
 	});
 });
 
