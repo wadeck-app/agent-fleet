@@ -168,6 +168,9 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		extraProjects: options.project,
 		isTty: process.stdout.isTTY === true,
 		canPrompt: approvalProvider !== undefined,
+		...(approvalProvider?.requiresTerminal !== undefined
+			? { promptNeedsTerminal: approvalProvider.requiresTerminal }
+			: {}),
 		pid: process.pid,
 		...(options.source !== undefined ? { sourceId: options.source } : {}),
 		labels: parseLabels(options.labels),
@@ -202,7 +205,12 @@ function explainInteractivity(interactive: boolean, hasApproval: boolean): strin
 	if (!hasApproval) {
 		return ' (no approval plugin configured, so no user_intervention step can run here)';
 	}
-	return ' (not a terminal, so no user_intervention step can run here)';
+	// Naming the plugin matters: the fix is either "run this in a terminal" or "configure an
+	// approval plugin that does not need one", and only the second is an edit to config.
+	return (
+		' (the configured approval plugin needs a terminal and this is not one, so no' +
+		' user_intervention step can run here -- plugins.file-approval answers from a file instead)'
+	);
 }
 
 /**

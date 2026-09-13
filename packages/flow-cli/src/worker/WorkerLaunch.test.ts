@@ -120,8 +120,43 @@ describe('buildRegistration', () => {
 		expect(reg.hasUserInterface).toBe(true);
 	});
 
-	it('reports none without a TTY, whatever else is available', () => {
+	it('reports none without a TTY when the way to prompt needs one', () => {
 		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: true, pid: 1 });
+
+		expect(reg.hasUserInterface).toBe(false);
+	});
+
+	// A TTY is what cli-approval needs, not what "a human can answer" means. file-approval takes
+	// its answer from a file, so a worker with no terminal can still honour an interactive step --
+	// which is the only way an automated agent or a remote reviewer can answer one.
+	it('reports a user interface without a TTY when prompting does not need one', () => {
+		const reg = buildRegistration({
+			projectRoot: 'C:/p',
+			isTty: false,
+			canPrompt: true,
+			promptNeedsTerminal: false,
+			pid: 1,
+		});
+
+		expect(reg.hasUserInterface).toBe(true);
+	});
+
+	// Absent means "assume a terminal is required": a third-party provider written against v1 of
+	// the contract cannot suddenly be treated as headless-capable.
+	it('still requires a TTY when the provider says nothing about needing one', () => {
+		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: true, pid: 1 });
+
+		expect(reg.hasUserInterface).toBe(false);
+	});
+
+	it('reports none when nothing can prompt, even if a terminal is not required', () => {
+		const reg = buildRegistration({
+			projectRoot: 'C:/p',
+			isTty: false,
+			canPrompt: false,
+			promptNeedsTerminal: false,
+			pid: 1,
+		});
 
 		expect(reg.hasUserInterface).toBe(false);
 	});

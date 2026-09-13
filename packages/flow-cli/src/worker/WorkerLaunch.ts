@@ -97,9 +97,14 @@ export function buildRegistration(params: {
 	isTty: boolean;
 	/**
 	 * Whether this worker has an approval provider, i.e. something that can actually put a
-	 * question to the human at that terminal.
+	 * question to somebody able to answer it.
 	 */
 	canPrompt: boolean;
+	/**
+	 * Whether that provider needs a terminal attached to this process. Defaults to true, so a
+	 * provider that does not say otherwise keeps the old TTY requirement.
+	 */
+	promptNeedsTerminal?: boolean;
 	pid: number;
 	sourceId?: string;
 	labels?: string[];
@@ -125,10 +130,11 @@ export function buildRegistration(params: {
 		...(params.sourceId !== undefined ? { sourceId: params.sourceId } : {}),
 		labels: params.labels ?? [],
 		attachedProjects,
-		// Only this process can see whether a human is attached (D#33, D#36) -- and a TTY
-		// alone is not the capability. Without an approval provider the worker would attract
-		// an interactive step and then fail it, so both halves are required.
-		hasUserInterface: params.isTty && params.canPrompt,
+		// Only this process can see whether anybody can be reached from here (D#33, D#36) -- and a
+		// TTY alone is not the capability. Without an approval provider the worker would attract an
+		// interactive step and then fail it, so something able to prompt is always required; a
+		// terminal is required only when that something reads from one.
+		hasUserInterface: params.canPrompt && (params.isTty || params.promptNeedsTerminal === false),
 	};
 }
 

@@ -87,6 +87,10 @@ export class FileApprovalProvider implements ApprovalProvider {
 	readonly pollIntervalMs: number;
 	readonly settleMs: number;
 
+	// The answer comes from a file, so this works in a worker with no terminal attached -- which is
+	// what lets a script, an agent or a remote reviewer answer an interactive step.
+	readonly requiresTerminal = false;
+
 	// Guarantees a unique audit-trail filename even for two answers within the same millisecond.
 	private sequence = 0;
 

@@ -26,6 +26,9 @@ export function createCliApprovalProvider(options: CliApprovalOptions = {}): App
 	const readLine = rlObj.ask;
 
 	return {
+		// This provider reads the answer from stdin, so a worker without a terminal cannot use it.
+		requiresTerminal: true,
+
 		async requestInput(req: InputRequest): Promise<string> {
 			const hint = req.hint ? ` (${req.hint})` : '';
 			const answer = await readLine(`\n[${req.taskId}/${req.stepId}] ${req.prompt}${hint}\n> `);
