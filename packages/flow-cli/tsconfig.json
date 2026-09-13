@@ -5,6 +5,8 @@
 		"declarationDir": "dist-types",
 		"rootDir": "src",
 		"types": ["vitest/globals", "node"],
+		// PluginLoader imports extension-points.json so esbuild inlines it into the standalone bundle.
+		"resolveJsonModule": true,
 		"paths": {
 			"extension-points": ["../extension-points/src/index"],
 			"flow-engine": ["../flow-engine/src"],

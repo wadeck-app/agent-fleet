@@ -1,3 +1,7 @@
+// Static import, not createRequire: esbuild only traces literal specifiers, so a dynamic require
+// stayed a runtime lookup and the standalone bundle -- which has no node_modules -- could not
+// resolve it, crashing the daemon of any project that declares plugins.
+import extensionPointsRegistry from 'extension-points/extension-points.json';
 import { readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -47,6 +51,9 @@ function loadRegistry(registryPath: string): ExtensionPointsRegistry {
 	}
 }
 
+// Scoped to flow-cli's own node_modules regardless of user's CWD
+const _require = createRequire(import.meta.url);
+
 function parseTypeRef(typeRef: string): { pluginId: string; implName: string } {
 	// Format: plugins.<pluginId>.<implName>
 	const match = typeRef.match(/^plugins\.([^.]+)\.([^.]+)$/);
@@ -55,9 +62,6 @@ function parseTypeRef(typeRef: string): { pluginId: string; implName: string } {
 	}
 	return { pluginId: match[1]!, implName: match[2]! };
 }
-
-// Scoped to flow-cli's own node_modules regardless of user's CWD
-const _require = createRequire(import.meta.url);
 
 export class PluginLoader {
 	private pluginPackagesDir: string | undefined;
@@ -227,8 +231,7 @@ export class PluginLoader {
 			if (this.registryPath) {
 				this.registryCache = loadRegistry(this.registryPath);
 			} else {
-				// Works in dev (node_modules resolution) and bundled mode (inlined by esbuild plugin).
-				this.registryCache = _require('extension-points/extension-points.json') as ExtensionPointsRegistry;
+				this.registryCache = extensionPointsRegistry as ExtensionPointsRegistry;
 			}
 		}
 		const registry = this.registryCache;
