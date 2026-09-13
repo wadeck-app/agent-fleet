@@ -83,6 +83,18 @@ describe('resolveSourceProvider', () => {
 		expect(() => resolveSourceProvider('built-in:telepathy', {})).toThrow(/built-in:inbound/);
 		expect(() => resolveSourceProvider('built-in:telepathy', {})).toThrow(/built-in:telepathy/);
 	});
+
+	it('builds the host provider when the daemon supplies its host registry', () => {
+		const provider = resolveSourceProvider('built-in:host', {}, { findHost: () => undefined });
+
+		expect(typeof provider.obtainWorker).toBe('function');
+	});
+
+	// Refused rather than degraded: a host provider with no way to reach hosts would produce
+	// nothing, which reads exactly like a machine that happens to be offline.
+	it('refuses the host provider when it cannot reach hosts, and says it is a wiring bug', () => {
+		expect(() => resolveSourceProvider('built-in:host', {})).toThrow(/report it/i);
+	});
 });
 
 describe('contactDeclaredSources', () => {

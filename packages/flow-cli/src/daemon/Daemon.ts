@@ -14,11 +14,12 @@ import type { WebSocket } from 'ws';
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { PluginResolver } from '../config/PluginResolver.js';
-import type { ClientCommand, WorkerToDaemon } from '../ipc/Protocol';
+import type { ClientCommand, SourceReady, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
+import { HostRegistry } from './HostRegistry.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WebSocketServer } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
@@ -240,6 +241,7 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 	const perFlowWorkspaceResolver = await PluginResolver.create().createPerFlowWorkspaceResolver();
 
 	let workerRegistry: WorkerRegistry;
+	let hostRegistry: HostRegistry;
 	let workerProvisioner: WorkerProvisioner;
 	let wsServer: WebSocketServer;
 	let commandHandler: CommandHandler;
@@ -306,6 +308,9 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 				workerRegistry = new WorkerRegistry();
 				const forkSource = new ForkWorkerSource(port, () => wsServer.port, claudePath);
 				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir);
+				// Hosts are tracked apart from workers because the two roles carry different
+				// credentials and neither may stand in for the other (T-04, T-11).
+				hostRegistry = new HostRegistry(sourceRegistry);
 				workerProvisioner = new WorkerProvisioner(
 					config.queue.concurrency,
 					workerRegistry,
@@ -342,7 +347,11 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 						message => {
 							process.stderr.write(`[daemon] ${message}\n`);
 							writeDaemonLog(logsDir, 'error', message);
-						}
+						},
+						// A host source is reached through its live connection, so the provider
+						// needs to look one up. At startup none has dialled in yet, which reports
+						// as "no host connected" rather than pretending capacity exists.
+						{ findHost: (sourceId: string) => hostRegistry.find(sourceId) }
 					).catch((err: unknown) => {
 						process.stderr.write(`[daemon] contacting worker sources failed: ${getErrorMessage(err)}\n`);
 					});
@@ -352,6 +361,13 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 	});
 
 	function handleWorkerMessage(ws: WebSocket, message: WorkerToDaemon): void {
+		// A host registering as a source arrives on the same listener but is not a worker: it
+		// presents a different credential and is never dispatched to (T-04, T-11).
+		if ((message as { type?: string }).type === 'source_ready') {
+			handleSourceRegistration(ws, message as unknown as SourceReady);
+			return;
+		}
+
 		switch (message.type) {
 			case 'ready': {
 				// Refused registrations are already reported and the socket terminated;
@@ -456,6 +472,28 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 		}
 	}
 
+	/**
+	 * Admits or refuses a machine claiming to be a declared source (D#17, T-11).
+	 *
+	 * A refusal closes the socket: an unauthenticated peer must not stay connected, and it is
+	 * told why, because the honest case -- a mistyped source id or the worker token used by
+	 * mistake -- is indistinguishable from an attack at this point.
+	 */
+	function handleSourceRegistration(ws: WebSocket, ready: SourceReady): void {
+		const admission = hostRegistry.register(ws, ready);
+		if (!admission.ok) {
+			process.stderr.write(`[daemon] ${admission.reason}\n`);
+			writeDaemonLog(logsDir, 'error', admission.reason);
+			ws.terminate();
+			return;
+		}
+		const note = `host registered for source "${admission.host.sourceId}" with capacity ${String(admission.host.capacity)}`;
+		writeDaemonLog(logsDir, 'info', note);
+		// Registering a host creates no capacity by itself: it is a machine that *can* make
+		// workers, and only a worker's own connection proves one exists (D#4). Dispatch is
+		// therefore not retried here.
+	}
+
 	function handleWorkerClose(ws: WebSocket): void {
 		// A disconnected worker can no longer report on its assignments; leaving them
 		// outstanding would let a reconnecting socket be matched against stale work.
@@ -464,6 +502,10 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 		// Only dispatch once this socket is out of the registry, or a re-queued step could
 		// go straight back to the worker that just vanished.
 		workerRegistry.remove(ws);
+		// The same listener carries hosts. Dropping one costs no in-flight work -- a host runs
+		// no steps -- but leaving it recorded would have the daemon ask a dead socket for
+		// workers and report the source as merely unproductive.
+		hostRegistry.remove(ws);
 		commandHandler.tryDispatch();
 		checkShutdown();
 	}
@@ -483,6 +525,9 @@ async function startDaemon(config: FlowConfig = FlowConfigLoader.DEFAULT, daemon
 			// WebSocket keeps the event loop alive, leaving an orphan process holding no
 			// port file. The worker re-registers once a daemon is available again.
 			workerRegistry.disconnectExternal();
+			// Nothing queued for later may outlive the decision to stop: a pending dispatch
+			// re-check would run against a closed listener.
+			commandHandler.stopBackgroundWork();
 			wsServer.close();
 			writeDaemonLog(logsDir, 'info', 'Daemon stopped (idle)');
 			void daemonHandle.stop('idle');

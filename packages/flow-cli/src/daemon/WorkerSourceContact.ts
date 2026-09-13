@@ -2,11 +2,20 @@ import type { WorkerRequest, WorkerSourceProvider } from 'extension-points';
 import { spawn } from 'node:child_process';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+import type { RegisteredHost } from './HostRegistry.js';
+import { HostWorkerSource } from './HostWorkerSource.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
-/** The S1 implementations that ship with flow (D#12 limits v1 to these two). */
+/** The S1 implementations that ship with flow. */
 const BUILT_IN_INBOUND = 'built-in:inbound';
 const BUILT_IN_COMMAND = 'built-in:command';
+const BUILT_IN_HOST = 'built-in:host';
+
+/** What an implementation may need from the daemon to reach its source. */
+export interface SourceProviderDependencies {
+	/** Looks up the live connection for a source, for the host provider (D#17). */
+	findHost?: (sourceId: string) => RegisteredHost | undefined;
+}
 
 /**
  * A source whose workers are already running and dial the daemon themselves.
@@ -82,15 +91,31 @@ export class CommandWorkerSource implements WorkerSourceProvider {
  *         treating a typo as the inbound provider would look exactly like a worker that
  *         never turns up, which is the least debuggable failure available.
  */
-export function resolveSourceProvider(provider: string, options: CommandSourceOptions): WorkerSourceProvider {
+export function resolveSourceProvider(
+	provider: string,
+	options: CommandSourceOptions,
+	dependencies: SourceProviderDependencies = {}
+): WorkerSourceProvider {
 	switch (provider) {
 		case BUILT_IN_INBOUND:
 			return new InboundWorkerSource();
 		case BUILT_IN_COMMAND:
 			return new CommandWorkerSource(options);
+		case BUILT_IN_HOST: {
+			const { findHost } = dependencies;
+			if (findHost === undefined) {
+				// Refused rather than degraded: a host source with no way to reach hosts would
+				// silently produce nothing, which is indistinguishable from a machine that is
+				// merely offline.
+				throw new Error(
+					`provider ${BUILT_IN_HOST} needs the daemon's host registry, which was not supplied. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
+				);
+			}
+			return new HostWorkerSource(findHost);
+		}
 		default:
 			throw new Error(
-				`unknown worker source provider "${provider}". Supported in v1: ${BUILT_IN_INBOUND}, ${BUILT_IN_COMMAND}.`
+				`unknown worker source provider "${provider}". Supported in v1: ${BUILT_IN_INBOUND}, ${BUILT_IN_COMMAND}, ${BUILT_IN_HOST}.`
 			);
 	}
 }
@@ -108,11 +133,16 @@ export function resolveSourceProvider(provider: string, options: CommandSourceOp
 export async function contactDeclaredSources(
 	entries: WorkerSourceEntry[],
 	daemonEndpoint: string,
-	report: (message: string) => void
+	report: (message: string) => void,
+	dependencies: SourceProviderDependencies = {}
 ): Promise<void> {
 	for (const entry of entries) {
 		try {
-			const provider = resolveSourceProvider(entry.provider, (entry.options ?? {}) as CommandSourceOptions);
+			const provider = resolveSourceProvider(
+				entry.provider,
+				(entry.options ?? {}) as CommandSourceOptions,
+				dependencies
+			);
 			await provider.obtainWorker({
 				daemonEndpoint,
 				sourceId: entry.sourceId,

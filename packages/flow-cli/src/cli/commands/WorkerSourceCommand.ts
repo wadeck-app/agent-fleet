@@ -10,7 +10,7 @@ import { WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
 // violations-suppress-end: ts/no-deep-relative
 
 /** S1 implementations that ship with flow. */
-const BUILT_IN_PROVIDERS = ['built-in:inbound', 'built-in:command'] as const;
+const BUILT_IN_PROVIDERS = ['built-in:inbound', 'built-in:command', 'built-in:host'] as const;
 
 function parseMaxWorkers(raw: string): number {
 	const value = Number(raw);
@@ -63,7 +63,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		.action((sourceId: string, options: { provider: string; labels: string; maxWorkers: string }) => {
 			try {
 				const registry = new WorkerSourceRegistry(ConfigDir.get('flow'));
-				const { token, entry } = registry.declare({
+				const { token, sourceToken, entry } = registry.declare({
 					sourceId,
 					provider: options.provider,
 					labels: parseLabels(options.labels),
@@ -75,9 +75,20 @@ export function registerWorkerSourceCommand(program: Command): Command {
 				console.log(`     labels     : ${entry.labels.length > 0 ? entry.labels.join(', ') : '(none)'}`);
 				console.log(`     maxWorkers : ${String(entry.maxWorkers)}`);
 				console.log('');
-				// Shown once by design: only the hash is stored, so it cannot be re-read.
-				console.log(`     Registration token (shown once, store it now):`);
+				// Shown once by design: only the hashes are stored, so neither can be re-read.
+				console.log(`     Worker token (shown once, store it now):`);
 				console.log(`     ${token}`);
+				console.log(
+					`     Pass it to each worker: flow worker --source ${entry.sourceId} --token <worker token>`
+				);
+				console.log('');
+				// Two credentials on purpose: a fake worker absorbs one step, a fake source
+				// manufactures capacity across every project, so neither token works in the
+				// other role (T-04, T-11).
+				console.log(`     Source token (shown once, store it now):`);
+				console.log(`     ${sourceToken}`);
+				console.log(`     Only a host registering *as* this source needs it. A worker cannot use it,`);
+				console.log(`     and the worker token cannot be used to register as the source.`);
 				console.log('');
 				console.log(`     Declaring a source does not create a worker. It records how one can be`);
 				console.log(`     obtained; a worker only becomes usable once it connects.`);

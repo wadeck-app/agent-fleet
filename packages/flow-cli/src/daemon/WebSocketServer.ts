@@ -69,8 +69,12 @@ export class WebSocketServer {
 					}
 				});
 				this.httpServer.once('listening', () => {
-					this._port = p;
-					resolve(p);
+					// Read back from the socket rather than trusting the number we asked for. With
+					// port 0 the OS picks one, and recording the request would publish "0" for every
+					// worker to dial. Any other divergence is worth inheriting rather than guessing.
+					const address = this.httpServer.address();
+					this._port = typeof address === 'object' && address !== null ? address.port : p;
+					resolve(this._port);
 				});
 				this.httpServer.listen(p, this.bindAddress);
 			};

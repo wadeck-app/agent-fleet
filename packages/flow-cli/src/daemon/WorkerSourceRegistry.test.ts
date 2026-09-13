@@ -117,6 +117,62 @@ describe('WorkerSourceRegistry - token verification (T-09)', () => {
 	});
 });
 
+describe('WorkerSourceRegistry - source credential (T-04, T-11)', () => {
+	// A fake *source* manufactures capacity wholesale rather than absorbing one step, so its
+	// credential is separate from the one workers present.
+	it('issues a source token distinct from the worker token', () => {
+		const registry = new WorkerSourceRegistry(dir);
+
+		const { token, sourceToken } = registry.declare(declaration);
+
+		expect(sourceToken).toBeTruthy();
+		expect(sourceToken).not.toBe(token);
+	});
+
+	it('accepts the issued source token for source registration', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		const { sourceToken } = registry.declare(declaration);
+
+		expect(registry.verifySourceToken('laptop', sourceToken)).toBe(true);
+	});
+
+	// The property the split exists for: neither credential works in the other role, so
+	// stealing a worker's token does not let the thief register as a manufacturer.
+	it('refuses a worker token presented as a source credential', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		const { token } = registry.declare(declaration);
+
+		expect(registry.verifySourceToken('laptop', token)).toBe(false);
+	});
+
+	it('refuses a source token presented as a worker credential', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		const { sourceToken } = registry.declare(declaration);
+
+		expect(registry.verifyToken('laptop', sourceToken)).toBe(false);
+	});
+
+	it('refuses a source token for a different source', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		const { sourceToken } = registry.declare(declaration);
+
+		expect(registry.verifySourceToken('other', sourceToken)).toBe(false);
+	});
+
+	// An entry written before the split has no source hash. Treating "absent" as "matches"
+	// would turn a missing credential into a universal one.
+	it('refuses source registration for an entry that carries no source hash', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		const { sourceToken } = registry.declare(declaration);
+		const file = join(dir, 'worker-sources.json');
+		const state = JSON.parse(readFileSync(file, 'utf8')) as { sources: Record<string, unknown>[] };
+		delete state.sources[0]!['sourceTokenHash'];
+		writeFileSync(file, JSON.stringify(state), 'utf8');
+
+		expect(new WorkerSourceRegistry(dir).verifySourceToken('laptop', sourceToken)).toBe(false);
+	});
+});
+
 describe('WorkerSourceRegistry - malformed state', () => {
 	// A corrupt registry must not be read as "no sources declared": that would silently
 	// drop every declared source and look like a configuration that never existed.

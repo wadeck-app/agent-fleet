@@ -1151,8 +1151,11 @@ describe('CommandHandler — covering unmet demand (S8, D#25)', () => {
 	// so "wait" would mean "wait forever" -- this is the test that would catch it.
 	it('re-runs dispatch while waiting, so the wait actually ends', async () => {
 		vi.useFakeTimers();
+		let handler: CommandHandler | undefined;
 		try {
-			const { workerPool } = await runWithNoWorker({ fork: 0 });
+			const started = await runWithNoWorker({ fork: 0 });
+			handler = started.handler;
+			const { workerPool } = started;
 			const callsBefore = workerPool.planProvisioning.mock.calls.length;
 
 			await vi.advanceTimersByTimeAsync(1_000);
@@ -1162,7 +1165,42 @@ describe('CommandHandler — covering unmet demand (S8, D#25)', () => {
 			const lastCall = workerPool.planProvisioning.mock.calls.at(-1)! as [number, number];
 			expect(lastCall[1]).toBeGreaterThan(0);
 		} finally {
+			// Or the pending re-check outlives the test and runs against reset mocks.
+			handler?.stopBackgroundWork();
 			vi.useRealTimers();
+		}
+	});
+
+	// The same guarantee the daemon needs on shutdown: nothing queued for later may run once
+	// the listener is closed.
+	it('stops re-running dispatch once background work is stopped', async () => {
+		vi.useFakeTimers();
+		try {
+			const { handler, workerPool } = await runWithNoWorker({ fork: 0 });
+
+			handler.stopBackgroundWork();
+			const callsBefore = workerPool.planProvisioning.mock.calls.length;
+			await vi.advanceTimersByTimeAsync(1_000);
+
+			expect(workerPool.planProvisioning.mock.calls.length).toBe(callsBefore);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// A broken plugin must not take the daemon with it: this path also runs from a timer,
+	// where an exception has no caller to report it.
+	it('reports a plugin that returns no usable decision instead of crashing', async () => {
+		const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+		try {
+			const { workerPool } = await runWithNoWorker(undefined as never);
+
+			expect(workerPool.provision).not.toHaveBeenCalled();
+			const reported = write.mock.calls.map(call => String(call[0])).join(' ');
+			expect(reported).toContain('provisioning plugin');
+			expect(reported).toMatch(/fork/);
+		} finally {
+			write.mockRestore();
 		}
 	});
 

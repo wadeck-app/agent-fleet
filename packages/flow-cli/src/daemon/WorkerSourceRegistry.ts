@@ -15,8 +15,19 @@ export interface WorkerSourceEntry {
 	labels: string[];
 	/** Upper bound on workers this source may supply, so one cannot absorb every step (D#64). */
 	maxWorkers: number;
-	/** sha256 of the registration token. The secret itself is never stored (T-09). */
+	/** sha256 of the token a *worker* from this source presents. Never the secret (T-09). */
 	tokenHash: string;
+	/**
+	 * sha256 of the token the *source itself* presents when it registers (T-04, T-11).
+	 *
+	 * Deliberately a second secret rather than a reuse of `tokenHash`. A fake worker absorbs
+	 * one step; a fake source manufactures capacity wholesale across every project, so a
+	 * stolen worker credential must not be promotable into that role.
+	 *
+	 * Optional only because an entry written before the split has none. Absent means "cannot
+	 * register as a source" -- never "any token matches".
+	 */
+	sourceTokenHash?: string;
 	createdAt: string;
 }
 
@@ -60,7 +71,7 @@ export class WorkerSourceRegistry {
 	 * The token is returned once and never recoverable afterwards, so the caller must
 	 * surface it immediately.
 	 */
-	declare(declaration: WorkerSourceDeclaration): { token: string; entry: WorkerSourceEntry } {
+	declare(declaration: WorkerSourceDeclaration): { token: string; sourceToken: string; entry: WorkerSourceEntry } {
 		this.validate(declaration);
 
 		const sources = this.read();
@@ -71,6 +82,9 @@ export class WorkerSourceRegistry {
 		}
 
 		const token = randomBytes(32).toString('hex');
+		// Independent secret, not derived from the worker token: deriving one from the other
+		// would mean holding either implies holding both, which is the thing being prevented.
+		const sourceToken = randomBytes(32).toString('hex');
 		const entry: WorkerSourceEntry = {
 			sourceId: declaration.sourceId,
 			provider: declaration.provider,
@@ -78,11 +92,12 @@ export class WorkerSourceRegistry {
 			labels: [...declaration.labels],
 			maxWorkers: declaration.maxWorkers,
 			tokenHash: hashToken(token),
+			sourceTokenHash: hashToken(sourceToken),
 			createdAt: new Date().toISOString(),
 		};
 
 		this.write([...sources, entry]);
-		return { token, entry };
+		return { token, sourceToken, entry };
 	}
 
 	list(): WorkerSourceEntry[] {
@@ -109,11 +124,30 @@ export class WorkerSourceRegistry {
 	 * response timing.
 	 */
 	verifyToken(sourceId: string, token: string): boolean {
-		const entry = this.find(sourceId);
-		if (entry === undefined) return false;
+		return this.matches(this.find(sourceId)?.tokenHash, token);
+	}
+
+	/**
+	 * Confirms a presented token authorises registering *as* the named source (T-04, T-11).
+	 *
+	 * A worker credential never passes here and this one never passes `verifyToken`: the two
+	 * hashes are independent secrets, so compromising one role does not grant the other.
+	 */
+	verifySourceToken(sourceId: string, token: string): boolean {
+		return this.matches(this.find(sourceId)?.sourceTokenHash, token);
+	}
+
+	/**
+	 * Constant-time comparison against a stored hash.
+	 *
+	 * An absent hash is a refusal, never a match -- an entry predating the source credential
+	 * simply cannot act as a source, which is the safe reading of missing data.
+	 */
+	private matches(storedHash: string | undefined, token: string): boolean {
+		if (storedHash === undefined) return false;
 
 		const presented = Buffer.from(hashToken(token), 'hex');
-		const stored = Buffer.from(entry.tokenHash, 'hex');
+		const stored = Buffer.from(storedHash, 'hex');
 		if (presented.length !== stored.length) return false;
 		return timingSafeEqual(presented, stored);
 	}

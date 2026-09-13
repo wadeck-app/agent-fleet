@@ -44,6 +44,43 @@ describe('WebSocketServer - loopback', () => {
 	});
 });
 
+describe('WebSocketServer - reported port', () => {
+	// Port 0 means "any free port", which is the only way concurrent daemons avoid colliding.
+	// Reporting the requested number instead of the bound one would publish 0 for workers to
+	// dial -- the port is published for exactly this purpose, so it has to be the real one.
+	it('reports the port the OS actually assigned when asked for any', async () => {
+		server = new WebSocketServer(
+			0,
+			() => {},
+			() => {}
+		);
+
+		const port = await server.start();
+
+		expect(port).toBeGreaterThan(0);
+		expect(server.port).toBe(port);
+	});
+
+	it('serves a client on the assigned port', async () => {
+		const received: unknown[] = [];
+		server = new WebSocketServer(
+			0,
+			(_ws, message) => received.push(message),
+			() => {}
+		);
+		const port = await server.start();
+
+		const client = new WebSocket(`ws://127.0.0.1:${String(port)}`);
+		await new Promise<void>((resolve, reject) => {
+			client.once('open', () => resolve());
+			client.once('error', reject);
+		});
+		client.send(JSON.stringify({ type: 'ready', pid: 2 }));
+		await vi.waitFor(() => expect(received).toHaveLength(1));
+		client.close();
+	});
+});
+
 describe('WebSocketServer - P-5 enforcement', () => {
 	// The listener refuses to exist rather than opening a port that would reject every peer
 	// it accepted. This is where P-5 actually bites in v1: a plaintext listener is only ever

@@ -836,6 +836,18 @@ export class CommandHandler {
 		this.unmetDemandSince ??= now;
 		const plan = this.provisioner.planProvisioning(unmetDemand, now - this.unmetDemandSince);
 
+		// Checked rather than trusted: this runs from a timer as well as from a message, and an
+		// exception there takes the daemon down with no stack a user could act on. Reported and
+		// the re-check dropped, so the same broken answer is not repeated four times a second;
+		// the queue resumes on the next real event.
+		if (typeof plan?.fork !== 'number' || !Number.isFinite(plan.fork)) {
+			process.stderr.write(
+				`[CommandHandler] the provisioning plugin returned no usable decision (${JSON.stringify(plan)}); it must return { fork: <number> }. ${String(unmetDemand)} step(s) are waiting and no worker was requested.\n`
+			);
+			this.clearDemandRecheck();
+			return;
+		}
+
 		if (plan.fork === 0) {
 			this.scheduleDemandRecheck();
 			return;
@@ -874,6 +886,18 @@ export class CommandHandler {
 		if (this.demandRecheck === undefined) return;
 		clearTimeout(this.demandRecheck);
 		this.demandRecheck = undefined;
+	}
+
+	/**
+	 * Drops work scheduled for later, when the daemon is shutting down.
+	 *
+	 * Without this the pending re-check survives the shutdown and runs against a daemon that
+	 * has closed its listener, so it asks for capacity nothing can deliver and reports against
+	 * torn-down collaborators. The timer is unref'd, so it never *delays* exit -- it just
+	 * should not fire after the decision to stop.
+	 */
+	stopBackgroundWork(): void {
+		this.clearDemandRecheck();
 	}
 
 	/**
