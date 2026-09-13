@@ -32,6 +32,20 @@ export class InboundWorkerSource implements WorkerSourceProvider {
 	}
 }
 
+/**
+ * Environment for a spawned source command: the daemon's own, minus what is daemon-only.
+ *
+ * FLOW_DAEMON_MODE must never reach the child. FlowIndex turns any process carrying it into a
+ * daemon *regardless of its arguments*, so inheriting it made `--command "flow worker"` start a
+ * second daemon, which contacted its sources at startup and started a third -- an unbounded chain,
+ * and the reason built-in:command could never work.
+ */
+function childEnv(additions: Record<string, string>): NodeJS.ProcessEnv {
+	const env: NodeJS.ProcessEnv = { ...process.env, ...additions };
+	delete env['FLOW_DAEMON_MODE'];
+	return env;
+}
+
 /** Options a `built-in:command` source entry carries. */
 export interface CommandSourceOptions {
 	command?: string;
@@ -62,13 +76,12 @@ export class CommandWorkerSource implements WorkerSourceProvider {
 		// violations-suppress: cli/no-spawn-without-windows-hide the command may launch an interactive worker the user watches; windowsHide would strip the console it prints into (d032e7e)
 		const child = spawn(command, this.options.args ?? [], {
 			...(this.options.cwd !== undefined ? { cwd: this.options.cwd } : {}),
-			env: {
-				...process.env,
+			env: childEnv({
 				// Where to register, and as what. No token: see the class doc.
 				FLOW_DAEMON_WS_URL: request.daemonEndpoint,
 				FLOW_WORKER_SOURCE_ID: request.sourceId,
 				FLOW_WORKER_PROJECTS: request.projects.join(','),
-			},
+			}),
 			stdio: ['ignore', 'ignore', 'pipe'],
 			shell: true,
 		});

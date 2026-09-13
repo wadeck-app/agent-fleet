@@ -60,6 +60,22 @@ describe('CommandWorkerSource', () => {
 		expect(env['FLOW_WORKER_TOKEN']).toBeUndefined();
 	});
 
+	// The bug this pins down: the child inherited the daemon's own FLOW_DAEMON_MODE=1, and
+	// FlowIndex turns any process carrying it into a daemon regardless of its arguments. So
+	// `--command "flow worker"` produced a second daemon, which contacted its sources at startup and
+	// spawned a third -- an unbounded chain of daemons, observed as 21 orphans in one run.
+	it('does not let the child inherit daemon mode', async () => {
+		process.env['FLOW_DAEMON_MODE'] = '1';
+		try {
+			await new CommandWorkerSource({ command: 'flow', args: ['worker'] }).obtainWorker(request);
+
+			const env = (spawnMock.mock.calls[0]![2] as { env: Record<string, string> }).env;
+			expect(env['FLOW_DAEMON_MODE']).toBeUndefined();
+		} finally {
+			delete process.env['FLOW_DAEMON_MODE'];
+		}
+	});
+
 	it('fails loudly when no command is configured', async () => {
 		await expect(new CommandWorkerSource({}).obtainWorker(request)).rejects.toThrow(/command/i);
 	});
