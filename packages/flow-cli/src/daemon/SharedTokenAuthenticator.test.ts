@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 
@@ -117,5 +118,82 @@ describe('SharedTokenAuthenticator - missing daemon token file', () => {
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error('expected refusal');
 		expect(result.reason).toMatch(/health_token/);
+	});
+});
+
+describe('SharedTokenAuthenticator - launch token', () => {
+	function declaredRegistry(): WorkerSourceRegistry {
+		const registry = new WorkerSourceRegistry(dir);
+		registry.declare({ sourceId: 'laptop', provider: 'built-in:inbound', labels: [], maxWorkers: 1 });
+		return registry;
+	}
+
+	// A worker the daemon launched itself cannot present the source's registration token: only its
+	// hash is stored (T-09). It presents a one-shot credential minted at launch instead.
+	it('accepts the one-shot credential minted for that launch', () => {
+		const issuer = new LaunchTokenIssuer();
+		const token = issuer.issue('laptop');
+
+		const result = new SharedTokenAuthenticator(dir, declaredRegistry(), issuer).authenticate({
+			token,
+			sourceId: 'laptop',
+			loopback: true,
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	it('refuses the same launch credential a second time', () => {
+		const issuer = new LaunchTokenIssuer();
+		const token = issuer.issue('laptop');
+		const authenticator = new SharedTokenAuthenticator(dir, declaredRegistry(), issuer);
+		const request = { token, sourceId: 'laptop', loopback: true };
+
+		expect(authenticator.authenticate(request).ok).toBe(true);
+		expect(authenticator.authenticate(request).ok).toBe(false);
+	});
+
+	it('refuses a launch credential minted for another source', () => {
+		const issuer = new LaunchTokenIssuer();
+		const token = issuer.issue('builder');
+
+		const result = new SharedTokenAuthenticator(dir, declaredRegistry(), issuer).authenticate({
+			token,
+			sourceId: 'laptop',
+			loopback: true,
+		});
+
+		expect(result.ok).toBe(false);
+	});
+
+	// The declared token must keep working: a worker started by hand presents that one.
+	it('still accepts the declared registration token', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		const { token } = registry.declare({
+			sourceId: 'laptop',
+			provider: 'built-in:command',
+			labels: [],
+			maxWorkers: 1,
+			options: { command: 'flow worker' },
+		});
+
+		const result = new SharedTokenAuthenticator(dir, registry, new LaunchTokenIssuer()).authenticate({
+			token,
+			sourceId: 'laptop',
+			loopback: true,
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	// Without an issuer wired in, nothing may be admitted that the registry cannot verify.
+	it('refuses an unknown token when no issuer is configured', () => {
+		const result = new SharedTokenAuthenticator(dir, declaredRegistry()).authenticate({
+			token: 'a'.repeat(64),
+			sourceId: 'laptop',
+			loopback: true,
+		});
+
+		expect(result.ok).toBe(false);
 	});
 });

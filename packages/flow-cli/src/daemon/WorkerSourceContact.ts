@@ -15,6 +15,13 @@ const BUILT_IN_HOST = 'built-in:host';
 export interface SourceProviderDependencies {
 	/** Looks up the live connection for a source, for the host provider (D#17). */
 	findHost?: (sourceId: string) => RegisteredHost | undefined;
+	/**
+	 * Mints the one-shot credential a launched worker registers with (T-09).
+	 *
+	 * Optional so a command declared with its own `--token` keeps working; when absent, nothing is
+	 * minted and the command is responsible for its own credential.
+	 */
+	issueLaunchToken?: (sourceId: string) => string;
 }
 
 /**
@@ -56,13 +63,19 @@ export interface CommandSourceOptions {
 /**
  * A source that creates a worker by running a command.
  *
- * The command is expected to be something like `flow worker --source <id> --token <tok>`,
- * possibly over ssh. **It must carry its own credential**: the registry stores only a hash
- * of the registration token (T-09), so the daemon cannot hand one out, and inventing one
- * would mean the token was recoverable after all.
+ * The command is usually just `flow worker`: everything it needs -- where to register, as what,
+ * for which projects, and with which credential -- arrives in its environment.
+ *
+ * The credential is minted for this launch alone, not read from the registry: only a hash of the
+ * registration token is stored (T-09), and a `built-in:command` entry could not embed one either,
+ * since the token does not exist when the source is declared. A command that carries its own
+ * `--token` still works; nothing is then minted for it.
  */
 export class CommandWorkerSource implements WorkerSourceProvider {
-	constructor(private readonly options: CommandSourceOptions) {}
+	constructor(
+		private readonly options: CommandSourceOptions,
+		private readonly issueLaunchToken?: (sourceId: string) => string
+	) {}
 
 	// eslint-disable-next-line @typescript-eslint/require-await -- async by interface contract
 	async obtainWorker(request: WorkerRequest): Promise<void> {
@@ -77,10 +90,14 @@ export class CommandWorkerSource implements WorkerSourceProvider {
 		const child = spawn(command, this.options.args ?? [], {
 			...(this.options.cwd !== undefined ? { cwd: this.options.cwd } : {}),
 			env: childEnv({
-				// Where to register, and as what. No token: see the class doc.
+				// Everything the launched worker needs to configure itself. See the class doc for
+				// why the credential is minted here rather than read from the registry.
 				FLOW_DAEMON_WS_URL: request.daemonEndpoint,
 				FLOW_WORKER_SOURCE_ID: request.sourceId,
 				FLOW_WORKER_PROJECTS: request.projects.join(','),
+				...(this.issueLaunchToken !== undefined
+					? { FLOW_WORKER_TOKEN: this.issueLaunchToken(request.sourceId) }
+					: {}),
 			}),
 			stdio: ['ignore', 'ignore', 'pipe'],
 			shell: true,
@@ -113,7 +130,7 @@ export function resolveSourceProvider(
 		case BUILT_IN_INBOUND:
 			return new InboundWorkerSource();
 		case BUILT_IN_COMMAND:
-			return new CommandWorkerSource(options);
+			return new CommandWorkerSource(options, dependencies.issueLaunchToken);
 		case BUILT_IN_HOST: {
 			const { findHost } = dependencies;
 			if (findHost === undefined) {

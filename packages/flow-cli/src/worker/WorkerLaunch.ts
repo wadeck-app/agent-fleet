@@ -23,6 +23,14 @@ export function resolveDaemonWsUrl(daemonDir: string, configuredWsPort: number |
 		return `ws://127.0.0.1:${String(configuredWsPort)}`;
 	}
 
+	// A worker the daemon launched is told where to dial. It matters beyond convenience: a worker
+	// started over ssh has no port file to read, and the daemon's loopback address is not the
+	// address that reaches it from another machine.
+	const fromEnv = process.env['FLOW_DAEMON_WS_URL'];
+	if (fromEnv !== undefined && fromEnv !== '') {
+		return fromEnv;
+	}
+
 	const portFile = join(daemonDir, 'worker.port');
 	let raw: string;
 	try {
@@ -88,6 +96,34 @@ export function resolveWorkerToken(options: { token?: string; sourceId?: string 
 			`No credential available: pass --token, set FLOW_WORKER_TOKEN, or start the daemon so its health_token exists in "${daemonDir}".`
 		);
 	}
+}
+
+/**
+ * Source this worker belongs to: the flag if given, else what launched it said.
+ *
+ * A worker the daemon launched via a `built-in:command` source is configured entirely from its
+ * environment, so the declared command can be plain `flow worker` with no ids to keep in sync.
+ */
+export function resolveSourceId(fromFlag: string | undefined): string | undefined {
+	if (fromFlag !== undefined && fromFlag !== '') return fromFlag;
+	const fromEnv = process.env['FLOW_WORKER_SOURCE_ID'];
+	return fromEnv !== undefined && fromEnv !== '' ? fromEnv : undefined;
+}
+
+/**
+ * Extra projects to serve: the flags if given, else what launched it said.
+ *
+ * A blank environment value yields none rather than one empty path, which would attach the worker
+ * to a project that does not exist.
+ */
+export function resolveExtraProjects(fromFlags: string[] | undefined): string[] {
+	if (fromFlags !== undefined && fromFlags.length > 0) return fromFlags;
+	const fromEnv = process.env['FLOW_WORKER_PROJECTS'];
+	if (fromEnv === undefined || fromEnv.trim() === '') return [];
+	return fromEnv
+		.split(',')
+		.map(project => project.trim())
+		.filter(project => project !== '');
 }
 
 /** Everything the worker declares about itself on registration. */

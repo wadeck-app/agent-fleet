@@ -25,7 +25,15 @@ import type { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 export class SharedTokenAuthenticator implements AuthenticationProvider {
 	constructor(
 		private readonly daemonDir: string,
-		private readonly sources: WorkerSourceRegistry
+		private readonly sources: WorkerSourceRegistry,
+		/**
+		 * Credentials minted for workers this daemon launched itself.
+		 *
+		 * Optional: without it, only what the registry can verify is admitted. A worker the daemon
+		 * started cannot present the source's registration token -- only its hash is stored (T-09) --
+		 * so it presents a one-shot token instead, valid once and briefly.
+		 */
+		private readonly launchTokens?: { consume(sourceId: string, token: string): boolean }
 	) {}
 
 	authenticate(request: AuthenticationRequest): AuthenticationResult {
@@ -39,7 +47,12 @@ export class SharedTokenAuthenticator implements AuthenticationProvider {
 		}
 
 		if (request.sourceId !== undefined && request.sourceId !== '') {
+			// Declared token first: it is what a worker started by hand presents, and checking it
+			// first means a launch token is only ever spent by the launch it was minted for.
 			if (!this.sources.verifyToken(request.sourceId, request.token)) {
+				if (this.launchTokens?.consume(request.sourceId, request.token) === true) {
+					return { ok: true };
+				}
 				return {
 					ok: false,
 					reason: `credential rejected for source "${request.sourceId}": it does not match that source's registration token, or the source is not declared`,

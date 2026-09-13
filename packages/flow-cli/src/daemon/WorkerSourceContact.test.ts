@@ -51,9 +51,25 @@ describe('CommandWorkerSource', () => {
 		expect(env['FLOW_WORKER_PROJECTS']).toBe('C:/proj');
 	});
 
-	// The registry stores only a hash of the token (T-09), so the daemon cannot hand one
-	// out. The declared command has to carry its own credential.
-	it('does not invent a credential', async () => {
+	// The registry stores only a hash of the registration token (T-09), so the daemon cannot hand
+	// that one out -- and the declared command cannot carry it either, since it does not exist yet
+	// when the source is declared. The daemon mints a one-shot credential for this launch instead.
+	it('passes the one-shot credential minted for this launch', async () => {
+		const issued: string[] = [];
+		const issueLaunchToken = (sourceId: string): string => {
+			issued.push(sourceId);
+			return 'minted-token';
+		};
+
+		await new CommandWorkerSource({ command: 'flow' }, issueLaunchToken).obtainWorker(request);
+
+		const env = (spawnMock.mock.calls[0]![2] as { env: Record<string, string> }).env;
+		expect(env['FLOW_WORKER_TOKEN']).toBe('minted-token');
+		expect(issued).toEqual(['laptop']);
+	});
+
+	// A command declared with its own `--token` stays valid: nothing is invented for it.
+	it('passes no credential when the daemon cannot mint one', async () => {
 		await new CommandWorkerSource({ command: 'flow' }).obtainWorker(request);
 
 		const env = (spawnMock.mock.calls[0]![2] as { env: Record<string, string> }).env;

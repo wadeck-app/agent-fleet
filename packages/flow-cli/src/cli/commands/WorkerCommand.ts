@@ -20,6 +20,8 @@ import {
 	buildRegistration,
 	reconnectDelayMs,
 	resolveDaemonWsUrl,
+	resolveExtraProjects,
+	resolveSourceId,
 	resolveWorkerToken,
 	scheduleReconnectTimer,
 } from '../../worker/WorkerLaunch';
@@ -169,17 +171,20 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	// as interactive and fail the first question it is asked.
 	const approvalProvider = await PluginResolver.create().resolveApproval();
 
-	const token = resolveWorkerToken({ token: options.token, sourceId: options.source }, daemonDir);
+	// A worker the daemon launched carries its configuration in its environment, so the source and
+	// the projects are resolved the same way the credential already was.
+	const sourceId = resolveSourceId(options.source);
+	const token = resolveWorkerToken({ token: options.token, sourceId }, daemonDir);
 	const registration = buildRegistration({
 		projectRoot,
-		extraProjects: options.project,
+		extraProjects: resolveExtraProjects(options.project),
 		isTty: process.stdout.isTTY === true,
 		canPrompt: approvalProvider !== undefined,
 		...(approvalProvider?.requiresTerminal !== undefined
 			? { promptNeedsTerminal: approvalProvider.requiresTerminal }
 			: {}),
 		pid: process.pid,
-		...(options.source !== undefined ? { sourceId: options.source } : {}),
+		...(sourceId !== undefined ? { sourceId } : {}),
 		labels: parseLabels(options.labels),
 		token,
 	});

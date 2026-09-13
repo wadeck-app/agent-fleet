@@ -20,6 +20,7 @@ import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { HostRegistry } from './HostRegistry.js';
+import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WebSocketServer } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
@@ -258,6 +259,7 @@ async function startDaemon(
 
 	let workerRegistry: WorkerRegistry;
 	let hostRegistry: HostRegistry;
+	let launchTokens: LaunchTokenIssuer;
 	let workerProvisioner: WorkerProvisioner;
 	let wsServer: WebSocketServer;
 	/** The port workers must dial, known only once the listener has bound. */
@@ -338,11 +340,14 @@ async function startDaemon(
 				// Hosts are tracked apart from workers because the two roles carry different
 				// credentials and neither may stand in for the other (T-04, T-11).
 				hostRegistry = new HostRegistry(sourceRegistry);
+				// One issuer, shared: the credential a launched worker presents has to be the one
+				// this daemon minted for it, and it is only ever valid here, once (T-09).
+				launchTokens = new LaunchTokenIssuer();
 				workerProvisioner = new WorkerProvisioner(
 					config.queue.concurrency,
 					workerRegistry,
 					forkSource,
-					new SharedTokenAuthenticator(resolvedDaemonDir, sourceRegistry),
+					new SharedTokenAuthenticator(resolvedDaemonDir, sourceRegistry, launchTokens),
 					sourceRegistry
 				);
 				commandHandler = new CommandHandler(
@@ -398,7 +403,13 @@ async function startDaemon(
 						// A host source is reached through its live connection, so the provider
 						// needs to look one up. At startup none has dialled in yet, which reports
 						// as "no host connected" rather than pretending capacity exists.
-						{ findHost: (sourceId: string) => hostRegistry.find(sourceId) }
+						{
+							findHost: (sourceId: string) => hostRegistry.find(sourceId),
+							// A worker this daemon launches cannot present the source's registration
+							// token -- only its hash is stored (T-09) -- so it is given a credential
+							// minted for that launch alone.
+							issueLaunchToken: (sourceId: string) => launchTokens.issue(sourceId),
+						}
 					).catch((err: unknown) => {
 						process.stderr.write(`[daemon] contacting worker sources failed: ${getErrorMessage(err)}\n`);
 					});

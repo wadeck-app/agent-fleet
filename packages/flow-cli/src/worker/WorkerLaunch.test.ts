@@ -7,6 +7,8 @@ import {
 	buildRegistration,
 	reconnectDelayMs,
 	resolveDaemonWsUrl,
+	resolveExtraProjects,
+	resolveSourceId,
 	resolveWorkerToken,
 	scheduleReconnectTimer,
 } from './WorkerLaunch.js';
@@ -238,5 +240,64 @@ describe('reconnectDelayMs', () => {
 
 	it('caps the wait so a restarted daemon is picked up promptly', () => {
 		expect(reconnectDelayMs(1000)).toBeLessThanOrEqual(30_000);
+	});
+});
+
+describe('worker configuration from the environment', () => {
+	afterEach(() => {
+		delete process.env['FLOW_WORKER_SOURCE_ID'];
+		delete process.env['FLOW_WORKER_PROJECTS'];
+		delete process.env['FLOW_DAEMON_WS_URL'];
+	});
+
+	// A worker the daemon launched is configured entirely by its environment, so the declared
+	// command can be just `flow worker`. Those three variables were being set by the daemon and
+	// read by nobody, which is why built-in:command produced workers that knew nothing.
+	it('takes the source id from the environment when no flag was given', () => {
+		process.env['FLOW_WORKER_SOURCE_ID'] = 'laptop';
+
+		expect(resolveSourceId(undefined)).toBe('laptop');
+	});
+
+	it('prefers an explicit --source over the environment', () => {
+		process.env['FLOW_WORKER_SOURCE_ID'] = 'laptop';
+
+		expect(resolveSourceId('builder')).toBe('builder');
+	});
+
+	it('has no source when neither says one', () => {
+		expect(resolveSourceId(undefined)).toBeUndefined();
+	});
+
+	it('takes the projects to serve from the environment', () => {
+		process.env['FLOW_WORKER_PROJECTS'] = 'C:/a,C:/b';
+
+		expect(resolveExtraProjects(undefined)).toEqual(['C:/a', 'C:/b']);
+	});
+
+	it('ignores an empty projects list rather than serving a blank path', () => {
+		process.env['FLOW_WORKER_PROJECTS'] = '';
+
+		expect(resolveExtraProjects(undefined)).toEqual([]);
+	});
+
+	it('prefers explicit --project flags over the environment', () => {
+		process.env['FLOW_WORKER_PROJECTS'] = 'C:/a';
+
+		expect(resolveExtraProjects(['C:/explicit'])).toEqual(['C:/explicit']);
+	});
+
+	// A remote worker launched over ssh has no port file to read: the endpoint it must dial is
+	// the one the daemon told it about.
+	it('dials the endpoint the daemon named, without consulting any port file', () => {
+		process.env['FLOW_DAEMON_WS_URL'] = 'ws://10.0.0.5:4101';
+
+		expect(resolveDaemonWsUrl('C:/nonexistent-daemon-dir', null)).toBe('ws://10.0.0.5:4101');
+	});
+
+	it('still prefers a configured port over the environment', () => {
+		process.env['FLOW_DAEMON_WS_URL'] = 'ws://10.0.0.5:4101';
+
+		expect(resolveDaemonWsUrl('C:/nonexistent-daemon-dir', 4242)).toBe('ws://127.0.0.1:4242');
 	});
 });
