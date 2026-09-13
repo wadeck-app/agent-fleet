@@ -49,9 +49,14 @@ flow worker source add factory-local \
   --cwd C:/path/to/project
 ```
 
-Use this for anything that must work without you: the daemon creates the worker at startup (D#54)
-and again whenever demand goes unserved (D#66), so an interactive step never races a worker that has
-not reconnected yet.
+Use this for anything that must work without you: when a step needs capacity nothing can serve, the
+daemon asks this source first and only forks as a fallback (D#66, D#25). An interactive step
+therefore gets a worker that can answer it, instead of racing a terminal worker that may not have
+reconnected -- the step waits while the source is asked, which is what the 45s bound in the
+interactivity policy is for.
+
+Sources are not asked at daemon startup: a daemon with nothing to do stops in about a second, so the
+worker it created was disconnected 20ms after connecting.
 
 The command needs no arguments -- everything arrives in its environment: `FLOW_DAEMON_WS_URL`,
 `FLOW_WORKER_SOURCE_ID`, `FLOW_WORKER_PROJECTS`, and `FLOW_WORKER_TOKEN`, a credential minted for
@@ -125,15 +130,31 @@ That watch is local-only. Deliberately, because the alternatives are worse:
 For a remote machine the daemon cannot reach, the answer is a relay: the notification then rides a
 connection the remote side opened, so nothing is exposed and the worker still initiates.
 
+## How the daemon knows a worker is broken
+
+The socket is the liveness signal; there is no heartbeat. When it closes, what happens depends on
+whether the step had started (D#65): assigned but not started goes back on the queue, up to three
+times; already executing is failed, with no automatic retry, because it may have had an effect
+already.
+
+A wedged worker never closes its socket, so silence is the second signal: an executing step that
+reports nothing for `queue.stepSilenceLimitSeconds` (default 1800) is failed the same way. Any
+output counts as progress, so a slow step is not a stuck one. Raise the setting for work that is
+legitimately quiet for longer.
+
+Only a daemon-forked worker gets more than that, because only there does the daemon own the process:
+a forked pid that never connects is killed after 10s, and its exit is noticed.
+
 ## What the messages mean
 
-| You see                                                                                                     | It means                                                                          |
-| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `interactive: false (no approval plugin configured…)`                                                       | add `plugins.approval` to `.flow/config.yml`                                      |
-| `interactive: false (the configured approval plugin needs a terminal…)`                                     | you are not on a TTY; use `plugins.file-approval`                                 |
-| `[wait] daemon connection closed; waiting to re-register`                                                   | normal with no daemon; it is waiting, not dying                                   |
-| `Step "x" needs a person to answer it. No connected worker declared a user interface in the 45s it waited.` | no interactive worker appeared; check `flow worker list` shows `interactive=true` |
-| `No worker is connected.` followed by declared sources                                                      | nothing live; the sources listed are contacted when a daemon starts               |
+| You see                                                                                                     | It means                                                                                           |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `interactive: false (no approval plugin configured…)`                                                       | add `plugins.approval` to `.flow/config.yml`                                                       |
+| `interactive: false (the configured approval plugin needs a terminal…)`                                     | you are not on a TTY; use `plugins.file-approval`                                                  |
+| `[wait] daemon connection closed; waiting to re-register`                                                   | normal with no daemon; it is waiting, not dying                                                    |
+| `Step "x" needs a person to answer it. No connected worker declared a user interface in the 45s it waited.` | no interactive worker appeared; check `flow worker list` shows `interactive=true`                  |
+| `No worker is connected.` followed by declared sources                                                      | nothing live; the sources listed are contacted when a step needs capacity                          |
+| `the worker running this step reported nothing for 1800s, so it is treated as stuck`                        | the step produced no output for that long; raise `queue.stepSilenceLimitSeconds` if that is normal |
 
 Refusals (a stale credential, an undeclared source, a cap reached) are in the daemon log:
 `flow logs`.

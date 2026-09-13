@@ -31,7 +31,10 @@ export function describeNoLiveWorkers(declared: WorkerSourceEntry[], daemonRunni
 	lines.push(
 		daemonRunning
 			? 'Each was already asked for a worker; none has connected. See the daemon log for what it reported.'
-			: 'They are asked for a worker when a daemon starts. Start one with "flow start", or just run a flow.'
+			: // Not "when a daemon starts": a daemon with nothing to do stops in about a second, so
+				// asking then produced a worker it immediately disconnected. Capacity is requested
+				// when a step needs it.
+				'They are asked for a worker when a step needs one, so run a flow. "flow start" only brings the daemon up.'
 	);
 	return lines.join('\n');
 }
