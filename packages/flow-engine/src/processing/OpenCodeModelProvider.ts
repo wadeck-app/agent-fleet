@@ -40,6 +40,34 @@ const DEFAULT_MAX_INLINE_CONFIG_BYTES = 1024 * 1024; // 1MB
 // ---------------------------------------------------------------------------
 
 /**
+ * Splits an OPENCODE_CONFIG value into config file paths.
+ *
+ * Comma and semicolon always separate. A colon separates only when it is not a Windows drive
+ * letter: a drive-qualified path was split at its colon into a bare drive letter and a rooted
+ * path, neither of which exists, so the config was dropped with nothing but a console warning --
+ * and the models it declared came back from opencode as an unexplained server error.
+ */
+/**
+ * Makes an MSYS-style path readable by Node on Windows.
+ *
+ * Git Bash hands out `/c/Users/...`, which every shell on this machine understands and Node does
+ * not. A flow author copying a path from their terminal therefore produced a config the provider
+ * could not open -- and the only sign was a console warning nobody reads.
+ */
+export function toNodeReadablePath(candidate: string): string {
+	if (process.platform !== 'win32') return candidate;
+	const msys = /^\/([A-Za-z])\/(.*)$/.exec(candidate);
+	return msys ? `${msys[1]!.toUpperCase()}:/${msys[2]!}` : candidate;
+}
+
+export function splitConfigPaths(value: string): string[] {
+	return value
+		.split(/[,;]|(?<![A-Za-z]):/)
+		.map(path => path.trim())
+		.filter(Boolean);
+}
+
+/**
  * Narrow an unknown JSON value to a plain object.
  * Arrays and null are rejected -- they never carry the keys we read.
  */
@@ -165,6 +193,11 @@ function buildSpawnParams(
 	if (process.env['USERPROFILE']) infraEnv['USERPROFILE'] = process.env['USERPROFILE']!;
 	if (process.env['SystemRoot']) infraEnv['SystemRoot'] = process.env['SystemRoot']!;
 	const env: Record<string, string> = { ...infraEnv, ...(options.env ?? {}) };
+	// Consumed already: copyGlobalConfig merged those files into the isolated XDG config below.
+	// Handing the variable to the CLI as well makes it re-read the paths itself, and any path form
+	// it cannot resolve leaves it with no config -- which opencode reports as an unexplained
+	// server error rather than "config not found", so the cause is invisible.
+	delete env['OPENCODE_CONFIG'];
 
 	// Serialize McpServers and/or plugin into the OpenCode config
 	let tempFile: string | undefined;
@@ -216,7 +249,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 		// We copy the global config.json so auth and model settings are preserved.
 		const tempDir = path.join(os.tmpdir(), `opencode-run-${crypto.randomUUID()}`);
 		fs.mkdirSync(tempDir, { recursive: true });
-		this.copyGlobalConfig(tempDir);
+		this.copyGlobalConfig(tempDir, options.env);
 
 		// Write plugin hook file if hooks are requested (auto-cleaned in finally via tempDir)
 		let pluginPath: string | undefined;
@@ -276,7 +309,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 		// We copy the global config.json so auth and model settings are preserved.
 		const tempDir = path.join(os.tmpdir(), `opencode-run-${crypto.randomUUID()}`);
 		fs.mkdirSync(tempDir, { recursive: true });
-		this.copyGlobalConfig(tempDir);
+		this.copyGlobalConfig(tempDir, options.env);
 
 		// Write plugin hook file if hooks are requested (auto-cleaned in finally via tempDir)
 		let pluginPath: string | undefined;
@@ -550,10 +583,14 @@ export class OpenCodeModelProvider implements ModelProvider {
 		let merged: Record<string, unknown> = {};
 		for (const configPath of configPaths) {
 			// violations-suppress: shared/no-out-of-repo-path expands the leading ~ of an OPENCODE_CONFIG entry to the opencode CLI's own config store under the user's home; that path is owned by the external CLI, not by this repo
-			const resolvedPath = configPath.replace(/^~/, os.homedir());
+			const resolvedPath = toNodeReadablePath(configPath.replace(/^~/, os.homedir()));
 			if (!fs.existsSync(resolvedPath)) {
-				console.warn(`[OpenCodeModelProvider] Config file not found: ${resolvedPath}`);
-				continue;
+				// Throws rather than warns. A missing config means the models it declared are absent,
+				// and opencode reports that as "Unexpected server error" -- so a console.warn here
+				// bought a failure much later with no visible cause.
+				throw new Error(
+					`OPENCODE_CONFIG names "${configPath}", which does not exist${resolvedPath === configPath ? '' : ` (resolved to "${resolvedPath}")`}. Fix the path, or remove it to use the global opencode config.`
+				);
 			}
 			try {
 				const content = fs.readFileSync(resolvedPath, 'utf8');
@@ -596,18 +633,15 @@ export class OpenCodeModelProvider implements ModelProvider {
 	 * retains auth and model settings while being isolated from global plugin state.
 	 * If OPENCODE_CONFIG env var is set, merge multiple config files before copying.
 	 */
-	private copyGlobalConfig(tempDir: string): void {
+	private copyGlobalConfig(tempDir: string, stepEnv?: Record<string, string>): void {
 		let config: Record<string, unknown> | null = null;
 
-		// Check for multi-config via OPENCODE_CONFIG env var
-		const multiConfigEnv = process.env['OPENCODE_CONFIG'];
+		// The step's own OPENCODE_CONFIG wins over the daemon's. Reading only process.env made a
+		// per-step config silently do nothing -- which is precisely what per-step `env` was added
+		// for: one flow using different opencode configs in different steps.
+		const multiConfigEnv = stepEnv?.['OPENCODE_CONFIG'] ?? process.env['OPENCODE_CONFIG'];
 		if (multiConfigEnv) {
-			// Split by comma or colon (colon for Unix paths, comma for Windows)
-			const separator = multiConfigEnv.includes(',') ? ',' : ':';
-			const configPaths = multiConfigEnv
-				.split(separator)
-				.map(p => p.trim())
-				.filter(Boolean);
+			const configPaths = splitConfigPaths(multiConfigEnv);
 			if (configPaths.length > 0) {
 				config = this.loadAndMergeConfigs(configPaths);
 			}

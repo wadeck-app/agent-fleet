@@ -23,9 +23,12 @@
  */
 export const MODEL_ALIASES: Record<string, Record<string, string>> = {
 	opencode: {
-		haiku: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
-		sonnet: 'us.anthropic.claude-sonnet-5',
-		opus: 'us.anthropic.claude-opus-5',
+		// The `amazon-bedrock/` prefix is required, not decoration: `opencode run -m` takes
+		// `provider/model`, and a bare model id comes back as an unexplained server error rather
+		// than "unknown model". Leaving it off made every aliased step fail this way.
+		haiku: 'amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0',
+		sonnet: 'amazon-bedrock/us.anthropic.claude-sonnet-5',
+		opus: 'amazon-bedrock/us.anthropic.claude-opus-5',
 	},
 };
 

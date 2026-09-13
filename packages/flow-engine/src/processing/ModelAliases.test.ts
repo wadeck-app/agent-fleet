@@ -5,21 +5,33 @@ import { MODEL_ALIASES, resolveModelAlias } from './ModelAliases';
 describe('resolveModelAlias - opencode', () => {
 	// A flow says "sonnet" and means "the current one". Bedrock ids are dated, undated or
 	// suffixed depending on the model, so nobody should have to remember which.
-	it('maps the family names to concrete bedrock ids', () => {
-		expect(resolveModelAlias('opencode', 'sonnet')).toBe('us.anthropic.claude-sonnet-5');
-		expect(resolveModelAlias('opencode', 'haiku')).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0');
-		expect(resolveModelAlias('opencode', 'opus')).toBe('us.anthropic.claude-opus-5');
+	// The provider prefix is not decoration: `opencode run -m` takes `provider/model` and rejects
+	// a bare model id with an unexplained server error. Omitting it made every aliased step fail.
+	it('maps the family names to provider-qualified bedrock ids', () => {
+		expect(resolveModelAlias('opencode', 'sonnet')).toBe('amazon-bedrock/us.anthropic.claude-sonnet-5');
+		expect(resolveModelAlias('opencode', 'haiku')).toBe(
+			'amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0'
+		);
+		expect(resolveModelAlias('opencode', 'opus')).toBe('amazon-bedrock/us.anthropic.claude-opus-5');
 	});
 
 	it('accepts the family name whatever the casing', () => {
-		expect(resolveModelAlias('opencode', 'Sonnet')).toBe('us.anthropic.claude-sonnet-5');
-		expect(resolveModelAlias('opencode', 'HAIKU')).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0');
+		expect(resolveModelAlias('opencode', 'Sonnet')).toBe('amazon-bedrock/us.anthropic.claude-sonnet-5');
+		expect(resolveModelAlias('opencode', 'HAIKU')).toBe(
+			'amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0'
+		);
+	});
+
+	it('always produces something with a provider prefix', () => {
+		for (const family of ['haiku', 'sonnet', 'opus']) {
+			expect(resolveModelAlias('opencode', family)).toMatch(/^[a-z-]+\//);
+		}
 	});
 
 	// The fallback that keeps every existing flow working, and the escape hatch for pinning an
 	// older version on purpose.
 	it('passes an explicit id through untouched', () => {
-		const pinned = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0';
+		const pinned = 'amazon-bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0';
 
 		expect(resolveModelAlias('opencode', pinned)).toBe(pinned);
 	});
@@ -57,14 +69,14 @@ describe('MODEL_ALIASES', () => {
 	// must have answered, so a typo cannot reach a flow as a silent failure at dispatch time.
 	it('only maps to ids proven to answer on this account', () => {
 		const proven = new Set([
-			'us.anthropic.claude-haiku-4-5-20251001-v1:0',
-			'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
-			'us.anthropic.claude-sonnet-4-6',
-			'us.anthropic.claude-sonnet-5',
-			'us.anthropic.claude-opus-4-6-v1',
-			'us.anthropic.claude-opus-4-7',
-			'us.anthropic.claude-opus-4-8',
-			'us.anthropic.claude-opus-5',
+			'amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0',
+			'amazon-bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+			'amazon-bedrock/us.anthropic.claude-sonnet-4-6',
+			'amazon-bedrock/us.anthropic.claude-sonnet-5',
+			'amazon-bedrock/us.anthropic.claude-opus-4-6-v1',
+			'amazon-bedrock/us.anthropic.claude-opus-4-7',
+			'amazon-bedrock/us.anthropic.claude-opus-4-8',
+			'amazon-bedrock/us.anthropic.claude-opus-5',
 		]);
 
 		for (const id of Object.values(MODEL_ALIASES['opencode'] ?? {})) {
@@ -75,7 +87,10 @@ describe('MODEL_ALIASES', () => {
 	// fable-5 and fable-5-1 exist in the bedrock account but the IAM role is not allowed to call
 	// them, so an alias pointing at one would fail with "Forbidden" at run time.
 	it('does not map anything to a model the IAM role cannot call', () => {
-		const forbidden = ['us.anthropic.claude-fable-5', 'us.anthropic.claude-fable-5-1'];
+		const forbidden = [
+			'amazon-bedrock/us.anthropic.claude-fable-5',
+			'amazon-bedrock/us.anthropic.claude-fable-5-1',
+		];
 
 		for (const table of Object.values(MODEL_ALIASES)) {
 			for (const id of Object.values(table)) {

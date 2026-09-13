@@ -9,18 +9,18 @@ are not consistent: some carry a date, some do not, one carries a bare `-v1`.
 
 ## Anthropic models — profile `cloudbees-bedrock-claude-infra-bedrock-claude-user`
 
-| Family | Id to use | opencode | claude |
-|---|---|---|---|
-| haiku-4-5 | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | works | works |
-| sonnet-4-5 | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | works | works |
-| sonnet-4-6 | `us.anthropic.claude-sonnet-4-6` | works | works |
-| sonnet-5 | `us.anthropic.claude-sonnet-5` | works | works |
-| opus-4-6 | `us.anthropic.claude-opus-4-6-v1` | works | works |
-| opus-4-7 | `us.anthropic.claude-opus-4-7` | works | works |
-| opus-4-8 | `us.anthropic.claude-opus-4-8` | works | works |
-| opus-5 | `us.anthropic.claude-opus-5` | works | works |
-| fable-5 | `us.anthropic.claude-fable-5` | **denied** | **fails** |
-| fable-5-1 | `us.anthropic.claude-fable-5-1` | **denied** | **fails** |
+| Family     | Id to use                                      | opencode   | claude    |
+| ---------- | ---------------------------------------------- | ---------- | --------- |
+| haiku-4-5  | `us.anthropic.claude-haiku-4-5-20251001-v1:0`  | works      | works     |
+| sonnet-4-5 | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | works      | works     |
+| sonnet-4-6 | `us.anthropic.claude-sonnet-4-6`               | works      | works     |
+| sonnet-5   | `us.anthropic.claude-sonnet-5`                 | works      | works     |
+| opus-4-6   | `us.anthropic.claude-opus-4-6-v1`              | works      | works     |
+| opus-4-7   | `us.anthropic.claude-opus-4-7`                 | works      | works     |
+| opus-4-8   | `us.anthropic.claude-opus-4-8`                 | works      | works     |
+| opus-5     | `us.anthropic.claude-opus-5`                   | works      | works     |
+| fable-5    | `us.anthropic.claude-fable-5`                  | **denied** | **fails** |
+| fable-5-1  | `us.anthropic.claude-fable-5-1`                | **denied** | **fails** |
 
 The fable models exist in the account and are refused by IAM, not by the CLIs:
 
@@ -37,23 +37,23 @@ a choice made in the environment.
 
 ## OpenAI models — profile `cloudbees-bedrock-openai-codex-codex-user` (codex)
 
-| Id | codex |
-|---|---|
+| Id                                              | codex |
+| ----------------------------------------------- | ----- |
 | `openai.gpt-5.6-terra` (the configured default) | works |
-| `openai.gpt-5.5` | works |
-| `openai.gpt-5.6` | works |
+| `openai.gpt-5.5`                                | works |
+| `openai.gpt-5.6`                                | works |
 
 This is a different bedrock account: anthropic models are not reachable from it, and family names
 like "sonnet" mean nothing there.
 
 ## What does not work, and why
 
-| What | Result | Cause |
-|---|---|---|
-| `anthropic.claude-haiku-4-5` | `The provided model identifier is invalid` | a catalogue alias, not a bedrock id |
-| Any id without the `us.` prefix, undeclared | `ProviderModelNotFoundError` from opencode | opencode's catalogue for bedrock has no such model |
-| `us.*` ids declared in `models` but absent from `whitelist` | missing from `opencode models` | opencode needs both halves |
-| `OPENCODE_CONFIG=C:/path/to.json` | config silently ignored | the value is split on `:`, so a drive letter becomes two bogus paths — use `/c/path/to.json` |
+| What                                                        | Result                                     | Cause                                                                                        |
+| ----------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `anthropic.claude-haiku-4-5`                                | `The provided model identifier is invalid` | a catalogue alias, not a bedrock id                                                          |
+| Any id without the `us.` prefix, undeclared                 | `ProviderModelNotFoundError` from opencode | opencode's catalogue for bedrock has no such model                                           |
+| `us.*` ids declared in `models` but absent from `whitelist` | missing from `opencode models`             | opencode needs both halves                                                                   |
+| `OPENCODE_CONFIG=C:/path/to.json`                           | config silently ignored                    | the value is split on `:`, so a drive letter becomes two bogus paths — use `/c/path/to.json` |
 
 ## Making opencode see a model it does not know
 
@@ -63,26 +63,26 @@ must be **declared and whitelisted**:
 
 ```json
 {
-  "provider": {
-    "amazon-bedrock": {
-      "options": { "region": "us-east-1", "profile": "cloudbees-bedrock-claude-infra-bedrock-claude-user" },
-      "models": {
-        "us.anthropic.claude-haiku-4-5-20251001-v1:0": { "name": "Claude Haiku 4.5" },
-        "us.anthropic.claude-sonnet-4-5-20250929-v1:0": { "name": "Claude Sonnet 4.5" },
-        "us.anthropic.claude-opus-4-6-v1": { "name": "Claude Opus 4.6" }
-      },
-      "whitelist": [
-        "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        "us.anthropic.claude-sonnet-4-6",
-        "us.anthropic.claude-sonnet-5",
-        "us.anthropic.claude-opus-4-6-v1",
-        "us.anthropic.claude-opus-4-7",
-        "us.anthropic.claude-opus-4-8",
-        "us.anthropic.claude-opus-5"
-      ]
-    }
-  }
+	"provider": {
+		"amazon-bedrock": {
+			"options": { "region": "us-east-1", "profile": "cloudbees-bedrock-claude-infra-bedrock-claude-user" },
+			"models": {
+				"us.anthropic.claude-haiku-4-5-20251001-v1:0": { "name": "Claude Haiku 4.5" },
+				"us.anthropic.claude-sonnet-4-5-20250929-v1:0": { "name": "Claude Sonnet 4.5" },
+				"us.anthropic.claude-opus-4-6-v1": { "name": "Claude Opus 4.6" }
+			},
+			"whitelist": [
+				"us.anthropic.claude-haiku-4-5-20251001-v1:0",
+				"us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+				"us.anthropic.claude-sonnet-4-6",
+				"us.anthropic.claude-sonnet-5",
+				"us.anthropic.claude-opus-4-6-v1",
+				"us.anthropic.claude-opus-4-7",
+				"us.anthropic.claude-opus-4-8",
+				"us.anthropic.claude-opus-5"
+			]
+		}
+	}
 }
 ```
 
@@ -90,11 +90,11 @@ must be **declared and whitelisted**:
 
 `packages/flow-engine/src/processing/ModelAliases.ts` maps the family names for **opencode only**:
 
-| A step writing | gets |
-|---|---|
-| `model: haiku` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` |
-| `model: sonnet` | `us.anthropic.claude-sonnet-5` |
-| `model: opus` | `us.anthropic.claude-opus-5` |
+| A step writing  | gets                                          |
+| --------------- | --------------------------------------------- |
+| `model: haiku`  | `us.anthropic.claude-haiku-4-5-20251001-v1:0` |
+| `model: sonnet` | `us.anthropic.claude-sonnet-5`                |
+| `model: opus`   | `us.anthropic.claude-opus-5`                  |
 
 Anything else passes through unchanged, so an explicit id still works and an older version can be
 pinned deliberately (`model: us.anthropic.claude-sonnet-4-6`). `claude` and `codex` are left

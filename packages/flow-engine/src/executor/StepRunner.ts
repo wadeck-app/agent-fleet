@@ -183,6 +183,7 @@ export class StepRunner {
 						// different id for opencode than for claude, and nothing for codex. An id
 						// that is not a family name passes through untouched.
 						resolvedModel: resolveModelAlias(providerName, modelStep.model),
+						providerName,
 					},
 					services,
 					onLogEntry

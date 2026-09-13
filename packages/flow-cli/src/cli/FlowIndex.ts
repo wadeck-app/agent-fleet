@@ -9,9 +9,11 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 
 import { FlowConfigLoader } from '../config/FlowConfig.js';
 import { Daemon, writeDaemonLog } from '../daemon/Daemon.js';
+import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { buildCliCommand } from './commands/CliCommand.js';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
@@ -64,7 +66,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 				process.stdout.write('[ok] daemon already running\n');
 				return;
 			}
-			const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url);
+			const bundlePath = resolveOwnBundlePath(FLOW_BUNDLE_NAME, fileURLToPath(import.meta.url));
 			if (process.platform === 'win32') {
 				const vbsPath = path.join(os.tmpdir(), `flow-daemon-start-${Date.now()}.vbs`);
 				const safeNode = process.execPath.replace(/"/g, '""');
@@ -266,7 +268,7 @@ async function main(): Promise<void> {
 	});
 
 	// Schedule background updater even when a command throws
-	const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url);
+	const bundlePath = resolveOwnBundlePath(FLOW_BUNDLE_NAME, fileURLToPath(import.meta.url));
 	try {
 		await program.parseAsync(process.argv);
 	} finally {

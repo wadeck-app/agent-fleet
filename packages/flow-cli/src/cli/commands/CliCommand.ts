@@ -15,10 +15,12 @@ import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 
-// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
+// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -198,7 +200,7 @@ function getCurrentVersion(): string {
 }
 
 function getUpdaterPath(): string | null {
-	const bundlePath = process.env['LAUNCHER_BUNDLE_OVERRIDE'] ?? fileURLToPath(import.meta.url);
+	const bundlePath = resolveOwnBundlePath(FLOW_BUNDLE_NAME, fileURLToPath(import.meta.url));
 	const dir = path.dirname(bundlePath);
 	const updaterPath = path.join(dir, 'flow-updater.cjs');
 	return fs.existsSync(updaterPath) ? updaterPath : null;

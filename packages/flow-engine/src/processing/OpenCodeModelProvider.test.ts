@@ -7,7 +7,10 @@
 import * as child_process from 'child_process';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PromptTooLargeError } from './ModelProvider';
@@ -59,6 +62,8 @@ function makeBaseOptions(overrides?: Partial<LaunchOptions>): LaunchOptions {
 describe('OpenCodeModelProvider', () => {
 	let provider: OpenCodeModelProvider;
 	let mockProcess: child_process.ChildProcess;
+	/** Real directory for the few tests that need a config file on disk. */
+	let tmpDir: string;
 
 	beforeEach(() => {
 		provider = new OpenCodeModelProvider();
@@ -66,10 +71,12 @@ describe('OpenCodeModelProvider', () => {
 		vi.mocked(child_process.spawn).mockReturnValue(mockProcess);
 		vi.clearAllMocks();
 		vi.mocked(child_process.spawn).mockReturnValue(mockProcess);
+		tmpDir = mkdtempSync(join(tmpdir(), 'opencode-provider-'));
 	});
 
 	afterEach(() => {
 		vi.restoreAllMocks();
+		rmSync(tmpDir, { recursive: true, force: true });
 	});
 
 	// -------------------------------------------------------------------------
@@ -133,6 +140,106 @@ describe('OpenCodeModelProvider', () => {
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
 			expect(args).not.toContain('--attach');
+		});
+
+		// A step declaring OPENCODE_CONFIG is asking *this step* to use those configs. Reading it
+		// from the daemon's own environment instead made per-step config silently do nothing,
+		// which is the whole reason `env` was added to model steps.
+		/**
+		 * Writes a config file with the real fs, since this suite mocks writeFileSync, and returns
+		 * whatever config the provider ended up copying for the CLI.
+		 */
+		async function configHandedToTheCli(configPath: string, contents: unknown): Promise<Record<string, unknown>> {
+			const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+			realFs.writeFileSync(configPath, JSON.stringify(contents), 'utf8');
+
+			const resultPromise = provider.launchBackground(makeBaseOptions({ env: { OPENCODE_CONFIG: configPath } }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			// The provider merges configs and writes the result into the isolated XDG dir.
+			const written = vi
+				.mocked(fs.writeFileSync)
+				.mock.calls.map(call => String(call[1]))
+				.filter(content => content.trim().startsWith('{'));
+			const merged = written.map(content => JSON.parse(content) as Record<string, unknown>);
+			return merged.find(config => 'model' in config) ?? {};
+		}
+
+		it('merges the config files the step names, not the ones the daemon was started with', async () => {
+			const previous = process.env['OPENCODE_CONFIG'];
+			delete process.env['OPENCODE_CONFIG'];
+			try {
+				const config = await configHandedToTheCli(join(tmpDir, 'step-config.json'), { model: 'from-the-step' });
+
+				expect(config['model']).toBe('from-the-step');
+			} finally {
+				if (previous === undefined) delete process.env['OPENCODE_CONFIG'];
+				else process.env['OPENCODE_CONFIG'] = previous;
+			}
+		});
+
+		// Git Bash prints paths as /c/..., which every shell here understands and Node does not. A
+		// flow author copying one from their terminal got a config that silently never loaded.
+		it('accepts an MSYS-style path from a Git Bash terminal', async () => {
+			const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+			const windowsPath = join(tmpDir, 'msys-config.json');
+			realFs.writeFileSync(windowsPath, JSON.stringify({ model: 'from-msys-path' }), 'utf8');
+			const msysPath = windowsPath
+				.replace(/\\/g, '/')
+				.replace(/^([A-Za-z]):/, (_m, drive: string) => `/${drive.toLowerCase()}`);
+
+			const resultPromise = provider.launchBackground(makeBaseOptions({ env: { OPENCODE_CONFIG: msysPath } }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const written = vi
+				.mocked(fs.writeFileSync)
+				.mock.calls.map(call => String(call[1]))
+				.filter(content => content.trim().startsWith('{'))
+				.map(content => JSON.parse(content) as Record<string, unknown>);
+			expect(written.find(config => 'model' in config)?.['model']).toBe('from-msys-path');
+		});
+
+		// A Windows path contains a colon, which the multi-config splitter used as a separator --
+		// so "C:/x.json" became "C" and "/x.json", neither of which exists, and the config was
+		// dropped with nothing but a console warning.
+		it('accepts a Windows path as a single config file', async () => {
+			const windowsPath = join(tmpDir, 'win-config.json').replace(/\//g, '\\');
+
+			const config = await configHandedToTheCli(windowsPath, { model: 'from-windows-path' });
+
+			expect(config['model']).toBe('from-windows-path');
+		});
+
+		// The provider has already merged those files into the isolated XDG config it hands the CLI.
+		// Passing the variable on as well makes the CLI re-read the paths itself, and a path form it
+		// cannot resolve leaves it with no config at all -- which surfaces from opencode as an
+		// unexplained server error, not as "config not found".
+		it('does not pass OPENCODE_CONFIG on to the CLI once it has been merged', async () => {
+			const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+			const configFile = join(tmpDir, 'merged.json');
+			realFs.writeFileSync(configFile, JSON.stringify({ model: 'x' }), 'utf8');
+
+			const resultPromise = provider.launchBackground(makeBaseOptions({ env: { OPENCODE_CONFIG: configFile } }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const env = (vi.mocked(child_process.spawn).mock.calls[0][2] as { env: Record<string, string> }).env;
+			expect(env['OPENCODE_CONFIG']).toBeUndefined();
+			// The isolated config dir is what the CLI must read instead.
+			expect(env['XDG_CONFIG_HOME']).toBeTruthy();
+		});
+
+		// A config the step named and that does not exist is a mistake worth stopping for. It used
+		// to be a console.warn nobody sees, and the step then failed much later with opencode's
+		// opaque "Unexpected server error" -- because the models that config declared were absent.
+		it('fails loudly when a config file the step named does not exist', async () => {
+			const missing = join(tmpDir, 'not-here.json');
+
+			await expect(provider.launchBackground(makeBaseOptions({ env: { OPENCODE_CONFIG: missing } }))).rejects.toThrow(
+				/not-here\.json/
+			);
 		});
 
 		// A blank value is a mistake, not a request to attach to nothing.

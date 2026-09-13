@@ -4,6 +4,8 @@ import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { BUILTIN_PLUGIN_MANIFESTS } from './BuiltinPlugins';
+
 interface ExtensionPointVersion {
 	version: number;
 	status: string;
@@ -150,6 +152,14 @@ export class PluginLoader {
 	}
 
 	private async loadManifest(pluginId: string, pluginsDir?: string): Promise<PluginManifest> {
+		// Built-ins first, unless the caller named a directory -- naming one means "use that copy".
+		// This is what lets the published single-file bundle load plugins at all: it has no
+		// node_modules, and a plugin's entry point imports TypeScript that plain node cannot read.
+		if (pluginsDir === undefined && this.pluginPackagesDir === undefined) {
+			const builtin = BUILTIN_PLUGIN_MANIFESTS[pluginId];
+			if (builtin !== undefined) return builtin;
+		}
+
 		const pluginDir = await this.resolvePluginDir(pluginId, pluginsDir);
 		const jsManifestPath = join(pluginDir, 'plugin.config.js');
 		const jsonManifestPath = join(pluginDir, 'plugin.manifest.json');

@@ -9,13 +9,15 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
+import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 
-// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { Daemon } from '../../daemon/Daemon';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
+// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -196,21 +198,24 @@ function parseInputArgs(rawInputs: string[]): Record<string, string> {
  * for its port file to appear -- avoids the WebSocket race condition of the in-process path.
  */
 async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Promise<void> {
-	const bundlePath =
-		process.env['LAUNCHER_BUNDLE_OVERRIDE'] ??
-		fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '');
 	// Resolve the .cjs bundle from the launcher override or the installed bundle location
 	const resolvedBundle = (() => {
-		const override = process.env['LAUNCHER_BUNDLE_OVERRIDE'];
-		if (override) return override;
 		// In the installed binary, __filename points to the flow.cjs bundle.
 		// In dev mode (tsx), we approximate via import.meta.url.
-		try {
-			return fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '/../../flow.cjs');
-		} catch {
-			return process.argv[1]!;
-		}
+		const self = (() => {
+			try {
+				return fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '/../../flow.cjs');
+			} catch {
+				return process.argv[1]!;
+			}
+		})();
+		return resolveOwnBundlePath(FLOW_BUNDLE_NAME, self);
 	})();
+
+	// A foreign override must not reach the daemon either: it would resolve its own updater path
+	// from another CLI's directory. Pass on the value we accepted, or nothing.
+	const daemonEnv: NodeJS.ProcessEnv = { ...process.env, FLOW_DAEMON_MODE: '1' };
+	if (daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'] !== resolvedBundle) delete daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'];
 
 	// Remove stale port file before spawning so the poll below only resolves on a fresh write
 	const portFile = path.join(daemonDir, 'config.port');
@@ -224,11 +229,14 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 		const vbsPath = path.join(os.tmpdir(), `flow-daemon-run-${Date.now()}.vbs`);
 		const safeNode = process.execPath.replace(/"/g, '""');
 		const safeBundle = resolvedBundle.replace(/"/g, '""');
-		const overrideLines = process.env['LAUNCHER_BUNDLE_OVERRIDE']
-			? [
-					`oShell.Environment("Process")("LAUNCHER_BUNDLE_OVERRIDE") = "${process.env['LAUNCHER_BUNDLE_OVERRIDE'].replace(/"/g, '""')}"`,
-				]
-			: [];
+		// Only forward an override we accepted: forwarding a foreign one would hand the daemon a
+		// bundle path belonging to another CLI (that is the bug this resolution guards against).
+		const overrideLines =
+			process.env['LAUNCHER_BUNDLE_OVERRIDE'] === resolvedBundle
+				? [
+						`oShell.Environment("Process")("LAUNCHER_BUNDLE_OVERRIDE") = "${resolvedBundle.replace(/"/g, '""')}"`,
+					]
+				: [];
 		fs.writeFileSync(
 			vbsPath,
 			[
@@ -243,14 +251,14 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 			detached: true,
 			stdio: 'ignore',
 			windowsHide: true,
-			env: { ...process.env, FLOW_DAEMON_MODE: '1' },
+			env: daemonEnv,
 		});
 		wscript.unref();
 	} else {
 		// violations-suppress: cli/no-spawn-without-windows-hide this is the non-Windows branch (win32 uses wscript.exe above), where windowsHide has no effect
 		const child = spawn(process.execPath, [resolvedBundle], {
 			stdio: 'ignore',
-			env: { ...process.env, FLOW_DAEMON_MODE: '1' },
+			env: daemonEnv,
 		});
 		child.unref();
 	}

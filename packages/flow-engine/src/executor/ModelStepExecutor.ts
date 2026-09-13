@@ -20,6 +20,14 @@ export interface ModelStepConfig {
 	/** Called with the fully-rendered prompt before the model CLI is launched. Use for debug logging. */
 	onRenderedPrompt?: (prompt: string) => void;
 	/**
+	 * Which provider ran the step, for error messages.
+	 *
+	 * Failures used to read "Claude exited with code 1" whatever the provider, which sends anyone
+	 * debugging an opencode or codex step looking at the wrong CLI. Defaults to the step's
+	 * declared provider name when omitted.
+	 */
+	providerName?: string;
+	/**
 	 * The step's model after family names like "sonnet" have been resolved for this provider.
 	 *
 	 * Resolved by the caller because that is where the provider is known (see `ModelAliases`).
@@ -47,6 +55,8 @@ export async function executeModelStep(
 	// "which model ran this?" -- a step saying `model: sonnet` otherwise leaves no record of
 	// which sonnet it was.
 	const effectiveModel = config.resolvedModel ?? step.model;
+	// Names the CLI that actually ran, so a failing opencode step does not report "Claude".
+	const providerLabel = config.providerName ?? step.provider ?? 'claude';
 
 	const renderedPrompt = templateRenderer.render(step.prompt, context, true);
 	stepTrace.prompt = renderedPrompt;
@@ -196,7 +206,7 @@ export async function executeModelStep(
 			stepTrace.meta = buildModelMeta();
 
 			if (result.exitCode !== 0 && result.exitCode !== 1 && result.exitCode !== null) {
-				stepTrace.error = `Claude exited with code ${result.exitCode}`;
+				stepTrace.error = `${providerLabel} exited with code ${result.exitCode}`;
 				return stepTrace;
 			}
 
@@ -230,7 +240,7 @@ export async function executeModelStep(
 			}
 
 			if (result.exitCode !== 0) {
-				stepTrace.error = `Claude exited with code ${result.exitCode}\n${result.stderr}`;
+				stepTrace.error = `${providerLabel} exited with code ${result.exitCode}\n${result.stderr}`;
 				return stepTrace;
 			}
 
