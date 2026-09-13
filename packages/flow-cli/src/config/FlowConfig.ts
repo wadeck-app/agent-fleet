@@ -2,19 +2,61 @@
  * DaemonConfig -- centralised configuration management for the flow daemon.
  *
  * Source of truth for all defaults and user-overridable values.
- * User config file: ~/.flow-config.yaml
+ * User config file: `~/.config/flow/config.yml` (D#58). `~/.flow-config.yaml` is the old
+ * location and is no longer read -- see {@link FlowConfigLoader.loadForDaemon}.
  *
  *   RULE: Adding a new config value requires ALL of the following steps:
  *   1. Add to FlowConfigData interface with JSDoc.
  *   2. Add to FlowConfig.DEFAULT with the default value.
  *   3. Add to FlowConfig.load() merge (spread the new section).
- *   4. Add to ~/.flow-config.yaml (commented, showing the default) -- MANDATORY.
+ *   4. Add to ~/.config/flow/config.yml (commented, showing the default) -- MANDATORY.
  *   5. Add a test in FlowConfig.test.ts covering the override.
  *
  * Skipping step 4 means the user cannot discover or override the value.
  */
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+/** The config file the daemon used to read, kept only to warn that it no longer does. */
+const LEGACY_CONFIG_FILE = '.flow-config.yaml';
+
+/**
+ * Every setting, read through a typed accessor.
+ *
+ * Spelled out rather than walked reflectively so the comparison stays type-checked: a setting
+ * that is renamed breaks this list at compile time instead of silently dropping out of the
+ * warning. A setting missing from here is only absent from that warning, never from the config.
+ */
+const COMPARED_SETTINGS: { path: string; read: (config: FlowConfigData) => unknown }[] = [
+	{ path: 'queue.concurrency', read: config => config.queue.concurrency },
+	{ path: 'logs.retainDays', read: config => config.logs.retainDays },
+	{ path: 'worker.wsPort', read: config => config.worker.wsPort },
+	{ path: 'worker.bindAddress', read: config => config.worker.bindAddress },
+	{ path: 'worker.tls', read: config => config.worker.tls },
+	{ path: 'security.allowAbsolutePaths', read: config => config.security.allowAbsolutePaths },
+	{ path: 'limits.maxInjectedSteps', read: config => config.limits.maxInjectedSteps },
+	{ path: 'limits.maxStepsPerExecution', read: config => config.limits.maxStepsPerExecution },
+	{ path: 'workspace.retainDays', read: config => config.workspace.retainDays },
+	{ path: 'workspace.maxWorkspaces', read: config => config.workspace.maxWorkspaces },
+];
+
+/**
+ * Names the settings where the legacy file disagrees with the config in use.
+ *
+ * Compared against the *effective* config, so a legacy value that happens to match a default
+ * is not reported as ignored -- it is not being ignored in any way the user would notice.
+ */
+function describeDifferences(legacy: FlowConfigData, inUse: FlowConfigData): string[] {
+	const differences: string[] = [];
+	for (const setting of COMPARED_SETTINGS) {
+		const legacyValue = setting.read(legacy);
+		if (JSON.stringify(legacyValue) === JSON.stringify(setting.read(inUse))) continue;
+		differences.push(`${setting.path}=${JSON.stringify(legacyValue)}`);
+	}
+	return differences;
+}
 
 export interface FlowConfigData {
 	queue: {
@@ -76,6 +118,46 @@ export class FlowConfigLoader {
 		},
 		workspace: { retainDays: 30, maxWorkspaces: 50 },
 	};
+
+	/**
+	 * Loads the daemon's config from the single location that counts (D#58).
+	 *
+	 * This exists because there were two. The daemon read `~/.flow-config.yaml` while
+	 * `flow worker` and plugin resolution read `~/.config/flow/config.yml`, so a machine with
+	 * both ran on values the user was not looking at -- one file said concurrency 14, the other
+	 * said 3, and nothing said which won.
+	 *
+	 * The legacy file is **never** merged or adopted. It is reported, with the settings that
+	 * differ spelled out, because a warning naming only the file leaves the user to diff two
+	 * YAML files by eye.
+	 *
+	 * @param daemonDir - where `config.yml` lives, normally `ConfigDir.get('flow')`
+	 * @param legacyConfigFile - the old path to check for and complain about
+	 * @returns the config, plus a warning the caller must surface when one is warranted
+	 */
+	static loadForDaemon(
+		daemonDir: string,
+		// violations-suppress: shared/no-out-of-repo-path the legacy file being warned about really did live in the user's home; looking anywhere else would never find it
+		legacyConfigFile: string = path.join(os.homedir(), LEGACY_CONFIG_FILE)
+	): { config: FlowConfigData; legacyWarning?: string } {
+		const configFile = path.join(daemonDir, 'config.yml');
+		const config = FlowConfigLoader.load(configFile);
+		if (!fs.existsSync(legacyConfigFile)) return { config };
+
+		const legacy = FlowConfigLoader.load(legacyConfigFile);
+		const differences = describeDifferences(legacy, config);
+		const detail =
+			differences.length === 0
+				? 'Its values match the ones in use, so nothing is being ignored right now.'
+				: `These settings in it are being ignored: ${differences.join(', ')}.`;
+
+		return {
+			config,
+			legacyWarning:
+				`"${legacyConfigFile}" is no longer read. The daemon's config is "${configFile}". ${detail} ` +
+				`Move anything you still want into that file and delete the old one.`,
+		};
+	}
 
 	/**
 	 * Load and merge user config from the given YAML file with the default config.

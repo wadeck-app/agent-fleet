@@ -372,8 +372,10 @@ export function registerRunCommand(program: Command): void {
 					}
 				}
 
-				// violations-suppress: shared/no-out-of-repo-path the global flow config lives in the user's home by design; a repo-relative path would make it per-checkout
-				const config = FlowConfigLoader.load(path.join(os.homedir(), '.flow-config.yaml'));
+				// The same single location the daemon reads, so a run and the daemon it starts
+				// never disagree about the configuration (D#58). The legacy-file warning is left
+				// to the daemon, which is the process whose behaviour it would have changed.
+				const { config } = FlowConfigLoader.loadForDaemon(daemonDir);
 
 				const cmd: Extract<ClientCommand, { type: 'run' }> = {
 					type: 'run',

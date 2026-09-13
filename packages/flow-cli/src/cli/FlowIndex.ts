@@ -193,8 +193,10 @@ async function printDaemonPid(): Promise<void> {
 async function main(): Promise<void> {
 	// Daemon-only mode: spawned by `flow start`, keeps the daemon running without any CLI command.
 	if (process.env['FLOW_DAEMON_MODE'] === '1') {
-		// violations-suppress: shared/no-out-of-repo-path the global flow config lives in the user's home by design; a repo-relative path would make it per-checkout
-		const config = FlowConfigLoader.load(path.join(os.homedir(), '.flow-config.yaml'));
+		const { config, legacyWarning } = FlowConfigLoader.loadForDaemon(DAEMON_DIR);
+		// Printed by the daemon itself, since this is the process whose behaviour the ignored
+		// file would have changed.
+		if (legacyWarning !== undefined) process.stderr.write(`[flow] ${legacyWarning}\n`);
 		await Daemon.start(config, DAEMON_DIR);
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).
 		return;

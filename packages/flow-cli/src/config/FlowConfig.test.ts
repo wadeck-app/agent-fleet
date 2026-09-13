@@ -149,3 +149,68 @@ describe('FlowConfigLoader.load', () => {
 		expect(config.queue).toEqual(FlowConfigLoader.DEFAULT.queue);
 	});
 });
+
+describe('FlowConfigLoader.loadForDaemon - one config location (D#58)', () => {
+	// The daemon read ~/.flow-config.yaml while `flow worker` and plugin resolution read
+	// ~/.config/flow/config.yml, so a machine with both ran on values the user was not
+	// looking at. One resolver, one location, and the other file is called out.
+	it('reads config.yml from the daemon directory', () => {
+		writeConfig('config.yml', 'queue:\n  concurrency: 9\n');
+
+		const { config } = FlowConfigLoader.loadForDaemon(tmpDir, path.join(tmpDir, 'absent-legacy.yaml'));
+
+		expect(config.queue.concurrency).toBe(9);
+	});
+
+	it('reports nothing when only the current location exists', () => {
+		writeConfig('config.yml', 'queue:\n  concurrency: 9\n');
+
+		const { legacyWarning } = FlowConfigLoader.loadForDaemon(tmpDir, path.join(tmpDir, 'absent-legacy.yaml'));
+
+		expect(legacyWarning).toBeUndefined();
+	});
+
+	// Loud, because the alternative is a daemon quietly running on settings from a file the
+	// user believes is no longer read -- which is exactly what was happening.
+	it('warns when the legacy file exists, naming both files', () => {
+		writeConfig('config.yml', 'queue:\n  concurrency: 9\n');
+		const legacy = writeConfig('legacy.yaml', 'queue:\n  concurrency: 14\n');
+
+		const { legacyWarning } = FlowConfigLoader.loadForDaemon(tmpDir, legacy);
+
+		expect(legacyWarning).toContain('legacy.yaml');
+		expect(legacyWarning).toContain('config.yml');
+	});
+
+	// The values differ, so the warning has to say which ones are being ignored -- naming the
+	// file alone leaves the user to diff two YAML files by eye.
+	it('names the settings that differ between the two files', () => {
+		writeConfig('config.yml', 'queue:\n  concurrency: 9\n');
+		const legacy = writeConfig('legacy.yaml', 'queue:\n  concurrency: 14\n');
+
+		const { legacyWarning } = FlowConfigLoader.loadForDaemon(tmpDir, legacy);
+
+		expect(legacyWarning).toContain('queue.concurrency');
+		expect(legacyWarning).toContain('14');
+	});
+
+	it('still warns when the current location does not exist at all', () => {
+		const legacy = writeConfig('legacy.yaml', 'queue:\n  concurrency: 14\n');
+
+		const { config, legacyWarning } = FlowConfigLoader.loadForDaemon(tmpDir, legacy);
+
+		// Defaults apply -- the legacy file is reported, never silently adopted.
+		expect(config.queue.concurrency).toBe(FlowConfigLoader.DEFAULT.queue.concurrency);
+		expect(legacyWarning).toContain('legacy.yaml');
+	});
+
+	it('does not warn about a legacy file whose values all match', () => {
+		writeConfig('config.yml', 'queue:\n  concurrency: 14\n');
+		const legacy = writeConfig('legacy.yaml', 'queue:\n  concurrency: 14\n');
+
+		const { legacyWarning } = FlowConfigLoader.loadForDaemon(tmpDir, legacy);
+
+		expect(legacyWarning).toContain('legacy.yaml');
+		expect(legacyWarning).not.toContain('queue.concurrency');
+	});
+});

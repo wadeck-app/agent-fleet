@@ -149,8 +149,11 @@ function registerListCommand(worker: Command): void {
 
 async function runWorker(options: WorkerOptions): Promise<void> {
 	const daemonDir = ConfigDir.get('flow');
-	// Same file the daemon reads, so a configured wsPort is honoured here too.
-	const config = FlowConfigLoader.load(join(daemonDir, 'config.yml'));
+	// Same resolver the daemon uses, so a configured wsPort is honoured here too and the two
+	// cannot end up reading different files (D#58). The legacy-file warning is deliberately
+	// dropped here rather than printed by every command that reads config: the daemon reports
+	// it once, and repeating it on each worker launch would be noise.
+	const { config } = FlowConfigLoader.loadForDaemon(daemonDir);
 	const { projectRoot } = new DefaultProjectResolver().resolve(process.cwd());
 
 	// Built here, in the process with the human in front of it (D#34): the CLI approval
