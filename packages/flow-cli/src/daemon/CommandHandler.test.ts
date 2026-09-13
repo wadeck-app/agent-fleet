@@ -1541,6 +1541,9 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 			const reason = String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
 			expect(reason).toMatch(/reported nothing/i);
 			expect(reason).toMatch(/stuck/i);
+			// The remedy has to name a key that exists: the first version said
+			// queue.stepSilenceLimit, which is not the setting.
+			expect(reason).toContain('queue.stepSilenceLimitSeconds');
 			// Not retried: it was executing, so it may already have had an effect (D#65).
 			expect(reason).toMatch(/not retried/i);
 		} finally {

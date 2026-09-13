@@ -531,7 +531,7 @@ export class CommandHandler {
 				step?.stepId ?? assignment.stepId,
 				`the worker running this step reported nothing for ${String(Math.round(this.stalledStepLimitMs / 1000))}s, so it is treated as stuck. ` +
 					'It was not retried automatically because it may have already had an effect. ' +
-					'A step that is legitimately quiet for that long needs a higher queue.stepSilenceLimit.'
+					'A step that is legitimately quiet for that long needs a higher queue.stepSilenceLimitSeconds.'
 			);
 		}
 	}
