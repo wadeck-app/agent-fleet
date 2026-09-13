@@ -34,6 +34,26 @@ function fail(err: unknown): never {
 	process.exit(1);
 }
 
+/**
+ * Collects the launch details a `built-in:command` entry needs, or nothing when none were given.
+ *
+ * Returns undefined rather than an empty object so a source declared without them stores no
+ * `options` key at all; whether they are required for the chosen provider is the registry's call,
+ * which is where the same rule applies to every caller and not just this CLI.
+ */
+function buildCommandOptions(options: {
+	command?: string;
+	arg?: string[];
+	cwd?: string;
+}): { command?: string; args?: string[]; cwd?: string } | undefined {
+	const built = {
+		...(options.command !== undefined ? { command: options.command } : {}),
+		...(options.arg !== undefined && options.arg.length > 0 ? { args: options.arg } : {}),
+		...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
+	};
+	return Object.keys(built).length > 0 ? built : undefined;
+}
+
 function parseLabels(raw: string | undefined): string[] {
 	if (raw === undefined || raw.trim() === '') return [];
 	// Comma-separated on the CLI, a list once stored -- matched as AND (D#7).
@@ -60,42 +80,72 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		)
 		.option('--labels <labels>', 'Comma-separated labels every worker from this source inherits', '')
 		.option('--max-workers <n>', 'Maximum workers this source may supply', '1')
-		.action((sourceId: string, options: { provider: string; labels: string; maxWorkers: string }) => {
-			try {
-				const registry = new WorkerSourceRegistry(ConfigDir.get('flow'));
-				const { token, sourceToken, entry } = registry.declare({
-					sourceId,
-					provider: options.provider,
-					labels: parseLabels(options.labels),
-					maxWorkers: parseMaxWorkers(options.maxWorkers),
-				});
+		// Without these, built-in:command could only be declared by hand-editing
+		// worker-sources.json -- which is the unreachability this CLI exists to remove (D#63).
+		.option(
+			'--command <command>',
+			'How built-in:command launches a worker, e.g. "flow worker --source <id> --token <token>"'
+		)
+		.option(
+			'--arg <value>',
+			'Argument appended to --command (repeatable)',
+			(value: string, previous: string[] = []) => [...previous, value]
+		)
+		.option('--cwd <path>', 'Directory --command runs in (defaults to the daemon working directory)')
+		.action(
+			(
+				sourceId: string,
+				options: {
+					provider: string;
+					labels: string;
+					maxWorkers: string;
+					command?: string;
+					arg?: string[];
+					cwd?: string;
+				}
+			) => {
+				try {
+					const registry = new WorkerSourceRegistry(ConfigDir.get('flow'));
+					const { token, sourceToken, entry } = registry.declare({
+						sourceId,
+						provider: options.provider,
+						labels: parseLabels(options.labels),
+						maxWorkers: parseMaxWorkers(options.maxWorkers),
+						...(buildCommandOptions(options) !== undefined
+							? { options: buildCommandOptions(options) }
+							: {}),
+					});
 
-				console.log(`[ok] Declared worker source '${entry.sourceId}'`);
-				console.log(`     provider   : ${entry.provider}`);
-				console.log(`     labels     : ${entry.labels.length > 0 ? entry.labels.join(', ') : '(none)'}`);
-				console.log(`     maxWorkers : ${String(entry.maxWorkers)}`);
-				console.log('');
-				// Shown once by design: only the hashes are stored, so neither can be re-read.
-				console.log(`     Worker token (shown once, store it now):`);
-				console.log(`     ${token}`);
-				console.log(
-					`     Pass it to each worker: flow worker --source ${entry.sourceId} --token <worker token>`
-				);
-				console.log('');
-				// Two credentials on purpose: a fake worker absorbs one step, a fake source
-				// manufactures capacity across every project, so neither token works in the
-				// other role (T-04, T-11).
-				console.log(`     Source token (shown once, store it now):`);
-				console.log(`     ${sourceToken}`);
-				console.log(`     Only a host registering *as* this source needs it. A worker cannot use it,`);
-				console.log(`     and the worker token cannot be used to register as the source.`);
-				console.log('');
-				console.log(`     Declaring a source does not create a worker. It records how one can be`);
-				console.log(`     obtained; a worker only becomes usable once it connects.`);
-			} catch (err) {
-				fail(err);
+					console.log(`[ok] Declared worker source '${entry.sourceId}'`);
+					console.log(`     provider   : ${entry.provider}`);
+					console.log(`     labels     : ${entry.labels.length > 0 ? entry.labels.join(', ') : '(none)'}`);
+					console.log(`     maxWorkers : ${String(entry.maxWorkers)}`);
+					if (entry.options?.command !== undefined) {
+						console.log(`     command    : ${entry.options.command}`);
+					}
+					console.log('');
+					// Shown once by design: only the hashes are stored, so neither can be re-read.
+					console.log(`     Worker token (shown once, store it now):`);
+					console.log(`     ${token}`);
+					console.log(
+						`     Pass it to each worker: flow worker --source ${entry.sourceId} --token <worker token>`
+					);
+					console.log('');
+					// Two credentials on purpose: a fake worker absorbs one step, a fake source
+					// manufactures capacity across every project, so neither token works in the
+					// other role (T-04, T-11).
+					console.log(`     Source token (shown once, store it now):`);
+					console.log(`     ${sourceToken}`);
+					console.log(`     Only a host registering *as* this source needs it. A worker cannot use it,`);
+					console.log(`     and the worker token cannot be used to register as the source.`);
+					console.log('');
+					console.log(`     Declaring a source does not create a worker. It records how one can be`);
+					console.log(`     obtained; a worker only becomes usable once it connects.`);
+				} catch (err) {
+					fail(err);
+				}
 			}
-		});
+		);
 
 	source
 		.command('list')

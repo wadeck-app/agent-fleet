@@ -62,6 +62,39 @@ describe('WorkerSourceRegistry - declaring', () => {
 		expect(() => registry.declare({ ...declaration, maxWorkers: -1 })).toThrow(/maxWorkers/i);
 	});
 
+	// D#63: the CLI exists so the `command` S1 implementation is reachable. Declaring such a source
+	// with no command to run produced an entry that only failed much later, at contact time, inside
+	// the daemon -- where the user never sees it.
+	it('rejects a built-in:command source that declares no command', () => {
+		const registry = new WorkerSourceRegistry(dir);
+
+		expect(() => registry.declare({ ...declaration, provider: 'built-in:command' })).toThrow(/command/i);
+		expect(() =>
+			registry.declare({ ...declaration, provider: 'built-in:command', options: { command: '   ' } })
+		).toThrow(/command/i);
+	});
+
+	it('stores the command a built-in:command source must run', () => {
+		const registry = new WorkerSourceRegistry(dir);
+
+		const { entry } = registry.declare({
+			...declaration,
+			provider: 'built-in:command',
+			options: { command: 'flow worker', args: ['--verbose'], cwd: 'C:/proj' },
+		});
+
+		expect(entry.options).toEqual({ command: 'flow worker', args: ['--verbose'], cwd: 'C:/proj' });
+	});
+
+	// Accepting a command a provider will never run is config that looks applied and is not.
+	it('refuses a command for a provider that does not run one', () => {
+		const registry = new WorkerSourceRegistry(dir);
+
+		expect(() =>
+			registry.declare({ ...declaration, provider: 'built-in:inbound', options: { command: 'flow worker' } })
+		).toThrow(/built-in:command/);
+	});
+
 	it('rejects labels that are not a list of non-empty strings', () => {
 		const registry = new WorkerSourceRegistry(dir);
 		expect(() => registry.declare({ ...declaration, labels: 'gpu' as unknown as string[] })).toThrow(/list/i);

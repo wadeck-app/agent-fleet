@@ -176,6 +176,34 @@ export class WorkerSourceRegistry {
 				);
 			}
 		}
+		this.validateCommandOptions(declaration);
+	}
+
+	/**
+	 * Checks a `built-in:command` entry can actually produce a worker, at declaration time.
+	 *
+	 * Without this the entry was accepted and only failed later, inside the daemon, when a step
+	 * needed capacity -- reported on the daemon's stderr, where the person who declared the source
+	 * is not looking. The reverse case is refused for the same reason: a command attached to a
+	 * provider that never runs one is configuration that looks applied and is not.
+	 */
+	private validateCommandOptions(declaration: WorkerSourceDeclaration): void {
+		const command = declaration.options?.command;
+		const isCommandProvider = declaration.provider === 'built-in:command';
+
+		if (isCommandProvider && (typeof command !== 'string' || command.trim() === '')) {
+			throw new Error(
+				`Worker source "${declaration.sourceId}" uses built-in:command but declares no command to run. ` +
+					'Pass --command "<how to launch a worker>", e.g. --command "flow worker --source ' +
+					`${declaration.sourceId} --token <worker token>".`
+			);
+		}
+		if (!isCommandProvider && command !== undefined) {
+			throw new Error(
+				`Worker source "${declaration.sourceId}" declares a command, but provider "${declaration.provider}" never runs one. ` +
+					'Use --provider built-in:command to have the daemon launch a worker itself.'
+			);
+		}
 	}
 
 	/**
