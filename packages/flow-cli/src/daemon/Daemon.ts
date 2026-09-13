@@ -31,6 +31,9 @@ import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 /** Name of the file the daemon publishes its bound WebSocket port in. */
 export const WORKER_PORT_FILE = 'worker.port';
 
+/** How often the daemon looks for a step whose worker went quiet. */
+const STALLED_SWEEP_INTERVAL_MS = 60_000;
+
 /**
  * Records the port workers must dial.
  *
@@ -264,6 +267,8 @@ async function startDaemon(
 	let wsServer: WebSocketServer;
 	/** The port workers must dial, known only once the listener has bound. */
 	let workerListenerPort: number | undefined;
+	/** Held so shutdown can stop it: an unref'd timer still fires while the daemon tears down. */
+	let stalledSweep: ReturnType<typeof setInterval> | undefined;
 	let commandHandler: CommandHandler;
 	let executionStore: ExecutionStore;
 	let logWriter: LogWriter;
@@ -325,7 +330,14 @@ async function startDaemon(
 						// `httpPort + 1`. A client that assumed the offset would dial whatever
 						// else holds that port, so the real one is written down for them.
 						publishWorkerPort(resolvedDaemonDir, boundPort);
-						contactSources(boundPort);
+						// Sources are contacted when a step needs capacity (D#66), not here.
+						//
+						// The startup contact used to be unconditional, which asked every source for a
+						// worker even when the daemon had nothing to do -- and a daemon with nothing to
+						// do stops in about a second, so the worker it just created was disconnected
+						// 20ms after connecting. "Contact at startup only if there is work" is the
+						// on-demand path with extra steps, so there is only the on-demand path.
+						pruneDeadSources();
 					})
 					.catch((err: Error) => {
 						process.stderr.write(`[daemon] WebSocket server failed to start: ${String(err)}\n`);
@@ -386,23 +398,28 @@ async function startDaemon(
 							return;
 						}
 						contactSources(workerListenerPort);
-					}
+					},
+					undefined,
+					config.queue.stepSilenceLimitSeconds * 1000
 				);
 
-				// Asks each declared source to produce a worker. The daemon pushes; a worker
-				// never polls. Fire-and-forget on purpose -- nothing waits for a worker to
-				// appear (D#51, D#66), and dispatch only ever targets a live connection (D#4),
-				// so a source that produces nothing simply has no capacity here.
-				//
-				// Called twice over: once when the listener binds (D#54), so a waiting
-				// `flow worker` is reachable straight away, and again whenever dispatch finds
-				// demand nothing can serve (D#66). A source told to dial a port nothing is
-				// listening on would produce a worker that cannot join, which is why the
-				// startup call waits for the bind.
-				function contactSources(boundPort: number): void {
-					// A worker that declared itself and was then killed left its entry behind. Dropping
-					// those first keeps the registry a description of what exists rather than a
-					// growing list of things that once did.
+				// Nothing else would notice a wedged worker: it keeps its socket open and answers
+				// pings, so only the absence of output over time says anything. Swept rather than
+				// timed per step, since one timer for the daemon is enough and a minute of lateness
+				// on a 30-minute limit costs nothing.
+				stalledSweep = setInterval(() => {
+					commandHandler.failStalledSteps();
+				}, STALLED_SWEEP_INTERVAL_MS);
+				stalledSweep.unref();
+
+				/**
+				 * Drops entries whose declaring worker is gone.
+				 *
+				 * Runs at startup and before each contact: a worker that declared itself and was then
+				 * killed cannot clean up, and declared capacity that can never appear reads as
+				 * "something exists" to whoever is looking.
+				 */
+				function pruneDeadSources(): void {
 					const pruned = sourceRegistry.pruneDead();
 					if (pruned.length > 0) {
 						writeDaemonLog(
@@ -411,6 +428,18 @@ async function startDaemon(
 							`Pruned worker sources whose process is gone: ${pruned.join(', ')}`
 						);
 					}
+				}
+
+				// Asks each declared source to produce a worker. The daemon pushes; a worker
+				// never polls. Fire-and-forget on purpose -- nothing waits for a worker to
+				// appear (D#51, D#66), and dispatch only ever targets a live connection (D#4),
+				// so a source that produces nothing simply has no capacity here.
+				//
+				// Called only when dispatch finds demand nothing can serve (D#66). A source told to
+				// dial a port nothing is listening on would produce a worker that cannot join, which
+				// is why the caller checks the bind first.
+				function contactSources(boundPort: number): void {
+					pruneDeadSources();
 					void contactDeclaredSources(
 						sourceRegistry.list(),
 						`ws://127.0.0.1:${String(boundPort)}`,
@@ -511,6 +540,9 @@ async function startDaemon(
 					const { assignmentId, executionId, stepId, entry } = message;
 					// Logs are bound too: they land in another execution's log file otherwise.
 					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
+					// Output is the proof a step is still working: a wedged worker keeps its socket
+					// open and answers pings, so silence is the only signal there is.
+					commandHandler.noteAssignmentActivity(assignmentId);
 					logWriter.write(executionId, stepId, entry);
 				} catch (err) {
 					process.stderr.write(`[daemon] log handler error: ${String(err)}\n`);
@@ -604,6 +636,8 @@ async function startDaemon(
 			// Nothing queued for later may outlive the decision to stop: a pending dispatch
 			// re-check would run against a closed listener.
 			commandHandler.stopBackgroundWork();
+			// Nothing is executing at this point, so a sweep would only run against a torn-down handler.
+			if (stalledSweep !== undefined) clearInterval(stalledSweep);
 			wsServer.close();
 			writeDaemonLog(logsDir, 'info', 'Daemon stopped (idle)');
 			void daemonHandle.stop('idle');

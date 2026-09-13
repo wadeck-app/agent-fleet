@@ -4,24 +4,24 @@ A worker is what actually runs a step. The daemon never runs one itself; it rout
 
 Two commands answer "what have I got":
 
-- `flow worker source list` — what is **declared**. Reads a file, works with no daemon.
-- `flow worker list` — what is **connected**. Only this is capacity.
+- `flow worker source list` -- what is **declared**. Reads a file, works with no daemon.
+- `flow worker list` -- what is **connected**. Only this is capacity.
 
 ## The kinds of worker
 
 | Kind                      | You run                                 | Shows as        | Serves `user_intervention`  | Survives a daemon restart | Capped by           |
 | ------------------------- | --------------------------------------- | --------------- | --------------------------- | ------------------------- | ------------------- |
 | Daemon-forked             | nothing                                 | `daemon-forked` | no                          | no                        | `queue.concurrency` |
-| Terminal                  | `flow worker`                           | `external`      | yes, if a plugin can prompt | yes                       | —                   |
+| Terminal                  | `flow worker`                           | `external`      | yes, if a plugin can prompt | yes                       | --                  |
 | `built-in:command` source | `flow worker source add …`              | `<sourceId>`    | yes                         | yes                       | `--max-workers`     |
 | `built-in:inbound` source | `flow worker --source <id> --token <t>` | `<sourceId>`    | yes                         | yes                       | `--max-workers`     |
-| `built-in:relay` source   | not implemented                         | —               | —                           | —                         | —                   |
+| `built-in:relay` source   | not implemented                         | --              | --                          | --                        | --                  |
 
 ### Daemon-forked
 
 The invisible default: when a step has nobody, the daemon forks a worker for it.
 
-Two things to know. It receives an **allow-listed environment** (T-08) — not your credentials, not
+Two things to know. It receives an **allow-listed environment** (T-08) -- not your credentials, not
 your ssh agent. And it can never serve a `user_intervention` step: its bundle carries no approval
 plugin, so it always reports `interactive=false`.
 
@@ -32,7 +32,7 @@ cd <project>
 flow worker
 ```
 
-Inherits **your whole shell** — PATH, credentials, agent sockets. That is deliberate, and is what
+Inherits **your whole shell** -- PATH, credentials, agent sockets. That is deliberate, and is what
 makes your own tooling usable from a step, but a step dispatched here runs with the reach of that
 terminal. Launch it where you would be willing to run the flow's commands yourself.
 
@@ -40,7 +40,7 @@ It records itself as `terminal-<pid>` (provider `built-in:inbound`, capacity 1) 
 while disconnected, and removes that entry on Ctrl-C. Killed hard, the entry is pruned by the next
 daemon that starts.
 
-### `built-in:command` — the daemon launches it
+### `built-in:command` -- the daemon launches it
 
 ```
 flow worker source add factory-local \
@@ -53,7 +53,7 @@ Use this for anything that must work without you: the daemon creates the worker 
 and again whenever demand goes unserved (D#66), so an interactive step never races a worker that has
 not reconnected yet.
 
-The command needs no arguments — everything arrives in its environment: `FLOW_DAEMON_WS_URL`,
+The command needs no arguments -- everything arrives in its environment: `FLOW_DAEMON_WS_URL`,
 `FLOW_WORKER_SOURCE_ID`, `FLOW_WORKER_PROJECTS`, and `FLOW_WORKER_TOKEN`, a credential minted for
 that launch alone and valid once. Both tokens printed by `add` are therefore discardable for a local
 source; keep the worker token only if you also intend to start that worker by hand.
@@ -62,10 +62,10 @@ source; keep the worker token only if you also intend to start that worker by ha
 without it the worker serves the daemon's directory instead of yours.
 
 Remote works the same way with `--command "ssh host flow worker"`, with one caveat: ssh does not
-carry the environment, so the credential must be passed explicitly — and a token on an ssh command
+carry the environment, so the credential must be passed explicitly -- and a token on an ssh command
 line is visible in the remote's process list. Unresolved today.
 
-### `built-in:inbound` — declared, dials in itself
+### `built-in:inbound` -- declared, dials in itself
 
 ```
 flow worker source add laptop --provider built-in:inbound
@@ -75,7 +75,7 @@ flow worker --source laptop --token <worker token>     # wherever that worker li
 Nothing can reach such a worker, so nothing nudges it; it inherits the source's labels (D#30) and
 counts against its cap.
 
-### `built-in:relay` — declared but not usable
+### `built-in:relay` -- declared but not usable
 
 The daemon side exists (`RelayWorkerSource`, `provide_worker`); the process to run on the remote
 machine does not. Declaring one today yields "no relay connected". A relay does no work: it holds a
@@ -85,7 +85,7 @@ connection to the daemon and launches a local worker when asked.
 
 1. **Declared is not available** (D#4). A declared source with nothing attached is intent, not
    capacity, and dispatch only ever targets a live connection.
-2. **A worker serves only the projects it announces** — its launch directory plus each `--project`.
+2. **A worker serves only the projects it announces** -- its launch directory plus each `--project`.
    A worker started in the wrong directory will never take your steps.
 3. **Interactivity comes from the plugin, not the terminal.** No approval plugin means
    `interactive: false` even in a real terminal; `plugins.cli-approval` needs a TTY;
@@ -94,11 +94,11 @@ connection to the daemon and launches a local worker when asked.
 
 ## Credentials
 
-| Kind                  | Presents                                                              | Rotates                                         |
-| --------------------- | --------------------------------------------------------------------- | ----------------------------------------------- |
-| Terminal, no source   | the daemon's `health_token`, over loopback only                       | on every daemon start — re-read at each attempt |
-| Launched by a source  | a one-shot token minted for that launch, valid once, expires in 2 min | per launch                                      |
-| Named source, by hand | that source's registration token from `add`                           | never; `remove` + `add` to rotate               |
+| Kind                  | Presents                                                              | Rotates                                          |
+| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------ |
+| Terminal, no source   | the daemon's `health_token`, over loopback only                       | on every daemon start -- re-read at each attempt |
+| Launched by a source  | a one-shot token minted for that launch, valid once, expires in 2 min | per launch                                       |
+| Named source, by hand | that source's registration token from `add`                           | never; `remove` + `add` to rotate                |
 
 Only hashes are stored (T-09), so a token cannot be recovered from
 `~/.config/flow/worker-sources.json`. A source credential and a worker credential are never
@@ -108,7 +108,7 @@ interchangeable (T-04, T-11).
 
 With no daemon there is nothing to register with, so a worker waits and retries: 500 ms, doubling to
 30 s. To avoid paying that latency, it also watches the daemon directory and connects the moment
-`worker.port` appears — the daemon publishes it once its listener is bound.
+`worker.port` appears -- the daemon publishes it once its listener is bound.
 
 The notification is **advisory**: it resets the wait, it does not force a connection, and losing it
 costs only latency. The worker always initiates; nothing ever connects to a worker.

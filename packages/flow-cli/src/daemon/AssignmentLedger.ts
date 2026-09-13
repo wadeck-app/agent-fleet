@@ -43,6 +43,19 @@ export class AssignmentLedger {
 	}
 
 	/**
+	 * What an outstanding assignment refers to, or undefined once it has settled.
+	 *
+	 * Read-only, and no worker is returned: this exists so the daemon can name the execution and
+	 * step of an assignment it is failing on its own initiative, not to route anything.
+	 */
+	describe(assignmentId: string): Assignment | undefined {
+		const found = this.outstanding.get(assignmentId);
+		if (found === undefined) return undefined;
+		const { assignmentId: id, executionId, stepId, started } = found;
+		return { assignmentId: id, executionId, stepId, started };
+	}
+
+	/**
 	 * Checks a reported result against the outstanding assignments.
 	 *
 	 * All three of assignment id, execution id and step id must match, and the report

@@ -78,6 +78,7 @@ export function parseFileApprovalOptions(raw: unknown): FileApprovalOptions {
 		throw new Error(`[file-approval] options must be an object, found ${describeFound(raw)}`);
 	}
 
+	// violations-suppress: ts/no-unsafe-type-cast this function exists to validate untyped config; the shape is checked key by key below rather than trusted
 	const entries = Object.entries(raw as Record<string, unknown>);
 	const known = ['dir', 'timeoutMs', 'pollIntervalMs', 'settleMs'] as const;
 	type KnownOption = (typeof known)[number];
@@ -295,6 +296,7 @@ export class FileApprovalProvider implements ApprovalProvider {
 			if (fs.existsSync(responsePath)) {
 				const raw = fs.readFileSync(responsePath, 'utf8');
 				try {
+					// violations-suppress: ts/no-unsafe-type-cast JSON.parse returns any; casting to unknown tightens it, and every field is validated by the caller
 					return JSON.parse(raw) as unknown;
 				} catch (error) {
 					lastParseError = (error as Error).message;

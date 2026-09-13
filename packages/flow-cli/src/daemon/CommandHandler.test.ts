@@ -1479,3 +1479,104 @@ describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
 		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
 	});
 });
+
+describe('CommandHandler — a step whose worker went quiet', () => {
+	/** Runs the one-step flow to the point where s1 is executing, with a short silence limit. */
+	async function startOneStep(limitMs: number) {
+		const flowFile = path.join(tmpDir, 'quiet.yml');
+		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
+
+		const workerPool = createMockWorkerPool();
+		const worker = {} as never;
+		const sent: { stepId: string; assignmentId: string }[] = [];
+		workerPool.getIdle.mockReturnValue(worker);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
+			const m = msg as { stepId: string; assignmentId: string };
+			sent.push({ stepId: m.stepId, assignmentId: m.assignmentId });
+			return true;
+		});
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			limitMs
+		);
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		const { executionId } = result as { executionId: string };
+		const assignmentId = sent[0]?.assignmentId;
+		if (assignmentId === undefined) throw new Error('no step was dispatched, so nothing can stall');
+		handler.onStepStarted(worker, assignmentId, executionId, 's1');
+
+		return { handler, assignmentId };
+	}
+
+	// The gap this closes: a closing socket was the only thing the daemon reacted to, so a step that
+	// simply never finished held its assignment forever and the flow waited with it. A `jest` run left
+	// in a workspace still held one 32 hours later.
+	it('fails an executing step that has reported nothing for the limit', async () => {
+		vi.useFakeTimers();
+		try {
+			const { handler } = await startOneStep(60_000);
+
+			// A slow step is not a stuck one.
+			vi.advanceTimersByTime(59_000);
+			handler.failStalledSteps();
+			expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+
+			vi.advanceTimersByTime(2_000);
+			handler.failStalledSteps();
+
+			const reason = String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
+			expect(reason).toMatch(/reported nothing/i);
+			expect(reason).toMatch(/stuck/i);
+			// Not retried: it was executing, so it may already have had an effect (D#65).
+			expect(reason).toMatch(/not retried/i);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('treats output as progress, so a long but talkative step survives', async () => {
+		vi.useFakeTimers();
+		try {
+			const { handler, assignmentId } = await startOneStep(60_000);
+
+			for (let elapsed = 0; elapsed < 180_000; elapsed += 30_000) {
+				vi.advanceTimersByTime(30_000);
+				handler.noteAssignmentActivity(assignmentId);
+				handler.failStalledSteps();
+			}
+
+			expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('says nothing about a step that settled normally', async () => {
+		vi.useFakeTimers();
+		try {
+			const { handler, assignmentId } = await startOneStep(60_000);
+			handler.settleAssignment(assignmentId);
+
+			vi.advanceTimersByTime(120_000);
+			handler.failStalledSteps();
+
+			expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+});

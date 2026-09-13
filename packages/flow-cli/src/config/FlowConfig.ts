@@ -62,6 +62,12 @@ export interface FlowConfigData {
 	queue: {
 		/** Max concurrent step executions. Default: 1. */
 		concurrency: number;
+		/**
+		 * Silence after which an executing step is treated as stuck, in seconds. Default: 1800.
+		 *
+		 * Only the daemon can notice this: a wedged worker keeps its socket open and answers pings.
+		 */
+		stepSilenceLimitSeconds: number;
 	};
 	logs: {
 		/** How many days to keep execution logs. Default: 30. */
@@ -108,7 +114,7 @@ export type FlowConfig = FlowConfigData;
 
 export class FlowConfigLoader {
 	static readonly DEFAULT: FlowConfigData = {
-		queue: { concurrency: 1 },
+		queue: { concurrency: 1, stepSilenceLimitSeconds: 1800 },
 		logs: { retainDays: 30 },
 		worker: { wsPort: null, bindAddress: '127.0.0.1', tls: null },
 		security: { allowAbsolutePaths: false },

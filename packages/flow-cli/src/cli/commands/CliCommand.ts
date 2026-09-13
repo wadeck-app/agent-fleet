@@ -17,9 +17,9 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 
+// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
-// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 
 // violations-suppress-end: ts/no-deep-relative

@@ -11,12 +11,12 @@ import { fileURLToPath } from 'node:url';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 
+// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { Daemon } from '../../daemon/Daemon';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
-// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
 
 // violations-suppress-end: ts/no-deep-relative

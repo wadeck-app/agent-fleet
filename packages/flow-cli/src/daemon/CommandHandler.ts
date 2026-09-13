@@ -26,6 +26,7 @@ import { LogWriter } from '../storage/LogWriter';
 import { AssignmentLedger } from './AssignmentLedger.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
 import { assertStepLabels } from './LabelMatcher.js';
+import { StalledStepWatch } from './StalledStepWatch.js';
 import { StepRouter } from './StepRouter.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
@@ -46,6 +47,14 @@ export const MAX_REDISPATCHES = 3;
  * to re-run dispatch: without this the wait would never end and the queue would sit still.
  */
 const DEMAND_RECHECK_MS = 250;
+
+/**
+ * Default silence after which an executing step is treated as stuck.
+ *
+ * Thirty minutes because a model step can think for a long time without printing, and failing honest
+ * work is worse than noticing a wedged one late. Override with `queue.stepSilenceLimit`.
+ */
+export const DEFAULT_STEP_SILENCE_LIMIT_MS = 30 * 60 * 1000;
 
 /**
  * Confirms a step is one the daemon can hand to a worker.
@@ -105,6 +114,8 @@ export class CommandHandler {
 	private readonly executionProjects = new Map<string, string>();
 	/** Chooses which live worker a step goes to (S3, S4) */
 	private readonly router = new StepRouter();
+	/** Notices an executing step whose worker went quiet; the only detector of a wedged worker */
+	private readonly stalledSteps: StalledStepWatch;
 	/** Decides the fate of a step needing a human when nothing can host one (S9) */
 	private readonly interactivityPolicy: InteractivityPolicyProvider = new DefaultInteractivityPolicy();
 	/** When each interactive step started waiting, so an S9 policy can bound its own wait */
@@ -163,9 +174,17 @@ export class CommandHandler {
 		 * Injectable so a test can bound the wait instead of waiting it out, and so the
 		 * extension point can be served from config without touching this class.
 		 */
-		interactivityPolicy?: InteractivityPolicyProvider
+		interactivityPolicy?: InteractivityPolicyProvider,
+		/**
+		 * Silence after which an executing step is treated as stuck (`queue.stepSilenceLimit`).
+		 *
+		 * Generous by default: a model step can think for a long time without printing, and failing
+		 * honest work is worse than noticing a wedged one late.
+		 */
+		private readonly stalledStepLimitMs: number = DEFAULT_STEP_SILENCE_LIMIT_MS
 	) {
 		if (interactivityPolicy !== undefined) this.interactivityPolicy = interactivityPolicy;
+		this.stalledSteps = new StalledStepWatch(stalledStepLimitMs);
 		this.executionStore = executionStore ?? new ExecutionStore(path.join(daemonDir, 'executions'));
 		this.logWriter = logWriter ?? new LogWriter(path.join(daemonDir, 'logs'));
 	}
@@ -483,8 +502,38 @@ export class CommandHandler {
 	/** Closes an assignment once its outcome has been accepted. */
 	settleAssignment(assignmentId: string): void {
 		this.assignments.settle(assignmentId);
+		this.stalledSteps.settled(assignmentId);
 		// The payload was only kept for a possible re-dispatch, which can no longer happen.
 		this.dispatched.delete(assignmentId);
+	}
+
+	/** Records that a worker is still saying something about an assignment it holds. */
+	noteAssignmentActivity(assignmentId: string): void {
+		this.stalledSteps.progressed(assignmentId);
+	}
+
+	/**
+	 * Fails the steps whose worker went quiet, and reports each one.
+	 *
+	 * Called on a timer by `Daemon`: nothing else would notice, since a wedged worker keeps its
+	 * socket open and answers pings. The step is failed rather than re-dispatched -- it was already
+	 * executing, so it may have changed something, exactly as for a mid-step disconnect (D#65).
+	 */
+	failStalledSteps(): void {
+		for (const assignmentId of this.stalledSteps.stalled()) {
+			const step = this.dispatched.get(assignmentId);
+			const assignment = this.assignments.describe(assignmentId);
+			if (assignment === undefined) continue;
+			this.dispatched.delete(assignmentId);
+			this.assignments.settle(assignmentId);
+			this.failStep(
+				assignment.executionId,
+				step?.stepId ?? assignment.stepId,
+				`the worker running this step reported nothing for ${String(Math.round(this.stalledStepLimitMs / 1000))}s, so it is treated as stuck. ` +
+					'It was not retried automatically because it may have already had an effect. ' +
+					'A step that is legitimately quiet for that long needs a higher queue.stepSilenceLimit.'
+			);
+		}
 	}
 
 	/**
@@ -500,6 +549,8 @@ export class CommandHandler {
 			return;
 		}
 		this.assignments.markStarted(assignmentId);
+		// Watching begins now, not at dispatch: a step waiting to be picked up is not stuck.
+		this.stalledSteps.started(assignmentId);
 		// The re-dispatch budget counts hand-offs that never began. This one did, so the
 		// step's earlier aborted hand-offs must not still be held against it: a later retry
 		// would otherwise start part-way through a budget it never spent.
