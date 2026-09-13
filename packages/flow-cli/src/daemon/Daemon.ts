@@ -393,6 +393,17 @@ async function startDaemon(
 				// listening on would produce a worker that cannot join, which is why the
 				// startup call waits for the bind.
 				function contactSources(boundPort: number): void {
+					// A worker that declared itself and was then killed left its entry behind. Dropping
+					// those first keeps the registry a description of what exists rather than a
+					// growing list of things that once did.
+					const pruned = sourceRegistry.pruneDead();
+					if (pruned.length > 0) {
+						writeDaemonLog(
+							logsDir,
+							'info',
+							`Pruned worker sources whose process is gone: ${pruned.join(', ')}`
+						);
+					}
 					void contactDeclaredSources(
 						sourceRegistry.list(),
 						`ws://127.0.0.1:${String(boundPort)}`,

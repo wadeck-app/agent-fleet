@@ -12,8 +12,12 @@ import { WebSocket } from 'ws';
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { FlowConfigLoader } from '../../config/FlowConfig';
 import { PluginResolver } from '../../config/PluginResolver';
+import { WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
+import type { WorkerSourceEntry } from '../../daemon/WorkerSourceRegistry';
 import type { AssignmentScopedMessage, DaemonToWorker, WorkerSummary, WorkerToDaemon } from '../../ipc/Protocol';
+import { watchForDaemon } from '../../worker/DaemonWatch';
 import type { McpServerConfig } from '../../worker/McpServer';
+import { declareSelf } from '../../worker/SelfDeclaration';
 import { WorkerAdapter } from '../../worker/WorkerAdapter';
 import { WorkerDisplay } from '../../worker/WorkerDisplay';
 import {
@@ -25,6 +29,7 @@ import {
 	resolveWorkerToken,
 	scheduleReconnectTimer,
 } from '../../worker/WorkerLaunch';
+import { describeNoLiveWorkers } from '../../worker/WorkerListing';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -39,6 +44,21 @@ interface WorkerOptions {
 function parseLabels(raw: string | undefined): string[] {
 	if (raw === undefined || raw.trim() === '') return [];
 	return raw.split(',').map(label => label.trim());
+}
+
+/**
+ * Declared sources, or none if the registry cannot be read.
+ *
+ * A damaged registry must not turn `flow worker list` into a failure: the question asked was about
+ * live workers, and the answer to that is already known. The reason is reported rather than hidden.
+ */
+function readDeclaredSources(daemonDir: string): WorkerSourceEntry[] {
+	try {
+		return new WorkerSourceRegistry(daemonDir).list();
+	} catch (err) {
+		report('[warn]', `could not read the declared worker sources: ${normalizeError(err).message}`);
+		return [];
+	}
 }
 
 /**
@@ -123,7 +143,7 @@ function registerListCommand(worker: Command): void {
 					return;
 				}
 				if (workers.length === 0) {
-					console.log('No workers connected. Start one with "flow worker" in a project directory.');
+					console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), true));
 					return;
 				}
 				for (const w of workers) {
@@ -135,8 +155,10 @@ function registerListCommand(worker: Command): void {
 				}
 			} catch (err) {
 				if (err instanceof DaemonNotRunningError) {
-					// Not an error state: no daemon simply means no live workers.
-					console.log('No daemon running, so no workers are connected. Start one with "flow start".');
+					// Not an error state: no daemon simply means no live workers. The registry is
+					// readable without one, so say what is declared rather than leaving the reader
+					// to guess whether anything is configured at all.
+					console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), false));
 					return;
 				}
 				const message = normalizeError(err).message;
@@ -202,8 +224,41 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		console.log('     Run with --verbose to also see the raw output each step produces.');
 	}
 
+	// Only a worker that belongs to no declared source records itself: one launched from a source
+	// already has an entry, and a second describing the same worker would double the declared
+	// capacity of that source.
+	const declaration =
+		sourceId === undefined
+			? declareSelf(daemonDir, {
+					projects: registration.attachedProjects ?? [projectRoot],
+					labels: registration.labels ?? [],
+					pid: process.pid,
+				})
+			: undefined;
+	if (declaration !== undefined) {
+		console.log(`     registry   : declared as "${declaration.sourceId}" while this process lives`);
+		releaseOnExit(declaration.release);
+	}
+
 	const display = new WorkerDisplay(options.verbose === true ? 'verbose' : 'summary');
 	connect(daemonDir, config.worker.wsPort, registration, 0, display, approvalProvider);
+}
+
+/**
+ * Takes the worker's registry entry back out when the process ends.
+ *
+ * Ctrl-C is the normal way to stop a worker, and it does not run `process.on('exit')` handlers on
+ * its own, so the signals are handled explicitly. A hard kill still leaks the entry -- that is what
+ * the pid in it is for: the next reader prunes it.
+ */
+function releaseOnExit(release: () => void): void {
+	process.on('exit', release);
+	for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+		process.on(signal, () => {
+			release();
+			process.exit(0);
+		});
+	}
 }
 
 /**
@@ -299,9 +354,24 @@ function scheduleReconnect(
 	display: WorkerDisplay,
 	approvalProvider: ApprovalProvider | undefined
 ): void {
-	scheduleReconnectTimer(reconnectDelayMs(attempt), () => {
+	// Two ways to learn the daemon is back, whichever comes first: it publishes worker.port when
+	// its listener is bound, and the backoff covers the case where that notification never arrives
+	// (an unwatchable directory, a network path). Waiting only on the backoff meant learning about a
+	// daemon up to 30s after it started -- long enough for it to dispatch a step and find nobody.
+	let fired = false;
+	let timer: NodeJS.Timeout | undefined;
+	let stopWatching: (() => void) | undefined;
+
+	const reconnect = (): void => {
+		if (fired) return;
+		fired = true;
+		if (timer !== undefined) clearTimeout(timer);
+		stopWatching?.();
 		connect(daemonDir, configuredWsPort, registration, attempt, display, approvalProvider);
-	});
+	};
+
+	timer = scheduleReconnectTimer(reconnectDelayMs(attempt), reconnect);
+	stopWatching = watchForDaemon(daemonDir, reconnect);
 }
 
 async function handleMessage(

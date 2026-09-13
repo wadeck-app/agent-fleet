@@ -221,3 +221,49 @@ describe('WorkerSourceRegistry - malformed state', () => {
 		expect(() => new WorkerSourceRegistry(dir).list()).toThrow(/worker-sources\.json/);
 	});
 });
+
+describe('WorkerSourceRegistry - a worker that declared itself', () => {
+	const declaration = {
+		sourceId: 'terminal-4242',
+		provider: 'built-in:inbound',
+		labels: [],
+		maxWorkers: 1,
+	};
+
+	// D#5's first kind of entry: "a worker that is already alive and waiting to be contacted". Its
+	// pid is what tells a later reader whether it is still that -- alive -- or a leftover.
+	it('records the pid of the process that declared it', () => {
+		const registry = new WorkerSourceRegistry(dir);
+
+		const { entry } = registry.declare({ ...declaration, pid: process.pid });
+
+		expect(entry.pid).toBe(process.pid);
+		expect(new WorkerSourceRegistry(dir).list()[0]?.pid).toBe(process.pid);
+	});
+
+	// A worker killed with no chance to clean up must not leave capacity declared forever.
+	it('prunes an entry whose process is gone', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		registry.declare({ ...declaration, sourceId: 'terminal-dead', pid: 999_999_998 });
+		registry.declare({ ...declaration, sourceId: 'terminal-alive', pid: process.pid });
+
+		const removed = registry.pruneDead();
+
+		expect(removed).toEqual(['terminal-dead']);
+		expect(new WorkerSourceRegistry(dir).list().map(e => e.sourceId)).toEqual(['terminal-alive']);
+	});
+
+	// An entry with no pid describes a machine or a command, not a process on this host: whether
+	// some local pid is alive says nothing about it.
+	it('never prunes an entry that declares no pid', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		registry.declare({ sourceId: 'laptop', provider: 'built-in:inbound', labels: [], maxWorkers: 1 });
+
+		expect(registry.pruneDead()).toEqual([]);
+		expect(new WorkerSourceRegistry(dir).list()).toHaveLength(1);
+	});
+
+	it('reports nothing pruned when the registry is empty', () => {
+		expect(new WorkerSourceRegistry(dir).pruneDead()).toEqual([]);
+	});
+});

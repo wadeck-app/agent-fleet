@@ -29,6 +29,15 @@ export interface WorkerSourceEntry {
 	 */
 	sourceTokenHash?: string;
 	createdAt: string;
+	/**
+	 * Process of a worker that declared *itself* -- D#5's first kind of entry, "a worker already
+	 * alive and waiting to be contacted".
+	 *
+	 * Present only for such an entry, and it is what makes one safely prunable: a worker killed
+	 * without a chance to clean up would otherwise leave declared capacity behind forever. Absent
+	 * means the entry describes a machine or a command, where no local pid could speak for it.
+	 */
+	pid?: number;
 }
 
 /** What the caller supplies to declare a source. */
@@ -38,6 +47,8 @@ export interface WorkerSourceDeclaration {
 	options?: Record<string, unknown>;
 	labels: string[];
 	maxWorkers: number;
+	/** Process that declared itself; see {@link WorkerSourceEntry.pid}. */
+	pid?: number;
 }
 
 interface RegistryFile {
@@ -91,6 +102,7 @@ export class WorkerSourceRegistry {
 			...(declaration.options ? { options: declaration.options } : {}),
 			labels: [...declaration.labels],
 			maxWorkers: declaration.maxWorkers,
+			...(declaration.pid !== undefined ? { pid: declaration.pid } : {}),
 			tokenHash: hashToken(token),
 			sourceTokenHash: hashToken(sourceToken),
 			createdAt: new Date().toISOString(),
@@ -115,6 +127,26 @@ export class WorkerSourceRegistry {
 		if (remaining.length === sources.length) return false;
 		this.write(remaining);
 		return true;
+	}
+
+	/**
+	 * Drops entries whose declaring process is gone, returning the ids removed.
+	 *
+	 * Only entries carrying a `pid` are candidates: a worker that declared itself and was then
+	 * killed cannot clean up after itself, and declared capacity that can never appear is worse than
+	 * none -- it is read as "something exists" by anyone looking. Entries without a pid describe a
+	 * machine or a command and are never touched.
+	 */
+	pruneDead(): string[] {
+		const sources = this.read();
+		const removed: string[] = [];
+		const remaining = sources.filter(source => {
+			if (source.pid === undefined || isProcessAlive(source.pid)) return true;
+			removed.push(source.sourceId);
+			return false;
+		});
+		if (removed.length > 0) this.write(remaining);
+		return removed;
 	}
 
 	/**
@@ -235,6 +267,22 @@ export class WorkerSourceRegistry {
 		mkdirSync(this.configDir, { recursive: true, mode: 0o700 });
 		const payload: RegistryFile = { sources };
 		writeFileSync(this.filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+	}
+}
+
+/**
+ * Whether a pid still names a running process.
+ *
+ * `kill(pid, 0)` sends no signal; it only asks. EPERM means the process exists but belongs to
+ * someone else, which is still "alive" for this purpose -- treating it as dead would drop a live
+ * worker's entry.
+ */
+function isProcessAlive(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (err) {
+		return (err as NodeJS.ErrnoException).code === 'EPERM';
 	}
 }
 
