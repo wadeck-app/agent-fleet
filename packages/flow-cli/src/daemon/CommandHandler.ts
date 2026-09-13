@@ -156,8 +156,16 @@ export class CommandHandler {
 		 * registry, the published endpoint -- which this class deliberately knows nothing
 		 * about. Optional so the many tests that never exercise provisioning stay unchanged.
 		 */
-		private readonly requestFromDeclaredSources?: () => void
+		private readonly requestFromDeclaredSources?: () => void,
+		/**
+		 * S9 policy deciding the fate of a step needing a human (D#39).
+		 *
+		 * Injectable so a test can bound the wait instead of waiting it out, and so the
+		 * extension point can be served from config without touching this class.
+		 */
+		interactivityPolicy?: InteractivityPolicyProvider
 	) {
+		if (interactivityPolicy !== undefined) this.interactivityPolicy = interactivityPolicy;
 		this.executionStore = executionStore ?? new ExecutionStore(path.join(daemonDir, 'executions'));
 		this.logWriter = logWriter ?? new LogWriter(path.join(daemonDir, 'logs'));
 	}

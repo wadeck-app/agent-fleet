@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { CommandHandler, MAX_REDISPATCHES } from './CommandHandler';
+import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy';
 
 const { mockAllocate, mockRelease, hoistedState } = vi.hoisted(() => ({
 	mockAllocate: vi.fn().mockResolvedValue({ path: '/tmp/test-workspace', id: 'ws-test-id' }),
@@ -1028,7 +1029,12 @@ steps:
       title: Ship it?
 `;
 
-	function handlerWith(idle: unknown[]) {
+	/**
+	 * @param waitMs S9 bound. Zero makes the "nothing can answer" decision immediate, so the
+	 *   failure path is asserted without waiting out a real timeout -- the default bound exists to
+	 *   give a reconnecting worker time, which no test should spend.
+	 */
+	function handlerWith(idle: unknown[], waitMs?: number) {
 		const flowFile = path.join(tmpDir, 'intervention.yml');
 		fs.writeFileSync(flowFile, INTERVENTION_FLOW_YAML);
 
@@ -1049,7 +1055,15 @@ steps:
 			workerPool as never,
 			undefined,
 			mockExecStore as never,
-			mockLogWriter as never
+			mockLogWriter as never,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			waitMs === undefined ? undefined : new DefaultInteractivityPolicy(waitMs)
 		);
 		return { handler, dispatched, flowFile };
 	}
@@ -1076,11 +1090,11 @@ steps:
 		expect(dispatched).toContain('confirm');
 	});
 
-	// No amount of provisioning fixes this -- a forked worker has no terminal -- so leaving
-	// the step queued would stall the flow with nothing to act on (D#39).
-	it('fails the step when only headless workers are connected', async () => {
+	// A forked worker cannot serve this step, so once the S9 bound is spent there is nothing left
+	// to wait for and leaving it queued would stall the flow with nothing to act on (D#39).
+	it('fails the step when only headless workers are connected and the wait is spent', async () => {
 		const headless = forkedWorker({});
-		const { handler, dispatched, flowFile } = handlerWith([headless]);
+		const { handler, dispatched, flowFile } = handlerWith([headless], 0);
 
 		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
 
@@ -1088,8 +1102,20 @@ steps:
 		expect(mockExecStore.markStepFailed).toHaveBeenCalled();
 	});
 
+	// The bound is what makes an interactive step winnable at all: an idle daemon disconnects
+	// external workers, so one is always briefly absent right after a run starts a fresh daemon.
+	it('keeps the step queued while an interactive worker still has time to appear', async () => {
+		const headless = forkedWorker({});
+		const { handler, dispatched, flowFile } = handlerWith([headless]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).not.toContain('confirm');
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+	});
+
 	it('says how to make the step runnable rather than just refusing it', async () => {
-		const { handler, flowFile } = handlerWith([]);
+		const { handler, flowFile } = handlerWith([], 0);
 
 		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
 
