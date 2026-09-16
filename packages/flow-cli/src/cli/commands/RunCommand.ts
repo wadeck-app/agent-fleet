@@ -79,7 +79,7 @@ export function tailLogFile(
 			continue;
 		}
 		const prefix = `[${executionId}|`;
-		if (!line.prefix.startsWith(prefix)) continue;
+		if (typeof line.prefix !== 'string' || !line.prefix.startsWith(prefix)) continue;
 		const stepId = line.prefix.slice(prefix.length, -1);
 		if (stepId === '__execution') continue;
 		onLog(stepId, line.message);
@@ -87,6 +87,8 @@ export function tailLogFile(
 
 	return stat.size;
 }
+
+class ExecutionTimeoutError extends Error {}
 
 async function waitForCompletion(
 	executionId: string,
@@ -117,7 +119,7 @@ async function waitForCompletion(
 		await new Promise(r => setTimeout(r, delay));
 		if (!options?.fastPoll) delay = Math.min(delay * 1.5, 2000);
 	}
-	throw new Error(`Execution ${executionId} did not complete within ${timeoutMs}ms`);
+	throw new ExecutionTimeoutError(`Execution ${executionId} did not complete within ${timeoutMs}ms`);
 }
 
 // Result type for flow file resolution -- either found with an optional inferred flow ID,
@@ -457,6 +459,11 @@ export function registerRunCommand(program: Command): void {
 				try {
 					finalState = await waitForCompletion(executionId, daemonDir, timeoutMs, logCallback, { fastPoll });
 				} catch (err) {
+					if (!(err instanceof ExecutionTimeoutError)) {
+						// violations-suppress: security/no-raw-err-in-cli unexpected internal error while polling -- the normalized message is already user-facing
+						console.error(`Error:${getErrorMessage(err)}`);
+						process.exit(1);
+					}
 					if (options.json && !options.human) {
 						process.stderr.write(JSON.stringify({ error: 'execution_timeout', executionId }) + '\n');
 					} else {
