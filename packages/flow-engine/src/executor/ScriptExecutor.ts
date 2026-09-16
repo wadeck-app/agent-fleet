@@ -152,8 +152,11 @@ export class ScriptExecutor {
 							/* ignore */
 						}
 					};
+					// Use the absolute bash path if the launcher pinned it (the daemon loses the
+					// Git Bash PATH after VBScript startup -- FLOW_BASH_PATH avoids WSL bash).
+					const bashExecutable = (cleanEnv['FLOW_BASH_PATH'] as string | undefined) ?? 'bash';
 					// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
-					const child = spawn('bash', [tempFilePath!], {
+					const child = spawn(bashExecutable, [tempFilePath!], {
 						cwd: workingDir,
 						env: cleanEnv,
 						// No windowsHide / detached: CREATE_NO_WINDOW and DETACHED_PROCESS strip the

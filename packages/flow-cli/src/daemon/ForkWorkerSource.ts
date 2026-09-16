@@ -135,6 +135,9 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 				: {}),
 			...(process.env['TEMP'] ? { TEMP: process.env['TEMP'] } : {}),
 			...(process.env['TMP'] ? { TMP: process.env['TMP'] } : {}),
+			// Absolute path to bash.exe, resolved by the launcher before VBScript discards the Git
+			// Bash PATH. Without it, ScriptExecutor would find WSL bash via the system PATH instead.
+			...(process.env['FLOW_BASH_PATH'] ? { FLOW_BASH_PATH: process.env['FLOW_BASH_PATH'] } : {}),
 		};
 	}
 }

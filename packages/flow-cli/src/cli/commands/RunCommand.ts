@@ -219,6 +219,21 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 	const daemonEnv: NodeJS.ProcessEnv = { ...process.env, FLOW_DAEMON_MODE: '1' };
 	if (daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'] !== resolvedBundle) delete daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'];
 
+	// On Windows the daemon is spawned via VBScript, which loses the Git Bash PATH enrichment
+	// (MSYS2 paths like C:\Program Files\Git\usr\bin are absent in the system PATH). Resolve
+	// bash.exe now, while we still have the Git Bash PATH, and pass the absolute path so the
+	// daemon and its forked workers never depend on PATH lookup for bash.
+	if (process.platform === 'win32' && !daemonEnv['FLOW_BASH_PATH']) {
+		const separator = path.delimiter;
+		for (const dir of (process.env['PATH'] ?? '').split(separator)) {
+			const candidate = path.join(dir, 'bash.exe');
+			if (fs.existsSync(candidate)) {
+				daemonEnv['FLOW_BASH_PATH'] = candidate;
+				break;
+			}
+		}
+	}
+
 	// Remove stale port file before spawning so the poll below only resolves on a fresh write
 	const portFile = path.join(daemonDir, 'config.port');
 	try {
