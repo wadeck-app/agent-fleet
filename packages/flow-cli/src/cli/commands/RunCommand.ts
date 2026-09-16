@@ -254,6 +254,13 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 						`oShell.Environment("Process")("LAUNCHER_BUNDLE_OVERRIDE") = "${resolvedBundle.replace(/"/g, '""')}"`,
 					]
 				: [];
+		// WScript.Shell.Run does not inherit the caller's env; only explicitly-set variables pass.
+		// FLOW_BASH_PATH must be set here so the daemon and its forked workers find Git bash, not WSL.
+		const bashPathLines = daemonEnv['FLOW_BASH_PATH']
+			? [
+					`oShell.Environment("Process")("FLOW_BASH_PATH") = "${(daemonEnv['FLOW_BASH_PATH'] as string).replace(/"/g, '""')}"`,
+				]
+			: [];
 		fs.writeFileSync(
 			vbsPath,
 			[
@@ -261,6 +268,7 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 				'Set oShell = CreateObject("WScript.Shell")',
 				'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
 				...overrideLines,
+				...bashPathLines,
 				`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
 			].join('\r\n')
 		);
