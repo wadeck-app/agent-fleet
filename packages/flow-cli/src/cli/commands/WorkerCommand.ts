@@ -15,8 +15,10 @@ import { PluginResolver } from '../../config/PluginResolver';
 import { WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
 import type { WorkerSourceEntry } from '../../daemon/WorkerSourceRegistry';
 import type { AssignmentScopedMessage, DaemonToWorker, WorkerSummary, WorkerToDaemon } from '../../ipc/Protocol';
-import { watchForDaemon } from '../../worker/DaemonWatch';
+import { DaemonWatchNotifier } from '../../worker/DaemonWatch';
 import type { McpServerConfig } from '../../worker/McpServer';
+import { NudgeServer } from '../../worker/NudgeServer';
+import type { ReconnectNotifier } from '../../worker/ReconnectNotifier';
 import { declareSelf } from '../../worker/SelfDeclaration';
 import { WorkerAdapter } from '../../worker/WorkerAdapter';
 import { WorkerDisplay } from '../../worker/WorkerDisplay';
@@ -212,6 +214,20 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		token,
 	});
 
+	// The nudge server lets the daemon notify this worker the moment its WS listener is
+	// bound -- no backoff wait. Works for local and remote workers alike, because the daemon
+	// sends an HTTP POST to the URL rather than relying on a shared filesystem.
+	const nudgeServer = new NudgeServer();
+	let nudgeUrl: string | undefined;
+	try {
+		nudgeUrl = await nudgeServer.start();
+	} catch (err) {
+		// A failed nudge server does not prevent the worker from running: the backoff path
+		// still works. Report and continue rather than exiting: the symptom (slower reconnect)
+		// is manageable, and a hard exit would surprise the user.
+		report('[warn]', `nudge server could not start, reconnect will rely on backoff only: ${normalizeError(err).message}`);
+	}
+
 	console.log(`[ok] flow worker for ${projectRoot}`);
 	if (registration.labels && registration.labels.length > 0) {
 		console.log(`     labels     : ${registration.labels.join(', ')}`);
@@ -234,31 +250,38 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 					projects: registration.attachedProjects ?? [projectRoot],
 					labels: registration.labels ?? [],
 					pid: process.pid,
+					nudgeUrl,
 				})
 			: undefined;
 	if (declaration !== undefined) {
 		console.log(`     registry   : declared as "${declaration.sourceId}" while this process lives`);
-		releaseOnExit(declaration.release);
 	}
 
+	// Single cleanup: removes the registry entry and stops the nudge server together.
+	releaseOnExit(() => {
+		declaration?.release();
+		nudgeServer.stop();
+	});
+
 	const display = new WorkerDisplay(options.verbose === true ? 'verbose' : 'summary');
-	connect(daemonDir, config.worker.wsPort, registration, 0, display, approvalProvider, () =>
+	const notifiers: ReconnectNotifier[] = [new DaemonWatchNotifier(daemonDir), nudgeServer];
+	connect(daemonDir, config.worker.wsPort, undefined, registration, 0, display, approvalProvider, notifiers, () =>
 		resolveWorkerToken({ token: options.token, sourceId }, daemonDir)
 	);
 }
 
 /**
- * Takes the worker's registry entry back out when the process ends.
+ * Runs a cleanup function when the process ends, however it ends.
  *
  * Ctrl-C is the normal way to stop a worker, and it does not run `process.on('exit')` handlers on
- * its own, so the signals are handled explicitly. A hard kill still leaks the entry -- that is what
- * the pid in it is for: the next reader prunes it.
+ * its own, so the signals are handled explicitly. A hard kill still leaks the registry entry -- that
+ * is what the pid in it is for: the next reader prunes it.
  */
-function releaseOnExit(release: () => void): void {
-	process.on('exit', release);
+function releaseOnExit(cleanup: () => void): void {
+	process.on('exit', cleanup);
 	for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 		process.on(signal, () => {
-			release();
+			cleanup();
 			process.exit(0);
 		});
 	}
@@ -288,33 +311,43 @@ function explainInteractivity(interactive: boolean, hasApproval: boolean): strin
  *
  * `attempt` only grows while connections keep failing; a successful registration resets
  * it, so a long-lived worker does not inherit a long backoff from an earlier outage.
+ *
+ * `wsUrlOverride` is provided when a nudge delivered the address; otherwise the worker
+ * reads `worker.port` from the daemon directory itself.
  */
 function connect(
 	daemonDir: string,
 	configuredWsPort: number | null,
+	wsUrlOverride: string | undefined,
 	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>,
 	attempt: number,
 	display: WorkerDisplay,
 	approvalProvider: ApprovalProvider | undefined,
+	notifiers: ReconnectNotifier[],
 	/** Re-read on every attempt: the daemon rotates its own token each time it starts. */
 	resolveToken: () => string
 ): void {
 	let wsUrl: string;
-	try {
-		wsUrl = resolveDaemonWsUrl(daemonDir, configuredWsPort);
-	} catch (err) {
-		// The daemon may simply not be up yet; report and keep waiting rather than exiting.
-		report('[wait]', normalizeError(err).message);
-		scheduleReconnect(
-			daemonDir,
-			configuredWsPort,
-			registration,
-			attempt + 1,
-			display,
-			approvalProvider,
-			resolveToken
-		);
-		return;
+	if (wsUrlOverride !== undefined) {
+		wsUrl = wsUrlOverride;
+	} else {
+		try {
+			wsUrl = resolveDaemonWsUrl(daemonDir, configuredWsPort);
+		} catch (err) {
+			// The daemon may simply not be up yet; report and keep waiting rather than exiting.
+			report('[wait]', normalizeError(err).message);
+			scheduleReconnect(
+				daemonDir,
+				configuredWsPort,
+				registration,
+				attempt + 1,
+				display,
+				approvalProvider,
+				notifiers,
+				resolveToken
+			);
+			return;
+		}
 	}
 
 	const ws = new WebSocket(wsUrl);
@@ -362,6 +395,7 @@ function connect(
 			attempt + 1,
 			display,
 			approvalProvider,
+			notifiers,
 			resolveToken
 		);
 	});
@@ -374,27 +408,31 @@ function scheduleReconnect(
 	attempt: number,
 	display: WorkerDisplay,
 	approvalProvider: ApprovalProvider | undefined,
+	notifiers: ReconnectNotifier[],
 	/** Re-read on every attempt: the daemon rotates its own token each time it starts. */
 	resolveToken: () => string
 ): void {
-	// Two ways to learn the daemon is back, whichever comes first: it publishes worker.port when
-	// its listener is bound, and the backoff covers the case where that notification never arrives
-	// (an unwatchable directory, a network path). Waiting only on the backoff meant learning about a
-	// daemon up to 30s after it started -- long enough for it to dispatch a step and find nobody.
+	// Three ways to learn the daemon is back, whichever arrives first:
+	// 1. An HTTP nudge from the daemon (NudgeServer): delivers the wsUrl directly, works remotely.
+	// 2. A filesystem event (DaemonWatchNotifier): local-only, worker reads worker.port itself.
+	// 3. The backoff timer: always fires regardless of the above two, so a missed notification
+	//    costs only latency.
 	let fired = false;
 	let timer: NodeJS.Timeout | undefined;
-	let stopWatching: (() => void) | undefined;
 
-	const reconnect = (): void => {
+	const reconnect = (wsUrlFromNudge?: string): void => {
 		if (fired) return;
 		fired = true;
 		if (timer !== undefined) clearTimeout(timer);
-		stopWatching?.();
-		connect(daemonDir, configuredWsPort, registration, attempt, display, approvalProvider, resolveToken);
+		// Disarm all notifiers so a late-arriving nudge does not trigger a second connect.
+		for (const n of notifiers) n.onNotify(undefined);
+		connect(daemonDir, configuredWsPort, wsUrlFromNudge, registration, attempt, display, approvalProvider, notifiers, resolveToken);
 	};
 
-	timer = scheduleReconnectTimer(reconnectDelayMs(attempt), reconnect);
-	stopWatching = watchForDaemon(daemonDir, reconnect);
+	timer = scheduleReconnectTimer(reconnectDelayMs(attempt), () => reconnect(undefined));
+	for (const n of notifiers) {
+		n.onNotify(wsUrl => reconnect(wsUrl));
+	}
 }
 
 async function handleMessage(

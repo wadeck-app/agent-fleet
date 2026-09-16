@@ -4,6 +4,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { RelayWorkerSource } from './RelayWorkerSource.js';
+import { sendNudge } from './NudgeDispatch.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
 /** The S1 implementations that ship with flow. */
@@ -27,15 +28,27 @@ export interface SourceProviderDependencies {
 /**
  * A source whose workers are already running and dial the daemon themselves.
  *
- * `obtainWorker` deliberately does nothing: there is no channel to reach such a worker,
- * which is the whole point of an inbound source -- trust originates from the worker
- * choosing to present itself (D#18). Resolving is not a claim that a worker appeared;
- * the interface says as much, and the caller bounds its own wait (D#66).
+ * When the entry carries a `nudgeUrl`, `obtainWorker` sends a single HTTP POST to it,
+ * delivering the daemon's WS address so the worker can connect immediately rather than
+ * waiting for its backoff timer. The nudge is best-effort: a failure is reported and
+ * ignored, because the worker reconnects via backoff regardless (D#4, D#66).
+ *
+ * Without a `nudgeUrl` there is no channel to the worker, which is the whole point of
+ * an inbound source: trust originates from the worker choosing to present itself (D#18).
  */
 export class InboundWorkerSource implements WorkerSourceProvider {
-	// eslint-disable-next-line @typescript-eslint/require-await -- async by interface contract
-	async obtainWorker(_request: WorkerRequest): Promise<void> {
-		// Nothing to initiate. An inbound worker connects on its own schedule.
+	constructor(private readonly nudgeUrl?: string) {}
+
+	async obtainWorker(request: WorkerRequest): Promise<void> {
+		if (this.nudgeUrl === undefined) return;
+		try {
+			await sendNudge(this.nudgeUrl, request.daemonEndpoint);
+		} catch (err) {
+			// Not fatal: the worker reconnects via backoff. Throw so the caller can log it.
+			throw new Error(
+				`nudge to "${request.sourceId}" at ${this.nudgeUrl} failed: ${normalizeError(err).message}`
+			);
+		}
 	}
 }
 
@@ -124,11 +137,12 @@ export class CommandWorkerSource implements WorkerSourceProvider {
 export function resolveSourceProvider(
 	provider: string,
 	options: CommandSourceOptions,
-	dependencies: SourceProviderDependencies = {}
+	dependencies: SourceProviderDependencies = {},
+	nudgeUrl?: string
 ): WorkerSourceProvider {
 	switch (provider) {
 		case BUILT_IN_INBOUND:
-			return new InboundWorkerSource();
+			return new InboundWorkerSource(nudgeUrl);
 		case BUILT_IN_COMMAND:
 			return new CommandWorkerSource(options, dependencies.issueLaunchToken);
 		case BUILT_IN_RELAY: {
@@ -171,7 +185,8 @@ export async function contactDeclaredSources(
 			const provider = resolveSourceProvider(
 				entry.provider,
 				(entry.options ?? {}) as CommandSourceOptions,
-				dependencies
+				dependencies,
+				entry.nudgeUrl
 			);
 			await provider.obtainWorker({
 				daemonEndpoint,

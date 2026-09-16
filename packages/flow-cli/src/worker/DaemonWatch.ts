@@ -1,6 +1,7 @@
 import { type FSWatcher, watch } from 'node:fs';
 
 import { WORKER_PORT_FILE } from '../daemon/Daemon.js';
+import type { ReconnectNotifier } from './ReconnectNotifier.js';
 
 /** Collapses the burst of events a single write produces into one notification. */
 const DEBOUNCE_MS = 50;
@@ -50,4 +51,32 @@ export function watchForDaemon(daemonDir: string, onDaemonReady: () => void): ()
 		if (timer !== undefined) clearTimeout(timer);
 		watcher?.close();
 	};
+}
+
+/**
+ * `ReconnectNotifier` implementation backed by `watchForDaemon`.
+ *
+ * Starts a new watcher each time `onNotify` is called with a callback, and stops it
+ * when cleared. The callback receives `undefined` for `wsUrl` because the file-watch
+ * only signals readiness -- the address is not carried by the event; the caller reads
+ * `worker.port` itself.
+ */
+export class DaemonWatchNotifier implements ReconnectNotifier {
+	private stopFn: (() => void) | undefined;
+
+	constructor(private readonly daemonDir: string) {}
+
+	onNotify(callback: ((wsUrl: string | undefined) => void) | undefined): void {
+		this.stopFn?.();
+		this.stopFn = undefined;
+		if (callback !== undefined) {
+			// File-watch does not carry the WS URL; the worker reads worker.port itself.
+			this.stopFn = watchForDaemon(this.daemonDir, () => callback(undefined));
+		}
+	}
+
+	stop(): void {
+		this.stopFn?.();
+		this.stopFn = undefined;
+	}
 }

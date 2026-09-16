@@ -1,10 +1,10 @@
 # Lessons Learned
 
-## singleton-daemon-kit SDK — When to Use It vs When Not To
+## singleton-daemon-kit SDK -- When to Use It vs When Not To
 
 **Context**: `packages/flow-cli` exposes two CLIs: `flow` and `task`. Both use a tsx launcher (`bin/*.js`) so they work globally via `npm link`. Only `flow` uses `@wadeck/singleton-daemon-kit`.
 
-**When the SDK is needed — `flow`**:
+**When the SDK is needed -- `flow`**:
 The `flow` CLI drives a long-running daemon (queue of steps, WebSocket workers, executions in progress). The SDK provides:
 
 - Port file → only one daemon instance runs at a time
@@ -14,8 +14,8 @@ The `flow` CLI drives a long-running daemon (queue of steps, WebSocket workers, 
 - Idle timer → daemon exits cleanly when queue is empty
 - Go launcher → native binary, no visible Node dependency for end users
 
-**When the SDK is NOT needed — `task`**:
-`task` is purely file-based: reads/writes JSON under `.flows/tasks/`, dispatches hooks via `HookDispatcher`. No daemon, no long-running process, no network. Using the SDK would be architecturally wrong — no singleton to manage, no port file, no idle timer relevant.
+**When the SDK is NOT needed -- `task`**:
+`task` is purely file-based: reads/writes JSON under `.flows/tasks/`, dispatches hooks via `HookDispatcher`. No daemon, no long-running process, no network. Using the SDK would be architecturally wrong -- no singleton to manage, no port file, no idle timer relevant.
 
 **The rule**: Use the SDK only when the CLI needs a persistent daemon (singleton process lifecycle). A CLI that does pure file I/O only needs the tsx launcher (`bin/*.js`) to resolve tsx correctly in a hoisted monorepo.
 
@@ -5479,8 +5479,8 @@ export const MyStory = ({
 **Context**: When integrating Claude CLI's `--output-format stream-json` with real-time log streaming, the NDJSON parser must handle:
 
 1. Partial lines across stdout chunks (buffering)
-2. Non-JSON lines (silent skip — Claude may emit setup text)
-3. The `result` event contains a `.result` field with the clean text output — use this instead of raw NDJSON stdout for OutputExtractor
+2. Non-JSON lines (silent skip -- Claude may emit setup text)
+3. The `result` event contains a `.result` field with the clean text output -- use this instead of raw NDJSON stdout for OutputExtractor
 
 **Pattern**: The StreamJsonParser feeds chunks into a line buffer, StreamEventMapper maps typed events to LiveLogEntry objects, and the entries are pushed to `stepTrace.liveLogEntries[]` which gets picked up by the existing 500ms trace polling mechanism in FlowWorker.
 
@@ -5488,7 +5488,7 @@ export const MyStory = ({
 
 ## Data2 Feature Contracts: Named Props, Never Spread
 
-**Problem**: Passing feature hooks to `Data2` via spread (`{...pagination}`) instead of named props (`pagination={pagination}`) causes all features to be silently ignored. The spread puts `fstate/actions/fillQuery` as top-level props, but Data2 destructures them as `pagination`, `sorting`, etc. — all undefined.
+**Problem**: Passing feature hooks to `Data2` via spread (`{...pagination}`) instead of named props (`pagination={pagination}`) causes all features to be silently ignored. The spread puts `fstate/actions/fillQuery` as top-level props, but Data2 destructures them as `pagination`, `sorting`, etc. -- all undefined.
 
 **Symptoms**:
 
@@ -5611,7 +5611,7 @@ const initializeController = async () => {
 
 ### Custom ESLint rule: no setTimeout in tests
 
-**Project rule**: `test-best-practices/no-settimeout-in-tests` forbids `new Promise(resolve => setTimeout(resolve, N))` in test files. Use `waitFor(() => expect(...))` from `@testing-library/react` to wait for async state — it retries automatically and doesn't introduce arbitrary delays.
+**Project rule**: `test-best-practices/no-settimeout-in-tests` forbids `new Promise(resolve => setTimeout(resolve, N))` in test files. Use `waitFor(() => expect(...))` from `@testing-library/react` to wait for async state -- it retries automatically and doesn't introduce arbitrary delays.
 
 ```typescript
 // ❌ Forbidden
@@ -5651,11 +5651,11 @@ await waitFor(() => {
 
 **Problem**: Adding `opacity-60` to a div while an async save is in progress works fine at normal speed, but when trying to capture it with `agent-browser screenshot`, the intermediate state is invisible. React 18 automatically batches `setState(loading)` + `setState(null)` if both happen before the next paint, so the component skips the loading render entirely.
 
-**Symptoms**: Agent adds `opacity-60 pointer-events-none` to a section during save, checks visually with screenshots, sees no change — even though the code is correct.
+**Symptoms**: Agent adds `opacity-60 pointer-events-none` to a section during save, checks visually with screenshots, sees no change -- even though the code is correct.
 
 **Root causes** (both must be fixed):
 
-1. On localhost, the PATCH call completes in < 20ms — faster than one frame
+1. On localhost, the PATCH call completes in < 20ms -- faster than one frame
 2. `finally { setSavingField(null) }` fires in the same microtask batch as `setSavingField(field)` if the awaited promise resolves synchronously (e.g., from cache)
 
 **Fix**:
@@ -5724,9 +5724,9 @@ onBlur={() => { if (localValue !== original) updateTicket(...); }}
 
 **Contributing factors**:
 
-1. The `post-comment` script step uses `node -e "..."` inline — spawns a new child process
+1. The `post-comment` script step uses `node -e "..."` inline -- spawns a new child process
 2. On Windows, when the worker process is under load, libuv can assert when the child process tries to exit
-3. The `ticketDescription` was "Analysis for: test for no comment" — a redundant description from the old `createFromPlan` that set `description: plan.analysis` (which starts with "Analysis for: ...")
+3. The `ticketDescription` was "Analysis for: test for no comment" -- a redundant description from the old `createFromPlan` that set `description: plan.analysis` (which starts with "Analysis for: ...")
 
 **Mitigation**:
 
@@ -5741,9 +5741,9 @@ onBlur={() => { if (localValue !== original) updateTicket(...); }}
 
 **Root causes encountered**:
 
-1. `node -e "fetch(...)"` → exit code 3221226505 — test written + flows.yml updated, but the task shown to user was from BEFORE the fix. Must trigger a NEW task after fixing to prove it works.
-2. `createFromPlan` description fix — backend was correct but `LocalClaudeAgentExecutor` (stub) copies description as title. Fix was partial.
-3. Layout loading states — multiple independent data fetches cause simultaneous spinners. Not visible until you use `dev-hold` + `agent-browser`.
+1. `node -e "fetch(...)"` → exit code 3221226505 -- test written + flows.yml updated, but the task shown to user was from BEFORE the fix. Must trigger a NEW task after fixing to prove it works.
+2. `createFromPlan` description fix -- backend was correct but `LocalClaudeAgentExecutor` (stub) copies description as title. Fix was partial.
+3. Layout loading states -- multiple independent data fetches cause simultaneous spinners. Not visible until you use `dev-hold` + `agent-browser`.
 
 **Mandatory testing protocol**:
 
@@ -5763,10 +5763,10 @@ onBlur={() => { if (localValue !== original) updateTicket(...); }}
 
 **Events recorded**:
 
-- `ticket.created` — on creation, includes initial status/labels/title
-- `ticket.updated` — on any field change, includes `{ fieldName: { before, after } }` per field
-- `ticket.transitioned` — on status change, includes `{ from, to }`
-- `ticket.comment_created` — on comment add, includes `{ content, author, commentId }`
+- `ticket.created` -- on creation, includes initial status/labels/title
+- `ticket.updated` -- on any field change, includes `{ fieldName: { before, after } }` per field
+- `ticket.transitioned` -- on status change, includes `{ from, to }`
+- `ticket.comment_created` -- on comment add, includes `{ content, author, commentId }`
 
 Note: `ticket.transitioned` is ALSO recorded even though it's a subset of `ticket.updated` (status field), because it provides semantic clarity in the history view.
 
@@ -5785,7 +5785,7 @@ Flows can then use `filter: { authorType: human }` or `filter: { authorType: wor
 
 **Why this is correct**: The event bus should emit for ALL comments. Loop prevention is the FLOW's responsibility via the filter, not the event bus's. This allows workers to subscribe to each other's comments.
 
-## No Unicode Arrows in UI — Use Lucide Icons (2026-03-05)
+## No Unicode Arrows in UI -- Use Lucide Icons (2026-03-05)
 
 **Rule**: Never use `→` or `←` or other Unicode arrows in UI text/links. Always use Lucide icon components.
 
@@ -5830,7 +5830,7 @@ Always read `ToastContext.tsx` before using the toast API. The signature uses po
 
 `<LoadingSpinner size="sm" />` renders BOTH a spinning div AND a `<p>Loading...</p>` text internally (from `message` prop defaulting to `'Loading...'`).
 
-Do NOT add a separate `<span>Loading...</span>` next to it — that produces duplicate text.
+Do NOT add a separate `<span>Loading...</span>` next to it -- that produces duplicate text.
 
 **Options**:
 
@@ -5842,21 +5842,21 @@ Do NOT add a separate `<span>Loading...</span>` next to it — that produces dup
 
 **Rule**: For every UI/design change, take a before screenshot BEFORE modifying code, then an after screenshot AFTER the change. Show both to the user.
 
-**Why**: Without comparison proof, there is no way to know if the change actually rendered — Vite HMR may not have reloaded, the wrong component may have been edited, or the change may be invisible. Screenshots caught all three failure modes in this session.
+**Why**: Without comparison proof, there is no way to know if the change actually rendered -- Vite HMR may not have reloaded, the wrong component may have been edited, or the change may be invisible. Screenshots caught all three failure modes in this session.
 
 **Checklist**:
 
 1. Open the page in a fresh browser session, navigate to the relevant section
-2. `agent-browser screenshot screenshot-xxx-before.png` — capture current state
+2. `agent-browser screenshot screenshot-xxx-before.png` -- capture current state
 3. Make the code change
 4. Wait for HMR or reload browser, verify via `agent-browser eval` that the DOM reflects the new class
-5. `agent-browser screenshot screenshot-xxx-after.png` — capture new state
+5. `agent-browser screenshot screenshot-xxx-after.png` -- capture new state
 6. Read both images and verify the diff is visible
 
 **Gotchas**:
 
-- `querySelector('.some-class')[0]` returns the FIRST element in the DOM — verify it's from the right component using `grep -rn "some-class" src/`
-- `TicketCommentsSection` uses a shared `MARKDOWN_COMPONENTS` const — changes to inline components in `TicketDetailLayoutG` do NOT affect the Comments tab which delegates to `TicketCommentsSection`
+- `querySelector('.some-class')[0]` returns the FIRST element in the DOM -- verify it's from the right component using `grep -rn "some-class" src/`
+- `TicketCommentsSection` uses a shared `MARKDOWN_COMPONENTS` const -- changes to inline components in `TicketDetailLayoutG` do NOT affect the Comments tab which delegates to `TicketCommentsSection`
 - Vite HMR sometimes requires a full `agent-browser close` + fresh open if repeated reloads don't pick up changes
 
 ## UX Principle: Never Hide Features
@@ -5871,7 +5871,7 @@ Hiding creates surprises. Disabled + explained = discovery.
 ## FlowValidator: SimulationValidator arithmetic false positive
 
 **Bug**: Regex `[+\-*/]` in `SimulationValidator.ts` matches hyphens in step IDs (e.g. `analyze-storage`).
-**Fix**: Require whitespace on both sides: `\s[+\-*/]\s` — distinguishes operators from identifier hyphens.
+**Fix**: Require whitespace on both sides: `\s[+\-*/]\s` -- distinguishes operators from identifier hyphens.
 
 ## UI Labels: NEVER use UPPERCASE text in the application
 
@@ -5905,10 +5905,10 @@ When displaying LLM output, normalize section headings to Title Case in the UI l
 Code inspection alone is NOT verification. "I added `w-full` to the class" is not a test.
 Visual/layout fixes MUST use agent-browser. In-flight states (blur during save) MUST use dev-hold skill.
 
-## Long dash (—) is forbidden in all UI strings
+## Long dash (--) is forbidden in all UI strings
 
-**Rule**: Never use em-dash `—` or en-dash `–` in UI text: toast messages, labels, descriptions, tooltips.
-**Bad**: `"Flow design requested — AI is processing..."`
+**Rule**: Never use em-dash `--` or en-dash `--` in UI text: toast messages, labels, descriptions, tooltips.
+**Bad**: `"Flow design requested -- AI is processing..."`
 **Good**: `"Flow design requested. AI is processing..."`
 This was explicitly stated by the user. Applies to all strings, including LLM-generated text displayed in the UI.
 
@@ -5920,7 +5920,7 @@ This was explicitly stated by the user. Applies to all strings, including LLM-ge
 - `▾` next to "Reject" implies there are multiple reject options to choose from (like a split button), which is wrong.
 - Follow established patterns: GitHub "close with comment" uses a separate arrow-only button; collapsible sections use rotating chevron.
 
-## After async submit/add, NEVER reload the tab — use local state + WS
+## After async submit/add, NEVER reload the tab -- use local state + WS
 
 **Rule**: Submitting a form, adding a thread, rejecting a proposal must NOT cause the entire tab to remount/reload.
 
@@ -5940,9 +5940,9 @@ This was explicitly stated by the user. Applies to all strings, including LLM-ge
 # 4. verify blur is visible before response returns
 ```
 
-Code inspection cannot verify this — the loading state is transient.
+Code inspection cannot verify this -- the loading state is transient.
 
-## FlowDesignerAgent: "adaptations" appears on first design — UI must filter
+## FlowDesignerAgent: "adaptations" appears on first design -- UI must filter
 
 **Root cause**: `FlowKnowledgeService` injects all project tickets with `flowId` as "Similar Tickets" into the prompt.
 The LLM sees these past flows and fills the `adaptations` field even on a first design, sometimes referencing
@@ -5958,21 +5958,21 @@ Also add to prompt: `"adaptations": fill ONLY if redesigning from a previous pro
 
 **Rule**: "The service emits the event" is not sufficient evidence that the activity/audit log shows it.
 After any backend event fix, open the Activity and Audit tabs in the browser and verify the entry appears
-with the expected content (not just the event type — also the message/detail).
+with the expected content (not just the event type -- also the message/detail).
 
 ## SelectWithSpinner layout: verify visually, not by class name
 
 Applying `gap-1` may be too tight depending on context. Apply the fix, then screenshot and compare
 against other similar instances in the app (e.g., the status select in layout B or D sidebar).
-Gap should feel natural — adjacent but with breathing room (`gap-2` is often more appropriate).
+Gap should feel natural -- adjacent but with breathing room (`gap-2` is often more appropriate).
 
-## Security findings must not be esquivé — 2026-08-15
+## Security findings must not be esquivé -- 2026-08-15
 
 Each security finding requires: (1) risk analysis with concrete threat scenario, (2) cost analysis (technical + UX impact of fixing), (3) concrete proposals with pros/cons, (4) explicit recommendation.
 
 Saying "documented v1 limitation" is not a substitute for analysis. A deferred fix still needs: why deferred, what is the residual risk, what is the detection/mitigation in place, when should it be revisited.
 
-Findings that touch user-facing logs, env vars, or auth must be treated as HIGH priority regardless of whether they are "local tool". Local tools become CI tools, shared runners, and Docker containers — the threat model changes without the code changing.
+Findings that touch user-facing logs, env vars, or auth must be treated as HIGH priority regardless of whether they are "local tool". Local tools become CI tools, shared runners, and Docker containers -- the threat model changes without the code changing.
 
 Specific rules going forward:
 
@@ -5982,40 +5982,40 @@ Specific rules going forward:
 - Log sensitivity must be explicit: user-facing stderr = human-friendly only, file logs = full technical detail
 - Design decisions (like LogMasker threshold) must be recorded in threat model, not just in code comments
 
-## process.env to subprocesses — opt-out not opt-in — 2026-08-15
+## process.env to subprocesses -- opt-out not opt-in -- 2026-08-15
 
 When adding env isolation to subprocess spawning, default to SECURE (isolate) and require explicit opt-out for legacy/permissive behavior. Do NOT default to the insecure behavior and require opt-in for security.
 
 Rationale: if the codebase is not in production yet and no flows exist, there is no cost to breaking the insecure default. Once in production, changing defaults becomes painful. Fix it now.
 
-Pattern: `isolateEnv?: boolean = true` — callers that need full env must explicitly pass `isolateEnv: false`.
+Pattern: `isolateEnv?: boolean = true` -- callers that need full env must explicitly pass `isolateEnv: false`.
 
 Applied to: ScriptExecutor.ts (flow-engine), ClaudeLauncher.ts (flow-engine), WorkerPool.ts (flow-cli).
 
-## Security proposals must present multiple options — 2026-08-15
+## Security proposals must present multiple options -- 2026-08-15
 
 Never present a single option for a security decision. Always analyse at least 3 options with pros/cons before recommending. The user must be able to choose. "One option" proposals are lazy and remove decision agency.
 
-## Threat model before solutions — 2026-08-15
+## Threat model before solutions -- 2026-08-15
 
 Always build the threat model (who are the actors, what can they actually do, what does the fix actually prevent) BEFORE proposing solutions. A solution that doesn't address the actual threat is not a solution.
 
-Proven by: WebSocket auth analysis — the "fix" (random token) would not have protected against the primary threat actor (same-user process). The threat model revealed there was nothing to implement.
+Proven by: WebSocket auth analysis -- the "fix" (random token) would not have protected against the primary threat actor (same-user process). The threat model revealed there was nothing to implement.
 
-## Messages must be self-contained — 2026-08-15
+## Messages must be self-contained -- 2026-08-15
 
 Never use abbreviations (L1/L2/L3, etc.) that were defined in a previous message. Every message with a decision request must be readable standalone. Repeating 3 lines of context is cheaper than forcing the reader to scroll.
 
-## Flow ↔ Task coupling = event-based, not core feature — 2026-08-16
+## Flow ↔ Task coupling = event-based, not core feature -- 2026-08-16
 
 Tasks are a useful concept _used with_ flows, but they are NOT part of the flow engine core.
 
 - `task.*` was removed from the `when:` condition context (`ConditionContext`)
 - Flows and tasks are bound by events (a task moves/creates/deletes → triggers a flow), not by direct dependency
 - If task data is needed inside a flow, it must be passed explicitly as `inputs`
-- `task.*` remains valid in prompt templates (`${{ task.priority }}`) via TemplateRenderer — that's the web-backend binding layer, not the engine core
+- `task.*` remains valid in prompt templates (`${{ task.priority }}`) via TemplateRenderer -- that's the web-backend binding layer, not the engine core
 
-## `when:` condition context shape — 2026-08-16
+## `when:` condition context shape -- 2026-08-16
 
 Canonical context for `when:` expressions:
 
@@ -6023,20 +6023,20 @@ Canonical context for `when:` expressions:
 { steps: { '<stepId>': { outputs: { ... } } }, outputs: { '<stepId>': { ... } }, inputs: { ... } }
 ```
 
-- `steps.X.outputs.Y` — primary form (dot notation; engine normalizes hyphenated IDs to bracket notation)
-- `outputs['X'].Y` — shorthand (flat keyed by step id)
+- `steps.X.outputs.Y` -- primary form (dot notation; engine normalizes hyphenated IDs to bracket notation)
+- `outputs['X'].Y` -- shorthand (flat keyed by step id)
 - Both `${{ expr }}` wrapper and bare expression supported
 - `task` is NOT in this context
 
-## Singleton-daemon-kit v2 local fallback — 2026-08-16
+## Singleton-daemon-kit v2 local fallback -- 2026-08-16
 
-New version of `@wadeck/singleton-daemon-kit` (in `packages/flow-cli/node_modules`) adds a local command fallback in `createDaemonClient.send()`: if no daemon is running AND `options.commands[command]` exists, it calls it directly. Do NOT pass a `commands` handler to `createDaemonClient` in `RunCommand.ts` — use `commands: {}` to avoid the local handler being invoked instead of starting the real daemon.
+New version of `@wadeck/singleton-daemon-kit` (in `packages/flow-cli/node_modules`) adds a local command fallback in `createDaemonClient.send()`: if no daemon is running AND `options.commands[command]` exists, it calls it directly. Do NOT pass a `commands` handler to `createDaemonClient` in `RunCommand.ts` -- use `commands: {}` to avoid the local handler being invoked instead of starting the real daemon.
 
-## npm workspace package shadowing — 2026-08-16
+## npm workspace package shadowing -- 2026-08-16
 
 ### Root cause
 
-When a workspace package (`packages/flow-cli`) lists a sibling workspace package as `"flow-engine": "*"` in its `dependencies`, npm resolves this correctly **when `npm install` is run from the monorepo root** — it deduplicates to the workspace symlink at `node_modules/flow-engine`.
+When a workspace package (`packages/flow-cli`) lists a sibling workspace package as `"flow-engine": "*"` in its `dependencies`, npm resolves this correctly **when `npm install` is run from the monorepo root** -- it deduplicates to the workspace symlink at `node_modules/flow-engine`.
 
 However, if any agent or developer runs `npm install` from **inside** `packages/flow-cli/` (not the root), npm does not operate in workspace mode for that invocation. It treats `"*"` as a normal semver range, hits the registry, finds the public `flow-engine` package (v1.2.0), and installs it locally at `packages/flow-cli/node_modules/flow-engine`. This local copy takes precedence over the root symlink in Node.js module resolution, silently shadowing the workspace package and causing cryptic "export not found" errors.
 
@@ -6053,7 +6053,7 @@ The npm-native solution is to use the `file:` protocol:
 }
 ```
 
-With `file:` protocol, npm records an explicit path-based reference in `package-lock.json`. When `npm install` is run from inside the sub-package, npm resolves the file path locally and cannot substitute a registry package — the reference is not a semver range at all. **Applied to this project on 2026-08-16.**
+With `file:` protocol, npm records an explicit path-based reference in `package-lock.json`. When `npm install` is run from inside the sub-package, npm resolves the file path locally and cannot substitute a registry package -- the reference is not a semver range at all. **Applied to this project on 2026-08-16.**
 
 ### Additional guard: always install from root
 
@@ -6072,13 +6072,13 @@ UNCERTAIN: whether npm has a built-in flag to refuse sub-directory installs.
 
 React, Babel, Jest all use `file:` or `link:` protocol for internal cross-package references in npm workspaces, for exactly this reason. The `workspace:` protocol (pnpm) is the cleaner ergonomic alternative but requires switching from npm to pnpm.
 
-## agent-browser: headless only — 2026-08-16
+## agent-browser: headless only -- 2026-08-16
 
-`agent-browser` (Playwright) is acceptable as long as it runs **headless**. Never launch a headed (visible) browser window — it opens on the user's screen and breaks their focus.
+`agent-browser` (Playwright) is acceptable as long as it runs **headless**. Never launch a headed (visible) browser window -- it opens on the user's screen and breaks their focus.
 
 Rule: `headless: true` always. Only use headed mode if the user explicitly requests it for a specific reason.
 
-## npm workspace package shadowing — solution et limitation — 2026-08-16
+## npm workspace package shadowing -- solution et limitation -- 2026-08-16
 
 ### Problème
 
@@ -6098,8 +6098,8 @@ npm ne peut pas substituer un package registry à un chemin `file:` explicite.
 
 `file:` est un contournement, pas la solution canonique. Deux problèmes :
 
-1. **Fragilité structurelle** — si un package est déplacé, les chemins cassent silencieusement
-2. **Ne scale pas** — à l'extension du framework (nouveaux packages, extraction en sous-monorepos), chaque nouveau package doit penser à utiliser `file:` pour ses dépendances internes
+1. **Fragilité structurelle** -- si un package est déplacé, les chemins cassent silencieusement
+2. **Ne scale pas** -- à l'extension du framework (nouveaux packages, extraction en sous-monorepos), chaque nouveau package doit penser à utiliser `file:` pour ses dépendances internes
 
 ### Vraie solution : packages scopés
 
@@ -6109,13 +6109,13 @@ La pratique industrie (Babel, Jest, etc.) est de préfixer tous les packages wor
 "@mon-scope/flow-engine": "*"
 ```
 
-Un package `@mon-scope/flow-engine` ne peut jamais entrer en collision avec un package public npm — le scope agit comme espace de nommage. `"*"` redevient safe.
+Un package `@mon-scope/flow-engine` ne peut jamais entrer en collision avec un package public npm -- le scope agit comme espace de nommage. `"*"` redevient safe.
 
-**Prérequis :** posséder ou contrôler le scope npm (`@mon-scope`). `@agent-fleet` n'est pas disponible — choisir un scope maîtrisé avant de migrer.
+**Prérequis :** posséder ou contrôler le scope npm (`@mon-scope`). `@agent-fleet` n'est pas disponible -- choisir un scope maîtrisé avant de migrer.
 
 **Impact du renommage :** tous les `import from 'flow-engine'`, `tsconfig.paths`, `package.json`, et fichiers de config devront être mis à jour. Planifier comme un refactoring dédié.
 
-## Template injection in flow scripts — RCE risk — 2026-08-16
+## Template injection in flow scripts -- RCE risk -- 2026-08-16
 
 When `${{ steps.X.outputs.Y }}` is embedded directly in a `script:` field, the rendered value is inserted into a bat/shell command verbatim. Multi-line model responses cause subsequent lines to be executed as shell commands.
 
@@ -6127,21 +6127,21 @@ script: echo ${{ steps.generate.outputs.response }} # RCE if response is multi-l
 
 Example: if Claude responds "Imagine you have blocks...", cmd.exe executes `Imagine` as a command.
 
-**Safe pattern — write to file via node:**
+**Safe pattern -- write to file via node:**
 
 ```yaml
 script: node -e "require('fs').writeFileSync(process.argv[1], process.argv[2])" "${{ context.workspaceDir }}\out.txt" "${{ steps.generate.outputs.response }}"
 ```
 
-Node receives the response as `process.argv[2]` — never interpreted as shell commands.
+Node receives the response as `process.argv[2]` -- never interpreted as shell commands.
 
 **Suggestions to reduce user error:**
 
-1. Flow validator: warn when `${{ steps.X.outputs.Y }}` is used inline in `script:` and Y is a `string` type — the value could be multi-line
+1. Flow validator: warn when `${{ steps.X.outputs.Y }}` is used inline in `script:` and Y is a `string` type -- the value could be multi-line
 2. Documentation: add a "Security" section to flow docs explaining this pattern
 3. Future engine enhancement: add a `writeOutput` step type that safely writes a template value to a file without shell involvement
 
-## Workspace vs Workspace Metadata separation — 2026-08-16
+## Workspace vs Workspace Metadata separation -- 2026-08-16
 
 ### Principle
 
@@ -6184,23 +6184,23 @@ Engine-generated artifacts (outputs, logs, state) are metadata and must NEVER li
 ### Package naming
 
 - Plugin implementations: `packages/plugin-<id>/` → `@flow/plugin-<id>` npm name
-- `plugin-sdk` is NOT a plugin — exclude it from PLUGIN-001 scans
+- `plugin-sdk` is NOT a plugin -- exclude it from PLUGIN-001 scans
 - Extension point interfaces: `packages/extension-points/` → `@flow/extension-points`
 
 ### Package exports for Vite/vitest resolution
 
 - The `exports` field in `package.json` overrides `main`
-- For in-source packages used in tests, always include `"default": "./src/index.ts"` in exports alongside `"types"` — Vite needs it to resolve the package at test time
+- For in-source packages used in tests, always include `"default": "./src/index.ts"` in exports alongside `"types"` -- Vite needs it to resolve the package at test time
 
 ### ES module import cache in tests
 
-- `import()` in Node.js caches by URL — two tests that write different files to the same path and then `import()` that path will get the cached result from the first test
+- `import()` in Node.js caches by URL -- two tests that write different files to the same path and then `import()` that path will get the cached result from the first test
 - Fix: use unique paths per test (e.g. a counter in the temp dir name)
 
 ### TypeScript project references
 
 - New packages must be added to root `tsconfig.json` references AND to `tsconfig.shared.json` paths
-- `check-ts.js` only checks hardcoded PACKAGES list — new packages need to be added there too (or built first)
+- `check-ts.js` only checks hardcoded PACKAGES list -- new packages need to be added there too (or built first)
 - Building a package before running `check` avoids "output file has not been built" errors
 
 ### Prettier `with` import assertions
@@ -6210,7 +6210,7 @@ Engine-generated artifacts (outputs, logs, state) are metadata and must NEVER li
 
 ### `packages/cli/` stale artifact
 
-- `packages/cli/` has no `package.json`, only `dist-types/` — `npm run lint` from there falls back to root ESLint which scans everything and causes false positives
+- `packages/cli/` has no `package.json`, only `dist-types/` -- `npm run lint` from there falls back to root ESLint which scans everything and causes false positives
 - Fix: remove `'cli'` from `check-eslint.js` PACKAGES list
 
 ### Path traversal pitfall in validateBaseDir on Windows
@@ -6222,7 +6222,7 @@ Engine-generated artifacts (outputs, logs, state) are metadata and must NEVER li
 
 - The violation rule checks TS manifests using `tsc --noEmit` for the package; for tests it's sufficient to check that `npm run check` passes for the plugin package as a whole
 
-## Plugin System — Phase 9 Integration Gotchas
+## Plugin System -- Phase 9 Integration Gotchas
 
 ### Plugin resolution must happen before createDaemon(), not inside onStart
 
@@ -6275,15 +6275,15 @@ See `.claude/kb/opencode-provider-windows-gotchas.md` for full details. Key poin
 
 ---
 
-## GitLab Package Registry — Token Validation
+## GitLab Package Registry -- Token Validation
 
 **Context**: CI workflows must validate tokens BEFORE any action (pre-contract). For GitLab npm registry deploy tokens.
 
 **READ token (`read_package_registry`) validation**:
 
 - `GET /api/v4/projects/{id}/packages/pypi/simple/` → **200** valid token, **401** invalid
-- Package-independent — works before first publish, no cross-repo dependency
-- DO NOT use npm registry endpoints (`/-/ping`, `/-/whoami`, `@scope/package`) — GitLab proxies missing packages to npmjs.org with a 302 **regardless of token validity**, making them useless for validation
+- Package-independent -- works before first publish, no cross-repo dependency
+- DO NOT use npm registry endpoints (`/-/ping`, `/-/whoami`, `@scope/package`) -- GitLab proxies missing packages to npmjs.org with a 302 **regardless of token validity**, making them useless for validation
 
 **WRITE token (`write_package_registry`) validation**:
 
@@ -6304,7 +6304,7 @@ Background Node.js pipelines (daemon → worker → script step) cause visible W
 
 ### Root cause (confirmed via atomic PoCs)
 
-`windowsHide:true` (CREATE_NO_WINDOW) **removes the console handle** from the spawned process ("the console handle for the application is not set" — MSDN). When cmd.exe or any other CONSOLE app is spawned consoleless, its first external child process cannot inherit a console → it calls AllocConsole() → Windows Terminal intercepts → visible tab. Shell builtins (echo, dir, exit) never spawn child processes so they produce 0 terminals even from a consoleless parent.
+`windowsHide:true` (CREATE_NO_WINDOW) **removes the console handle** from the spawned process ("the console handle for the application is not set" -- MSDN). When cmd.exe or any other CONSOLE app is spawned consoleless, its first external child process cannot inherit a console → it calls AllocConsole() → Windows Terminal intercepts → visible tab. Shell builtins (echo, dir, exit) never spawn child processes so they produce 0 terminals even from a consoleless parent.
 
 ### Fix (d032e7e + b2bca73)
 
@@ -6316,7 +6316,7 @@ Two-part fix:
 ### Key rules
 
 - `detached:true` sets DETACHED_PROCESS + CREATE_BREAKAWAY_FROM_JOB. Use it ONLY on the wscript.exe launcher to escape Job Objects.
-- `windowsHide:true` (CREATE_NO_WINDOW) must NOT be used on workers or script executors — it breaks console inheritance.
+- `windowsHide:true` (CREATE_NO_WINDOW) must NOT be used on workers or script executors -- it breaks console inheritance.
 - node.exe with pipe/NUL handles does not call AllocConsole; only console-app children spawned from a consoleless parent trigger WT.
 - Job Objects (from Claude Code, orch daemon, etc.) kill non-detached children. Use wscript.exe + detached:true to escape; all subsequent spawns can be non-detached.
 - Validate with atomic PoCs via queue dispatch: `cmd /c exit 0` = 0 terminal; `cmd /c node --version` = 1 terminal (before fix), 0 terminal (after fix).

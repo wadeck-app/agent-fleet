@@ -49,6 +49,14 @@ export interface WorkerSourceEntry {
 	 * means the entry describes a machine or a command, where no local pid could speak for it.
 	 */
 	pid?: number;
+	/**
+	 * HTTP endpoint the daemon POSTs to when its WebSocket listener is ready.
+	 *
+	 * Format: `http://<host>:<port>/nudge`. The daemon sends `{ wsUrl }` so the worker
+	 * can connect immediately instead of waiting for its backoff timer. Optional: workers
+	 * that do not expose one still reconnect via backoff.
+	 */
+	nudgeUrl?: string;
 }
 
 /** What the caller supplies to declare a source. */
@@ -60,6 +68,8 @@ export interface WorkerSourceDeclaration {
 	maxWorkers: number;
 	/** Process that declared itself; see {@link WorkerSourceEntry.pid}. */
 	pid?: number;
+	/** HTTP nudge endpoint; see {@link WorkerSourceEntry.nudgeUrl}. */
+	nudgeUrl?: string;
 }
 
 interface RegistryFile {
@@ -114,6 +124,7 @@ export class WorkerSourceRegistry {
 			labels: [...declaration.labels],
 			maxWorkers: declaration.maxWorkers,
 			...(declaration.pid !== undefined ? { pid: declaration.pid } : {}),
+			...(declaration.nudgeUrl !== undefined ? { nudgeUrl: declaration.nudgeUrl } : {}),
 			tokenHash: hashToken(token),
 			sourceTokenHash: hashToken(sourceToken),
 			createdAt: new Date().toISOString(),

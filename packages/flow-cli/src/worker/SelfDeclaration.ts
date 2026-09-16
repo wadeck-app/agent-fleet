@@ -25,7 +25,7 @@ export interface SelfDeclarationHandle {
  */
 export function declareSelf(
 	daemonDir: string,
-	worker: { projects: string[]; labels: string[]; pid: number }
+	worker: { projects: string[]; labels: string[]; pid: number; nudgeUrl?: string }
 ): SelfDeclarationHandle | undefined {
 	const registry = new WorkerSourceRegistry(daemonDir);
 	const sourceId = `terminal-${String(worker.pid)}`;
@@ -34,12 +34,13 @@ export function declareSelf(
 		registry.declare({
 			sourceId,
 			// Nothing can reach out to it: it dials in on its own schedule, which is what inbound
-			// means (D#18). The watch on the daemon's port file is how it learns when to.
+			// means (D#18). The nudge URL is how it learns when to, for both local and remote workers.
 			provider: 'built-in:inbound',
 			labels: [...worker.labels],
 			maxWorkers: 1,
 			options: { projects: [...worker.projects] },
 			pid: worker.pid,
+			...(worker.nudgeUrl !== undefined ? { nudgeUrl: worker.nudgeUrl } : {}),
 		});
 	} catch (err) {
 		console.error(
