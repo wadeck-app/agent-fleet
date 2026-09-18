@@ -83,7 +83,9 @@ describe('ScriptExecutor - Windows console inheritance (no windowsHide / detache
 			await executePromise;
 
 			// Sanity check: this is the bash branch, not the shell branch.
-			expect(vi.mocked(child_process.spawn).mock.calls[0]![0]).toBe('bash');
+			// The executable may be an absolute path resolved by resolveBashOnWindows().
+			const executable = vi.mocked(child_process.spawn).mock.calls[0]![0] as string;
+			expect(executable.endsWith('bash.exe') || executable === 'bash').toBe(true);
 
 			const options = spawnOptions();
 			expect(options['windowsHide']).not.toBe(true);

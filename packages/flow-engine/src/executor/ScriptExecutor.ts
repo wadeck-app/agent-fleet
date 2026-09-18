@@ -10,6 +10,40 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 /**
+ * Finds bash.exe on Windows without relying on the system PATH.
+ *
+ * WScript.Shell.Run (used to start the daemon) spawns with the system PATH, which does not
+ * include Git Bash's MSYS2 directories. A plain 'bash' lookup finds WSL bash first, which
+ * starts in 3-6s and cannot access Windows temp-file paths. This function searches PATH,
+ * then falls back to the Git for Windows install directories.
+ */
+function resolveBashOnWindows(env: Record<string, string>): string {
+	// Explicit pin from the environment (set by launcher before PATH is lost).
+	const pinned = env['FLOW_BASH_PATH'];
+	if (pinned && fs.existsSync(pinned)) return pinned;
+
+	// Search the worker's own PATH for bash.exe.
+	const pathEnv = env['PATH'] ?? '';
+	for (const dir of pathEnv.split(path.delimiter)) {
+		const candidate = path.join(dir, 'bash.exe');
+		if (fs.existsSync(candidate)) return candidate;
+	}
+
+	// Known Git for Windows installation paths, in preference order.
+	const knownLocations = [
+		'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
+		'C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe',
+		'C:\\Program Files\\Git\\bin\\bash.exe',
+	];
+	for (const loc of knownLocations) {
+		if (fs.existsSync(loc)) return loc;
+	}
+
+	// Last resort: let the OS find it. May resolve to WSL bash.
+	return 'bash';
+}
+
+/**
  * Result of script execution
  */
 export interface ScriptExecutionResult {
@@ -152,9 +186,11 @@ export class ScriptExecutor {
 							/* ignore */
 						}
 					};
-					// Use the absolute bash path if the launcher pinned it (the daemon loses the
-					// Git Bash PATH after VBScript startup -- FLOW_BASH_PATH avoids WSL bash).
-					const bashExecutable = (cleanEnv['FLOW_BASH_PATH'] as string | undefined) ?? 'bash';
+					// Resolve bash.exe: prefer explicit env, then PATH, then known Git for Windows
+					// locations. WScript.Shell.Run (used to start the daemon on Windows) spawns
+					// with the system PATH, not the enriched Git Bash PATH, so 'bash' alone finds
+					// C:\Windows\System32\bash.exe (WSL) first. An explicit path avoids that.
+					const bashExecutable = resolveBashOnWindows(cleanEnv);
 					// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
 					const child = spawn(bashExecutable, [tempFilePath!], {
 						cwd: workingDir,
