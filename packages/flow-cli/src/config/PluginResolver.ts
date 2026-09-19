@@ -89,6 +89,16 @@ export class PluginResolver {
 		)) as ApprovalProvider;
 	}
 
+	/**
+	 * Loads an approval provider by its type string, bypassing config.
+	 *
+	 * Used by `flow worker` to load the TTY fallback (`plugins.cli-approval.default`) when
+	 * no approval plugin is configured and the worker is running in an interactive terminal.
+	 */
+	async resolveApprovalByType(type: string, options: Record<string, unknown> = {}): Promise<ApprovalProvider> {
+		return (await this.pluginLoader.loadProvider(type, 'approval', options, undefined)) as ApprovalProvider;
+	}
+
 	async resolveAll(): Promise<ResolvedProviders> {
 		const config = await this.configLoader.load();
 		const result: ResolvedProviders = {};

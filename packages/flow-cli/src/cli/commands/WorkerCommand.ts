@@ -203,7 +203,14 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	// plugin reads its own stdin, so a daemon-side instance could never reach anybody. A
 	// failure to load a *configured* plugin stops the worker rather than letting it register
 	// as interactive and fail the first question it is asked.
-	const approvalProvider = await PluginResolver.create().resolveApproval();
+	//
+	// TTY fallback: when no approval plugin is configured and the worker is running in an
+	// interactive terminal, cli-approval is loaded automatically. The operator does not have
+	// to edit config.yml just to answer checkpoints from their own terminal.
+	let approvalProvider = await PluginResolver.create().resolveApproval();
+	if (approvalProvider === undefined && process.stdout.isTTY) {
+		approvalProvider = await PluginResolver.create().resolveApprovalByType('plugins.cli-approval.default');
+	}
 
 	// A worker the daemon launched carries its configuration in its environment, so the source and
 	// the projects are resolved the same way the credential already was.
