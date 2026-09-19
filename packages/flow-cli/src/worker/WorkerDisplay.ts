@@ -9,6 +9,12 @@ import type { LiveLogEntry } from 'flow-engine/types';
  */
 export type WorkerVerbosity = 'summary' | 'verbose';
 
+const SEPARATOR = '──────────────────────────────────────────────────────────';
+
+function ts(): string {
+	return new Date().toISOString().slice(11, 19);
+}
+
 /**
  * What a worker prints to its own terminal while running steps.
  *
@@ -27,8 +33,15 @@ export class WorkerDisplay {
 		}
 	) {}
 
-	stepStarted(stepId: string): void {
-		this.write(`[run ] ${stepId}`);
+	stepStarted(stepId: string, context?: { executionId?: string; stepName?: string }): void {
+		const t = ts();
+		this.write(`[${t}] ${SEPARATOR}`);
+		const name = context?.stepName && context.stepName !== stepId ? context.stepName : undefined;
+		this.write(`[${t}]  step : ${stepId}${name !== undefined ? `  (${name})` : ''}`);
+		if (context?.executionId) {
+			this.write(`[${t}]  exec : ${context.executionId}`);
+		}
+		this.write(`[${t}] ${SEPARATOR}`);
 	}
 
 	/**
@@ -42,15 +55,18 @@ export class WorkerDisplay {
 		const important = entry.level === 'warning' || entry.level === 'error';
 		if (this.verbosity !== 'verbose' && !important) return;
 		const marker = important ? entry.level.slice(0, 4) : 'out ';
-		this.write(`[${marker}] ${stepId}: ${entry.message}`);
+		this.write(`[${ts()}] [${marker}] ${stepId}: ${entry.message}`);
 	}
 
 	stepCompleted(stepId: string, elapsedMs: number): void {
-		this.write(`[ok  ] ${stepId} (${formatDuration(elapsedMs)})`);
+		this.write(`[${ts()}] [ok  ] ${stepId} (${formatDuration(elapsedMs)})`);
+		this.write(`[${ts()}] ${SEPARATOR}`);
 	}
 
-	stepFailed(stepId: string, error: string): void {
-		this.write(`[fail] ${stepId}: ${error}`);
+	stepFailed(stepId: string, error: string, elapsedMs?: number): void {
+		const duration = elapsedMs !== undefined ? `  (${formatDuration(elapsedMs)})` : '';
+		this.write(`[${ts()}] [fail] ${stepId}: ${error}${duration}`);
+		this.write(`[${ts()}] ${SEPARATOR}`);
 	}
 }
 

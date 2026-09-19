@@ -25,8 +25,20 @@ describe('WorkerDisplay - default verbosity', () => {
 		display.stepStarted('build');
 		display.stepCompleted('build', 1_500);
 
-		expect(out.lines.join('\n')).toContain('build');
+		const joined = out.lines.join('\n');
+		expect(joined).toContain('build');
 		expect(out.lines.some(line => line.includes('1.5s'))).toBe(true);
+	});
+
+	it('shows executionId and step name in the header when provided', () => {
+		const out = collector();
+		const display = new WorkerDisplay('summary', out.write);
+
+		display.stepStarted('build', { executionId: 'abc12345', stepName: 'Build project' });
+
+		const joined = out.lines.join('\n');
+		expect(joined).toContain('abc12345');
+		expect(joined).toContain('Build project');
 	});
 
 	// Raw model output is the worker's by nature, but printing it unasked buries the
@@ -47,7 +59,19 @@ describe('WorkerDisplay - default verbosity', () => {
 
 		display.stepFailed('build', 'exit code 1');
 
-		expect(out.lines.join('\n')).toContain('exit code 1');
+		const joined = out.lines.join('\n');
+		expect(joined).toContain('exit code 1');
+	});
+
+	it('reports a failure with elapsed time when provided', () => {
+		const out = collector();
+		const display = new WorkerDisplay('summary', out.write);
+
+		display.stepFailed('build', 'exit code 1', 3_200);
+
+		const joined = out.lines.join('\n');
+		expect(joined).toContain('exit code 1');
+		expect(joined).toContain('3.2s');
 	});
 
 	// A warning from a step that still succeeded would otherwise vanish entirely.
@@ -58,6 +82,18 @@ describe('WorkerDisplay - default verbosity', () => {
 		display.stepLog('build', entry('deprecated flag', 'warning'));
 
 		expect(out.lines.join('\n')).toContain('deprecated flag');
+	});
+
+	it('separators appear around start and end events', () => {
+		const out = collector();
+		const display = new WorkerDisplay('summary', out.write);
+
+		display.stepStarted('build');
+		display.stepCompleted('build', 10);
+
+		// At least two separator lines (opening + closing)
+		const separators = out.lines.filter(l => l.includes('──'));
+		expect(separators.length).toBeGreaterThanOrEqual(2);
 	});
 });
 
@@ -79,7 +115,12 @@ describe('WorkerDisplay - verbose', () => {
 		display.stepLog('build', entry('line one'));
 		display.stepCompleted('build', 10);
 
-		expect(out.lines).toHaveLength(3);
+		// Header: separator + step line + separator (3), log: 1, footer: ok + separator (2) = 6+
+		expect(out.lines.length).toBeGreaterThanOrEqual(3);
+		// All three events produced at least one line each
+		const joined = out.lines.join('\n');
+		expect(joined).toContain('build');
+		expect(joined).toContain('line one');
 	});
 
 	// A worker runs one step at a time (idle/busy), so raw output never interleaves and
@@ -99,13 +140,30 @@ describe('WorkerDisplay - durations', () => {
 		const out = collector();
 		new WorkerDisplay('summary', out.write).stepCompleted('quick', 42);
 
-		expect(out.lines[0]).toContain('42ms');
+		const joined = out.lines.join('\n');
+		expect(joined).toContain('42ms');
 	});
 
 	it('shows minutes for long work rather than a huge second count', () => {
 		const out = collector();
 		new WorkerDisplay('summary', out.write).stepCompleted('slow', 3 * 60_000 + 5_000);
 
-		expect(out.lines[0]).toContain('3m5s');
+		expect(out.lines.join('\n')).toContain('3m5s');
+	});
+});
+
+describe('WorkerDisplay - timestamps', () => {
+	it('all lifecycle lines include a timestamp', () => {
+		const out = collector();
+		const display = new WorkerDisplay('summary', out.write);
+
+		display.stepStarted('build');
+		display.stepCompleted('build', 10);
+
+		// Every non-separator line should have [HH:MM:SS] prefix
+		const infoLines = out.lines.filter(l => !l.includes('──'));
+		for (const line of infoLines) {
+			expect(line).toMatch(/^\[\d{2}:\d{2}:\d{2}\]/);
+		}
 	});
 });

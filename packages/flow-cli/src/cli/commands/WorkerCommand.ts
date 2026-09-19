@@ -64,6 +64,15 @@ function readDeclaredSources(daemonDir: string): WorkerSourceEntry[] {
 	}
 }
 
+function ts(): string {
+	return new Date().toISOString().slice(11, 19);
+}
+
+function formatDelay(ms: number): string {
+	if (ms < 1_000) return `${String(ms)}ms`;
+	return `${String(Math.round(ms / 1_000))}s`;
+}
+
 /**
  * Prints one prefixed line for the operator.
  *
@@ -72,7 +81,7 @@ function readDeclaredSources(daemonDir: string): WorkerSourceEntry[] {
  * the detail is itself what the user needs in order to act.
  */
 function report(prefix: '[fail]' | '[wait]' | '[warn]', message: string): void {
-	console.error(`${prefix} ${message}`);
+	console.error(`[${ts()}] ${prefix} ${message}`);
 }
 
 /**
@@ -268,6 +277,20 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	connect(daemonDir, config.worker.wsPort, undefined, registration, 0, display, approvalProvider, notifiers, () =>
 		resolveWorkerToken({ token: options.token, sourceId }, daemonDir)
 	);
+
+	// Accept typed input when the terminal is interactive: lines are echoed as notes so the
+	// operator can annotate the session log without affecting any file.
+	if (process.stdin.isTTY) {
+		process.stdin.setEncoding('utf8');
+		process.stdin.resume();
+		process.stdin.on('data', (chunk: string) => {
+			for (const line of chunk.split(/\r?\n/)) {
+				if (line.trim()) {
+					console.log(`[${ts()}] [note] ${line.trim()}`);
+				}
+			}
+		});
+	}
 }
 
 /**
@@ -387,7 +410,8 @@ function connect(
 	});
 
 	ws.on('close', () => {
-		console.log('[wait] daemon connection closed; waiting to re-register');
+		const delay = reconnectDelayMs(attempt + 1);
+		console.log(`[${ts()}] [wait] daemon connection closed; next attempt in ${formatDelay(delay)}`);
 		scheduleReconnect(
 			daemonDir,
 			configuredWsPort,
@@ -452,7 +476,10 @@ async function handleMessage(
 				if (scoped.type === 'log') display.stepLog(stepId, scoped.entry);
 				send({ ...scoped, assignmentId } as WorkerToDaemon);
 			};
-			display.stepStarted(stepId);
+			display.stepStarted(stepId, {
+				executionId: executionContext.executionId,
+				stepName: (stepConfig as unknown as { name?: string }).name,
+			});
 			const startedAt = Date.now();
 			// Announced before the first side effect: after this the daemon treats a
 			// disconnect as a failure rather than replaying the step (D#65). Closing this
@@ -478,7 +505,7 @@ async function handleMessage(
 					error,
 					output,
 				});
-				display.stepFailed(stepId, error);
+				display.stepFailed(stepId, error, Date.now() - startedAt);
 			}
 			// No credential refresh here: this socket is already authenticated, and re-reading a
 			// token mid-connection would only matter if the daemon re-checked it, which it does not.
