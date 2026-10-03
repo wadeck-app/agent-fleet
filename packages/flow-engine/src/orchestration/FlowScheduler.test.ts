@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { FailureConfig } from '../types';
-import { FlowScheduler } from './FlowScheduler';
+import { FlowScheduler, buildSubStepFeedback } from './FlowScheduler';
 import type { ReadyItem, SchedulerContext, SchedulerStep, StepOutcome } from './FlowScheduler';
 
 function makeContext(overrides?: Partial<SchedulerContext>): SchedulerContext {
@@ -33,6 +33,41 @@ function fail(scheduler: FlowScheduler, stepId: string, error = 'step-error'): R
 	const outcome: StepOutcome = { type: 'failed', error };
 	return scheduler.complete(stepId, outcome);
 }
+
+describe('buildSubStepFeedback', () => {
+	it('prefers stderr, labels by step id', () => {
+		const feedback = buildSubStepFeedback(
+			new Map([['validate', { outputs: { stderr: 'parse error' }, status: 'failed' }]])
+		);
+		expect(feedback).toBe('[validate]\nparse error');
+	});
+
+	it('falls back to rawOutput, then stdout, then the raw outputs object', () => {
+		expect(buildSubStepFeedback(new Map([['a', { outputs: { rawOutput: 'bad yaml' }, status: 'failed' }]]))).toBe(
+			'[a]\nbad yaml'
+		);
+		expect(buildSubStepFeedback(new Map([['b', { outputs: { stdout: 'exit 1' }, status: 'failed' }]]))).toBe(
+			'[b]\nexit 1'
+		);
+		expect(buildSubStepFeedback(new Map([['c', { outputs: { code: 1 }, status: 'failed' }]]))).toBe(
+			'[c]\n{"code":1}'
+		);
+	});
+
+	it('joins multiple failed sub-steps with a blank line', () => {
+		const feedback = buildSubStepFeedback(
+			new Map([
+				['write', { outputs: { stderr: 'write failed' }, status: 'failed' }],
+				['check', { outputs: { stderr: 'check failed' }, status: 'failed' }],
+			])
+		);
+		expect(feedback).toBe('[write]\nwrite failed\n\n[check]\ncheck failed');
+	});
+
+	it('returns an empty string for no failed sub-steps', () => {
+		expect(buildSubStepFeedback(new Map())).toBe('');
+	});
+});
 
 describe('FlowScheduler', () => {
 	describe('isTerminal()', () => {

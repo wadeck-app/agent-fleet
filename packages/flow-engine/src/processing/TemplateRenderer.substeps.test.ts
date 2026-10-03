@@ -76,6 +76,24 @@ describe('TemplateRenderer — subSteps namespace', () => {
 	});
 });
 
+describe('TemplateRenderer — subStepFeedback', () => {
+	const renderer = new TemplateRenderer();
+	const baseContext: TemplateContext = {
+		inputs: {},
+		stepOutputs: new Map(),
+		taskMetadata: {},
+	};
+
+	it('resolves to the pre-aggregated feedback string', () => {
+		const ctx: TemplateContext = { ...baseContext, subStepFeedback: '[validate]\nparse error' };
+		expect(renderer.render('${{ subStepFeedback }}', ctx)).toBe('[validate]\nparse error');
+	});
+
+	it('resolves to empty string when absent (no sub-step has failed yet)', () => {
+		expect(renderer.render('[${{ subStepFeedback }}]', baseContext)).toBe('[]');
+	});
+});
+
 describe('TemplateRenderer — {% if/else/endif %} blocks', () => {
 	const renderer = new TemplateRenderer();
 

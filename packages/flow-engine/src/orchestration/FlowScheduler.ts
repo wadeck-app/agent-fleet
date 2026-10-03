@@ -7,6 +7,28 @@ import type { SubStepAction, SubStepStrategy, SubStepStrategyContext } from './F
 
 export type { SubStepAction, SubStepStrategy, SubStepStrategyContext };
 
+/**
+ * Aggregates every failed sub-step's own feedback into one string for the parent's retry
+ * prompt, exposed as `${{ subStepFeedback }}` -- a flow author adding a new sub-step to a
+ * retry chain does not also have to remember to wire its feedback into the prompt by hand.
+ * Prefers stderr, falls back to rawOutput/stdout, then the raw outputs object -- whatever a
+ * sub-step actually produced that explains the failure.
+ */
+export function buildSubStepFeedback(
+	subSteps: Map<string, { outputs: Record<string, unknown>; status: string }>
+): string {
+	const parts: string[] = [];
+	for (const [stepId, { outputs }] of subSteps) {
+		const text =
+			(outputs['stderr'] as string | undefined) ||
+			(outputs['rawOutput'] as string | undefined) ||
+			(outputs['stdout'] as string | undefined) ||
+			JSON.stringify(outputs);
+		parts.push(`[${stepId}]\n${text}`);
+	}
+	return parts.join('\n\n');
+}
+
 export interface SchedulerStep {
 	id: string;
 	depends?: string[];

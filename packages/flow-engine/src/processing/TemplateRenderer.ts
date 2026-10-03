@@ -8,6 +8,7 @@
  * - ${{ task.metadata.key }} - task metadata access
  * - ${{ subSteps.stepId.outputs.varName }} - outputs from a failed sub-step (parent restart)
  * - ${{ subSteps.stepId.status.failed }} - whether a sub-step failed (boolean as string)
+ * - ${{ subStepFeedback }} - every failed sub-step's own feedback, pre-aggregated into one string
  * - {% if expr %}...{% endif %} / {% if expr %}...{% else %}...{% endif %} - conditional blocks
  */
 
@@ -47,6 +48,12 @@ export interface TemplateContext {
 
 	/** Sub-step results accessible by sub-step ID when parent step is restarting */
 	subSteps?: Map<string, { outputs: Record<string, any>; status: string }>;
+
+	/**
+	 * Every failed sub-step's own feedback (stderr/rawOutput/stdout), pre-aggregated into one
+	 * string via FlowScheduler.buildSubStepFeedback(). Accessible as `${{ subStepFeedback }}`.
+	 */
+	subStepFeedback?: string;
 
 	/** Callback when Claude process starts */
 	onClaudeProcessStarted?: (process: any) => void;
@@ -216,6 +223,10 @@ export class TemplateRenderer {
 			}
 			const path = parts.slice(1);
 			return this.resolveNested(context.context ?? {}, path, expression);
+		} else if (root === 'subStepFeedback') {
+			// ${{ subStepFeedback }} -- bare root, no further path. Empty string before any
+			// sub-step has failed, same neutral-value convention as subSteps.* above.
+			return context.subStepFeedback ?? '';
 		} else if (root === 'subSteps') {
 			// ${{ subSteps.stepId.outputs.varName }} or ${{ subSteps.stepId.status.failed }}
 			if (parts.length < 4 || (parts[2] !== 'outputs' && parts[2] !== 'status')) {
@@ -249,7 +260,7 @@ export class TemplateRenderer {
 			}
 		} else {
 			throw new TemplateRenderError(
-				`Unknown root context: '${root}'. Use 'inputs', 'steps', 'task', 'context', or 'subSteps'`,
+				`Unknown root context: '${root}'. Use 'inputs', 'steps', 'task', 'context', 'subSteps', or 'subStepFeedback'`,
 				expression,
 				root
 			);

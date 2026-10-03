@@ -8,7 +8,7 @@ import type {
 } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
 import { FlowValidator, WorkspaceManager } from 'flow-engine';
-import { FlowScheduler } from 'flow-engine';
+import { FlowScheduler, buildSubStepFeedback } from 'flow-engine';
 import type { ReadyItem, SchedulerContext, SchedulerStep } from 'flow-engine';
 import { TemplateRenderer } from 'flow-engine';
 import type { FlowDefinition, FlowPluginOverrides, FlowStep } from 'flow-engine';
@@ -806,6 +806,7 @@ export class CommandHandler {
 					const subStepsMap = scheduler.getSubSteps();
 					if (subStepsMap && subStepsMap.size > 0) {
 						step.executionContext.subSteps = Object.fromEntries(subStepsMap);
+						step.executionContext.subStepFeedback = buildSubStepFeedback(subStepsMap);
 					}
 				}
 

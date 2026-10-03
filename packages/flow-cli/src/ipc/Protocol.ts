@@ -35,6 +35,13 @@ export interface ExecutionContext {
 	 */
 	subSteps?: Record<string, { outputs: Record<string, unknown>; status: string }>;
 
+	/**
+	 * Every failed sub-step's own feedback (stderr/rawOutput/stdout), pre-aggregated into one
+	 * string. Consumed by TemplateRenderer via ${{ subStepFeedback }} -- a flow author adding a
+	 * sub-step to a retry chain does not also have to wire its feedback into the prompt by hand.
+	 */
+	subStepFeedback?: string;
+
 	/** Default working directory from the flow definition (FlowDefinition.workingDir). */
 	flowWorkingDir?: string;
 }

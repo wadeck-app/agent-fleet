@@ -14,7 +14,7 @@ export type { FlowGenerationResult, FlowConstraints } from './generation/FlowGen
 export { FlowRecommendationEngine } from './analysis/FlowRecommendationEngine';
 export type { IdeaRequirements } from './analysis/FlowRecommendationEngine';
 export { WorkspaceManager } from './workspace/WorkspaceManager';
-export { FlowScheduler } from './orchestration/FlowScheduler';
+export { buildSubStepFeedback, FlowScheduler } from './orchestration/FlowScheduler';
 export type {
 	FlowSchedulerOptions,
 	ReadyItem,

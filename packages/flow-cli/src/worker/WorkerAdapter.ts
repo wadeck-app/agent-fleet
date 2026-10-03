@@ -91,6 +91,8 @@ export class WorkerAdapter {
 			},
 			// Sub-step outputs for ${{ subSteps.stepId.outputs.* }} and {% if subSteps.stepId.status.failed %}
 			subSteps: context.subSteps ? new Map(Object.entries(context.subSteps)) : undefined,
+			// Every failed sub-step's own feedback, pre-aggregated for ${{ subStepFeedback }}
+			subStepFeedback: context.subStepFeedback,
 		};
 
 		// For model steps, wire up the MCP server for provideSteps injection

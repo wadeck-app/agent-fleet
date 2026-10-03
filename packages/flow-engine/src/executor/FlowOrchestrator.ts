@@ -9,7 +9,7 @@ import type { ApprovalProvider } from 'extension-points';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { v4 as uuidv4 } from 'uuid';
 
-import { FlowScheduler } from '../orchestration/FlowScheduler';
+import { FlowScheduler, buildSubStepFeedback } from '../orchestration/FlowScheduler';
 import type { ReadyItem, SchedulerStep, StepOutcome } from '../orchestration/FlowScheduler';
 import type { TemplateContext } from '../processing/TemplateRenderer';
 import { TemplateRenderer } from '../processing/TemplateRenderer';
@@ -172,7 +172,7 @@ export class FlowOrchestrator {
 				readyItems.map(item => {
 					const rawStep = item.step as unknown as FlowStep;
 					const step: FlowStep =
-						resolvedGlobalEnv && rawStep.type === 'script'
+						resolvedGlobalEnv && (rawStep.type === 'script' || rawStep.type === 'model')
 							? { ...rawStep, env: { ...resolvedGlobalEnv, ...(rawStep.env ?? {}) } }
 							: rawStep;
 					return this.stepRunner.executeStep(step, workspace, context, inProgressTrace => {
@@ -212,6 +212,7 @@ export class FlowOrchestrator {
 				// Sync sub-step results into TemplateContext so the parent's next render
 				// can use ${{ subSteps.stepId.outputs.* }} and ${{ subSteps.stepId.status.failed }}
 				context.subSteps = scheduler.getSubSteps();
+				context.subStepFeedback = context.subSteps ? buildSubStepFeedback(context.subSteps) : undefined;
 
 				if (scheduler.hasFailed()) {
 					trace.status = 'failed';
