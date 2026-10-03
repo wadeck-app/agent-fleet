@@ -1,3 +1,5 @@
+import type { ApprovalProvider } from 'extension-points';
+import type { McpServer, StepRunnerConfig } from 'flow-engine';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -172,6 +174,33 @@ export function buildRegistration(params: {
 		// terminal is required only when that something reads from one.
 		hasUserInterface: params.canPrompt && (params.isTty || params.promptNeedsTerminal === false),
 	};
+}
+
+/**
+ * The `StepRunnerConfig` for a `flow worker` terminal.
+ *
+ * `interactive` here means "launch a `type: model` step via the model CLI's own interactive
+ * terminal session" (`ModelStepExecutor` -> `launchInteractive()`) -- an entirely different
+ * thing from `hasUserInterface` ("this worker can answer a human-facing `user_intervention`
+ * checkpoint"). The two used to share one flag: `hasUserInterface` fed `interactive` directly,
+ * so any approval-capable worker (a real TTY, or just a configured approval plugin like
+ * file-approval) also silently hijacked every unrelated model step into Claude's own terminal
+ * session, with no clean way out. They are now separate: `interactive` is only ever true when
+ * the operator explicitly asks for it (`flow worker --interactive`), never as a side effect of
+ * approval capability.
+ */
+export function buildStepRunnerConfig(
+	approvalProvider: ApprovalProvider | undefined,
+	mcpServers: McpServer[],
+	interactive: boolean
+): StepRunnerConfig {
+	const base: StepRunnerConfig = {
+		interactive,
+		// The provider lives in this process, so a user_intervention step reaches the human
+		// at this terminal (D#34). Unrelated to `interactive` above.
+		...(approvalProvider !== undefined ? { approvalProvider } : {}),
+	};
+	return mcpServers.length > 0 ? { ...base, mcpServers } : base;
 }
 
 /**

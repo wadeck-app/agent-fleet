@@ -3,7 +3,6 @@ import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton
 import type { Command } from 'commander';
 import type { ApprovalProvider } from 'extension-points';
 import { StepRunner } from 'flow-engine';
-import type { StepRunnerConfig } from 'flow-engine';
 import { join } from 'node:path';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
@@ -24,6 +23,7 @@ import { WorkerAdapter } from '../../worker/WorkerAdapter';
 import { WorkerDisplay } from '../../worker/WorkerDisplay';
 import {
 	buildRegistration,
+	buildStepRunnerConfig,
 	reconnectDelayMs,
 	resolveDaemonWsUrl,
 	resolveExtraProjects,
@@ -42,6 +42,7 @@ interface WorkerOptions {
 	project?: string[];
 	labels?: string;
 	verbose?: boolean;
+	interactive?: boolean;
 }
 
 function parseLabels(raw: string | undefined): string[] {
@@ -115,6 +116,12 @@ export function registerWorkerCommand(worker: Command): void {
 		)
 		.option('--labels <labels>', 'Comma-separated labels advertised to the daemon', '')
 		.option('--verbose', 'Also print the raw output each step produces, not just its lifecycle')
+		.option(
+			'--interactive',
+			"Launch type:model steps via the model CLI's own interactive terminal session in this terminal. " +
+				'Separate from being able to answer a user_intervention checkpoint (which an approval plugin ' +
+				'or a plain TTY already provides) -- this opts every model step on this worker into terminal takeover.'
+		)
 		.action(async (options: WorkerOptions) => {
 			try {
 				await runWorker(options);
@@ -241,7 +248,10 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		// A failed nudge server does not prevent the worker from running: the backoff path
 		// still works. Report and continue rather than exiting: the symptom (slower reconnect)
 		// is manageable, and a hard exit would surprise the user.
-		report('[warn]', `nudge server could not start, reconnect will rely on backoff only: ${normalizeError(err).message}`);
+		report(
+			'[warn]',
+			`nudge server could not start, reconnect will rely on backoff only: ${normalizeError(err).message}`
+		);
 	}
 
 	console.log(`[ok] flow worker for ${projectRoot}`);
@@ -250,7 +260,16 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	}
 	console.log(`     projects   : ${(registration.attachedProjects ?? []).join(', ')}`);
 	console.log(
-		`     interactive: ${String(registration.hasUserInterface)}${explainInteractivity(registration.hasUserInterface === true, approvalProvider !== undefined)}`
+		`     can-answer-checkpoints: ${String(registration.hasUserInterface)}${explainInteractivity(registration.hasUserInterface === true, approvalProvider !== undefined)}`
+	);
+	// Separate from the line above on purpose (see buildStepRunnerConfig): being able to answer
+	// a user_intervention checkpoint never implies this.
+	console.log(
+		`     model-step-interactive: ${String(options.interactive === true)}${
+			options.interactive === true
+				? " (every type:model step on this worker launches via the model CLI's own interactive terminal session)"
+				: ' (pass --interactive to opt in)'
+		}`
 	);
 	console.log('     Waiting for steps. This worker stays alive across daemon restarts; Ctrl-C to stop.');
 	if (options.verbose !== true) {
@@ -281,8 +300,17 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 
 	const display = new WorkerDisplay(options.verbose === true ? 'verbose' : 'summary');
 	const notifiers: ReconnectNotifier[] = [new DaemonWatchNotifier(daemonDir), nudgeServer];
-	connect(daemonDir, config.worker.wsPort, undefined, registration, 0, display, approvalProvider, notifiers, () =>
-		resolveWorkerToken({ token: options.token, sourceId }, daemonDir)
+	connect(
+		daemonDir,
+		config.worker.wsPort,
+		undefined,
+		registration,
+		0,
+		display,
+		approvalProvider,
+		notifiers,
+		() => resolveWorkerToken({ token: options.token, sourceId }, daemonDir),
+		options.interactive === true
 	);
 
 	// Accept typed input when the terminal is interactive: lines are echoed as notes so the
@@ -355,7 +383,9 @@ function connect(
 	approvalProvider: ApprovalProvider | undefined,
 	notifiers: ReconnectNotifier[],
 	/** Re-read on every attempt: the daemon rotates its own token each time it starts. */
-	resolveToken: () => string
+	resolveToken: () => string,
+	/** `--interactive`: see {@link buildStepRunnerConfig}. Independent of `approvalProvider`. */
+	interactive: boolean
 ): void {
 	let wsUrl: string;
 	if (wsUrlOverride !== undefined) {
@@ -374,23 +404,18 @@ function connect(
 				display,
 				approvalProvider,
 				notifiers,
-				resolveToken
+				resolveToken,
+				interactive
 			);
 			return;
 		}
 	}
 
 	const ws = new WebSocket(wsUrl);
-	const adapter = new WorkerAdapter((mcpServers: McpServerConfig[]) => {
-		const base: StepRunnerConfig = {
-			interactive: registration.hasUserInterface === true,
-			// The provider lives in this process, so a user_intervention step reaches the human
-			// at this terminal (D#34).
-			...(approvalProvider !== undefined ? { approvalProvider } : {}),
-		};
-		const runnerConfig = (mcpServers.length > 0 ? { ...base, mcpServers } : base) as StepRunnerConfig;
-		return new StepRunner(runnerConfig);
-	});
+	const adapter = new WorkerAdapter(
+		(mcpServers: McpServerConfig[]) =>
+			new StepRunner(buildStepRunnerConfig(approvalProvider, mcpServers, interactive))
+	);
 
 	const send = (message: WorkerToDaemon): void => {
 		if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
@@ -427,7 +452,8 @@ function connect(
 			display,
 			approvalProvider,
 			notifiers,
-			resolveToken
+			resolveToken,
+			interactive
 		);
 	});
 }
@@ -441,7 +467,9 @@ function scheduleReconnect(
 	approvalProvider: ApprovalProvider | undefined,
 	notifiers: ReconnectNotifier[],
 	/** Re-read on every attempt: the daemon rotates its own token each time it starts. */
-	resolveToken: () => string
+	resolveToken: () => string,
+	/** `--interactive`: see {@link buildStepRunnerConfig}. Independent of `approvalProvider`. */
+	interactive: boolean
 ): void {
 	// Three ways to learn the daemon is back, whichever arrives first:
 	// 1. An HTTP nudge from the daemon (NudgeServer): delivers the wsUrl directly, works remotely.
@@ -457,7 +485,18 @@ function scheduleReconnect(
 		if (timer !== undefined) clearTimeout(timer);
 		// Disarm all notifiers so a late-arriving nudge does not trigger a second connect.
 		for (const n of notifiers) n.onNotify(undefined);
-		connect(daemonDir, configuredWsPort, wsUrlFromNudge, registration, attempt, display, approvalProvider, notifiers, resolveToken);
+		connect(
+			daemonDir,
+			configuredWsPort,
+			wsUrlFromNudge,
+			registration,
+			attempt,
+			display,
+			approvalProvider,
+			notifiers,
+			resolveToken,
+			interactive
+		);
 	};
 
 	timer = scheduleReconnectTimer(reconnectDelayMs(attempt), () => reconnect(undefined));

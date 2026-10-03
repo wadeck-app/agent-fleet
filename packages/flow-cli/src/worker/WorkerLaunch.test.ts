@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	buildRegistration,
+	buildStepRunnerConfig,
 	reconnectDelayMs,
 	resolveDaemonWsUrl,
 	resolveExtraProjects,
@@ -353,5 +354,35 @@ describe('withFreshToken', () => {
 				throw new Error('health_token is gone');
 			})
 		).toThrow(/health_token/);
+	});
+});
+
+describe('buildStepRunnerConfig', () => {
+	// Regression: `interactive` used to be read off `hasUserInterface`, so any approval-capable
+	// worker (a real TTY, or just a configured approval plugin) silently hijacked every
+	// unrelated `type: model` step into the model CLI's own interactive terminal session, with
+	// no clean way out. The two must stay independent: `interactive` is only ever what the
+	// caller explicitly passes, regardless of approval capability.
+	it('is never interactive by default, even with an approval provider configured', () => {
+		const approvalProvider = { requiresTerminal: true } as never;
+
+		const config = buildStepRunnerConfig(approvalProvider, [], false);
+
+		expect(config.interactive).toBe(false);
+		expect(config.approvalProvider).toBe(approvalProvider);
+	});
+
+	it('is interactive only when explicitly asked for, independent of approval capability', () => {
+		const config = buildStepRunnerConfig(undefined, [], true);
+
+		expect(config.interactive).toBe(true);
+		expect(config.approvalProvider).toBeUndefined();
+	});
+
+	it('includes mcpServers only when at least one was given', () => {
+		expect(buildStepRunnerConfig(undefined, [], false)).not.toHaveProperty('mcpServers');
+
+		const withServers = buildStepRunnerConfig(undefined, [{ name: 'x', command: ['x'] }], false);
+		expect(withServers.mcpServers).toEqual([{ name: 'x', command: ['x'] }]);
 	});
 });
