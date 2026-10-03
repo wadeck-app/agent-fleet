@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
+import { VERSION } from '../cli/version.js';
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { PluginResolver } from '../config/PluginResolver.js';
@@ -272,11 +273,16 @@ async function startDaemon(
 	let commandHandler: CommandHandler;
 	let executionStore: ExecutionStore;
 	let logWriter: LogWriter;
+	/** checkShutdown() can be re-entered (e.g. a worker's own close event fires while
+	 * its socket is also being torn down by this same shutdown): without this guard
+	 * the idle-stop log line and daemonHandle.stop('idle') would both run twice. */
+	let shuttingDown = false;
 
 	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });
 
 	const daemonHandle = await createDaemon({
 		configDir: resolvedDaemonDir,
+		appVersion: VERSION,
 		...(options.port !== undefined ? { port: options.port } : {}),
 		idleTimeout: null,
 		commands: {
@@ -619,11 +625,13 @@ async function startDaemon(
 	}
 
 	function checkShutdown(): void {
+		if (shuttingDown) return;
 		if (
 			commandHandler.isQueueEmpty() &&
 			!commandHandler.hasActiveExecutions() &&
 			!workerRegistry.hasBusyWorkers()
 		) {
+			shuttingDown = true;
 			// Only the workers this daemon forked are told to exit. A worker the user
 			// launched in a terminal must survive an idle period: it is registered, not
 			// owned (D#51), and telling it to exit is what made `flow worker` unusable
