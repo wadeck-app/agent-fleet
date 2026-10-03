@@ -91,10 +91,10 @@ export class ClaudeLauncher {
 	/**
 	 * Find Claude executable path
 	 */
-	public findClaudePath(): string {
-		// Allow tests to inject a mock Claude binary
-		if (process.env['CLAUDE_MOCK_PATH']) {
-			return process.env['CLAUDE_MOCK_PATH'];
+	public findClaudePath(env: NodeJS.ProcessEnv = process.env): string {
+		// Allow tests -- and a per-step mock-config overlay (options.env) -- to inject a mock Claude binary
+		if (env['CLAUDE_MOCK_PATH']) {
+			return env['CLAUDE_MOCK_PATH'];
 		}
 		try {
 			if (process.platform === 'win32') {
@@ -118,7 +118,7 @@ export class ClaudeLauncher {
 	 * Launch Claude in interactive mode
 	 */
 	public async launchInteractive(options: ClaudeLaunchOptions): Promise<ClaudeInteractiveResult> {
-		const claudePath = this.findClaudePath();
+		const claudePath = this.findClaudePath({ ...process.env, ...(options.env ?? {}) });
 		const { command, args } = this.buildCommand(
 			claudePath,
 			options.prompt,
@@ -137,7 +137,7 @@ export class ClaudeLauncher {
 	 * Launch Claude in background mode
 	 */
 	public async launchBackground(options: ClaudeLaunchOptions): Promise<ClaudeBackgroundResult> {
-		const claudePath = this.findClaudePath();
+		const claudePath = this.findClaudePath({ ...process.env, ...(options.env ?? {}) });
 
 		const { command, args } = this.buildCommand(
 			claudePath,

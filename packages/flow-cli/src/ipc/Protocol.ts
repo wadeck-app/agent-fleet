@@ -53,6 +53,15 @@ export type ClientCommand = {
 	inputs?: Record<string, string>;
 	quiet?: boolean;
 	cwd: string;
+	/**
+	 * `--mock-config` overlay: per-step env vars merged into that step's `env` with the
+	 * highest priority, so a mock-CLI convention (`*_MOCK_PATH`/`*_MOCK_RESPONSE`/
+	 * `*_MOCK_EXIT_CODE`) can replace a step's real execution without touching the flow file.
+	 * Keyed by step id.
+	 */
+	mockEnv?: Record<string, Record<string, string>>;
+	/** Absolute path to the `--mock-config` file, surfaced in the "MOCK" warning banner. */
+	mockConfigPath?: string;
 };
 
 export type DaemonResponse =

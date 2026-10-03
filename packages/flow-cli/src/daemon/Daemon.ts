@@ -19,6 +19,7 @@ import type { ClientCommand, SourceReady, WorkerToDaemon } from '../ipc/Protocol
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
+import { writeDaemonLog } from './DaemonLog.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { RelayRegistry } from './RelayRegistry.js';
@@ -55,18 +56,9 @@ export function publishWorkerPort(daemonDir: string, port: number): void {
 	}
 }
 
-// Exported for testing. Writes a single NDJSON daemon lifecycle entry to logsDir.
-export function writeDaemonLog(logsDir: string, level: 'info' | 'error', msg: string): void {
-	const today = new Date().toISOString().slice(0, 10);
-	const line = JSON.stringify({ ts: new Date().toISOString(), level, msg }) + '\n';
-	const filePath = path.join(logsDir, `${today}.ndjson`);
-	try {
-		fs.mkdirSync(logsDir, { recursive: true });
-		fs.appendFileSync(filePath, line, 'utf8');
-	} catch (err) {
-		process.stderr.write(`[daemon] Failed to write daemon log: ${String(err)}\n`);
-	}
-}
+// Re-exported for backward compatibility (Daemon.test.ts imports it from here). The
+// implementation lives in DaemonLog.ts to avoid a Daemon.ts <-> CommandHandler.ts import cycle.
+export { writeDaemonLog } from './DaemonLog.js';
 
 function resolveClaudePath(): string {
 	try {

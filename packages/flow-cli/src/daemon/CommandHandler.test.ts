@@ -1583,3 +1583,125 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 		}
 	});
 });
+
+describe('CommandHandler.handleRun -- mockEnv (--mock-config)', () => {
+	const MOCK_FLOW_YAML = `\
+id: mock-flow
+version: "1.0.0"
+name: Mock Flow
+description: Test
+workspace:
+  mode: manual
+  gitStrategy: any
+  reusePolicy: if-available
+inputs: {}
+steps:
+  - id: model_step
+    name: Model Step
+    type: model
+    provider: opencode
+    model: astra
+    prompt: do something
+    env:
+      OWN_VAR: own-value
+  - id: approve
+    name: Approve
+    type: user_intervention
+    interventionType: approval
+    depends:
+      - model_step
+    approval:
+      title: Approve
+      description: Please review
+`;
+
+	function dispatchCapturingHandler(): {
+		handler: CommandHandler;
+		dispatched: { stepId: string; env?: Record<string, string> }[];
+	} {
+		const workerPool = createMockWorkerPool();
+		const dispatched: { stepId: string; env?: Record<string, string> }[] = [];
+		workerPool.getIdle.mockReturnValue({} as never);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
+			const m = msg as { stepId: string; stepConfig: { env?: Record<string, string> } };
+			dispatched.push({ stepId: m.stepId, env: m.stepConfig.env });
+			return true;
+		});
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		return { handler, dispatched };
+	}
+
+	it("overlays mockEnv onto the targeted step with highest priority, above the step's own env", async () => {
+		const flowFile = path.join(tmpDir, 'mock.yml');
+		fs.writeFileSync(flowFile, MOCK_FLOW_YAML);
+
+		const { handler, dispatched } = dispatchCapturingHandler();
+		const result = await handler.handleRun({
+			type: 'run',
+			flowFile,
+			cwd: tmpDir,
+			mockEnv: {
+				model_step: { OPENCODE_MOCK_RESPONSE: 'canned output', OWN_VAR: 'overridden' },
+			},
+			mockConfigPath: '/path/to/mock-config.yaml',
+		} as never);
+
+		expect(result.type).not.toBe('error');
+		const modelStep = dispatched.find(d => d.stepId === 'model_step');
+		expect(modelStep?.env).toMatchObject({
+			OPENCODE_MOCK_RESPONSE: 'canned output',
+			OWN_VAR: 'overridden',
+		});
+	});
+
+	it('emits a visible warning banner to both the execution log and the daemon log for a mocked step', async () => {
+		const flowFile = path.join(tmpDir, 'mock.yml');
+		fs.writeFileSync(flowFile, MOCK_FLOW_YAML);
+
+		const { handler } = dispatchCapturingHandler();
+		const result = await handler.handleRun({
+			type: 'run',
+			flowFile,
+			cwd: tmpDir,
+			mockEnv: { model_step: { OPENCODE_MOCK_RESPONSE: 'canned output' } },
+			mockConfigPath: '/path/to/mock-config.yaml',
+		} as never);
+		const { executionId } = result as { executionId: string };
+
+		expect(mockLogWriter.writeExecution).toHaveBeenCalledWith(
+			executionId,
+			expect.stringContaining("MOCK: step 'model_step'"),
+			'info'
+		);
+
+		const today = new Date().toISOString().slice(0, 10);
+		const daemonLogContent = fs.readFileSync(path.join(daemonDir, 'logs', `${today}.ndjson`), 'utf8');
+		expect(daemonLogContent).toContain("MOCK: step 'model_step'");
+		expect(daemonLogContent).toContain('/path/to/mock-config.yaml');
+	});
+
+	it('fails loudly (VALIDATION_FAILED) when mockEnv targets a step with no env to overlay (user_intervention)', async () => {
+		const flowFile = path.join(tmpDir, 'mock.yml');
+		fs.writeFileSync(flowFile, MOCK_FLOW_YAML);
+
+		const { handler } = dispatchCapturingHandler();
+		const result = await handler.handleRun({
+			type: 'run',
+			flowFile,
+			cwd: tmpDir,
+			mockEnv: { approve: { SOME_VAR: 'x' } },
+		} as never);
+
+		expect(result.type).toBe('error');
+		if (result.type !== 'error') throw new Error('Expected error response');
+		expect((result as { code: string }).code).toBe('VALIDATION_FAILED');
+		expect((result as { message: string }).message).toContain("step 'approve'");
+	});
+});

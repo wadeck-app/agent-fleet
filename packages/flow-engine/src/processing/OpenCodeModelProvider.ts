@@ -312,7 +312,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 			fs.writeFileSync(pluginPath, OpenCodeHookTranslator.toPluginJs(options.toolHooks), { encoding: 'utf8' });
 		}
 
-		const { parts, needsShell } = this.findOpenCodeCommand();
+		const { parts, needsShell } = this.findOpenCodeCommand({ ...process.env, ...(options.env ?? {}) });
 		const { command, args, env, tempFile, shell } = buildSpawnParams(
 			options,
 			true,
@@ -373,7 +373,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 			fs.writeFileSync(pluginPath, OpenCodeHookTranslator.toPluginJs(options.toolHooks), { encoding: 'utf8' });
 		}
 
-		const { parts, needsShell } = this.findOpenCodeCommand();
+		const { parts, needsShell } = this.findOpenCodeCommand({ ...process.env, ...(options.env ?? {}) });
 		const { command, args, env, tempFile, shell } = buildSpawnParams(
 			options,
 			false,
@@ -572,10 +572,11 @@ export class OpenCodeModelProvider implements ModelProvider {
 
 	/**
 	 * Resolve the opencode binary path.
-	 * OPENCODE_MOCK_PATH env var overrides path resolution -- used in tests.
+	 * OPENCODE_MOCK_PATH env var overrides path resolution -- used in tests, and in a per-step
+	 * mock-config overlay (checked via `env`, which already carries options.env, before process.env).
 	 */
-	private findOpenCodeCommand(): { parts: string[]; needsShell: boolean } {
-		const mockPath = process.env['OPENCODE_MOCK_PATH'];
+	private findOpenCodeCommand(env: NodeJS.ProcessEnv = process.env): { parts: string[]; needsShell: boolean } {
+		const mockPath = env['OPENCODE_MOCK_PATH'];
 		if (mockPath) {
 			// .mjs/.js files are not directly executable -- run via node
 			if (mockPath.endsWith('.mjs') || mockPath.endsWith('.js')) {

@@ -70,6 +70,23 @@ describe('ClaudeLauncher', () => {
 
 			expect(path).toBe('C:\\path\\claude.cmd');
 		});
+
+		it('uses CLAUDE_MOCK_PATH from a passed-in env (per-step mock-config overlay) even when unset in process.env', () => {
+			delete process.env['CLAUDE_MOCK_PATH'];
+
+			const path = manager.findClaudePath({ ...process.env, CLAUDE_MOCK_PATH: '/custom/per-step-mock' });
+
+			expect(path).toBe('/custom/per-step-mock');
+		});
+
+		it('prefers process.env CLAUDE_MOCK_PATH when the passed-in env agrees with it (default param is process.env)', () => {
+			process.env['CLAUDE_MOCK_PATH'] = '/from/process-env';
+
+			const path = manager.findClaudePath();
+
+			expect(path).toBe('/from/process-env');
+			delete process.env['CLAUDE_MOCK_PATH'];
+		});
 	});
 
 	describe('launchInteractive', () => {

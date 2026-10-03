@@ -300,6 +300,42 @@ describe('CodexModelProvider', () => {
 	});
 
 	// -------------------------------------------------------------------------
+	// CODEX_MOCK_PATH
+	// -------------------------------------------------------------------------
+
+	describe('CODEX_MOCK_PATH', () => {
+		afterEach(() => {
+			delete process.env['CODEX_MOCK_PATH'];
+		});
+
+		it('uses CODEX_MOCK_PATH from options.env (per-step mock-config overlay) even when unset in process.env', async () => {
+			delete process.env['CODEX_MOCK_PATH'];
+
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({ env: { CODEX_MOCK_PATH: '/custom/per-step-mock' } })
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const [spawnCommand] = vi.mocked(child_process.spawn).mock.calls[0] as unknown as [string, string[]];
+			expect(spawnCommand).toBe('/custom/per-step-mock');
+		});
+
+		it('prefers options.env CODEX_MOCK_PATH over process.env when both are set', async () => {
+			process.env['CODEX_MOCK_PATH'] = '/from/process-env';
+
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({ env: { CODEX_MOCK_PATH: '/from/options-env' } })
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const [spawnCommand] = vi.mocked(child_process.spawn).mock.calls[0] as unknown as [string, string[]];
+			expect(spawnCommand).toBe('/from/options-env');
+		});
+	});
+
+	// -------------------------------------------------------------------------
 	// kill
 	// -------------------------------------------------------------------------
 

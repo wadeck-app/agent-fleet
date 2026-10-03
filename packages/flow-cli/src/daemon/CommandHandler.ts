@@ -24,6 +24,7 @@ import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, I
 import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { AssignmentLedger } from './AssignmentLedger.js';
+import { writeDaemonLog } from './DaemonLog.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
 import { assertStepLabels } from './LabelMatcher.js';
 import { StalledStepWatch } from './StalledStepWatch.js';
@@ -288,6 +289,23 @@ export class CommandHandler {
 			};
 		}
 
+		// --mock-config step ids are already validated against the flow at CLI time
+		// (RunCommand.loadMockConfig), but only an id, not a type: a step id that names a
+		// `user_intervention` step has no `env` to overlay. Checked here, before any workspace
+		// or execution-store allocation, so this is a refused run rather than a leak.
+		if (cmd.mockEnv) {
+			for (const stepId of Object.keys(cmd.mockEnv)) {
+				const step = flow.steps.find((s: FlowStep) => s.id === stepId);
+				if (step && step.type !== 'model' && step.type !== 'script') {
+					return {
+						type: 'error',
+						code: 'VALIDATION_FAILED',
+						message: `--mock-config references step '${stepId}', which is of type '${step.type}' and has no env to overlay (only 'model' and 'script' steps can be mocked).`,
+					};
+				}
+			}
+		}
+
 		const flowId = cmd.flowId ?? flow.id;
 		const executionId = generateExecutionId();
 
@@ -453,6 +471,23 @@ export class CommandHandler {
 					)
 				: flow.steps
 		).map((s: FlowStep) => assertAssignable(s));
+
+		// --mock-config overlay: merged last, so it outranks both the flow's global `env:` and
+		// the step's own declared `env:`. Always loud (D#55-equivalent): a mocked run must never
+		// be mistaken for a real one later, so every overridden step gets a visible banner in
+		// both the daemon log and the execution log.
+		if (cmd.mockEnv) {
+			for (const step of assignable) {
+				const overlay = cmd.mockEnv[step.id];
+				if (!overlay) continue;
+				// Step type (model/script) was already confirmed above, before any allocation.
+				if (step.type !== 'model' && step.type !== 'script') continue;
+				step.env = { ...(step.env ?? {}), ...overlay };
+				const banner = `MOCK: step '${step.id}' output replaced by ${cmd.mockConfigPath ?? '--mock-config'}`;
+				writeDaemonLog(path.join(this.daemonDir, 'logs'), 'info', `⚠ ${banner}`);
+				this.logWriter.writeExecution(executionId, `⚠ ${banner}`, 'info');
+			}
+		}
 
 		const scheduler = new FlowScheduler(schedulerCtx);
 		const readyItems = scheduler.start(assignable as unknown as SchedulerStep[], depends);

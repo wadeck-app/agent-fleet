@@ -210,7 +210,7 @@ export class CodexModelProvider implements ModelProvider {
 			fs.writeFileSync(pluginPath, OpenCodeHookTranslator.toPluginJs(options.toolHooks), { encoding: 'utf8' });
 		}
 
-		const { parts, needsShell } = this.findCodexCommand();
+		const { parts, needsShell } = this.findCodexCommand({ ...process.env, ...(options.env ?? {}) });
 		const { command, args, env, tempFile, shell } = buildSpawnParams(
 			options,
 			true,
@@ -268,7 +268,7 @@ export class CodexModelProvider implements ModelProvider {
 			fs.writeFileSync(pluginPath, OpenCodeHookTranslator.toPluginJs(options.toolHooks), { encoding: 'utf8' });
 		}
 
-		const { parts, needsShell } = this.findCodexCommand();
+		const { parts, needsShell } = this.findCodexCommand({ ...process.env, ...(options.env ?? {}) });
 		const { command, args, env, tempFile, shell } = buildSpawnParams(
 			options,
 			false,
@@ -456,10 +456,11 @@ export class CodexModelProvider implements ModelProvider {
 
 	/**
 	 * Resolve the codex binary path.
-	 * CODEX_MOCK_PATH env var overrides path resolution -- used in tests.
+	 * CODEX_MOCK_PATH env var overrides path resolution -- used in tests, and in a per-step
+	 * mock-config overlay (checked via `env`, which already carries options.env, before process.env).
 	 */
-	private findCodexCommand(): { parts: string[]; needsShell: boolean } {
-		const mockPath = process.env['CODEX_MOCK_PATH'];
+	private findCodexCommand(env: NodeJS.ProcessEnv = process.env): { parts: string[]; needsShell: boolean } {
+		const mockPath = env['CODEX_MOCK_PATH'];
 		if (mockPath) {
 			if (mockPath.endsWith('.mjs') || mockPath.endsWith('.js')) {
 				return { parts: ['node', mockPath], needsShell: false };
