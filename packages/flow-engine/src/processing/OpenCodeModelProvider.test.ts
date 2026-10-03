@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PromptTooLargeError } from './ModelProvider';
 import type { LaunchOptions } from './ModelProvider';
-import { OpenCodeModelProvider } from './OpenCodeModelProvider';
+import { OpenCodeModelProvider, autoSelectOpenCodeConfig } from './OpenCodeModelProvider';
 import type { StreamJsonEvent } from './StreamJsonParser';
 
 vi.mock('child_process');
@@ -58,6 +58,43 @@ function makeBaseOptions(overrides?: Partial<LaunchOptions>): LaunchOptions {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('autoSelectOpenCodeConfig', () => {
+	it('picks OPENCODE_CONFIG_OPENAI for an OpenAI-family resolved model', () => {
+		const env = {
+			OPENCODE_CONFIG_OPENAI: '/configs/codex.json',
+			OPENCODE_CONFIG_ANTHROPIC: '/configs/claude.json',
+		};
+		expect(autoSelectOpenCodeConfig('amazon-bedrock/openai.gpt-5.6-luna', undefined, env)).toBe(
+			'/configs/codex.json'
+		);
+	});
+
+	it('picks OPENCODE_CONFIG_ANTHROPIC for an Anthropic-family resolved model', () => {
+		const env = {
+			OPENCODE_CONFIG_OPENAI: '/configs/codex.json',
+			OPENCODE_CONFIG_ANTHROPIC: '/configs/claude.json',
+		};
+		expect(autoSelectOpenCodeConfig('amazon-bedrock/us.anthropic.claude-sonnet-5', undefined, env)).toBe(
+			'/configs/claude.json'
+		);
+	});
+
+	it('never overrides an explicit OPENCODE_CONFIG the step already set', () => {
+		const env = { OPENCODE_CONFIG_OPENAI: '/configs/codex.json' };
+		expect(
+			autoSelectOpenCodeConfig('amazon-bedrock/openai.gpt-5.6-luna', '/configs/custom.json', env)
+		).toBeUndefined();
+	});
+
+	it('does nothing when the matching env var is not set', () => {
+		expect(autoSelectOpenCodeConfig('amazon-bedrock/openai.gpt-5.6-luna', undefined, {})).toBeUndefined();
+	});
+
+	it('does nothing when no model is given', () => {
+		expect(autoSelectOpenCodeConfig(undefined, undefined, { OPENCODE_CONFIG_OPENAI: '/x.json' })).toBeUndefined();
+	});
+});
 
 describe('OpenCodeModelProvider', () => {
 	let provider: OpenCodeModelProvider;

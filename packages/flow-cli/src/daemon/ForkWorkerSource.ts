@@ -138,6 +138,14 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 			// Absolute path to bash.exe, resolved by the launcher before VBScript discards the Git
 			// Bash PATH. Without it, ScriptExecutor would find WSL bash via the system PATH instead.
 			...(process.env['FLOW_BASH_PATH'] ? { FLOW_BASH_PATH: process.env['FLOW_BASH_PATH'] } : {}),
+			// Lets OpenCodeModelProvider auto-select OPENCODE_CONFIG by resolved model family
+			// (see WindowsDaemonEnv.ts's PASSTHROUGH_ENV_VARS -- same forwarding gap, same fix).
+			...(process.env['OPENCODE_CONFIG_OPENAI']
+				? { OPENCODE_CONFIG_OPENAI: process.env['OPENCODE_CONFIG_OPENAI'] }
+				: {}),
+			...(process.env['OPENCODE_CONFIG_ANTHROPIC']
+				? { OPENCODE_CONFIG_ANTHROPIC: process.env['OPENCODE_CONFIG_ANTHROPIC'] }
+				: {}),
 		};
 	}
 }

@@ -6,6 +6,9 @@
  * Multi-config: OPENCODE_CONFIG env var can specify multiple config files (comma or colon-separated)
  *               that will be merged before being passed to opencode. Example:
  *               OPENCODE_CONFIG="~/.config/opencode/config_claude.json:~/.config/opencode/config_codex.json"
+ * Auto config selection: when a step doesn't set its own OPENCODE_CONFIG, and the resolved model
+ *               is an Anthropic or OpenAI family model, OPENCODE_CONFIG_ANTHROPIC / _OPENAI (if
+ *               set in the environment) is picked automatically -- see autoSelectOpenCodeConfig.
  * Env isolation: only options.env is forwarded; process.env is never inherited.
  * Prompt limit: 32KB -- throws PromptTooLargeError if exceeded.
  * XDG isolation: each subprocess gets a unique XDG_CONFIG_HOME so it never reads ~/.config/opencode/.
@@ -17,6 +20,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+import { isAnthropicModel, isOpenAiModel } from './ModelAliases';
 import type {
 	LaunchOptions,
 	McpServer,
@@ -74,6 +78,33 @@ export function splitConfigPaths(value: string): string[] {
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Picks OPENCODE_CONFIG automatically from the resolved model's family, when the step didn't
+ * already set one. Each AWS account/profile here only whitelists one model family (verified
+ * live: an Anthropic-profile config 404s on an OpenAI-on-Bedrock id and vice versa), so a step
+ * switching from `model: sonnet` to `model: terra` would otherwise silently keep hitting the
+ * wrong profile until someone notices the model never changed.
+ *
+ * Never overrides an explicit `OPENCODE_CONFIG` -- that is always the step author's own choice.
+ * Does nothing if the matching env var isn't set, which keeps this inert for anyone not using
+ * the convention.
+ */
+export function autoSelectOpenCodeConfig(
+	model: string | undefined,
+	existingConfigEnv: string | undefined,
+	env: NodeJS.ProcessEnv = process.env
+): string | undefined {
+	if (existingConfigEnv || !model) return undefined;
+
+	if (isOpenAiModel(model) && env['OPENCODE_CONFIG_OPENAI']) {
+		return env['OPENCODE_CONFIG_OPENAI'];
+	}
+	if (isAnthropicModel(model) && env['OPENCODE_CONFIG_ANTHROPIC']) {
+		return env['OPENCODE_CONFIG_ANTHROPIC'];
+	}
+	return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +281,16 @@ export class OpenCodeModelProvider implements ModelProvider {
 		this.maxInlineConfigBytes = options.maxInlineConfigBytes ?? DEFAULT_MAX_INLINE_CONFIG_BYTES;
 	}
 
-	public async launchInteractive(options: LaunchOptions): Promise<ModelInteractiveResult> {
+	/** Applies autoSelectOpenCodeConfig(), logging the choice so a model-vs-config mismatch is traceable. */
+	private withAutoConfig(options: LaunchOptions): LaunchOptions {
+		const picked = autoSelectOpenCodeConfig(options.model, options.env?.['OPENCODE_CONFIG']);
+		if (!picked) return options;
+		console.log(`[OpenCodeModelProvider] auto-selected OPENCODE_CONFIG=${picked} for model '${options.model}'`);
+		return { ...options, env: { ...(options.env ?? {}), OPENCODE_CONFIG: picked } };
+	}
+
+	public async launchInteractive(rawOptions: LaunchOptions): Promise<ModelInteractiveResult> {
+		const options = this.withAutoConfig(rawOptions);
 		validateLaunchOptions(options);
 
 		// Each subprocess gets an isolated XDG_CONFIG_HOME so plugin state never leaks between runs.
@@ -305,7 +345,8 @@ export class OpenCodeModelProvider implements ModelProvider {
 		}
 	}
 
-	public async launchBackground(options: LaunchOptions): Promise<ModelBackgroundResult> {
+	public async launchBackground(rawOptions: LaunchOptions): Promise<ModelBackgroundResult> {
+		const options = this.withAutoConfig(rawOptions);
 		validateLaunchOptions(options);
 
 		const promptBytes = Buffer.byteLength(options.prompt, 'utf8');

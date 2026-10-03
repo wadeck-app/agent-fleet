@@ -13,8 +13,7 @@
  *   still works and an older version can be pinned on purpose.
  * - A provider with no table here is left entirely alone. `claude` resolves haiku/sonnet/opus
  *   itself and honours `ANTHROPIC_DEFAULT_*_MODEL`, so mapping them here would silently override
- *   the user's own configuration; `codex` runs OpenAI models on a different account, where a
- *   family name means nothing.
+ *   the user's own configuration.
  *
  * Every id below was verified by calling it -- see `.claude/scripts/model-inventory.mjs` and
  * `.claude/docs/model-inventory.md`. The
@@ -29,6 +28,16 @@ export const MODEL_ALIASES: Record<string, Record<string, string>> = {
 		haiku: 'amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0',
 		sonnet: 'amazon-bedrock/us.anthropic.claude-sonnet-5',
 		opus: 'amazon-bedrock/us.anthropic.claude-opus-5',
+		// OpenAI-on-Bedrock ids: no `us.` inference-profile prefix, unlike the Anthropic ones
+		// above -- verified live, adding it makes opencode fail with "unexpected server error".
+		luna: 'amazon-bedrock/openai.gpt-5.6-luna',
+		terra: 'amazon-bedrock/openai.gpt-5.6-terra',
+	},
+	codex: {
+		// Bare ids, no provider prefix at all -- codex is single-provider and already defaults
+		// to this form in ~/.codex/config.toml. Verified live via `codex exec -m`.
+		luna: 'openai.gpt-5.6-luna',
+		terra: 'openai.gpt-5.6-terra',
 	},
 };
 
@@ -50,14 +59,18 @@ export function resolveModelAlias(provider: string, model: string | undefined): 
 
 const ANTHROPIC_FAMILY_NAMES = new Set(['sonnet', 'haiku', 'opus']);
 
-function isAnthropicModel(model: string): boolean {
+/** Exported for OpenCodeModelProvider's OPENCODE_CONFIG auto-selection. */
+export function isAnthropicModel(model: string): boolean {
 	const lower = model.trim().toLowerCase();
 	return ANTHROPIC_FAMILY_NAMES.has(lower) || lower.includes('claude') || lower.includes('anthropic');
 }
 
-function isOpenAiModel(model: string): boolean {
+const OPENAI_FAMILY_NAMES = new Set(['luna', 'terra']);
+
+/** Exported for OpenCodeModelProvider's OPENCODE_CONFIG auto-selection. */
+export function isOpenAiModel(model: string): boolean {
 	const lower = model.trim().toLowerCase();
-	return /^(gpt|o1|o3|o4)(-|$)/.test(lower) || lower.includes('openai');
+	return OPENAI_FAMILY_NAMES.has(lower) || /^(gpt|o1|o3|o4)(-|$)/.test(lower) || lower.includes('openai');
 }
 
 /**

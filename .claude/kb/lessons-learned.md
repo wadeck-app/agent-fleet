@@ -6424,3 +6424,32 @@ assumed:
   (`list`, `question`, `lsp`, `doom_loop`, `skill`, `external_directory`) with no Claude or
   Codex equivalent found; they're left at OpenCode's own default rather than growing the
   canonical set for one provider.
+
+## luna/terra aliases + OPENCODE_CONFIG auto-select (2026-10-03)
+
+Added `luna`/`terra` (OpenAI-on-Bedrock) to `MODEL_ALIASES` (`ModelAliases.ts`), alongside the
+existing `haiku`/`sonnet`/`opus`. Id shape differs by provider, verified live for both:
+
+- `codex`: bare id, no prefix at all -- `openai.gpt-5.6-luna`.
+- `opencode`: `amazon-bedrock/openai.gpt-5.6-luna` -- **no `us.` inference-profile prefix**,
+  unlike the Anthropic ids. Adding `us.` here reproduces the exact "Unexpected server error"
+  symptom that looked like an opencode bug on first attempt; it wasn't one, the id was wrong.
+
+Each AWS profile only whitelists one model family (Anthropic-profile config 404s on an
+OpenAI-on-Bedrock id and vice versa), so switching `model: sonnet` -> `model: terra` on an
+opencode step silently kept hitting the wrong profile unless `OPENCODE_CONFIG` was also
+changed by hand. Added `autoSelectOpenCodeConfig()` (`OpenCodeModelProvider.ts`): if the step
+didn't set its own `OPENCODE_CONFIG`, and `OPENCODE_CONFIG_OPENAI` / `OPENCODE_CONFIG_ANTHROPIC`
+is set in the environment, pick the one matching the resolved model's family. Logs the pick
+(`[OpenCodeModelProvider] auto-selected OPENCODE_CONFIG=...`) so a mismatch is traceable, not
+silent. Does nothing if the env var isn't set -- inert for anyone not using the convention.
+
+**Caught the exact same forwarding gap a third time.** `OPENCODE_CONFIG_OPENAI`/`_ANTHROPIC` set
+in the user's shell reached neither the daemon (WScript.Shell.Run drops everything not
+explicitly set, same as the PATH/FLOW_BASH_PATH bugs above) nor the forked worker
+(`ForkWorkerSource.buildEnv()`'s explicit allow-list). The auto-select logic tested correct in
+isolation first, then failed with the opencode server error again through the real daemon
+pipeline until both forwarding points were fixed -- isolated-unit-test passing is not evidence
+the daemon pipeline carries a new env var; always verify through the daemon too.
+Generalized `WindowsDaemonEnv.ts`'s PATH-forwarding into a `PASSTHROUGH_ENV_VARS` list instead
+of another one-off line, specifically so a fourth var doesn't repeat this.

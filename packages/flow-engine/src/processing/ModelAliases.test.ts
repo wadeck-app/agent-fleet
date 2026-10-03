@@ -53,10 +53,24 @@ describe('resolveModelAlias - other providers', () => {
 		expect(resolveModelAlias('claude', 'haiku')).toBe('haiku');
 	});
 
-	// codex runs OpenAI models on a different bedrock account, where "sonnet" means nothing.
-	it('leaves codex model names untouched', () => {
+	// codex runs OpenAI models on a different bedrock account, where "sonnet" means nothing --
+	// it has no Anthropic family table, only its own luna/terra one.
+	it('leaves codex model names untouched when not a known codex family name', () => {
 		expect(resolveModelAlias('codex', 'openai.gpt-5.6-terra')).toBe('openai.gpt-5.6-terra');
 		expect(resolveModelAlias('codex', 'sonnet')).toBe('sonnet');
+	});
+
+	// Verified live via `codex exec -m <id>`: bare id, no provider prefix, no `us.` profile prefix.
+	it('resolves luna/terra to bare OpenAI-on-Bedrock ids for codex', () => {
+		expect(resolveModelAlias('codex', 'luna')).toBe('openai.gpt-5.6-luna');
+		expect(resolveModelAlias('codex', 'terra')).toBe('openai.gpt-5.6-terra');
+	});
+
+	// Verified live via `opencode run -m amazon-bedrock/<id>` with OPENCODE_CONFIG pointed at
+	// the openai-codex-profile config.
+	it('resolves luna/terra to amazon-bedrock-prefixed ids for opencode', () => {
+		expect(resolveModelAlias('opencode', 'luna')).toBe('amazon-bedrock/openai.gpt-5.6-luna');
+		expect(resolveModelAlias('opencode', 'terra')).toBe('amazon-bedrock/openai.gpt-5.6-terra');
 	});
 
 	it('passes through for a provider it has never heard of', () => {
@@ -77,6 +91,10 @@ describe('MODEL_ALIASES', () => {
 			'amazon-bedrock/us.anthropic.claude-opus-4-7',
 			'amazon-bedrock/us.anthropic.claude-opus-4-8',
 			'amazon-bedrock/us.anthropic.claude-opus-5',
+			// Verified live in this session: opencode run -m amazon-bedrock/openai.gpt-5.6-luna
+			// (and -terra) with OPENCODE_CONFIG pointed at the openai-codex-profile config.
+			'amazon-bedrock/openai.gpt-5.6-luna',
+			'amazon-bedrock/openai.gpt-5.6-terra',
 		]);
 
 		for (const id of Object.values(MODEL_ALIASES['opencode'] ?? {})) {
@@ -132,5 +150,12 @@ describe('checkProviderModelCompatibility', () => {
 	it('leaves an unset model alone', () => {
 		expect(checkProviderModelCompatibility('codex', undefined)).toBeUndefined();
 		expect(checkProviderModelCompatibility('claude', undefined)).toBeUndefined();
+	});
+
+	it('accepts luna/terra on codex, rejects them on claude', () => {
+		expect(checkProviderModelCompatibility('codex', 'luna')).toBeUndefined();
+		expect(checkProviderModelCompatibility('codex', 'terra')).toBeUndefined();
+		expect(checkProviderModelCompatibility('claude', 'luna')).toMatch(/does not support OpenAI/);
+		expect(checkProviderModelCompatibility('claude', 'terra')).toMatch(/does not support OpenAI/);
 	});
 });
