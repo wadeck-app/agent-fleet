@@ -268,6 +268,42 @@ describe('WorkerSourceRegistry - a worker that declared itself', () => {
 	});
 });
 
+describe('WorkerSourceRegistry.livenessOf', () => {
+	const declaration = {
+		sourceId: 'terminal-4242',
+		provider: 'built-in:inbound',
+		labels: [],
+		maxWorkers: 1,
+	};
+
+	it('reports "alive" for an entry whose pid is still running', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		const { entry } = registry.declare({ ...declaration, pid: process.pid });
+
+		expect(registry.livenessOf(entry)).toBe('alive');
+	});
+
+	it('reports "dead" for an entry whose pid is gone, without removing it', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		const { entry } = registry.declare({ ...declaration, pid: 999_999_998 });
+
+		expect(registry.livenessOf(entry)).toBe('dead');
+		expect(registry.list()).toHaveLength(1);
+	});
+
+	it('reports "unknown" for an entry with no pid', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		const { entry } = registry.declare({
+			sourceId: 'laptop',
+			provider: 'built-in:inbound',
+			labels: [],
+			maxWorkers: 1,
+		});
+
+		expect(registry.livenessOf(entry)).toBe('unknown');
+	});
+});
+
 /**
  * `built-in:host` was the relay provider's name before the rename. It is refused rather than
  * aliased: it never had a relay process to talk to, so an entry naming it never worked, and

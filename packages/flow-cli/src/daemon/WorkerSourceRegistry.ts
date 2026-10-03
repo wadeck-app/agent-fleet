@@ -174,6 +174,18 @@ export class WorkerSourceRegistry {
 	}
 
 	/**
+	 * Whether a declared source's backing process is still around, for a human to inspect
+	 * without mutating the registry (unlike {@link pruneDead}).
+	 *
+	 * 'unknown' for an entry with no `pid`: it describes a machine or a command, not a
+	 * process on this host, so there is nothing local to check.
+	 */
+	livenessOf(entry: WorkerSourceEntry): 'alive' | 'dead' | 'unknown' {
+		if (entry.pid === undefined) return 'unknown';
+		return isProcessAlive(entry.pid) ? 'alive' : 'dead';
+	}
+
+	/**
 	 * Confirms a presented token belongs to the named source.
 	 *
 	 * Compared in constant time so a wrong token cannot be recovered byte by byte from

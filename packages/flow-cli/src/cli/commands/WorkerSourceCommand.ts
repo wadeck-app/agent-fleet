@@ -151,12 +151,23 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		.command('list')
 		.description('List declared worker sources')
 		.option('--json', 'Output as JSON')
-		.action((options: { json?: boolean }) => {
+		.option(
+			'--validate',
+			"Check each entry's backing process (where one was recorded) and show whether it is still alive"
+		)
+		.action((options: { json?: boolean; validate?: boolean }) => {
 			try {
-				const entries = new WorkerSourceRegistry(ConfigDir.get('flow')).list();
+				const registry = new WorkerSourceRegistry(ConfigDir.get('flow'));
+				const entries = registry.list();
+				const liveness = options.validate
+					? new Map(entries.map(e => [e.sourceId, registry.livenessOf(e)]))
+					: undefined;
 
 				if (options.json) {
-					console.log(JSON.stringify(entries, null, 2));
+					const payload = liveness
+						? entries.map(e => ({ ...e, liveness: liveness.get(e.sourceId) }))
+						: entries;
+					console.log(JSON.stringify(payload, null, 2));
 					return;
 				}
 				if (entries.length === 0) {
@@ -167,13 +178,36 @@ export function registerWorkerSourceCommand(program: Command): Command {
 				}
 				for (const entry of entries) {
 					const labels = entry.labels.length > 0 ? entry.labels.join(', ') : '(none)';
+					const livenessSuffix = liveness ? `\tliveness=${liveness.get(entry.sourceId)}` : '';
 					console.log(
-						`${entry.sourceId}\t${entry.provider}\tmax=${String(entry.maxWorkers)}\tlabels=${labels}`
+						`${entry.sourceId}\t${entry.provider}\tmax=${String(entry.maxWorkers)}\tlabels=${labels}${livenessSuffix}`
 					);
 				}
 				// Declared is not the same as available: only a live connection proves that.
 				console.log('');
 				console.log('Declared sources describe intent. Use "flow worker list" to see live workers.');
+				if (options.validate) {
+					console.log(
+						'liveness=dead means the recorded pid is gone and the entry is safe to remove with "flow worker source prune".'
+					);
+					console.log('liveness=unknown means the entry names a machine/command, not a local pid.');
+				}
+			} catch (err) {
+				fail(err);
+			}
+		});
+
+	source
+		.command('prune')
+		.description('Remove declared sources whose recorded pid is no longer running')
+		.action(() => {
+			try {
+				const removed = new WorkerSourceRegistry(ConfigDir.get('flow')).pruneDead();
+				if (removed.length === 0) {
+					console.log('[ok] No dead worker sources found.');
+					return;
+				}
+				console.log(`[ok] Pruned ${String(removed.length)} dead worker source(s): ${removed.join(', ')}`);
 			} catch (err) {
 				fail(err);
 			}
