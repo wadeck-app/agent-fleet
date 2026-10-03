@@ -666,6 +666,15 @@ export interface ModelFlowStep extends BaseFlowStep {
 	 * @see ToolHook
 	 */
 	toolHooks?: import('./processing/ToolHook').ToolHook[];
+
+	/**
+	 * Restricts this step to the named tools (e.g. `['read']` for a text-only step that must
+	 * not write files or run shell commands). Omit for no restriction (provider default).
+	 * Codex has no per-tool mechanism and only honors the write/bash-exclusion case via its
+	 * sandbox level -- see `CodexModelProvider`.
+	 * @see ./processing/ToolAccess
+	 */
+	tools?: import('./processing/ToolAccess').ToolName[];
 }
 
 /**

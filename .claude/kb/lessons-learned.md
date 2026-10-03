@@ -6354,3 +6354,73 @@ Check this first when something "just does nothing".
   one-line re-exports of a single module under `src/`.
 - **Stopping a background shell does not kill a detached worker.** `flow worker` survives its
   wrapper; check `wmic process where "name='node.exe'" get processid,commandline` before assuming.
+
+## WScript.Shell.Run drops PATH silently; forward it explicitly (2026-10-03)
+
+### Root cause
+
+`WScript.Shell.Run` (used to spawn the flow daemon on Windows) does not inherit the caller's
+env. Only variables explicitly set via `oShell.Environment("Process")(key) = val` reach the
+spawned process. The VBS script forwarded `FLOW_DAEMON_MODE` and `FLOW_BASH_PATH` but never
+`PATH`, so the daemon's own `process.env.PATH` was empty from birth -- not merely missing Git.
+`ensureGitCoreutilsOnPath` in `ScriptExecutor.ts` then prepended Git's `usr/bin`/`bin` to an
+empty string, producing a bare `/usr/bin:/bin` with nothing behind it: any npm-global shim
+invoked by bare name from a script step (`task`, etc.) was "command not found".
+
+### Fix
+
+Forward `PATH` the same way as `FLOW_BASH_PATH`: one more `oShell.Environment("Process")`
+line. Extracted both into `packages/flow-cli/src/daemon/WindowsDaemonEnv.ts`, shared by
+`RunCommand.ts` (`flow run`) and `FlowIndex.ts` (`flow start`) -- the latter had the same VBS
+pattern and was missing `FLOW_BASH_PATH` too. No `isolateEnv` behavior changed: it already does
+"Git coreutils first, then inherited PATH" correctly once PATH is real.
+
+### Decision: no `pathStrategy` abstraction
+
+Only one PATH behavior is correct here (inherit the real PATH, Git coreutils ahead of it), and
+it's the only one implemented. Declined a proposal for a pluggable `pathStrategy`
+(`inherit`/`replace`/`append`/`filter`) because there was no second real use case driving it --
+the apparent "replace" behavior people observed was this bug, not a deliberate mode.
+**If a second genuine, concrete need for a different PATH behavior shows up later (e.g. a CI
+box that must NOT see the host's full PATH), that's the point to introduce the abstraction --
+not before.**
+
+## `tools` step restriction: one canonical list, per-provider translation (2026-10-03)
+
+### Context
+
+An opencode `model` step whose contract was "return text only" used its `write`/`bash` tools
+anyway (wrote a file, caught itself, deleted it, then answered with a prose prefix that broke
+a strict "must start with `id:`" parser downstream). No existing knob stopped a step with real
+tool access from reaching for it.
+
+### Design
+
+`ModelFlowStep.tools?: ToolName[]` (`packages/flow-engine/src/processing/ToolAccess.ts`) --
+one canonical, lowercase, provider-agnostic list: `read, write, edit, bash, glob, grep,
+webfetch, websearch, task, todowrite`. Omitting `tools` leaves every provider's own default
+untouched; an empty array disables all of them.
+
+Each provider translates the same list to its own native mechanism -- verified live, not
+assumed:
+
+| Provider | Mechanism | Verified |
+|---|---|---|
+| Claude | `--tools <PascalCase,names>` (`""` disables all) | `claude -p ... --tools "Read"` really refused to write a file |
+| OpenCode | `tools: {<name>: boolean}` in the per-run config.json | `tools: {write:false,edit:false,bash:false}` made the model report exactly `glob, grep, read, skill, task, todowrite, webfetch` as its own tools |
+| Codex | no per-tool list, only `--sandbox read-only/workspace-write/danger-full-access` | not independently verified; mapped only the unambiguous case |
+
+### Known gaps, by design, not oversight
+
+- **Codex only gets `--sandbox read-only` when `tools` excludes both `write` and `bash`.**
+  Any other combination (e.g. allow `bash` but not `write`) has no Codex equivalent and is left
+  at Codex's default -- a wrong guess would be a silent *under*-restriction, worse than no
+  restriction. Don't try to get clever here without a real per-tool Codex mechanism to map to.
+- **OpenCode's `patch` tool has no canonical name** (it's an alternate write path, confirmed
+  live). `buildOpenCodeToolsConfig` folds it into `write`: excluding `write` also sets
+  `patch: false`. If OpenCode adds another write-capable tool later, fold it in the same way --
+  don't let a new tool silently stay enabled because it's not in the canonical list.
+- **The canonical list is deliberately small.** OpenCode has more real permission categories
+  (`list`, `question`, `lsp`, `doom_loop`, `skill`, `external_directory`) with no Claude or
+  Codex equivalent found; they're left at OpenCode's own default rather than growing the
+  canonical set for one provider.

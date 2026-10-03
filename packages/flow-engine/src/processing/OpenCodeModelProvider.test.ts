@@ -237,9 +237,9 @@ describe('OpenCodeModelProvider', () => {
 		it('fails loudly when a config file the step named does not exist', async () => {
 			const missing = join(tmpDir, 'not-here.json');
 
-			await expect(provider.launchBackground(makeBaseOptions({ env: { OPENCODE_CONFIG: missing } }))).rejects.toThrow(
-				/not-here\.json/
-			);
+			await expect(
+				provider.launchBackground(makeBaseOptions({ env: { OPENCODE_CONFIG: missing } }))
+			).rejects.toThrow(/not-here\.json/);
 		});
 
 		// A blank value is a mistake, not a request to attach to nothing.
@@ -378,6 +378,49 @@ describe('OpenCodeModelProvider', () => {
 	// -------------------------------------------------------------------------
 	// MCP config serialization
 	// -------------------------------------------------------------------------
+
+	describe('tools', () => {
+		it('writes a tools config restricting to the named tools, folding patch into write', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ tools: ['read', 'bash'] }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			const config = JSON.parse(spawnOpts.env!['OPENCODE_CONFIG_CONTENT']!) as { tools: Record<string, boolean> };
+			expect(config.tools).toMatchObject({
+				read: true,
+				bash: true,
+				write: false,
+				edit: false,
+				patch: false,
+				glob: false,
+				grep: false,
+				webfetch: false,
+				websearch: false,
+				task: false,
+				todowrite: false,
+			});
+		});
+
+		it('disables every tool, including patch, for an empty tools list', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ tools: [] }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			const config = JSON.parse(spawnOpts.env!['OPENCODE_CONFIG_CONTENT']!) as { tools: Record<string, boolean> };
+			expect(Object.values(config.tools).every(v => v === false)).toBe(true);
+		});
+
+		it('does not set OPENCODE_CONFIG_CONTENT when tools is not set', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			expect(spawnOpts.env?.['OPENCODE_CONFIG_CONTENT']).toBeUndefined();
+		});
+	});
 
 	describe('mcpServers', () => {
 		it('sets OPENCODE_CONFIG_CONTENT for small MCP config', async () => {

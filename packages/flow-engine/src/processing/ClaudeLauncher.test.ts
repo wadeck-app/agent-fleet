@@ -253,6 +253,77 @@ describe('ClaudeLauncher', () => {
 		});
 	});
 
+	describe('tools restriction (--tools)', () => {
+		it('passes --tools with mapped PascalCase names when tools is set', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') setTimeout(() => callback(0), 10);
+					return mockProcess;
+				}),
+			};
+
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Test',
+				stepId: 'test',
+				tools: ['read', 'bash'],
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1];
+			const toolsIndex = calledArgs.indexOf('--tools');
+			expect(toolsIndex).toBeGreaterThanOrEqual(0);
+			expect(calledArgs[toolsIndex + 1]).toBe('Read,Bash');
+		});
+
+		it('passes --tools "" when tools is an empty array (disables all tools)', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') setTimeout(() => callback(0), 10);
+					return mockProcess;
+				}),
+			};
+
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Test',
+				stepId: 'test',
+				tools: [],
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1];
+			const toolsIndex = calledArgs.indexOf('--tools');
+			expect(toolsIndex).toBeGreaterThanOrEqual(0);
+			expect(calledArgs[toolsIndex + 1]).toBe('');
+		});
+
+		it('omits --tools when tools is not set', async () => {
+			const mockProcess = {
+				on: vi.fn((event, callback) => {
+					if (event === 'close') setTimeout(() => callback(0), 10);
+					return mockProcess;
+				}),
+			};
+
+			vi.spyOn(child_process, 'spawn').mockReturnValue(mockProcess as any);
+			vi.spyOn(manager, 'findClaudePath').mockReturnValue('/usr/bin/claude');
+
+			await manager.launchInteractive({
+				workingDir: '/test',
+				prompt: 'Test',
+				stepId: 'test',
+			});
+
+			const calledArgs = (child_process.spawn as any).mock.calls[0][1];
+			expect(calledArgs).not.toContain('--tools');
+		});
+	});
+
 	describe('session continuation (--resume)', () => {
 		it('includes --resume <id> before -p when resumeSessionId is set', async () => {
 			const mockProcess = {

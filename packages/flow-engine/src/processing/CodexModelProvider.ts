@@ -132,6 +132,15 @@ function buildSpawnParams(
 		args.push('-m', options.model);
 	}
 
+	// Codex has no per-tool allow-list -- only a sandbox level. The one case we can map
+	// faithfully is "no file writes, no shell commands": excluding both from `tools` gets
+	// `--sandbox read-only`. Any other combination (e.g. allowing bash but not write) has no
+	// Codex equivalent and is left at Codex's own default, deliberately -- a wrong guess here
+	// would be a silent under-restriction, which is worse than not restricting at all.
+	if (options.tools !== undefined && !options.tools.includes('write') && !options.tools.includes('bash')) {
+		args.push('--sandbox', 'read-only');
+	}
+
 	// Env isolation: forward infrastructure env vars
 	const infraEnv: Record<string, string> = {};
 	if (process.env['PATH']) infraEnv['PATH'] = process.env['PATH']!;

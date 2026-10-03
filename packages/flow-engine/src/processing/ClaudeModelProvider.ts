@@ -105,6 +105,7 @@ export class ClaudeModelProvider implements ModelProvider {
 			mcpConfigPath,
 			settingsPath,
 			skipPermissions: options.skipPermissions,
+			tools: options.tools,
 			streamJson: options.streamJson,
 			verbose: options.verbose,
 			resumeSessionId: options.resumeSessionId,

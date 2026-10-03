@@ -140,6 +140,39 @@ describe('CodexModelProvider', () => {
 			expect(args).not.toContain('--auto');
 		});
 
+		// Codex has no per-tool allow-list, only a sandbox level. Excluding both write and bash
+		// is the one case that maps faithfully to --sandbox read-only.
+		describe('tools (--sandbox fallback)', () => {
+			it('passes --sandbox read-only when tools excludes both write and bash', async () => {
+				const resultPromise = provider.launchBackground(makeBaseOptions({ tools: ['read'] }));
+				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+				await resultPromise;
+
+				const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+				const idx = args.indexOf('--sandbox');
+				expect(idx).toBeGreaterThanOrEqual(0);
+				expect(args[idx + 1]).toBe('read-only');
+			});
+
+			it('does not pass --sandbox when tools includes write', async () => {
+				const resultPromise = provider.launchBackground(makeBaseOptions({ tools: ['read', 'write'] }));
+				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+				await resultPromise;
+
+				const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+				expect(args).not.toContain('--sandbox');
+			});
+
+			it('does not pass --sandbox when tools is not set', async () => {
+				const resultPromise = provider.launchBackground(makeBaseOptions());
+				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+				await resultPromise;
+
+				const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+				expect(args).not.toContain('--sandbox');
+			});
+		});
+
 		// Resuming is a subcommand now (`codex exec resume <id> [prompt]`), not a flag. The old
 		// `--resume <id>` form is rejected outright.
 		it('resumes through the exec subcommand, with the session id before the prompt', async () => {

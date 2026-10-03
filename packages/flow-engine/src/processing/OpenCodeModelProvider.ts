@@ -27,6 +27,7 @@ import type {
 import { PromptTooLargeError, validateLaunchOptions } from './ModelProvider';
 import { OpenCodeHookTranslator } from './OpenCodeHookTranslator';
 import type { StreamJsonEvent } from './StreamJsonParser';
+import { buildOpenCodeToolsConfig } from './ToolAccess';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -87,7 +88,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Windows path fix: all command elements and cwd use forward slashes.
  * Backslash paths cause silent `server status=failed` on Windows.
  */
-function buildOpenCodeConfig(servers: McpServer[], pluginPath?: string): Record<string, unknown> {
+function buildOpenCodeConfig(
+	servers: McpServer[],
+	pluginPath?: string,
+	tools?: readonly import('./ToolAccess').ToolName[]
+): Record<string, unknown> {
 	const mcp: Record<string, unknown> = {};
 	for (const s of servers) {
 		const entry: Record<string, unknown> = {
@@ -108,6 +113,9 @@ function buildOpenCodeConfig(servers: McpServer[], pluginPath?: string): Record<
 	if (pluginPath) {
 		// Use forward slashes for cross-platform compatibility
 		config['plugin'] = [pluginPath.replace(/\\/g, '/')];
+	}
+	if (tools !== undefined) {
+		config['tools'] = buildOpenCodeToolsConfig(tools);
 	}
 	return config;
 }
@@ -199,11 +207,11 @@ function buildSpawnParams(
 	// server error rather than "config not found", so the cause is invisible.
 	delete env['OPENCODE_CONFIG'];
 
-	// Serialize McpServers and/or plugin into the OpenCode config
+	// Serialize McpServers and/or plugin and/or tool restriction into the OpenCode config
 	let tempFile: string | undefined;
 	const hasServers = options.mcpServers && options.mcpServers.length > 0;
-	if (hasServers || pluginPath) {
-		const config = buildOpenCodeConfig(options.mcpServers ?? [], pluginPath);
+	if (hasServers || pluginPath || options.tools !== undefined) {
+		const config = buildOpenCodeConfig(options.mcpServers ?? [], pluginPath, options.tools);
 		const json = JSON.stringify(config);
 		const jsonBytes = Buffer.byteLength(json, 'utf8');
 

@@ -7,6 +7,7 @@
 import type { ChildProcess } from 'node:child_process';
 
 import type { StreamJsonEventCallback } from './StreamJsonParser';
+import { type ToolName, validateToolNames } from './ToolAccess';
 import type { ToolHook } from './ToolHook';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,8 @@ export interface LaunchOptions {
 	 * (OpenCode ESM plugin JS, Claude settings JSON).
 	 */
 	toolHooks?: ToolHook[];
+	/** Restricts the model to these tools. Omit for no restriction. @see ToolAccess */
+	tools?: ToolName[];
 }
 
 export interface ModelInteractiveResult {
@@ -146,5 +149,8 @@ export function validateLaunchOptions(options: LaunchOptions): void {
 		for (const server of options.mcpServers) {
 			validateMcpServer(server);
 		}
+	}
+	if (options.tools !== undefined) {
+		validateToolNames(options.tools);
 	}
 }

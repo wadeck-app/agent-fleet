@@ -138,6 +138,7 @@ export async function executeModelStep(
 		// Merge config-level servers (e.g. the provideSteps daemon server) with step-level servers
 		mcpServers: [...(config.mcpServers ?? []), ...(step.mcpServers ?? [])],
 		toolHooks: step.toolHooks ?? [],
+		tools: step.tools,
 		onProcessStarted: config.onClaudeProcessStarted,
 		streamJson: streamJson && !config.interactive,
 		verbose: verbose && !config.interactive,

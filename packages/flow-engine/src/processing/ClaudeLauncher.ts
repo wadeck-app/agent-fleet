@@ -8,6 +8,7 @@
 import { execSync, spawn } from 'node:child_process';
 
 import { type StreamJsonEventCallback, StreamJsonParser } from './StreamJsonParser';
+import { type ToolName, buildClaudeToolsArg } from './ToolAccess';
 
 /**
  * Result from launching Claude in interactive mode
@@ -62,6 +63,9 @@ export interface ClaudeLaunchOptions {
 
 	/** Enable --dangerously-skip-permissions (default: false, explicit opt-in required) */
 	skipPermissions?: boolean;
+
+	/** Restricts the model to these tools via --tools. Omit for no restriction. @see ToolAccess */
+	tools?: ToolName[];
 
 	/** Resume a previous Claude session by ID (passes --resume <id> before -p) */
 	resumeSessionId?: string;
@@ -165,6 +169,7 @@ export class ClaudeLauncher {
 			| 'autoCompact'
 			| 'mcpConfigPath'
 			| 'settingsPath'
+			| 'tools'
 		>
 	): { command: string; args: string[] } {
 		let command: string;
@@ -196,6 +201,12 @@ export class ClaudeLauncher {
 
 		if (skipPermissions) {
 			args.push('--dangerously-skip-permissions');
+		}
+
+		// "" disables all tools (confirmed via `claude --help`); a non-empty list restricts to
+		// exactly those names. Omitting `tools` leaves Claude's own default untouched.
+		if (options?.tools !== undefined) {
+			args.push('--tools', buildClaudeToolsArg(options.tools));
 		}
 
 		if (options?.streamJson) {
