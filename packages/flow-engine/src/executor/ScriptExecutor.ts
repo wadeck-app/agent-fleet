@@ -22,14 +22,10 @@ function resolveBashOnWindows(env: Record<string, string>): string {
 	const pinned = env['FLOW_BASH_PATH'];
 	if (pinned && fs.existsSync(pinned)) return pinned;
 
-	// Search the worker's own PATH for bash.exe.
-	const pathEnv = env['PATH'] ?? '';
-	for (const dir of pathEnv.split(path.delimiter)) {
-		const candidate = path.join(dir, 'bash.exe');
-		if (fs.existsSync(candidate)) return candidate;
-	}
-
-	// Known Git for Windows installation paths, in preference order.
+	// Known Git for Windows installation paths, in preference order. Checked before the PATH
+	// search below: System32 (which carries the WSL bash.exe stub) is on nearly every Windows
+	// PATH, so searching PATH first would find WSL before ever reaching Git -- the exact bug
+	// this function exists to avoid.
 	const knownLocations = [
 		'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
 		'C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe',
@@ -37,6 +33,14 @@ function resolveBashOnWindows(env: Record<string, string>): string {
 	];
 	for (const loc of knownLocations) {
 		if (fs.existsSync(loc)) return loc;
+	}
+
+	// Search the worker's own PATH for bash.exe -- only reached when Git isn't in any of the
+	// well-known locations above (e.g. a custom install path).
+	const pathEnv = env['PATH'] ?? '';
+	for (const dir of pathEnv.split(path.delimiter)) {
+		const candidate = path.join(dir, 'bash.exe');
+		if (fs.existsSync(candidate)) return candidate;
 	}
 
 	// Last resort: let the OS find it. May resolve to WSL bash.
@@ -165,6 +169,12 @@ export class ScriptExecutor {
 						: {}),
 					...(process.platform === 'win32' && process.env['USERPROFILE']
 						? { USERPROFILE: process.env['USERPROFILE'] }
+						: {}),
+					// The launcher pins this to Git's bash.exe because WScript.Shell.Run drops the
+					// Git Bash PATH enrichment; without it, resolveBashOnWindows() can only fall
+					// back to known install paths or an unqualified 'bash' lookup.
+					...(process.platform === 'win32' && process.env['FLOW_BASH_PATH']
+						? { FLOW_BASH_PATH: process.env['FLOW_BASH_PATH'] }
 						: {}),
 				}
 			: { ...process.env };
