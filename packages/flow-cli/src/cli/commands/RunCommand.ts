@@ -15,6 +15,7 @@ import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { Daemon } from '../../daemon/Daemon';
+import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
@@ -223,15 +224,9 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 	// (MSYS2 paths like C:\Program Files\Git\usr\bin are absent in the system PATH). Resolve
 	// bash.exe now, while we still have the Git Bash PATH, and pass the absolute path so the
 	// daemon and its forked workers never depend on PATH lookup for bash.
-	if (process.platform === 'win32' && !daemonEnv['FLOW_BASH_PATH']) {
-		const separator = path.delimiter;
-		for (const dir of (process.env['PATH'] ?? '').split(separator)) {
-			const candidate = path.join(dir, 'bash.exe');
-			if (fs.existsSync(candidate)) {
-				daemonEnv['FLOW_BASH_PATH'] = candidate;
-				break;
-			}
-		}
+	if (process.platform === 'win32') {
+		const resolved = resolveFlowBashPath(daemonEnv);
+		if (resolved) daemonEnv['FLOW_BASH_PATH'] = resolved;
 	}
 
 	// Remove stale port file before spawning so the poll below only resolves on a fresh write
@@ -254,13 +249,6 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 						`oShell.Environment("Process")("LAUNCHER_BUNDLE_OVERRIDE") = "${resolvedBundle.replace(/"/g, '""')}"`,
 					]
 				: [];
-		// WScript.Shell.Run does not inherit the caller's env; only explicitly-set variables pass.
-		// FLOW_BASH_PATH must be set here so the daemon and its forked workers find Git bash, not WSL.
-		const bashPathLines = daemonEnv['FLOW_BASH_PATH']
-			? [
-					`oShell.Environment("Process")("FLOW_BASH_PATH") = "${(daemonEnv['FLOW_BASH_PATH'] as string).replace(/"/g, '""')}"`,
-				]
-			: [];
 		fs.writeFileSync(
 			vbsPath,
 			[
@@ -268,7 +256,7 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 				'Set oShell = CreateObject("WScript.Shell")',
 				'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
 				...overrideLines,
-				...bashPathLines,
+				...buildWindowsDaemonEnvLines(daemonEnv),
 				`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
 			].join('\r\n')
 		);

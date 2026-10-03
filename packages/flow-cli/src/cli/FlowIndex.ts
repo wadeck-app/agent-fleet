@@ -13,6 +13,7 @@ import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 
 import { FlowConfigLoader } from '../config/FlowConfig.js';
 import { Daemon, writeDaemonLog } from '../daemon/Daemon.js';
+import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { buildCliCommand } from './commands/CliCommand.js';
 import { registerDocsCommand } from './commands/DocsCommand';
@@ -72,12 +73,16 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 				const vbsPath = path.join(os.tmpdir(), `flow-daemon-start-${Date.now()}.vbs`);
 				const safeNode = process.execPath.replace(/"/g, '""');
 				const safeBundle = bundlePath.replace(/"/g, '""');
+				const daemonEnv: NodeJS.ProcessEnv = { ...process.env, FLOW_DAEMON_MODE: '1' };
+				const resolvedBashPath = resolveFlowBashPath(daemonEnv);
+				if (resolvedBashPath) daemonEnv['FLOW_BASH_PATH'] = resolvedBashPath;
 				fs.writeFileSync(
 					vbsPath,
 					[
 						'Dim oShell',
 						'Set oShell = CreateObject("WScript.Shell")',
 						'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
+						...buildWindowsDaemonEnvLines(daemonEnv),
 						`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
 					].join('\r\n')
 				);
@@ -85,7 +90,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 					detached: true,
 					stdio: 'ignore',
 					windowsHide: true,
-					env: { ...process.env, FLOW_DAEMON_MODE: '1' },
+					env: daemonEnv,
 				});
 				wscript.unref();
 			} else {
