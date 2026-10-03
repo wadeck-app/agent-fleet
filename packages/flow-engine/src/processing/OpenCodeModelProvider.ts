@@ -281,9 +281,15 @@ export class OpenCodeModelProvider implements ModelProvider {
 		this.maxInlineConfigBytes = options.maxInlineConfigBytes ?? DEFAULT_MAX_INLINE_CONFIG_BYTES;
 	}
 
-	/** Applies autoSelectOpenCodeConfig(), logging the choice so a model-vs-config mismatch is traceable. */
+	/**
+	 * Applies autoSelectOpenCodeConfig(), logging the choice so a model-vs-config mismatch is
+	 * traceable. Checks the flow/step's own `env:` block first, then process.env -- a flow
+	 * author setting OPENCODE_CONFIG_OPENAI/_ANTHROPIC in the flow YAML must not need it set in
+	 * the OS environment too.
+	 */
 	private withAutoConfig(options: LaunchOptions): LaunchOptions {
-		const picked = autoSelectOpenCodeConfig(options.model, options.env?.['OPENCODE_CONFIG']);
+		const lookupEnv = { ...process.env, ...(options.env ?? {}) };
+		const picked = autoSelectOpenCodeConfig(options.model, options.env?.['OPENCODE_CONFIG'], lookupEnv);
 		if (!picked) return options;
 		console.log(`[OpenCodeModelProvider] auto-selected OPENCODE_CONFIG=${picked} for model '${options.model}'`);
 		return { ...options, env: { ...(options.env ?? {}), OPENCODE_CONFIG: picked } };

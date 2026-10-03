@@ -56,11 +56,12 @@ describe('Daemon spawn — Windows wscript.exe approach', () => {
 	});
 
 	it('flow start (FlowIndex) does NOT fall back to direct node spawn on Windows', () => {
-		// Ensure the win32 branch is present and uses wscript, not a direct spawn
-		const win32Block = FLOW_INDEX_SRC.slice(
-			FLOW_INDEX_SRC.indexOf("process.platform === 'win32'"),
-			FLOW_INDEX_SRC.indexOf("process.platform === 'win32'") + 800
-		);
+		// Ensure the win32 branch is present and uses wscript, not a direct spawn. Sliced up to
+		// the else branch (the non-Windows direct spawn), not a fixed length -- the win32 block
+		// grows over time (e.g. more oShell.Environment lines) without this test caring.
+		const win32Start = FLOW_INDEX_SRC.indexOf("process.platform === 'win32'");
+		const elseStart = FLOW_INDEX_SRC.indexOf('} else {', win32Start);
+		const win32Block = FLOW_INDEX_SRC.slice(win32Start, elseStart);
 		expect(win32Block).toContain('wscript.exe');
 	});
 });

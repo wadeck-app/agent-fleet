@@ -441,7 +441,7 @@ export class CommandHandler {
 		const assignable = (
 			resolvedGlobalEnv
 				? flow.steps.map((s: FlowStep) =>
-						s.type === 'script'
+						s.type === 'script' || s.type === 'model'
 							? {
 									...s,
 									env: {
