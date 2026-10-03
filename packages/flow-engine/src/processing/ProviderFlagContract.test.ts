@@ -38,6 +38,7 @@ const PROVIDER_FLAGS: { cli: string; helpArgs: string[]; source: string; flags: 
 			'--model',
 			'--resume',
 			'-p',
+			'--tools',
 		],
 	},
 	{
@@ -45,7 +46,7 @@ const PROVIDER_FLAGS: { cli: string; helpArgs: string[]; source: string; flags: 
 		helpArgs: ['exec', '--help'],
 		source: 'CodexModelProvider.buildSpawnParams',
 		// `resume` is a subcommand rather than a flag, and appears in the same help output.
-		flags: ['--json', '--skip-git-repo-check', '-m', '--approve-for-me', 'resume'],
+		flags: ['--json', '--skip-git-repo-check', '-m', '--approve-for-me', 'resume', '--sandbox'],
 	},
 ];
 
