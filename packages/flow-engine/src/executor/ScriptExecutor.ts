@@ -44,6 +44,33 @@ function resolveBashOnWindows(env: Record<string, string>): string {
 }
 
 /**
+ * Git for Windows' bash is a thin shell: coreutils the shim scripts rely on (sed, dirname,
+ * uname, ...) live in `<gitRoot>\usr\bin`, not next to bash.exe's own directory on PATH.
+ * The daemon's own PATH (inherited from WScript.Shell.Run) carries neither, so any script
+ * invoking an npm-installed POSIX shim fails with "command not found" despite bash itself
+ * being found correctly via resolveBashOnWindows above.
+ */
+function gitRootFromBash(bashExecutable: string): string | null {
+	const dir = path.dirname(bashExecutable); // .../usr/bin or .../bin
+	const parent = path.dirname(dir);
+	return path.basename(parent).toLowerCase() === 'usr' ? path.dirname(parent) : parent;
+}
+
+/** Mutates env['PATH'] in place to prepend Git's coreutils dirs, if found and not already present. */
+function ensureGitCoreutilsOnPath(env: Record<string, string>, bashExecutable: string): void {
+	const gitRoot = gitRootFromBash(bashExecutable);
+	if (!gitRoot) return;
+	const existingPath = env['PATH'] ?? '';
+	const existingDirs = new Set(existingPath.split(path.delimiter).map(d => d.toLowerCase()));
+	const toPrepend = [path.join(gitRoot, 'usr', 'bin'), path.join(gitRoot, 'bin')].filter(
+		d => fs.existsSync(d) && !existingDirs.has(d.toLowerCase())
+	);
+	if (toPrepend.length > 0) {
+		env['PATH'] = [...toPrepend, existingPath].filter(Boolean).join(path.delimiter);
+	}
+}
+
+/**
  * Result of script execution
  */
 export interface ScriptExecutionResult {
@@ -191,6 +218,7 @@ export class ScriptExecutor {
 					// with the system PATH, not the enriched Git Bash PATH, so 'bash' alone finds
 					// C:\Windows\System32\bash.exe (WSL) first. An explicit path avoids that.
 					const bashExecutable = resolveBashOnWindows(cleanEnv);
+					ensureGitCoreutilsOnPath(cleanEnv, bashExecutable);
 					// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
 					const child = spawn(bashExecutable, [tempFilePath!], {
 						cwd: workingDir,
