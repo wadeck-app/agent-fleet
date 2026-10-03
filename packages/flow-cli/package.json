@@ -23,7 +23,7 @@
 		"bundle": "tsx ci/scripts/bundle.ts"
 	},
 	"dependencies": {
-		"@wadeck-app/shared-cli": "latest",
+		"@wadeck-app/shared-cli": "^2026.10.3-035-1e4adce3",
 		"@wadeck-app/shared-updater": "latest",
 		"@wadeck-app/singleton-daemon-kit": "latest",
 		"commander": "^12.1.0",

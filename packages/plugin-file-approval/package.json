@@ -17,7 +17,7 @@
 		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
-		"@wadeck-app/shared-cli": "latest",
+		"@wadeck-app/shared-cli": "^2026.10.3-035-1e4adce3",
 		"extension-points": "file:../extension-points"
 	},
 	"devDependencies": {
