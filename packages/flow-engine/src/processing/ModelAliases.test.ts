@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MODEL_ALIASES, resolveModelAlias } from './ModelAliases';
+import { MODEL_ALIASES, checkProviderModelCompatibility, resolveModelAlias } from './ModelAliases';
 
 describe('resolveModelAlias - opencode', () => {
 	// A flow says "sonnet" and means "the current one". Bedrock ids are dated, undated or
@@ -97,5 +97,40 @@ describe('MODEL_ALIASES', () => {
 				expect(forbidden).not.toContain(id);
 			}
 		}
+	});
+});
+
+describe('checkProviderModelCompatibility', () => {
+	it('rejects an Anthropic family name on codex', () => {
+		expect(checkProviderModelCompatibility('codex', 'sonnet')).toMatch(/does not support Anthropic/);
+		expect(checkProviderModelCompatibility('codex', 'haiku')).toMatch(/does not support Anthropic/);
+		expect(checkProviderModelCompatibility('codex', 'opus')).toMatch(/does not support Anthropic/);
+	});
+
+	it('rejects an explicit Claude/Anthropic id on codex', () => {
+		expect(checkProviderModelCompatibility('codex', 'claude-sonnet-4-5')).toMatch(/does not support Anthropic/);
+		expect(checkProviderModelCompatibility('codex', 'us.anthropic.claude-opus-5')).toMatch(
+			/does not support Anthropic/
+		);
+	});
+
+	it('rejects an OpenAI model name on claude', () => {
+		expect(checkProviderModelCompatibility('claude', 'gpt-5')).toMatch(/does not support OpenAI/);
+		expect(checkProviderModelCompatibility('claude', 'o3-mini')).toMatch(/does not support OpenAI/);
+	});
+
+	it('accepts a matching family on each provider', () => {
+		expect(checkProviderModelCompatibility('codex', 'gpt-5')).toBeUndefined();
+		expect(checkProviderModelCompatibility('claude', 'sonnet')).toBeUndefined();
+	});
+
+	it('leaves opencode alone -- it is a multi-provider router', () => {
+		expect(checkProviderModelCompatibility('opencode', 'sonnet')).toBeUndefined();
+		expect(checkProviderModelCompatibility('opencode', 'gpt-5')).toBeUndefined();
+	});
+
+	it('leaves an unset model alone', () => {
+		expect(checkProviderModelCompatibility('codex', undefined)).toBeUndefined();
+		expect(checkProviderModelCompatibility('claude', undefined)).toBeUndefined();
 	});
 });

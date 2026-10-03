@@ -47,3 +47,35 @@ export function resolveModelAlias(provider: string, model: string | undefined): 
 
 	return table[model.trim().toLowerCase()] ?? model;
 }
+
+const ANTHROPIC_FAMILY_NAMES = new Set(['sonnet', 'haiku', 'opus']);
+
+function isAnthropicModel(model: string): boolean {
+	const lower = model.trim().toLowerCase();
+	return ANTHROPIC_FAMILY_NAMES.has(lower) || lower.includes('claude') || lower.includes('anthropic');
+}
+
+function isOpenAiModel(model: string): boolean {
+	const lower = model.trim().toLowerCase();
+	return /^(gpt|o1|o3|o4)(-|$)/.test(lower) || lower.includes('openai');
+}
+
+/**
+ * Catches a step naming a model family its provider cannot run, before any process is
+ * spawned -- `codex`+`sonnet` used to reach a real Bedrock/OpenAI endpoint and fail with a
+ * 404 five retries later. Only the two unambiguous cases are rejected (an Anthropic family
+ * name on codex, an OpenAI family name on claude); `opencode` is a multi-provider router
+ * (model string is `provider/model`) and is deliberately left alone, same reasoning as
+ * `MODEL_ALIASES` above.
+ */
+export function checkProviderModelCompatibility(provider: string, model: string | undefined): string | undefined {
+	if (model === undefined) return undefined;
+
+	if (provider === 'codex' && isAnthropicModel(model)) {
+		return `codex does not support Anthropic/Claude models (got '${model}'). codex only runs OpenAI models (gpt-*, o1-*, o3-*, ...).`;
+	}
+	if (provider === 'claude' && isOpenAiModel(model)) {
+		return `claude does not support OpenAI models (got '${model}'). claude only runs Anthropic/Claude models (sonnet, haiku, opus, or an explicit claude-* id).`;
+	}
+	return undefined;
+}

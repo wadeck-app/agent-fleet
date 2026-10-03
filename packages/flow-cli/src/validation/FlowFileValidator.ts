@@ -89,6 +89,7 @@ function validationCodeToType(code: ValidationCode): string {
 		case ValidationCode.DUPLICATE_ID:
 		case ValidationCode.EMPTY_COLLECTION:
 		case ValidationCode.TYPE_MISMATCH:
+		case ValidationCode.INCOMPATIBLE_PROVIDER_MODEL:
 			return 'schema';
 		case ValidationCode.UNDEFINED_INPUT:
 		case ValidationCode.UNDEFINED_OUTPUT:

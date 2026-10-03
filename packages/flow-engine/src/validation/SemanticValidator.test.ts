@@ -173,6 +173,96 @@ describe('SemanticValidator', () => {
 		});
 	});
 
+	describe('Provider/Model Compatibility Validation', () => {
+		test('should error when codex is given an Anthropic family name', () => {
+			const steps: FlowStep[] = [
+				{
+					type: 'model',
+					id: 'step1',
+					name: 'Step 1',
+					provider: 'codex',
+					model: 'sonnet',
+					prompt: 'Test',
+				},
+			];
+
+			const stepIds = new Set(['step1']);
+			const flow: FlowDefinition = {
+				id: 'test-flow',
+				version: '1.0.0',
+				name: 'Test',
+				description: 'Test',
+				workspace: { mode: 'manual', gitStrategy: 'main-only', reusePolicy: 'never' },
+				inputs: {},
+				steps,
+			};
+
+			semanticValidator.validateSemantics(flow, stepIds);
+
+			expect(issueCollector.issues).toHaveLength(1);
+			expect(issueCollector.issues[0].code).toBe(ValidationCode.INCOMPATIBLE_PROVIDER_MODEL);
+			expect(issueCollector.issues[0].message).toContain('does not support Anthropic');
+		});
+
+		test('should error when claude is given an OpenAI model name', () => {
+			const steps: FlowStep[] = [
+				{
+					type: 'model',
+					id: 'step1',
+					name: 'Step 1',
+					provider: 'claude',
+					model: 'gpt-5',
+					prompt: 'Test',
+				},
+			];
+
+			const stepIds = new Set(['step1']);
+			const flow: FlowDefinition = {
+				id: 'test-flow',
+				version: '1.0.0',
+				name: 'Test',
+				description: 'Test',
+				workspace: { mode: 'manual', gitStrategy: 'main-only', reusePolicy: 'never' },
+				inputs: {},
+				steps,
+			};
+
+			semanticValidator.validateSemantics(flow, stepIds);
+
+			expect(issueCollector.issues).toHaveLength(1);
+			expect(issueCollector.issues[0].code).toBe(ValidationCode.INCOMPATIBLE_PROVIDER_MODEL);
+			expect(issueCollector.issues[0].message).toContain('does not support OpenAI');
+		});
+
+		test('should accept opencode with any model family (multi-provider router)', () => {
+			const steps: FlowStep[] = [
+				{
+					type: 'model',
+					id: 'step1',
+					name: 'Step 1',
+					provider: 'opencode',
+					model: 'sonnet',
+					prompt: 'Test',
+				},
+			];
+
+			const stepIds = new Set(['step1']);
+			const flow: FlowDefinition = {
+				id: 'test-flow',
+				version: '1.0.0',
+				name: 'Test',
+				description: 'Test',
+				workspace: { mode: 'manual', gitStrategy: 'main-only', reusePolicy: 'never' },
+				inputs: {},
+				steps,
+			};
+
+			semanticValidator.validateSemantics(flow, stepIds);
+
+			expect(issueCollector.issues).toHaveLength(0);
+		});
+	});
+
 	describe('onFailure Configuration Validation', () => {
 		test('should error when maxIterations is invalid', () => {
 			const steps: FlowStep[] = [

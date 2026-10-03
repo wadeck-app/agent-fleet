@@ -13,8 +13,9 @@
  * This validator assumes the flow has already passed schema validation,
  * so basic structure (step IDs, types) is guaranteed to be valid.
  */
+import { checkProviderModelCompatibility } from '../processing/ModelAliases';
 import type { FlowRegistry } from '../registry/FlowRegistry';
-import type { FlowDefinition, FlowStep, SubFlowStep, WorkspaceStrategy } from '../types';
+import type { FlowDefinition, FlowStep, ModelFlowStep, SubFlowStep, WorkspaceStrategy } from '../types';
 import type { GraphValidator } from './GraphValidator';
 import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
@@ -181,6 +182,23 @@ export class SemanticValidator {
 						expected: 'boolean',
 					},
 				});
+			}
+
+			// Validate provider/model-family compatibility (model steps only)
+			if (step.type === 'model') {
+				const modelStep = step as ModelFlowStep;
+				const provider = modelStep.provider ?? 'claude';
+				const incompatibility = checkProviderModelCompatibility(provider, modelStep.model);
+				if (incompatibility) {
+					this.issueCollector.addIssue({
+						severity: 'error',
+						code: ValidationCode.INCOMPATIBLE_PROVIDER_MODEL,
+						message: `Step '${step.id}': ${incompatibility}`,
+						location: { stepId: step.id, field: 'model' },
+						suggestion: 'Use a model family that provider supports, or change the provider.',
+						context: { actual: modelStep.model, related: [provider] },
+					});
+				}
 			}
 
 			// Validate session.continue (model steps only)
