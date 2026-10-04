@@ -30,3 +30,7 @@ export { TemplateRenderer } from './processing/TemplateRenderer';
 export type { FlowDefinition, FlowPluginOverrides, FlowStep } from './types';
 export type { McpServer } from './processing/ModelProvider';
 export type { ModelProviderName } from './types';
+export { BashShellStrategy } from './executor/shell/BashShellStrategy';
+export { CmdShellStrategy } from './executor/shell/CmdShellStrategy';
+export { PwshShellStrategy } from './executor/shell/PwshShellStrategy';
+export type { ShellStrategy } from './executor/shell/ShellStrategy';

@@ -17,6 +17,7 @@ function candidate(workerId: string, overrides: Partial<RegisteredWorker> = {}):
 			attachedProjects: [],
 			hasUserInterface: false,
 			ephemeral: true,
+			shellCapabilities: [],
 			...overrides,
 		},
 	};
@@ -86,6 +87,23 @@ describe('DefaultWorkerAcceptance', () => {
 	it('refuses a registered worker when the run belongs to no project', () => {
 		const worker = candidate('w1', { ephemeral: false, attachedProjects: ['C:/proj'] }).worker;
 		expect(acceptance.accepts({ step: step(), worker })).toBe(false);
+	});
+
+	// A step requiring a shell the worker never declared must not be dispatched, not
+	// silently allowed through (no-silent-fallback constraint).
+	it('refuses a worker missing the shell a step requires', () => {
+		const worker = candidate('w1', { shellCapabilities: ['cmd'] }).worker;
+		expect(acceptance.accepts({ step: step({ shellKind: 'bash' }), worker })).toBe(false);
+	});
+
+	it('accepts a worker that declared the shell a step requires', () => {
+		const worker = candidate('w1', { shellCapabilities: ['bash', 'cmd'] }).worker;
+		expect(acceptance.accepts({ step: step({ shellKind: 'bash' }), worker })).toBe(true);
+	});
+
+	it('accepts a worker regardless of its shell capabilities when the step requests none', () => {
+		const worker = candidate('w1', { shellCapabilities: [] }).worker;
+		expect(acceptance.accepts({ step: step(), worker })).toBe(true);
 	});
 });
 

@@ -24,6 +24,7 @@ import { WorkerDisplay } from '../../worker/WorkerDisplay';
 import {
 	buildRegistration,
 	buildStepRunnerConfig,
+	probeShellCapabilities,
 	reconnectDelayMs,
 	resolveDaemonWsUrl,
 	resolveExtraProjects,
@@ -168,9 +169,10 @@ function registerListCommand(worker: Command): void {
 				}
 				for (const w of workers) {
 					const labels = w.labels.length > 0 ? w.labels.join(',') : '-';
+					const shells = w.shellCapabilities && w.shellCapabilities.length > 0 ? w.shellCapabilities.join(',') : '-';
 					const origin = w.ephemeral ? 'daemon-forked' : (w.sourceId ?? 'external');
 					console.log(
-						`${w.workerId}\t${w.state}\tpid=${String(w.pid)}\t${origin}\tlabels=${labels}\tinteractive=${String(w.hasUserInterface)}`
+						`${w.workerId}\t${w.state}\tpid=${String(w.pid)}\t${origin}\tlabels=${labels}\tshells=${shells}\tinteractive=${String(w.hasUserInterface)}`
 					);
 				}
 			} catch (err) {
@@ -236,6 +238,7 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		...(sourceId !== undefined ? { sourceId } : {}),
 		labels: parseLabels(options.labels),
 		token,
+		shellCapabilities: probeShellCapabilities(process.env),
 	});
 
 	// The nudge server lets the daemon notify this worker the moment its WS listener is
@@ -263,6 +266,9 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		console.log(`     labels     : ${registration.labels.join(', ')}`);
 	}
 	console.log(`     projects   : ${(registration.attachedProjects ?? []).join(', ')}`);
+	console.log(
+		`     shells     : ${registration.shellCapabilities && registration.shellCapabilities.length > 0 ? registration.shellCapabilities.join(', ') : '(none detected)'}`
+	);
 	console.log(
 		`     can-answer-checkpoints: ${String(registration.hasUserInterface)}${explainInteractivity(registration.hasUserInterface === true, approvalProvider !== undefined)}`
 	);

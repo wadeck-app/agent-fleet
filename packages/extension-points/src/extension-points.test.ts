@@ -89,6 +89,7 @@ describe('extension-points interfaces compile correctly', () => {
 			attachedProjects: ['C:/proj'],
 			hasUserInterface: true,
 			ephemeral: false,
+			shellCapabilities: [],
 		};
 		const step: StepPlacement = { stepId: 's1', labels: ['gpu'], requiresUserInterface: false };
 
@@ -106,6 +107,7 @@ describe('extension-points interfaces compile correctly', () => {
 			attachedProjects: [],
 			hasUserInterface: false,
 			ephemeral: true,
+			shellCapabilities: [],
 		}));
 
 		expect(provider.order(candidates).map(candidate => candidate.workerId)).toEqual(['b', 'a']);

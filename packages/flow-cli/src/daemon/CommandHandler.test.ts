@@ -43,6 +43,7 @@ function forkedWorker(ws: unknown) {
 			attachedProjects: [] as string[],
 			hasUserInterface: false,
 			ephemeral: true,
+			shellCapabilities: [] as string[],
 		},
 	};
 }
@@ -1006,6 +1007,85 @@ steps:
 		expect((result as { type: string }).type).toBe('error');
 		expect(JSON.stringify(result)).toMatch(/labels/i);
 		expect(dispatched).toEqual([]);
+	});
+});
+
+describe('CommandHandler — routing script steps by shell: field (Proposal 2)', () => {
+	const SHELL_FLOW_YAML = `\
+id: shell-flow
+version: "1.0.0"
+name: Shell Flow
+description: shell routing
+workspace:
+  mode: manual
+  gitStrategy: any
+  reusePolicy: if-available
+inputs: {}
+steps:
+  - id: needs-bash
+    name: Needs Bash
+    type: script
+    script: echo bash
+    shell: bash
+  - id: plain
+    name: Plain
+    type: script
+    script: echo plain
+`;
+
+	function handlerFor(yamlText: string, idle: unknown[]) {
+		const flowFile = path.join(tmpDir, 'shell-routing.yml');
+		fs.writeFileSync(flowFile, yamlText);
+
+		const workerPool = createMockWorkerPool();
+		const dispatched: string[] = [];
+		workerPool.listIdle.mockReturnValue(idle);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
+			dispatched.push((msg as { stepId: string }).stepId);
+			return true;
+		});
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		return { handler, dispatched, flowFile, workerPool };
+	}
+
+	// No-silent-fallback: a step requiring a shell the worker never declared must not be
+	// dispatched to it.
+	it('does not dispatch a shell-scoped step to a worker without that shell', async () => {
+		const worker = forkedWorker({});
+		worker.worker.shellCapabilities = ['cmd'];
+		const { handler, dispatched, flowFile } = handlerFor(SHELL_FLOW_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).not.toContain('needs-bash');
+	});
+
+	it('dispatches a shell-scoped step to a worker declaring that shell', async () => {
+		const worker = forkedWorker({});
+		worker.worker.shellCapabilities = ['bash'];
+		const { handler, dispatched, flowFile } = handlerFor(SHELL_FLOW_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).toContain('needs-bash');
+	});
+
+	it('dispatches a step with no shell: field regardless of worker shell capabilities', async () => {
+		const worker = forkedWorker({});
+		worker.worker.shellCapabilities = [];
+		const { handler, dispatched, flowFile } = handlerFor(SHELL_FLOW_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).toContain('plain');
 	});
 });
 

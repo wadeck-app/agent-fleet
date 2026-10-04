@@ -115,6 +115,7 @@ describe('WorkerRegistry - registration metadata', () => {
 			labels: ['gpu', 'linux'],
 			attachedProjects: ['C:/proj'],
 			hasUserInterface: true,
+			shellCapabilities: ['bash', 'cmd'],
 		});
 
 		const info = registry.describe(ws);
@@ -122,11 +123,12 @@ describe('WorkerRegistry - registration metadata', () => {
 		expect(info?.labels).toEqual(['gpu', 'linux']);
 		expect(info?.attachedProjects).toEqual(['C:/proj']);
 		expect(info?.hasUserInterface).toBe(true);
+		expect(info?.shellCapabilities).toEqual(['bash', 'cmd']);
 	});
 
 	// Defaults are documented, not inferred: a worker that claims nothing is headless,
 	// unlabelled and attached to nothing until it says otherwise.
-	it('defaults labels and projects to empty and hasUserInterface to false', () => {
+	it('defaults labels, projects and shellCapabilities to empty and hasUserInterface to false', () => {
 		const registry = new WorkerRegistry();
 		const ws = fakeWorker();
 		registry.register(ws, minimal);
@@ -135,6 +137,7 @@ describe('WorkerRegistry - registration metadata', () => {
 		expect(info?.labels).toEqual([]);
 		expect(info?.attachedProjects).toEqual([]);
 		expect(info?.hasUserInterface).toBe(false);
+		expect(info?.shellCapabilities).toEqual([]);
 	});
 });
 
@@ -199,6 +202,7 @@ describe('WorkerRegistry - summarize', () => {
 				labels: ['gpu'],
 				attachedProjects: ['C:/proj'],
 				hasUserInterface: true,
+				shellCapabilities: ['pwsh'],
 			},
 			{ ephemeral: false }
 		);
@@ -212,6 +216,14 @@ describe('WorkerRegistry - summarize', () => {
 		expect(summary?.state).toBe('idle');
 		expect(summary?.ephemeral).toBe(false);
 		expect(summary?.workerId).toBe(registry.describe(ws)?.workerId);
+		expect(summary?.shellCapabilities).toEqual(['pwsh']);
+	});
+
+	it('defaults shellCapabilities to empty in the summary when none was declared', () => {
+		const registry = new WorkerRegistry();
+		registry.register(fakeWorker(), minimal);
+
+		expect(registry.summarize()[0]?.shellCapabilities).toEqual([]);
 	});
 
 	it('reflects the busy state so the list is not misread as free capacity', () => {

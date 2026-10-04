@@ -90,6 +90,8 @@ export interface WorkerSummary {
 	hasUserInterface: boolean;
 	/** True when this daemon created the worker, so it exits when the daemon idles down. */
 	ephemeral: boolean;
+	/** Shells this worker can actually run, probed at launch (see WorkerLaunch.probeShellCapabilities). */
+	shellCapabilities?: ('bash' | 'cmd' | 'pwsh')[];
 }
 
 export type DaemonToWorker =
@@ -211,6 +213,13 @@ export interface WorkerReady {
 	 * (D#33, D#36) -- the daemon cannot observe the far side's TTY. Defaults to false.
 	 */
 	hasUserInterface?: boolean;
+	/**
+	 * Shells this worker can actually run (`bash`/`cmd`/`pwsh`), probed once at launch via
+	 * each shell's own `ShellStrategy.resolve()` (see WorkerLaunch.probeShellCapabilities).
+	 * Populated by inbound workers; the daemon applies the same "claims nothing until it
+	 * says otherwise" default as `labels` -- absent or omitted means no declared capability.
+	 */
+	shellCapabilities?: ('bash' | 'cmd' | 'pwsh')[];
 }
 
 export type WorkerToDaemon =

@@ -8,6 +8,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
 import { workerSatisfiesLabels } from './LabelMatcher.js';
+import { workerSatisfiesShell } from './ShellMatcher.js';
 import type { RegisteredWorker } from './WorkerRegistry.js';
 
 /** An idle worker together with the connection to reach it. */
@@ -32,6 +33,8 @@ export class DefaultWorkerAcceptance implements WorkerAcceptanceProvider {
 		if (step.requiresUserInterface && !worker.hasUserInterface) return false;
 
 		if (!workerSatisfiesLabels(step.labels, worker.labels)) return false;
+
+		if (!workerSatisfiesShell(step.shellKind, worker.shellCapabilities)) return false;
 
 		// A daemon-created worker exists to serve this daemon's queue, so there is no
 		// declared project set to check it against.

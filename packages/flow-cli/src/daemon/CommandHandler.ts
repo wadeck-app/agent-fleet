@@ -1025,6 +1025,9 @@ export class CommandHandler {
 	private placementFor(step: ReadyStep): StepPlacement {
 		const labels = (step.stepConfig as { labels?: unknown }).labels;
 		assertStepLabels(labels, step.stepId);
+		// Only `type: script` steps carry `shell:` (Proposal 1); every other step type has
+		// no such field, which `workerSatisfiesShell` already treats as "no constraint".
+		const shellKind = (step.stepConfig as { shell?: 'bash' | 'cmd' | 'pwsh' }).shell;
 		return {
 			stepId: step.stepId,
 			labels: labels ?? [],
@@ -1034,6 +1037,7 @@ export class CommandHandler {
 			...(this.executionProjects.get(step.executionContext.executionId) !== undefined
 				? { projectRoot: this.executionProjects.get(step.executionContext.executionId)! }
 				: {}),
+			...(shellKind !== undefined ? { shellKind } : {}),
 		};
 	}
 

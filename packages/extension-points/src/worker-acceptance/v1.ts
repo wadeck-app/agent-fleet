@@ -28,6 +28,12 @@ export interface StepPlacement {
 	 * attributed to one (D#10) -- a `flow run` from outside any project.
 	 */
 	projectRoot?: string;
+	/**
+	 * Interpreter a `type: script` step declared via its `shell:` field, or undefined when
+	 * the step did not request one (any shell-capable worker may run it) or is not a script
+	 * step at all.
+	 */
+	shellKind?: 'bash' | 'cmd' | 'pwsh';
 }
 
 /** The candidate worker, as it declared itself when registering. */
@@ -45,6 +51,8 @@ export interface WorkerCandidate {
 	 */
 	ephemeral: boolean;
 	sourceId?: string;
+	/** Shells this worker can actually run -- never an authorization decision, routing only. */
+	shellCapabilities: ('bash' | 'cmd' | 'pwsh')[];
 }
 
 export interface WorkerAcceptanceRequest {

@@ -20,6 +20,8 @@ export interface RegisteredWorker {
 	labels: string[];
 	attachedProjects: string[];
 	hasUserInterface: boolean;
+	/** Shells this worker can actually run -- never an authorization decision, routing only. */
+	shellCapabilities: ('bash' | 'cmd' | 'pwsh')[];
 	/**
 	 * True when this daemon created the worker, so it exists only to serve this daemon
 	 * and may be told to exit once there is nothing left to run.
@@ -83,6 +85,7 @@ export class WorkerRegistry {
 			labels: registration.labels ?? [],
 			attachedProjects: registration.attachedProjects ?? [],
 			hasUserInterface: registration.hasUserInterface ?? false,
+			shellCapabilities: registration.shellCapabilities ?? [],
 		});
 	}
 
@@ -101,6 +104,7 @@ export class WorkerRegistry {
 			attachedProjects: worker.attachedProjects,
 			hasUserInterface: worker.hasUserInterface,
 			ephemeral: worker.ephemeral,
+			shellCapabilities: worker.shellCapabilities,
 		}));
 	}
 

@@ -201,6 +201,24 @@ describe('buildRegistration', () => {
 			buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: false, pid: 1, labels: ['  '] })
 		).toThrow(/empty/i);
 	});
+
+	it('defaults shellCapabilities to empty when omitted', () => {
+		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: false, pid: 1 });
+
+		expect(reg.shellCapabilities).toEqual([]);
+	});
+
+	it('passes shellCapabilities through when provided', () => {
+		const reg = buildRegistration({
+			projectRoot: 'C:/p',
+			isTty: false,
+			canPrompt: false,
+			pid: 1,
+			shellCapabilities: ['bash', 'pwsh'],
+		});
+
+		expect(reg.shellCapabilities).toEqual(['bash', 'pwsh']);
+	});
 });
 
 describe('scheduleReconnectTimer', () => {

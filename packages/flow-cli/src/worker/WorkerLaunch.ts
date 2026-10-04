@@ -1,5 +1,6 @@
 import type { ApprovalProvider } from 'extension-points';
-import type { McpServer, StepRunnerConfig } from 'flow-engine';
+import { BashShellStrategy, CmdShellStrategy, PwshShellStrategy } from 'flow-engine';
+import type { McpServer, ShellStrategy, StepRunnerConfig } from 'flow-engine';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -128,6 +129,33 @@ export function resolveExtraProjects(fromFlags: string[] | undefined): string[] 
 		.filter(project => project !== '');
 }
 
+/**
+ * Shells this worker can actually run, probed once at launch rather than per step.
+ *
+ * Each strategy resolves its own binary independently (not assuming it is already on this
+ * worker's inherited PATH) and throws when it is not found -- that throw means "not
+ * available", not "crash the worker": it is caught here and the shell is simply omitted
+ * from the result, so a worker missing `pwsh` still registers and runs everything else.
+ */
+export function probeShellCapabilities(env: NodeJS.ProcessEnv): ('bash' | 'cmd' | 'pwsh')[] {
+	const candidates: { kind: 'bash' | 'cmd' | 'pwsh'; strategy: ShellStrategy }[] = [
+		{ kind: 'bash', strategy: new BashShellStrategy() },
+		{ kind: 'cmd', strategy: new CmdShellStrategy() },
+		{ kind: 'pwsh', strategy: new PwshShellStrategy() },
+	];
+
+	const available: ('bash' | 'cmd' | 'pwsh')[] = [];
+	for (const { kind, strategy } of candidates) {
+		try {
+			strategy.resolve(env);
+			available.push(kind);
+		} catch {
+			// Not available on this worker's machine -- omitted, not fatal.
+		}
+	}
+	return available;
+}
+
 /** Everything the worker declares about itself on registration. */
 export function buildRegistration(params: {
 	projectRoot: string;
@@ -147,6 +175,8 @@ export function buildRegistration(params: {
 	sourceId?: string;
 	labels?: string[];
 	token?: string;
+	/** Shells this worker can run, from probeShellCapabilities(). Defaults to none declared. */
+	shellCapabilities?: ('bash' | 'cmd' | 'pwsh')[];
 }): Omit<WorkerReady, 'type'> {
 	for (const label of params.labels ?? []) {
 		if (label.trim() === '') {
@@ -167,6 +197,7 @@ export function buildRegistration(params: {
 		...(params.token !== undefined ? { authToken: params.token } : {}),
 		...(params.sourceId !== undefined ? { sourceId: params.sourceId } : {}),
 		labels: params.labels ?? [],
+		shellCapabilities: params.shellCapabilities ?? [],
 		attachedProjects,
 		// Only this process can see whether anybody can be reached from here (D#33, D#36) -- and a
 		// TTY alone is not the capability. Without an approval provider the worker would attract an

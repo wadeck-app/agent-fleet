@@ -33,8 +33,10 @@ vi.mock('../../worker/WorkerLaunch', () => ({
 		labels: [],
 		attachedProjects: ['/fake/project'],
 		hasUserInterface: false,
+		shellCapabilities: ['bash', 'cmd'],
 	}),
 	buildStepRunnerConfig: () => ({ interactive: false }),
+	probeShellCapabilities: () => ['bash', 'cmd'],
 	reconnectDelayMs: () => 500,
 	resolveDaemonWsUrl: () => 'ws://127.0.0.1:9999',
 	scheduleReconnectTimer: () => setTimeout(() => {}, 0),
@@ -103,5 +105,84 @@ describe('WorkerCommand verbose startup banner', () => {
 		const versionLine = allOutput.split('\n').find((line: string) => line.includes('version'));
 		expect(versionLine).toBeDefined();
 		expect(versionLine).toContain(VERSION);
+	});
+
+	// So an operator can see their own worker's declared shell capabilities immediately,
+	// without waiting for `flow worker list` against the daemon.
+	it('prints a shells line with the probed shell capabilities', async () => {
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		registerWorkerCommand(workerCommand);
+
+		await program.parseAsync(['node', 'test', 'worker']);
+
+		const allOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
+		const shellsLine = allOutput.split('\n').find((line: string) => line.includes('shells'));
+		expect(shellsLine).toBeDefined();
+		expect(shellsLine).toContain('bash');
+		expect(shellsLine).toContain('cmd');
+	});
+});
+
+describe('flow worker list — shells column', () => {
+	let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.resetModules();
+	});
+
+	// `--json` already carries shellCapabilities via WorkerSummary (step A); this covers
+	// the human-readable line printed by `flow worker list` without --json.
+	it('includes a shells= column reflecting each worker declared capabilities', async () => {
+		vi.resetModules();
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
+			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
+			createDaemonClient: () => ({
+				send: async () =>
+					Promise.resolve([
+						{
+							workerId: 'w1',
+							pid: 1,
+							state: 'idle',
+							labels: [],
+							attachedProjects: [],
+							hasUserInterface: false,
+							ephemeral: true,
+							shellCapabilities: ['bash', 'pwsh'],
+						},
+						{
+							workerId: 'w2',
+							pid: 2,
+							state: 'idle',
+							labels: [],
+							attachedProjects: [],
+							hasUserInterface: false,
+							ephemeral: true,
+							shellCapabilities: [],
+						},
+					]),
+			}),
+		}));
+
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+
+		await program.parseAsync(['node', 'test', 'worker', 'list']);
+
+		const allOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
+		expect(allOutput).toContain('shells=bash,pwsh');
+		expect(allOutput).toContain('shells=-');
 	});
 });
