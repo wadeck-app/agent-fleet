@@ -105,6 +105,56 @@ describe('ExecutionStore', () => {
 			expect(state.steps['step-a'].completedAt).toBeDefined();
 			expect(state.currentSteps).not.toContain('step-a');
 		});
+
+		it('persists meta onto the step when provided (ModelStepMeta shape)', () => {
+			store.create({
+				executionId: EXEC_ID,
+				flowFile: 'flow.yaml',
+				flowId: 'my-flow',
+				stepIds: ['step-a'],
+			});
+			store.markStepRunning(EXEC_ID, 'step-a');
+			const meta = {
+				model: 'claude-sonnet',
+				session_id: 'sess-1',
+				session_file: '/tmp/sess-1.jsonl',
+				ttft_ms: 150,
+				duration_ms: 3000,
+				cost: { input_tokens: 10, output_tokens: 20, usd: 0.01 },
+			};
+			const state = store.markStepCompleted(EXEC_ID, 'step-a', meta);
+
+			expect(state.steps['step-a'].meta).toEqual(meta);
+			// Re-read from disk, since markStepCompleted writes before returning.
+			expect(store.read(EXEC_ID).steps['step-a'].meta).toEqual(meta);
+		});
+
+		it('persists meta onto the step when provided (ScriptStepMeta shape)', () => {
+			store.create({
+				executionId: EXEC_ID,
+				flowFile: 'flow.yaml',
+				flowId: 'my-flow',
+				stepIds: ['step-a'],
+			});
+			store.markStepRunning(EXEC_ID, 'step-a');
+			const meta = { duration_ms: 500, exit_code: 0 };
+			const state = store.markStepCompleted(EXEC_ID, 'step-a', meta);
+
+			expect(state.steps['step-a'].meta).toEqual(meta);
+		});
+
+		it('does not add a meta key when meta is omitted', () => {
+			store.create({
+				executionId: EXEC_ID,
+				flowFile: 'flow.yaml',
+				flowId: 'my-flow',
+				stepIds: ['step-a'],
+			});
+			store.markStepRunning(EXEC_ID, 'step-a');
+			const state = store.markStepCompleted(EXEC_ID, 'step-a');
+
+			expect(state.steps['step-a']).not.toHaveProperty('meta');
+		});
 	});
 
 	describe('markStepFailed()', () => {

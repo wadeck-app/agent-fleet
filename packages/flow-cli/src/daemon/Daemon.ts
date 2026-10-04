@@ -515,7 +515,7 @@ async function startDaemon(
 					// The outcome is accepted from here on, so the assignment is closed and
 					// the same result cannot be replayed.
 					commandHandler.settleAssignment(assignmentId);
-					executionStore.markStepCompleted(executionId, stepId);
+					executionStore.markStepCompleted(executionId, stepId, meta);
 					commandHandler.onStepCompleted(executionId, stepId, output, meta);
 					logWriter.writeExecution(executionId, `Step ${stepId} completed`);
 					commandHandler.dispatchHook(executionId, 'onStepEnd', { executionId, stepId });

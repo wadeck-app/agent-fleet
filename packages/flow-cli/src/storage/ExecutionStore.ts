@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { ExecutionState, StepStatus } from '../ipc/Protocol';
+import type { StepMeta } from 'flow-engine/types';
 
 export function generateExecutionId(): string {
 	const hex = crypto.randomUUID().replace(/-/g, '');
@@ -127,12 +128,13 @@ export class ExecutionStore {
 		return state;
 	}
 
-	markStepCompleted(executionId: string, stepId: string): ExecutionState {
+	markStepCompleted(executionId: string, stepId: string, meta?: StepMeta): ExecutionState {
 		const state = this.read(executionId);
 		const step = state.steps[stepId];
 		if (step) {
 			step.status = 'completed';
 			step.completedAt = new Date().toISOString();
+			if (meta !== undefined) step.meta = meta;
 		}
 		state.currentSteps = state.currentSteps.filter(id => id !== stepId);
 		this.write(state);

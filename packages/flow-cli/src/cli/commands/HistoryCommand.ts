@@ -1,5 +1,6 @@
 import { ConfigDir } from '@wadeck-app/shared-cli';
 import type { Command } from 'commander';
+import type { StepMeta } from 'flow-engine/types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -11,6 +12,8 @@ export interface StepStateRecord {
 	error?: string;
 	stdout?: string;
 	stderr?: string;
+	/** Cost/token/duration metadata reported by the worker, when the step completed. */
+	meta?: StepMeta;
 }
 
 export interface ExecutionRecord {
@@ -89,6 +92,8 @@ function renderDetailView(exec: ExecutionRecord): string {
 		const name = step.injected ? `${stepId}*` : stepId;
 		const dur = step.startedAt ? formatDuration(step.startedAt, step.completedAt ?? null) : '-';
 		lines.push('  ' + pad(name, COL_STEP) + pad(step.status, COL_STATUS) + dur);
+		const costLine = formatModelCost(step.meta);
+		if (costLine) lines.push('      ' + costLine);
 	}
 
 	lines.push('');
@@ -111,6 +116,13 @@ function renderDetailView(exec: ExecutionRecord): string {
 	}
 
 	return lines.join('\n');
+}
+
+/** `meta.cost` only exists on ModelStepMeta -- a script step's meta has no such field. */
+function formatModelCost(meta: StepMeta | undefined): string | undefined {
+	if (!meta || !('cost' in meta)) return undefined;
+	const { cost } = meta as { cost: { input_tokens: number; output_tokens: number; usd: number } };
+	return `cost: $${cost.usd.toFixed(4)} (${cost.input_tokens} in / ${cost.output_tokens} out tokens, ${meta.duration_ms}ms)`;
 }
 
 function indentBlock(text: string): string {

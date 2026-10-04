@@ -157,6 +157,45 @@ describe('buildHistoryTable --id detail view', () => {
 		expect(out).toContain('not found');
 	});
 
+	it('renders cost/token meta for a completed model step', () => {
+		const execWithMeta = makeExec({
+			executionId: 'withmeta',
+			steps: {
+				'model-step': {
+					status: 'completed',
+					startedAt: '2026-08-16T12:00:00.000Z',
+					completedAt: '2026-08-16T12:00:03.000Z',
+					meta: {
+						model: 'claude-sonnet',
+						session_id: 'sess-1',
+						session_file: '/tmp/sess-1.jsonl',
+						ttft_ms: 120,
+						duration_ms: 3000,
+						cost: { input_tokens: 100, output_tokens: 50, usd: 0.0123 },
+					},
+				},
+			},
+		});
+		const out = buildHistoryTable([execWithMeta], { id: 'withmeta' });
+		expect(out).toContain('cost: $0.0123 (100 in / 50 out tokens, 3000ms)');
+	});
+
+	it('does not render a cost line for a completed script step', () => {
+		const execWithMeta = makeExec({
+			executionId: 'scriptmeta',
+			steps: {
+				'script-step': {
+					status: 'completed',
+					startedAt: '2026-08-16T12:00:00.000Z',
+					completedAt: '2026-08-16T12:00:01.000Z',
+					meta: { duration_ms: 500, exit_code: 0 },
+				},
+			},
+		});
+		const out = buildHistoryTable([execWithMeta], { id: 'scriptmeta' });
+		expect(out).not.toContain('cost:');
+	});
+
 	it('marks injected steps with * in detail view', () => {
 		const execWithInjected = makeExec({
 			executionId: 'inj',

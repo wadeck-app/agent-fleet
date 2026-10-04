@@ -302,6 +302,8 @@ export interface StepState {
 	stdout?: string;
 	/** Full stderr captured during the step's execution, when the step failed. */
 	stderr?: string;
+	/** Execution metadata reported by the worker on step_completed (cost/tokens/duration). */
+	meta?: StepMeta;
 	/**
 	 * Which source supplied the worker that ran this step, and which worker it was
 	 * (T-06). Without this, a step's outcome cannot be attributed to the machine that

@@ -88,7 +88,9 @@ async function workerUrl(): Promise<string> {
  * Connects a worker that behaves like `flow worker`: announces itself as attached to the
  * project, reports each step as started, and completes it.
  */
-async function connectRegisteredWorker(options: { reportStarted?: boolean } = {}): Promise<{
+async function connectRegisteredWorker(
+	options: { reportStarted?: boolean; meta?: Record<string, unknown> } = {}
+): Promise<{
 	assigned: string[];
 	sent: Record<string, unknown>[];
 }> {
@@ -132,6 +134,7 @@ async function connectRegisteredWorker(options: { reportStarted?: boolean } = {}
 			executionId: executionContext.executionId,
 			stepId,
 			output: { stdout: 'hello' },
+			...(options.meta !== undefined ? { meta: options.meta } : {}),
 		});
 		send({ ...registration });
 	});
@@ -179,9 +182,11 @@ async function settledExecution(executionId: string): Promise<ExecutionState> {
  * first would race the daemon's own exit. With work already queued the daemon stays up, and
  * the step waits for capacity exactly as it would in a real run.
  */
-async function queueFlowThenConnectWorker(): Promise<{ executionId: string; assigned: string[] }> {
+async function queueFlowThenConnectWorker(options: {
+	meta?: Record<string, unknown>;
+} = {}): Promise<{ executionId: string; assigned: string[] }> {
 	const executionId = await runFlow();
-	const worker = await connectRegisteredWorker();
+	const worker = await connectRegisteredWorker(options);
 	return { executionId, assigned: worker.assigned };
 }
 
@@ -219,6 +224,25 @@ describe('a step running on a worker the daemon did not create', () => {
 		const state = await settledExecution(executionId);
 
 		expect(state.projectRoot).toBe(projectRoot);
+	});
+
+	// The gap this task closes: `step_completed`'s `meta` reached in-memory template
+	// rendering already, but was dropped on the way to disk -- `flow history --id` had
+	// nothing to show for cost/duration even though the worker reported it.
+	it('persists the step_completed meta onto the step record', async () => {
+		const meta = {
+			model: 'claude-sonnet',
+			session_id: 'sess-123',
+			session_file: '/tmp/sess-123.jsonl',
+			ttft_ms: 120,
+			duration_ms: 4200,
+			cost: { input_tokens: 100, output_tokens: 50, usd: 0.0123 },
+		};
+		const { executionId } = await queueFlowThenConnectWorker({ meta });
+
+		const state = await settledExecution(executionId);
+
+		expect(state.steps['only-step']?.meta).toEqual(meta);
 	});
 });
 
