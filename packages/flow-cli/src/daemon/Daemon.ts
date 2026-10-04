@@ -37,6 +37,20 @@ export const WORKER_PORT_FILE = 'worker.port';
 const STALLED_SWEEP_INTERVAL_MS = 60_000;
 
 /**
+ * Grace period between the idle condition becoming true and the daemon actually stopping.
+ *
+ * `flow run` auto-starts the daemon, then dials it over IPC to submit the "run" command --
+ * that is a separate connect-and-send round trip, not instant. A worker's own `'ready'`
+ * message (e.g. a stale external worker reconnecting, or a daemon-forked source answering)
+ * can land in that window and find the queue genuinely empty, because the run has not been
+ * enqueued into `commandHandler` yet. Reacting immediately then stops the daemon before the
+ * command it was started for ever arrives, leaving that execution stuck at `status: "queued"`
+ * forever. 1s is well above the sub-150ms window observed in practice while costing nothing
+ * once the daemon is actually idle -- it only delays a shutdown that was never time-critical.
+ */
+const SHUTDOWN_GRACE_MS = 1_000;
+
+/**
  * Records the port workers must dial.
  *
  * Necessary because the WebSocket server retries upward on EADDRINUSE, so the bound port
@@ -269,6 +283,8 @@ async function startDaemon(
 	 * its socket is also being torn down by this same shutdown): without this guard
 	 * the idle-stop log line and daemonHandle.stop('idle') would both run twice. */
 	let shuttingDown = false;
+	/** Pending debounced shutdown (SHUTDOWN_GRACE_MS), or none scheduled. */
+	let pendingShutdown: ReturnType<typeof setTimeout> | undefined;
 
 	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });
 
@@ -628,13 +644,32 @@ async function startDaemon(
 		checkShutdown();
 	}
 
+	function isIdle(): boolean {
+		return (
+			commandHandler.isQueueEmpty() && !commandHandler.hasActiveExecutions() && !workerRegistry.hasBusyWorkers()
+		);
+	}
+
+	/**
+	 * Looks idle right now and schedules the actual stop after SHUTDOWN_GRACE_MS, rather than
+	 * stopping synchronously -- see SHUTDOWN_GRACE_MS for why. The grace period re-checks
+	 * idleness itself when it elapses, so nothing here needs to notice "something changed" and
+	 * cancel early: a run that lands late simply finds the daemon still up and makes the
+	 * recheck below see activity, at which point the schedule is dropped without acting.
+	 */
 	function checkShutdown(): void {
 		if (shuttingDown) return;
-		if (
-			commandHandler.isQueueEmpty() &&
-			!commandHandler.hasActiveExecutions() &&
-			!workerRegistry.hasBusyWorkers()
-		) {
+		if (!isIdle()) {
+			if (pendingShutdown !== undefined) {
+				clearTimeout(pendingShutdown);
+				pendingShutdown = undefined;
+			}
+			return;
+		}
+		if (pendingShutdown !== undefined) return; // already scheduled
+		pendingShutdown = setTimeout(() => {
+			pendingShutdown = undefined;
+			if (shuttingDown || !isIdle()) return;
 			shuttingDown = true;
 			// Only the workers this daemon forked are told to exit. A worker the user
 			// launched in a terminal must survive an idle period: it is registered, not
@@ -653,7 +688,7 @@ async function startDaemon(
 			wsServer.close();
 			writeDaemonLog(logsDir, 'info', 'Daemon stopped (idle)');
 			void daemonHandle.stop('idle');
-		}
+		}, SHUTDOWN_GRACE_MS);
 	}
 
 	return daemonHandle;
