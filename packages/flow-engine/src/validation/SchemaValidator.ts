@@ -681,6 +681,22 @@ export class SchemaValidator {
 				},
 			});
 		}
+
+		// Validate timeout (optional; 0 is invalid -- omit the field instead to mean "no timeout")
+		if (step.timeout !== undefined) {
+			if (typeof step.timeout !== 'number' || step.timeout <= 0) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.INVALID_VALUE,
+					message: `Model step '${step.id}' timeout must be a positive number of minutes`,
+					location: { stepId: step.id, field: 'timeout' },
+					suggestion: 'Set a positive number of minutes, or omit the field for no timeout',
+					context: {
+						actual: step.timeout,
+					},
+				});
+			}
+		}
 	}
 
 	/**

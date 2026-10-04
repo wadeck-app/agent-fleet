@@ -687,6 +687,15 @@ export interface ModelFlowStep extends BaseFlowStep {
 	 * than fixed, since step-scoped is the design that is actually needed.
 	 */
 	skipPermissions?: boolean;
+
+	/**
+	 * Maximum time in minutes to wait for the model to respond before killing the
+	 * underlying process and failing the step. Omit (or leave undefined) for no timeout.
+	 *
+	 * Unlike `UserInterventionStep.timeout`, there is no `onTimeout` mode here -- a model
+	 * step that times out has no legitimate "continue"/"default" semantics, only "fail".
+	 */
+	timeout?: number;
 }
 
 /**

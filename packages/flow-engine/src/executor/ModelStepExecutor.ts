@@ -36,6 +36,37 @@ export interface ModelStepConfig {
 	resolvedModel?: string;
 }
 
+/**
+ * Races `promise` against `step.timeout` (minutes). If the timer fires first, kills the
+ * provider's underlying process and rejects with an actionable message naming the step,
+ * provider, model, and configured timeout -- a hang must never surface as a generic failure.
+ * No-op (returns `promise` as-is) when `step.timeout` is unset.
+ */
+function withModelTimeout<T>(
+	promise: Promise<T>,
+	step: ModelFlowStep,
+	provider: ModelProvider,
+	providerLabel: string,
+	effectiveModel: string | undefined
+): Promise<T> {
+	const timeoutMinutes = step.timeout;
+	if (!timeoutMinutes) return promise;
+
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timeoutPromise = new Promise<never>((_resolve, reject) => {
+		timer = setTimeout(() => {
+			provider.kill();
+			reject(
+				new Error(
+					`Model step '${step.id}' (provider: ${providerLabel}, model: ${effectiveModel ?? 'default'}) timed out after ${timeoutMinutes} minute(s) with no response -- killed.`
+				)
+			);
+		}, timeoutMinutes * 60_000);
+	});
+
+	return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
+
 export async function executeModelStep(
 	step: ModelFlowStep,
 	workspacePath: string,
@@ -198,7 +229,13 @@ export async function executeModelStep(
 
 	try {
 		if (config.interactive) {
-			const result = await provider.launchInteractive(launchOptions);
+			const result = await withModelTimeout(
+				provider.launchInteractive(launchOptions),
+				step,
+				provider,
+				providerLabel,
+				effectiveModel
+			);
 
 			stepTrace.response = result.response;
 			stepTrace.exitCode = result.exitCode ?? undefined;
@@ -218,7 +255,13 @@ export async function executeModelStep(
 			writeOutputFiles(stepTrace.outputs ?? {}, step.output, context);
 			return stepTrace;
 		} else {
-			const result = await provider.launchBackground(launchOptions);
+			const result = await withModelTimeout(
+				provider.launchBackground(launchOptions),
+				step,
+				provider,
+				providerLabel,
+				effectiveModel
+			);
 
 			if (pollingInterval) {
 				clearInterval(pollingInterval);
