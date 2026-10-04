@@ -33,6 +33,7 @@ import {
 	withFreshToken,
 } from '../../worker/WorkerLaunch';
 import { describeNoLiveWorkers } from '../../worker/WorkerListing';
+import { VERSION } from '../version.js';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -255,6 +256,9 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	}
 
 	console.log(`[ok] flow worker for ${projectRoot}`);
+	// So "which build served this step" is answerable from the worker's own terminal, not just
+	// by cross-referencing a daemon-side version field after the fact.
+	console.log(`     version    : ${VERSION}`);
 	if (registration.labels && registration.labels.length > 0) {
 		console.log(`     labels     : ${registration.labels.join(', ')}`);
 	}
