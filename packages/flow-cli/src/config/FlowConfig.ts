@@ -40,6 +40,8 @@ const COMPARED_SETTINGS: { path: string; read: (config: FlowConfigData) => unkno
 	{ path: 'limits.maxStepsPerExecution', read: config => config.limits.maxStepsPerExecution },
 	{ path: 'workspace.retainDays', read: config => config.workspace.retainDays },
 	{ path: 'workspace.maxWorkspaces', read: config => config.workspace.maxWorkspaces },
+	{ path: 'opencode.configAnthropic', read: config => config.opencode.configAnthropic },
+	{ path: 'opencode.configOpenai', read: config => config.opencode.configOpenai },
 ];
 
 /**
@@ -107,6 +109,33 @@ export interface FlowConfigData {
 		/** Maximum number of workspace directories to keep. Oldest are pruned first. Default: 50. */
 		maxWorkspaces: number;
 	};
+	opencode: {
+		/**
+		 * Path to the opencode config used for Anthropic-family models. Default: undefined (no
+		 * global default -- OpenCodeModelProvider falls back to its own conventional path).
+		 *
+		 * Global-only: no project-local override. A daemon can serve steps from several projects
+		 * at once, so a project-local value here would leak one project's AWS-profile-scoped
+		 * config into another project's steps -- the exact bug class D#58 already fixed once for
+		 * this same config file.
+		 */
+		configAnthropic: string | undefined;
+		/** Path to the opencode config used for OpenAI-on-Bedrock models. Default: undefined. */
+		configOpenai: string | undefined;
+	};
+}
+
+/**
+ * Expands a leading `~` to the user's home directory. No-op for any other path shape.
+ *
+ * Matches the convention `defaultOpenCodeConfigPath` (flow-engine's OpenCodeModelProvider) already
+ * uses to build its own default path -- `path.join(os.homedir(), ...)` -- rather than inventing a
+ * separate expansion rule for this one setting.
+ */
+function expandHome(value: string): string {
+	if (value === '~') return os.homedir();
+	if (value.startsWith('~/') || value.startsWith('~\\')) return path.join(os.homedir(), value.slice(2));
+	return value;
 }
 
 // Keep FlowConfig as a type alias for backward compatibility with callers using `type FlowConfig`.
@@ -123,6 +152,7 @@ export class FlowConfigLoader {
 			maxStepsPerExecution: 50,
 		},
 		workspace: { retainDays: 30, maxWorkspaces: 50 },
+		opencode: { configAnthropic: undefined, configOpenai: undefined },
 	};
 
 	/**
@@ -182,10 +212,67 @@ export class FlowConfigLoader {
 				security: { ...FlowConfigLoader.DEFAULT.security, ...loaded?.security },
 				limits: { ...FlowConfigLoader.DEFAULT.limits, ...loaded?.limits },
 				workspace: { ...FlowConfigLoader.DEFAULT.workspace, ...loaded?.workspace },
+				opencode: {
+					...FlowConfigLoader.DEFAULT.opencode,
+					...loaded?.opencode,
+					...(loaded?.opencode?.configAnthropic !== undefined
+						? { configAnthropic: expandHome(loaded.opencode.configAnthropic) }
+						: {}),
+					...(loaded?.opencode?.configOpenai !== undefined
+						? { configOpenai: expandHome(loaded.opencode.configOpenai) }
+						: {}),
+				},
 			};
 		} catch {
 			process.stderr.write('Warning: daemon config could not be parsed, using defaults.\n');
 			return FlowConfigLoader.DEFAULT;
 		}
+	}
+
+	/**
+	 * Sets OPENCODE_CONFIG_ANTHROPIC / _OPENAI on the given env from `config.opencode`, so they
+	 * flow through the existing daemon -> worker forwarding chain (WindowsDaemonEnv.ts's
+	 * PASSTHROUGH_ENV_VARS, ForkWorkerSource.ts's buildEnv()) with no changes to either file.
+	 *
+	 * Must run on the daemon process itself, before any worker is forked -- a value set only on a
+	 * worker's env would not survive the next daemon restart or additional workers.
+	 *
+	 * Never overrides a value the operator already set: config.yml is a convenience default, not
+	 * a forced value. An operator who exported OPENCODE_CONFIG_ANTHROPIC themselves knows what
+	 * they are doing; config.yml must not silently override that.
+	 *
+	 * A config.yml path that does not exist on disk is reported, not silently dropped -- same
+	 * "[flow] ..." stderr channel FlowIndex.ts's daemon-mode startup already uses for the
+	 * legacy-config warning (both are config.yml diagnostics printed by the daemon process).
+	 */
+	static applyOpenCodeEnvDefaults(config: FlowConfigData, env: NodeJS.ProcessEnv = process.env): void {
+		FlowConfigLoader.applyOneOpenCodeEnvDefault(
+			'OPENCODE_CONFIG_ANTHROPIC',
+			'opencode.configAnthropic',
+			config.opencode.configAnthropic,
+			env
+		);
+		FlowConfigLoader.applyOneOpenCodeEnvDefault(
+			'OPENCODE_CONFIG_OPENAI',
+			'opencode.configOpenai',
+			config.opencode.configOpenai,
+			env
+		);
+	}
+
+	private static applyOneOpenCodeEnvDefault(
+		envVar: string,
+		configKey: string,
+		configuredPath: string | undefined,
+		env: NodeJS.ProcessEnv
+	): void {
+		if (configuredPath === undefined || env[envVar] !== undefined) return;
+		if (!fs.existsSync(configuredPath)) {
+			process.stderr.write(
+				`[flow] ${configKey} in config.yml points to '${configuredPath}', but that file does not exist -- ${envVar} will not be set\n`
+			);
+			return;
+		}
+		env[envVar] = configuredPath;
 	}
 }

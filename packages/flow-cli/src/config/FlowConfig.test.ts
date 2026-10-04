@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FlowConfigLoader } from './FlowConfig.js';
 
@@ -147,6 +147,89 @@ describe('FlowConfigLoader.load', () => {
 		expect(config.limits.maxInjectedSteps).toBe(10);
 		expect(config.limits.maxStepsPerExecution).toBe(FlowConfigLoader.DEFAULT.limits.maxStepsPerExecution);
 		expect(config.queue).toEqual(FlowConfigLoader.DEFAULT.queue);
+	});
+
+	describe('opencode', () => {
+		it('section absent: both fields undefined, no error', () => {
+			const file = writeConfig('cfg.yaml', 'queue:\n  concurrency: 2\n');
+			expect(FlowConfigLoader.load(file).opencode).toEqual({
+				configAnthropic: undefined,
+				configOpenai: undefined,
+			});
+		});
+
+		it('parses configAnthropic and configOpenai from an absolute path', () => {
+			const file = writeConfig(
+				'cfg.yaml',
+				'opencode:\n  configAnthropic: /abs/path/config_claude.json\n  configOpenai: /abs/path/config_codex.json\n'
+			);
+			const { opencode } = FlowConfigLoader.load(file);
+			expect(opencode.configAnthropic).toBe('/abs/path/config_claude.json');
+			expect(opencode.configOpenai).toBe('/abs/path/config_codex.json');
+		});
+
+		it('one field present without the other: the other stays undefined', () => {
+			const file = writeConfig('cfg.yaml', 'opencode:\n  configAnthropic: /abs/path/config_claude.json\n');
+			const { opencode } = FlowConfigLoader.load(file);
+			expect(opencode.configAnthropic).toBe('/abs/path/config_claude.json');
+			expect(opencode.configOpenai).toBeUndefined();
+		});
+
+		it('expands a leading ~ to the home directory', () => {
+			const file = writeConfig('cfg.yaml', 'opencode:\n  configAnthropic: ~/.config/opencode/config_claude.json\n');
+			const { opencode } = FlowConfigLoader.load(file);
+			expect(opencode.configAnthropic).toBe(path.join(os.homedir(), '.config', 'opencode', 'config_claude.json'));
+		});
+
+		it('default opencode section has both fields undefined', () => {
+			expect(FlowConfigLoader.DEFAULT.opencode).toEqual({ configAnthropic: undefined, configOpenai: undefined });
+		});
+	});
+
+	describe('applyOpenCodeEnvDefaults', () => {
+		it('sets OPENCODE_CONFIG_ANTHROPIC/_OPENAI from config when env is unset and the file exists', () => {
+			const anthropicPath = writeConfig('config_claude.json', '{}');
+			const openaiPath = writeConfig('config_codex.json', '{}');
+			const env: NodeJS.ProcessEnv = {};
+			FlowConfigLoader.applyOpenCodeEnvDefaults(
+				{ ...FlowConfigLoader.DEFAULT, opencode: { configAnthropic: anthropicPath, configOpenai: openaiPath } },
+				env
+			);
+			expect(env['OPENCODE_CONFIG_ANTHROPIC']).toBe(anthropicPath);
+			expect(env['OPENCODE_CONFIG_OPENAI']).toBe(openaiPath);
+		});
+
+		it('does NOT override an operator-set OPENCODE_CONFIG_ANTHROPIC', () => {
+			const anthropicPath = writeConfig('config_claude.json', '{}');
+			const env: NodeJS.ProcessEnv = { OPENCODE_CONFIG_ANTHROPIC: '/operator/own-config.json' };
+			FlowConfigLoader.applyOpenCodeEnvDefaults(
+				{ ...FlowConfigLoader.DEFAULT, opencode: { configAnthropic: anthropicPath, configOpenai: undefined } },
+				env
+			);
+			expect(env['OPENCODE_CONFIG_ANTHROPIC']).toBe('/operator/own-config.json');
+		});
+
+		it('leaves env untouched when config.opencode has no values', () => {
+			const env: NodeJS.ProcessEnv = {};
+			FlowConfigLoader.applyOpenCodeEnvDefaults(FlowConfigLoader.DEFAULT, env);
+			expect(env['OPENCODE_CONFIG_ANTHROPIC']).toBeUndefined();
+			expect(env['OPENCODE_CONFIG_OPENAI']).toBeUndefined();
+		});
+
+		it('does not set the env var and logs the exact missing path when the configured file does not exist', () => {
+			const missingPath = path.join(tmpDir, 'does-not-exist', 'config_claude.json');
+			const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+			const env: NodeJS.ProcessEnv = {};
+			FlowConfigLoader.applyOpenCodeEnvDefaults(
+				{ ...FlowConfigLoader.DEFAULT, opencode: { configAnthropic: missingPath, configOpenai: undefined } },
+				env
+			);
+			expect(env['OPENCODE_CONFIG_ANTHROPIC']).toBeUndefined();
+			expect(writeSpy).toHaveBeenCalledWith(
+				`[flow] opencode.configAnthropic in config.yml points to '${missingPath}', but that file does not exist -- OPENCODE_CONFIG_ANTHROPIC will not be set\n`
+			);
+			writeSpy.mockRestore();
+		});
 	});
 });
 

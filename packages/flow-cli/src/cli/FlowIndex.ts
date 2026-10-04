@@ -205,6 +205,9 @@ async function main(): Promise<void> {
 		// Printed by the daemon itself, since this is the process whose behaviour the ignored
 		// file would have changed.
 		if (legacyWarning !== undefined) process.stderr.write(`[flow] ${legacyWarning}\n`);
+		// Must run before any worker is forked: ForkWorkerSource/WindowsDaemonEnv forward these
+		// two vars from this process's own env, never overriding an operator's explicit export.
+		FlowConfigLoader.applyOpenCodeEnvDefaults(config);
 		await Daemon.start(config, DAEMON_DIR);
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).
 		return;

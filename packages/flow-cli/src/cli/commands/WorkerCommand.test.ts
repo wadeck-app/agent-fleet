@@ -1,11 +1,30 @@
 import { Command } from 'commander';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../config/FlowConfig', () => ({
-	FlowConfigLoader: {
-		loadForDaemon: () => ({ config: { worker: { wsPort: null }, queue: {}, limits: {}, workspace: {} } }),
-	},
+// Mutable so individual tests (the opencode-env-defaults ones) can hand runWorker a config with
+// an `opencode` section, while the startup-banner/list/update tests keep the plain default.
+const hoistedState = vi.hoisted(() => ({
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	loadForDaemonConfig: { worker: { wsPort: null }, queue: {}, limits: {}, workspace: {}, opencode: {} } as any,
 }));
+
+vi.mock('../../config/FlowConfig', async () => {
+	// applyOpenCodeEnvDefaults is kept real (not stubbed): this file's "opencode env defaults"
+	// tests below exist specifically to prove runWorker wires it to this worker's OWN
+	// process.env (the gap external, non-daemon-forked workers would otherwise have).
+	const actual = await vi.importActual<typeof import('../../config/FlowConfig')>('../../config/FlowConfig');
+	return {
+		FlowConfigLoader: {
+			DEFAULT: actual.FlowConfigLoader.DEFAULT,
+			load: actual.FlowConfigLoader.load,
+			loadForDaemon: () => ({ config: hoistedState.loadForDaemonConfig }),
+			applyOpenCodeEnvDefaults: actual.FlowConfigLoader.applyOpenCodeEnvDefaults,
+		},
+	};
+});
 
 vi.mock('../../config/DefaultProjectResolver', () => ({
 	DefaultProjectResolver: class {
@@ -314,5 +333,72 @@ describe('flow worker update', () => {
 		expect(exitSpy).toHaveBeenCalledWith(1);
 		const errOutput = consoleErrorSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
 		expect(errOutput).toContain('No connected worker has id "ghost"');
+	});
+});
+
+describe('flow worker — opencode env defaults (external, non-daemon-forked worker)', () => {
+	// This worker process runs StepRunner/OpenCodeModelProvider in-process, reading its own
+	// process.env -- it is never forked by the daemon, so it never inherits anything via
+	// ForkWorkerSource.ts's env passthrough. runWorker must apply config.yml's opencode
+	// defaults directly to this process's own env, same as the daemon does for its own.
+	let tmpDir: string;
+	let anthropicConfigPath: string;
+	const defaultLoadForDaemonConfig = {
+		worker: { wsPort: null },
+		queue: {},
+		limits: {},
+		workspace: {},
+		opencode: {},
+	};
+
+	beforeEach(() => {
+		vi.spyOn(console, 'log').mockImplementation(() => {});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'worker-opencode-env-test-'));
+		anthropicConfigPath = path.join(tmpDir, 'config_claude.json');
+		fs.writeFileSync(anthropicConfigPath, '{}', 'utf8');
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+		hoistedState.loadForDaemonConfig = defaultLoadForDaemonConfig;
+		delete process.env['OPENCODE_CONFIG_ANTHROPIC'];
+	});
+
+	it("sets this worker's own OPENCODE_CONFIG_ANTHROPIC from config.yml when no env var is already set", async () => {
+		delete process.env['OPENCODE_CONFIG_ANTHROPIC'];
+		hoistedState.loadForDaemonConfig = {
+			...defaultLoadForDaemonConfig,
+			opencode: { configAnthropic: anthropicConfigPath, configOpenai: undefined },
+		};
+
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		registerWorkerCommand(workerCommand);
+
+		await program.parseAsync(['node', 'test', 'worker']);
+
+		expect(process.env['OPENCODE_CONFIG_ANTHROPIC']).toBe(anthropicConfigPath);
+	});
+
+	it("does NOT override an operator-set OPENCODE_CONFIG_ANTHROPIC on this worker's own env", async () => {
+		process.env['OPENCODE_CONFIG_ANTHROPIC'] = '/operator/own-config.json';
+		hoistedState.loadForDaemonConfig = {
+			...defaultLoadForDaemonConfig,
+			opencode: { configAnthropic: anthropicConfigPath, configOpenai: undefined },
+		};
+
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		registerWorkerCommand(workerCommand);
+
+		await program.parseAsync(['node', 'test', 'worker']);
+
+		expect(process.env['OPENCODE_CONFIG_ANTHROPIC']).toBe('/operator/own-config.json');
 	});
 });

@@ -9,6 +9,10 @@
  * Auto config selection: when a step doesn't set its own OPENCODE_CONFIG, and the resolved model
  *               is an Anthropic or OpenAI family model, OPENCODE_CONFIG_ANTHROPIC / _OPENAI (if
  *               set in the environment) is picked automatically -- see autoSelectOpenCodeConfig.
+ *               Falling back further still, if neither env var is set, the conventional default
+ *               file for that model family (~/.config/opencode/config_claude.json or
+ *               config_codex.json -- see defaultOpenCodeConfigPath) is used when it exists on
+ *               disk, so a flow author never has to know this mechanism exists at all.
  * Env isolation: only options.env is forwarded; process.env is never inherited.
  * Prompt limit: 32KB -- throws PromptTooLargeError if exceeded.
  * XDG isolation: each subprocess gets a unique XDG_CONFIG_HOME so it never reads ~/.config/opencode/.
@@ -81,15 +85,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * Conventional path for the per-model-family OpenCode config that autoSelectOpenCodeConfig falls
+ * back to when no explicit env var is set. Uses os.homedir() rather than a hardcoded path so this
+ * works the same on Windows and POSIX -- same convention documented in this file's header
+ * (OPENCODE_CONFIG example).
+ */
+export function defaultOpenCodeConfigPath(kind: 'anthropic' | 'openai'): string {
+	return path.join(os.homedir(), '.config', 'opencode', kind === 'anthropic' ? 'config_claude.json' : 'config_codex.json');
+}
+
+/**
  * Picks OPENCODE_CONFIG automatically from the resolved model's family, when the step didn't
  * already set one. Each AWS account/profile here only whitelists one model family (verified
  * live: an Anthropic-profile config 404s on an OpenAI-on-Bedrock id and vice versa), so a step
  * switching from `model: sonnet` to `model: terra` would otherwise silently keep hitting the
  * wrong profile until someone notices the model never changed.
  *
- * Never overrides an explicit `OPENCODE_CONFIG` -- that is always the step author's own choice.
- * Does nothing if the matching env var isn't set, which keeps this inert for anyone not using
- * the convention.
+ * Resolution order, so a flow author never has to know this exists:
+ *  1. `existingConfigEnv` -- the step's own explicit OPENCODE_CONFIG. Never overridden.
+ *  2. OPENCODE_CONFIG_ANTHROPIC / _OPENAI -- an explicit override naming a non-default path.
+ *  3. defaultOpenCodeConfigPath() for the model's family -- used only when that file actually
+ *     exists on disk (fs.existsSync). A missing file falls through to undefined rather than
+ *     pointing opencode at a path that doesn't exist, which would just trade one unexplained
+ *     failure for another.
  */
 export function autoSelectOpenCodeConfig(
 	model: string | undefined,
@@ -98,11 +116,23 @@ export function autoSelectOpenCodeConfig(
 ): string | undefined {
 	if (existingConfigEnv || !model) return undefined;
 
-	if (isOpenAiModel(model) && env['OPENCODE_CONFIG_OPENAI']) {
-		return env['OPENCODE_CONFIG_OPENAI'];
+	if (isOpenAiModel(model)) {
+		if (env['OPENCODE_CONFIG_OPENAI']) return env['OPENCODE_CONFIG_OPENAI'];
+		const defaultPath = defaultOpenCodeConfigPath('openai');
+		if (fs.existsSync(defaultPath)) return defaultPath;
+		console.log(
+			`[OpenCodeModelProvider] no OPENCODE_CONFIG_OPENAI set and default path '${defaultPath}' not found -- opencode will use its own default catalogue`
+		);
+		return undefined;
 	}
-	if (isAnthropicModel(model) && env['OPENCODE_CONFIG_ANTHROPIC']) {
-		return env['OPENCODE_CONFIG_ANTHROPIC'];
+	if (isAnthropicModel(model)) {
+		if (env['OPENCODE_CONFIG_ANTHROPIC']) return env['OPENCODE_CONFIG_ANTHROPIC'];
+		const defaultPath = defaultOpenCodeConfigPath('anthropic');
+		if (fs.existsSync(defaultPath)) return defaultPath;
+		console.log(
+			`[OpenCodeModelProvider] no OPENCODE_CONFIG_ANTHROPIC set and default path '${defaultPath}' not found -- opencode will use its own default catalogue`
+		);
+		return undefined;
 	}
 	return undefined;
 }

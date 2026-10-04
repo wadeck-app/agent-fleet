@@ -318,6 +318,11 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	// dropped here rather than printed by every command that reads config: the daemon reports
 	// it once, and repeating it on each worker launch would be noise.
 	const { config } = FlowConfigLoader.loadForDaemon(daemonDir);
+	// This worker runs StepRunner/OpenCodeModelProvider fully in-process (WorkerAdapter.execute()),
+	// reading this process's own process.env -- it is never forked by the daemon, so it never
+	// inherits the daemon's env via ForkWorkerSource.ts. It must set its own defaults the same way,
+	// at the same point in startup, before any step can run.
+	FlowConfigLoader.applyOpenCodeEnvDefaults(config);
 	const { projectRoot } = new DefaultProjectResolver().resolve(process.cwd());
 
 	// Built here, in the process with the human in front of it (D#34): the CLI approval

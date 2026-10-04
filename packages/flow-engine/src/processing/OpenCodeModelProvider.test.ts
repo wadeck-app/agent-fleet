@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PromptTooLargeError } from './ModelProvider';
 import type { LaunchOptions } from './ModelProvider';
-import { OpenCodeModelProvider, autoSelectOpenCodeConfig } from './OpenCodeModelProvider';
+import { autoSelectOpenCodeConfig, defaultOpenCodeConfigPath, OpenCodeModelProvider } from './OpenCodeModelProvider';
 import type { StreamJsonEvent } from './StreamJsonParser';
 
 vi.mock('child_process');
@@ -87,12 +87,78 @@ describe('autoSelectOpenCodeConfig', () => {
 		).toBeUndefined();
 	});
 
-	it('does nothing when the matching env var is not set', () => {
+	it('does nothing when the matching env var is not set and no default file exists', () => {
+		vi.spyOn(fs, 'existsSync').mockReturnValue(false);
 		expect(autoSelectOpenCodeConfig('amazon-bedrock/openai.gpt-5.6-luna', undefined, {})).toBeUndefined();
+		vi.restoreAllMocks();
 	});
 
 	it('does nothing when no model is given', () => {
 		expect(autoSelectOpenCodeConfig(undefined, undefined, { OPENCODE_CONFIG_OPENAI: '/x.json' })).toBeUndefined();
+	});
+
+	describe('conventional default file fallback', () => {
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it('falls back to the conventional default file for an Anthropic model when it exists', () => {
+			const expectedPath = defaultOpenCodeConfigPath('anthropic');
+			vi.spyOn(fs, 'existsSync').mockImplementation(p => p === expectedPath);
+			expect(autoSelectOpenCodeConfig('amazon-bedrock/us.anthropic.claude-sonnet-5', undefined, {})).toBe(
+				expectedPath
+			);
+		});
+
+		it('returns undefined for an Anthropic model when the default file does not exist, and logs the missing path', () => {
+			vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+			const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+			const expectedPath = defaultOpenCodeConfigPath('anthropic');
+			expect(
+				autoSelectOpenCodeConfig('amazon-bedrock/us.anthropic.claude-sonnet-5', undefined, {})
+			).toBeUndefined();
+			expect(logSpy).toHaveBeenCalledWith(
+				`[OpenCodeModelProvider] no OPENCODE_CONFIG_ANTHROPIC set and default path '${expectedPath}' not found -- opencode will use its own default catalogue`
+			);
+		});
+
+		it('falls back to the conventional default file for an OpenAI model when it exists', () => {
+			const expectedPath = defaultOpenCodeConfigPath('openai');
+			vi.spyOn(fs, 'existsSync').mockImplementation(p => p === expectedPath);
+			expect(autoSelectOpenCodeConfig('amazon-bedrock/openai.gpt-5.6-luna', undefined, {})).toBe(expectedPath);
+		});
+
+		it('returns undefined for an OpenAI model when the default file does not exist, and logs the missing path', () => {
+			vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+			const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+			const expectedPath = defaultOpenCodeConfigPath('openai');
+			expect(autoSelectOpenCodeConfig('amazon-bedrock/openai.gpt-5.6-luna', undefined, {})).toBeUndefined();
+			expect(logSpy).toHaveBeenCalledWith(
+				`[OpenCodeModelProvider] no OPENCODE_CONFIG_OPENAI set and default path '${expectedPath}' not found -- opencode will use its own default catalogue`
+			);
+		});
+
+		it('an explicit OPENCODE_CONFIG_ANTHROPIC env var wins even when the default file also exists', () => {
+			vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+			const env = { OPENCODE_CONFIG_ANTHROPIC: '/configs/custom-claude.json' };
+			expect(autoSelectOpenCodeConfig('amazon-bedrock/us.anthropic.claude-sonnet-5', undefined, env)).toBe(
+				'/configs/custom-claude.json'
+			);
+		});
+
+		it('an explicit existingConfigEnv wins regardless of the default file', () => {
+			vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+			expect(
+				autoSelectOpenCodeConfig('amazon-bedrock/us.anthropic.claude-sonnet-5', '/configs/custom.json', {})
+			).toBeUndefined();
+		});
+	});
+});
+
+describe('defaultOpenCodeConfigPath', () => {
+	it('builds the conventional path under the home directory for each model family', () => {
+		expect(defaultOpenCodeConfigPath('anthropic')).toBe(join(os.homedir(), '.config', 'opencode', 'config_claude.json'));
+		expect(defaultOpenCodeConfigPath('openai')).toBe(join(os.homedir(), '.config', 'opencode', 'config_codex.json'));
 	});
 });
 
