@@ -5,6 +5,16 @@ import type { DaemonToWorker, WorkerReady, WorkerSummary } from '../ipc/Protocol
 
 type WorkerState = 'idle' | 'busy';
 
+/**
+ * Shells `updateWorker` accepts for `shellCapabilities`.
+ *
+ * Mirrors `validShells` in `packages/flow-engine/src/validation/SchemaValidator.ts` (the
+ * enum a step's own `shell:` field is checked against) -- same values, so a worker can
+ * never be told it supports a shell no step is allowed to request. `sh` is deliberately
+ * absent there and here, for the same reason (not a near-equivalent of `bash`).
+ */
+const VALID_SHELLS: readonly string[] = ['bash', 'cmd', 'pwsh'];
+
 /** What a registered worker told the daemon about itself, plus its dispatch state. */
 export interface RegisteredWorker {
 	state: WorkerState;
@@ -120,6 +130,64 @@ export class WorkerRegistry {
 	/** What this worker declared, or undefined when it is not registered. */
 	describe(ws: WebSocket): RegisteredWorker | undefined {
 		return this.workers.get(ws);
+	}
+
+	/**
+	 * Updates labels and/or shell capabilities on an already-connected worker, in place --
+	 * the same `RegisteredWorker` object `tryDispatch()` reads from, so the next dispatch
+	 * sees the new values immediately (Proposal 3). No restart needed.
+	 *
+	 * Each field, when given, *replaces* the current list -- the same semantic
+	 * `buildRegistration()` uses for a worker's initial `--labels`, not a merge.
+	 *
+	 * Daemon-registry only: this does not notify the worker process itself. Dispatch
+	 * correctness is the actual point of this method, and `StepRouter`/`LabelMatcher`/
+	 * `ShellMatcher` read straight from this registry -- the worker's own startup banner
+	 * staying stale afterwards is cosmetic, and nothing here needs to fix it.
+	 *
+	 * @throws when neither field is given (nothing to update), a label is blank, a shell is
+	 *         not one of `bash`/`cmd`/`pwsh`, or no live worker has this id -- an update that
+	 *         silently did nothing would leave the caller believing dispatch now routes
+	 *         differently when it does not.
+	 */
+	updateWorker(workerId: string, updates: { labels?: string[]; shellCapabilities?: string[] }): RegisteredWorker {
+		if (updates.labels === undefined && updates.shellCapabilities === undefined) {
+			throw new Error(
+				`updateWorker("${workerId}") was given neither labels nor shellCapabilities to update -- nothing to do.`
+			);
+		}
+		if (updates.labels?.some(label => label.trim() === '')) {
+			throw new Error(
+				`Worker labels must not be empty: ${JSON.stringify(updates.labels)} contains a blank entry, which no step could match.`
+			);
+		}
+		if (updates.shellCapabilities !== undefined) {
+			const invalid = updates.shellCapabilities.filter(shell => !VALID_SHELLS.includes(shell));
+			if (invalid.length > 0) {
+				throw new Error(
+					`Unknown shell(s) ${invalid.map(s => `'${s}'`).join(', ')} for worker "${workerId}" -- expected one of: ${VALID_SHELLS.join(', ')}.`
+				);
+			}
+		}
+
+		for (const worker of this.workers.values()) {
+			if (worker.workerId !== workerId) continue;
+			if (updates.labels !== undefined) worker.labels = updates.labels;
+			// violations-suppress: ts/no-unsafe-type-cast validated above against VALID_SHELLS, which lists exactly 'bash' | 'cmd' | 'pwsh'
+			if (updates.shellCapabilities !== undefined) {
+				worker.shellCapabilities = updates.shellCapabilities as ('bash' | 'cmd' | 'pwsh')[];
+			}
+			return worker;
+		}
+
+		const live = [...this.workers.values()].map(w => w.workerId);
+		throw new Error(
+			`No connected worker has id "${workerId}". ` +
+				(live.length > 0
+					? `Live worker ids: ${live.join(', ')}.`
+					: 'No workers are currently connected.') +
+				' Run "flow worker list" to see current ids.'
+		);
 	}
 
 	/**

@@ -94,6 +94,22 @@ export interface WorkerSummary {
 	shellCapabilities?: ('bash' | 'cmd' | 'pwsh')[];
 }
 
+/**
+ * Payload for the `updateWorker` admin command (`flow worker update`).
+ *
+ * Sent over the daemon's command channel (`@wadeck-app/singleton-daemon-kit`'s
+ * `createDaemonClient`/`createDaemon`), the same one `flow worker list` already uses for
+ * `workers` -- not over the worker WebSocket protocol below. It mutates the daemon's own
+ * `WorkerRegistry` entry only (Proposal 3): `StepRouter` reads straight from that registry,
+ * so no restart, and no message to the worker process itself, is needed for dispatch to see
+ * the change. `labels`/`shellCapabilities`, when given, replace the current list.
+ */
+export interface UpdateWorkerRequest {
+	workerId: string;
+	labels?: string[];
+	shellCapabilities?: string[];
+}
+
 export type DaemonToWorker =
 	| {
 			type: 'assign';

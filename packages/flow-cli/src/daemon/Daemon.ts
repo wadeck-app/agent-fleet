@@ -15,7 +15,7 @@ import { VERSION } from '../cli/version.js';
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { PluginResolver } from '../config/PluginResolver.js';
-import type { ClientCommand, SourceReady, WorkerToDaemon } from '../ipc/Protocol';
+import type { ClientCommand, SourceReady, UpdateWorkerRequest, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
@@ -287,6 +287,18 @@ async function startDaemon(
 			// Live connections only: a declared source with nothing connected is not
 			// capacity, and reporting it as available would suggest a step could reach it (D#4).
 			workers: (): unknown => workerRegistry.summarize(),
+			// Proposal 3: updates an already-connected worker's labels/shellCapabilities on
+			// this daemon's registry, so the next tryDispatch() sees them without a restart.
+			// Thrown errors (unknown workerId, blank label, unknown shell) propagate to the
+			// CLI as a rejected command -- there is no silent no-op path here.
+			updateWorker: (payload: unknown): unknown => {
+				const { workerId, labels, shellCapabilities } = payload as UpdateWorkerRequest;
+				if (typeof workerId !== 'string' || workerId.trim() === '') {
+					throw new Error('updateWorker requires a non-empty "workerId".');
+				}
+				workerRegistry.updateWorker(workerId, { labels, shellCapabilities });
+				return workerRegistry.summarize().find(w => w.workerId === workerId);
+			},
 		},
 		health: () => ({
 			status: 'ok' as const,

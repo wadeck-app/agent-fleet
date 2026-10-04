@@ -186,3 +186,133 @@ describe('flow worker list — shells column', () => {
 		expect(allOutput).toContain('shells=-');
 	});
 });
+
+describe('flow worker update', () => {
+	let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+	let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+			throw new Error('process.exit called');
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.resetModules();
+	});
+
+	it('fails fast locally when neither --labels nor --shells is given, without contacting the daemon', async () => {
+		vi.resetModules();
+		const send = vi.fn();
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
+			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
+			createDaemonClient: () => ({ send }),
+		}));
+
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+
+		await expect(program.parseAsync(['node', 'test', 'worker', 'update', 'w1'])).rejects.toThrow();
+
+		expect(send).not.toHaveBeenCalled();
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		const errOutput = consoleErrorSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
+		expect(errOutput).toContain('--labels');
+		expect(errOutput).toContain('--shells');
+	});
+
+	it('fails fast locally on an unknown shell, without contacting the daemon', async () => {
+		vi.resetModules();
+		const send = vi.fn();
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
+			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
+			createDaemonClient: () => ({ send }),
+		}));
+
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+
+		await expect(
+			program.parseAsync(['node', 'test', 'worker', 'update', 'w1', '--shells', 'sh'])
+		).rejects.toThrow();
+
+		expect(send).not.toHaveBeenCalled();
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		const errOutput = consoleErrorSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
+		expect(errOutput).toContain("Unknown shell(s) 'sh'");
+		expect(errOutput).toContain('bash, cmd, pwsh');
+	});
+
+	it('sends workerId/labels/shellCapabilities to the daemon and prints the result', async () => {
+		vi.resetModules();
+		const send = vi.fn().mockResolvedValue({
+			workerId: 'w1',
+			pid: 1,
+			state: 'idle',
+			labels: ['npm'],
+			attachedProjects: [],
+			hasUserInterface: false,
+			ephemeral: true,
+			shellCapabilities: ['bash', 'pwsh'],
+		});
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
+			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
+			createDaemonClient: () => ({ send }),
+		}));
+
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+
+		await program.parseAsync(['node', 'test', 'worker', 'update', 'w1', '--labels', 'npm', '--shells', 'bash,pwsh']);
+
+		expect(send).toHaveBeenCalledWith('updateWorker', {
+			workerId: 'w1',
+			labels: ['npm'],
+			shellCapabilities: ['bash', 'pwsh'],
+		});
+		const allOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
+		expect(allOutput).toContain("Updated worker 'w1'");
+		expect(allOutput).toContain('labels : npm');
+		expect(allOutput).toContain('shells : bash, pwsh');
+	});
+
+	it('reports an actionable error when the daemon rejects the update (unknown workerId)', async () => {
+		vi.resetModules();
+		const send = vi.fn().mockRejectedValue(new Error('No connected worker has id "ghost". (none connected)'));
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
+			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
+			createDaemonClient: () => ({ send }),
+		}));
+
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+
+		await expect(
+			program.parseAsync(['node', 'test', 'worker', 'update', 'ghost', '--labels', 'npm'])
+		).rejects.toThrow();
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		const errOutput = consoleErrorSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
+		expect(errOutput).toContain('No connected worker has id "ghost"');
+	});
+});

@@ -294,3 +294,102 @@ describe('WorkerRegistry - sending', () => {
 		expect(forked.close).not.toHaveBeenCalled();
 	});
 });
+
+// Proposal 3: labels/shellCapabilities can be changed on an already-connected worker,
+// without a restart, by mutating the same RegisteredWorker object tryDispatch() reads from.
+describe('WorkerRegistry - updateWorker (Proposal 3)', () => {
+	it('updates labels only, leaving shellCapabilities untouched', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, { pid: 1, labels: ['old'], shellCapabilities: ['bash'] });
+		const { workerId } = registry.describe(ws)!;
+
+		registry.updateWorker(workerId, { labels: ['new', 'npm'] });
+
+		const info = registry.describe(ws);
+		expect(info?.labels).toEqual(['new', 'npm']);
+		expect(info?.shellCapabilities).toEqual(['bash']);
+	});
+
+	it('updates shellCapabilities only, leaving labels untouched', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, { pid: 1, labels: ['gpu'], shellCapabilities: ['bash'] });
+		const { workerId } = registry.describe(ws)!;
+
+		registry.updateWorker(workerId, { shellCapabilities: ['bash', 'pwsh'] });
+
+		const info = registry.describe(ws);
+		expect(info?.labels).toEqual(['gpu']);
+		expect(info?.shellCapabilities).toEqual(['bash', 'pwsh']);
+	});
+
+	it('updates both labels and shellCapabilities together', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal);
+		const { workerId } = registry.describe(ws)!;
+
+		registry.updateWorker(workerId, { labels: ['npm'], shellCapabilities: ['pwsh'] });
+
+		const info = registry.describe(ws);
+		expect(info?.labels).toEqual(['npm']);
+		expect(info?.shellCapabilities).toEqual(['pwsh']);
+	});
+
+	it('is visible to summarize() and listIdle() immediately -- the same object dispatch reads from', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal);
+		const { workerId } = registry.describe(ws)!;
+
+		registry.updateWorker(workerId, { labels: ['gpu'] });
+
+		expect(registry.summarize()[0]?.labels).toEqual(['gpu']);
+		expect(registry.listIdle()[0]?.worker.labels).toEqual(['gpu']);
+	});
+
+	it('throws for a nonexistent workerId, naming the live ids', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal);
+		const liveId = registry.describe(ws)!.workerId;
+
+		expect(() => registry.updateWorker('does-not-exist', { labels: ['x'] })).toThrow(new RegExp(liveId));
+	});
+
+	it('throws naming no workers connected when the registry is empty', () => {
+		const registry = new WorkerRegistry();
+
+		expect(() => registry.updateWorker('anything', { labels: ['x'] })).toThrow(
+			/No workers are currently connected/
+		);
+	});
+
+	it('throws when neither labels nor shellCapabilities is given', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal);
+		const { workerId } = registry.describe(ws)!;
+
+		expect(() => registry.updateWorker(workerId, {})).toThrow(/nothing to do/);
+	});
+
+	it('throws on a blank label, naming the offending list', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal);
+		const { workerId } = registry.describe(ws)!;
+
+		expect(() => registry.updateWorker(workerId, { labels: ['ok', '  '] })).toThrow(/must not be empty/);
+	});
+
+	it('throws on an unknown shell, listing the accepted ones', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, minimal);
+		const { workerId } = registry.describe(ws)!;
+
+		expect(() => registry.updateWorker(workerId, { shellCapabilities: ['sh'] })).toThrow(/bash, cmd, pwsh/);
+	});
+});
