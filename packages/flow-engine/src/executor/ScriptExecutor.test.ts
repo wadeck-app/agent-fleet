@@ -7,6 +7,9 @@ import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ScriptExecutionError, ScriptExecutor } from './ScriptExecutor';
+import { BashShellStrategy } from './shell/BashShellStrategy';
+import { CmdShellStrategy } from './shell/CmdShellStrategy';
+import { PwshShellStrategy } from './shell/PwshShellStrategy';
 
 // Mock child_process
 vi.mock('child_process');
@@ -489,6 +492,102 @@ describe('ScriptExecutor', () => {
 			const result = await executePromise;
 
 			expect(result.durationMs).toBeGreaterThanOrEqual(0);
+		});
+	});
+
+	describe('execute with shellKind', () => {
+		it('should dispatch to BashShellStrategy and spawn the resolved binary', async () => {
+			const resolveSpy = vi.spyOn(BashShellStrategy.prototype, 'resolve').mockReturnValue('/resolved/bash');
+
+			const executePromise = executor.execute({
+				script: 'echo hello',
+				shellKind: 'bash',
+			});
+
+			mockChild.stdout.emit('data', Buffer.from('hello\n'));
+			mockChild.emit('close', 0);
+
+			const result = await executePromise;
+
+			expect(resolveSpy).toHaveBeenCalled();
+			expect(child_process.spawn).toHaveBeenCalledWith(
+				'/resolved/bash',
+				[expect.stringMatching(/\.sh$/)],
+				expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
+			);
+			expect(result.stdout).toBe('hello');
+			expect(result.exitCode).toBe(0);
+			expect(result.success).toBe(true);
+
+			resolveSpy.mockRestore();
+		});
+
+		it('should dispatch to CmdShellStrategy and spawn the resolved binary with /d /c', async () => {
+			const resolveSpy = vi.spyOn(CmdShellStrategy.prototype, 'resolve').mockReturnValue('C:\\Windows\\System32\\cmd.exe');
+
+			const executePromise = executor.execute({
+				script: 'echo hello',
+				shellKind: 'cmd',
+			});
+
+			mockChild.stdout.emit('data', Buffer.from('hello\n'));
+			mockChild.emit('close', 0);
+
+			const result = await executePromise;
+
+			expect(resolveSpy).toHaveBeenCalled();
+			expect(child_process.spawn).toHaveBeenCalledWith(
+				'C:\\Windows\\System32\\cmd.exe',
+				['/d', '/c', expect.stringMatching(/\.bat$/)],
+				expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
+			);
+			expect(result.stdout).toBe('hello');
+			expect(result.success).toBe(true);
+
+			resolveSpy.mockRestore();
+		});
+
+		it('should dispatch to PwshShellStrategy and spawn the resolved binary with -File', async () => {
+			const resolveSpy = vi.spyOn(PwshShellStrategy.prototype, 'resolve').mockReturnValue('/resolved/pwsh');
+
+			const executePromise = executor.execute({
+				script: 'Write-Host hello',
+				shellKind: 'pwsh',
+			});
+
+			mockChild.stdout.emit('data', Buffer.from('hello\n'));
+			mockChild.emit('close', 0);
+
+			const result = await executePromise;
+
+			expect(resolveSpy).toHaveBeenCalled();
+			expect(child_process.spawn).toHaveBeenCalledWith(
+				'/resolved/pwsh',
+				['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', expect.stringMatching(/\.ps1$/)],
+				expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
+			);
+			expect(result.stdout).toBe('hello');
+			expect(result.success).toBe(true);
+
+			resolveSpy.mockRestore();
+		});
+
+		it('should reject with the exact error thrown by strategy.resolve() without wrapping', async () => {
+			const resolveError = new Error('bash not found: checked FLOW_BASH_PATH, ...');
+			const resolveSpy = vi.spyOn(BashShellStrategy.prototype, 'resolve').mockImplementation(() => {
+				throw resolveError;
+			});
+
+			await expect(
+				executor.execute({
+					script: 'echo hello',
+					shellKind: 'bash',
+				})
+			).rejects.toBe(resolveError);
+
+			expect(child_process.spawn).not.toHaveBeenCalled();
+
+			resolveSpy.mockRestore();
 		});
 	});
 

@@ -57,6 +57,7 @@ export async function executeScriptStep(
 		streaming: true,
 		stepId: step.id,
 		isolateEnv: false,
+		shellKind: step.shell,
 	});
 
 	stepTrace.exitCode = result.exitCode;

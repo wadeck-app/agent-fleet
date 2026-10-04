@@ -104,6 +104,11 @@ export class SchemaValidator {
 			this.validateStatusTransitions(flow.statusTransitions, flow.id);
 		}
 
+		// Validate execution config (optional)
+		if (flow.execution) {
+			this.validateExecutionConfig(flow.execution as Record<string, unknown>, flow.id);
+		}
+
 		// Validate and normalize inputs
 		const normalizedInputs = this.validateInputs(flow.inputs, flow.id);
 
@@ -111,6 +116,29 @@ export class SchemaValidator {
 		const stepIds = this.validateSteps(flow.steps, flow.id);
 
 		return { stepIds, normalizedInputs };
+	}
+
+	/**
+	 * Rejects the removed flow-level `execution.skipPermissions`, named rather than caught by a
+	 * generic "unknown field" check.
+	 *
+	 * It used to silently do nothing for a daemon-dispatched `flow run`: only the separate
+	 * in-process FlowExecutor ever wired `flow.execution` into a model step's launch options, so
+	 * a flow author relying on it got no error and no suppressed prompt. Removed in favor of a
+	 * per-step `skipPermissions` (different steps legitimately need different permission scopes),
+	 * and flagged by name here so an existing flow fails loudly instead of silently losing the
+	 * setting it already thought it had.
+	 */
+	private validateExecutionConfig(config: Record<string, unknown>, flowId: string): void {
+		if ('skipPermissions' in config) {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_VALUE,
+				message: `Flow '${flowId}' sets execution.skipPermissions, which no longer exists`,
+				location: { field: 'execution.skipPermissions' },
+				suggestion: 'Set skipPermissions on each model step that needs it instead (steps[].skipPermissions).',
+			});
+		}
 	}
 
 	/**
@@ -674,6 +702,33 @@ export class SchemaValidator {
 					expected: 'object',
 					actual: typeof step.env,
 				},
+			});
+		}
+
+		// Validate shell (optional; 'sh' is deliberately not accepted)
+		const validShells = ['bash', 'cmd', 'pwsh'];
+		if (step.shell !== undefined) {
+			if (!validShells.includes(step.shell)) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.INVALID_VALUE,
+					message: `unknown shell '${step.shell}', expected one of: ${validShells.join(', ')}`,
+					location: { stepId: step.id, field: 'shell' },
+					suggestion: `Must be one of: ${validShells.join(', ')}`,
+					context: {
+						actual: step.shell,
+						expected: validShells,
+						related: validShells,
+					},
+				});
+			}
+		} else {
+			this.issueCollector.addIssue({
+				severity: 'warning',
+				code: ValidationCode.MISSING_FIELD,
+				message: `step '${step.id}' has no shell: field; behavior depends on the executing platform and script line count`,
+				location: { stepId: step.id, field: 'shell' },
+				suggestion: `Add shell: bash, cmd, or pwsh to make the execution shell explicit`,
 			});
 		}
 	}

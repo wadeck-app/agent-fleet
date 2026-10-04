@@ -9,6 +9,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { BashShellStrategy } from './shell/BashShellStrategy';
+import { CmdShellStrategy } from './shell/CmdShellStrategy';
+import { PwshShellStrategy } from './shell/PwshShellStrategy';
+import type { ShellStrategy } from './shell/ShellStrategy';
+
 /**
  * Finds bash.exe on Windows without relying on the system PATH.
  *
@@ -113,6 +118,14 @@ export interface ScriptExecutionOptions {
 	/** Shell to use (defaults to platform default) */
 	shell?: string | boolean;
 
+	/**
+	 * Explicit shell kind requested via the step's `shell:` YAML field.
+	 * Distinct from `shell` above (which is passed straight to Node's spawn). When set, takes
+	 * priority over the implicit Windows multiline-bash heuristic and dispatches through the
+	 * matching ShellStrategy (see ./shell/*.ts).
+	 */
+	shellKind?: 'bash' | 'cmd' | 'pwsh';
+
 	/** Stream stdout/stderr in real-time with timestamps (default: false) */
 	streaming?: boolean;
 
@@ -191,6 +204,39 @@ export class ScriptExecutor {
 		let tempFilePath: string | null = null;
 		const isWindows = process.platform === 'win32';
 		const isMultiline = options.script.includes('\n') || options.script.includes('\r\n');
+
+		// Explicit `shell:` field on the step takes priority over the implicit Windows
+		// multiline-bash heuristic below -- the user asked for a specific shell, so we must
+		// honor it (and fail fast via strategy.resolve() if that shell isn't available)
+		// rather than silently falling through to the generic/bash paths.
+		if (options.shellKind) {
+			const shellKind = options.shellKind;
+			const strategy: ShellStrategy =
+				shellKind === 'bash'
+					? new BashShellStrategy()
+					: shellKind === 'cmd'
+						? new CmdShellStrategy()
+						: new PwshShellStrategy();
+			// Synchronous throw inside this async method becomes a rejected promise --
+			// no try/catch here on purpose, so resolve() errors propagate verbatim.
+			const binary = strategy.resolve(cleanEnv);
+
+			const tempDir = os.tmpdir();
+			const timestamp = Date.now();
+			const random = Math.random().toString(36).substring(7);
+			const extension = shellKind === 'bash' ? 'sh' : shellKind === 'cmd' ? 'bat' : 'ps1';
+			const kindTempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.${extension}`);
+			fs.writeFileSync(kindTempFilePath, options.script, 'utf8');
+
+			const args =
+				shellKind === 'bash'
+					? [kindTempFilePath]
+					: shellKind === 'cmd'
+						? ['/d', '/c', kindTempFilePath]
+						: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', kindTempFilePath];
+
+			return this.runViaTempFileBinary(binary, args, kindTempFilePath, options, startTime, workingDir, cleanEnv);
+		}
 
 		if (isWindows && isMultiline && shell) {
 			const tempDir = os.tmpdir();
@@ -408,6 +454,78 @@ export class ScriptExecutor {
 
 				reject(new ScriptExecutionError(`Failed to execute script: ${String(error)}`, -1, stdout, stderr));
 			});
+		});
+	}
+
+	/**
+	 * Spawns a resolved shell binary against a temp script file for an explicit `shellKind`
+	 * dispatch. Mirrors the existing implicit-bash branch's capture/cleanup/timeout contract
+	 * (trim stdout/stderr, exitCode `code ?? 1`, reject on spawn `error`) so behavior is
+	 * consistent across all explicit shell kinds.
+	 */
+	private runViaTempFileBinary(
+		binary: string,
+		args: string[],
+		tempFilePath: string,
+		options: ScriptExecutionOptions,
+		startTime: number,
+		workingDir: string,
+		cleanEnv: Record<string, string>
+	): Promise<ScriptExecutionResult> {
+		return new Promise<ScriptExecutionResult>((resolve, reject) => {
+			let stdout = '';
+			let stderr = '';
+			let killed = false;
+			const cleanup = () => {
+				try {
+					fs.unlinkSync(tempFilePath);
+				} catch {
+					/* ignore */
+				}
+			};
+			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
+			const child = spawn(binary, args, {
+				cwd: workingDir,
+				env: cleanEnv,
+				stdio: ['ignore', 'pipe', 'pipe'],
+			});
+			child.stdout?.on('data', (d: Buffer) => {
+				stdout += d.toString();
+			});
+			child.stderr?.on('data', (d: Buffer) => {
+				stderr += d.toString();
+			});
+			child.on('close', (code: number | null) => {
+				cleanup();
+				const exitCode = code ?? 1;
+				const durationMs = Date.now() - startTime;
+				resolve({
+					stdout: stdout.trim(),
+					stderr: stderr.trim(),
+					exitCode,
+					durationMs,
+					success: exitCode === 0,
+				});
+			});
+			child.on('error', (err: Error) => {
+				cleanup();
+				reject(err);
+			});
+			if (options.timeout) {
+				setTimeout(() => {
+					killed = true;
+					child.kill();
+					cleanup();
+					resolve({
+						stdout,
+						stderr,
+						exitCode: -1,
+						durationMs: Date.now() - startTime,
+						success: false,
+					});
+				}, options.timeout);
+			}
+			void killed; // suppress unused warning
 		});
 	}
 

@@ -675,6 +675,18 @@ export interface ModelFlowStep extends BaseFlowStep {
 	 * @see ./processing/ToolAccess
 	 */
 	tools?: import('./processing/ToolAccess').ToolName[];
+
+	/**
+	 * Enable --dangerously-skip-permissions for this step only (default: false).
+	 *
+	 * Per-step rather than flow-wide on purpose: different steps in the same flow legitimately
+	 * need different permission scopes (one needs bash, another just reads), and a single
+	 * flow-wide switch cannot express that. There used to be a flow-level `execution.
+	 * skipPermissions`, which never reached the model CLI through the daemon-dispatched `flow
+	 * run` path at all (only the separate in-process FlowExecutor wired it) -- removed rather
+	 * than fixed, since step-scoped is the design that is actually needed.
+	 */
+	skipPermissions?: boolean;
 }
 
 /**
@@ -695,6 +707,12 @@ export interface ScriptFlowStep extends BaseFlowStep {
 
 	/** Named stdout output variable (e.g. 'stdout' -> steps.x.outputs.stdout), or true for default capture */
 	captureOutput?: string | boolean;
+
+	/**
+	 * Shell to use for executing the script. 'sh' is deliberately not accepted.
+	 * If omitted, behavior depends on the executing platform and script line count (see SchemaValidator warning).
+	 */
+	shell?: 'bash' | 'cmd' | 'pwsh';
 }
 
 /**
@@ -844,8 +862,6 @@ export interface ExecutionConfig {
 	streamJson?: boolean;
 	/** Enable --verbose flag (default: true) */
 	verbose?: boolean;
-	/** Enable --dangerously-skip-permissions (default: true) */
-	skipPermissions?: boolean;
 }
 
 /**
