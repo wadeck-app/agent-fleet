@@ -862,6 +862,8 @@ export interface ExecutionConfig {
 	streamJson?: boolean;
 	/** Enable --verbose flag (default: true) */
 	verbose?: boolean;
+	/** Enable --dangerously-skip-permissions (default: true) */
+	skipPermissions?: boolean;
 }
 
 /**
