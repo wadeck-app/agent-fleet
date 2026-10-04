@@ -41,6 +41,28 @@ describe('WorkerDisplay - default verbosity', () => {
 		expect(joined).toContain('Build project');
 	});
 
+	// A worker's own log is where a diagnosis often starts; without the flow's id/version
+	// printed on every step, there is no way to tell which flow produced a given log line.
+	it('shows flow id and version in the header when provided', () => {
+		const out = collector();
+		const display = new WorkerDisplay('summary', out.write);
+
+		display.stepStarted('build', { flowId: 'diag_min_bash', flowVersion: '1.0.0' });
+
+		const joined = out.lines.join('\n');
+		expect(joined).toContain('diag_min_bash');
+		expect(joined).toContain('1.0.0');
+	});
+
+	it('omits the flow line when flowId is not provided', () => {
+		const out = collector();
+		const display = new WorkerDisplay('summary', out.write);
+
+		display.stepStarted('build', { executionId: 'abc12345' });
+
+		expect(out.lines.some(line => line.includes('flow :'))).toBe(false);
+	});
+
 	// Raw model output is the worker's by nature, but printing it unasked buries the
 	// lifecycle it is meant to illustrate.
 	it('does not print raw step output', () => {

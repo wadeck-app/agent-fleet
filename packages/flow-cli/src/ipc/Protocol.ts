@@ -44,6 +44,12 @@ export interface ExecutionContext {
 
 	/** Default working directory from the flow definition (FlowDefinition.workingDir). */
 	flowWorkingDir?: string;
+
+	/** Flow definition's own id/version (FlowDefinition.id/.version) -- printed once per
+	 * execution in the worker's own log, next to its connection-state messages, so a diagnosis
+	 * started from worker output alone always knows which flow version actually ran. */
+	flowId?: string;
+	flowVersion?: string;
 }
 
 export type ClientCommand = {

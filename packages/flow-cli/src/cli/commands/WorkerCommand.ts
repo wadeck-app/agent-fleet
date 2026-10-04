@@ -525,6 +525,8 @@ async function handleMessage(
 			display.stepStarted(stepId, {
 				executionId: executionContext.executionId,
 				stepName: (stepConfig as unknown as { name?: string }).name,
+				flowId: executionContext.flowId,
+				flowVersion: executionContext.flowVersion,
 			});
 			const startedAt = Date.now();
 			// Announced before the first side effect: after this the daemon treats a

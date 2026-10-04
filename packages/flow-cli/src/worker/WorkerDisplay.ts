@@ -33,9 +33,18 @@ export class WorkerDisplay {
 		}
 	) {}
 
-	stepStarted(stepId: string, context?: { executionId?: string; stepName?: string }): void {
+	stepStarted(
+		stepId: string,
+		context?: { executionId?: string; stepName?: string; flowId?: string; flowVersion?: string }
+	): void {
 		const t = ts();
 		this.write(`[${t}] ${SEPARATOR}`);
+		// Printed on every step, not just the first: a long flow's later steps are exactly
+		// where a diagnosis is likely to start reading from, so the flow/version must not
+		// scroll out of view.
+		if (context?.flowId) {
+			this.write(`[${t}]  flow : ${context.flowId}${context.flowVersion ? `  v${context.flowVersion}` : ''}`);
+		}
 		const name = context?.stepName && context.stepName !== stepId ? context.stepName : undefined;
 		this.write(`[${t}]  step : ${stepId}${name !== undefined ? `  (${name})` : ''}`);
 		if (context?.executionId) {

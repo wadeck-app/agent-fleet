@@ -423,6 +423,8 @@ export class CommandHandler {
 			outputsDir: workspaceMetaDir + '/outputs',
 			cwd: cmd.cwd,
 			...(flow.workingDir ? { flowWorkingDir: flow.workingDir } : {}),
+			flowId: flow.id,
+			flowVersion: flow.version,
 		};
 
 		const schedulerCtx: SchedulerContext = {
