@@ -107,6 +107,9 @@ export class SchemaValidator {
 		// Validate and normalize inputs
 		const normalizedInputs = this.validateInputs(flow.inputs, flow.id);
 
+		// Validate flow-level labels (optional)
+		this.validateFlowLabels(flow);
+
 		// Validate steps
 		const stepIds = this.validateSteps(flow.steps, flow.id);
 
@@ -523,6 +526,52 @@ export class SchemaValidator {
 		}
 
 		return stepIds;
+	}
+
+	/**
+	 * Validates the flow-level `labels`, inherited by every step (union merge with its
+	 * own `labels:`, see {@link FlowDefinition.labels}).
+	 *
+	 * Same shape/constraint as {@link validateStepLabels} -- a list of non-empty strings,
+	 * reported at validation time so a malformed flow-level field fails loudly before the
+	 * flow starts rather than being silently ignored at dispatch.
+	 */
+	private validateFlowLabels(flow: FlowDefinition): void {
+		const labels = flow.labels;
+		if (labels === undefined) return;
+
+		if (!Array.isArray(labels)) {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_TYPE,
+				message: `Flow '${flow.id}' labels must be a list, got ${typeof labels}: ${JSON.stringify(labels)}`,
+				location: { field: 'labels' },
+				suggestion: `Write labels as a list, e.g. labels: ["gpu", "linux"] -- every entry must match (AND). Expressions such as "a || b" are not supported.`,
+			});
+			return;
+		}
+
+		for (const label of labels) {
+			if (typeof label !== 'string') {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.INVALID_TYPE,
+					message: `Flow '${flow.id}' labels must all be strings, got ${typeof label}: ${JSON.stringify(label)}`,
+					location: { field: 'labels' },
+					suggestion: `Use plain strings, e.g. labels: ["gpu"]`,
+				});
+				continue;
+			}
+			if (label.trim() === '') {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.INVALID_VALUE,
+					message: `Flow '${flow.id}' has a blank label`,
+					location: { field: 'labels' },
+					suggestion: `Remove the blank entry -- omitting labels already means steps run on any worker.`,
+				});
+			}
+		}
 	}
 
 	/**

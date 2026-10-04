@@ -931,6 +931,16 @@ export interface FlowDefinition {
 	/** Global environment variables injected into every step (supports ${{ }} templates). Step-level env takes precedence. */
 	env?: Record<string, string>;
 
+	/**
+	 * Labels every step inherits for worker routing (AND-matched, see {@link BaseFlowStep.labels}).
+	 *
+	 * Merged by union with a step's own `labels:`, never overridden: a step that declares
+	 * unrelated labels (e.g. `gpu`) still keeps the flow-wide pin, otherwise a forgotten
+	 * `labels:` entry would silently fall back to "any worker" -- the exact failure mode
+	 * this field exists to close.
+	 */
+	labels?: string[];
+
 	/** Default working directory for script steps. Step-level workingDir takes precedence. */
 	workingDir?: string;
 

@@ -1010,6 +1010,121 @@ steps:
 	});
 });
 
+describe('CommandHandler — flow-level labels: inheritance (Proposal 4)', () => {
+	const FLOW_LEVEL_LABELS_YAML = `\
+id: flow-level-labels
+version: "1.0.0"
+name: Flow Level Labels
+description: flow-level label inheritance
+workspace:
+  mode: manual
+  gitStrategy: any
+  reusePolicy: if-available
+labels: [npm]
+inputs: {}
+steps:
+  - id: no-own-labels
+    name: No Own Labels
+    type: script
+    script: echo plain
+  - id: with-gpu
+    name: With GPU
+    type: script
+    script: echo gpu
+    labels: [gpu]
+  - id: with-npm-dup
+    name: With NPM Duplicate
+    type: script
+    script: echo dup
+    labels: [npm]
+`;
+
+	function handlerFor(yamlText: string, idle: unknown[]) {
+		const flowFile = path.join(tmpDir, 'flow-level-labels.yml');
+		fs.writeFileSync(flowFile, yamlText);
+
+		const workerPool = createMockWorkerPool();
+		const dispatched: string[] = [];
+		workerPool.listIdle.mockReturnValue(idle);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
+			dispatched.push((msg as { stepId: string }).stepId);
+			return true;
+		});
+
+		const handler = new CommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		return { handler, dispatched, flowFile, workerPool };
+	}
+
+	// Union merge, not override (plan-level decision): a step with no own `labels:` must
+	// still inherit the flow-wide pin, or a forgotten per-step `labels:` would silently
+	// fall back to "any worker" -- the exact failure mode Proposal 4 exists to close.
+	it('dispatches a step with no own labels only to a worker carrying the flow-level label', async () => {
+		const worker = forkedWorker({});
+		worker.worker.labels = ['npm'];
+		const { handler, dispatched, flowFile } = handlerFor(FLOW_LEVEL_LABELS_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).toContain('no-own-labels');
+	});
+
+	it('does not dispatch a step with no own labels to a worker missing the flow-level label', async () => {
+		const worker = forkedWorker({});
+		const { handler, dispatched, flowFile } = handlerFor(FLOW_LEVEL_LABELS_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).not.toContain('no-own-labels');
+	});
+
+	// The critical case the plan explicitly calls out: override would let `gpu` silently
+	// lose the flow-wide `npm` pin, reproducing the bug this proposal fixes.
+	it('requires both the flow-level and the step-level label (union, not override)', async () => {
+		const worker = forkedWorker({});
+		worker.worker.labels = ['gpu']; // has the step label but not the flow-level one
+		const { handler, dispatched, flowFile } = handlerFor(FLOW_LEVEL_LABELS_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).not.toContain('with-gpu');
+	});
+
+	it('dispatches the union-labelled step to a worker carrying both labels', async () => {
+		const worker = forkedWorker({});
+		worker.worker.labels = ['npm', 'gpu'];
+		const { handler, dispatched, flowFile } = handlerFor(FLOW_LEVEL_LABELS_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(dispatched).toContain('with-gpu');
+	});
+
+	// Dedup: a step re-listing an already flow-level label must produce a single entry,
+	// not a duplicate -- observed directly on the StepPlacement handed to the router.
+	it('dedupes a step label already present at the flow level', async () => {
+		const { StepRouter } = await import('./StepRouter');
+		const selectSpy = vi.spyOn(StepRouter.prototype, 'select');
+		const worker = forkedWorker({});
+		worker.worker.labels = ['npm'];
+		const { handler, flowFile } = handlerFor(FLOW_LEVEL_LABELS_YAML, [worker]);
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		const dupCall = selectSpy.mock.calls.find(call => (call[0] as { stepId: string }).stepId === 'with-npm-dup');
+		expect(dupCall).toBeDefined();
+		expect((dupCall![0] as { labels: string[] }).labels).toEqual(['npm']);
+
+		selectSpy.mockRestore();
+	});
+});
+
 describe('CommandHandler — routing script steps by shell: field (Proposal 2)', () => {
 	const SHELL_FLOW_YAML = `\
 id: shell-flow

@@ -458,19 +458,27 @@ export class CommandHandler {
 				return [s.id, s.parent && !explicit.includes(s.parent) ? [...explicit, s.parent] : explicit];
 			})
 		);
+		// Flow-level `labels:` (Proposal 4) are unioned into every step's own `labels:`, never
+		// overriding them -- a step with unrelated labels (e.g. `gpu`) must keep the flow-wide
+		// pin, or a forgotten per-step `labels:` would silently fall back to "any worker".
+		const flowLabels = flow.labels ?? [];
 		const assignable = (
-			resolvedGlobalEnv
-				? flow.steps.map((s: FlowStep) =>
-						s.type === 'script' || s.type === 'model'
-							? {
-									...s,
-									env: {
-										...resolvedGlobalEnv,
-										...((s as { env?: Record<string, string> }).env ?? {}),
-									},
-								}
-							: s
-					)
+			resolvedGlobalEnv || flowLabels.length > 0
+				? flow.steps.map((s: FlowStep) => {
+						const withEnv =
+							resolvedGlobalEnv && (s.type === 'script' || s.type === 'model')
+								? {
+										...s,
+										env: {
+											...resolvedGlobalEnv,
+											...((s as { env?: Record<string, string> }).env ?? {}),
+										},
+									}
+								: s;
+						if (flowLabels.length === 0) return withEnv;
+						const stepLabels = (withEnv as { labels?: string[] }).labels ?? [];
+						return { ...withEnv, labels: [...new Set([...flowLabels, ...stepLabels])] };
+					})
 				: flow.steps
 		).map((s: FlowStep) => assertAssignable(s));
 
