@@ -139,13 +139,15 @@ export class ExecutionStore {
 		return state;
 	}
 
-	markStepFailed(executionId: string, stepId: string, error?: string): ExecutionState {
+	markStepFailed(executionId: string, stepId: string, error?: string, stdout?: string, stderr?: string): ExecutionState {
 		const state = this.read(executionId);
 		const step = state.steps[stepId];
 		if (step) {
 			step.status = 'failed';
 			step.completedAt = new Date().toISOString();
 			if (error !== undefined) step.error = error;
+			if (stdout !== undefined) step.stdout = stdout;
+			if (stderr !== undefined) step.stderr = stderr;
 		}
 		state.currentSteps = state.currentSteps.filter(id => id !== stepId);
 		if (error !== undefined) state.lastError = error;

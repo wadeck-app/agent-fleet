@@ -77,12 +77,16 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 			} catch (err) {
 				const error = normalizeError(err).message;
 				const output = (err as { stepOutputs?: Record<string, unknown> }).stepOutputs;
+				const stdout = (err as { stdout?: string }).stdout;
+				const stderr = (err as { stderr?: string }).stderr;
 				sendForAssignment({
 					type: 'step_failed',
 					executionId: executionContext.executionId,
 					stepId,
 					error,
 					output,
+					stdout,
+					stderr,
 				});
 			}
 			send({ type: 'ready', pid: process.pid });

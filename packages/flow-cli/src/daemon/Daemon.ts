@@ -519,10 +519,10 @@ async function startDaemon(
 			}
 			case 'step_failed': {
 				try {
-					const { assignmentId, executionId, stepId, error, output } = message;
+					const { assignmentId, executionId, stepId, error, output, stdout, stderr } = message;
 					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
 					commandHandler.settleAssignment(assignmentId);
-					executionStore.markStepFailed(executionId, stepId, error);
+					executionStore.markStepFailed(executionId, stepId, error, stdout, stderr);
 					commandHandler.onStepFailed(executionId, stepId, error, output);
 					// markExecutionFailed is now called inside onStepFailed only when the failure is terminal
 					logWriter.writeExecution(executionId, `Step ${stepId} failed: ${error}`, 'error');

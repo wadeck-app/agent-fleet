@@ -218,6 +218,8 @@ export class WorkerAdapter {
 			// to the scheduler for ${{ subSteps.xxx.outputs.stderr }} in parent prompts.
 			const err = Object.assign(new Error(trace.error), {
 				stepOutputs: trace.outputs ?? {},
+				stdout: trace.stdout,
+				stderr: trace.stderr,
 			});
 			throw err;
 		}

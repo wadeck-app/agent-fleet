@@ -240,6 +240,8 @@ export type WorkerToDaemon =
 			stepId: string;
 			error: string;
 			output?: Record<string, unknown>;
+			stdout?: string;
+			stderr?: string;
 	  }
 	| { type: 'inject_steps'; assignmentId: string; executionId: string; steps: InjectedStep[] };
 
@@ -271,6 +273,10 @@ export interface StepState {
 	injected?: boolean;
 	/** Error message if the step failed. */
 	error?: string;
+	/** Full stdout captured during the step's execution, when the step failed. */
+	stdout?: string;
+	/** Full stderr captured during the step's execution, when the step failed. */
+	stderr?: string;
 	/**
 	 * Which source supplied the worker that ran this step, and which worker it was
 	 * (T-06). Without this, a step's outcome cannot be attributed to the machine that

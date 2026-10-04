@@ -8,6 +8,9 @@ export interface StepStateRecord {
 	startedAt?: string;
 	completedAt?: string;
 	injected?: boolean;
+	error?: string;
+	stdout?: string;
+	stderr?: string;
 }
 
 export interface ExecutionRecord {
@@ -18,6 +21,7 @@ export interface ExecutionRecord {
 	startedAt: string;
 	completedAt: string | null;
 	steps: Record<string, StepStateRecord>;
+	lastError?: string;
 }
 
 export interface HistoryOptions {
@@ -89,7 +93,31 @@ function renderDetailView(exec: ExecutionRecord): string {
 
 	lines.push('');
 	lines.push('  * = dynamically injected step');
+
+	const failedSteps = Object.entries(exec.steps).filter(([, step]) => step.status === 'failed');
+	for (const [stepId, step] of failedSteps) {
+		if (!step.error && !step.stdout && !step.stderr) continue;
+		lines.push('');
+		lines.push(`Step '${stepId}' failed:`);
+		if (step.error) lines.push(`  Error:  ${step.error}`);
+		if (step.stdout) {
+			lines.push('  Stdout:');
+			lines.push(indentBlock(step.stdout));
+		}
+		if (step.stderr) {
+			lines.push('  Stderr:');
+			lines.push(indentBlock(step.stderr));
+		}
+	}
+
 	return lines.join('\n');
+}
+
+function indentBlock(text: string): string {
+	return text
+		.split('\n')
+		.map(line => `    ${line}`)
+		.join('\n');
 }
 
 export function buildHistoryTable(execs: ExecutionRecord[], opts: HistoryOptions): string {
