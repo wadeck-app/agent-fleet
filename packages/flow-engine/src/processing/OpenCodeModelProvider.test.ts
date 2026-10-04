@@ -584,6 +584,21 @@ describe('OpenCodeModelProvider', () => {
 
 			delete process.env['ANTHROPIC_API_KEY'];
 		});
+
+		it('forwards PATHEXT -- without it, resolving a bare non-.exe command (npm -> npm.ps1) inside the bash tool breaks PowerShell and pops a console on Windows (root-caused live)', async () => {
+			const previous = process.env['PATHEXT'];
+			process.env['PATHEXT'] = '.COM;.EXE;.BAT;.CMD;.PS1';
+
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			expect(spawnOpts.env?.['PATHEXT']).toBe('.COM;.EXE;.BAT;.CMD;.PS1');
+
+			if (previous === undefined) delete process.env['PATHEXT'];
+			else process.env['PATHEXT'] = previous;
+		});
 	});
 
 	// -------------------------------------------------------------------------

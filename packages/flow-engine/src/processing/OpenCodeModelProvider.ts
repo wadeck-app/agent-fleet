@@ -231,6 +231,10 @@ function buildSpawnParams(
 	if (process.env['HOME']) infraEnv['HOME'] = process.env['HOME']!;
 	if (process.env['USERPROFILE']) infraEnv['USERPROFILE'] = process.env['USERPROFILE']!;
 	if (process.env['SystemRoot']) infraEnv['SystemRoot'] = process.env['SystemRoot']!;
+	// Without PATHEXT, resolving a bare non-.exe command (npm -> npm.ps1) inside the bash tool
+	// leaves PowerShell's own $LASTEXITCODE uninitialized and pops a new console on Windows --
+	// root-caused live, see .claude/kb/lessons-learned.md.
+	if (process.env['PATHEXT']) infraEnv['PATHEXT'] = process.env['PATHEXT']!;
 	const env: Record<string, string> = { ...infraEnv, ...(options.env ?? {}) };
 	// Consumed already: copyGlobalConfig merged those files into the isolated XDG config below.
 	// Handing the variable to the CLI as well makes it re-read the paths itself, and any path form
