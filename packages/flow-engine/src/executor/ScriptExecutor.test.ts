@@ -6,7 +6,7 @@ import { EventEmitter } from 'events';
 import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ScriptExecutionError, ScriptExecutor } from './ScriptExecutor';
+import { normalizePathKey, ScriptExecutionError, ScriptExecutor } from './ScriptExecutor';
 import { BashShellStrategy } from './shell/BashShellStrategy';
 import { CmdShellStrategy } from './shell/CmdShellStrategy';
 import { PwshShellStrategy } from './shell/PwshShellStrategy';
@@ -588,6 +588,128 @@ describe('ScriptExecutor', () => {
 			expect(child_process.spawn).not.toHaveBeenCalled();
 
 			resolveSpy.mockRestore();
+		});
+	});
+
+	describe('normalizePathKey', () => {
+		it('adds a PATH key when only "Path" exists, keeping the original casing', () => {
+			const result = normalizePathKey({ Path: 'C:\\dir' });
+			expect(result).toEqual({ Path: 'C:\\dir', PATH: 'C:\\dir' });
+		});
+
+		it('leaves the env unchanged when PATH already exists in the exact case', () => {
+			const input = { PATH: '/usr/bin' };
+			expect(normalizePathKey(input)).toEqual({ PATH: '/usr/bin' });
+		});
+
+		it('leaves the env unchanged when no PATH-like key exists at all', () => {
+			const input = { HOME: '/home/user' };
+			expect(normalizePathKey(input)).toEqual({ HOME: '/home/user' });
+		});
+
+		it('prefers the exact-case PATH over any other casing when both are present', () => {
+			const result = normalizePathKey({ PATH: '/correct/path', Path: '/stale/path' });
+			expect(result['PATH']).toBe('/correct/path');
+		});
+
+		it('is case-insensitive when locating the source key (e.g. lowercase "path")', () => {
+			const result = normalizePathKey({ path: '/lower/case' });
+			expect(result).toEqual({ path: '/lower/case', PATH: '/lower/case' });
+		});
+	});
+
+	// Script steps always run with isolateEnv:false (see ScriptStepExecutor.ts), which spreads
+	// process.env wholesale ({...process.env}). On Windows that spread can enumerate the PATH
+	// variable under whatever casing the OS actually used (observed in production: `Path`, not
+	// `PATH`) because the case-insensitive process.env proxy is gone once spread into a plain
+	// object. MSYS2/Git-for-Windows bash does a case-SENSITIVE PATH lookup, so without
+	// normalizePathKey it silently falls back to its own hardcoded `/usr/bin:/bin`.
+	describe('PATH casing normalization for bash spawns', () => {
+		const describeWindows = process.platform === 'win32' ? describe : describe.skip;
+		let originalEnv: NodeJS.ProcessEnv;
+
+		beforeEach(() => {
+			originalEnv = process.env;
+		});
+
+		afterEach(() => {
+			Object.defineProperty(process, 'env', { value: originalEnv, configurable: true, writable: true });
+		});
+
+		function stubEnvWithPathOnly(pathValue: string): void {
+			Object.defineProperty(process, 'env', {
+				// TEMP/TMP are kept from the real env so os.tmpdir() still resolves -- only PATH's
+				// casing is under test here.
+				value: { ...originalEnv, Path: pathValue, PATH: undefined },
+				configurable: true,
+				writable: true,
+			});
+		}
+
+		describeWindows('implicit Windows multiline-bash branch', () => {
+			it('spawn receives an exact-case PATH key even when process.env only has "Path"', async () => {
+				stubEnvWithPathOnly('C:\\only\\path\\dir');
+
+				const executePromise = executor.execute({
+					script: 'echo one\necho two',
+					isolateEnv: false,
+				});
+
+				mockChild.emit('close', 0);
+				await executePromise;
+
+				const spawnEnv = vi.mocked(child_process.spawn).mock.calls[0]![2]!.env as Record<string, string>;
+				expect(spawnEnv['PATH']).toBeDefined();
+				expect(spawnEnv['PATH']).toContain('C:\\only\\path\\dir');
+				// Original casing is preserved alongside the normalized key.
+				expect(spawnEnv['Path']).toBe('C:\\only\\path\\dir');
+			});
+		});
+
+		describe('explicit shellKind: bash dispatch', () => {
+			it('strategy.resolve() and spawn both receive an exact-case PATH key even when process.env only has "Path"', async () => {
+				stubEnvWithPathOnly('C:\\only\\path\\dir');
+				const resolveSpy = vi.spyOn(BashShellStrategy.prototype, 'resolve').mockReturnValue('/resolved/bash');
+
+				const executePromise = executor.execute({
+					script: 'echo hello',
+					shellKind: 'bash',
+					isolateEnv: false,
+				});
+
+				mockChild.emit('close', 0);
+				await executePromise;
+
+				expect(resolveSpy).toHaveBeenCalledWith(expect.objectContaining({ PATH: 'C:\\only\\path\\dir' }));
+
+				const spawnEnv = vi.mocked(child_process.spawn).mock.calls[0]![2]!.env as Record<string, string>;
+				expect(spawnEnv['PATH']).toBe('C:\\only\\path\\dir');
+				expect(spawnEnv['Path']).toBe('C:\\only\\path\\dir');
+
+				resolveSpy.mockRestore();
+			});
+		});
+
+		describe('cmd/pwsh dispatch is left untouched', () => {
+			it('does not add a PATH key for shellKind: cmd when only "Path" exists (Windows env lookup is case-insensitive)', async () => {
+				stubEnvWithPathOnly('C:\\only\\path\\dir');
+				const resolveSpy = vi.spyOn(CmdShellStrategy.prototype, 'resolve').mockReturnValue('C:\\Windows\\System32\\cmd.exe');
+
+				const executePromise = executor.execute({
+					script: 'echo hello',
+					shellKind: 'cmd',
+					isolateEnv: false,
+				});
+
+				mockChild.emit('close', 0);
+				await executePromise;
+
+				const spawnEnv = vi.mocked(child_process.spawn).mock.calls[0]![2]!.env as Record<string, string>;
+				expect(spawnEnv['PATH']).toBeUndefined();
+				expect(spawnEnv['Path']).toBe('C:\\only\\path\\dir');
+
+				resolveSpy.mockRestore();
+			});
 		});
 	});
 

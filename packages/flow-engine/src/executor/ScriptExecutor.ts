@@ -53,6 +53,28 @@ function resolveBashOnWindows(env: Record<string, string>): string {
 }
 
 /**
+ * Returns an env object guaranteed to have an exact-case `PATH` key, if any case variant of it
+ * exists at all.
+ *
+ * On Windows, `process.env` is an internal case-insensitive proxy, but spreading it
+ * (`{...process.env}`) yields a plain object whose keys keep whatever casing the OS actually
+ * handed this process -- observed in production as `Path`, never `PATH`. MSYS2/Git-for-Windows'
+ * bash does a case-SENSITIVE lookup for `PATH` (POSIX semantics); finding no exact match, it
+ * silently falls back to its own hardcoded `/usr/bin:/bin`, breaking every script that relies on
+ * an npm-installed binary. cmd.exe/PowerShell are unaffected (Windows env lookups are
+ * case-insensitive), so this must only be applied before handing an env object to bash.
+ *
+ * The original-cased key is kept alongside -- some other reader may depend on its exact casing.
+ * If an exact-case `PATH` already exists, it is never overwritten by another casing's value.
+ */
+export function normalizePathKey(env: Record<string, string>): Record<string, string> {
+	if (Object.prototype.hasOwnProperty.call(env, 'PATH')) return env;
+	const existingKey = Object.keys(env).find(key => key.toUpperCase() === 'PATH');
+	if (existingKey === undefined) return env;
+	return { ...env, PATH: env[existingKey] };
+}
+
+/**
  * Git for Windows' bash is a thin shell: coreutils the shim scripts rely on (sed, dirname,
  * uname, ...) live in `<gitRoot>\usr\bin`, not next to bash.exe's own directory on PATH.
  * The daemon's own PATH (inherited from WScript.Shell.Run) carries neither, so any script
@@ -217,9 +239,12 @@ export class ScriptExecutor {
 					: shellKind === 'cmd'
 						? new CmdShellStrategy()
 						: new PwshShellStrategy();
+			// Only bash needs the PATH-casing fix (see normalizePathKey) -- cmd/pwsh resolve
+			// their binary and spawn via Windows' own case-insensitive env lookups.
+			const shellEnv = shellKind === 'bash' ? normalizePathKey(cleanEnv) : cleanEnv;
 			// Synchronous throw inside this async method becomes a rejected promise --
 			// no try/catch here on purpose, so resolve() errors propagate verbatim.
-			const binary = strategy.resolve(cleanEnv);
+			const binary = strategy.resolve(shellEnv);
 
 			const tempDir = os.tmpdir();
 			const timestamp = Date.now();
@@ -235,7 +260,7 @@ export class ScriptExecutor {
 						? ['/d', '/c', kindTempFilePath]
 						: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', kindTempFilePath];
 
-			return this.runViaTempFileBinary(binary, args, kindTempFilePath, options, startTime, workingDir, cleanEnv);
+			return this.runViaTempFileBinary(binary, args, kindTempFilePath, options, startTime, workingDir, shellEnv);
 		}
 
 		if (isWindows && isMultiline && shell) {
@@ -273,12 +298,16 @@ export class ScriptExecutor {
 					// locations. WScript.Shell.Run (used to start the daemon on Windows) spawns
 					// with the system PATH, not the enriched Git Bash PATH, so 'bash' alone finds
 					// C:\Windows\System32\bash.exe (WSL) first. An explicit path avoids that.
-					const bashExecutable = resolveBashOnWindows(cleanEnv);
-					ensureGitCoreutilsOnPath(cleanEnv, bashExecutable);
+					// normalizePathKey first: {...process.env} on Windows can yield a `Path` key
+					// instead of `PATH` (see normalizePathKey's doc comment), which bash's
+					// case-sensitive lookup would otherwise miss entirely.
+					const bashEnv = normalizePathKey(cleanEnv);
+					const bashExecutable = resolveBashOnWindows(bashEnv);
+					ensureGitCoreutilsOnPath(bashEnv, bashExecutable);
 					// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
 					const child = spawn(bashExecutable, [tempFilePath!], {
 						cwd: workingDir,
-						env: cleanEnv,
+						env: bashEnv,
 						// No windowsHide / detached: CREATE_NO_WINDOW and DETACHED_PROCESS strip the
 						// console handle, so grandchildren allocate a visible console. The script
 						// must inherit the daemon's hidden console instead (see d032e7e).
