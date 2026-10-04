@@ -16,8 +16,17 @@ import { EventEmitter } from 'events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ScriptExecutor } from './ScriptExecutor';
+import { BashShellStrategy } from './shell/BashShellStrategy';
+import { CmdShellStrategy } from './shell/CmdShellStrategy';
+import { PwshShellStrategy } from './shell/PwshShellStrategy';
 
 vi.mock('child_process');
+
+const strategyClassFor = {
+	bash: BashShellStrategy,
+	cmd: CmdShellStrategy,
+	pwsh: PwshShellStrategy,
+} as const;
 
 interface MockChild extends EventEmitter {
 	stdout: EventEmitter;
@@ -90,6 +99,26 @@ describe('ScriptExecutor - Windows console inheritance (no windowsHide / detache
 			const options = spawnOptions();
 			expect(options['windowsHide']).not.toBe(true);
 			expect(options['detached']).not.toBe(true);
+		});
+	});
+
+	// shellKind dispatch (explicit shell: field) reuses runViaTempFileBinary -- a separate
+	// spawn call site from the implicit branches above, so it needs its own guard against the
+	// same regression (d032e7e): without this, nothing catches a future change reintroducing
+	// windowsHide/detached on the cmd/pwsh/bash explicit paths.
+	describe('shellKind dispatch (explicit shell: field)', () => {
+		(['bash', 'cmd', 'pwsh'] as const).forEach(shellKind => {
+			it(`${shellKind} spawn does NOT set windowsHide:true or detached:true`, async () => {
+				vi.spyOn(strategyClassFor[shellKind].prototype, 'resolve').mockReturnValue(`/resolved/${shellKind}`);
+
+				const executePromise = executor.execute({ script: 'echo test', shellKind });
+				mockChild.emit('close', 0);
+				await executePromise;
+
+				const options = spawnOptions();
+				expect(options['windowsHide']).not.toBe(true);
+				expect(options['detached']).not.toBe(true);
+			});
 		});
 	});
 });
