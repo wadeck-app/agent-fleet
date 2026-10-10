@@ -1158,7 +1158,9 @@ describe('StepRunner', () => {
 							result: 'hi',
 							cost_usd: 0.001,
 							duration_ms: 1500,
-							modelUsage: { haiku: { inputTokens: 10, outputTokens: 5 } },
+							modelUsage: {
+								haiku: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 3, cacheWriteTokens: 7 },
+							},
 						},
 					} as any);
 				}
@@ -1172,8 +1174,52 @@ describe('StepRunner', () => {
 			const meta = trace.meta as any;
 			expect(meta.session_id).toBe('sess-abc123');
 			expect(meta.cost.usd).toBe(0.001);
+			expect(meta.cost.input_tokens).toBe(10);
+			expect(meta.cost.output_tokens).toBe(5);
+			expect(meta.cost.cache_read_tokens).toBe(3);
+			expect(meta.cost.cache_write_tokens).toBe(7);
 			expect(meta.duration_ms).toBeGreaterThanOrEqual(1);
 			expect(meta.model).toBe('haiku');
+		});
+
+		it('model step defaults cache token counts to 0 when provider does not report them', async () => {
+			const step: ModelFlowStep = {
+				id: 'model-step-no-cache',
+				name: 'Model',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'hello',
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
+
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async opts => {
+				if (opts.onStreamEvent) {
+					opts.onStreamEvent({
+						type: 'system',
+						subtype: 'init',
+						data: { session_id: 'sess-no-cache', model: 'haiku' },
+					} as any);
+					opts.onStreamEvent({
+						type: 'result',
+						subtype: 'result',
+						data: {
+							result: 'hi',
+							cost_usd: 0.001,
+							duration_ms: 100,
+							modelUsage: { haiku: { inputTokens: 10, outputTokens: 5 } },
+						},
+					} as any);
+				}
+				return { stdout: 'hi', stderr: '', exitCode: 0 };
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: 'hi' });
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			const meta = trace.meta as any;
+			expect(meta.cost.cache_read_tokens).toBe(0);
+			expect(meta.cost.cache_write_tokens).toBe(0);
 		});
 
 		it('model step resolves session_file from memory_paths.auto in system:init event', async () => {

@@ -444,6 +444,8 @@ export class OpenCodeModelProvider implements ModelProvider {
 				let costUsd = 0;
 				let inputTokens = 0;
 				let outputTokens = 0;
+				let cacheReadTokens = 0;
+				let cacheWriteTokens = 0;
 				let firstStepStartFired = false;
 
 				const processLine = (line: string): void => {
@@ -523,6 +525,10 @@ export class OpenCodeModelProvider implements ModelProvider {
 							const tokens = isRecord(tokensValue) ? tokensValue : undefined;
 							inputTokens += (tokens?.['input'] as number | undefined) ?? 0;
 							outputTokens += (tokens?.['output'] as number | undefined) ?? 0;
+							const cacheValue = tokens?.['cache'];
+							const cache = isRecord(cacheValue) ? cacheValue : undefined;
+							cacheReadTokens += (cache?.['read'] as number | undefined) ?? 0;
+							cacheWriteTokens += (cache?.['write'] as number | undefined) ?? 0;
 						}
 					}
 				};
@@ -575,6 +581,8 @@ export class OpenCodeModelProvider implements ModelProvider {
 									opencode: {
 										inputTokens,
 										outputTokens,
+										cacheReadTokens,
+										cacheWriteTokens,
 									},
 								},
 							},

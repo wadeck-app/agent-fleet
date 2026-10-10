@@ -171,13 +171,42 @@ describe('buildHistoryTable --id detail view', () => {
 						session_file: '/tmp/sess-1.jsonl',
 						ttft_ms: 120,
 						duration_ms: 3000,
-						cost: { input_tokens: 100, output_tokens: 50, usd: 0.0123 },
+						cost: { input_tokens: 100, output_tokens: 50, cache_read_tokens: 0, cache_write_tokens: 0, usd: 0.0123 },
 					},
 				},
 			},
 		});
 		const out = buildHistoryTable([execWithMeta], { id: 'withmeta' });
 		expect(out).toContain('cost: $0.0123 (100 in / 50 out tokens, 3000ms)');
+	});
+
+	it('renders cache tokens as an additional, separate figure when non-zero', () => {
+		const execWithMeta = makeExec({
+			executionId: 'withcache',
+			steps: {
+				'model-step': {
+					status: 'completed',
+					startedAt: '2026-08-16T12:00:00.000Z',
+					completedAt: '2026-08-16T12:06:06.531Z',
+					meta: {
+						model: 'opencode/some-model',
+						session_id: 'sess-2',
+						session_file: '/tmp/sess-2.jsonl',
+						ttft_ms: 120,
+						duration_ms: 366531,
+						cost: {
+							input_tokens: 46,
+							output_tokens: 11335,
+							cache_read_tokens: 1239000,
+							cache_write_tokens: 43,
+							usd: 0.1704,
+						},
+					},
+				},
+			},
+		});
+		const out = buildHistoryTable([execWithMeta], { id: 'withcache' });
+		expect(out).toContain('cost: $0.1704 (46 in / 11335 out + 1239043 cache tokens, 366531ms)');
 	});
 
 	it('does not render a cost line for a completed script step', () => {

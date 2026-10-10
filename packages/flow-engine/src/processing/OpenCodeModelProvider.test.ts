@@ -840,7 +840,7 @@ describe('OpenCodeModelProvider', () => {
 							reason: 'stop',
 							messageID: 'm1',
 							sessionID,
-							tokens: { total: 100, input: 20, output: 8, reasoning: 0, cache: { write: 72, read: 0 } },
+							tokens: { total: 100, input: 20, output: 8, reasoning: 0, cache: { write: 72, read: 4 } },
 							cost: 0.0425,
 						},
 					}),
@@ -855,10 +855,12 @@ describe('OpenCodeModelProvider', () => {
 			expect(resultEvent?.data['cost_usd']).toBe(0.0425);
 			const usage = resultEvent?.data['modelUsage'] as Record<
 				string,
-				{ inputTokens: number; outputTokens: number }
+				{ inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number }
 			>;
 			expect(usage['opencode'].inputTokens).toBe(20);
 			expect(usage['opencode'].outputTokens).toBe(8);
+			expect(usage['opencode'].cacheReadTokens).toBe(4);
+			expect(usage['opencode'].cacheWriteTokens).toBe(72);
 		});
 
 		it('does not fire result event when no step_start was seen', async () => {
@@ -957,7 +959,7 @@ describe('OpenCodeModelProvider', () => {
 							reason: 'stop',
 							messageID: 'm1',
 							sessionID,
-							tokens: { total: 50, input: 10, output: 5, reasoning: 0, cache: { write: 35, read: 0 } },
+							tokens: { total: 50, input: 10, output: 5, reasoning: 0, cache: { write: 35, read: 2 } },
 							cost: 0.01,
 						},
 					}),
@@ -970,7 +972,7 @@ describe('OpenCodeModelProvider', () => {
 							reason: 'stop',
 							messageID: 'm2',
 							sessionID,
-							tokens: { total: 50, input: 15, output: 8, reasoning: 0, cache: { write: 27, read: 0 } },
+							tokens: { total: 50, input: 15, output: 8, reasoning: 0, cache: { write: 27, read: 3 } },
 							cost: 0.02,
 						},
 					}),
@@ -984,10 +986,12 @@ describe('OpenCodeModelProvider', () => {
 			expect(resultEvent?.data['cost_usd']).toBeCloseTo(0.03);
 			const usage = resultEvent?.data['modelUsage'] as Record<
 				string,
-				{ inputTokens: number; outputTokens: number }
+				{ inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number }
 			>;
 			expect(usage['opencode'].inputTokens).toBe(25);
 			expect(usage['opencode'].outputTokens).toBe(13);
+			expect(usage['opencode'].cacheReadTokens).toBe(5);
+			expect(usage['opencode'].cacheWriteTokens).toBe(62);
 		});
 	});
 

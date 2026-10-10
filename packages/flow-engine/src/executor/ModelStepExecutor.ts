@@ -112,6 +112,8 @@ export async function executeModelStep(
 	let capturedCostUsd = 0;
 	let capturedInputTokens = 0;
 	let capturedOutputTokens = 0;
+	let capturedCacheReadTokens = 0;
+	let capturedCacheWriteTokens = 0;
 	let capturedTtftMs = 0;
 	const modelStartTime = Date.now();
 
@@ -195,11 +197,21 @@ export async function executeModelStep(
 						if (event.type === 'result') {
 							capturedCostUsd = (event.data.cost_usd as number) ?? 0;
 							const usage = event.data.modelUsage as
-								Record<string, { inputTokens?: number; outputTokens?: number }> | undefined;
+								Record<
+									string,
+									{
+										inputTokens?: number;
+										outputTokens?: number;
+										cacheReadTokens?: number;
+										cacheWriteTokens?: number;
+									}
+								> | undefined;
 							if (usage) {
 								for (const u of Object.values(usage)) {
 									capturedInputTokens += u.inputTokens ?? 0;
 									capturedOutputTokens += u.outputTokens ?? 0;
+									capturedCacheReadTokens += u.cacheReadTokens ?? 0;
+									capturedCacheWriteTokens += u.cacheWriteTokens ?? 0;
 								}
 							}
 						}
@@ -223,6 +235,8 @@ export async function executeModelStep(
 		cost: {
 			input_tokens: capturedInputTokens,
 			output_tokens: capturedOutputTokens,
+			cache_read_tokens: capturedCacheReadTokens,
+			cache_write_tokens: capturedCacheWriteTokens,
 			usd: capturedCostUsd,
 		},
 	});

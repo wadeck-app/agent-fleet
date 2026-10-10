@@ -121,8 +121,14 @@ function renderDetailView(exec: ExecutionRecord): string {
 /** `meta.cost` only exists on ModelStepMeta -- a script step's meta has no such field. */
 function formatModelCost(meta: StepMeta | undefined): string | undefined {
 	if (!meta || !('cost' in meta)) return undefined;
-	const { cost } = meta as { cost: { input_tokens: number; output_tokens: number; usd: number } };
-	return `cost: $${cost.usd.toFixed(4)} (${cost.input_tokens} in / ${cost.output_tokens} out tokens, ${meta.duration_ms}ms)`;
+	const { cost } = meta as {
+		cost: { input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number; usd: number };
+	};
+	const cacheTokens = (cost.cache_read_tokens ?? 0) + (cost.cache_write_tokens ?? 0);
+	// Cache tokens are an ADDITIONAL volume on top of "in" tokens, not already counted there --
+	// surfacing them separately avoids misreading "in" as the total processed input.
+	const cacheSuffix = cacheTokens > 0 ? ` + ${cacheTokens} cache` : '';
+	return `cost: $${cost.usd.toFixed(4)} (${cost.input_tokens} in / ${cost.output_tokens} out${cacheSuffix} tokens, ${meta.duration_ms}ms)`;
 }
 
 function indentBlock(text: string): string {
