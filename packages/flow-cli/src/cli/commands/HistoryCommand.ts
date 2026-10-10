@@ -88,16 +88,31 @@ function renderDetailView(exec: ExecutionRecord): string {
 	lines.push(header);
 	lines.push(sep);
 
+	let hasInjectedStep = false;
+	let totalCostUsd = 0;
+	let hasCost = false;
 	for (const [stepId, step] of Object.entries(exec.steps)) {
+		if (step.injected) hasInjectedStep = true;
 		const name = step.injected ? `${stepId}*` : stepId;
 		const dur = step.startedAt ? formatDuration(step.startedAt, step.completedAt ?? null) : '-';
 		lines.push('  ' + pad(name, COL_STEP) + pad(step.status, COL_STATUS) + dur);
 		const costLine = formatModelCost(step.meta);
 		if (costLine) lines.push('      ' + costLine);
+		if (step.meta && 'cost' in step.meta) {
+			hasCost = true;
+			totalCostUsd += (step.meta as { cost: { usd: number } }).cost.usd;
+		}
 	}
 
-	lines.push('');
-	lines.push('  * = dynamically injected step');
+	if (hasCost) {
+		lines.push('');
+		lines.push(`  Total cost: $${totalCostUsd.toFixed(4)}`);
+	}
+
+	if (hasInjectedStep) {
+		lines.push('');
+		lines.push('  * = dynamically injected step');
+	}
 
 	const failedSteps = Object.entries(exec.steps).filter(([, step]) => step.status === 'failed');
 	for (const [stepId, step] of failedSteps) {

@@ -236,5 +236,60 @@ describe('buildHistoryTable --id detail view', () => {
 		const out = buildHistoryTable([execWithInjected], { id: 'inj' });
 		expect(out).toContain('dynamic-step*');
 		expect(out).not.toContain('static-step*');
+		expect(out).toContain('* = dynamically injected step');
+	});
+
+	it('omits the injected-step legend when no step was injected', () => {
+		const execNoInjected = makeExec({
+			executionId: 'noinj',
+			steps: {
+				'static-step': { status: 'completed' },
+			},
+		});
+		const out = buildHistoryTable([execNoInjected], { id: 'noinj' });
+		expect(out).not.toContain('dynamically injected step');
+	});
+
+	it('prints a total cost line summing all model steps', () => {
+		const execWithMeta = makeExec({
+			executionId: 'totalcost',
+			steps: {
+				haiku: {
+					status: 'completed',
+					meta: {
+						model: 'haiku',
+						session_id: 's1',
+						session_file: '/tmp/s1.jsonl',
+						ttft_ms: 50,
+						duration_ms: 1000,
+						cost: { input_tokens: 10, output_tokens: 20, cache_read_tokens: 0, cache_write_tokens: 0, usd: 0.01 },
+					},
+				},
+				sonnet: {
+					status: 'completed',
+					meta: {
+						model: 'sonnet',
+						session_id: 's2',
+						session_file: '/tmp/s2.jsonl',
+						ttft_ms: 50,
+						duration_ms: 2000,
+						cost: { input_tokens: 30, output_tokens: 40, cache_read_tokens: 0, cache_write_tokens: 0, usd: 0.5 },
+					},
+				},
+			},
+		});
+		const out = buildHistoryTable([execWithMeta], { id: 'totalcost' });
+		expect(out).toContain('Total cost: $0.5100');
+	});
+
+	it('omits the total cost line when no step has cost meta', () => {
+		const execNoCost = makeExec({
+			executionId: 'nocost',
+			steps: {
+				'script-step': { status: 'completed', meta: { duration_ms: 500, exit_code: 0 } },
+			},
+		});
+		const out = buildHistoryTable([execNoCost], { id: 'nocost' });
+		expect(out).not.toContain('Total cost');
 	});
 });
