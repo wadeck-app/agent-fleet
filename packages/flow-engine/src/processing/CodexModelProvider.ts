@@ -471,7 +471,9 @@ export class CodexModelProvider implements ModelProvider {
 			// On Windows, codex.cmd is a Node.js wrapper: node @openai/codex/bin/codex.js
 			// Spawn node + codex.js directly to avoid shell-splitting the prompt args
 			try {
-				const cmdPath = execSync('where.exe codex.cmd', { encoding: 'utf8', windowsHide: true })
+				// "2>nul" discards at the shell level -- where.exe writes its localized "could not
+				// find files" message straight to the console on a miss, bypassing stdio redirection.
+				const cmdPath = execSync('where.exe codex.cmd 2>nul', { encoding: 'utf8', windowsHide: true })
 					.trim()
 					.split('\n')[0]!
 					.trim();

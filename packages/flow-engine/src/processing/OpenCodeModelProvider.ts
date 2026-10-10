@@ -630,7 +630,9 @@ export class OpenCodeModelProvider implements ModelProvider {
 			// On Windows, find the real opencode.exe next to opencode.cmd in the npm global bin dir.
 			// shell:true with complex prompts (newlines, backticks) is unreliable on Windows cmd.exe.
 			try {
-				const cmdPath = execSync('where.exe opencode.cmd', { encoding: 'utf8', windowsHide: true })
+				// "2>nul" discards at the shell level -- where.exe writes its localized "could not
+				// find files" message straight to the console on a miss, bypassing stdio redirection.
+				const cmdPath = execSync('where.exe opencode.cmd 2>nul', { encoding: 'utf8', windowsHide: true })
 					.trim()
 					.split('\n')[0]!
 					.trim();

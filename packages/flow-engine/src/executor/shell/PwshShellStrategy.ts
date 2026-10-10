@@ -40,7 +40,10 @@ export class PwshShellStrategy implements ShellStrategy {
 
 	private whereExe(binary: string): string | null {
 		try {
-			const resolved = execSync(`where.exe ${binary}`, { encoding: 'utf8' })
+			// "2>nul" discards at the shell level, not just Node's stdio pipe -- where.exe writes
+			// its localized "could not find files" message straight to the console on a miss,
+			// bypassing stdio redirection otherwise (confirmed live: leaks even with stdio: 'pipe').
+			const resolved = execSync(`where.exe ${binary} 2>nul`, { encoding: 'utf8' })
 				.trim()
 				.split('\n')[0]
 				?.trim();
