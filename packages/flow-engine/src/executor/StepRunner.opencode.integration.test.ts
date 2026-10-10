@@ -1,8 +1,9 @@
 /**
  * Integration test: verifies opencode-mock produces NDJSON compatible with OpenCodeModelProvider.
  *
- * Auto-triggered when opencode version changes (detected via opencode-version-tested.json).
- * Manual run: OPENCODE_INTEGRATION=1 npx vitest run StepRunner.opencode.integration.test
+ * Auto-triggered locally (never in CI) when the installed `opencode` version differs from the one
+ * last recorded in .claude/opencode-version-tested.json. Force a run regardless of the cache with:
+ *   OPENCODE_INTEGRATION=1 npx vitest run StepRunner.opencode.integration.test
  *
  * Covers:
  *   - Correct flags assembled by OpenCodeModelProvider (--format json, --auto, positional prompt)
@@ -22,7 +23,7 @@
  * See also: StepRunner.model.integration.test.ts for the Claude equivalent.
  */
 import { execSync, spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dirname } from 'node:path';
@@ -62,20 +63,55 @@ function currentOpenCodeVersion(): string | null {
 }
 
 /**
- * Runs on request, locally, never in CI.
+ * Walks up from `startDir` to the nearest ancestor containing `.git`.
  *
- * This deliberately keeps no "last tested version" file. That mechanism is what failed: the
- * baseline path pointed outside the repo, so it read as "no baseline", which the gate treated
- * as "skip forever" -- and three provider flags drifted unnoticed. Asking the CLI itself is the
- * only check that cannot rot, which is what `ProviderFlagContract.test.ts` does on every run.
- *
- * CI never runs this: the CLIs are not installed there, and a suite that talks to real models
- * has no business in an automated pipeline.
+ * The previous version-tracking attempt resolved its baseline path relative to something other
+ * than the actual repo root, so the file was never found, every run read as "no baseline", and
+ * the gate treated that as "skip forever" -- three provider flags drifted unnoticed for months.
+ * Walking to the real `.git` root instead of hardcoding a relative `../../..` count survives the
+ * file moving to a different nesting depth.
+ */
+function findRepoRoot(startDir: string): string {
+	let dir = startDir;
+	while (!existsSync(join(dir, '.git'))) {
+		const parent = dirname(dir);
+		if (parent === dir) throw new Error(`findRepoRoot: no .git found above ${startDir}`);
+		dir = parent;
+	}
+	return dir;
+}
+
+const VERSION_FILE = join(findRepoRoot(__dirname), '.claude', 'opencode-version-tested.json');
+
+/** The version this suite last confirmed compatible, or null when never recorded / unreadable. */
+function lastTestedVersion(): string | null {
+	try {
+		const parsed = JSON.parse(readFileSync(VERSION_FILE, 'utf8'));
+		return typeof parsed['testedVersion'] === 'string' ? parsed['testedVersion'] : null;
+	} catch {
+		return null;
+	}
+}
+
+function recordTestedVersion(version: string): void {
+	mkdirSync(dirname(VERSION_FILE), { recursive: true });
+	writeFileSync(
+		VERSION_FILE,
+		JSON.stringify({ testedVersion: version, testedAt: new Date().toISOString() }, null, 2)
+	);
+}
+
+/**
+ * Runs locally when the installed opencode version has not yet been confirmed compatible, or
+ * when OPENCODE_INTEGRATION=1 forces it regardless of the cache. Never in CI -- this suite talks
+ * to a real CLI, and `ProviderFlagContract.test.ts` already covers flag drift on every commit.
  */
 function shouldRunIntegration(): boolean {
 	if (process.env['CI']) return false;
-	if (!process.env['OPENCODE_INTEGRATION']) return false;
-	return currentOpenCodeVersion() !== null;
+	const current = currentOpenCodeVersion();
+	if (current === null) return false;
+	if (process.env['OPENCODE_INTEGRATION']) return true;
+	return current !== lastTestedVersion();
 }
 
 function runProcess(
@@ -143,6 +179,13 @@ describe.skipIf(!shouldRunIntegration())('OpenCode real vs mock compatibility', 
 				const real = await runProcess(realOpenCodePath, flags, undefined, needsShell);
 				// Real opencode may fail in test env but should not exit with code 2 (bad args)
 				expect(real.exitCode).not.toBe(2);
+
+				// This is the only assertion in the suite that actually touches the real binary --
+				// flags only, not the NDJSON event schema itself. Caching "tested" here is honest
+				// about that scope; it is not the same depth of guarantee as the Claude suite's
+				// field-by-field mock-vs-real comparison.
+				const version = currentOpenCodeVersion();
+				if (version) recordTestedVersion(version);
 			}
 		},
 		INTEGRATION_TIMEOUT
@@ -267,9 +310,6 @@ describe.skipIf(!shouldRunIntegration())('OpenCode real vs mock compatibility', 
 					>;
 					expect(usage['opencode'].inputTokens).toBeGreaterThan(0);
 					expect(usage['opencode'].outputTokens).toBeGreaterThan(0);
-
-					// Reported, not recorded: a "last tested version" file is what rotted last time.
-					console.log(`✓ OpenCode mock compatible with opencode ${currentOpenCodeVersion() ?? 'unknown'}`);
 				} else {
 					console.warn(
 						`opencode-mock.mjs exited with code ${result.exitCode} — on Windows, set OPENCODE_MOCK_PATH to a .cmd wrapper`

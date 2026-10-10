@@ -121,6 +121,19 @@ emit({
 		cache_creation_input_tokens: 0,
 		cache_read_input_tokens: 0,
 	},
+	// Per-model breakdown, keyed by model id. Field names (inputTokens/outputTokens/
+	// cacheReadInputTokens/cacheCreationInputTokens/costUSD) match the real `claude` CLI's
+	// internal usage tracker, not the top-level `usage` block's snake_case naming.
+	modelUsage: {
+		'claude-haiku-mock': {
+			inputTokens: 10,
+			outputTokens: responseText.split(' ').length,
+			cacheReadInputTokens: 0,
+			cacheCreationInputTokens: 0,
+			webSearchRequests: 0,
+			costUSD: 0.0001,
+		},
+	},
 	num_turns: 1,
 	stop_reason: 'end_turn',
 });

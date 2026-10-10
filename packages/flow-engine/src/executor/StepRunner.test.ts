@@ -1156,10 +1156,18 @@ describe('StepRunner', () => {
 						subtype: 'result',
 						data: {
 							result: 'hi',
-							cost_usd: 0.001,
+							// Claude's native stream-json result event names these `total_cost_usd` and
+							// `cacheReadInputTokens`/`cacheCreationInputTokens` -- verified against the
+							// real installed CLI by StepRunner.model.integration.test.ts, not assumed.
+							total_cost_usd: 0.001,
 							duration_ms: 1500,
 							modelUsage: {
-								haiku: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 3, cacheWriteTokens: 7 },
+								haiku: {
+									inputTokens: 10,
+									outputTokens: 5,
+									cacheReadInputTokens: 3,
+									cacheCreationInputTokens: 7,
+								},
 							},
 						},
 					} as any);

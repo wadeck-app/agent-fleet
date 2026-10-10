@@ -231,7 +231,9 @@ export class StreamEventMapper {
 	private mapResultEvent(event: StreamJsonEvent): LiveLogEntry {
 		const data = event.data;
 		const numTurns = data.num_turns ?? '?';
-		const cost = data.cost_usd != null ? `$${data.cost_usd}` : '$?';
+		// Claude's native stream-json names this `total_cost_usd`; OpenCode/Codex synthesize `cost_usd` instead.
+		const costUsd = data.total_cost_usd ?? data.cost_usd;
+		const cost = costUsd != null ? `$${costUsd}` : '$?';
 		const durationSeconds = data.duration_ms != null ? `${(data.duration_ms / 1000).toFixed(1)}s` : '?s';
 		const resultText = data.result || '';
 
@@ -241,7 +243,7 @@ export class StreamEventMapper {
 			level: 'info',
 			message: `Completed: ${numTurns} turns, ${cost} USD, ${durationSeconds}`,
 			eventType: 'result',
-			metadata: { numTurns, cost: data.cost_usd, durationMs: data.duration_ms, resultText },
+			metadata: { numTurns, cost: costUsd, durationMs: data.duration_ms, resultText },
 		};
 	}
 

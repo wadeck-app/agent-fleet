@@ -195,23 +195,33 @@ export async function executeModelStep(
 							}
 						}
 						if (event.type === 'result') {
-							capturedCostUsd = (event.data.cost_usd as number) ?? 0;
+							// Claude's own CLI names this `total_cost_usd` in its native stream-json result event
+							// (see claude-mock.mjs). OpenCode/Codex synthesize their own event with `cost_usd`
+							// instead -- support both so neither provider regresses.
+							capturedCostUsd =
+								(event.data.total_cost_usd as number) ?? (event.data.cost_usd as number) ?? 0;
 							const usage = event.data.modelUsage as
-								Record<
-									string,
-									{
-										inputTokens?: number;
-										outputTokens?: number;
-										cacheReadTokens?: number;
-										cacheWriteTokens?: number;
-									}
-								> | undefined;
+								| Record<
+										string,
+										{
+											inputTokens?: number;
+											outputTokens?: number;
+											// Claude's native modelUsage entries use the `*InputTokens` names below.
+											// OpenCode/Codex synthesize their own modelUsage with `cacheReadTokens` /
+											// `cacheWriteTokens` instead -- read both so neither provider regresses.
+											cacheReadInputTokens?: number;
+											cacheCreationInputTokens?: number;
+											cacheReadTokens?: number;
+											cacheWriteTokens?: number;
+										}
+								  >
+								| undefined;
 							if (usage) {
 								for (const u of Object.values(usage)) {
 									capturedInputTokens += u.inputTokens ?? 0;
 									capturedOutputTokens += u.outputTokens ?? 0;
-									capturedCacheReadTokens += u.cacheReadTokens ?? 0;
-									capturedCacheWriteTokens += u.cacheWriteTokens ?? 0;
+									capturedCacheReadTokens += u.cacheReadInputTokens ?? u.cacheReadTokens ?? 0;
+									capturedCacheWriteTokens += u.cacheCreationInputTokens ?? u.cacheWriteTokens ?? 0;
 								}
 							}
 						}

@@ -1,8 +1,9 @@
 /**
  * Integration test: verifies the mock Claude produces the same NDJSON structure as real Claude.
  *
- * Auto-triggered when Claude version changes (detected in CI via claude-version-tested.json).
- * Manual run: CLAUDE_INTEGRATION=1 npx vitest run StepRunner.model.integration.test
+ * Auto-triggered locally (never in CI) when the installed `claude` version differs from the one
+ * last recorded in .claude/claude-version-tested.json. Force a run regardless of the cache with:
+ *   CLAUDE_INTEGRATION=1 npx vitest run StepRunner.model.integration.test
  *
  * Covers:
  *   - Accepted CLI flags (inputs / parameters)
@@ -10,18 +11,40 @@
  *   - Required fields per event type
  *   - Exit codes
  *
- * Last tested version stored in .claude/claude-version-tested.json.
- * When current version ≠ stored version, the compatibility test is automatically enabled.
+ * The version marker is only written after the structural-compatibility test passes, so a real
+ * incompatibility is never cached as "already tested" -- it keeps re-triggering every run until
+ * fixed.
  */
 import { execSync, spawn } from 'node:child_process';
-import { join } from 'node:path';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MOCK_PATH = join(__dirname, '../testing/claude-mock.mjs');
 const INTEGRATION_TIMEOUT = 60_000;
+
+/**
+ * Walks up from `startDir` to the nearest ancestor containing `.git`.
+ *
+ * The previous version-tracking attempt resolved its baseline path relative to something other
+ * than the actual repo root, so the file was never found, every run read as "no baseline", and
+ * the gate treated that as "skip forever" -- three provider flags drifted unnoticed for months.
+ * Walking to the real `.git` root instead of hardcoding a relative `../../..` count survives the
+ * file moving to a different nesting depth.
+ */
+function findRepoRoot(startDir: string): string {
+	let dir = startDir;
+	while (!existsSync(join(dir, '.git'))) {
+		const parent = dirname(dir);
+		if (parent === dir) throw new Error(`findRepoRoot: no .git found above ${startDir}`);
+		dir = parent;
+	}
+	return dir;
+}
+
+const VERSION_FILE = join(findRepoRoot(__dirname), '.claude', 'claude-version-tested.json');
 
 function currentClaudeVersion(): string | null {
 	try {
@@ -31,18 +54,36 @@ function currentClaudeVersion(): string | null {
 	}
 }
 
+/** The version this suite last confirmed compatible, or null when never recorded / unreadable. */
+function lastTestedVersion(): string | null {
+	try {
+		const parsed = JSON.parse(readFileSync(VERSION_FILE, 'utf8'));
+		return typeof parsed['testedVersion'] === 'string' ? parsed['testedVersion'] : null;
+	} catch {
+		return null;
+	}
+}
+
+function recordTestedVersion(version: string): void {
+	mkdirSync(dirname(VERSION_FILE), { recursive: true });
+	writeFileSync(
+		VERSION_FILE,
+		JSON.stringify({ testedVersion: version, testedAt: new Date().toISOString() }, null, 2)
+	);
+}
+
 /**
- * Runs on request, locally, never in CI.
- *
- * No "last tested version" file: that mechanism pointed outside the repo, read as "no baseline",
- * and the gate turned that into a permanent silent skip while provider flags drifted. The check
- * that cannot rot is asking the CLI directly -- see `ProviderFlagContract.test.ts`, which runs
- * on every commit. This suite talks to a real model, so CI is never the place for it.
+ * Runs locally when the installed Claude version has not yet been confirmed compatible, or when
+ * CLAUDE_INTEGRATION=1 forces it regardless of the cache. Never in CI -- this suite calls a real
+ * model, so CI is never the place for it. `ProviderFlagContract.test.ts` runs on every commit
+ * instead, cheaply, by reading `--help` with no model call.
  */
 function shouldRunIntegration(): boolean {
 	if (process.env['CI']) return false;
-	if (!process.env['CLAUDE_INTEGRATION']) return false;
-	return currentClaudeVersion() !== null;
+	const current = currentClaudeVersion();
+	if (current === null) return false;
+	if (process.env['CLAUDE_INTEGRATION']) return true;
+	return current !== lastTestedVersion();
 }
 
 function runProcess(
@@ -199,8 +240,24 @@ describe.skipIf(!shouldRunIntegration())('Claude real vs mock compatibility', ()
 				expect(typeof r['duration_ms']).toBe('number');
 			}
 
-			// Reported, not recorded: a "last tested version" file is what rotted last time.
-			console.log(`✓ Mock compatible with Claude ${currentClaudeVersion() ?? 'unknown'}`);
+			// result event: cost/token fields -- ModelStepExecutor reads `total_cost_usd` (not
+			// `cost_usd`) and `modelUsage[model].{inputTokens,outputTokens,cacheReadInputTokens,
+			// cacheCreationInputTokens}`. A real-CLI drift here silently zeroes cost in `flow history`.
+			for (const r of [mockResultEvent, realResultEvent]) {
+				expect(typeof r['total_cost_usd']).toBe('number');
+				expect(typeof r['modelUsage']).toBe('object');
+				const firstModelUsage = Object.values(r['modelUsage'] as Record<string, unknown>)[0] as any;
+				expect(typeof firstModelUsage['inputTokens']).toBe('number');
+				expect(typeof firstModelUsage['outputTokens']).toBe('number');
+				expect(typeof firstModelUsage['cacheReadInputTokens']).toBe('number');
+				expect(typeof firstModelUsage['cacheCreationInputTokens']).toBe('number');
+			}
+
+			// Every assertion above passed -- only now is this version safe to cache as "compatible",
+			// so the next local run skips until the installed Claude version changes again.
+			const version = currentClaudeVersion();
+			if (version) recordTestedVersion(version);
+			console.log(`✓ Mock compatible with Claude ${version ?? 'unknown'}`);
 		},
 		INTEGRATION_TIMEOUT
 	);
