@@ -9,7 +9,6 @@
 		{ "path": "packages/plugin-file-approval" },
 		{ "path": "packages/e2e-web" },
 		{ "path": "packages/flow-cli" },
-		{ "path": "packages/task-cli" },
 		{ "path": "packages/flow-engine" },
 		{ "path": "packages/orchestrator" },
 		{ "path": "packages/shared-common" },

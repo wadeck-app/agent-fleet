@@ -57,14 +57,6 @@ const testSuites = [
 		args: ['run', 'test', '--workspace=flow-engine'],
 		type: testSuiteType_UNIT,
 	},
-	// Was missing, so its suite sat red without anyone noticing -- including a production bug
-	// (task cli self-check writing into a shared temp index) that its tests did expose.
-	{
-		name: 'Task CLI Unit Tests',
-		command: 'npm',
-		args: ['run', 'test', '--workspace=task-cli'],
-		type: testSuiteType_UNIT,
-	},
 	// No plugin package was covered either, although a plugin is what a daemon loads at startup:
 	// a broken one takes the whole daemon down.
 	{

@@ -28,9 +28,6 @@ EOF
 generate "flow-cli-win32-x64"    "win32"  "x64"   "flow.exe"
 generate "flow-cli-darwin-arm64" "darwin" "arm64" "flow"
 generate "flow-cli-darwin-x64"   "darwin" "x64"   "flow"
-generate "task-cli-win32-x64"    "win32"  "x64"   "task.exe"
-generate "task-cli-darwin-arm64" "darwin" "arm64" "task"
-generate "task-cli-darwin-x64"   "darwin" "x64"   "task"
 
 # Generates the -dist wrapper package (bin launcher + package.json) for a CLI.
 # The .cjs bundles are copied by copy-binaries.sh; this only creates the scaffolding.
@@ -81,4 +78,3 @@ EOF
 }
 
 generate_dist "flow" "worker.cjs"
-generate_dist "task"

@@ -62,7 +62,7 @@ jobs:
               run: bash ci/scripts/generate-platform-packages.sh
 
             - name: Copy artifacts to platform packages
-              run: bash ci/scripts/copy-binaries.sh flow
+              run: bash ci/scripts/copy-binaries.sh
 
             - name: Set version in all packages
               run: |

@@ -44,7 +44,6 @@ const PACKAGES = [
 	// Was absent, which is how three of its files stayed corrupted and unnoticed:
 	// `npm run check` never typechecked them.
 	'e2e-web',
-	'task-cli',
 	'extension-points',
 ];
 
