@@ -84,12 +84,12 @@ If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a
 
 ## CLI Development Workflow
 
-`flow-cli` and `task-cli` are installed globally via CI (GitHub Packages). Source edits alone do nothing -- the binary in PATH is the published version.
+`flow-cli` is installed globally via CI (GitHub Packages). Source edits alone do nothing -- the binary in PATH is the published version. (`task-cli` moved to its own repo, [wadeck-app/task](https://github.com/wadeck-app/task) -- same workflow applies there.)
 
 **To deploy a local change:**
 
 1. `git commit` + `git push` -> CI builds and publishes automatically
-2. `flow cli update` or `task cli update` to install the new version locally
+2. `flow cli update` to install the new version locally
 
 **Never patch `node_modules` manually** -- it gets overwritten on the next install.
 

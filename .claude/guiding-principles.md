@@ -25,7 +25,6 @@
 ## Library boundaries
 
 - `flow-engine` is a pure library — no process lifecycle concerns, no side effects, no I/O.
-- `singleton-daemon-kit` is only for CLIs needing a persistent daemon; `task-cli` is file-based and must NOT use it.
 
 ## Frontend (Data2)
 
@@ -42,7 +41,7 @@
 
 ### Build / monorepo
 
-- Run `npm run build` on `flow-engine` before running TypeScript checks in any dependent package (`flow-cli`, `task-cli`) — composite tsconfig references require built dist-types or errors are misleading.
+- Run `npm run build` on `flow-engine` before running TypeScript checks in any dependent package (`flow-cli`) — composite tsconfig references require built dist-types or errors are misleading.
 - Always run `npm install` from the monorepo root, never from a subpackage directory — per-subpackage install causes workspace shadowing (hoisted dep resolves from registry instead of workspace).
 - Scope all affected files (grep for all import/use sites) before starting any cross-package refactor — partial scoping is the root cause of "incomplete fix" cycles.
 

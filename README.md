@@ -7,7 +7,7 @@ Architecture
 Two independent systems live in this monorepo:
 
 . Agent Fleet -- the current production system: orchestrator + workers + web UI
-. Flow CLI / Task CLI -- standalone daemon-based CLIs for running flows and managing tasks without the web stack
+. Flow CLI -- standalone daemon-based CLI for running flows without the web stack
 
 ```
 web-frontend  HTTP/WS>  web-backend  embedded>  orchestrator
@@ -33,7 +33,6 @@ Runtime processes
 | `packages/web-frontend` | React SPA (Vite). Dashboard, task management, visual flow editor (`@xyflow/react`), real-time event consumption.                                                                                                                       |
 | `packages/legacy-cli`   | Thin CLI binary (`fleet-task`). Submits tasks to the orchestrator REST API from the command line. No web UI needed.                                                                                                                    |
 | `packages/flow-cli`     | Standalone CLI (`flow`). Runs and validates agent flows via a background daemon. No web stack required. Install: `npm install -g @wadeck-app/flow-cli`.                                                                                |
-| `packages/task-cli`     | Standalone CLI (`task`). Local task tracker with YAML config and lifecycle hooks. Install: `npm install -g @wadeck-app/task-cli`.                                                                                                      |
 
 Libraries
 
@@ -45,5 +44,7 @@ Libraries
 | `packages/shared-frontend-backend` | HTTP API contract layer between web-backend and web-frontend. Typed API contracts per domain, route-builder helpers, WebSocket/SSE/polling transport protocol types.                                                                                                         |
 
 ---
+
+Task CLI (`task`, `@wadeck-app/task-cli`) has moved to its own repo: [wadeck-app/task](https://github.com/wadeck-app/task).
 
 _Reference content moved to [docs/reference.md](docs/reference.md)._

@@ -56,7 +56,7 @@
 
 - [ ] Always call `ToolSearch("select:<skill-name>")` before invoking any deferred skill/tool — never assume availability; treat the first "NOT YET KNOWN" as a hard stop, not a retry signal
 - [ ] When debugging a failure, form one hypothesis, make one change, observe the result — never make multiple speculative edits in parallel (thrashing pattern observed 20+ times)
-- [ ] Run `npm run build` on `flow-engine` before running type checks on dependent packages (`flow-cli`, `task-cli`) — composite tsconfig references require built dist-types
+- [ ] Run `npm run build` on `flow-engine` before running type checks on dependent packages (`flow-cli`) — composite tsconfig references require built dist-types
 - [ ] Run a full spec goldfish/security audit before starting implementation, not after — iterative post-implementation audit rounds (v2→v6) consistently cost more than upfront review
 - [ ] Scope all affected files (grep for all import/use sites) before starting any cross-package refactor — partial scoping is the root cause of 80%+ of "incomplete fix" cycles
 - [ ] When delegating to parallel agents, assign explicit non-overlapping file ownership — never let two agents edit the same file concurrently

@@ -70,20 +70,7 @@ Config dir: `~/.config/flow/` (override: `FLOW_CONFIG_DIR` env). Auto-updates in
 
 ## Task CLI
 
-Lightweight local task tracker, no server required.
-
-```bash
-npm install -g @wadeck-app/task-cli
-
-task init                     # initialize a project (creates .task/)
-task new "description"        # create a task
-task list                     # list all tasks
-task show <id>                # show a task
-task set-status <id> <status> # move a task to a status
-task cli update               # manual update
-```
-
-Configure statuses and hooks in `.task/config.yml`. Global config: `~/.config/task/`. Auto-updates in background on every invocation.
+Moved to its own repo: [wadeck-app/task](https://github.com/wadeck-app/task). Install: `npm install -g @wadeck-app/task-cli`.
 
 ## Development
 

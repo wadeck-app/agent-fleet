@@ -5,7 +5,7 @@
 Multi-agent orchestration system for autonomous software development using Claude Code. Two independent subsystems:
 
 - **Web stack**: orchestrator + workers + web UI communicating over WebSocket (port 3738) and REST (port 3737).
-- **Daemon CLIs**: `flow-cli` and `task-cli` — standalone, independently distributed.
+- **Daemon CLI**: `flow-cli` — standalone, independently distributed. (`task-cli` moved to its own repo, [wadeck-app/task](https://github.com/wadeck-app/task).)
 
 ## Roadmap
 
@@ -27,7 +27,3 @@ Autonomous external CLI receiving orchestrator events via `HookDispatcher` (HTTP
 - OpenCode step provider (alternate Claude provider).
 - Meta-hooks.
 - Merge of flow-cli feature specs into main branch.
-
-### Task CLI
-
-Stays purely file-based; no daemon; independent of `singleton-daemon-kit`.
