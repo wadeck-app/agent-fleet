@@ -952,6 +952,21 @@ No decision was made -- this step is unanswered, not denied.`;
 		expect(mockRelease).not.toHaveBeenCalled();
 	});
 
+	// Daemon.ts's isIdle() consults this directly (alongside hasActiveExecutions()) so its
+	// own idle-exit check never tears down a resumable execution's in-memory state out from
+	// under a `flow resume` that has not run yet.
+	it('hasResumableInterventions is true after the timeout and false again once resumed', async () => {
+		const handler = makeHandler();
+		const executionId = await runToInterventionStep(handler);
+		expect(handler.hasResumableInterventions()).toBe(false);
+
+		handler.onStepFailed(executionId, 'approve', TIMEOUT_ERROR);
+		expect(handler.hasResumableInterventions()).toBe(true);
+
+		handler.handleResume(executionId);
+		expect(handler.hasResumableInterventions()).toBe(false);
+	});
+
 	it('cleans up normally when a user_intervention step fails for a reason other than a timeout', async () => {
 		const handler = makeHandler();
 		const executionId = await runToInterventionStep(handler);

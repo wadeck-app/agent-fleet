@@ -705,7 +705,15 @@ async function startDaemon(
 
 	function isIdle(): boolean {
 		return (
-			commandHandler.isQueueEmpty() && !commandHandler.hasActiveExecutions() && !workerRegistry.hasBusyWorkers()
+			commandHandler.isQueueEmpty() &&
+			!commandHandler.hasActiveExecutions() &&
+			!workerRegistry.hasBusyWorkers() &&
+			// A failed-on-unanswered-intervention execution is kept alive specifically so a
+			// later `flow resume` can re-dispatch it (CommandHandler.handleResume) -- that only
+			// works against this same daemon process's in-memory scheduler/context state, so
+			// idle-exit must not tear it down just because nothing is queued or running right
+			// this second.
+			!commandHandler.hasResumableInterventions()
 		);
 	}
 

@@ -231,6 +231,23 @@ export class CommandHandler {
 		return this.activeExecutionCount > 0;
 	}
 
+	/**
+	 * Whether any execution is waiting on `flow resume` after an unanswered-intervention
+	 * timeout (see `resumableInterventions`).
+	 *
+	 * Consulted by the daemon's own idle-exit check (`Daemon.ts`'s `isIdle()`) explicitly,
+	 * by name, rather than relying only on `hasActiveExecutions()` staying true for it: a
+	 * kept-alive execution not incrementing/decrementing `activeExecutionCount` the way an
+	 * ordinary running one does is an implementation detail of `cleanupExecution` being
+	 * skipped, not a documented contract -- a future change to that bookkeeping could silently
+	 * reopen the race `flow resume` depends on not happening (idle-exit destroying the
+	 * in-memory scheduler/context state before an operator can plausibly run it). Naming the
+	 * actual condition here makes the dependency explicit instead of incidental.
+	 */
+	hasResumableInterventions(): boolean {
+		return this.resumableInterventions.size > 0;
+	}
+
 	async handleRun(
 		cmd: Extract<ClientCommand, { type: 'run' }>,
 		hookDispatcher?: HookDispatcher
