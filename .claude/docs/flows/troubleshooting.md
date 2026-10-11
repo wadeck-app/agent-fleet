@@ -1183,6 +1183,20 @@ pattern: '(.*)'
 
 ---
 
+### "user_intervention step timed out before anyone answered"
+
+**Symptoms**: execution fails with `[file-approval] Timed out after <N> ms waiting for an answer... No decision was made -- this step is unanswered, not denied.`
+
+**Fix**: this is not final. Write the response file as described in the error (or late, after the fact), then run:
+
+```bash
+flow resume <execution-id>
+```
+
+This re-dispatches only the timed-out step -- nothing else re-runs. Only works while the daemon that ran the execution is still alive; a daemon restart since the failure means `flow resume` returns `NOT_RESUMABLE`, and the flow must be re-run from scratch.
+
+---
+
 ## Debugging Workflow
 
 Step-by-step process for debugging flow issues.

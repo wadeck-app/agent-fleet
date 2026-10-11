@@ -492,6 +492,34 @@ export class FlowScheduler {
 		return this.failedSteps.size > 0;
 	}
 
+	/**
+	 * Re-arms a terminally failed step as ready to dispatch again, as if it had never failed.
+	 *
+	 * No other step is touched or re-run -- only the one step named. Used by CommandHandler to
+	 * resume an execution after a `user_intervention` step was answered late, past its original
+	 * timeout: the rest of the flow's state (outputs, completed steps) is untouched because
+	 * nothing else ever ran again.
+	 *
+	 * Only valid when this step is the sole reason {@link hasFailed} is true: resuming it while
+	 * an unrelated step is also terminally failed would un-pause an execution that still cannot
+	 * succeed, silently hiding the other failure.
+	 */
+	resumeFailedStep(stepId: string): ReadyItem {
+		if (!this.failedSteps.has(stepId)) {
+			throw new Error(`FlowScheduler: step "${stepId}" is not failed, cannot resume it.`);
+		}
+		const otherFailed = [...this.failedSteps].filter(id => id !== stepId);
+		if (otherFailed.length > 0) {
+			throw new Error(
+				`FlowScheduler: cannot resume step "${stepId}" because other step(s) are also terminally failed: ${otherFailed.join(', ')}.`
+			);
+		}
+		const step = this.steps.get(stepId);
+		if (!step) throw new Error(`FlowScheduler: unknown stepId "${stepId}" in resumeFailedStep()`);
+		this.failedSteps.delete(stepId);
+		return { stepId, step };
+	}
+
 	/** Current step outputs map (read-only snapshot). Used by CommandHandler to sync ExecutionContext. */
 	getOutputs(): Map<string, Record<string, unknown>> {
 		return new Map(this.outputs);

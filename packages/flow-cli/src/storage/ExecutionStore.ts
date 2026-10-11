@@ -169,6 +169,24 @@ export class ExecutionStore {
 		return this.update(executionId, { status: 'failed', completedAt: new Date().toISOString(), currentSteps: [] });
 	}
 
+	/**
+	 * Reopens a `failed` execution so `flow history`/`flow show` reflect it as running again,
+	 * and resets the resumed step back to `pending` so it is dispatched as a fresh attempt.
+	 */
+	markExecutionResumed(executionId: string, stepId: string): ExecutionState {
+		const state = this.read(executionId);
+		state.status = 'running';
+		state.completedAt = null;
+		const step = state.steps[stepId];
+		if (step) {
+			step.status = 'pending';
+			delete step.completedAt;
+			delete step.error;
+		}
+		this.write(state);
+		return state;
+	}
+
 	private filePath(executionId: string): string {
 		return path.join(this.executionsDir, `${executionId}.json`);
 	}

@@ -33,5 +33,9 @@ Both files then move to `<dir>/answered/` as an audit trail.
 ## Failure modes -- all loud
 
 - Malformed JSON, missing/mistyped field, or unknown `choiceId` -> throws naming the file, what was found and what was expected. No default, no auto-approval; the file stays on disk for inspection.
-- Timeout -> throws with the request path, the response path to create and the expected shape. Never resolves to `false`, which would look like a real denial.
-- A stale response file already present when the request is published -> throws instead of consuming it.
+- Timeout -> throws with the request path, the response path to create and the expected shape. Never resolves to `false`, which would look like a real denial. The request file is left in place, unarchived.
+- A response file present with no matching request -> throws instead of consuming it (true stale leftover).
+
+## Answering after a timeout
+
+A timed-out request is still answerable: write the response file as usual, then run `flow resume <executionId>` (see flow-cli's `flow resume --help`). The request is still open (never archived), so re-asking consumes the already-written response immediately instead of refusing it as stale. With no response yet, resuming re-opens the same wait for a fresh timeout window.

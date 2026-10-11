@@ -193,6 +193,7 @@ const mockExecStore = {
 	markStepFailed: vi.fn(),
 	markExecutionCompleted: vi.fn(),
 	markExecutionFailed: vi.fn(),
+	markExecutionResumed: vi.fn(),
 	pruneOldExecutions: vi.fn(),
 	update: vi.fn(),
 };
@@ -915,6 +916,127 @@ describe('CommandHandler — plugin workspace provider', () => {
 		expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('release failed'));
 
 		warnSpy.mockRestore();
+	});
+});
+
+describe('CommandHandler — resuming an unanswered user_intervention step', () => {
+	const TIMEOUT_ERROR = `[file-approval] Timed out after 30 ms waiting for an answer.
+  Request file : /tmp/approvals/x_approve.request.json
+  Response file: /tmp/approvals/x_approve.response.json (does not exist)
+  How to answer: Create /tmp/approvals/x_approve.response.json containing {"approved": true|false}
+No decision was made -- this step is unanswered, not denied.`;
+
+	async function runToInterventionStep(handler: CommandHandler): Promise<string> {
+		const flowFile = path.join(tmpDir, 'intervention.yml');
+		fs.writeFileSync(flowFile, USER_INTERVENTION_FLOW_YAML);
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		expect(result.type).toBe('execution_started');
+		const { executionId } = result as { executionId: string };
+		// s1 (script) completes first, which is what makes 'approve' (user_intervention,
+		// depends: [s1]) ready to dispatch.
+		handler.onStepCompleted(executionId, 's1', {});
+		return executionId;
+	}
+
+	it('does not clean up the execution when the failure is an unanswered intervention timeout', async () => {
+		const handler = makeHandler();
+		const executionId = await runToInterventionStep(handler);
+
+		handler.onStepFailed(executionId, 'approve', TIMEOUT_ERROR);
+
+		expect(mockExecStore.markExecutionFailed).toHaveBeenCalledWith(executionId);
+		// Kept alive, not torn down: a resume must still be possible.
+		expect(handler.hasActiveExecutions()).toBe(true);
+		// release() is called synchronously by cleanupExecution when it runs; its absence here
+		// proves cleanupExecution was skipped, with no need to wait out its (also skipped) promise.
+		expect(mockRelease).not.toHaveBeenCalled();
+	});
+
+	it('cleans up normally when a user_intervention step fails for a reason other than a timeout', async () => {
+		const handler = makeHandler();
+		const executionId = await runToInterventionStep(handler);
+
+		handler.onStepFailed(executionId, 'approve', 'the approval provider crashed unexpectedly');
+
+		expect(handler.hasActiveExecutions()).toBe(false);
+		// release() itself is invoked synchronously inside cleanupExecution -- only its
+		// continuation is async, which this assertion does not need to wait for.
+		expect(mockRelease).toHaveBeenCalled();
+	});
+
+	it('cleans up normally when a non-intervention step fails', async () => {
+		const flowFile = path.join(tmpDir, 'valid.yml');
+		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
+		const handler = makeHandler();
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		const { executionId } = result as { executionId: string };
+
+		handler.onStepFailed(executionId, 's1', 'some script error');
+
+		expect(handler.hasActiveExecutions()).toBe(false);
+		expect(mockRelease).toHaveBeenCalled();
+	});
+
+	it('handleResume re-enqueues the timed-out step and marks the execution running again', async () => {
+		const workerPool = createMockWorkerPool();
+		const dispatched: string[] = [];
+		const interactive = forkedWorker({});
+		interactive.worker.hasUserInterface = true;
+		workerPool.listIdle.mockReturnValue([interactive]);
+		workerPool.send.mockImplementation((_ws: unknown, msg: unknown) => {
+			dispatched.push((msg as { stepId: string }).stepId);
+			return true;
+		});
+		const handler = makeHandler(workerPool);
+		const executionId = await runToInterventionStep(handler);
+		handler.onStepFailed(executionId, 'approve', TIMEOUT_ERROR);
+		dispatched.length = 0; // clear the record of 'approve' being dispatched the first time
+
+		const response = handler.handleResume(executionId);
+
+		expect(response).toEqual({ type: 'execution_resumed', executionId, stepId: 'approve' });
+		expect(mockExecStore.markExecutionResumed).toHaveBeenCalledWith(executionId, 'approve');
+		expect(dispatched).toContain('approve');
+		expect(handler.hasActiveExecutions()).toBe(true);
+	});
+
+	it('a second handleResume for the same execution is NOT_RESUMABLE', async () => {
+		const handler = makeHandler();
+		const executionId = await runToInterventionStep(handler);
+		handler.onStepFailed(executionId, 'approve', TIMEOUT_ERROR);
+		handler.handleResume(executionId);
+		// This execution genuinely exists; only the resumability window has closed.
+		mockExecStore.exists.mockReturnValueOnce(true);
+
+		const second = handler.handleResume(executionId);
+
+		expect(second.type).toBe('error');
+		expect((second as { code: string }).code).toBe('NOT_RESUMABLE');
+	});
+
+	it('handleResume on an execution that never failed on an intervention is NOT_RESUMABLE', async () => {
+		const handler = makeHandler();
+		const flowFile = path.join(tmpDir, 'valid.yml');
+		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		const { executionId } = result as { executionId: string };
+		// This execution genuinely exists (unlike a made-up id), just never failed in a
+		// resumable way -- the mock otherwise defaults exists() to false for every id.
+		mockExecStore.exists.mockReturnValueOnce(true);
+
+		const response = handler.handleResume(executionId);
+
+		expect(response.type).toBe('error');
+		expect((response as { code: string }).code).toBe('NOT_RESUMABLE');
+	});
+
+	it('handleResume on a completely unknown executionId is EXECUTION_NOT_FOUND', () => {
+		const handler = makeHandler();
+
+		const response = handler.handleResume('nonexistent');
+
+		expect(response.type).toBe('error');
+		expect((response as { code: string }).code).toBe('EXECUTION_NOT_FOUND');
 	});
 });
 

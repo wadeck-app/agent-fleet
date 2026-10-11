@@ -78,6 +78,17 @@ function assertAssignable(step: FlowStep): AssignableStep {
 const DEFAULT_MAX_INJECTED_STEPS = 20;
 const DEFAULT_MAX_STEPS_PER_EXECUTION = 50;
 
+/**
+ * True when a step_failed error is the file-approval timeout's exact sentinel, as opposed to
+ * an explicit decision (approved/rejected never throws -- see UserInterventionStepExecutor) or
+ * an unrelated provider crash. Matched on this literal phrase rather than the step type alone
+ * so a crash that merely happens to be a user_intervention step is still cleaned up normally,
+ * not left dangling as "resumable" forever.
+ */
+function isUnansweredInterventionError(error: string): boolean {
+	return error.includes('this step is unanswered, not denied');
+}
+
 interface ReadyStep {
 	stepId: string;
 	stepConfig: AssignableStep;
@@ -134,6 +145,13 @@ export class CommandHandler {
 	>();
 	/** Per-execution WorkspaceManager handles for the non-plugin path */
 	private readonly nativeWorkspaceManagers = new Map<string, { manager: WorkspaceManager; workspaceId: string }>();
+	/** Step definitions by execution, consulted on failure to decide resumability. */
+	private readonly stepDefinitions = new Map<string, Map<string, AssignableStep>>();
+	/**
+	 * Executions kept alive (not cleaned up) after a `user_intervention` step timed out
+	 * unanswered, so a later `flow resume` can re-dispatch exactly that step (see handleResume).
+	 */
+	private readonly resumableInterventions = new Map<string, { stepId: string }>();
 	private activeExecutionCount = 0;
 
 	constructor(
@@ -504,6 +522,7 @@ export class CommandHandler {
 
 		this.schedulers.set(executionId, scheduler);
 		this.executionContexts.set(executionId, context);
+		this.stepDefinitions.set(executionId, new Map(assignable.map(s => [s.id, s])));
 		this.stepCounts.set(executionId, assignable.length);
 		this.activeExecutionCount++;
 
@@ -721,12 +740,81 @@ export class CommandHandler {
 				}
 			}
 			this.executionStore.markExecutionFailed(executionId);
+
+			const stepType = this.stepDefinitions.get(executionId)?.get(stepId)?.type;
+			if (stepType === 'user_intervention' && isUnansweredInterventionError(error)) {
+				// Kept alive on purpose: no other step is touched, so there is nothing to
+				// re-validate when this one is answered late (see handleResume).
+				this.resumableInterventions.set(executionId, { stepId });
+				this.logWriter.writeExecution(
+					executionId,
+					`Step ${stepId} is an unanswered intervention -- kept resumable via "flow resume ${executionId}" instead of being cleaned up.`,
+					'info'
+				);
+				return;
+			}
+
 			this.cleanupExecution(executionId, new Error(error));
 		} else {
 			// Loop/retry/sub-step-re-run in progress - re-enqueue steps returned by the scheduler
 			this.enqueueReadyItems(executionId, newReady, context);
 			this.tryDispatch();
 		}
+	}
+
+	/**
+	 * Resumes an execution that was kept alive after a `user_intervention` step timed out
+	 * unanswered, re-dispatching exactly that one step.
+	 *
+	 * No other step is re-run: the scheduler, context, and workspace are exactly as they were
+	 * the moment the step timed out, because `onStepFailed` deliberately skipped cleanup for
+	 * this case. Only possible while the same daemon process that ran the step is still alive
+	 * -- there is no on-disk reconstruction of in-memory execution state (crash recovery is
+	 * tracked separately; see the 're-queued' comment on ExecutionStatus in Protocol.ts).
+	 */
+	handleResume(executionId: string): DaemonResponse {
+		const resumable = this.resumableInterventions.get(executionId);
+		if (!resumable) {
+			if (!this.executionStore.exists(executionId)) {
+				return {
+					type: 'error',
+					code: 'EXECUTION_NOT_FOUND',
+					message: `No execution found with id "${executionId}".`,
+				};
+			}
+			return {
+				type: 'error',
+				code: 'NOT_RESUMABLE',
+				message:
+					`Execution "${executionId}" is not resumable. Either it did not fail on an unanswered ` +
+					'user_intervention step, it was already resumed, or the daemon has restarted since it ' +
+					'failed (resume only works while the same daemon process that ran it is still alive).',
+			};
+		}
+
+		const scheduler = this.schedulers.get(executionId);
+		const context = this.executionContexts.get(executionId);
+		if (!scheduler || !context) {
+			// Should be unreachable: resumableInterventions is only ever set alongside a live
+			// scheduler/context, and cleanupExecution is never called while it holds an entry.
+			// Fail loudly rather than silently drop the resume if it ever happens.
+			this.resumableInterventions.delete(executionId);
+			return {
+				type: 'error',
+				code: 'NOT_RESUMABLE',
+				message: `Execution "${executionId}" lost its in-memory state and cannot be resumed. Re-run the flow instead.`,
+			};
+		}
+
+		this.resumableInterventions.delete(executionId);
+		const readyItem = scheduler.resumeFailedStep(resumable.stepId);
+		this.executionStore.markExecutionResumed(executionId, resumable.stepId);
+		this.logWriter.writeExecution(executionId, `Execution resumed at step ${resumable.stepId}`, 'info');
+
+		this.enqueueReadyItems(executionId, [readyItem], context);
+		this.tryDispatch();
+
+		return { type: 'execution_resumed', executionId, stepId: resumable.stepId };
 	}
 
 	/**
@@ -1072,6 +1160,8 @@ export class CommandHandler {
 	private cleanupExecution(executionId: string, priorError?: unknown): void {
 		this.schedulers.delete(executionId);
 		this.executionContexts.delete(executionId);
+		this.stepDefinitions.delete(executionId);
+		this.resumableInterventions.delete(executionId);
 		this.stepCounts.delete(executionId);
 		this.executionProjects.delete(executionId);
 		this.activeExecutionCount--;

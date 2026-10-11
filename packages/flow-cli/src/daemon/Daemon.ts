@@ -303,6 +303,16 @@ async function startDaemon(
 				const flowHooks = loadFlowHooks(cmd.cwd);
 				return commandHandler.handleRun(cmd, new HookDispatcher(flowHooks));
 			},
+			// Resumes an execution kept alive after a `user_intervention` step timed out
+			// unanswered (see CommandHandler.handleResume). Only works against this same
+			// daemon process -- there is no on-disk reconstruction of in-memory state.
+			resume: (payload: unknown): unknown => {
+				const { executionId } = payload as Extract<ClientCommand, { type: 'resume' }>;
+				if (typeof executionId !== 'string' || executionId.trim() === '') {
+					throw new Error('resume requires a non-empty "executionId".');
+				}
+				return commandHandler.handleResume(executionId);
+			},
 			// Live connections only: a declared source with nothing connected is not
 			// capacity, and reporting it as available would suggest a step could reach it (D#4).
 			workers: (): unknown => workerRegistry.summarize(),

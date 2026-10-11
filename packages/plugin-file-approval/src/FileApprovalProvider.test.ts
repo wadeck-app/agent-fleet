@@ -284,6 +284,51 @@ describe('FileApprovalProvider timeout', () => {
 	});
 });
 
+describe('FileApprovalProvider resuming after a timeout', () => {
+	it('consumes a response written after the fact instead of refusing it as stale', async () => {
+		const impatient = createFileApprovalProvider({ dir, pollIntervalMs: 5, timeoutMs: 30 });
+		await expect(impatient.requestApproval(APPROVAL_REQUEST)).rejects.toThrow(/timed out/i);
+		// Nothing ever consumed the request -- it is still sitting there.
+		expect(fs.existsSync(requestPath())).toBe(true);
+
+		// The late answer arrives after the timeout already fired.
+		fs.writeFileSync(responsePath(), JSON.stringify({ approved: true }), 'utf8');
+
+		// Re-asking the same question (what a daemon resume does) must pick it up, not
+		// throw "stale response file" the way it would for a truly orphaned response.
+		await expect(provider.requestApproval(APPROVAL_REQUEST)).resolves.toBe(true);
+	});
+
+	it('archives both the original request and the late response once consumed', async () => {
+		const impatient = createFileApprovalProvider({ dir, pollIntervalMs: 5, timeoutMs: 30 });
+		await expect(impatient.requestApproval(APPROVAL_REQUEST)).rejects.toThrow(/timed out/i);
+		fs.writeFileSync(responsePath(), JSON.stringify({ approved: false }), 'utf8');
+
+		await provider.requestApproval(APPROVAL_REQUEST);
+
+		expect(fs.existsSync(requestPath())).toBe(false);
+		expect(fs.existsSync(responsePath())).toBe(false);
+	});
+
+	it('keeps waiting on the still-open request rather than refusing when no answer has arrived yet', async () => {
+		const impatient = createFileApprovalProvider({ dir, pollIntervalMs: 5, timeoutMs: 30 });
+		await expect(impatient.requestApproval(APPROVAL_REQUEST)).rejects.toThrow(/timed out/i);
+
+		// Resuming with no answer yet must time out again on the still-open request --
+		// never a "stale response" refusal, since no response file exists at all here.
+		const resumed = createFileApprovalProvider({ dir, pollIntervalMs: 5, timeoutMs: 30 });
+		await expect(resumed.requestApproval(APPROVAL_REQUEST)).rejects.toThrow(/timed out/i);
+	});
+
+	it('still refuses a response with no corresponding request as a true stale leftover', async () => {
+		// No request was ever published for this address, so this response cannot be a late
+		// answer to anything this provider asked -- the original stale-response guard still
+		// applies here.
+		fs.writeFileSync(responsePath(), JSON.stringify({ approved: true }), 'utf8');
+		await expect(provider.requestApproval(APPROVAL_REQUEST)).rejects.toThrow(/stale response file/i);
+	});
+});
+
 describe('FileApprovalProvider directory resolution', () => {
 	const envKey = 'FLOW_APPROVAL_DIR';
 	let previousEnv: string | undefined;

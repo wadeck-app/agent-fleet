@@ -250,20 +250,35 @@ export class FileApprovalProvider implements ApprovalProvider {
 		const requestPath = this.requestPath(req.taskId, req.stepId);
 		const responsePath = this.responsePath(req.taskId, req.stepId);
 
-		if (fs.existsSync(responsePath)) {
+		// A request file still sitting here means a previous ask of this exact question
+		// (same taskId/stepId) was never consumed -- most likely it timed out. A response
+		// alongside it is that question's late answer, not stale garbage: resuming after a
+		// timeout (e.g. `flow resume`) re-asks the same question, and the answer may already
+		// be sitting there from before the resume happened. Reuse the open request instead of
+		// publishing a redundant new one, so the exchange below picks the response up on its
+		// very first poll.
+		const requestStillOpen = fs.existsSync(requestPath);
+
+		if (fs.existsSync(responsePath) && !requestStillOpen) {
 			throw new Error(
 				`[file-approval] Refusing to ask ${req.taskId}/${req.stepId}: a stale response file already exists at ` +
-					`${responsePath}. It would be consumed as if it answered this request. ` +
+					`${responsePath}, with no matching pending request. It would be consumed as if it answered this request. ` +
 					'Inspect it, then move or delete it.'
 			);
 		}
 
-		const requestBody = { kind, ...req, createdAt: new Date().toISOString(), respondBy };
-		fs.writeFileSync(requestPath, `${JSON.stringify(requestBody, null, '\t')}\n`, 'utf8');
+		if (requestStillOpen) {
+			process.stdout.write(
+				`[file-approval] Resuming wait for ${kind} of ${req.taskId}/${req.stepId} -- a prior request is still open at ${requestPath}\n`
+			);
+		} else {
+			const requestBody = { kind, ...req, createdAt: new Date().toISOString(), respondBy };
+			fs.writeFileSync(requestPath, `${JSON.stringify(requestBody, null, '\t')}\n`, 'utf8');
 
-		process.stdout.write(
-			`[file-approval] Waiting for ${kind} of ${req.taskId}/${req.stepId} -- answer by creating ${responsePath} (${respondBy})\n`
-		);
+			process.stdout.write(
+				`[file-approval] Waiting for ${kind} of ${req.taskId}/${req.stepId} -- answer by creating ${responsePath} (${respondBy})\n`
+			);
+		}
 
 		const parsed = await this.waitForResponse(requestPath, responsePath, respondBy, kind);
 

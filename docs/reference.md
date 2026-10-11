@@ -55,16 +55,17 @@ flow logs                               # tail today's daemon log
 flow cli update                         # manual update
 ```
 
-| Command           | Description                             |
-| ----------------- | --------------------------------------- |
-| `flow start/stop` | Manage the background daemon            |
-| `flow status`     | Show daemon state (running/stopped/pid) |
-| `flow run`        | Execute a flow YAML                     |
-| `flow validate`   | Validate a flow YAML without running    |
-| `flow show`       | Inspect a past execution                |
-| `flow history`    | List recent executions                  |
-| `flow docs`       | Show flow YAML documentation            |
-| `flow cli update` | Update to latest release                |
+| Command            | Description                                                  |
+| ------------------ | ------------------------------------------------------------ |
+| `flow start/stop`  | Manage the background daemon                                 |
+| `flow status`      | Show daemon state (running/stopped/pid)                      |
+| `flow run`         | Execute a flow YAML                                          |
+| `flow validate`    | Validate a flow YAML without running                         |
+| `flow show`        | Inspect a past execution                                     |
+| `flow history`     | List recent executions                                       |
+| `flow resume <id>` | Re-dispatch a timed-out, unanswered `user_intervention` step |
+| `flow docs`        | Show flow YAML documentation                                 |
+| `flow cli update`  | Update to latest release                                     |
 
 Config dir: `~/.config/flow/` (override: `FLOW_CONFIG_DIR` env). Auto-updates in background on every invocation.
 

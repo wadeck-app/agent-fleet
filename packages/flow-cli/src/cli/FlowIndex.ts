@@ -19,6 +19,7 @@ import { buildCliCommand } from './commands/CliCommand.js';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
 import { registerPluginsCommand } from './commands/PluginsCommand';
+import { registerResumeCommand } from './commands/ResumeCommand';
 import { registerRunCommand } from './commands/RunCommand';
 import { registerShowCommand } from './commands/ShowCommand';
 import { registerValidateCommand } from './commands/ValidateCommand';
@@ -254,6 +255,7 @@ async function main(): Promise<void> {
 	registerShowCommand(program);
 	registerValidateCommand(program);
 	registerRunCommand(program);
+	registerResumeCommand(program);
 	registerHistoryCommand(program);
 	registerWorkerCommand(registerWorkerSourceCommand(program));
 	registerPluginsCommand(program);

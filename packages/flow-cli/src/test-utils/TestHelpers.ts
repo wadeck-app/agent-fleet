@@ -13,6 +13,8 @@ type FlowTestCommands = {
 	run: (payload: unknown) => Promise<DaemonResponse>;
 	/** Live worker summaries, for `flow worker list` (Q#9). */
 	workers?: () => Promise<unknown>;
+	/** Resumes an execution kept alive after an unanswered user_intervention timeout. */
+	resume?: (payload: unknown) => Promise<DaemonResponse>;
 };
 
 export interface TestDaemonContext {

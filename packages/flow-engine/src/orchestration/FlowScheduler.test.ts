@@ -132,6 +132,61 @@ describe('FlowScheduler', () => {
 		});
 	});
 
+	describe('resumeFailedStep()', () => {
+		it('clears the failed state and returns the step as ready again', () => {
+			const scheduler = new FlowScheduler(makeContext());
+			scheduler.start([makeStep('a')], new Map());
+			scheduler.acknowledge('a');
+			fail(scheduler, 'a');
+			expect(scheduler.hasFailed()).toBe(true);
+
+			const resumed = scheduler.resumeFailedStep('a');
+
+			expect(resumed).toEqual({ stepId: 'a', step: { id: 'a', depends: undefined } });
+			expect(scheduler.hasFailed()).toBe(false);
+			expect(scheduler.isTerminal()).toBe(false);
+		});
+
+		it('lets the resumed step complete normally afterwards', () => {
+			const scheduler = new FlowScheduler(makeContext());
+			scheduler.start([makeStep('a')], new Map());
+			scheduler.acknowledge('a');
+			fail(scheduler, 'a');
+
+			scheduler.resumeFailedStep('a');
+			scheduler.acknowledge('a');
+			succeed(scheduler, 'a');
+
+			expect(scheduler.isTerminal()).toBe(true);
+			expect(scheduler.hasFailed()).toBe(false);
+		});
+
+		it('throws when the step was never failed', () => {
+			const scheduler = new FlowScheduler(makeContext());
+			scheduler.start([makeStep('a')], new Map());
+
+			expect(() => scheduler.resumeFailedStep('a')).toThrow(/not.*failed/i);
+		});
+
+		it('throws when a different step is also terminally failed', () => {
+			const scheduler = new FlowScheduler(makeContext());
+			scheduler.start([makeStep('a'), makeStep('b')], new Map());
+			scheduler.acknowledge('a');
+			fail(scheduler, 'a');
+			scheduler.acknowledge('b');
+			fail(scheduler, 'b');
+
+			expect(() => scheduler.resumeFailedStep('a')).toThrow(/other.*failed|also.*failed/i);
+		});
+
+		it('throws for an unknown stepId', () => {
+			const scheduler = new FlowScheduler(makeContext());
+			scheduler.start([makeStep('a')], new Map());
+
+			expect(() => scheduler.resumeFailedStep('does-not-exist')).toThrow(/not.*failed/i);
+		});
+	});
+
 	describe('retry', () => {
 		it('re-enqueues step on first failure when maxAttempts > 0', () => {
 			const step: SchedulerStep = { id: 'a', retry: { maxAttempts: 2, backoff: 'linear' } };

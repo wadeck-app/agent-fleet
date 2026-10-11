@@ -52,26 +52,33 @@ export interface ExecutionContext {
 	flowVersion?: string;
 }
 
-export type ClientCommand = {
-	type: 'run';
-	flowFile: string;
-	flowId?: string;
-	inputs?: Record<string, string>;
-	quiet?: boolean;
-	cwd: string;
-	/**
-	 * `--mock-config` overlay: per-step env vars merged into that step's `env` with the
-	 * highest priority, so a mock-CLI convention (`*_MOCK_PATH`/`*_MOCK_RESPONSE`/
-	 * `*_MOCK_EXIT_CODE`) can replace a step's real execution without touching the flow file.
-	 * Keyed by step id.
-	 */
-	mockEnv?: Record<string, Record<string, string>>;
-	/** Absolute path to the `--mock-config` file, surfaced in the "MOCK" warning banner. */
-	mockConfigPath?: string;
-};
+export type ClientCommand =
+	| {
+			type: 'run';
+			flowFile: string;
+			flowId?: string;
+			inputs?: Record<string, string>;
+			quiet?: boolean;
+			cwd: string;
+			/**
+			 * `--mock-config` overlay: per-step env vars merged into that step's `env` with the
+			 * highest priority, so a mock-CLI convention (`*_MOCK_PATH`/`*_MOCK_RESPONSE`/
+			 * `*_MOCK_EXIT_CODE`) can replace a step's real execution without touching the flow file.
+			 * Keyed by step id.
+			 */
+			mockEnv?: Record<string, Record<string, string>>;
+			/** Absolute path to the `--mock-config` file, surfaced in the "MOCK" warning banner. */
+			mockConfigPath?: string;
+	  }
+	| {
+			type: 'resume';
+			executionId: string;
+	  };
 
 export type DaemonResponse =
-	{ type: 'execution_started'; executionId: string } | { type: 'error'; message: string; code: string };
+	| { type: 'execution_started'; executionId: string }
+	| { type: 'execution_resumed'; executionId: string; stepId: string }
+	| { type: 'error'; message: string; code: string };
 
 /**
  * One live worker, as reported to `flow worker list`.
