@@ -865,14 +865,14 @@ export type FlowTrigger = EventFlowTrigger;
 
 /**
  * Execution configuration for Claude CLI invocations
+ *
+ * `skipPermissions` deliberately does not live here -- see `ModelFlowStep.skipPermissions`.
  */
 export interface ExecutionConfig {
 	/** Enable --output-format=stream-json (default: true) */
 	streamJson?: boolean;
 	/** Enable --verbose flag (default: true) */
 	verbose?: boolean;
-	/** Enable --dangerously-skip-permissions (default: true) */
-	skipPermissions?: boolean;
 }
 
 /**

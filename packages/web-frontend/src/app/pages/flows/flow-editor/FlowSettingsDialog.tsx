@@ -42,7 +42,6 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 				execution: flowDefinition.execution || {
 					streamJson: true,
 					verbose: true,
-					skipPermissions: true,
 				},
 			};
 			setLocalFlow(updatedFlow);
@@ -302,28 +301,6 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 											execution: {
 												...prev.execution,
 												verbose: checked,
-											},
-										}))
-									}
-								/>
-							</div>
-
-							<div className="flex items-center justify-between">
-								<div className="space-y-0.5">
-									<Label htmlFor="skip-permissions">Skip permissions</Label>
-									<p className="text-xs text-muted-foreground">
-										Bypass permission checks (use with caution in development only)
-									</p>
-								</div>
-								<Switch
-									id="skip-permissions"
-									checked={localFlow.execution?.skipPermissions ?? true}
-									onCheckedChange={checked =>
-										setLocalFlow(prev => ({
-											...prev,
-											execution: {
-												...prev.execution,
-												skipPermissions: checked,
 											},
 										}))
 									}

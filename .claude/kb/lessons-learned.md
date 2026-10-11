@@ -6550,3 +6550,25 @@ env, same `windowsHide:true`, demonstrably not vulnerable to this exact failure)
 (`ClaudeLauncher.ts` never sets `windowsHide` at all -- a different, already-shipped fix, guarded
 by `ClaudeLauncher.windows-console.test.ts`). Three providers, three different states for what
 looked like one shared bug.
+
+### Flow-level `execution.skipPermissions` was dead on the real `flow run` path
+
+**Problem:** `execution.skipPermissions: true` at a flow's top level never suppressed Claude's
+permission prompt when run via `flow run`/`flow worker` -- it looked wired (typed, read by
+`ModelStepExecutor`, used in some tests) but did nothing in practice.
+**Fix:** Removed `skipPermissions` from `ExecutionConfig` entirely (`types.ts`); `ModelStepExecutor`
+now reads the per-step `ModelFlowStep.skipPermissions` instead (different steps legitimately need
+different permission scopes). `SchemaValidator.validateExecutionConfig` now rejects a flow still
+setting `execution.skipPermissions` by name, so an existing flow fails loudly at `flow validate`
+instead of silently losing the setting.
+**Context:** There are two separate step-execution entry points: the in-process `FlowExecutor`
+(`executionConfig: flow.execution`, FlowExecutor.ts:121) and the daemon-dispatched path used by
+real `flow run`/`flow worker` (`WorkerCommand.ts` -> `WorkerAdapter` -> `StepRunner`). Only the
+former ever set `StepRunnerConfig.executionConfig`; nothing under `packages/flow-cli/src/worker/`
+did. A flow-level field read by `ModelStepExecutor` can therefore compile, type-check, and even
+pass a unit test that exercises `FlowExecutor` directly, while being completely dead on the path
+real users actually run. Always check which of the two entry points sets a given
+`StepRunnerConfig` field before trusting a flow-level knob works end to end. **Caught by an
+independent code review** (not by the original author of the change) that ran the two new test
+files directly against the working tree and found both failing despite the kb previously
+documenting this as already fixed -- the lesson had been written before the fix actually landed.

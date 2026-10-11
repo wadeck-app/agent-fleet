@@ -99,6 +99,9 @@ export class SchemaValidator {
 		// Validate workspace config
 		this.validateWorkspaceConfig(flow.workspace, flow.id);
 
+		// Validate execution config (optional)
+		this.validateExecutionConfig(flow);
+
 		// Validate status transitions (optional)
 		if (flow.statusTransitions) {
 			this.validateStatusTransitions(flow.statusTransitions, flow.id);
@@ -536,6 +539,28 @@ export class SchemaValidator {
 	 * reported at validation time so a malformed flow-level field fails loudly before the
 	 * flow starts rather than being silently ignored at dispatch.
 	 */
+	/**
+	 * Rejects a flow still setting the removed flow-level `execution.skipPermissions`.
+	 *
+	 * It never reached the model CLI through the daemon-dispatched `flow run` path (only
+	 * the separate in-process FlowExecutor ever wired `flow.execution` into
+	 * `StepRunnerConfig.executionConfig`), so a flow author relying on it got no error and
+	 * no suppressed prompt -- it silently did nothing. Reported here so an existing flow
+	 * fails loudly at `flow validate` instead of continuing to lose the setting quietly.
+	 */
+	private validateExecutionConfig(flow: FlowDefinition): void {
+		const execution = flow.execution as { skipPermissions?: unknown } | undefined;
+		if (execution?.skipPermissions === undefined) return;
+
+		this.issueCollector.addIssue({
+			severity: 'error',
+			code: ValidationCode.INVALID_VALUE,
+			message: `Flow '${flow.id}' sets the removed flow-level 'execution.skipPermissions' -- it never reached the model CLI through the real 'flow run' path.`,
+			location: { field: 'execution.skipPermissions' },
+			suggestion: `Set 'skipPermissions: true' on the individual steps[].skipPermissions that need it instead -- different steps legitimately need different permission scopes.`,
+		});
+	}
+
 	private validateFlowLabels(flow: FlowDefinition): void {
 		const labels = flow.labels;
 		if (labels === undefined) return;

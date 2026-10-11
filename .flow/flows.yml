@@ -254,7 +254,6 @@ stream-json:
     execution:
         streamJson: true
         verbose: true
-        skipPermissions: true
     inputs:
         task:
             type: string
@@ -266,6 +265,7 @@ stream-json:
           name: 'Stream JSON'
           model: haiku
           prompt: '${{ inputs.task }}'
+          skipPermissions: true
 
 debug-local:
     version: '1.0.0'

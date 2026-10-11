@@ -114,6 +114,8 @@ export interface ModelFlowStep extends BaseFlowStep {
 	model?: string;
 	provider?: ModelProviderName;
 	prompt: string;
+	/** Bypass permission checks for this model step (use with caution) */
+	skipPermissions?: boolean;
 }
 
 export interface ScriptFlowStep extends BaseFlowStep {
@@ -160,7 +162,6 @@ export type FlowStep = ModelFlowStep | ScriptFlowStep | SubFlowStep | UserInterv
 export interface ExecutionConfig {
 	streamJson?: boolean;
 	verbose?: boolean;
-	skipPermissions?: boolean;
 }
 
 export interface FlowDefinition {

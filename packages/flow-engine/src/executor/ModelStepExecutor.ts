@@ -100,7 +100,8 @@ export async function executeModelStep(
 	const execConfig = config.executionConfig;
 	const streamJson = execConfig?.streamJson !== false;
 	const verbose = execConfig?.verbose !== false;
-	const skipPermissions = execConfig?.skipPermissions === true;
+	// Per-step, not flow-level: see ModelFlowStep.skipPermissions for why.
+	const skipPermissions = step.skipPermissions === true;
 
 	let finalResultText: string | undefined;
 	const liveLogEntries: LiveLogEntry[] = [];

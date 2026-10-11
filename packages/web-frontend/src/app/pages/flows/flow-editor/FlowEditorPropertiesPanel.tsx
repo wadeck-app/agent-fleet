@@ -476,6 +476,33 @@ export function FlowEditorPropertiesPanel({
 								).filter(issue => issue.location?.field === 'prompt')}
 							/>
 						</div>
+
+						<div className="space-y-2">
+							{readOnly ? (
+								<>
+									<ReadOnlyFieldLabel>Skip Permissions</ReadOnlyFieldLabel>
+									<p className="text-sm">{step.skipPermissions ? 'Yes' : 'No'}</p>
+								</>
+							) : (
+								<Label htmlFor="skipPermissions" className="flex items-center gap-2">
+									<Checkbox
+										id="skipPermissions"
+										checked={step.skipPermissions ?? false}
+										onCheckedChange={checked =>
+											onUpdateNode(selectedNode.id, {
+												skipPermissions: typeof checked === 'boolean' ? checked : false,
+											} as Partial<FlowStep>)
+										}
+									/>
+									Skip Permissions
+								</Label>
+							)}
+							{!readOnly && (
+								<p className="text-xs text-muted-foreground">
+									Bypass permission checks for this step (use with caution)
+								</p>
+							)}
+						</div>
 					</>
 				)}
 
