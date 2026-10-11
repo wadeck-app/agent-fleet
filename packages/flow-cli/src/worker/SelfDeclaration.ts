@@ -64,3 +64,72 @@ export function declareSelf(
 		},
 	};
 }
+
+/** How often a worker retries recording itself after a failed attempt. */
+const SELF_DECLARATION_RETRY_MS = 30_000;
+
+/**
+ * Keeps retrying {@link declareSelf} on a timer until it succeeds, instead of trying once at
+ * startup and leaving a failure permanent for the rest of the process's life.
+ *
+ * A worker whose first attempt failed (the registry file was briefly locked, a transient
+ * disk error, ...) used to warn once -- to whatever terminal happened to be looking at that
+ * exact instant -- and then run forever looking and behaving exactly like a healthy,
+ * discoverable worker: same startup banner, same "Waiting for steps" line, same log cadence.
+ * Nothing ever flagged the degraded state again, and a worker that can never be given a step
+ * because it was never discoverable is the one case that must not look identical to a healthy
+ * one. Retrying surfaces the warning again on every failed attempt (so it is not a single
+ * easily-missed line) and recovers automatically once the underlying problem clears, without
+ * requiring the worker to be restarted.
+ */
+export class SelfDeclarationManager {
+	private handle: SelfDeclarationHandle | undefined;
+	private retryTimer: ReturnType<typeof setInterval> | undefined;
+	private released = false;
+
+	constructor(
+		private readonly daemonDir: string,
+		private readonly worker: { projects: string[]; labels: string[]; pid: number; nudgeUrl?: string }
+	) {
+		this.attempt();
+	}
+
+	/** This process's declared id, once an attempt has actually succeeded. */
+	get sourceId(): string | undefined {
+		return this.handle?.sourceId;
+	}
+
+	/** Stops retrying and removes the registry entry, if one was ever recorded. */
+	release(): void {
+		if (this.released) return;
+		this.released = true;
+		if (this.retryTimer !== undefined) {
+			clearInterval(this.retryTimer);
+			this.retryTimer = undefined;
+		}
+		this.handle?.release();
+	}
+
+	private attempt(): void {
+		// declareSelf() itself prints the "[warn] ... could not record itself ..." line on
+		// every failed call, so a failure here is already said out loud -- retrying is what
+		// makes it recur instead of being said exactly once.
+		const handle = declareSelf(this.daemonDir, this.worker);
+		if (handle === undefined) {
+			this.retryTimer ??= setInterval(() => this.attempt(), SELF_DECLARATION_RETRY_MS);
+			return;
+		}
+
+		const hadFailed = this.retryTimer !== undefined;
+		if (this.retryTimer !== undefined) {
+			clearInterval(this.retryTimer);
+			this.retryTimer = undefined;
+		}
+		this.handle = handle;
+		if (hadFailed) {
+			console.error(
+				`[ok] this worker's registry entry recovered -- it is now listed as "${handle.sourceId}" while disconnected.`
+			);
+		}
+	}
+}

@@ -73,7 +73,10 @@ vi.mock('../../worker/NudgeServer', () => ({
 }));
 
 vi.mock('../../worker/SelfDeclaration', () => ({
-	declareSelf: () => undefined,
+	SelfDeclarationManager: class {
+		sourceId: string | undefined = undefined;
+		release(): void {}
+	},
 }));
 
 vi.mock('../../worker/WorkerDisplay', () => ({

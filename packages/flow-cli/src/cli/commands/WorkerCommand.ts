@@ -30,7 +30,7 @@ import { DaemonWatchNotifier } from '../../worker/DaemonWatch';
 import type { McpServerConfig } from '../../worker/McpServer';
 import { NudgeServer } from '../../worker/NudgeServer';
 import type { ReconnectNotifier } from '../../worker/ReconnectNotifier';
-import { declareSelf } from '../../worker/SelfDeclaration';
+import { SelfDeclarationManager } from '../../worker/SelfDeclaration';
 import { WorkerAdapter } from '../../worker/WorkerAdapter';
 import { WorkerDisplay } from '../../worker/WorkerDisplay';
 import {
@@ -558,15 +558,22 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	// capacity of that source.
 	const declaration =
 		sourceId === undefined
-			? declareSelf(daemonDir, {
+			? new SelfDeclarationManager(daemonDir, {
 					projects: registration.attachedProjects ?? [projectRoot],
 					labels: registration.labels ?? [],
 					pid: process.pid,
 					nudgeUrl,
 				})
 			: undefined;
-	if (declaration !== undefined) {
+	if (declaration?.sourceId !== undefined) {
 		console.log(`     registry   : declared as "${declaration.sourceId}" while this process lives`);
+	} else if (declaration !== undefined) {
+		// Not a fatal condition (see SelfDeclarationManager): this worker still runs and can
+		// still be dispatched to by a daemon that already holds its connection, it just will
+		// not show up in "flow worker list" or survive a disconnect while unregistered. Said
+		// here too, not only in the retried warning, since this is the one line most likely
+		// to actually be read (right after launch).
+		console.log('     registry   : could not record itself yet -- retrying in the background (see warnings above)');
 	}
 
 	// Named (not inline) so the self re-exec path below can also run it directly, outside the

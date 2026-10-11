@@ -81,7 +81,12 @@ vi.mock('../../worker/NudgeServer', () => ({
 	},
 }));
 
-vi.mock('../../worker/SelfDeclaration', () => ({ declareSelf: () => undefined }));
+vi.mock('../../worker/SelfDeclaration', () => ({
+	SelfDeclarationManager: class {
+		sourceId: string | undefined = undefined;
+		release(): void {}
+	},
+}));
 vi.mock('../../worker/WorkerDisplay', () => ({ WorkerDisplay: class {} }));
 vi.mock('../../worker/DaemonWatch', () => ({
 	DaemonWatchNotifier: class {

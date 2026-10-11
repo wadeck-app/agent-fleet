@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkerSourceRegistry } from '../daemon/WorkerSourceRegistry.js';
-import { declareSelf } from './SelfDeclaration.js';
+import { SelfDeclarationManager, declareSelf } from './SelfDeclaration.js';
 
 let dir: string;
 
@@ -14,6 +14,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	vi.useRealTimers();
 	rmSync(dir, { recursive: true, force: true });
 });
 
@@ -74,5 +75,69 @@ describe('declareSelf', () => {
 
 		expect(handle).toBeUndefined();
 		expect(warn.mock.calls.map(call => call.join(' ')).join('\n')).toMatch(/disk full/);
+	});
+});
+
+describe('SelfDeclarationManager', () => {
+	// A worker whose first attempt failed used to warn once, at startup, and then run forever
+	// looking exactly like a healthy, discoverable worker -- the degraded state was never
+	// surfaced again. Retrying must both keep saying so and recover on its own.
+	it('declares immediately when the registry is writable', () => {
+		vi.useFakeTimers();
+		const manager = new SelfDeclarationManager(dir, { projects: ['C:/proj'], labels: [], pid: process.pid });
+
+		expect(manager.sourceId).toBeDefined();
+		expect(new WorkerSourceRegistry(dir).list()).toHaveLength(1);
+	});
+
+	it('retries on a timer and recovers once the registry becomes writable again', () => {
+		vi.useFakeTimers();
+		const warn = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const declareSpy = vi.spyOn(WorkerSourceRegistry.prototype, 'declare').mockImplementation(() => {
+			throw new Error('disk full');
+		});
+
+		const manager = new SelfDeclarationManager(dir, { projects: ['C:/proj'], labels: [], pid: process.pid });
+		expect(manager.sourceId).toBeUndefined();
+		const failedAttempts = declareSpy.mock.calls.length;
+
+		// Still failing on the next few ticks -- each one must warn again, not just the first.
+		vi.advanceTimersByTime(30_000);
+		vi.advanceTimersByTime(30_000);
+		expect(declareSpy.mock.calls.length).toBeGreaterThan(failedAttempts);
+		expect(warn.mock.calls.filter(call => call.join(' ').includes('disk full')).length).toBeGreaterThan(1);
+
+		// The underlying problem clears; the next retry must pick it up without a restart.
+		declareSpy.mockRestore();
+		vi.advanceTimersByTime(30_000);
+
+		expect(manager.sourceId).toBeDefined();
+		expect(new WorkerSourceRegistry(dir).list()).toHaveLength(1);
+		expect(warn.mock.calls.some(call => call.join(' ').includes('recovered'))).toBe(true);
+	});
+
+	it('stops retrying once released, even if it never succeeded', () => {
+		vi.useFakeTimers();
+		vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const declareSpy = vi.spyOn(WorkerSourceRegistry.prototype, 'declare').mockImplementation(() => {
+			throw new Error('disk full');
+		});
+
+		const manager = new SelfDeclarationManager(dir, { projects: ['C:/proj'], labels: [], pid: process.pid });
+		manager.release();
+		const callsAtRelease = declareSpy.mock.calls.length;
+
+		vi.advanceTimersByTime(120_000);
+
+		expect(declareSpy.mock.calls.length).toBe(callsAtRelease);
+	});
+
+	it('releases the registry entry once declared', () => {
+		vi.useFakeTimers();
+		const manager = new SelfDeclarationManager(dir, { projects: ['C:/proj'], labels: [], pid: process.pid });
+
+		manager.release();
+
+		expect(new WorkerSourceRegistry(dir).list()).toEqual([]);
 	});
 });
