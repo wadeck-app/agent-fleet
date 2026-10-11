@@ -12,7 +12,12 @@ const hoisted = vi.hoisted(() => ({
 	updateConfig: { channel: 'stable', checkIntervalMs: 1000, disabled: false },
 	cache: { lastCheckedAt: 0, latestVersion: null as string | null },
 	intervalCallbacks: [] as (() => void)[],
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	spawnedChildren: [] as any[],
 }));
+
+/** How long reExecAndExit (WorkerCommand.ts) waits before trusting the replacement survived. */
+const REEXEC_HEALTH_CHECK_MS = 3_000;
 
 vi.mock('../../config/FlowConfig', async () => {
 	const actual = await vi.importActual<typeof import('../../config/FlowConfig')>('../../config/FlowConfig');
@@ -170,6 +175,12 @@ async function flushMicrotasks(): Promise<void> {
 	for (let i = 0; i < 5; i++) await Promise.resolve();
 }
 
+/** Advances past reExecAndExit's health-check window with nothing having gone wrong. */
+async function surviveHealthCheck(): Promise<void> {
+	await vi.advanceTimersByTimeAsync(REEXEC_HEALTH_CHECK_MS);
+	await flushMicrotasks();
+}
+
 describe('WorkerCommand -- self re-exec on version bump', () => {
 	let exitSpy: ReturnType<typeof vi.spyOn>;
 
@@ -184,11 +195,21 @@ describe('WorkerCommand -- self re-exec on version bump', () => {
 		executeMock.mockReset();
 		scheduleBackgroundUpdateMock.mockReset();
 		spawnMock.mockReset();
-		spawnMock.mockReturnValue({ unref: vi.fn() });
+		hoisted.spawnedChildren.length = 0;
+		spawnMock.mockImplementation(() => {
+			const child = new EventEmitter() as EventEmitter & { unref: () => void };
+			child.unref = vi.fn();
+			hoisted.spawnedChildren.push(child);
+			return child;
+		});
 		installManualInterval();
+		// Only setTimeout/clearTimeout -- installManualInterval() already intercepts
+		// setInterval/clearInterval by hand, and faking those too would double-intercept them.
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 	});
 
 	afterEach(() => {
+		vi.useRealTimers();
 		vi.restoreAllMocks();
 		global.setInterval = realSetInterval;
 		global.clearInterval = realClearInterval;
@@ -250,8 +271,11 @@ describe('WorkerCommand -- self re-exec on version bump', () => {
 
 		fireIntervalTick();
 		await flushMicrotasks();
-
+		// Not yet: the health check has not elapsed, so the old process must still be running.
 		expect(spawnMock).toHaveBeenCalledTimes(1);
+		expect(exitSpy).not.toHaveBeenCalled();
+
+		await surviveHealthCheck();
 		expect(exitSpy).toHaveBeenCalledWith(0);
 	});
 
@@ -281,6 +305,7 @@ describe('WorkerCommand -- self re-exec on version bump', () => {
 
 		// Idle again: the previously-detected bump now fires, without waiting for another tick.
 		expect(spawnMock).toHaveBeenCalledTimes(1);
+		await surviveHealthCheck();
 		expect(exitSpy).toHaveBeenCalledWith(0);
 	});
 
@@ -291,6 +316,7 @@ describe('WorkerCommand -- self re-exec on version bump', () => {
 		fireIntervalTick();
 		await flushMicrotasks();
 		expect(spawnMock).toHaveBeenCalledTimes(1);
+		await surviveHealthCheck();
 
 		fireIntervalTick();
 		await flushMicrotasks();
@@ -325,9 +351,59 @@ describe('WorkerCommand -- self re-exec on version bump', () => {
 
 		fireIntervalTick();
 		await flushMicrotasks();
+		await surviveHealthCheck();
 
 		expect(spawnMock).toHaveBeenCalledTimes(1);
 		expect(exitSpy).toHaveBeenCalledWith(0);
+	});
+
+	it('does not exit when the re-exec child errors before the health check elapses, and stays on the current version', async () => {
+		await startWorker();
+		hoisted.cache = { lastCheckedAt: 1, latestVersion: '9999.99.99' };
+
+		fireIntervalTick();
+		await flushMicrotasks();
+		expect(hoisted.spawnedChildren).toHaveLength(1);
+
+		hoisted.spawnedChildren[0]!.emit('error', new Error('ENOENT'));
+		await flushMicrotasks();
+		await vi.advanceTimersByTimeAsync(REEXEC_HEALTH_CHECK_MS);
+		await flushMicrotasks();
+
+		expect(exitSpy).not.toHaveBeenCalled();
+	});
+
+	it('does not exit when the re-exec child exits early (crash on startup), and stays on the current version', async () => {
+		await startWorker();
+		hoisted.cache = { lastCheckedAt: 1, latestVersion: '9999.99.99' };
+
+		fireIntervalTick();
+		await flushMicrotasks();
+		expect(hoisted.spawnedChildren).toHaveLength(1);
+
+		hoisted.spawnedChildren[0]!.emit('exit', 1, null);
+		await flushMicrotasks();
+		await vi.advanceTimersByTimeAsync(REEXEC_HEALTH_CHECK_MS);
+		await flushMicrotasks();
+
+		expect(exitSpy).not.toHaveBeenCalled();
+	});
+
+	it('does not retry the same version automatically after a failed re-exec attempt', async () => {
+		await startWorker();
+		hoisted.cache = { lastCheckedAt: 1, latestVersion: '9999.99.99' };
+
+		fireIntervalTick();
+		await flushMicrotasks();
+		hoisted.spawnedChildren[0]!.emit('error', new Error('ENOENT'));
+		await flushMicrotasks();
+
+		// Next tick, same cached version still -- must not spawn again for a version already
+		// known to fail to start.
+		fireIntervalTick();
+		await flushMicrotasks();
+
+		expect(spawnMock).toHaveBeenCalledTimes(1);
 	});
 
 	it('busy flag: an exception from adapter.execute() still ends in idle state (finally) and does not block a later re-exec', async () => {
@@ -354,6 +430,7 @@ describe('WorkerCommand -- self re-exec on version bump', () => {
 		// Finally must have run despite the throw, flipping busy back to false and firing the
 		// deferred re-exec.
 		expect(spawnMock).toHaveBeenCalledTimes(1);
+		await surviveHealthCheck();
 		expect(exitSpy).toHaveBeenCalledWith(0);
 	});
 });

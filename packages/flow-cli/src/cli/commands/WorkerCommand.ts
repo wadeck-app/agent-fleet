@@ -111,6 +111,18 @@ export function buildReExecArgs(params: {
 }
 
 /**
+ * How long a self re-exec'd replacement worker must stay up (no `error`/`exit` on its child
+ * handle) before the old process commits to exiting.
+ *
+ * Not a liveness/registration check -- just long enough to catch the common failure mode of
+ * a build that cannot even start (a module resolution error, a syntax error in a freshly
+ * bundled file, an uncaught exception during argument parsing). A replacement that passes
+ * this and later fails to connect/register is a different, already-handled case (D#51: it
+ * retries on its own backoff).
+ */
+const REEXEC_HEALTH_CHECK_MS = 3_000;
+
+/**
  * Whether a cached `latestVersion` should trigger this worker's self re-exec.
  *
  * `lastHandledVersion` is what makes repeated calls idempotent: without it, every periodic
@@ -628,9 +640,36 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		// none attached, popping a visible console window (regression fixed multiple times
 		// already: d032e7e, b2bca73, d9af4d67). It must inherit this process's console exactly
 		// like ForkWorkerSource.obtainWorker() does for daemon-forked workers.
-		spawn(process.execPath, [scriptPath, 'worker', ...args], { stdio: 'ignore' }).unref();
-		cleanup();
-		process.exit(0);
+		report('[wait]', `newer version detected -- re-exec'ing to pick it up`);
+		const child = spawn(process.execPath, [scriptPath, 'worker', ...args], { stdio: 'ignore' });
+
+		// Does not exit until the replacement has survived REEXEC_HEALTH_CHECK_MS without
+		// crashing on startup. Without this, a replacement that fails immediately after spawn
+		// (a bad build, a bug only hit at runtime, an environment difference) left this process
+		// already dead -- zero live workers, with nothing behind to explain why: the terminal
+		// this worker was running in had already exited.
+		let settled = false;
+		const onEarlyFailure = (detail: unknown): void => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(healthTimer);
+			report(
+				'[fail]',
+				`re-exec'd replacement failed to start (${String(detail)}) -- staying on the current version instead of leaving no worker running. It will not retry this same version automatically.`
+			);
+		};
+		child.once('error', onEarlyFailure);
+		child.once('exit', (code, signal) => onEarlyFailure(`exit code=${String(code)} signal=${String(signal)}`));
+		const healthTimer = setTimeout(() => {
+			if (settled) return;
+			settled = true;
+			child.removeAllListeners('error');
+			child.removeAllListeners('exit');
+			child.unref();
+			cleanup();
+			process.exit(0);
+		}, REEXEC_HEALTH_CHECK_MS);
+		healthTimer.unref();
 	};
 
 	const maybeReExec = (): void => {

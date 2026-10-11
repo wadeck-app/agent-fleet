@@ -130,7 +130,7 @@ vi.mock('@wadeck-app/shared-cli', async importOriginal => {
 	};
 });
 
-const spawnMock = vi.fn().mockReturnValue({ unref: vi.fn() });
+const spawnMock = vi.fn();
 vi.mock('node:child_process', async importOriginal => {
 	const actual = await importOriginal<typeof import('node:child_process')>();
 	return { ...actual, spawn: (...args: unknown[]) => spawnMock(...args) };
@@ -154,10 +154,16 @@ describe('WorkerCommand -- self re-exec Windows console inheritance (no windowsH
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(global as any).clearInterval = (): void => {};
 		spawnMock.mockClear();
-		spawnMock.mockReturnValue({ unref: vi.fn() });
+		spawnMock.mockImplementation(() => {
+			const child = new EventEmitter() as EventEmitter & { unref: () => void };
+			child.unref = vi.fn();
+			return child;
+		});
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 	});
 
 	afterEach(() => {
+		vi.useRealTimers();
 		vi.restoreAllMocks();
 		global.setInterval = realSetInterval;
 		global.clearInterval = realClearInterval;
