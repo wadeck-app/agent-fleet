@@ -220,6 +220,42 @@ describe('WorkerSourceRegistry - malformed state', () => {
 
 		expect(() => new WorkerSourceRegistry(dir).list()).toThrow(/worker-sources\.json/);
 	});
+
+	it('names "flow worker source repair" as the way out of a parse failure', () => {
+		writeFileSync(join(dir, 'worker-sources.json'), '{ not json', 'utf8');
+
+		expect(() => new WorkerSourceRegistry(dir).list()).toThrow(/flow worker source repair/);
+	});
+});
+
+describe('WorkerSourceRegistry.repair', () => {
+	it('backs up a corrupt file and leaves the registry empty', () => {
+		writeFileSync(join(dir, 'worker-sources.json'), '{ not json', 'utf8');
+
+		const result = new WorkerSourceRegistry(dir).repair();
+
+		expect(result).toBeDefined();
+		expect(result!.backupPath).toMatch(/worker-sources\.json\.corrupt-\d+$/);
+		// The broken content is preserved, not discarded.
+		expect(readFileSync(result!.backupPath, 'utf8')).toBe('{ not json');
+		expect(new WorkerSourceRegistry(dir).list()).toEqual([]);
+	});
+
+	it('does nothing and reports undefined when the file already parses fine', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		registry.declare({ sourceId: 'laptop', provider: 'built-in:inbound', labels: [], maxWorkers: 1 });
+
+		const result = registry.repair();
+
+		expect(result).toBeUndefined();
+		expect(registry.list().map(e => e.sourceId)).toEqual(['laptop']);
+	});
+
+	it('does nothing and reports undefined when there is no file at all', () => {
+		const result = new WorkerSourceRegistry(dir).repair();
+
+		expect(result).toBeUndefined();
+	});
 });
 
 describe('WorkerSourceRegistry - atomic write', () => {

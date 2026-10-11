@@ -322,16 +322,48 @@ export class WorkerSourceRegistry {
 		try {
 			parsed = JSON.parse(readFileSync(this.filePath, 'utf8'));
 		} catch (err) {
-			throw new Error(`Failed to parse worker source registry at "${this.filePath}": ${String(err)}`);
+			throw new Error(
+				`Failed to parse worker source registry at "${this.filePath}": ${String(err)}. ` +
+					'Run "flow worker source repair" to back up the broken file and reset the registry to empty.'
+			);
 		}
 
 		const sources = (parsed as RegistryFile | null)?.sources;
 		if (!Array.isArray(sources)) {
 			throw new Error(
-				`Worker source registry at "${this.filePath}" is malformed: expected a "sources" list, got ${typeof sources}`
+				`Worker source registry at "${this.filePath}" is malformed: expected a "sources" list, got ${typeof sources}. ` +
+					'Run "flow worker source repair" to back up the broken file and reset the registry to empty.'
 			);
 		}
 		return sources;
+	}
+
+	/**
+	 * Resets a registry file that fails to parse back to empty, after backing up what was
+	 * there -- the explicit, human-invoked CLI path forward ("flow worker source repair")
+	 * once a corrupt file has already left every reader failing loudly.
+	 *
+	 * `parse()` itself still never does this silently: a corrupt file is deliberately never
+	 * read as "nothing declared" on its own (see `parse()`'s own doc) -- that would discard
+	 * every source the user set up without them deciding to. This method exists so there is
+	 * still a way out once a human has decided that is the right call, without just deleting
+	 * the broken file: it is renamed aside, never discarded, so nothing is unrecoverable.
+	 *
+	 * Returns `undefined` when the file already parses fine (nothing to repair).
+	 */
+	repair(): { backupPath: string } | undefined {
+		if (!existsSync(this.filePath)) return undefined;
+		try {
+			this.parse();
+			return undefined;
+		} catch {
+			// Falls through to the actual repair below.
+		}
+
+		const backupPath = `${this.filePath}.corrupt-${String(Date.now())}`;
+		renameSync(this.filePath, backupPath);
+		this.write([]);
+		return { backupPath };
 	}
 
 	/**

@@ -214,6 +214,27 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		});
 
 	source
+		.command('repair')
+		.description(
+			'Reset a worker-sources.json that fails to parse (e.g. after a crash mid-write) -- backs up the broken file first'
+		)
+		.action(() => {
+			try {
+				const result = new WorkerSourceRegistry(ConfigDir.get('flow')).repair();
+				if (result === undefined) {
+					console.log('[ok] Worker source registry already parses fine -- nothing to repair.');
+					return;
+				}
+				console.log(`[ok] Worker source registry was corrupt -- backed up to '${result.backupPath}'.`);
+				console.log(
+					'     The registry is now empty. Re-declare any sources you need with "flow worker source add".'
+				);
+			} catch (err) {
+				fail(err);
+			}
+		});
+
+	source
 		.command('remove <sourceId>')
 		.description('Remove a declared worker source')
 		.action((sourceId: string) => {
