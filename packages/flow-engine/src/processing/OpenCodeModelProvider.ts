@@ -34,6 +34,7 @@ import type {
 } from './ModelProvider';
 import { PromptTooLargeError, validateLaunchOptions } from './ModelProvider';
 import { OpenCodeHookTranslator } from './OpenCodeHookTranslator';
+import type { OpenCodePermissionOverrides } from './OpenCodePermissions';
 import type { StreamJsonEvent } from './StreamJsonParser';
 import { buildOpenCodeToolsConfig } from './ToolAccess';
 
@@ -91,7 +92,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * (OPENCODE_CONFIG example).
  */
 export function defaultOpenCodeConfigPath(kind: 'anthropic' | 'openai'): string {
-	return path.join(os.homedir(), '.config', 'opencode', kind === 'anthropic' ? 'config_claude.json' : 'config_codex.json');
+	return path.join(
+		os.homedir(),
+		'.config',
+		'opencode',
+		kind === 'anthropic' ? 'config_claude.json' : 'config_codex.json'
+	);
 }
 
 /**
@@ -152,7 +158,8 @@ export function autoSelectOpenCodeConfig(
 function buildOpenCodeConfig(
 	servers: McpServer[],
 	pluginPath?: string,
-	tools?: readonly import('./ToolAccess').ToolName[]
+	tools?: readonly import('./ToolAccess').ToolName[],
+	permission?: OpenCodePermissionOverrides
 ): Record<string, unknown> {
 	const mcp: Record<string, unknown> = {};
 	for (const s of servers) {
@@ -174,6 +181,11 @@ function buildOpenCodeConfig(
 	if (pluginPath) {
 		// Use forward slashes for cross-platform compatibility
 		config['plugin'] = [pluginPath.replace(/\\/g, '/')];
+	}
+	if (permission !== undefined && Object.keys(permission).length > 0) {
+		// Mirrors opencode's own permission config block verbatim -- see OpenCodePermissions.ts
+		// for why this is step-scoped rather than a project-wide .flow/opencode.json edit.
+		config['permission'] = permission;
 	}
 	if (tools !== undefined) {
 		config['tools'] = buildOpenCodeToolsConfig(tools);
@@ -272,11 +284,13 @@ function buildSpawnParams(
 	// server error rather than "config not found", so the cause is invisible.
 	delete env['OPENCODE_CONFIG'];
 
-	// Serialize McpServers and/or plugin and/or tool restriction into the OpenCode config
+	// Serialize McpServers and/or plugin and/or tool restriction and/or permission overrides
+	// into the OpenCode config
 	let tempFile: string | undefined;
 	const hasServers = options.mcpServers && options.mcpServers.length > 0;
-	if (hasServers || pluginPath || options.tools !== undefined) {
-		const config = buildOpenCodeConfig(options.mcpServers ?? [], pluginPath, options.tools);
+	const hasPermission = options.permission !== undefined && Object.keys(options.permission).length > 0;
+	if (hasServers || pluginPath || options.tools !== undefined || hasPermission) {
+		const config = buildOpenCodeConfig(options.mcpServers ?? [], pluginPath, options.tools, options.permission);
 		const json = JSON.stringify(config);
 		const jsonBytes = Buffer.byteLength(json, 'utf8');
 

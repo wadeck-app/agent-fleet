@@ -689,6 +689,25 @@ export interface ModelFlowStep extends BaseFlowStep {
 	skipPermissions?: boolean;
 
 	/**
+	 * Fine-grained permission overrides for providers that ask before certain actions
+	 * (currently opencode only -- ignored by other providers, which have no equivalent knob).
+	 * Omit for the provider's own default. Scoped to the step rather than project-wide
+	 * (`.flow/opencode.json`'s `permission` block) for the same reason as `skipPermissions`:
+	 * most steps never need to touch anything outside the project, and a global allow/deny
+	 * either over-restricts other legitimate uses or over-opens every headless step's
+	 * filesystem reach project-wide.
+	 *
+	 * The concrete problem this exists for: a headless worker (no TTY, no approval plugin
+	 * wired for this permission type) can never answer opencode's default `ask` action for
+	 * e.g. `external_directory` -- the CLI just hangs until it exits 0 with no output and
+	 * zero metered tokens, caught (as a failure, not explained) by `ModelStepExecutor`'s
+	 * empty-output guard. Setting `permission: { external_directory: 'allow' | 'deny' }` on
+	 * the specific step that needs to read outside the project avoids the hang outright.
+	 * @see ./processing/OpenCodePermissions
+	 */
+	permission?: import('./processing/OpenCodePermissions').OpenCodePermissionOverrides;
+
+	/**
 	 * Maximum time in minutes to wait for the model to respond before killing the
 	 * underlying process and failing the step. Omit (or leave undefined) for no timeout.
 	 *

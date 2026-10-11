@@ -105,3 +105,55 @@ describe('ModelStepExecutor -- step.timeout', () => {
 		expect(kill).not.toHaveBeenCalled();
 	});
 });
+
+describe('ModelStepExecutor -- empty-output guard opencode hint', () => {
+	// Headless opencode hangs on a permission prompt (e.g. external_directory) nothing can
+	// answer, eventually exiting 0 with no output and zero metered tokens -- the empty-output
+	// guard already catches this as a failure; this just makes the error say why, for the one
+	// provider where it is a known, common cause.
+	function emptyResultProvider(): ModelProvider {
+		return {
+			launchInteractive: () => Promise.resolve({ response: '', exitCode: 0 }),
+			launchBackground: options => {
+				options.onStreamEvent?.({
+					type: 'result',
+					subtype: 'result',
+					data: { result: '', total_cost_usd: 0 },
+				} as any);
+				return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+			},
+			kill: vi.fn(),
+		};
+	}
+
+	it('appends a permission hint when the step provider is opencode', async () => {
+		const step = makeStep();
+		const trace = await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider: emptyResultProvider(), providerName: 'opencode', resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		expect(trace.error).toContain('zero tokens');
+		expect(trace.error).toContain('permission');
+		expect(trace.error).toContain('external_directory');
+	});
+
+	it('does not append the opencode hint for a non-opencode provider', async () => {
+		const step = makeStep({ provider: 'claude' });
+		const trace = await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider: emptyResultProvider(), providerName: 'claude', resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		expect(trace.error).toContain('zero tokens');
+		expect(trace.error).not.toContain('permission');
+	});
+});

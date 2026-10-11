@@ -173,6 +173,7 @@ export async function executeModelStep(
 		mcpServers: [...(config.mcpServers ?? []), ...(step.mcpServers ?? [])],
 		toolHooks: step.toolHooks ?? [],
 		tools: step.tools,
+		permission: step.permission,
 		onProcessStarted: config.onClaudeProcessStarted,
 		streamJson: streamJson && !config.interactive,
 		verbose: verbose && !config.interactive,
@@ -325,7 +326,16 @@ export async function executeModelStep(
 			if (streamJson) {
 				const noResponseText = responseText == null || responseText.trim() === '';
 				if (noResponseText && capturedInputTokens === 0 && capturedOutputTokens === 0) {
-					stepTrace.error = `${providerLabel} exited 0 but produced no output and metered zero tokens -- treating as a failure instead of a silent empty success`;
+					// opencode's own most common cause for this exact symptom: a permission prompt
+					// (e.g. external_directory) stuck in its default `ask` state, which a headless
+					// worker can never answer, so the CLI eventually exits 0 having done nothing.
+					// Named here because the actual pending-permission state lives only in
+					// opencode's own log file, which this process has no handle on.
+					const openCodeHint =
+						step.provider === 'opencode'
+							? ' If this step accesses a path outside the project, opencode may be stuck waiting on a permission prompt it was never asked to resolve -- set `permission` on this step (e.g. { external_directory: "allow" }) to avoid asking.'
+							: '';
+					stepTrace.error = `${providerLabel} exited 0 but produced no output and metered zero tokens -- treating as a failure instead of a silent empty success.${openCodeHint}`;
 					return stepTrace;
 				}
 			}

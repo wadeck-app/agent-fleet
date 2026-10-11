@@ -6,6 +6,7 @@
  */
 import type { ChildProcess } from 'node:child_process';
 
+import { type OpenCodePermissionOverrides, validateOpenCodePermissionOverrides } from './OpenCodePermissions';
 import type { StreamJsonEventCallback } from './StreamJsonParser';
 import { type ToolName, validateToolNames } from './ToolAccess';
 import type { ToolHook } from './ToolHook';
@@ -45,6 +46,13 @@ export interface LaunchOptions {
 	toolHooks?: ToolHook[];
 	/** Restricts the model to these tools. Omit for no restriction. @see ToolAccess */
 	tools?: ToolName[];
+	/**
+	 * Per-permission overrides for providers that ask before certain actions. Currently read
+	 * only by OpenCodeModelProvider; ignored by providers with no equivalent knob. Omit for
+	 * that provider's own default (opencode's default is `ask` for everything not otherwise
+	 * configured). @see OpenCodePermissions
+	 */
+	permission?: OpenCodePermissionOverrides;
 }
 
 export interface ModelInteractiveResult {
@@ -152,5 +160,8 @@ export function validateLaunchOptions(options: LaunchOptions): void {
 	}
 	if (options.tools !== undefined) {
 		validateToolNames(options.tools);
+	}
+	if (options.permission !== undefined) {
+		validateOpenCodePermissionOverrides(options.permission);
 	}
 }

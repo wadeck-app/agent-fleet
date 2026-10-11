@@ -525,6 +525,43 @@ describe('OpenCodeModelProvider', () => {
 		});
 	});
 
+	describe('permission', () => {
+		// The actual problem this exists for: a headless worker can never answer opencode's
+		// default `ask` action for e.g. external_directory, so the step just hangs. The fix is
+		// to thread a per-step override straight into opencode's own config.
+		it('writes a permission config with the given overrides', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({ permission: { external_directory: 'allow', bash: 'deny' } })
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			const config = JSON.parse(spawnOpts.env!['OPENCODE_CONFIG_CONTENT']!) as {
+				permission: Record<string, string>;
+			};
+			expect(config.permission).toEqual({ external_directory: 'allow', bash: 'deny' });
+		});
+
+		it('does not set OPENCODE_CONFIG_CONTENT when permission is not set', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			expect(spawnOpts.env?.['OPENCODE_CONFIG_CONTENT']).toBeUndefined();
+		});
+
+		it('does not set OPENCODE_CONFIG_CONTENT for an empty permission object', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ permission: {} }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const spawnOpts = vi.mocked(child_process.spawn).mock.calls[0][2] as { env?: Record<string, string> };
+			expect(spawnOpts.env?.['OPENCODE_CONFIG_CONTENT']).toBeUndefined();
+		});
+	});
+
 	describe('mcpServers', () => {
 		it('sets OPENCODE_CONFIG_CONTENT for small MCP config', async () => {
 			const resultPromise = provider.launchBackground(
@@ -1187,6 +1224,18 @@ describe('OpenCodeModelProvider', () => {
 					})
 				)
 			).rejects.toThrow('null bytes or invalid control characters');
+		});
+
+		it('throws on an unknown permission key', async () => {
+			await expect(
+				provider.launchBackground(makeBaseOptions({ permission: { not_a_real_key: 'allow' } as any }))
+			).rejects.toThrow('not_a_real_key');
+		});
+
+		it('throws on an invalid permission action', async () => {
+			await expect(
+				provider.launchBackground(makeBaseOptions({ permission: { bash: 'maybe' } as any }))
+			).rejects.toThrow('must be one of: allow, deny, ask');
 		});
 	});
 });
