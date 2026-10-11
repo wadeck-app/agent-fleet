@@ -275,10 +275,10 @@ describe('flow worker list — shells column', () => {
 });
 
 describe('flow worker list --follow', () => {
-	let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+	let stdoutWriteSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
-		consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 	});
@@ -299,10 +299,14 @@ describe('flow worker list --follow', () => {
 		shellCapabilities: [],
 	};
 
-	// `--follow` must behave like `tail -f` (per shared-cli's guiding-principles.md
-	// convention), not a periodically refreshed screen: an unchanged worker must not be
-	// reprinted every tick, or the operator's terminal scrolls on its own for no reason.
-	it('does not reprint an unchanged worker on a later tick', async () => {
+	const writtenText = (spy: ReturnType<typeof vi.spyOn>): string =>
+		spy.mock.calls.map((call: unknown[]) => String(call[0])).join('');
+
+	// `flow worker list` is a *live state view* (who is connected right now), not an event
+	// log -- unlike "task list -f"/"queue history -f", it must redraw the full current
+	// state every tick (in place, via LiveRegion) rather than diff-and-print-only-new,
+	// because a worker disappearing is itself meaningful and a diff would never surface it.
+	it('redraws the current worker on every tick, not just once', async () => {
 		vi.useFakeTimers();
 		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
 			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
@@ -318,27 +322,27 @@ describe('flow worker list --follow', () => {
 		program.addCommand(workerCommand);
 		freshRegisterWorkerCommand(workerCommand);
 
-		// Follow mode never resolves on its own; only await the first tick, then advance time
-		// to prove a second, identical poll does not print the worker again.
 		void program.parseAsync(['node', 'test', 'worker', 'list', '--follow']);
 		await vi.advanceTimersByTimeAsync(1);
-		const countAfterInitial = consoleLogSpy.mock.calls.length;
-		expect(countAfterInitial).toBeGreaterThan(0);
+		const callsAfterInitial = stdoutWriteSpy.mock.calls.length;
+		expect(callsAfterInitial).toBeGreaterThan(0);
 
 		await vi.advanceTimersByTimeAsync(500);
-		await vi.advanceTimersByTimeAsync(500);
-		expect(consoleLogSpy.mock.calls.length).toBe(countAfterInitial);
+		// A second tick must still write the worker again (full redraw), not go silent --
+		// the opposite expectation from an event-log --follow.
+		expect(stdoutWriteSpy.mock.calls.length).toBeGreaterThan(callsAfterInitial);
+		expect(writtenText(stdoutWriteSpy)).toContain('w1');
 	});
 
-	// The whole point of --follow is picking up what changes without re-running the
-	// command by hand -- a status flip on an existing worker must be printed.
-	it('prints a worker again once its state actually changes', async () => {
+	// The whole point of a live-state view: a worker disconnecting must disappear from
+	// what's shown, not linger because it was never "diffed out".
+	it('stops showing a worker once it is no longer in the live list', async () => {
 		vi.useFakeTimers();
-		let state: 'idle' | 'busy' = 'idle';
+		let workers = [{ ...baseWorker, workerId: 'w1' }];
 		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
 			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
 			createDaemonClient: () => ({
-				send: async () => Promise.resolve([{ ...baseWorker, workerId: 'w1', state }]),
+				send: async () => Promise.resolve(workers),
 			}),
 		}));
 
@@ -351,13 +355,13 @@ describe('flow worker list --follow', () => {
 
 		void program.parseAsync(['node', 'test', 'worker', 'list', '--follow']);
 		await vi.advanceTimersByTimeAsync(1);
-		consoleLogSpy.mockClear();
+		expect(writtenText(stdoutWriteSpy)).toContain('w1');
+		stdoutWriteSpy.mockClear();
 
-		state = 'busy';
+		workers = [];
 		await vi.advanceTimersByTimeAsync(500);
 
-		const allOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
-		expect(allOutput).toContain('busy');
+		expect(writtenText(stdoutWriteSpy)).not.toContain('w1');
 	});
 
 	// An unsupported/outdated daemon is a fatal condition in one-shot mode (exit 1), but

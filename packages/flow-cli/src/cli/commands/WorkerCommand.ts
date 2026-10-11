@@ -1,5 +1,6 @@
 import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
-import { FOLLOW_POLL_INTERVAL_MS, diffSnapshot } from '@wadeck-app/shared-cli/FollowSnapshot';
+import { FOLLOW_POLL_INTERVAL_MS } from '@wadeck-app/shared-cli/FollowSnapshot';
+import { LiveRegion } from '@wadeck-app/shared-cli/LiveRegion';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { cacheFilePath, readCache, readUpdateConfig, semverLte } from '@wadeck-app/shared-updater';
 import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
@@ -307,49 +308,46 @@ async function runWorkerListOnce(daemonDir: string, json: boolean): Promise<void
 }
 
 /**
- * `flow worker list --follow` -- `tail -f` on the live worker list, not a periodically
- * refreshed screen (see shared-cli's guiding-principles.md `--follow` convention): the
- * initial state is printed once, then each poll prints only workers that are new or
- * changed since the last tick, via `diffSnapshot`. A worker that stops being new/changed
- * (the common case: it just sits idle) is never reprinted, so the operator's terminal
- * does not scroll on its own.
+ * `flow worker list --follow` -- a *live state view* (see shared-cli's
+ * guiding-principles.md `--follow` convention), not an event log: the question is
+ * "who is connected right now", and a worker disconnecting is exactly as meaningful as
+ * one connecting. Each poll redraws the full current list in place via `LiveRegion`
+ * (erasing exactly its own last render), so the operator always sees the actual current
+ * state -- including a worker that just dropped off -- without the terminal scrolling.
  */
 async function runWorkerListFollow(daemonDir: string, json: boolean): Promise<void> {
-	const printWorker = (w: WorkerSummary): void => {
-		console.log(json ? JSON.stringify(w) : formatWorkerLine(w));
+	const region = new LiveRegion();
+	let lastFailureMessage: string | undefined;
+
+	const renderOnce = async (): Promise<void> => {
+		const result = await readWorkerList(daemonDir);
+		if (!result.ok) {
+			// A condition that stays fatal (e.g. the daemon staying too old) must not spam
+			// the identical line every tick -- report it once per distinct failure only. The
+			// region itself is left showing the last known-good state rather than cleared.
+			if (result.message !== lastFailureMessage) report('[fail]', result.message);
+			lastFailureMessage = result.message;
+			return;
+		}
+		lastFailureMessage = undefined;
+		if (json) {
+			// Split on embedded newlines so LiveRegion's line count (used to erase the
+			// previous render) matches what actually prints -- it tracks array entries, not
+			// terminal rows.
+			region.render(JSON.stringify(result.workers, null, 2).split('\n'));
+			return;
+		}
+		if (result.workers.length === 0) {
+			region.render(describeNoLiveWorkers(readDeclaredSources(daemonDir), true).split('\n'));
+			return;
+		}
+		region.render(result.workers.map(formatWorkerLine));
 	};
 
-	const initial = await readWorkerList(daemonDir);
-	let lastFailureMessage: string | undefined;
-	if (!initial.ok) {
-		report('[fail]', initial.message);
-		lastFailureMessage = initial.message;
-	} else if (initial.workers.length === 0 && !json) {
-		console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), true));
-	} else {
-		for (const w of initial.workers) printWorker(w);
-	}
-	let snapshot = initial.ok
-		? diffSnapshot(new Map(), initial.workers, w => w.workerId).snapshot
-		: new Map<string, string>();
-
+	await renderOnce();
 	process.stderr.write(`[${ts()}] [wait] Following the worker list -- Ctrl+C to stop\n`);
 	await new Promise<void>(resolve => {
-		const interval = setInterval(() => {
-			void readWorkerList(daemonDir).then(result => {
-				if (!result.ok) {
-					// A condition that stays fatal (e.g. the daemon staying too old) must not spam
-					// the identical line every tick -- report it once per distinct failure only.
-					if (result.message !== lastFailureMessage) report('[fail]', result.message);
-					lastFailureMessage = result.message;
-					return;
-				}
-				lastFailureMessage = undefined;
-				const { changed, snapshot: next } = diffSnapshot(snapshot, result.workers, w => w.workerId);
-				snapshot = next;
-				for (const w of changed) printWorker(w);
-			});
-		}, FOLLOW_POLL_INTERVAL_MS);
+		const interval = setInterval(() => void renderOnce(), FOLLOW_POLL_INTERVAL_MS);
 		process.on('SIGINT', () => {
 			clearInterval(interval);
 			resolve();
