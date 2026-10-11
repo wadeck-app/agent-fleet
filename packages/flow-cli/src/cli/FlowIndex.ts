@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
 import { cliLogsCommand } from '@wadeck-app/shared-cli/CliMetaCommands';
+import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { createDaemonClient, readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
 import { spawn } from 'node:child_process';
@@ -9,7 +10,6 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 
 import { FlowConfigLoader } from '../config/FlowConfig.js';
 import { Daemon, writeDaemonLog } from '../daemon/Daemon.js';

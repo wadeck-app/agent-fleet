@@ -1,4 +1,5 @@
 import { ConfigDir } from '@wadeck-app/shared-cli';
+import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import type { FlowDefinition, InputDefinition } from 'flow-engine/types';
@@ -9,7 +10,6 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
-import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';

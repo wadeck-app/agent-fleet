@@ -7,6 +7,7 @@ import {
 	cliVersionCommand,
 	warnUnknownArgs,
 } from '@wadeck-app/shared-cli/CliMetaCommands';
+import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { Command } from 'commander';
 import { FlowExecutor, StepRunner } from 'flow-engine';
 import * as yaml from 'js-yaml';
@@ -15,7 +16,6 @@ import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveOwnBundlePath } from 'shared-common/utils/resolveOwnBundlePath';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
