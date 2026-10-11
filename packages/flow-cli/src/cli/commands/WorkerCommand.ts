@@ -1,4 +1,5 @@
 import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
+import { FOLLOW_POLL_INTERVAL_MS, diffSnapshot } from '@wadeck-app/shared-cli/FollowSnapshot';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { cacheFilePath, readCache, readUpdateConfig, semverLte } from '@wadeck-app/shared-updater';
 import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
@@ -236,25 +237,27 @@ export function registerWorkerCommand(worker: Command): void {
 		});
 }
 
-/** How often `--follow` re-polls the daemon for its live worker list. */
-const FOLLOW_INTERVAL_MS = 2_000;
+/** One formatted text line for a worker, as printed by `flow worker list` without `--json`. */
+function formatWorkerLine(w: WorkerSummary): string {
+	const labels = w.labels.length > 0 ? w.labels.join(',') : '-';
+	const shells = w.shellCapabilities && w.shellCapabilities.length > 0 ? w.shellCapabilities.join(',') : '-';
+	const origin = w.ephemeral ? 'daemon-forked' : (w.sourceId ?? 'external');
+	return `${w.workerId}\t${w.state}\tpid=${String(w.pid)}\tversion=${w.version ?? '-'}\t${origin}\tlabels=${labels}\tshells=${shells}\tinteractive=${String(w.hasUserInterface)}`;
+}
 
 /**
- * Fetches the live worker list once and prints it (text or `--json`).
+ * Reads the live worker list once, without printing anything.
  *
- * Shared between the one-shot and `--follow` paths so both render identically. On a
- * condition the caller should treat as fatal (an unsupported/outdated daemon, or any
- * other unexpected error -- `DaemonNotRunningError` is never one of these, since no
- * daemon simply means no live workers, which is printed and treated as success), the
- * failure message is returned rather than reported here: the one-shot caller reports it
- * once and exits, while `--follow` reports it once per distinct failure rather than
- * every tick, so an unchanging condition (e.g. the daemon staying too old) does not spam
- * the same line forever while the operator waits for it to change.
+ * Shared between the one-shot and `--follow` paths. `DaemonNotRunningError` is reported
+ * as an empty list, not a failure: no daemon simply means no live workers. Any other
+ * error (most commonly an outdated daemon that predates this command) is fatal -- the
+ * one-shot caller reports it and exits; `--follow` reports it once per distinct failure
+ * rather than every tick, so an unchanging condition does not spam the identical line
+ * for however long the operator leaves it running.
  */
-async function fetchWorkerList(
-	daemonDir: string,
-	json: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
+async function readWorkerList(
+	daemonDir: string
+): Promise<{ ok: true; workers: WorkerSummary[] } | { ok: false; message: string }> {
 	try {
 		// The command is declared optional and left unimplemented on purpose: a local
 		// handler here would be used as an in-process fallback and would answer with
@@ -265,31 +268,10 @@ async function fetchWorkerList(
 			commands: {},
 		});
 		const workers = (await client.send('workers', undefined)) as WorkerSummary[];
-
-		if (json) {
-			console.log(JSON.stringify(workers, null, 2));
-			return { ok: true };
-		}
-		if (workers.length === 0) {
-			console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), true));
-			return { ok: true };
-		}
-		for (const w of workers) {
-			const labels = w.labels.length > 0 ? w.labels.join(',') : '-';
-			const shells = w.shellCapabilities && w.shellCapabilities.length > 0 ? w.shellCapabilities.join(',') : '-';
-			const origin = w.ephemeral ? 'daemon-forked' : (w.sourceId ?? 'external');
-			console.log(
-				`${w.workerId}\t${w.state}\tpid=${String(w.pid)}\tversion=${w.version ?? '-'}\t${origin}\tlabels=${labels}\tshells=${shells}\tinteractive=${String(w.hasUserInterface)}`
-			);
-		}
-		return { ok: true };
+		return { ok: true, workers };
 	} catch (err) {
 		if (err instanceof DaemonNotRunningError) {
-			// Not an error state: no daemon simply means no live workers. The registry is
-			// readable without one, so say what is declared rather than leaving the reader
-			// to guess whether anything is configured at all.
-			console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), false));
-			return { ok: true };
+			return { ok: true, workers: [] };
 		}
 		const message = normalizeError(err).message;
 		if (/unknown command/i.test(message)) {
@@ -306,6 +288,75 @@ async function fetchWorkerList(
 	}
 }
 
+/** `flow worker list` with neither `--json` nor `--follow`: one full read, then exit. */
+async function runWorkerListOnce(daemonDir: string, json: boolean): Promise<void> {
+	const result = await readWorkerList(daemonDir);
+	if (!result.ok) {
+		report('[fail]', result.message);
+		process.exit(1);
+	}
+	if (json) {
+		console.log(JSON.stringify(result.workers, null, 2));
+		return;
+	}
+	if (result.workers.length === 0) {
+		console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), true));
+		return;
+	}
+	for (const w of result.workers) console.log(formatWorkerLine(w));
+}
+
+/**
+ * `flow worker list --follow` -- `tail -f` on the live worker list, not a periodically
+ * refreshed screen (see shared-cli's guiding-principles.md `--follow` convention): the
+ * initial state is printed once, then each poll prints only workers that are new or
+ * changed since the last tick, via `diffSnapshot`. A worker that stops being new/changed
+ * (the common case: it just sits idle) is never reprinted, so the operator's terminal
+ * does not scroll on its own.
+ */
+async function runWorkerListFollow(daemonDir: string, json: boolean): Promise<void> {
+	const printWorker = (w: WorkerSummary): void => {
+		console.log(json ? JSON.stringify(w) : formatWorkerLine(w));
+	};
+
+	const initial = await readWorkerList(daemonDir);
+	let lastFailureMessage: string | undefined;
+	if (!initial.ok) {
+		report('[fail]', initial.message);
+		lastFailureMessage = initial.message;
+	} else if (initial.workers.length === 0 && !json) {
+		console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), true));
+	} else {
+		for (const w of initial.workers) printWorker(w);
+	}
+	let snapshot = initial.ok
+		? diffSnapshot(new Map(), initial.workers, w => w.workerId).snapshot
+		: new Map<string, string>();
+
+	process.stderr.write(`[${ts()}] [wait] Following the worker list -- Ctrl+C to stop\n`);
+	await new Promise<void>(resolve => {
+		const interval = setInterval(() => {
+			void readWorkerList(daemonDir).then(result => {
+				if (!result.ok) {
+					// A condition that stays fatal (e.g. the daemon staying too old) must not spam
+					// the identical line every tick -- report it once per distinct failure only.
+					if (result.message !== lastFailureMessage) report('[fail]', result.message);
+					lastFailureMessage = result.message;
+					return;
+				}
+				lastFailureMessage = undefined;
+				const { changed, snapshot: next } = diffSnapshot(snapshot, result.workers, w => w.workerId);
+				snapshot = next;
+				for (const w of changed) printWorker(w);
+			});
+		}, FOLLOW_POLL_INTERVAL_MS);
+		process.on('SIGINT', () => {
+			clearInterval(interval);
+			resolve();
+		});
+	});
+}
+
 /**
  * `flow worker list` -- the live workers this daemon can currently dispatch to.
  *
@@ -320,35 +371,15 @@ function registerListCommand(worker: Command): void {
 		.option('--json', 'Output as JSON')
 		.option(
 			'-f, --follow',
-			`Keep polling and reprinting the list every ${String(FOLLOW_INTERVAL_MS / 1_000)}s until interrupted (Ctrl-C), instead of exiting after one read`
+			'Keep following the worker list (tail -f style: only new/changed workers are printed after the initial read) until interrupted (Ctrl-C), instead of exiting after one read'
 		)
 		.action(async (options: { json?: boolean; follow?: boolean }) => {
 			const daemonDir = ConfigDir.get('flow');
 			const json = options.json === true;
-
-			if (options.follow !== true) {
-				const result = await fetchWorkerList(daemonDir, json);
-				if (!result.ok) {
-					report('[fail]', result.message);
-					process.exit(1);
-				}
-				return;
-			}
-
-			// Follow mode never exits on its own: a failure this tick (daemon down, daemon too
-			// old) may no longer hold on the next one, and `--follow` exists precisely so the
-			// operator does not have to keep re-running the command by hand to find out. The
-			// failure message is only reported again when it changes, so a condition that stays
-			// fatal (e.g. the daemon staying too old) does not spam the identical line forever.
-			let lastFailureMessage: string | undefined;
-			for (;;) {
-				console.log(`[${ts()}] ---`);
-				const result = await fetchWorkerList(daemonDir, json);
-				if (!result.ok && result.message !== lastFailureMessage) {
-					report('[fail]', result.message);
-				}
-				lastFailureMessage = result.ok ? undefined : result.message;
-				await new Promise(resolve => setTimeout(resolve, FOLLOW_INTERVAL_MS));
+			if (options.follow === true) {
+				await runWorkerListFollow(daemonDir, json);
+			} else {
+				await runWorkerListOnce(daemonDir, json);
 			}
 		});
 }

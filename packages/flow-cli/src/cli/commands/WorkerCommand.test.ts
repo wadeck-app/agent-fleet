@@ -280,6 +280,7 @@ describe('flow worker list --follow', () => {
 	beforeEach(() => {
 		consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 		vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 	});
 
 	afterEach(() => {
@@ -288,18 +289,25 @@ describe('flow worker list --follow', () => {
 		vi.useRealTimers();
 	});
 
-	// `--follow` must poll on an interval rather than exit after the first read -- the whole
-	// point of the flag is to not require the operator to re-run the command by hand.
-	it('polls repeatedly instead of returning after the first read', async () => {
+	const baseWorker = {
+		pid: 1,
+		state: 'idle' as const,
+		labels: [],
+		attachedProjects: [],
+		hasUserInterface: false,
+		ephemeral: true,
+		shellCapabilities: [],
+	};
+
+	// `--follow` must behave like `tail -f` (per shared-cli's guiding-principles.md
+	// convention), not a periodically refreshed screen: an unchanged worker must not be
+	// reprinted every tick, or the operator's terminal scrolls on its own for no reason.
+	it('does not reprint an unchanged worker on a later tick', async () => {
 		vi.useFakeTimers();
-		let callCount = 0;
 		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
 			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
 			createDaemonClient: () => ({
-				send: async () => {
-					callCount++;
-					return Promise.resolve([]);
-				},
+				send: async () => Promise.resolve([{ ...baseWorker, workerId: 'w1' }]),
 			}),
 		}));
 
@@ -311,22 +319,51 @@ describe('flow worker list --follow', () => {
 		freshRegisterWorkerCommand(workerCommand);
 
 		// Follow mode never resolves on its own; only await the first tick, then advance time
-		// to prove a second poll happens without a second invocation of the command.
+		// to prove a second, identical poll does not print the worker again.
 		void program.parseAsync(['node', 'test', 'worker', 'list', '--follow']);
 		await vi.advanceTimersByTimeAsync(1);
-		expect(callCount).toBe(1);
+		const countAfterInitial = consoleLogSpy.mock.calls.length;
+		expect(countAfterInitial).toBeGreaterThan(0);
 
-		await vi.advanceTimersByTimeAsync(2_000);
-		expect(callCount).toBe(2);
+		await vi.advanceTimersByTimeAsync(500);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(consoleLogSpy.mock.calls.length).toBe(countAfterInitial);
+	});
 
-		await vi.advanceTimersByTimeAsync(2_000);
-		expect(callCount).toBe(3);
+	// The whole point of --follow is picking up what changes without re-running the
+	// command by hand -- a status flip on an existing worker must be printed.
+	it('prints a worker again once its state actually changes', async () => {
+		vi.useFakeTimers();
+		let state: 'idle' | 'busy' = 'idle';
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
+			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
+			createDaemonClient: () => ({
+				send: async () => Promise.resolve([{ ...baseWorker, workerId: 'w1', state }]),
+			}),
+		}));
+
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+
+		void program.parseAsync(['node', 'test', 'worker', 'list', '--follow']);
+		await vi.advanceTimersByTimeAsync(1);
+		consoleLogSpy.mockClear();
+
+		state = 'busy';
+		await vi.advanceTimersByTimeAsync(500);
+
+		const allOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
+		expect(allOutput).toContain('busy');
 	});
 
 	// An unsupported/outdated daemon is a fatal condition in one-shot mode (exit 1), but
-	// --follow keeps polling it forever (it may be restarted onto a newer build mid-session).
-	// Reporting the identical failure every 2s for however long the operator leaves it running
-	// would be pure noise, so it must be reported once and then stay silent while unchanged.
+	// --follow keeps polling it (it may be restarted onto a newer build mid-session).
+	// Reporting the identical failure every tick for however long the operator leaves it
+	// running would be pure noise, so it must be reported once and then stay silent.
 	it('reports a repeating failure once, not on every tick', async () => {
 		vi.useFakeTimers();
 		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -346,8 +383,8 @@ describe('flow worker list --follow', () => {
 
 		void program.parseAsync(['node', 'test', 'worker', 'list', '--follow']);
 		await vi.advanceTimersByTimeAsync(1);
-		await vi.advanceTimersByTimeAsync(2_000);
-		await vi.advanceTimersByTimeAsync(2_000);
+		await vi.advanceTimersByTimeAsync(500);
+		await vi.advanceTimersByTimeAsync(500);
 
 		const failCalls = consoleErrorSpy.mock.calls.filter((call: unknown[]) =>
 			String(call.join(' ')).includes('does not support "flow worker list"')
