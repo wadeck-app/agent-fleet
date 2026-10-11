@@ -967,6 +967,17 @@ No decision was made -- this step is unanswered, not denied.`;
 		expect(handler.hasResumableInterventions()).toBe(false);
 	});
 
+	// So the daemon log can answer "what did isIdle() actually see" if the idle-exit race
+	// ever recurs, without another from-scratch investigation.
+	it('describeIdleState reports the resumable intervention count', async () => {
+		const handler = makeHandler();
+		const executionId = await runToInterventionStep(handler);
+		expect(handler.describeIdleState()).toContain('resumableInterventions=0');
+
+		handler.onStepFailed(executionId, 'approve', TIMEOUT_ERROR);
+		expect(handler.describeIdleState()).toContain('resumableInterventions=1');
+	});
+
 	it('cleans up normally when a user_intervention step fails for a reason other than a timeout', async () => {
 		const handler = makeHandler();
 		const executionId = await runToInterventionStep(handler);

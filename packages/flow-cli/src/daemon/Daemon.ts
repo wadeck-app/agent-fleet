@@ -718,6 +718,14 @@ async function startDaemon(
 	}
 
 	/**
+	 * One-line snapshot of every `isIdle()` input, for the idle-exit diagnostic log entries
+	 * below -- see `CommandHandler.describeIdleState()` for why this exists.
+	 */
+	function diagnosticSnapshot(): string {
+		return `${commandHandler.describeIdleState()} liveWorkers=${String(workerRegistry.liveCount)} idleWorkers=${String(workerRegistry.idleCount)}`;
+	}
+
+	/**
 	 * Looks idle right now and schedules the actual stop after SHUTDOWN_GRACE_MS, rather than
 	 * stopping synchronously -- see SHUTDOWN_GRACE_MS for why. The grace period re-checks
 	 * idleness itself when it elapses, so nothing here needs to notice "something changed" and
@@ -730,13 +738,23 @@ async function startDaemon(
 			if (pendingShutdown !== undefined) {
 				clearTimeout(pendingShutdown);
 				pendingShutdown = undefined;
+				writeDaemonLog(logsDir, 'info', `Idle shutdown cancelled, no longer idle (${diagnosticSnapshot()})`);
 			}
 			return;
 		}
 		if (pendingShutdown !== undefined) return; // already scheduled
+		writeDaemonLog(
+			logsDir,
+			'info',
+			`Idle detected, scheduling shutdown in ${String(SHUTDOWN_GRACE_MS)}ms (${diagnosticSnapshot()})`
+		);
 		pendingShutdown = setTimeout(() => {
 			pendingShutdown = undefined;
-			if (shuttingDown || !isIdle()) return;
+			if (shuttingDown) return;
+			if (!isIdle()) {
+				writeDaemonLog(logsDir, 'info', `Idle shutdown skipped on recheck (${diagnosticSnapshot()})`);
+				return;
+			}
 			shuttingDown = true;
 			// Only the workers this daemon forked are told to exit. A worker the user
 			// launched in a terminal must survive an idle period: it is registered, not
@@ -755,7 +773,7 @@ async function startDaemon(
 			// updateCheckTimer is cleared by the onShutdown hook, which fires for every stop()
 			// path -- including the daemonHandle.stop('idle') call just below.
 			wsServer.close();
-			writeDaemonLog(logsDir, 'info', 'Daemon stopped (idle)');
+			writeDaemonLog(logsDir, 'info', `Daemon stopped (idle) (${diagnosticSnapshot()})`);
 			void daemonHandle.stop('idle');
 		}, SHUTDOWN_GRACE_MS);
 	}

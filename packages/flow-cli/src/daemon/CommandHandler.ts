@@ -248,6 +248,21 @@ export class CommandHandler {
 		return this.resumableInterventions.size > 0;
 	}
 
+	/**
+	 * One-line diagnostic snapshot of everything `isIdle()` consults here, for the daemon's
+	 * own idle-exit log entries (see `Daemon.ts`'s `checkShutdown()`).
+	 *
+	 * Added after an idle-exit race with `flow resume` was reported but could not be
+	 * conclusively reproduced (the suspected condition -- `hasActiveExecutions()` not
+	 * actually staying true through an unanswered-intervention timeout -- could not be
+	 * confirmed or ruled out from code reading or a live repro alone). If it recurs, this
+	 * line in the daemon log answers "what did isIdle() actually see" directly instead of
+	 * requiring another investigation from scratch.
+	 */
+	describeIdleState(): string {
+		return `queue=${String(this.readyQueue.length)} activeExecutions=${String(this.activeExecutionCount)} resumableInterventions=${String(this.resumableInterventions.size)}`;
+	}
+
 	async handleRun(
 		cmd: Extract<ClientCommand, { type: 'run' }>,
 		hookDispatcher?: HookDispatcher
