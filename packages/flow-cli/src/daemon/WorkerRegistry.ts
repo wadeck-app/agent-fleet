@@ -25,6 +25,8 @@ export interface RegisteredWorker {
 	 */
 	workerId: string;
 	pid: number;
+	/** flow-cli version this worker process is running, as self-reported on registration. */
+	version?: string;
 	sourceId?: string;
 	/** Routing labels only -- never an authorization decision (T-07). */
 	labels: string[];
@@ -89,6 +91,7 @@ export class WorkerRegistry {
 			workerId,
 			ephemeral: options?.ephemeral ?? existing?.ephemeral ?? false,
 			pid: registration.pid,
+			version: registration.version,
 			sourceId: registration.sourceId,
 			// Documented defaults rather than inference: a worker that claims nothing is
 			// unlabelled, attached to nothing, and headless until it says otherwise.
@@ -108,6 +111,7 @@ export class WorkerRegistry {
 		return [...this.workers.values()].map(worker => ({
 			workerId: worker.workerId,
 			pid: worker.pid,
+			...(worker.version !== undefined ? { version: worker.version } : {}),
 			state: worker.state,
 			...(worker.sourceId !== undefined ? { sourceId: worker.sourceId } : {}),
 			labels: worker.labels,
@@ -183,9 +187,7 @@ export class WorkerRegistry {
 		const live = [...this.workers.values()].map(w => w.workerId);
 		throw new Error(
 			`No connected worker has id "${workerId}". ` +
-				(live.length > 0
-					? `Live worker ids: ${live.join(', ')}.`
-					: 'No workers are currently connected.') +
+				(live.length > 0 ? `Live worker ids: ${live.join(', ')}.` : 'No workers are currently connected.') +
 				' Run "flow worker list" to see current ids.'
 		);
 	}

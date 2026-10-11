@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Test the writeDaemonLog helper (exported from Daemon.ts)
 describe('writeDaemonLog', () => {
@@ -140,5 +140,81 @@ describe('loadFlowHooks', () => {
 		fs.writeFileSync(path.join(tmpDir, '.flow', 'config.yml'), 'hooks:\n  onFlowEnd: [unclosed\n', 'utf8');
 
 		expect(() => loadFlowHooks(tmpDir)).toThrow(/Failed to parse flow config/);
+	});
+});
+
+// So the daemon's own updater cache -- the one StepRouter's version preference reads --
+// doesn't go stale for days while a long-running daemon never happens to restart.
+describe('periodic update check', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flow-daemon-update-')));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('schedules a background update check on startup, keeps re-triggering it on checkIntervalMs, and stops on shutdown', async () => {
+		// Real spawn is replaced with a spy: scheduleBackgroundUpdate otherwise launches the
+		// real flow-updater.cjs child process against the real user config dir (D#TBD).
+		fs.writeFileSync(path.join(tmpDir, 'config.yml'), 'checkInterval: 20ms\n', 'utf8');
+		const { UpdateManager } = await import('@wadeck-app/shared-cli');
+		const scheduleSpy = vi.spyOn(UpdateManager.prototype, 'scheduleBackgroundUpdate').mockImplementation(() => {});
+
+		const { Daemon } = await import('./Daemon.js');
+		const { FlowConfigLoader } = await import('../config/FlowConfig.js');
+		const handle = await Daemon.start(
+			{ ...FlowConfigLoader.DEFAULT, worker: { ...FlowConfigLoader.DEFAULT.worker, wsPort: 0 } },
+			tmpDir,
+			{ port: 0 }
+		);
+
+		try {
+			await vi.waitFor(() => expect(scheduleSpy).toHaveBeenCalled(), { timeout: 2000, interval: 10 });
+			const callsAfterStartup = scheduleSpy.mock.calls.length;
+			await vi.waitFor(() => expect(scheduleSpy.mock.calls.length).toBeGreaterThan(callsAfterStartup), {
+				timeout: 2000,
+				interval: 10,
+			});
+		} finally {
+			await handle.stop('idle');
+		}
+
+		const callsAtStop = scheduleSpy.mock.calls.length;
+		await new Promise(resolve => setTimeout(resolve, 60));
+		// Not cleared would mean the timer keeps firing against a torn-down daemon.
+		expect(scheduleSpy.mock.calls.length).toBe(callsAtStop);
+
+		scheduleSpy.mockRestore();
+	});
+
+	// Re-arming at exactly checkIntervalMs beats against shared-updater's own
+	// cache.lastCheckedAt gate inside the spawned updater (same WorkerCommand.ts fix, see
+	// its UPDATER_SKIP_THROTTLE comment) -- without this, timing jitter makes the gate skip
+	// roughly every other tick, silently halving the real cadence.
+	it('tells the spawned updater to skip its own throttle, since the daemon already owns the schedule', async () => {
+		const previousEnv = process.env['UPDATER_SKIP_THROTTLE'];
+		delete process.env['UPDATER_SKIP_THROTTLE'];
+		const { UpdateManager } = await import('@wadeck-app/shared-cli');
+		const scheduleSpy = vi.spyOn(UpdateManager.prototype, 'scheduleBackgroundUpdate').mockImplementation(() => {});
+
+		const { Daemon } = await import('./Daemon.js');
+		const { FlowConfigLoader } = await import('../config/FlowConfig.js');
+		const handle = await Daemon.start(
+			{ ...FlowConfigLoader.DEFAULT, worker: { ...FlowConfigLoader.DEFAULT.worker, wsPort: 0 } },
+			tmpDir,
+			{ port: 0 }
+		);
+
+		try {
+			expect(process.env['UPDATER_SKIP_THROTTLE']).toBe('1');
+		} finally {
+			await handle.stop('idle');
+			scheduleSpy.mockRestore();
+			if (previousEnv === undefined) delete process.env['UPDATER_SKIP_THROTTLE'];
+			else process.env['UPDATER_SKIP_THROTTLE'] = previousEnv;
+		}
 	});
 });

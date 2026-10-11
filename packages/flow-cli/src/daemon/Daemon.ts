@@ -1,5 +1,7 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
+import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
 import { type HookConfig, HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
+import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
+import { readUpdateConfig } from '@wadeck-app/shared-updater';
 import { type DaemonHandle, createDaemon } from '@wadeck-app/singleton-daemon-kit';
 import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
 import { WorkspaceManager } from 'flow-engine';
@@ -8,9 +10,11 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
+import { FLOW_BUNDLE_NAME } from '../cli/FlowBundleName.js';
 import { VERSION } from '../cli/version.js';
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
@@ -279,6 +283,17 @@ async function startDaemon(
 	let workerListenerPort: number | undefined;
 	/** Held so shutdown can stop it: an unref'd timer still fires while the daemon tears down. */
 	let stalledSweep: ReturnType<typeof setInterval> | undefined;
+	/**
+	 * Held so shutdown can stop it.
+	 *
+	 * Keeps this daemon's own updater cache fresh (`readUpdateConfig`/`readCache`, see
+	 * `UpdateManager`): the worker side refreshes it on its own self-restart (Part 2), but a
+	 * long-running daemon that never restarts would otherwise read a `latestVersion` from
+	 * whenever it last happened to start -- stale for however many days it stays up. Pure
+	 * refresh, not a gate: `StepRouter`'s version preference degrades to "no preference"
+	 * when the cache is missing or stale, so a slow or failed check never blocks dispatch.
+	 */
+	let updateCheckTimer: ReturnType<typeof setInterval> | undefined;
 	let commandHandler: CommandHandler;
 	let executionStore: ExecutionStore;
 	let logWriter: LogWriter;
@@ -334,6 +349,15 @@ async function startDaemon(
 			running_executions: workerRegistry?.liveCount ?? 0,
 		}),
 		hooks: {
+			// Fires on every stop() path (idle, signal, command, error, update -- see
+			// singleton-daemon-kit's `handle.stop()`), unlike the idle-only teardown inside
+			// `checkShutdown()` below. The update-check timer is unref'd, so leaking it past
+			// shutdown costs nothing once the process actually exits -- but a daemon stopped
+			// in-process (tests, or `flow daemon stop` reusing the same process) must not keep
+			// firing it against a torn-down daemon.
+			onShutdown: () => {
+				if (updateCheckTimer !== undefined) clearInterval(updateCheckTimer);
+			},
 			onStart: (port: number) => {
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
 				fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
@@ -450,6 +474,28 @@ async function startDaemon(
 					commandHandler.failStalledSteps();
 				}, STALLED_SWEEP_INTERVAL_MS);
 				stalledSweep.unref();
+
+				// Same mechanism as the worker side's self-restart check (Part 2): schedule a
+				// background update check now, then keep re-triggering it on the configured
+				// cadence so this daemon's own `latestVersion` cache does not go stale across a
+				// long-running process. Re-arming at exactly checkIntervalMs used to beat against
+				// shared-updater's own cache.lastCheckedAt gate (same threshold, so the check
+				// that finishes a few seconds after each tick made the NEXT tick land a hair
+				// short of the gate -- it skipped every other tick, silently halving the real
+				// cadence). UPDATER_SKIP_THROTTLE tells the spawned updater this caller already
+				// owns its schedule, so the gate is not needed on top of it.
+				process.env['UPDATER_SKIP_THROTTLE'] = '1';
+				const updateManager = new UpdateManager('@wadeck-app/flow-cli');
+				const bundlePath = resolveOwnBundlePath(FLOW_BUNDLE_NAME, fileURLToPath(import.meta.url));
+				const scheduleUpdateCheck = (): void => {
+					updateManager.scheduleBackgroundUpdate(bundlePath, 'flow-updater.cjs');
+				};
+				scheduleUpdateCheck();
+				updateCheckTimer = setInterval(
+					scheduleUpdateCheck,
+					readUpdateConfig(resolvedDaemonDir).checkIntervalMs
+				);
+				updateCheckTimer.unref();
 
 				/**
 				 * Drops entries whose declaring worker is gone.
@@ -698,6 +744,8 @@ async function startDaemon(
 			commandHandler.stopBackgroundWork();
 			// Nothing is executing at this point, so a sweep would only run against a torn-down handler.
 			if (stalledSweep !== undefined) clearInterval(stalledSweep);
+			// updateCheckTimer is cleared by the onShutdown hook, which fires for every stop()
+			// path -- including the daemonHandle.stop('idle') call just below.
 			wsServer.close();
 			writeDaemonLog(logsDir, 'info', 'Daemon stopped (idle)');
 			void daemonHandle.stop('idle');

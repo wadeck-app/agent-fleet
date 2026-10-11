@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const REGISTRY_FILE = 'worker-sources.json';
@@ -334,10 +334,30 @@ export class WorkerSourceRegistry {
 		return sources;
 	}
 
+	/**
+	 * Writes the registry atomically: a plain `writeFileSync` truncates the file before writing
+	 * its content, so a process killed mid-write (exactly what a `taskkill`'d worker or a crashed
+	 * daemon does) leaves a zero-byte or partial file -- which then fails every reader with a
+	 * JSON parse error until a human notices and deletes it by hand. Writing to a sibling temp
+	 * file first and renaming it into place avoids that: a rename is atomic on the same volume,
+	 * so a crash leaves either the old content or the new content, never a half-written file.
+	 */
 	private write(sources: WorkerSourceEntry[]): void {
 		mkdirSync(this.configDir, { recursive: true, mode: 0o700 });
 		const payload: RegistryFile = { sources };
-		writeFileSync(this.filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+		const tmpPath = `${this.filePath}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`;
+		writeFileSync(tmpPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+		try {
+			renameSync(tmpPath, this.filePath);
+		} catch (err) {
+			try {
+				unlinkSync(tmpPath);
+			} catch {
+				// Best effort -- the write already failed, and a leftover temp file is a smaller
+				// problem than losing the error that caused it.
+			}
+			throw err;
+		}
 	}
 }
 

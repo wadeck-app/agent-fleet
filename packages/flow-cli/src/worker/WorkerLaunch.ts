@@ -4,6 +4,7 @@ import type { McpServer, ShellStrategy, StepRunnerConfig } from 'flow-engine';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { VERSION } from '../cli/version';
 import type { WorkerReady } from '../ipc/Protocol';
 
 /** Longest gap between reconnection attempts, so a restarted daemon is found promptly. */
@@ -194,6 +195,9 @@ export function buildRegistration(params: {
 
 	return {
 		pid: params.pid,
+		// Self-reported so the daemon/admin tooling can see which build a worker is running
+		// without having to infer it from behaviour.
+		version: VERSION,
 		...(params.token !== undefined ? { authToken: params.token } : {}),
 		...(params.sourceId !== undefined ? { sourceId: params.sourceId } : {}),
 		labels: params.labels ?? [],

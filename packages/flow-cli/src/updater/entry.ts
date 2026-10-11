@@ -204,11 +204,21 @@ const logPathBeforeRun = updaterLogPath();
 const logSizeBeforeRun = logSize(logPathBeforeRun);
 const startedAt = Date.now();
 
+// Set by the daemon and the worker's self-update timer only (Daemon.ts, WorkerCommand.ts) --
+// both already re-invoke this entry point on their own schedule, at exactly checkIntervalMs, so
+// the cache.lastCheckedAt gate was skipping every other tick: the gate's threshold and the
+// caller's own interval beat against each other, which read as the check running every 2x
+// checkIntervalMs instead of every checkIntervalMs. A plain `flow <command>` invocation (which
+// has no schedule of its own and relies on the gate to not hit npm on every command) never sets
+// this, so the gate still applies there.
+const skipThrottle = process.env['UPDATER_SKIP_THROTTLE'] === '1';
+
 runUpdater({
 	pkgName: PKG_NAME,
 	configDir,
 	currentVersion,
 	strategy: 'without-daemon',
+	skipThrottle,
 	onUpdateAvailable: async (_newVersion: string) => {
 		try {
 			const portJson = readFileSync(join(configDir, 'config.port'), 'utf8');

@@ -1,5 +1,9 @@
+import { cacheFilePath, writeCache } from '@wadeck-app/shared-updater';
 import type { StepDistributionProvider, StepPlacement, WorkerAcceptanceProvider } from 'extension-points';
-import { describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 
 import { DefaultStepDistribution, DefaultWorkerAcceptance, type RoutingCandidate, StepRouter } from './StepRouter.js';
@@ -140,6 +144,89 @@ describe('DefaultStepDistribution', () => {
 		]);
 
 		expect(ordered.map(w => w.workerId)).toEqual(['first', 'second']);
+	});
+});
+
+// Passive preference for an idle worker already running the daemon's latest known
+// flow-cli version (D#TBD) -- never a gate, just the lowest-priority tie-break.
+describe('DefaultStepDistribution version preference', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'step-router-version-')));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	function seedLatestVersion(version: string): void {
+		writeCache(cacheFilePath(tmpDir), { lastCheckedAt: Date.now(), latestVersion: version });
+	}
+
+	it('prefers a candidate matching the cached latest version over an otherwise-equal one that does not', () => {
+		seedLatestVersion('1.2.0');
+		const distribution = new DefaultStepDistribution(tmpDir);
+
+		const ordered = distribution.order([
+			candidate('stale', { ephemeral: false, version: '1.1.0' }).worker,
+			candidate('current', { ephemeral: false, version: '1.2.0' }).worker,
+		]);
+
+		expect(ordered.map(w => w.workerId)).toEqual(['current', 'stale']);
+	});
+
+	// Never a gate: every candidate still comes back even when none of them is current.
+	it('falls back to the existing order when every idle candidate is stale', () => {
+		seedLatestVersion('1.2.0');
+		const distribution = new DefaultStepDistribution(tmpDir);
+
+		const ordered = distribution.order([
+			candidate('a', { ephemeral: false, version: '1.0.0' }).worker,
+			candidate('b', { ephemeral: false, version: '1.1.0' }).worker,
+		]);
+
+		expect(ordered.map(w => w.workerId)).toEqual(['a', 'b']);
+	});
+
+	it('leaves ordering unchanged when there is no updater cache yet', () => {
+		const distribution = new DefaultStepDistribution(tmpDir); // no cache file written
+
+		const ordered = distribution.order([
+			candidate('a', { ephemeral: false, version: '1.0.0' }).worker,
+			candidate('b', { ephemeral: false, version: '1.2.0' }).worker,
+		]);
+
+		expect(ordered.map(w => w.workerId)).toEqual(['a', 'b']);
+	});
+
+	// Lowest priority: registered-vs-forked (D#23) still wins even when the forked
+	// candidate happens to be current and the registered one stale.
+	it('never overrides the registered-before-forked priority already in order()', () => {
+		seedLatestVersion('1.2.0');
+		const distribution = new DefaultStepDistribution(tmpDir);
+
+		const ordered = distribution.order([
+			candidate('forked-current', { ephemeral: true, version: '1.2.0' }).worker,
+			candidate('registered-stale', { ephemeral: false, version: '1.0.0' }).worker,
+		]);
+
+		expect(ordered.map(w => w.workerId)).toEqual(['registered-stale', 'forked-current']);
+	});
+
+	// D#24: preference orders candidates, it never drops one.
+	it('keeps every candidate while applying the version preference', () => {
+		seedLatestVersion('1.2.0');
+		const distribution = new DefaultStepDistribution(tmpDir);
+
+		const ordered = distribution.order([
+			candidate('a', { ephemeral: false, version: '1.0.0' }).worker,
+			candidate('b', { ephemeral: false, version: '1.2.0' }).worker,
+			candidate('c', { ephemeral: false }).worker, // never reported a version
+		]);
+
+		expect(ordered).toHaveLength(3);
+		expect(ordered.map(w => w.workerId).sort()).toEqual(['a', 'b', 'c']);
 	});
 });
 

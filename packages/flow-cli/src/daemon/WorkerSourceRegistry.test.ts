@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -219,6 +219,28 @@ describe('WorkerSourceRegistry - malformed state', () => {
 		writeFileSync(join(dir, 'worker-sources.json'), '{"sources": "nope"}', 'utf8');
 
 		expect(() => new WorkerSourceRegistry(dir).list()).toThrow(/worker-sources\.json/);
+	});
+});
+
+describe('WorkerSourceRegistry - atomic write', () => {
+	// A plain writeFileSync truncates the file before writing its content, so a process killed
+	// mid-write (a taskkill'd worker, a crashed daemon) leaves a zero-byte file that then fails
+	// every reader with a JSON parse error. Writing to a temp file and renaming it into place
+	// means a write either fully lands or the previous content survives untouched.
+	it('leaves no temp file behind after a successful write', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		registry.declare({ sourceId: 'laptop', provider: 'built-in:inbound', labels: [], maxWorkers: 1 });
+
+		const files = readdirSync(dir);
+		expect(files).toEqual(['worker-sources.json']);
+	});
+
+	it('does not corrupt the existing file if a later write never happens', () => {
+		const registry = new WorkerSourceRegistry(dir);
+		registry.declare({ sourceId: 'laptop', provider: 'built-in:inbound', labels: [], maxWorkers: 1 });
+
+		// Reading again (no write in between) must still see exactly what was written.
+		expect(new WorkerSourceRegistry(dir).list().map(e => e.sourceId)).toEqual(['laptop']);
 	});
 });
 

@@ -4,8 +4,7 @@
 	"private": true,
 	"type": "module",
 	"bin": {
-		"flow": "./bin/flow.js",
-		"task": "./bin/task.js"
+		"flow": "./bin/flow.js"
 	},
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
@@ -23,7 +22,7 @@
 		"bundle": "tsx ci/scripts/bundle.ts"
 	},
 	"dependencies": {
-		"@wadeck-app/shared-cli": "^2026.10.3-035-1e4adce3",
+		"@wadeck-app/shared-cli": "^2026.10.10-036-4b70545a",
 		"@wadeck-app/shared-updater": "latest",
 		"@wadeck-app/singleton-daemon-kit": "latest",
 		"commander": "^12.1.0",

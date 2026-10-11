@@ -126,6 +126,16 @@ describe('WorkerRegistry - registration metadata', () => {
 		expect(info?.shellCapabilities).toEqual(['bash', 'cmd']);
 	});
 
+	// Part 1 of the version-reporting plan: the worker's self-reported version is stored
+	// as-is, so the daemon can see which build is connected.
+	it('records the version the worker reported', () => {
+		const registry = new WorkerRegistry();
+		const ws = fakeWorker();
+		registry.register(ws, { pid: 1, version: '2026.10.10-120000-42-abcd1234' });
+
+		expect(registry.describe(ws)?.version).toBe('2026.10.10-120000-42-abcd1234');
+	});
+
 	// Defaults are documented, not inferred: a worker that claims nothing is headless,
 	// unlabelled and attached to nothing until it says otherwise.
 	it('defaults labels, projects and shellCapabilities to empty and hasUserInterface to false', () => {
@@ -198,6 +208,7 @@ describe('WorkerRegistry - summarize', () => {
 			ws,
 			{
 				pid: 4242,
+				version: '2026.10.10-120000-42-abcd1234',
 				sourceId: 'laptop',
 				labels: ['gpu'],
 				attachedProjects: ['C:/proj'],
@@ -209,6 +220,7 @@ describe('WorkerRegistry - summarize', () => {
 
 		const [summary] = registry.summarize();
 		expect(summary?.pid).toBe(4242);
+		expect(summary?.version).toBe('2026.10.10-120000-42-abcd1234');
 		expect(summary?.sourceId).toBe('laptop');
 		expect(summary?.labels).toEqual(['gpu']);
 		expect(summary?.attachedProjects).toEqual(['C:/proj']);
@@ -217,6 +229,15 @@ describe('WorkerRegistry - summarize', () => {
 		expect(summary?.ephemeral).toBe(false);
 		expect(summary?.workerId).toBe(registry.describe(ws)?.workerId);
 		expect(summary?.shellCapabilities).toEqual(['pwsh']);
+	});
+
+	// `minimal` reports no version, mirroring a worker on an older build that predates
+	// self-reporting -- the field must simply be absent, not a fabricated default.
+	it('omits version from the summary when the worker did not report one', () => {
+		const registry = new WorkerRegistry();
+		registry.register(fakeWorker(), minimal);
+
+		expect(registry.summarize()[0]?.version).toBeUndefined();
 	});
 
 	it('defaults shellCapabilities to empty in the summary when none was declared', () => {

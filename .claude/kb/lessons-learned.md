@@ -6453,3 +6453,100 @@ pipeline until both forwarding points were fixed -- isolated-unit-test passing i
 the daemon pipeline carries a new env var; always verify through the daemon too.
 Generalized `WindowsDaemonEnv.ts`'s PATH-forwarding into a `PASSTHROUGH_ENV_VARS` list instead
 of another one-off line, specifically so a fourth var doesn't repeat this.
+
+### opencode pops a visible console window on Windows through flow's daemon/worker chain
+
+**Problem:** A standalone `opencode run` per step, launched through flow's daemon/worker chain on
+Windows, pops a visible console window when opencode spawns its own shell-tool subprocess.
+**Fix:** Set `OPENCODE_ATTACH_URL` on the step/flow env to point at a pre-started `opencode
+serve` instance instead of spawning a standalone `opencode run` per step -- confirmed twice
+through the real daemon/worker pipeline to produce zero windows. Already supported by
+`OpenCodeModelProvider` today; no flow-engine change needed, this is a usage pattern.
+**Context:** Not a flow-engine bug: `CodexModelProvider`'s spawn options are byte-identical to
+`OpenCodeModelProvider`'s on the same daemon/worker path, and codex never pops a window there --
+so the window allocation happens inside opencode's own binary when it spawns its shell tool with
+no console to inherit. The attach-mode mitigation is also faster (4-8s vs 10-14s) and avoids an
+unrelated npm.ps1/$LASTEXITCODE PowerShell error that standalone spawns hit.
+
+**SUPERSEDED (2026-10-04) -- see the entry immediately below.** "unrelated npm.ps1 error" above
+was wrong: it's the same bug, not a second one. Root cause found: a missing `PATHEXT` env var,
+fixed directly in `OpenCodeModelProvider.ts` (commit `eb504667`). The `OPENCODE_ATTACH_URL`
+workaround above still works but is no longer necessary -- standalone `opencode run` per step no
+longer pops a window either, post-fix.
+
+### Root cause of the opencode window popup: missing PATHEXT, not opencode's binary, not console inheritance (2026-10-04)
+
+**Problem (same symptom as above, real root cause this time):** `OpenCodeModelProvider`'s
+`infraEnv` allowlist (`PATH`, `HOME`, `USERPROFILE`, `SystemRoot` only -- `OpenCodeModelProvider.ts:229-234`)
+was missing `PATHEXT`. Without it, resolving a bare non-`.exe` command inside opencode's bash
+tool (`npm` -> `npm.ps1` on this machine) breaks PowerShell's own session init: `$LASTEXITCODE`
+never gets set (`RuntimeException: VariableIsUndefined` inside `npm.ps1`), and the same broken
+resolution path pops a new, visible console. One root cause, two symptoms -- the PowerShell
+error was never "unrelated," it was the other half of the same bug.
+
+**Fix:** add `PATHEXT` to that allowlist. One line, `OpenCodeModelProvider.ts`, commit
+`eb504667`. Confirmed via a real-worker before/after: same flow (`diag_min_bash.yml`, prompt
+`npm --version` via bash), same `terminal-*` worker, before the fix -> PowerShell error + window;
+after the fix (CI-published, `flow cli update`'d, worker restarted) -> clean `11.6.2` output, no
+window.
+
+**Why this was hard to find -- two false leads chased first, both initially plausible:**
+
+1. **"It's opencode's own binary"** (the superseded conclusion above). Looked solid: codex has
+   byte-identical spawn options (`windowsHide:true`, same narrow env, confirmed by reading both
+   providers' code) on the identical daemon/worker chain, and never pops a window. But "same env,
+   different binary behavior" was read as "must be the binary's fault" without checking whether
+   codex's own narrow env was *also* missing something that happened not to matter for codex's
+   internal command resolution. It was -- codex is missing `PATHEXT` too, and is simply not
+   vulnerable to it, for reasons inside codex's own binary, not flow's code. Different root
+   cause, same missing env var, no bug on codex's side.
+2. **Console-inheritance theory** (the general Windows-Terminal-tab mechanism documented in the
+   "Windows Terminal Default Terminal" entry above, `d032e7e`/`b2bca73`). A standalone
+   minimal-repro script using the exact documented production spawn options (`windowsHide:true`,
+   VBS-rooted hidden-console ancestor, matching the daemon's own launch mechanism) **failed to
+   reproduce the bug twice** -- same flag, same console-inheritance shape, no window. That
+   negative result is what forced questioning the general theory for this *specific* bug, rather
+   than concluding the repro script was simply wrong somehow. Lesson: two bugs can look
+   identical (a popping console window) and share surface-level conditions (same spawn flags,
+   same daemon/worker chain) while having completely different, unrelated root causes. Confirming
+   a mechanism for bug A does not mean bug B -- which merely looks the same -- shares it. Always
+   re-derive the specific mechanism for the specific bug, even when a textbook-plausible
+   explanation already exists elsewhere in this file.
+
+**Method that actually found it -- controlled single-variable bisection, not more theorizing:**
+
+1. Reproduced the known-buggy production spawn (`windowsHide:true`, `npm --version` prompt) in a
+   **standalone script** passing the **full** environment -- no window. This was the pivotal
+   negative result: production's env is *not* the full environment (verified by reading
+   `buildSpawnParams()` directly), so a full-env repro that doesn't fail while production does is
+   itself informative, not just an inconclusive miss.
+2. Swapped to the **exact production narrow allowlist** (`PATH`/`HOME`/`USERPROFILE`/`SystemRoot`
+   only), same script, same prompt, same flag -- **window reproduced**, with the identical
+   PowerShell error signature as the real repro. Single-variable, controlled, reproducible: env
+   content, nothing else, flips the result.
+3. Bisected forward from that narrow baseline, one candidate at a time, isolated (not stacked):
+   `TEMP`/`TMP` -- ruled out. `ComSpec` -- ruled out. `PSModulePath` -- ruled out. Combined
+   `windir`+`PATHEXT`+`PROCESSOR_ARCHITECTURE` together -- fixed it. Bisected within that set:
+   `windir` alone -- ruled out. `PROCESSOR_ARCHITECTURE` alone -- ruled out. `PATHEXT` alone --
+   fixed it, confirmed twice (once via the PowerShell-error log as a fast proxy, once with a
+   human watching the screen directly).
+4. **Used the PowerShell `$LASTEXITCODE` error as a reliable proxy for the window** once the
+   correlation was established (every test where the error appeared, the window appeared; every
+   test where it didn't, no window) -- let most of the bisection run unattended via log output
+   alone, reserving visual confirmation for the final candidate and the final real-worker
+   validation. Significant speed-up once the proxy was trustworthy; would have been premature to
+   rely on it before the correlation was established across several independent tests.
+5. **Final validation went through the user's actual running `flow worker`, not another
+   standalone script** -- every standalone-script result up to that point was still only
+   suggestive of the real worker's behavior (different env, different bootstrap, never actually
+   verified identical). Reproduced the bug once live through the real worker (before the fix),
+   then re-ran the identical flow through the identical worker after a full real deploy cycle
+   (commit, push, CI build+publish, `flow cli update`, worker restart) -- not a shortcut, since
+   `flow-cli`/`flow-engine` are consumed by the global `flow` command as published packages, not
+   live from repo source.
+
+**Scope:** this fix is specific to `OpenCodeModelProvider`. Does not apply to Codex (same narrow
+env, same `windowsHide:true`, demonstrably not vulnerable to this exact failure) or Claude
+(`ClaudeLauncher.ts` never sets `windowsHide` at all -- a different, already-shipped fix, guarded
+by `ClaudeLauncher.windows-console.test.ts`). Three providers, three different states for what
+looked like one shared bug.

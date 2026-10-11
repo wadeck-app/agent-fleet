@@ -90,6 +90,8 @@ export type DaemonResponse =
 export interface WorkerSummary {
 	workerId: string;
 	pid: number;
+	/** flow-cli version this worker process is running, as self-reported on registration. */
+	version?: string;
 	state: 'idle' | 'busy';
 	sourceId?: string;
 	labels: string[];
@@ -216,6 +218,8 @@ export interface WorkerReady {
 	 * has no PID the daemon can recognise, which is why `authToken` exists (T-01).
 	 */
 	pid: number;
+	/** flow-cli version this worker process is running, as reported by its own `VERSION` constant. */
+	version?: string;
 	/** Credential presented by the worker. Verified by the S7 implementation (Phase 2a). */
 	authToken?: string;
 	/** The WorkerSource that produced this worker, for provenance in the audit trail (T-06). */

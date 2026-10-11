@@ -1,3 +1,5 @@
+import { ConfigDir } from '@wadeck-app/shared-cli';
+import { cacheFilePath, readCache } from '@wadeck-app/shared-updater';
 import type {
 	StepDistributionProvider,
 	StepPlacement,
@@ -56,10 +58,48 @@ export class DefaultWorkerAcceptance implements WorkerAcceptanceProvider {
  * (D#24).
  */
 export class DefaultStepDistribution implements StepDistributionProvider {
+	/**
+	 * @param configDir - where this daemon's updater cache lives. Defaults to the real
+	 *        `flow` config dir (`ConfigDir.get('flow')`) so production needs no wiring; a
+	 *        test passes its own tmp dir to control what `readLatestVersion` sees without
+	 *        touching the developer's real cache file.
+	 */
+	constructor(private readonly configDir: string = ConfigDir.get('flow')) {}
+
 	order(candidates: WorkerCandidate[]): WorkerCandidate[] {
-		const registered = candidates.filter(candidate => !candidate.ephemeral);
-		const forked = candidates.filter(candidate => candidate.ephemeral);
+		const registered = this.preferUpToDate(candidates.filter(candidate => !candidate.ephemeral));
+		const forked = this.preferUpToDate(candidates.filter(candidate => candidate.ephemeral));
 		return [...registered, ...forked];
+	}
+
+	/**
+	 * Lowest-priority tie-break, applied only *within* a group the criteria above already
+	 * treat as equal (registered vs. forked) -- never across them, so it can only reorder
+	 * candidates that were already interchangeable.
+	 *
+	 * A candidate whose self-reported `version` matches this daemon's own idea of the
+	 * latest `flow-cli` (its updater cache, kept fresh by the daemon's own periodic
+	 * check -- see `Daemon.ts`) sorts first within the group. Pure preference, not a gate
+	 * (D#24): every candidate is still returned, in every case, including when the latest
+	 * version is unknown (no cache yet) or when every candidate in the group is stale --
+	 * waiting for a worker to self-restart must never block or shrink dispatch.
+	 */
+	private preferUpToDate(group: WorkerCandidate[]): WorkerCandidate[] {
+		const latestVersion = this.readLatestVersion();
+		if (latestVersion === undefined) return group;
+
+		const versioned = group as (WorkerCandidate & { version?: string })[];
+		const upToDate = versioned.filter(candidate => candidate.version === latestVersion);
+		if (upToDate.length === 0 || upToDate.length === versioned.length) return group;
+
+		const stale = versioned.filter(candidate => candidate.version !== latestVersion);
+		return [...upToDate, ...stale];
+	}
+
+	/** This daemon's own idea of the latest `flow-cli` version, or undefined when unknown. */
+	private readLatestVersion(): string | undefined {
+		const cache = readCache(cacheFilePath(this.configDir));
+		return cache?.latestVersion ?? undefined;
 	}
 }
 

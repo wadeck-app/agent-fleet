@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { VERSION } from '../cli/version.js';
 import {
 	buildRegistration,
 	buildStepRunnerConfig,
@@ -97,6 +98,14 @@ describe('buildRegistration', () => {
 		const reg = buildRegistration({ projectRoot: 'C:/proj', isTty: false, canPrompt: false, pid: 7 });
 
 		expect(reg.attachedProjects).toEqual(['C:/proj']);
+	});
+
+	// Part 1 of the version-reporting plan: the daemon/admin tooling needs to see which build a
+	// worker is running without inferring it from behaviour.
+	it('reports the running flow-cli version', () => {
+		const reg = buildRegistration({ projectRoot: 'C:/proj', isTty: false, canPrompt: false, pid: 7 });
+
+		expect(reg.version).toBe(VERSION);
 	});
 
 	it('adds explicitly requested projects without dropping the launch one', () => {

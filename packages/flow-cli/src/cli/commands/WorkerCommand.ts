@@ -1,9 +1,13 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
+import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
+import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
+import { cacheFilePath, readCache, readUpdateConfig, semverLte } from '@wadeck-app/shared-updater';
 import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import type { ApprovalProvider } from 'extension-points';
 import { StepRunner } from 'flow-engine';
+import { spawn } from 'node:child_process';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
 
@@ -40,6 +44,7 @@ import {
 	withFreshToken,
 } from '../../worker/WorkerLaunch';
 import { describeNoLiveWorkers } from '../../worker/WorkerListing';
+import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 import { VERSION } from '../version.js';
 
 // violations-suppress-end: ts/no-deep-relative
@@ -56,6 +61,69 @@ interface WorkerOptions {
 function parseLabels(raw: string | undefined): string[] {
 	if (raw === undefined || raw.trim() === '') return [];
 	return raw.split(',').map(label => label.trim());
+}
+
+/**
+ * Mutable busy flag shared between step execution and the self-update timer (see `runWorker`).
+ *
+ * Set to `true`/`false` only around the `adapter.execute()` call in `handleMessage`'s
+ * `'assign'` case -- that is the sole place a worker is actually doing anything that a
+ * self re-exec must wait out.
+ */
+interface BusyTracker {
+	busy: boolean;
+	/**
+	 * Called once, right after `busy` flips back to `false` -- lets a version bump detected
+	 * mid-step act the moment the step finishes, instead of waiting for the next periodic
+	 * check (which could be minutes away).
+	 */
+	onIdle: () => void;
+}
+
+/**
+ * Explicit CLI args to relaunch this worker with the exact same identity it was started
+ * with (Part 2 of worker auto-update, see WorkerCommand's self re-exec).
+ *
+ * Built from the already-resolved values at the top of `runWorker` rather than left to be
+ * re-derived from environment variables on the new process: `FLOW_WORKER_TOKEN`/
+ * `FLOW_WORKER_SOURCE_ID`/`FLOW_WORKER_PROJECTS` could have been rotated or cleared between
+ * the two processes, and a respawned worker silently joining under a different identity
+ * would be far harder to notice than a worker that fails to start at all.
+ */
+export function buildReExecArgs(params: {
+	sourceId: string | undefined;
+	token: string;
+	extraProjects: string[];
+	labels: string[];
+	verbose: boolean;
+	interactive: boolean;
+}): string[] {
+	const args: string[] = [];
+	if (params.sourceId !== undefined) args.push('--source', params.sourceId);
+	args.push('--token', params.token);
+	for (const project of params.extraProjects) args.push('--project', project);
+	if (params.labels.length > 0) args.push('--labels', params.labels.join(','));
+	if (params.verbose) args.push('--verbose');
+	if (params.interactive) args.push('--interactive');
+	return args;
+}
+
+/**
+ * Whether a cached `latestVersion` should trigger this worker's self re-exec.
+ *
+ * `lastHandledVersion` is what makes repeated calls idempotent: without it, every periodic
+ * check after the first one to see the same cached `latestVersion` would re-trigger the
+ * same re-exec attempt. Version comparison is delegated to `semverLte` (shared-updater) --
+ * it already handles both this project's calver scheme and plain semver, so it is reused
+ * rather than re-implemented here.
+ */
+export function isNewerVersionAvailable(
+	currentVersion: string,
+	latestVersion: string | null,
+	lastHandledVersion: string | undefined
+): boolean {
+	if (latestVersion === null || latestVersion === lastHandledVersion) return false;
+	return !semverLte(latestVersion, currentVersion);
 }
 
 /**
@@ -203,7 +271,8 @@ function registerListCommand(worker: Command): void {
 				}
 				for (const w of workers) {
 					const labels = w.labels.length > 0 ? w.labels.join(',') : '-';
-					const shells = w.shellCapabilities && w.shellCapabilities.length > 0 ? w.shellCapabilities.join(',') : '-';
+					const shells =
+						w.shellCapabilities && w.shellCapabilities.length > 0 ? w.shellCapabilities.join(',') : '-';
 					const origin = w.ephemeral ? 'daemon-forked' : (w.sourceId ?? 'external');
 					console.log(
 						`${w.workerId}\t${w.state}\tpid=${String(w.pid)}\t${origin}\tlabels=${labels}\tshells=${shells}\tinteractive=${String(w.hasUserInterface)}`
@@ -342,9 +411,12 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	// the projects are resolved the same way the credential already was.
 	const sourceId = resolveSourceId(options.source);
 	const token = resolveWorkerToken({ token: options.token, sourceId }, daemonDir);
+	// Captured once, rather than re-resolved later from (possibly rotated/cleared) env vars:
+	// the self re-exec below must relaunch with the exact same identity this process has now.
+	const extraProjects = resolveExtraProjects(options.project);
 	const registration = buildRegistration({
 		projectRoot,
-		extraProjects: resolveExtraProjects(options.project),
+		extraProjects,
 		isTty: process.stdout.isTTY === true,
 		canPrompt: approvalProvider !== undefined,
 		...(approvalProvider?.requiresTerminal !== undefined
@@ -418,11 +490,97 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		console.log(`     registry   : declared as "${declaration.sourceId}" while this process lives`);
 	}
 
-	// Single cleanup: removes the registry entry and stops the nudge server together.
-	releaseOnExit(() => {
+	// Named (not inline) so the self re-exec path below can also run it directly, outside the
+	// process.on('exit'/SIGINT/SIGTERM) handlers releaseOnExit installs.
+	const cleanup = (): void => {
 		declaration?.release();
 		nudgeServer.stop();
-	});
+		clearInterval(selfUpdateTimer);
+	};
+	releaseOnExit(cleanup);
+
+	// --- Periodic self-check + self re-exec (worker auto-update, Part 2) -------------------
+	//
+	// This worker is long-lived (D#51) and never restarted by anything else, so it is
+	// responsible for noticing its own staleness. Background update checks/downloads are
+	// re-triggered on the same cadence `flow`'s own CLI commands use (readUpdateConfig's
+	// checkIntervalMs); once a newer build lands on disk (UpdateManager's cache file), this
+	// process relaunches itself with the exact args it was started with and exits cleanly so
+	// the daemon sees an ordinary disconnect, not a crash.
+	const busyTracker: BusyTracker = {
+		busy: false,
+		// A version bump noticed while a step is running must not interrupt it; this fires the
+		// moment handleMessage's 'assign' case flips `busy` back to false, instead of waiting
+		// for the next periodic tick (which could be minutes away).
+		onIdle: () => maybeReExec(),
+	};
+	let lastHandledVersion: string | undefined;
+	let pendingReExec = false;
+	const bundlePath = resolveOwnBundlePath(FLOW_BUNDLE_NAME, fileURLToPath(import.meta.url));
+
+	const reExecAndExit = (): void => {
+		const scriptPath = process.argv[1];
+		if (scriptPath === undefined) {
+			// Fail loudly rather than silently skipping the re-exec: a worker that detected an
+			// update and then quietly never relaunched would look identical to one with nothing
+			// to do, and the operator would have no idea why it never picked up the new build.
+			throw new Error(
+				'Cannot self re-exec: process.argv[1] is unset. This worker was not launched as a normal "node <script> worker ..." process.'
+			);
+		}
+		const args = buildReExecArgs({
+			sourceId,
+			token,
+			extraProjects,
+			labels: registration.labels ?? [],
+			verbose: options.verbose === true,
+			interactive: options.interactive === true,
+		});
+		// stdio:'ignore' only -- deliberately NOT detached/windowsHide. Either flag strips the
+		// console handle (CREATE_NO_WINDOW / DETACHED_PROCESS), and this respawned worker will
+		// itself go on to launch shell/model-CLI subprocesses that AllocConsole() when they find
+		// none attached, popping a visible console window (regression fixed multiple times
+		// already: d032e7e, b2bca73, d9af4d67). It must inherit this process's console exactly
+		// like ForkWorkerSource.obtainWorker() does for daemon-forked workers.
+		spawn(process.execPath, [scriptPath, 'worker', ...args], { stdio: 'ignore' }).unref();
+		cleanup();
+		process.exit(0);
+	};
+
+	const maybeReExec = (): void => {
+		if (!pendingReExec || busyTracker.busy) return;
+		pendingReExec = false;
+		reExecAndExit();
+	};
+
+	const checkForNewerVersion = (): void => {
+		const cache = readCache(cacheFilePath(daemonDir));
+		const latestVersion = cache?.latestVersion ?? null;
+		if (!isNewerVersionAvailable(VERSION, latestVersion, lastHandledVersion)) return;
+		// Recorded before busy is even checked: a second tick seeing the same cached version
+		// while still busy must not re-arm a second pending re-exec (idempotency).
+		lastHandledVersion = latestVersion ?? undefined;
+		pendingReExec = true;
+		maybeReExec();
+	};
+
+	const updateConfig = readUpdateConfig(daemonDir);
+	// Re-arming at exactly checkIntervalMs used to beat against shared-updater's own
+	// cache.lastCheckedAt gate (same threshold, so the check finishing a few seconds after each
+	// tick made the next tick land a hair short of the gate -- it skipped every other tick,
+	// silently halving the real cadence). UPDATER_SKIP_THROTTLE tells the spawned updater this
+	// caller already owns its schedule, so the gate is not needed on top of it.
+	process.env['UPDATER_SKIP_THROTTLE'] = '1';
+	const updateManager = new UpdateManager('@wadeck-app/flow-cli');
+	const selfUpdateTimer = setInterval(() => {
+		// Has its own locking; safe to call on every tick even if a previous download is
+		// still in flight or just finished.
+		updateManager.scheduleBackgroundUpdate(bundlePath, 'flow-updater.cjs');
+		checkForNewerVersion();
+	}, updateConfig.checkIntervalMs);
+	// Never the sole reason this process stays alive: the WS connection, nudge server, and (for
+	// an interactive terminal) stdin already do that job, so this timer does not need to.
+	selfUpdateTimer.unref();
 
 	const display = new WorkerDisplay(options.verbose === true ? 'verbose' : 'summary');
 	const notifiers: ReconnectNotifier[] = [new DaemonWatchNotifier(daemonDir), nudgeServer];
@@ -436,7 +594,8 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		approvalProvider,
 		notifiers,
 		() => resolveWorkerToken({ token: options.token, sourceId }, daemonDir),
-		options.interactive === true
+		options.interactive === true,
+		busyTracker
 	);
 
 	// Accept typed input when the terminal is interactive: lines are echoed as notes so the
@@ -511,7 +670,9 @@ function connect(
 	/** Re-read on every attempt: the daemon rotates its own token each time it starts. */
 	resolveToken: () => string,
 	/** `--interactive`: see {@link buildStepRunnerConfig}. Independent of `approvalProvider`. */
-	interactive: boolean
+	interactive: boolean,
+	/** Shared across reconnects (see runWorker): a step in flight across a reconnect is still busy. */
+	busyTracker: BusyTracker
 ): void {
 	let wsUrl: string;
 	if (wsUrlOverride !== undefined) {
@@ -531,7 +692,8 @@ function connect(
 				approvalProvider,
 				notifiers,
 				resolveToken,
-				interactive
+				interactive,
+				busyTracker
 			);
 			return;
 		}
@@ -559,7 +721,7 @@ function connect(
 			report('[warn]', `ignored an unparseable daemon message: ${String(err)}`);
 			return;
 		}
-		void handleMessage(message, adapter, send, registration, display);
+		void handleMessage(message, adapter, send, registration, display, busyTracker);
 	});
 
 	ws.on('error', (err: Error) => {
@@ -579,7 +741,8 @@ function connect(
 			approvalProvider,
 			notifiers,
 			resolveToken,
-			interactive
+			interactive,
+			busyTracker
 		);
 	});
 }
@@ -595,7 +758,9 @@ function scheduleReconnect(
 	/** Re-read on every attempt: the daemon rotates its own token each time it starts. */
 	resolveToken: () => string,
 	/** `--interactive`: see {@link buildStepRunnerConfig}. Independent of `approvalProvider`. */
-	interactive: boolean
+	interactive: boolean,
+	/** Shared across reconnects (see runWorker): a step in flight across a reconnect is still busy. */
+	busyTracker: BusyTracker
 ): void {
 	// Three ways to learn the daemon is back, whichever arrives first:
 	// 1. An HTTP nudge from the daemon (NudgeServer): delivers the wsUrl directly, works remotely.
@@ -621,7 +786,8 @@ function scheduleReconnect(
 			approvalProvider,
 			notifiers,
 			resolveToken,
-			interactive
+			interactive,
+			busyTracker
 		);
 	};
 
@@ -636,7 +802,8 @@ async function handleMessage(
 	adapter: WorkerAdapter,
 	send: (message: WorkerToDaemon) => void,
 	registration: Omit<import('../../ipc/Protocol').WorkerReady, 'type'>,
-	display: WorkerDisplay
+	display: WorkerDisplay,
+	busyTracker: BusyTracker
 ): Promise<void> {
 	switch (message.type) {
 		case 'assign': {
@@ -659,6 +826,9 @@ async function handleMessage(
 			// disconnect as a failure rather than replaying the step (D#65). Closing this
 			// terminal before a step starts therefore costs the flow nothing.
 			sendForAssignment({ type: 'step_started', executionId: executionContext.executionId, stepId });
+			// This is the only place busy state changes (see runWorker's self-update timer):
+			// true for the whole execute() call, false again no matter how it ends.
+			busyTracker.busy = true;
 			try {
 				const { output, meta } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
 				sendForAssignment({
@@ -680,7 +850,12 @@ async function handleMessage(
 					output,
 				});
 				display.stepFailed(stepId, error, Date.now() - startedAt);
+			} finally {
+				busyTracker.busy = false;
 			}
+			// A version bump detected mid-step is only acted on now, right as the worker goes
+			// idle again -- not on the next periodic tick, which could be minutes away.
+			busyTracker.onIdle();
 			// No credential refresh here: this socket is already authenticated, and re-reading a
 			// token mid-connection would only matter if the daemon re-checked it, which it does not.
 			send({ type: 'ready', ...registration });

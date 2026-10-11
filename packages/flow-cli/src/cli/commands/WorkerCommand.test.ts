@@ -4,6 +4,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { VERSION } from '../version.js';
+import { registerWorkerCommand } from './WorkerCommand';
+
 // Mutable so individual tests (the opencode-env-defaults ones) can hand runWorker a config with
 // an `opencode` section, while the startup-banner/list/update tests keep the plain default.
 const hoistedState = vi.hoisted(() => ({
@@ -96,8 +99,24 @@ vi.mock('ws', () => ({
 	},
 }));
 
-import { registerWorkerCommand } from './WorkerCommand';
-import { VERSION } from '../version.js';
+// These tests never advance past startup, so the self-update timer (see WorkerCommand's
+// runWorker) never actually ticks -- but it still runs setup synchronously on every runWorker()
+// call, which would otherwise read/write the real, machine-specific ~/.config/flow directory.
+vi.mock('@wadeck-app/shared-updater', () => ({
+	readUpdateConfig: () => ({ channel: 'stable', checkIntervalMs: 24 * 60 * 60 * 1000, disabled: false }),
+	readCache: () => null,
+	cacheFilePath: (dir: string) => `${dir}/update-cache.json`,
+	semverLte: (a: string, b: string) => a <= b,
+}));
+vi.mock('@wadeck-app/shared-cli', async importOriginal => {
+	const actual = await importOriginal<typeof import('@wadeck-app/shared-cli')>();
+	return {
+		...actual,
+		UpdateManager: class {
+			scheduleBackgroundUpdate(): void {}
+		},
+	};
+});
 
 describe('WorkerCommand verbose startup banner', () => {
 	let consoleLogSpy: ReturnType<typeof vi.spyOn>;
@@ -298,7 +317,17 @@ describe('flow worker update', () => {
 		program.addCommand(workerCommand);
 		freshRegisterWorkerCommand(workerCommand);
 
-		await program.parseAsync(['node', 'test', 'worker', 'update', 'w1', '--labels', 'npm', '--shells', 'bash,pwsh']);
+		await program.parseAsync([
+			'node',
+			'test',
+			'worker',
+			'update',
+			'w1',
+			'--labels',
+			'npm',
+			'--shells',
+			'bash,pwsh',
+		]);
 
 		expect(send).toHaveBeenCalledWith('updateWorker', {
 			workerId: 'w1',
