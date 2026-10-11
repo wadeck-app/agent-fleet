@@ -313,6 +313,23 @@ export async function executeModelStep(
 				return stepTrace;
 			}
 
+			// Exit 0 with no text and zero metered tokens means nothing happened -- a legitimate
+			// tool-call-only turn still meters tokens for that turn, so this only catches a
+			// provider that silently produced nothing, not "no final text". Only checked when
+			// `streamJson` is active: capturedInputTokens/capturedOutputTokens are populated
+			// exclusively inside onStreamEvent, which is itself gated on `streamJson` (see
+			// launchOptions above) -- with streamJson:false they are always 0 regardless of real
+			// success, which would otherwise fail every non-streaming step with legitimately
+			// empty stdout (see diag_terra_stability.yml execution 77vx3aqo for the streaming case
+			// this guards against).
+			if (streamJson) {
+				const noResponseText = responseText == null || responseText.trim() === '';
+				if (noResponseText && capturedInputTokens === 0 && capturedOutputTokens === 0) {
+					stepTrace.error = `${providerLabel} exited 0 but produced no output and metered zero tokens -- treating as a failure instead of a silent empty success`;
+					return stepTrace;
+				}
+			}
+
 			stepTrace.outputs = outputExtractor.extract(responseText, step.output, step.id, {
 				rawOutput: responseText,
 				response: responseText,

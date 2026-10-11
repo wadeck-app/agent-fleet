@@ -1230,6 +1230,100 @@ describe('StepRunner', () => {
 			expect(meta.cost.cache_write_tokens).toBe(0);
 		});
 
+		it('model step fails when the provider exits 0 but produces no text and meters zero tokens', async () => {
+			// Reproduces execution 77vx3aqo (diag_terra_stability.yml): a provider that exits 0
+			// having emitted no text and metered no tokens must not be recorded as `completed`.
+			const step: ModelFlowStep = {
+				id: 'model-step-empty',
+				name: 'Model',
+				type: 'model',
+				model: 'terra',
+				prompt: 'hello',
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
+
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async opts => {
+				if (opts.onStreamEvent) {
+					opts.onStreamEvent({
+						type: 'result',
+						subtype: 'result',
+						data: { result: '', total_cost_usd: 0, duration_ms: 11800 },
+					} as any);
+				}
+				return { stdout: '', stderr: '', exitCode: 0 };
+			});
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			expect(trace.error).toBeDefined();
+			expect(trace.error).toContain('zero tokens');
+			expect(trace.outputs).toBeUndefined();
+		});
+
+		it('model step succeeds with empty text when tokens were metered (tool-only turn)', async () => {
+			// A step that only emits tool calls has no final text, but a real turn still
+			// meters tokens -- must not be caught by the empty-output guard above.
+			const step: ModelFlowStep = {
+				id: 'model-step-tool-only',
+				name: 'Model',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'hello',
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
+
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async opts => {
+				if (opts.onStreamEvent) {
+					opts.onStreamEvent({
+						type: 'result',
+						subtype: 'result',
+						data: {
+							result: '',
+							total_cost_usd: 0.0002,
+							duration_ms: 500,
+							modelUsage: { haiku: { inputTokens: 20, outputTokens: 8 } },
+						},
+					} as any);
+				}
+				return { stdout: '', stderr: '', exitCode: 0 };
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: '' });
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			expect(trace.error).toBeUndefined();
+		});
+
+		it('model step with streamJson:false and empty stdout succeeds (zero-token check is skipped)', async () => {
+			// capturedInputTokens/capturedOutputTokens are only ever populated inside
+			// onStreamEvent, which only fires when streamJson is active -- with streamJson:false
+			// they are always 0 regardless of real success, so the guard above must not apply
+			// here, or every non-streaming step with legitimately empty stdout would fail.
+			const nonStreamingRunner = new StepRunner({ interactive: false, executionConfig: { streamJson: false } });
+			const step: ModelFlowStep = {
+				id: 'model-step-no-stream',
+				name: 'Model',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'hello',
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
+
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockResolvedValue({
+				stdout: '',
+				stderr: '',
+				exitCode: 0,
+			});
+			vi.mocked(OutputExtractor.prototype.extract).mockReturnValue({ response: '' });
+
+			const trace = await nonStreamingRunner.executeStep(step, testWorkspace, context);
+
+			expect(trace.error).toBeUndefined();
+		});
+
 		it('model step resolves session_file from memory_paths.auto in system:init event', async () => {
 			const step: ModelFlowStep = {
 				id: 'model-step',
