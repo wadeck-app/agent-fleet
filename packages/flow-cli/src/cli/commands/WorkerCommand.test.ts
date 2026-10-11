@@ -223,6 +223,137 @@ describe('flow worker list — shells column', () => {
 		expect(allOutput).toContain('shells=bash,pwsh');
 		expect(allOutput).toContain('shells=-');
 	});
+
+	// So the operator can tell which build each connected worker is actually running
+	// (relevant when some have not yet picked up a self-update) directly from the list,
+	// without cross-referencing each worker's own startup banner.
+	it('includes a version= column reflecting each worker self-reported version', async () => {
+		vi.resetModules();
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
+			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
+			createDaemonClient: () => ({
+				send: async () =>
+					Promise.resolve([
+						{
+							workerId: 'w1',
+							pid: 1,
+							version: '2026.10.1',
+							state: 'idle',
+							labels: [],
+							attachedProjects: [],
+							hasUserInterface: false,
+							ephemeral: true,
+							shellCapabilities: [],
+						},
+						{
+							workerId: 'w2',
+							pid: 2,
+							state: 'idle',
+							labels: [],
+							attachedProjects: [],
+							hasUserInterface: false,
+							ephemeral: true,
+							shellCapabilities: [],
+						},
+					]),
+			}),
+		}));
+
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+
+		await program.parseAsync(['node', 'test', 'worker', 'list']);
+
+		const allOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
+		expect(allOutput).toContain('version=2026.10.1');
+		expect(allOutput).toContain('version=-');
+	});
+});
+
+describe('flow worker list --follow', () => {
+	let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.resetModules();
+		vi.useRealTimers();
+	});
+
+	// `--follow` must poll on an interval rather than exit after the first read -- the whole
+	// point of the flag is to not require the operator to re-run the command by hand.
+	it('polls repeatedly instead of returning after the first read', async () => {
+		vi.useFakeTimers();
+		let callCount = 0;
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
+			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
+			createDaemonClient: () => ({
+				send: async () => {
+					callCount++;
+					return Promise.resolve([]);
+				},
+			}),
+		}));
+
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+
+		// Follow mode never resolves on its own; only await the first tick, then advance time
+		// to prove a second poll happens without a second invocation of the command.
+		void program.parseAsync(['node', 'test', 'worker', 'list', '--follow']);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(callCount).toBe(1);
+
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(callCount).toBe(2);
+
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(callCount).toBe(3);
+	});
+
+	// An unsupported/outdated daemon is a fatal condition in one-shot mode (exit 1), but
+	// --follow keeps polling it forever (it may be restarted onto a newer build mid-session).
+	// Reporting the identical failure every 2s for however long the operator leaves it running
+	// would be pure noise, so it must be reported once and then stay silent while unchanged.
+	it('reports a repeating failure once, not on every tick', async () => {
+		vi.useFakeTimers();
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
+			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
+			createDaemonClient: () => ({
+				send: async () => Promise.reject(new Error('unknown command: workers')),
+			}),
+		}));
+
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+
+		void program.parseAsync(['node', 'test', 'worker', 'list', '--follow']);
+		await vi.advanceTimersByTimeAsync(1);
+		await vi.advanceTimersByTimeAsync(2_000);
+		await vi.advanceTimersByTimeAsync(2_000);
+
+		const failCalls = consoleErrorSpy.mock.calls.filter((call: unknown[]) =>
+			String(call.join(' ')).includes('does not support "flow worker list"')
+		);
+		expect(failCalls).toHaveLength(1);
+	});
 });
 
 describe('flow worker update', () => {

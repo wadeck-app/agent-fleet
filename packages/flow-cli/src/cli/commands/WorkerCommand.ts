@@ -236,6 +236,76 @@ export function registerWorkerCommand(worker: Command): void {
 		});
 }
 
+/** How often `--follow` re-polls the daemon for its live worker list. */
+const FOLLOW_INTERVAL_MS = 2_000;
+
+/**
+ * Fetches the live worker list once and prints it (text or `--json`).
+ *
+ * Shared between the one-shot and `--follow` paths so both render identically. On a
+ * condition the caller should treat as fatal (an unsupported/outdated daemon, or any
+ * other unexpected error -- `DaemonNotRunningError` is never one of these, since no
+ * daemon simply means no live workers, which is printed and treated as success), the
+ * failure message is returned rather than reported here: the one-shot caller reports it
+ * once and exits, while `--follow` reports it once per distinct failure rather than
+ * every tick, so an unchanging condition (e.g. the daemon staying too old) does not spam
+ * the same line forever while the operator waits for it to change.
+ */
+async function fetchWorkerList(
+	daemonDir: string,
+	json: boolean
+): Promise<{ ok: true } | { ok: false; message: string }> {
+	try {
+		// The command is declared optional and left unimplemented on purpose: a local
+		// handler here would be used as an in-process fallback and would answer with
+		// its own empty list, so `flow worker list` would report "no workers" while a
+		// daemon with live workers was running.
+		const client = createDaemonClient<{ workers?: () => Promise<WorkerSummary[]> }>({
+			configDir: daemonDir,
+			commands: {},
+		});
+		const workers = (await client.send('workers', undefined)) as WorkerSummary[];
+
+		if (json) {
+			console.log(JSON.stringify(workers, null, 2));
+			return { ok: true };
+		}
+		if (workers.length === 0) {
+			console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), true));
+			return { ok: true };
+		}
+		for (const w of workers) {
+			const labels = w.labels.length > 0 ? w.labels.join(',') : '-';
+			const shells = w.shellCapabilities && w.shellCapabilities.length > 0 ? w.shellCapabilities.join(',') : '-';
+			const origin = w.ephemeral ? 'daemon-forked' : (w.sourceId ?? 'external');
+			console.log(
+				`${w.workerId}\t${w.state}\tpid=${String(w.pid)}\tversion=${w.version ?? '-'}\t${origin}\tlabels=${labels}\tshells=${shells}\tinteractive=${String(w.hasUserInterface)}`
+			);
+		}
+		return { ok: true };
+	} catch (err) {
+		if (err instanceof DaemonNotRunningError) {
+			// Not an error state: no daemon simply means no live workers. The registry is
+			// readable without one, so say what is declared rather than leaving the reader
+			// to guess whether anything is configured at all.
+			console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), false));
+			return { ok: true };
+		}
+		const message = normalizeError(err).message;
+		if (/unknown command/i.test(message)) {
+			// The daemon is a long-lived process, so it can predate the CLI asking it
+			// something new. Saying "unknown command" alone sends the user looking for a
+			// typo in their own command line.
+			return {
+				ok: false,
+				message:
+					'The running daemon does not support "flow worker list" -- it started before this command existed. Restart it with "flow stop" then "flow start", or run "flow cli update" first if its version is older than this CLI.',
+			};
+		}
+		return { ok: false, message };
+	}
+}
+
 /**
  * `flow worker list` -- the live workers this daemon can currently dispatch to.
  *
@@ -248,57 +318,37 @@ function registerListCommand(worker: Command): void {
 		.command('list')
 		.description('List the workers currently connected to the daemon')
 		.option('--json', 'Output as JSON')
-		.action(async (options: { json?: boolean }) => {
+		.option(
+			'-f, --follow',
+			`Keep polling and reprinting the list every ${String(FOLLOW_INTERVAL_MS / 1_000)}s until interrupted (Ctrl-C), instead of exiting after one read`
+		)
+		.action(async (options: { json?: boolean; follow?: boolean }) => {
 			const daemonDir = ConfigDir.get('flow');
-			try {
-				// The command is declared optional and left unimplemented on purpose: a local
-				// handler here would be used as an in-process fallback and would answer with
-				// its own empty list, so `flow worker list` would report "no workers" while a
-				// daemon with live workers was running.
-				const client = createDaemonClient<{ workers?: () => Promise<WorkerSummary[]> }>({
-					configDir: daemonDir,
-					commands: {},
-				});
-				const workers = (await client.send('workers', undefined)) as WorkerSummary[];
+			const json = options.json === true;
 
-				if (options.json) {
-					console.log(JSON.stringify(workers, null, 2));
-					return;
-				}
-				if (workers.length === 0) {
-					console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), true));
-					return;
-				}
-				for (const w of workers) {
-					const labels = w.labels.length > 0 ? w.labels.join(',') : '-';
-					const shells =
-						w.shellCapabilities && w.shellCapabilities.length > 0 ? w.shellCapabilities.join(',') : '-';
-					const origin = w.ephemeral ? 'daemon-forked' : (w.sourceId ?? 'external');
-					console.log(
-						`${w.workerId}\t${w.state}\tpid=${String(w.pid)}\t${origin}\tlabels=${labels}\tshells=${shells}\tinteractive=${String(w.hasUserInterface)}`
-					);
-				}
-			} catch (err) {
-				if (err instanceof DaemonNotRunningError) {
-					// Not an error state: no daemon simply means no live workers. The registry is
-					// readable without one, so say what is declared rather than leaving the reader
-					// to guess whether anything is configured at all.
-					console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), false));
-					return;
-				}
-				const message = normalizeError(err).message;
-				if (/unknown command/i.test(message)) {
-					// The daemon is a long-lived process, so it can predate the CLI asking it
-					// something new. Saying "unknown command" alone sends the user looking for a
-					// typo in their own command line.
-					report(
-						'[fail]',
-						'The running daemon does not support "flow worker list" -- it started before this command existed. Restart it with "flow stop" then "flow start", or run "flow cli update" first if its version is older than this CLI.'
-					);
+			if (options.follow !== true) {
+				const result = await fetchWorkerList(daemonDir, json);
+				if (!result.ok) {
+					report('[fail]', result.message);
 					process.exit(1);
 				}
-				report('[fail]', message);
-				process.exit(1);
+				return;
+			}
+
+			// Follow mode never exits on its own: a failure this tick (daemon down, daemon too
+			// old) may no longer hold on the next one, and `--follow` exists precisely so the
+			// operator does not have to keep re-running the command by hand to find out. The
+			// failure message is only reported again when it changes, so a condition that stays
+			// fatal (e.g. the daemon staying too old) does not spam the identical line forever.
+			let lastFailureMessage: string | undefined;
+			for (;;) {
+				console.log(`[${ts()}] ---`);
+				const result = await fetchWorkerList(daemonDir, json);
+				if (!result.ok && result.message !== lastFailureMessage) {
+					report('[fail]', result.message);
+				}
+				lastFailureMessage = result.ok ? undefined : result.message;
+				await new Promise(resolve => setTimeout(resolve, FOLLOW_INTERVAL_MS));
 			}
 		});
 }
