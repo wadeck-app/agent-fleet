@@ -304,9 +304,12 @@ describe('flow worker list --follow', () => {
 
 	// `flow worker list` is a *live state view* (who is connected right now), not an event
 	// log -- unlike "task list -f"/"queue history -f", it must redraw the full current
-	// state every tick (in place, via LiveRegion) rather than diff-and-print-only-new,
-	// because a worker disappearing is itself meaningful and a diff would never surface it.
-	it('redraws the current worker on every tick, not just once', async () => {
+	// state (in place, via LiveRegion) rather than diff-and-print-only-new, because a
+	// worker disappearing is itself meaningful and a diff would never surface it. But a
+	// tick where nothing actually changed must not write anything either (LiveRegion
+	// skips an identical redraw) -- most polls see nothing change, and redrawing anyway
+	// would flicker the terminal for no reason.
+	it('does not write anything on a tick where the worker is unchanged', async () => {
 		vi.useFakeTimers();
 		vi.doMock('@wadeck-app/singleton-daemon-kit', () => ({
 			DaemonNotRunningError: class DaemonNotRunningError extends Error {},
@@ -324,14 +327,12 @@ describe('flow worker list --follow', () => {
 
 		void program.parseAsync(['node', 'test', 'worker', 'list', '--follow']);
 		await vi.advanceTimersByTimeAsync(1);
-		const callsAfterInitial = stdoutWriteSpy.mock.calls.length;
-		expect(callsAfterInitial).toBeGreaterThan(0);
+		expect(writtenText(stdoutWriteSpy)).toContain('w1');
+		stdoutWriteSpy.mockClear();
 
 		await vi.advanceTimersByTimeAsync(500);
-		// A second tick must still write the worker again (full redraw), not go silent --
-		// the opposite expectation from an event-log --follow.
-		expect(stdoutWriteSpy.mock.calls.length).toBeGreaterThan(callsAfterInitial);
-		expect(writtenText(stdoutWriteSpy)).toContain('w1');
+		await vi.advanceTimersByTimeAsync(500);
+		expect(stdoutWriteSpy.mock.calls).toHaveLength(0);
 	});
 
 	// The whole point of a live-state view: a worker disconnecting must disappear from
