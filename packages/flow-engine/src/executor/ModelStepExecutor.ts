@@ -116,6 +116,12 @@ export async function executeModelStep(
 	let capturedCacheReadTokens = 0;
 	let capturedCacheWriteTokens = 0;
 	let capturedTtftMs = 0;
+	// True when the provider's own result event flags the turn as an error (e.g. Claude's
+	// `is_error: true`) despite exiting 0 with a `subtype: "success"` -- auto-compact
+	// thrashing (`terminal_reason: "rapid_refill_breaker"`) is the known case. Neither the
+	// exit-code check nor the empty-output guard below catch this: the process exits 0 and
+	// usually still produced text/tokens, just not a real answer.
+	let capturedIsError = false;
 	const modelStartTime = Date.now();
 
 	if (streamJson && !config.interactive) {
@@ -197,6 +203,12 @@ export async function executeModelStep(
 							}
 						}
 						if (event.type === 'result') {
+							// Claude sets this true on a turn that failed internally (e.g. auto-compact
+							// thrashing, terminal_reason: "rapid_refill_breaker") while still exiting 0
+							// with subtype: "success" -- read here since nothing else surfaces it.
+							if (event.data.is_error === true) {
+								capturedIsError = true;
+							}
 							// Claude's own CLI names this `total_cost_usd` in its native stream-json result event
 							// (see claude-mock.mjs). OpenCode/Codex synthesize their own event with `cost_usd`
 							// instead -- support both so neither provider regresses.
@@ -311,6 +323,14 @@ export async function executeModelStep(
 
 			if (result.exitCode !== 0) {
 				stepTrace.error = `${providerLabel} exited with code ${result.exitCode}\n${result.stderr}`;
+				return stepTrace;
+			}
+
+			// Checked before the empty-output guard below: a thrashing turn usually still
+			// produces text and meters tokens (just not a real answer), so the empty-output
+			// guard's zero-token condition would not catch it either.
+			if (capturedIsError) {
+				stepTrace.error = `${providerLabel} exited 0 and reported subtype: "success" but flagged this turn as is_error: true -- likely auto-compact thrashing (terminal_reason: "rapid_refill_breaker") rather than a real answer.`;
 				return stepTrace;
 			}
 

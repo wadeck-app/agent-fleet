@@ -1261,6 +1261,46 @@ describe('StepRunner', () => {
 			expect(trace.outputs).toBeUndefined();
 		});
 
+		it('model step fails on is_error:true even though it exits 0 with subtype:"success" and real text/tokens', async () => {
+			// Auto-compact thrashing (terminal_reason: "rapid_refill_breaker"): Claude exits 0,
+			// subtype is "success", and it usually still produced text/tokens -- so neither the
+			// exit-code check nor the empty-output guard would catch this without reading
+			// is_error directly.
+			const step: ModelFlowStep = {
+				id: 'model-step-thrash',
+				name: 'Model',
+				type: 'model',
+				model: 'haiku',
+				prompt: 'hello',
+			};
+			const context = { inputs: {}, stepOutputs: new Map(), taskMetadata: {} };
+			vi.mocked(TemplateRenderer.prototype.render).mockReturnValue('hello');
+
+			vi.mocked(ClaudeModelProvider.prototype.launchBackground).mockImplementation(async opts => {
+				if (opts.onStreamEvent) {
+					opts.onStreamEvent({
+						type: 'result',
+						subtype: 'result',
+						data: {
+							result: 'partial answer before the breaker tripped',
+							total_cost_usd: 0.01,
+							is_error: true,
+							terminal_reason: 'rapid_refill_breaker',
+							modelUsage: { haiku: { inputTokens: 500, outputTokens: 50 } },
+						},
+					} as any);
+				}
+				return { stdout: 'partial answer before the breaker tripped', stderr: '', exitCode: 0 };
+			});
+
+			const trace = await runner.executeStep(step, testWorkspace, context);
+
+			expect(trace.error).toBeDefined();
+			expect(trace.error).toContain('is_error');
+			expect(trace.error).toContain('rapid_refill_breaker');
+			expect(trace.outputs).toBeUndefined();
+		});
+
 		it('model step succeeds with empty text when tokens were metered (tool-only turn)', async () => {
 			// A step that only emits tool calls has no final text, but a real turn still
 			// meters tokens -- must not be caught by the empty-output guard above.
