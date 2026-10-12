@@ -483,17 +483,23 @@ export class OpenCodeModelProvider implements ModelProvider {
 						capturedSessionId = sessionID;
 					}
 
-					if (eventType === 'step_start' && !firstStepStartFired) {
-						firstStepStartFired = true;
-						const initEvent: StreamJsonEvent = {
-							type: 'system',
-							subtype: 'init',
-							data: {
-								session_id: capturedSessionId,
-								model: options.model ?? 'opencode',
-							},
-						};
-						options.onStreamEvent?.(initEvent);
+					if (eventType === 'step_start') {
+						// A new turn starts here -- discard narration carried over from the previous
+						// turn (e.g. "Let me check that file first." before a tool call) so it does not
+						// glue, with no separator, onto this turn's text once it becomes the final result.
+						responseText = '';
+						if (!firstStepStartFired) {
+							firstStepStartFired = true;
+							const initEvent: StreamJsonEvent = {
+								type: 'system',
+								subtype: 'init',
+								data: {
+									session_id: capturedSessionId,
+									model: options.model ?? 'opencode',
+								},
+							};
+							options.onStreamEvent?.(initEvent);
+						}
 					} else if (eventType === 'text') {
 						const partValue = parsed['part'];
 						const part = isRecord(partValue) ? partValue : undefined;

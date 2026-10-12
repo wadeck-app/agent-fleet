@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PromptTooLargeError } from './ModelProvider';
 import type { LaunchOptions } from './ModelProvider';
-import { autoSelectOpenCodeConfig, defaultOpenCodeConfigPath, OpenCodeModelProvider } from './OpenCodeModelProvider';
+import { OpenCodeModelProvider, autoSelectOpenCodeConfig, defaultOpenCodeConfigPath } from './OpenCodeModelProvider';
 import type { StreamJsonEvent } from './StreamJsonParser';
 
 vi.mock('child_process');
@@ -157,8 +157,12 @@ describe('autoSelectOpenCodeConfig', () => {
 
 describe('defaultOpenCodeConfigPath', () => {
 	it('builds the conventional path under the home directory for each model family', () => {
-		expect(defaultOpenCodeConfigPath('anthropic')).toBe(join(os.homedir(), '.config', 'opencode', 'config_claude.json'));
-		expect(defaultOpenCodeConfigPath('openai')).toBe(join(os.homedir(), '.config', 'opencode', 'config_codex.json'));
+		expect(defaultOpenCodeConfigPath('anthropic')).toBe(
+			join(os.homedir(), '.config', 'opencode', 'config_claude.json')
+		);
+		expect(defaultOpenCodeConfigPath('openai')).toBe(
+			join(os.homedir(), '.config', 'opencode', 'config_codex.json')
+		);
 	});
 });
 
@@ -853,6 +857,75 @@ describe('OpenCodeModelProvider', () => {
 
 			const resultEvent = events.find(e => e.type === 'result');
 			expect(resultEvent?.data['result']).toBe('Hello World');
+		});
+
+		it('discards narration text from an earlier turn once a new turn starts, instead of gluing it to the final answer', async () => {
+			const events: StreamJsonEvent[] = [];
+			const resultPromise = provider.launchBackground(makeBaseOptions({ onStreamEvent: e => events.push(e) }));
+
+			setImmediate(() => {
+				const sessionID = 'ses_turns';
+				emitLines([
+					// Turn 1: narration before a tool call
+					JSON.stringify({
+						type: 'step_start',
+						timestamp: 1000,
+						sessionID,
+						part: { type: 'step-start', messageID: 'm1', sessionID },
+					}),
+					JSON.stringify({
+						type: 'text',
+						timestamp: 1100,
+						sessionID,
+						part: { type: 'text', text: 'Let me check that file first.', time: { start: 1000, end: 1050 } },
+					}),
+					JSON.stringify({
+						type: 'step_finish',
+						timestamp: 1200,
+						sessionID,
+						part: {
+							type: 'step-finish',
+							reason: 'tool-calls',
+							messageID: 'm1',
+							sessionID,
+							tokens: { total: 10, input: 5, output: 5, reasoning: 0, cache: { write: 0, read: 0 } },
+							cost: 0.0001,
+						},
+					}),
+					// Turn 2: the actual final answer
+					JSON.stringify({
+						type: 'step_start',
+						timestamp: 1300,
+						sessionID,
+						part: { type: 'step-start', messageID: 'm2', sessionID },
+					}),
+					JSON.stringify({
+						type: 'text',
+						timestamp: 1400,
+						sessionID,
+						part: { type: 'text', text: 'The answer is 42.', time: { start: 1300, end: 1350 } },
+					}),
+					JSON.stringify({
+						type: 'step_finish',
+						timestamp: 1500,
+						sessionID,
+						part: {
+							type: 'step-finish',
+							reason: 'stop',
+							messageID: 'm2',
+							sessionID,
+							tokens: { total: 100, input: 10, output: 5, reasoning: 0, cache: { write: 85, read: 0 } },
+							cost: 0.001,
+						},
+					}),
+				]);
+				(mockProcess as EventEmitter).emit('exit', 0);
+			});
+
+			await resultPromise;
+
+			const resultEvent = events.find(e => e.type === 'result');
+			expect(resultEvent?.data['result']).toBe('The answer is 42.');
 		});
 
 		it('extracts cost_usd and token counts from step_finish with reason stop', async () => {
