@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+import { buildContextLimitEnv, haikuContextLimitWarning, validateContextLimit } from '../processing/ContextLimit';
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import type { OutputExtractor } from '../processing/OutputExtractor';
 import { StreamEventMapper } from '../processing/StreamEventMapper';
@@ -88,6 +89,9 @@ export async function executeModelStep(
 	const effectiveModel = config.resolvedModel ?? step.model;
 	// Names the CLI that actually ran, so a failing opencode step does not report "Claude".
 	const providerLabel = config.providerName ?? step.provider ?? 'claude';
+	// Same identity, used for routing decisions rather than display -- providerLabel can be
+	// overridden by config.providerName, which must not change what contextLimit validates.
+	const actualProvider = step.provider ?? 'claude';
 
 	const renderedPrompt = templateRenderer.render(step.prompt, context, true);
 	stepTrace.prompt = renderedPrompt;
@@ -96,6 +100,31 @@ export async function executeModelStep(
 	// Emit the rendered prompt before launching the model so callers can forward it
 	// to the execution log. The format starts with "[rendered prompt]\n" for easy filtering.
 	config.onRenderedPrompt?.(renderedPrompt);
+
+	if (step.contextLimit !== undefined) {
+		try {
+			validateContextLimit({
+				contextLimit: step.contextLimit,
+				provider: actualProvider,
+				stepEnv: step.env,
+				claudeEnv: config.claudeEnv,
+				sessionMode: step.session?.mode,
+			});
+		} catch (err) {
+			stepTrace.error = normalizeError(err).message;
+			return stepTrace;
+		}
+	}
+	const haikuWarning = haikuContextLimitWarning({
+		provider: actualProvider,
+		model: effectiveModel,
+		contextLimit: step.contextLimit,
+		stepEnv: step.env,
+		claudeEnv: config.claudeEnv,
+	});
+	if (haikuWarning !== undefined) {
+		process.stderr.write(`[warn] ${haikuWarning}\n`);
+	}
 
 	const execConfig = config.executionConfig;
 	const streamJson = execConfig?.streamJson !== false;
@@ -172,7 +201,10 @@ export async function executeModelStep(
 		stepId: step.id,
 		model: effectiveModel,
 		env: (() => {
-			const merged = { ...(config.claudeEnv ?? {}), ...(step.env ?? {}) };
+			// contextLimit's env vars are never already present here: validateContextLimit above
+			// rejects the combination, so merge order never decides which one actually wins.
+			const contextLimitEnv = step.contextLimit !== undefined ? buildContextLimitEnv(step.contextLimit) : {};
+			const merged = { ...(config.claudeEnv ?? {}), ...(step.env ?? {}), ...contextLimitEnv };
 			return Object.keys(merged).length > 0 ? merged : undefined;
 		})(),
 		// Merge config-level servers (e.g. the provideSteps daemon server) with step-level servers

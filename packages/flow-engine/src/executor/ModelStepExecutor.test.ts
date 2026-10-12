@@ -157,3 +157,141 @@ describe('ModelStepExecutor -- empty-output guard opencode hint', () => {
 		expect(trace.error).not.toContain('permission');
 	});
 });
+
+describe('ModelStepExecutor -- contextLimit', () => {
+	function makeCapturingProvider(): {
+		provider: ModelProvider;
+		capturedEnv: () => Record<string, string> | undefined;
+	} {
+		let capturedEnv: Record<string, string> | undefined;
+		const provider: ModelProvider = {
+			launchInteractive: () => Promise.resolve({ response: 'ok', exitCode: 0 }),
+			launchBackground: options => {
+				capturedEnv = options.env;
+				return Promise.resolve({ stdout: 'ok', stderr: '', exitCode: 0 });
+			},
+			kill: vi.fn(),
+		};
+		return { provider, capturedEnv: () => capturedEnv };
+	}
+
+	it('injects CLAUDE_CODE_AUTO_COMPACT_WINDOW/CLAUDE_AUTOCOMPACT_PCT_OVERRIDE for a limit at or below 100000', async () => {
+		const { provider, capturedEnv } = makeCapturingProvider();
+		const step = makeStep({ provider: 'claude', contextLimit: 60_000 });
+		await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'claude', resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		expect(capturedEnv()).toMatchObject({
+			CLAUDE_CODE_AUTO_COMPACT_WINDOW: '100000',
+			CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '60',
+		});
+	});
+
+	it('injects only CLAUDE_CODE_AUTO_COMPACT_WINDOW for a limit above 100000', async () => {
+		const { provider, capturedEnv } = makeCapturingProvider();
+		const step = makeStep({ provider: 'claude', contextLimit: 150_000 });
+		await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'claude', resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		expect(capturedEnv()).toEqual({ CLAUDE_CODE_AUTO_COMPACT_WINDOW: '150000' });
+	});
+
+	it('does not set any env when contextLimit is omitted', async () => {
+		const { provider, capturedEnv } = makeCapturingProvider();
+		const step = makeStep({ provider: 'claude' });
+		await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'claude', resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		expect(capturedEnv()).toBeUndefined();
+	});
+
+	it('fails the step (does not launch silently) when contextLimit is set on a non-claude provider', async () => {
+		const { provider } = makeCapturingProvider();
+		const launchSpy = vi.spyOn(provider, 'launchBackground');
+		const step = makeStep({ provider: 'opencode', contextLimit: 100_000 });
+		const trace = await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'opencode', resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		expect(trace.error).toContain('opencode');
+		expect(launchSpy).not.toHaveBeenCalled();
+	});
+
+	it('fails the step when contextLimit conflicts with an explicit env var on the same step', async () => {
+		const { provider } = makeCapturingProvider();
+		const step = makeStep({
+			provider: 'claude',
+			contextLimit: 100_000,
+			env: { CLAUDE_CODE_AUTO_COMPACT_WINDOW: '50000' },
+		});
+		const trace = await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'claude', resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		expect(trace.error).toContain('CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+	});
+
+	it('warns to stderr when the step runs Haiku 5.5 with no contextLimit set', async () => {
+		const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		const { provider } = makeCapturingProvider();
+		const step = makeStep({ provider: 'claude', model: 'claude-haiku-5-5' });
+		await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'claude', resolvedModel: 'claude-haiku-5-5' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		const written = stderrSpy.mock.calls.map(call => String(call[0])).join('');
+		expect(written).toContain('contextLimit');
+		stderrSpy.mockRestore();
+	});
+
+	it('does not warn when contextLimit is set on a Haiku 5.5 step', async () => {
+		const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		const { provider } = makeCapturingProvider();
+		const step = makeStep({ provider: 'claude', model: 'claude-haiku-5-5', contextLimit: 100_000 });
+		await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'claude', resolvedModel: 'claude-haiku-5-5' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		const written = stderrSpy.mock.calls.map(call => String(call[0])).join('');
+		expect(written).not.toContain('contextLimit');
+		stderrSpy.mockRestore();
+	});
+});

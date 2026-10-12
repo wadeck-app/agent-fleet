@@ -100,12 +100,15 @@ export class StreamJsonParser {
 			subtype = 'result';
 		}
 
-		// System/init events
+		// System events: Claude's own events carry their subtype in the raw JSON (e.g.
+		// "init", "compact_boundary") -- read it rather than hardcoding "init", which used to
+		// silently relabel every system event (including compact_boundary, used by the
+		// contextLimit compaction log line) as "init".
+		// TODO(flow-cli): data.session_id must be captured here and returned to the caller.
+		// /resume requires --resume <sessionId> -- without it, retries start a fresh conversation
+		// and the correction prompt has no context. See D25.
 		if (type === 'system') {
-			subtype = 'init';
-			// TODO(flow-cli): data.session_id must be captured here and returned to the caller.
-			// /resume requires --resume <sessionId> -- without it, retries start a fresh conversation
-			// and the correction prompt has no context. See D25.
+			subtype = typeof data.subtype === 'string' ? data.subtype : 'init';
 		}
 
 		return { type, subtype, data };

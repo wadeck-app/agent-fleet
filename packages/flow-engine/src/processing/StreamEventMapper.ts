@@ -150,6 +150,36 @@ export class StreamEventMapper {
 
 	private mapSystemEvent(event: StreamJsonEvent): LiveLogEntry {
 		const data = event.data;
+
+		// A compaction actually happened -- logged by default (no step config needed) so a
+		// flow author can see context was trimmed, and by how much, without reading
+		// Claude's own log file. pre_tokens/post_tokens/duration_ms are Claude's own fields.
+		if (event.subtype === 'compact_boundary') {
+			const meta = (data.compact_metadata ?? {}) as Record<string, unknown>;
+			return {
+				id: this.nextId(),
+				timestamp: Date.now(),
+				level: 'info',
+				message: `Context compacted (${String(meta['trigger'] ?? 'unknown')} trigger): ${String(meta['pre_tokens'] ?? '?')} -> ${String(meta['post_tokens'] ?? '?')} tokens`,
+				eventType: 'compact_boundary',
+				metadata: meta,
+			};
+		}
+
+		// A compaction was attempted and failed -- Claude then proceeds with the full,
+		// uncompacted context (a huge first prompt is never retried smaller), so this is
+		// worth a warning rather than silently falling through to the generic branch below.
+		if (data.compact_result === 'failed') {
+			return {
+				id: this.nextId(),
+				timestamp: Date.now(),
+				level: 'warning',
+				message: `Context compaction failed (${String(data.compact_error ?? 'unknown reason')}) -- continuing with the full, uncompacted context.`,
+				eventType: 'compact_failed',
+				metadata: { raw: data },
+			};
+		}
+
 		const model = data.model || 'unknown';
 		const tools = data.tools;
 		const toolCount = Array.isArray(tools) ? tools.length : 0;

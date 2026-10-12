@@ -126,6 +126,22 @@ describe('StreamJsonParser', () => {
 			});
 		});
 
+		it('preserves a system event\'s own subtype (e.g. compact_boundary) instead of hardcoding "init"', () => {
+			const callback = vi.fn();
+			const parser = new StreamJsonParser(callback);
+
+			parser.feed(
+				'{"type":"system","subtype":"compact_boundary","compact_metadata":{"trigger":"auto","pre_tokens":90957,"post_tokens":1055}}\n'
+			);
+
+			expect(callback.mock.calls[0][0].subtype).toBe('compact_boundary');
+			expect(callback.mock.calls[0][0].data.compact_metadata).toEqual({
+				trigger: 'auto',
+				pre_tokens: 90957,
+				post_tokens: 1055,
+			});
+		});
+
 		it('should classify assistant text events', () => {
 			const callback = vi.fn();
 			const parser = new StreamJsonParser(callback);

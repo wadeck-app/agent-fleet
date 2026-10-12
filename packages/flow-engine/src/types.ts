@@ -689,6 +689,26 @@ export interface ModelFlowStep extends BaseFlowStep {
 	skipPermissions?: boolean;
 
 	/**
+	 * Caps this step's context window (in tokens) via Claude's own auto-compact. `claude`
+	 * provider only.
+	 *
+	 * STRONGLY RECOMMENDED for `model: haiku`/`claude-haiku-5-5`: on the Anthropic API
+	 * pricing, Haiku 5.5 costs 5x per token once a prompt exceeds 100K tokens ($0.50/$2.50
+	 * per MTok in/out, vs $0.10/$0.50 under 100K) -- a multi-turn agentic step (tool calls,
+	 * file reads) can cross that line without anything else about the flow looking wrong.
+	 * Omitting this on a Haiku 5.5 step logs a warning naming the exact fix.
+	 *
+	 * Internally translated to `CLAUDE_CODE_AUTO_COMPACT_WINDOW`/`CLAUDE_AUTOCOMPACT_PCT_
+	 * OVERRIDE` -- deliberately not something a flow author sets directly in `env`/
+	 * `claudeEnv` (doing so alongside this field is a validation error, not a silent
+	 * override). Minimum 30000 (Claude's own baseline prompt is already ~18K tokens before
+	 * any work). For a limit at or below 100000 (Claude Code's own window floor), the actual
+	 * trigger point is an UPPER BOUND approximation, not exact -- see `ContextLimit.ts`.
+	 * @see ./processing/ContextLimit
+	 */
+	contextLimit?: number;
+
+	/**
 	 * Fine-grained permission overrides for providers that ask before certain actions
 	 * (currently opencode only -- ignored by other providers, which have no equivalent knob).
 	 * Omit for the provider's own default. Scoped to the step rather than project-wide

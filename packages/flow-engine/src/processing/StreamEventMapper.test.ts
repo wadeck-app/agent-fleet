@@ -29,6 +29,48 @@ describe('StreamEventMapper', () => {
 			expect(entries[0].metadata?.model).toBe('claude-sonnet-4-20250514');
 		});
 
+		it('maps a compact_boundary system event to an info-level log line with pre/post tokens, by default', () => {
+			const mapper = new StreamEventMapper('step-1');
+			const event: StreamJsonEvent = {
+				type: 'system',
+				subtype: 'compact_boundary',
+				data: {
+					type: 'system',
+					subtype: 'compact_boundary',
+					compact_metadata: { trigger: 'auto', pre_tokens: 90957, post_tokens: 1055, duration_ms: 1200 },
+				},
+			};
+
+			const entries = mapper.map(event);
+
+			expect(entries).toHaveLength(1);
+			expect(entries[0].level).toBe('info');
+			expect(entries[0].eventType).toBe('compact_boundary');
+			expect(entries[0].message).toContain('90957');
+			expect(entries[0].message).toContain('1055');
+			expect(entries[0].message).toContain('auto');
+		});
+
+		it('maps a failed compaction (compact_result: "failed") to a warning, not the generic system branch', () => {
+			const mapper = new StreamEventMapper('step-1');
+			const event: StreamJsonEvent = {
+				type: 'system',
+				subtype: 'init',
+				data: {
+					type: 'system',
+					compact_result: 'failed',
+					compact_error: 'too_few_groups',
+				},
+			};
+
+			const entries = mapper.map(event);
+
+			expect(entries).toHaveLength(1);
+			expect(entries[0].level).toBe('warning');
+			expect(entries[0].eventType).toBe('compact_failed');
+			expect(entries[0].message).toContain('too_few_groups');
+		});
+
 		it('should map assistant text events to info level', () => {
 			const mapper = new StreamEventMapper('step-1');
 			const event: StreamJsonEvent = {
