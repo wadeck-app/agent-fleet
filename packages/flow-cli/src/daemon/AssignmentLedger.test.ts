@@ -205,3 +205,22 @@ describe('AssignmentLedger - execution start (D#65)', () => {
 		expect(() => ledger.markStarted('never-issued')).not.toThrow();
 	});
 });
+
+describe('AssignmentLedger - connectionOf', () => {
+	it('returns the connection an outstanding assignment was issued to', () => {
+		const ledger = new AssignmentLedger();
+		const worker = fakeWorker('w1');
+		const issued = ledger.issue(worker, 'exec-1', 'step-a');
+
+		expect(ledger.connectionOf(issued.assignmentId)).toBe(worker);
+	});
+
+	it('returns nothing once the assignment has settled, or for an unknown id', () => {
+		const ledger = new AssignmentLedger();
+		const issued = ledger.issue(fakeWorker('w1'), 'exec-1', 'step-a');
+		ledger.settle(issued.assignmentId);
+
+		expect(ledger.connectionOf(issued.assignmentId)).toBeUndefined();
+		expect(ledger.connectionOf('never-issued')).toBeUndefined();
+	});
+});

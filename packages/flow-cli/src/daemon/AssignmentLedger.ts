@@ -56,6 +56,16 @@ export class AssignmentLedger {
 	}
 
 	/**
+	 * The connection an outstanding assignment was issued to, or undefined once it has settled.
+	 *
+	 * Exists for one purpose: dropping the connection of a worker the daemon has given up on
+	 * (see CommandHandler.failStalledSteps). Not for routing results or messages.
+	 */
+	connectionOf(assignmentId: string): WebSocket | undefined {
+		return this.outstanding.get(assignmentId)?.worker;
+	}
+
+	/**
 	 * Checks a reported result against the outstanding assignments.
 	 *
 	 * All three of assignment id, execution id and step id must match, and the report

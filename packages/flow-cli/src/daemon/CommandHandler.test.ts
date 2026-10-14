@@ -62,6 +62,7 @@ function createMockWorkerPool() {
 		}),
 		markBusy: vi.fn(),
 		markIdle: vi.fn(),
+		disconnect: vi.fn(),
 		hasBusyWorkers: vi.fn().mockReturnValue(false),
 		send: vi.fn(),
 		broadcast: vi.fn(),
@@ -1893,7 +1894,7 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 		if (assignmentId === undefined) throw new Error('no step was dispatched, so nothing can stall');
 		handler.onStepStarted(worker, assignmentId, executionId, 's1');
 
-		return { handler, assignmentId };
+		return { handler, assignmentId, workerPool, worker };
 	}
 
 	// The gap this closes: a closing socket was the only thing the daemon reacted to, so a step that
@@ -1920,6 +1921,23 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 			expect(reason).toContain('queue.stepSilenceLimitSeconds');
 			// Not retried: it was executing, so it may already have had an effect (D#65).
 			expect(reason).toMatch(/not retried/i);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// Settling the assignment alone left the worker marked busy for good: only the worker's own
+	// `ready` frees it, and a worker that is wedged never sends one. That kept the daemon from
+	// hibernating and held back every update, long after the step itself had been failed.
+	it('drops the connection of the worker that stalled, so it does not stay busy forever', async () => {
+		vi.useFakeTimers();
+		try {
+			const { handler, workerPool, worker } = await startOneStep(60_000);
+
+			vi.advanceTimersByTime(61_000);
+			handler.failStalledSteps();
+
+			expect(workerPool.disconnect).toHaveBeenCalledWith(worker);
 		} finally {
 			vi.useRealTimers();
 		}

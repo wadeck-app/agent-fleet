@@ -260,6 +260,17 @@ export class WorkerRegistry {
 	}
 
 	/**
+	 * Drops one worker's connection without telling it to exit.
+	 *
+	 * For a worker the daemon has stopped trusting with its step: the normal disconnect path then
+	 * removes it from the registry, so it can no longer sit "busy" for a step already failed. An
+	 * external worker re-registers on its own (D#51); a forked one is replaced on demand.
+	 */
+	disconnect(ws: WebSocket): void {
+		ws.terminate();
+	}
+
+	/**
 	 * Only ever updates a worker already present. Creating an entry here would
 	 * resurrect a worker that has already disconnected, and it would be counted as
 	 * capacity that does not exist.

@@ -647,7 +647,11 @@ export class CommandHandler {
 			const assignment = this.assignments.describe(assignmentId);
 			if (assignment === undefined) continue;
 			this.dispatched.delete(assignmentId);
+			const connection = this.assignments.connectionOf(assignmentId);
 			this.assignments.settle(assignmentId);
+			// A wedged worker never sends the `ready` that would free it, so without this it would stay
+			// "busy" forever: the daemon could never hibernate and updates would wait on it for good.
+			if (connection !== undefined) this.registry.disconnect(connection);
 			this.failStep(
 				assignment.executionId,
 				step?.stepId ?? assignment.stepId,
