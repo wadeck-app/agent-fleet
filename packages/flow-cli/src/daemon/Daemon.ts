@@ -640,6 +640,14 @@ async function startDaemon(
 				commandHandler.onStepStarted(ws, assignmentId, executionId, stepId);
 				break;
 			}
+			case 'step_progress': {
+				// Carries no content -- unlike 'log', this is never written to the execution log,
+				// only used to reset the silence clock (see Protocol.ts for why this exists).
+				const { assignmentId, executionId, stepId } = message;
+				if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
+				commandHandler.noteAssignmentActivity(assignmentId);
+				break;
+			}
 			case 'inject_steps': {
 				const { assignmentId, executionId, steps } = message;
 				if (!commandHandler.verifyAssignmentScope(ws, assignmentId, executionId)) break;

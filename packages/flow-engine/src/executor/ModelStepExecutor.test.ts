@@ -295,3 +295,67 @@ describe('ModelStepExecutor -- contextLimit', () => {
 		stderrSpy.mockRestore();
 	});
 });
+
+describe('ModelStepExecutor -- onActivity', () => {
+	// The daemon's stall watchdog only hears about a step via onLogEntry, which log:'end' (the
+	// default) and toolLog:'none' (the default) both suppress for whole classes of events (e.g. a
+	// tool-call-only turn with no narration). onActivity exists precisely so the watchdog is told
+	// a provider is doing *something*, independently of what the operator chose to have displayed.
+	function streamingProvider(events: Array<Record<string, unknown>>): ModelProvider {
+		return {
+			launchInteractive: () => Promise.resolve({ response: 'ok', exitCode: 0 }),
+			launchBackground: options => {
+				for (const event of events) options.onStreamEvent?.(event as any);
+				return Promise.resolve({ stdout: 'ok', stderr: '', exitCode: 0 });
+			},
+			kill: vi.fn(),
+		};
+	}
+
+	it('fires onActivity for every stream event even when log mode is the default ("end", no onLogEntry wired)', async () => {
+		const onActivity = vi.fn();
+		const step = makeStep();
+		const provider = streamingProvider([
+			{
+				type: 'tool_use',
+				subtype: 'tool_use',
+				data: { tool: 'read', callID: 'c1', input: {}, output: '', status: 'done' },
+			},
+			{
+				type: 'tool_use',
+				subtype: 'tool_use',
+				data: { tool: 'grep', callID: 'c2', input: {}, output: '', status: 'done' },
+			},
+			{ type: 'result', subtype: 'result', data: { result: 'done', total_cost_usd: 0.01 } },
+		]);
+
+		await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'opencode', resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any },
+			undefined,
+			onActivity
+		);
+
+		expect(onActivity).toHaveBeenCalledTimes(3);
+	});
+
+	it('does not throw when onActivity is omitted', async () => {
+		const step = makeStep();
+		const provider = streamingProvider([{ type: 'result', subtype: 'result', data: { result: 'done' } }]);
+
+		const trace = await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'opencode', resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+
+		expect(trace.error).toBeUndefined();
+	});
+});

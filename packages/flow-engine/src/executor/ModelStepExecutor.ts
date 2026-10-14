@@ -78,7 +78,17 @@ export async function executeModelStep(
 		templateRenderer: TemplateRenderer;
 		outputExtractor: OutputExtractor;
 	},
-	onLogEntry?: (entry: LiveLogEntry) => void
+	onLogEntry?: (entry: LiveLogEntry) => void,
+	/**
+	 * Called on every stream event, regardless of `step.log`/`toolLog` display settings.
+	 *
+	 * The daemon's stall watchdog hears about a step only through forwarded log entries, which
+	 * `log: 'end'` (the default) never forwards and `toolLog: 'none'` (the default) strips tool
+	 * activity from even in `log: 'streaming'` -- so a healthy tool-call-only, no-narration turn
+	 * can go fully silent and get killed as stuck. This exists so "is the provider doing anything"
+	 * stays independent of "what should be displayed".
+	 */
+	onActivity?: () => void
 ): Promise<StepTrace> {
 	const { templateRenderer, outputExtractor } = services;
 	const provider = config.provider;
@@ -221,6 +231,7 @@ export async function executeModelStep(
 		onStreamEvent:
 			streamJson && !config.interactive
 				? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
+						onActivity?.();
 						if (event.type === 'result' && event.data.result !== undefined && event.data.result !== null) {
 							finalResultText = event.data.result;
 						}

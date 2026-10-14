@@ -178,12 +178,26 @@ export class WorkerAdapter {
 								}
 							};
 
+				// Keeps the daemon's stall watchdog informed regardless of log/toolLog display
+				// settings (see Protocol.ts's 'step_progress' doc for why onLogEntry alone is not
+				// enough). Throttled: the watchdog only needs "something happened recently", not
+				// one message per stream chunk.
+				const PROGRESS_THROTTLE_MS = 5000;
+				let lastProgressSentAt = 0;
+				const onActivity = (): void => {
+					const now = Date.now();
+					if (now - lastProgressSentAt < PROGRESS_THROTTLE_MS) return;
+					lastProgressSentAt = now;
+					sendMessage({ type: 'step_progress', executionId: context.executionId, stepId: step.id });
+				};
+
 				const trace = await runner.executeStep(
 					step as unknown as ModelFlowStep,
 					workspace,
 					templateContext,
 					undefined,
-					onLogEntry
+					onLogEntry,
+					onActivity
 				);
 				// For log:end/none -- send response as logs after completion (existing behavior)
 				if (logMode === 'end') {

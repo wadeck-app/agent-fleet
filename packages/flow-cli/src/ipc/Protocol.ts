@@ -261,6 +261,16 @@ export type WorkerToDaemon =
 	 * questions later.
 	 */
 	| { type: 'step_started'; assignmentId: string; executionId: string; stepId: string }
+	/**
+	 * A heartbeat for the daemon's stall watchdog, independent of `log`/`toolLog` display settings.
+	 *
+	 * `log: 'end'` (the default) never forwards a `log` message mid-execution, and `toolLog: 'none'`
+	 * (the default) strips tool activity even from `log: 'streaming'` -- so a healthy, narration-free,
+	 * tool-call-only step could go fully silent and get killed as stuck even though the provider was
+	 * actively working the whole time. This message carries no content to display; it only resets
+	 * the silence clock.
+	 */
+	| { type: 'step_progress'; assignmentId: string; executionId: string; stepId: string }
 	| {
 			type: 'step_completed';
 			assignmentId: string;
@@ -293,6 +303,7 @@ export type WorkerToDaemon =
 export type AssignmentScopedMessage =
 	| Omit<Extract<WorkerToDaemon, { type: 'log' }>, 'assignmentId'>
 	| Omit<Extract<WorkerToDaemon, { type: 'step_started' }>, 'assignmentId'>
+	| Omit<Extract<WorkerToDaemon, { type: 'step_progress' }>, 'assignmentId'>
 	| Omit<Extract<WorkerToDaemon, { type: 'step_completed' }>, 'assignmentId'>
 	| Omit<Extract<WorkerToDaemon, { type: 'step_failed' }>, 'assignmentId'>
 	| Omit<Extract<WorkerToDaemon, { type: 'inject_steps' }>, 'assignmentId'>;

@@ -135,7 +135,8 @@ export class StepRunner {
 		workspace: Workspace,
 		context: TemplateContext,
 		onStepTraceCreated?: (stepTrace: StepTrace) => void,
-		onLogEntry?: (entry: LiveLogEntry) => void
+		onLogEntry?: (entry: LiveLogEntry) => void,
+		onActivity?: () => void
 	): Promise<StepTrace> {
 		const stepTrace: StepTrace = {
 			stepId: step.id,
@@ -186,7 +187,8 @@ export class StepRunner {
 						providerName,
 					},
 					services,
-					onLogEntry
+					onLogEntry,
+					onActivity
 				);
 			} else if (step.type === 'subflow') {
 				return await executeSubFlowStep(
