@@ -263,10 +263,36 @@ export class CommandHandler {
 		return `queue=${String(this.readyQueue.length)} activeExecutions=${String(this.activeExecutionCount)} resumableInterventions=${String(this.resumableInterventions.size)}`;
 	}
 
+	/**
+	 * While draining, new runs are refused so in-flight executions can finish and a pending update
+	 * can restart the daemon. Refused rather than queued: execution state lives only in this
+	 * process's memory, so a queued run would be lost by the very restart the drain is waiting for.
+	 * Not persisted: the restart that ends a drain also clears it.
+	 */
+	private draining = false;
+
+	setDraining(draining: boolean): void {
+		this.draining = draining;
+	}
+
+	isDraining(): boolean {
+		return this.draining;
+	}
+
 	async handleRun(
 		cmd: Extract<ClientCommand, { type: 'run' }>,
 		hookDispatcher?: HookDispatcher
 	): Promise<DaemonResponse> {
+		if (this.draining) {
+			return {
+				type: 'error',
+				code: 'DAEMON_DRAINING',
+				message:
+					'The daemon is draining for a pending update and is not starting new flow runs. ' +
+					'Retry once the update has been applied, or cancel the drain with: flow cli update --cancel-drain',
+			};
+		}
+
 		const flowFile = path.isAbsolute(cmd.flowFile) ? cmd.flowFile : path.resolve(cmd.cwd, cmd.flowFile);
 
 		if (!this.allowAbsolutePaths) {

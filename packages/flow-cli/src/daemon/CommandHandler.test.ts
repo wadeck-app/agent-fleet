@@ -229,6 +229,37 @@ function makeHandler(workerPool = createMockWorkerPool()): CommandHandler {
 	);
 }
 
+describe('CommandHandler draining', () => {
+	it('refuses a new run with an actionable DAEMON_DRAINING error while draining', async () => {
+		const handler = makeHandler();
+		handler.setDraining(true);
+
+		const result = await handler.handleRun({ type: 'run', flowFile: '/any/flow.yml', cwd: tmpDir } as never);
+
+		if (result.type !== 'error') throw new Error('Expected error response');
+		expect(result.code).toBe('DAEMON_DRAINING');
+		expect(result.message).toContain('flow cli update --cancel-drain');
+	});
+
+	it('accepts runs again once draining is cancelled', async () => {
+		const handler = makeHandler();
+		handler.setDraining(true);
+		handler.setDraining(false);
+
+		const result = await handler.handleRun({ type: 'run', flowFile: '/no/such/flow.yml', cwd: tmpDir } as never);
+
+		if (result.type !== 'error') throw new Error('Expected error response');
+		expect(result.code).toBe('FLOW_NOT_FOUND');
+	});
+
+	it('reports whether it is draining', () => {
+		const handler = makeHandler();
+		expect(handler.isDraining()).toBe(false);
+		handler.setDraining(true);
+		expect(handler.isDraining()).toBe(true);
+	});
+});
+
 describe('CommandHandler.handleRun', () => {
 	it('returns FLOW_NOT_FOUND error when the flow file does not exist', async () => {
 		const handler = makeHandler();

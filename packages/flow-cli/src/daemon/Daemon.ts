@@ -23,6 +23,7 @@ import type { ClientCommand, SourceReady, UpdateWorkerRequest, WorkerToDaemon } 
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
+import { buildDaemonHealth } from './DaemonHealth';
 import { writeDaemonLog } from './DaemonLog.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
@@ -335,6 +336,15 @@ async function startDaemon(
 			// this daemon's registry, so the next tryDispatch() sees them without a restart.
 			// Thrown errors (unknown workerId, blank label, unknown shell) propagate to the
 			// CLI as a rejected command -- there is no silent no-op path here.
+			// `flow cli update --drain` / `--cancel-drain`: see CommandHandler.setDraining.
+			setDraining: (payload: unknown): unknown => {
+				const { draining } = payload as { draining?: unknown };
+				if (typeof draining !== 'boolean') {
+					throw new Error('setDraining requires a boolean "draining".');
+				}
+				commandHandler.setDraining(draining);
+				return { draining };
+			},
 			updateWorker: (payload: unknown): unknown => {
 				const { workerId, labels, shellCapabilities } = payload as UpdateWorkerRequest;
 				if (typeof workerId !== 'string' || workerId.trim() === '') {
@@ -344,10 +354,7 @@ async function startDaemon(
 				return workerRegistry.summarize().find(w => w.workerId === workerId);
 			},
 		},
-		health: () => ({
-			status: 'ok' as const,
-			running_executions: workerRegistry?.liveCount ?? 0,
-		}),
+		health: () => buildDaemonHealth({ isIdle, isDraining: () => commandHandler.isDraining() }),
 		hooks: {
 			// Fires on every stop() path (idle, signal, command, error, update -- see
 			// singleton-daemon-kit's `handle.stop()`), unlike the idle-only teardown inside

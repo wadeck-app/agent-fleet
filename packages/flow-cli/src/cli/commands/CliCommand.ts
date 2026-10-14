@@ -8,6 +8,7 @@ import {
 	warnUnknownArgs,
 } from '@wadeck-app/shared-cli/CliMetaCommands';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
+import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
 import { FlowExecutor, StepRunner } from 'flow-engine';
 import * as yaml from 'js-yaml';
@@ -16,6 +17,7 @@ import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
@@ -190,6 +192,40 @@ async function cliLogsRawCommand(configDir: string, opts: { follow?: boolean; li
 
 const PKG_NAME = '@wadeck-app/flow-cli';
 
+/**
+ * Asks the running daemon to start/stop refusing new runs (see CommandHandler.setDraining).
+ * No daemon running is not an error: there is nothing to drain or cancel.
+ */
+async function setDaemonDraining(draining: boolean): Promise<void> {
+	try {
+		const client = createDaemonClient<{ setDraining?: (payload?: unknown) => Promise<unknown> }>({
+			configDir: ConfigDir.get('flow'),
+			commands: {},
+		});
+		await client.send('setDraining', { draining });
+	} catch (err) {
+		if (err instanceof DaemonNotRunningError) {
+			process.stdout.write(
+				draining
+					? '[ok] No daemon is running, so there is nothing to drain; updating directly.\n'
+					: '[ok] No daemon is running, so there is no drain to cancel.\n'
+			);
+			return;
+		}
+		process.stderr.write(
+			`[fail] Could not ${draining ? 'start' : 'cancel'} draining: ${normalizeError(err).message}\n` +
+				'       Check the daemon with: flow daemon status\n'
+		);
+		process.exit(1);
+	}
+	process.stdout.write(
+		draining
+			? '[ok] Daemon is draining: new flow runs are refused until the update applies. Running executions continue.\n' +
+					'     Changed your mind? Run: flow cli update --cancel-drain\n'
+			: '[ok] Drain cancelled: the daemon accepts new flow runs again.\n'
+	);
+}
+
 function getCurrentVersion(): string {
 	try {
 		return __FLOW_CLI_VERSION__;
@@ -230,40 +266,54 @@ export function buildCliCommand(): Command {
 	updateCmd.description('Update the flow CLI, or check/inspect update status');
 	updateCmd.option('--check', 'Show available version without installing');
 	updateCmd.option('--log', 'Print the update log');
+	updateCmd.option(
+		'--drain',
+		'Refuse new flow runs until the update applies, so running executions can finish and the update is not deferred forever'
+	);
+	updateCmd.option('--cancel-drain', 'Stop refusing new flow runs (undo --drain)');
 	updateCmd.allowUnknownOption(false);
-	updateCmd.action(async (opts: { check?: boolean; log?: boolean }, cmd: Command) => {
-		const rawArgs = cmd.args;
-		warnUnknownArgs(
-			rawArgs.filter(a => a.startsWith('-')),
-			['--check', '--log'],
-			'flow cli update'
-		);
-		if (opts.log) {
-			const logFile = path.join(ConfigDir.get('flow'), 'update-log.txt');
-			if (fs.existsSync(logFile)) {
-				process.stdout.write(fs.readFileSync(logFile, 'utf-8'));
-			} else {
-				process.stdout.write('No update log found.\n');
+	updateCmd.action(
+		async (opts: { check?: boolean; log?: boolean; drain?: boolean; cancelDrain?: boolean }, cmd: Command) => {
+			const rawArgs = cmd.args;
+			warnUnknownArgs(
+				rawArgs.filter(a => a.startsWith('-')),
+				['--check', '--log', '--drain', '--cancel-drain'],
+				'flow cli update'
+			);
+			if (opts.cancelDrain) {
+				await setDaemonDraining(false);
+				return;
 			}
-			return;
+			if (opts.log) {
+				const logFile = path.join(ConfigDir.get('flow'), 'update-log.txt');
+				if (fs.existsSync(logFile)) {
+					process.stdout.write(fs.readFileSync(logFile, 'utf-8'));
+				} else {
+					process.stdout.write('No update log found.\n');
+				}
+				return;
+			}
+			if (opts.check) {
+				const current = getCurrentVersion();
+				const channel = readChannelFromConfig(ConfigDir.get('flow'));
+				await cliVersionCommand(PKG_NAME, current, channel);
+				return;
+			}
+			const updaterPath = getUpdaterPath();
+			if (!updaterPath) {
+				process.stderr.write('Updater bundle not found (dev mode or missing build).\n');
+				process.exit(1);
+				return;
+			}
+			if (opts.drain) {
+				await setDaemonDraining(true);
+			}
+			// Flag manual invocation so the updater bypasses autoUpdate:false in config
+			process.env['UPDATER_MANUAL'] = '1';
+			await cliUpdateCommand(updaterPath, PKG_NAME);
+			delete process.env['UPDATER_MANUAL'];
 		}
-		if (opts.check) {
-			const current = getCurrentVersion();
-			const channel = readChannelFromConfig(ConfigDir.get('flow'));
-			await cliVersionCommand(PKG_NAME, current, channel);
-			return;
-		}
-		const updaterPath = getUpdaterPath();
-		if (!updaterPath) {
-			process.stderr.write('Updater bundle not found (dev mode or missing build).\n');
-			process.exit(1);
-			return;
-		}
-		// Flag manual invocation so the updater bypasses autoUpdate:false in config
-		process.env['UPDATER_MANUAL'] = '1';
-		await cliUpdateCommand(updaterPath, PKG_NAME);
-		delete process.env['UPDATER_MANUAL'];
-	});
+	);
 	cli.addCommand(updateCmd);
 
 	// flow cli rollback -- restore previous version

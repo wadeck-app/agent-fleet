@@ -165,3 +165,58 @@ describe('cli self-check', () => {
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 });
+
+const sendMock = vi.fn();
+vi.mock('@wadeck-app/singleton-daemon-kit', async () => {
+	const real = await vi.importActual<typeof import('@wadeck-app/singleton-daemon-kit')>(
+		'@wadeck-app/singleton-daemon-kit'
+	);
+	return { ...real, createDaemonClient: vi.fn(() => ({ send: sendMock })) };
+});
+
+describe('cli update --drain / --cancel-drain', () => {
+	beforeEach(() => {
+		sendMock.mockReset();
+		vi.mocked(fs.existsSync).mockReturnValue(true);
+	});
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('--cancel-drain tells the daemon to stop draining and does not run the updater', async () => {
+		sendMock.mockResolvedValue({ draining: false });
+		const { cliUpdateCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
+		vi.mocked(cliUpdateCommand).mockClear();
+
+		await runCliArgs(['update', '--cancel-drain']);
+
+		expect(sendMock).toHaveBeenCalledWith('setDraining', { draining: false });
+		expect(cliUpdateCommand).not.toHaveBeenCalled();
+	});
+
+	it('--drain tells the daemon to start draining, then runs the updater', async () => {
+		sendMock.mockResolvedValue({ draining: true });
+		const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+		const { cliUpdateCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
+		vi.mocked(cliUpdateCommand).mockClear();
+
+		await runCliArgs(['update', '--drain']);
+
+		expect(sendMock).toHaveBeenCalledWith('setDraining', { draining: true });
+		expect(cliUpdateCommand).toHaveBeenCalledTimes(1);
+		const written = stdoutSpy.mock.calls.map(c => String(c[0])).join('');
+		expect(written).toContain('--cancel-drain');
+	});
+
+	it('--drain still runs the updater when no daemon is running, since there is nothing to drain', async () => {
+		const { DaemonNotRunningError } = await import('@wadeck-app/singleton-daemon-kit');
+		sendMock.mockRejectedValue(new DaemonNotRunningError('no daemon'));
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+		const { cliUpdateCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
+		vi.mocked(cliUpdateCommand).mockClear();
+
+		await runCliArgs(['update', '--drain']);
+
+		expect(cliUpdateCommand).toHaveBeenCalledTimes(1);
+	});
+});

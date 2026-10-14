@@ -69,6 +69,10 @@ flow cli update                         # manual update
 
 Config dir: `~/.config/flow/` (override: `FLOW_CONFIG_DIR` env). Auto-updates in background on every invocation.
 
+**Updates wait for the daemon to have nothing to lose**: no queued step, active execution, busy worker or resumable intervention. Idle connected workers do not block an update. The check retries every 2 minutes.
+
+If executions keep arriving, `flow cli update --drain` makes the daemon refuse new `flow run` (error `DAEMON_DRAINING`) while running executions finish, then the update applies. `flow cli update --cancel-drain` undoes it. Runs are refused rather than queued because execution state lives only in daemon memory and the update restarts the daemon.
+
 ## Task CLI
 
 Moved to its own repo: [wadeck-app/task](https://github.com/wadeck-app/task). Install: `npm install -g @wadeck-app/task-cli`.

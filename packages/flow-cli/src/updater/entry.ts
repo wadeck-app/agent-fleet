@@ -15,6 +15,8 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import { join } from 'node:path';
 
+import { decideUpdate } from './UpdateDeferral';
+
 declare const __FLOW_CLI_VERSION__: string;
 
 const PKG_NAME = '@wadeck-app/flow-cli';
@@ -224,15 +226,7 @@ runUpdater({
 			const portJson = readFileSync(join(configDir, 'config.port'), 'utf8');
 			const { port } = JSON.parse(portJson) as { port: number };
 			const token = readFileSync(join(configDir, 'health_token'), 'utf8').trim();
-			const health = await queryDaemonHealth(port, token, 3_000);
-			if (
-				health !== null &&
-				typeof health['running_executions'] === 'number' &&
-				health['running_executions'] > 0
-			) {
-				// A flow execution is in progress -- defer the update to avoid disruption.
-				return { defer: true, retryIn: 2 * 60_000 };
-			}
+			return decideUpdate(await queryDaemonHealth(port, token, 3_000));
 		} catch {
 			// Daemon unreachable, config files missing, or JSON parse error -> apply now.
 		}
