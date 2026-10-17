@@ -3652,3 +3652,14 @@ If the tag above is non-empty, fix the reported issues before regenerating.
 ```
 
 This applies to any dynamic value injected into a prompt: error messages, previous outputs, context from other steps. XML-style tags are well-understood by all major LLMs and reduce ambiguity about what is static instruction vs dynamic input.
+
+## Staging a delegated change: `git add -u` skips new files
+
+A sub-agent added a new source file; `git add -u` staged only tracked files, so the commit imported a file that was not in it. Local tests and `tsc` passed (the file existed on disk), CI failed with TS2307.
+
+- Ask every delegating prompt for the full list of NEW untracked files, and stage them by name.
+- Before pushing, compare `git status --short | grep '^??'` against the expected leftovers (owner's scratch files only).
+
+## A mock that "passes" can model the wrong provider
+
+The codex mock and `CodexModelProvider` used opencode's event format for months; every mock-based test was green while real codex would have returned an empty response. The mock-vs-real suites and the version cache exist to catch exactly this: see `.claude/docs/mock-fidelity.md`. A provider is not covered until a real-vs-mock comparison has run against its real CLI.
