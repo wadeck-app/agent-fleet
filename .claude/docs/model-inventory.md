@@ -15,8 +15,8 @@ are not consistent: some carry a date, some do not, one carries a bare `-v1`.
 | sonnet-4-5 | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | works      | works     |
 | sonnet-4-6 | `us.anthropic.claude-sonnet-4-6`               | works      | works     |
 | sonnet-5   | `us.anthropic.claude-sonnet-5`                 | works      | works     |
-| haiku-5-5  | `us.anthropic.claude-haiku-5-5`                | unverified | works     |
-| sonnet-5-5 | `us.anthropic.claude-sonnet-5-5`               | unverified | works     |
+| haiku-5-5  | `us.anthropic.claude-haiku-5-5`                | works      | works     |
+| sonnet-5-5 | `us.anthropic.claude-sonnet-5-5`               | works      | works     |
 | opus-4-6   | `us.anthropic.claude-opus-4-6-v1`              | works      | works     |
 | opus-4-7   | `us.anthropic.claude-opus-4-7`                 | works      | works     |
 | opus-4-8   | `us.anthropic.claude-opus-4-8`                 | works      | works     |
@@ -33,11 +33,18 @@ Model access is denied due to IAM user or service role is not authorized to perf
 That is a permission to request, not a configuration to fix. Nothing in flow should alias to
 them until it is granted.
 
-The 5.5 rows are ACTIVE in `aws bedrock list-inference-profiles` and answered a real
-`claude -p --model <id>` (`canonicalModel` `claude-haiku-5-5` / `claude-sonnet-5-5`). Through
-opencode they are **unverified**: the ids must be in the `whitelist` of `config_claude.json`
-(added locally), and the opencode calls hung on that machine even for the known-good Haiku 4.5 id,
-so the cause was not the new ids but was not resolved.
+The 5.5 rows are ACTIVE in `aws bedrock list-inference-profiles`, answered a real
+`claude -p --model <id>` (`canonicalModel` `claude-haiku-5-5` / `claude-sonnet-5-5`), and ran in a
+real flow through opencode.
+
+opencode only offers an id listed in the `whitelist` of `~/.config/opencode/config_claude.json`
+(`opencode models` shows what it accepts); the two 5.5 ids had to be added there. This is machine
+configuration, not repo code.
+
+**Cost basis differs.** For the same model, opencode reports exactly list price x1.1 (Haiku 5.5 and
+Sonnet 5.5, 3 steps), while Claude Code reports list price (`costBasis: "list"`). Whether the `us.`
+cross-region profile really bills 10% above list is unverified; check Cost Explorer before trusting
+either figure.
 
 `claude` also accepts the family names `haiku`, `sonnet`, `opus` directly, and honours
 `ANTHROPIC_DEFAULT_*_MODEL`.

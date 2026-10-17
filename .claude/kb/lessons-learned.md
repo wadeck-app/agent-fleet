@@ -6603,3 +6603,11 @@ that contains it.
 `child.kill()` ends `cmd.exe` but not the command it started. Kill the tree (`taskkill /PID <pid> /T /F`,
 awaited -- it is asynchronous; a process group on POSIX). Found because the test's temp dir could not be
 removed (EPERM) while the orphan held it as its cwd.
+
+## opencode run hangs when its stdin is left open
+
+Run from a tool that leaves stdin as an open pipe, `opencode run --format json` printed nothing and
+never exited (every attempt timed out), including with model ids that were fine. With `< /dev/null`
+the same calls returned in ~3s. Flow's provider is unaffected (`stdio: ['ignore', ...]`), so do not
+chase model ids or config when a manual `opencode run` hangs: close stdin first. A model missing from
+`whitelist` in the opencode config is a separate failure (it is simply not listed by `opencode models`).
