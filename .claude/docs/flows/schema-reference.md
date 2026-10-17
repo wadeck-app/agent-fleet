@@ -1240,6 +1240,45 @@ When a sub-step fails and its parent model step restarts, the failed sub-step's 
 
 `subSteps` is absent on the first run — the `{% if subSteps.stepId.status.failed %}` block evaluates to false cleanly.
 
+`${{ subStepFeedback }}` (bare root) is every failed sub-step's feedback aggregated into one string (`[stepId]\n<stderr|rawOutput|stdout>`), empty before any failure. Use it in the parent's prompt instead of wiring each sub-step by hand.
+
+`flow validate` accepts it everywhere; it warns (`UNDEFINED_VARIABLE`) when no step declares `parent: <this step>`, because it then always renders empty.
+
+### Sub-Step Failure Resumes the Parent's Session
+
+When a sub-step fails and its parent **model** step is re-run, the parent resumes the session of its previous run (`session_id` from its own last run; no `session:` field needed) and receives one new user message: the failed sub-steps' feedback (`subStepFeedback`, stderr preferred) in a short wrapper. The step's `prompt` is **not rendered or sent again**.
+
+| Situation                                           | Behaviour                                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| First launch                                        | Unchanged: `prompt` rendered, `subSteps` / `subStepFeedback` empty                    |
+| Re-run after sub-step failure                       | Resume + feedback only; `{% if subSteps... %}` blocks in `prompt` are never evaluated |
+| No `session_id` recorded, or provider cannot resume | Step fails with an actionable error (never a fresh conversation)                      |
+| `maxSubStepIterations` exhausted                    | Parent fails terminally, as before                                                    |
+| Parent is a `script` step                           | Unchanged (re-run as before)                                                          |
+
+Providers that resume: `claude`, `opencode`, `codex`. Several failing sub-steps (`subStepStrategy: wait-all`) arrive in one message. Flows that still reference `subSteps` / `subStepFeedback` in `prompt` keep working; those references only matter on the first launch.
+
+Optional model-step field `subStepFeedbackPrompt`: custom wrapper, must contain `${{ subStepFeedback }}` (validated). Default: "The sub-step(s) that checked your previous answer failed. Their feedback follows. Fix what they report, then answer again." + feedback.
+
+```yaml
+- id: classify
+  type: model
+  prompt: Classify ${{ inputs.text }}
+  subStepFeedbackPrompt: |
+      Validation failed, fix your answer:
+      ${{ subStepFeedback }}
+- id: classify_validate
+  type: script
+  parent: classify
+  script: ./validate.sh
+```
+
+Workers built before this feature (no `sub-step-session-resume` in `ready.features`) re-render the whole prompt; the daemon logs a warning in the execution log when it dispatches such a relaunch to one.
+
+### Roots accepted by `flow validate`
+
+Same set as the renderer (enforced by `TemplateContract.test.ts`): `inputs.*`, `steps.<id>.outputs.*`, `steps.<id>.meta.*`, `task.*`, `context.*` (dotted paths allowed for `inputs`/`task`/`context`), `subSteps.<id>.outputs.*`, `subSteps.<id>.status.failed`, `subStepFeedback`. Escaped `$${{ ... }}` is ignored by all validators, as by the renderer.
+
 ### Escape Syntax (`$${{ }}`)
 
 `$${{ expr }}` outputs a **literal** `${{ expr }}` without substitution. Use this when a step generates content that will itself be interpreted as a flow template (e.g., a model step that generates a YAML flow).

@@ -11,6 +11,7 @@
  *
  * This validator catches logical errors that would cause runtime failures.
  */
+import { TemplateEscape } from '../processing/TemplateEscape';
 import type { FlowDefinition, FlowStep, OutputVariableConfig, VariableType } from '../types';
 import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
@@ -317,7 +318,7 @@ export class LogicalValidator {
 
 			// Extract step output references from script
 			const stepRefPattern = /\$\{\{\s*steps\.([a-zA-Z0-9_-]+)\.outputs\.([a-zA-Z0-9_-]+)\s*\}\}/g;
-			const matches = [...script.matchAll(stepRefPattern)];
+			const matches = [...TemplateEscape.strip(script).matchAll(stepRefPattern)];
 
 			for (const match of matches) {
 				const referencedStepId = match[1];
@@ -356,7 +357,7 @@ export class LogicalValidator {
 
 			// Extract step output references
 			const stepRefPattern = /\$\{\{\s*steps\.([a-zA-Z0-9_-]+)\.outputs\.([a-zA-Z0-9_-]+)\s*\}\}/g;
-			const matches = [...prompt.matchAll(stepRefPattern)];
+			const matches = [...TemplateEscape.strip(prompt).matchAll(stepRefPattern)];
 
 			for (const match of matches) {
 				const referencedStepId = match[1];

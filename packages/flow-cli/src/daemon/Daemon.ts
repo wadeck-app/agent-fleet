@@ -586,9 +586,12 @@ async function startDaemon(
 					commandHandler.dispatchHook(executionId, 'onStepEnd', { executionId, stepId });
 
 					const state = executionStore.read(executionId);
-					const allDone = Object.values(state.steps).every(
-						s => s.status === 'completed' || s.status === 'failed'
-					);
+					// The store alone cannot tell "settled" from "a failed step is about to be re-run"
+					// (sub-step restart, retry, loop): a step that failed earlier still reads failed
+					// until its next attempt starts. While the scheduler has work left, nothing is final.
+					const allDone =
+						!commandHandler.isExecutionActive(executionId) &&
+						Object.values(state.steps).every(s => s.status === 'completed' || s.status === 'failed');
 					if (allDone) {
 						if (Object.values(state.steps).every(s => s.status === 'completed')) {
 							executionStore.markExecutionCompleted(executionId);

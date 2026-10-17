@@ -67,6 +67,14 @@ export interface ModelBackgroundResult {
 }
 
 export interface ModelProvider {
+	/**
+	 * True when `LaunchOptions.resumeSessionId` really continues that conversation.
+	 *
+	 * Required for delivering a failed sub-step's feedback into the parent's existing session:
+	 * a provider that does not declare it is treated as unable to, and the step fails with an
+	 * actionable error rather than silently starting a fresh conversation.
+	 */
+	readonly supportsSessionResume?: boolean;
 	launchInteractive(options: LaunchOptions): Promise<ModelInteractiveResult>;
 	launchBackground(options: LaunchOptions): Promise<ModelBackgroundResult>;
 	kill(): void;

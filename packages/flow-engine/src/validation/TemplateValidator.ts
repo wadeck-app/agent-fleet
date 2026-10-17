@@ -15,6 +15,7 @@
  * Supports auto-discovery of inputs: undeclared inputs referenced in templates
  * can be automatically discovered and added as optional string inputs.
  */
+import { TemplateEscape } from '../processing/TemplateEscape';
 import type { FlowDefinition, NormalizedInputDefinition } from '../types';
 import { type IssueCollector, ValidationCode, type VariableReference } from './ValidationTypes';
 
@@ -96,9 +97,11 @@ export class TemplateValidator {
 				// This was missing and is a critical fix for auto-discovery
 				for (const [inputKey, inputValue] of Object.entries(step.inputs || {})) {
 					if (typeof inputValue === 'string') {
+						// $${{ ... }} is an escaped literal for the renderer: not a reference
+						const unescapedValue = TemplateEscape.strip(inputValue);
 						let match;
 						const regex = new RegExp(templateRegex.source, templateRegex.flags);
-						while ((match = regex.exec(inputValue)) !== null) {
+						while ((match = regex.exec(unescapedValue)) !== null) {
 							const expression = match[1].trim();
 							const parsed = this.parseVariableExpression(expression);
 
@@ -121,6 +124,8 @@ export class TemplateValidator {
 
 			// Find all template expressions in text
 			if (text) {
+				// $${{ ... }} is an escaped literal for the renderer: not a reference
+				text = TemplateEscape.strip(text);
 				let match;
 				while ((match = templateRegex.exec(text)) !== null) {
 					const expression = match[1].trim();

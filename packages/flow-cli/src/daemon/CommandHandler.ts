@@ -20,6 +20,7 @@ import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMes
 import type { WebSocket } from 'ws';
 
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
+import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
 import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
@@ -229,6 +230,19 @@ export class CommandHandler {
 
 	hasActiveExecutions(): boolean {
 		return this.activeExecutionCount > 0;
+	}
+
+	/**
+	 * Whether the scheduler still has work for this execution (steps queued, running, or about to
+	 * be re-run by a retry, loop or sub-step restart). False once it settled -- completed, failed
+	 * terminally -- or is unknown.
+	 *
+	 * The execution store cannot answer this: a step that failed and is about to run again still
+	 * reads `failed` there until its next attempt starts, which made the daemon declare a run
+	 * failed (and fire `onFlowError`) while the scheduler was in the middle of recovering it.
+	 */
+	isExecutionActive(executionId: string): boolean {
+		return this.schedulers.has(executionId);
 	}
 
 	/**
@@ -1017,6 +1031,18 @@ export class CommandHandler {
 					}
 				}
 
+				// A parent re-queued because a sub-step failed continues its own session with just
+				// the feedback. Decided per assignment from the scheduler: `subSteps` above is
+				// execution-wide and reaches unrelated steps, so it cannot tell which one this is.
+				const relaunchFeedback = scheduler?.getSubStepRelaunchFeedback(step.stepId);
+				const executionContext =
+					relaunchFeedback === undefined
+						? step.executionContext
+						: { ...step.executionContext, subStepRelaunch: { feedback: relaunchFeedback } };
+				if (relaunchFeedback !== undefined) {
+					this.warnIfWorkerCannotResume(step, idleWorker);
+				}
+
 				this.registry.markBusy(idleWorker);
 				// Acknowledge: marks step as in-flight in scheduler to prevent double-dispatch
 				scheduler?.acknowledge(step.stepId);
@@ -1040,7 +1066,7 @@ export class CommandHandler {
 					assignmentId: assignment.assignmentId,
 					stepId: step.stepId,
 					stepConfig: step.stepConfig,
-					executionContext: step.executionContext,
+					executionContext,
 				});
 				// Watched from the hand-over, not only from step_started: a worker confirms with
 				// step_started before anything else, so an assignment it never confirms would
@@ -1064,6 +1090,24 @@ export class CommandHandler {
 
 		this.readyQueue.unshift(...unplaced);
 		this.coverUnmetDemand(unplaced.length);
+	}
+
+	/**
+	 * Names, in the execution log, a worker that cannot resume the parent's session.
+	 *
+	 * Such a worker (built before `WORKER_FEATURE_SUB_STEP_SESSION_RESUME`) ignores the relaunch
+	 * payload and renders the parent's whole prompt again, which is the previous behaviour. It is
+	 * allowed to run the step -- routing is an extension point and refusing would stall a flow in
+	 * the middle of a rolling worker update -- but never silently.
+	 */
+	private warnIfWorkerCannotResume(step: ReadyStep, worker: WebSocket): void {
+		const registered = this.registry.describe(worker);
+		if (registered?.features.includes(WORKER_FEATURE_SUB_STEP_SESSION_RESUME) === true) return;
+		this.logWriter.writeExecution(
+			step.executionContext.executionId,
+			`Step '${step.stepId}' is re-run because a sub-step failed, but worker ${registered?.workerId ?? 'unknown'} (flow-cli ${registered?.version ?? 'unknown version'}) cannot resume its session: it will render the step's prompt again from scratch instead of receiving only the sub-step feedback. Update flow-cli on that worker (\`flow cli update\`) and restart it to get the session-resume behaviour.`,
+			'warning'
+		);
 	}
 
 	/**

@@ -48,6 +48,8 @@ function buildClaudeMcpConfig(servers: McpServer[]): Record<string, unknown> {
 }
 
 export class ClaudeModelProvider implements ModelProvider {
+	/** Passes `resumeSessionId` to the CLI, so a sub-step failure can be delivered into the parent's session. */
+	readonly supportsSessionResume = true;
 	private readonly launcher = new ClaudeLauncher();
 	private currentProcess: ChildProcess | null = null;
 

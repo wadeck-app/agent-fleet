@@ -119,6 +119,11 @@ export class ExecutionStore {
 			...state.steps[stepId],
 			status: 'running',
 			startedAt: new Date().toISOString(),
+			// A new attempt: the previous one's failure must not linger on a step that may now succeed
+			error: undefined,
+			stdout: undefined,
+			stderr: undefined,
+			completedAt: undefined,
 			...(provenance?.sourceId !== undefined ? { sourceId: provenance.sourceId } : {}),
 			...(provenance?.workerId !== undefined ? { workerId: provenance.workerId } : {}),
 		};

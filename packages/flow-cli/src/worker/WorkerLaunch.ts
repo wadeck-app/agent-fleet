@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { VERSION } from '../cli/version';
+import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { WorkerReady } from '../ipc/Protocol';
 
 /** Longest gap between reconnection attempts, so a restarted daemon is found promptly. */
@@ -202,6 +203,8 @@ export function buildRegistration(params: {
 		...(params.sourceId !== undefined ? { sourceId: params.sourceId } : {}),
 		labels: params.labels ?? [],
 		shellCapabilities: params.shellCapabilities ?? [],
+		// What this build implements beyond the base protocol; an older worker simply omits it
+		features: [WORKER_FEATURE_SUB_STEP_SESSION_RESUME],
 		attachedProjects,
 		// Only this process can see whether anybody can be reached from here (D#33, D#36) -- and a
 		// TTY alone is not the capability. Without an approval provider the worker would attract an

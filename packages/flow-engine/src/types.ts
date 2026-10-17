@@ -640,6 +640,13 @@ export interface ModelFlowStep extends BaseFlowStep {
 	toolLog?: 'none' | 'name' | 'full';
 
 	/**
+	 * Wrapper for the message that delivers failed sub-step feedback into this step's resumed
+	 * session when it is re-run because a sub-step failed. Must reference `${{ subStepFeedback }}`.
+	 * Omit for the built-in wrapper. The original `prompt` is not re-sent on such a re-run.
+	 */
+	subStepFeedbackPrompt?: string;
+
+	/**
 	 * Session continuation: resume a previous model step's Claude session.
 	 * The new prompt is injected as a user message into the existing conversation.
 	 */

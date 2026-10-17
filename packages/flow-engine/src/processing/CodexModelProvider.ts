@@ -59,6 +59,8 @@ interface PreparedLaunch {
 }
 
 export class CodexModelProvider implements ModelProvider {
+	/** Passes `resumeSessionId` to the CLI, so a sub-step failure can be delivered into the parent's session. */
+	readonly supportsSessionResume = true;
 	private currentProcess: ChildProcess | null = null;
 
 	public async launchInteractive(options: LaunchOptions): Promise<ModelInteractiveResult> {

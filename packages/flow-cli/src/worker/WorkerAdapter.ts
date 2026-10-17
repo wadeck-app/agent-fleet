@@ -93,6 +93,9 @@ export class WorkerAdapter {
 			subSteps: context.subSteps ? new Map(Object.entries(context.subSteps)) : undefined,
 			// Every failed sub-step's own feedback, pre-aggregated for ${{ subStepFeedback }}
 			subStepFeedback: context.subStepFeedback,
+			// Set only when the daemon re-dispatched this parent because a sub-step failed: the model
+			// step then resumes its previous session (stepMeta) with just this feedback
+			...(context.subStepRelaunch ? { subStepRelaunch: context.subStepRelaunch } : {}),
 		};
 
 		// For model steps, wire up the MCP server for provideSteps injection

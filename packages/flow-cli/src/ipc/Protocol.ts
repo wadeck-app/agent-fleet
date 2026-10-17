@@ -42,6 +42,16 @@ export interface ExecutionContext {
 	 */
 	subStepFeedback?: string;
 
+	/**
+	 * Present only on the assignment of a parent step re-queued because a sub-step failed. The
+	 * worker resumes the parent's previous session (`stepMeta[stepId].session_id`) and sends only
+	 * `feedback` -- the failed sub-steps' aggregated feedback -- instead of rendering the step's
+	 * prompt again. Set per assignment by the daemon, never on the shared execution context.
+	 * A worker that predates it ignores the field and re-renders the prompt (see
+	 * `WORKER_FEATURE_SUB_STEP_SESSION_RESUME`); the daemon warns when it dispatches to one.
+	 */
+	subStepRelaunch?: { feedback: string };
+
 	/** Default working directory from the flow definition (FlowDefinition.workingDir). */
 	flowWorkingDir?: string;
 
@@ -51,6 +61,13 @@ export interface ExecutionContext {
 	flowId?: string;
 	flowVersion?: string;
 }
+
+/**
+ * `WorkerReady.features` value: the worker honours `ExecutionContext.subStepRelaunch` (resumes the
+ * parent's session with just the sub-step feedback). A worker not declaring it re-renders the
+ * parent's whole prompt, so the daemon names that in the execution log instead of staying silent.
+ */
+export const WORKER_FEATURE_SUB_STEP_SESSION_RESUME = 'sub-step-session-resume';
 
 export type ClientCommand =
 	| {
@@ -247,6 +264,12 @@ export interface WorkerReady {
 	 * says otherwise" default as `labels` -- absent or omitted means no declared capability.
 	 */
 	shellCapabilities?: ('bash' | 'cmd' | 'pwsh')[];
+	/**
+	 * Protocol features this worker implements (see `WORKER_FEATURE_*`). Absent from a worker
+	 * built before the feature existed, which the daemon treats as "supports none" and names in
+	 * the log where it matters, rather than assuming.
+	 */
+	features?: string[];
 }
 
 export type WorkerToDaemon =

@@ -707,6 +707,27 @@ export class SchemaValidator {
 			});
 		}
 
+		// Validate subStepFeedbackPrompt (optional): it must carry the feedback, or the relaunch
+		// message would silently tell the model nothing about what failed
+		if (step.subStepFeedbackPrompt !== undefined) {
+			const wrapper: unknown = step.subStepFeedbackPrompt;
+			if (
+				typeof wrapper !== 'string' ||
+				wrapper.trim() === '' ||
+				!/\$\{\{\s*subStepFeedback\s*\}\}/.test(wrapper)
+			) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.INVALID_VALUE,
+					message: `Model step '${step.id}' subStepFeedbackPrompt must be a non-empty string that references the sub-step feedback`,
+					location: { stepId: step.id, field: 'subStepFeedbackPrompt' },
+					suggestion:
+						'Include ${{ subStepFeedback }} in it (e.g. "Validation failed:\\n${{ subStepFeedback }}"), or omit the field to use the built-in wrapper',
+					context: { actual: wrapper },
+				});
+			}
+		}
+
 		// Validate timeout (optional; 0 is invalid -- omit the field instead to mean "no timeout")
 		if (step.timeout !== undefined) {
 			if (typeof step.timeout !== 'number' || step.timeout <= 0) {

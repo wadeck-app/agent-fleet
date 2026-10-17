@@ -11,6 +11,7 @@
  * This validator identifies issues that would cause runtime problems but aren't
  * caught by structural or semantic validation.
  */
+import { TemplateEscape } from '../processing/TemplateEscape';
 import type { FlowDefinition, FlowStep } from '../types';
 import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
@@ -319,7 +320,8 @@ export class SimulationValidator {
 			text += step.onFailure.addComment;
 		}
 
-		return text;
+		// ${{ ... }} is an escaped literal for the renderer: not an expression to validate
+		return TemplateEscape.strip(text);
 	}
 
 	/**
@@ -329,10 +331,12 @@ export class SimulationValidator {
 	 *   steps.<id>.outputs.<id>
 	 *   flow.<id>
 	 *   task.<id>  (prompt template only -- task is NOT available in when: conditions)
-	 * Where <id> is [a-zA-Z0-9_-]+
+	 *   context.<id>
+	 *   subStepFeedback  (bare root; '' without failed sub-steps, see TemplateRenderer)
+	 * Where <id> is [a-zA-Z0-9_-]+ (inputs/task/context accept dotted paths, like TemplateRenderer.resolveNested)
 	 */
 	private static readonly VALID_TEMPLATE_EXPRESSION =
-		/^(inputs\.[a-zA-Z0-9_-]+|steps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_.-]+|steps\.[a-zA-Z0-9_-]+\.meta\.[a-zA-Z0-9_.-]+|subSteps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_.-]+|subSteps\.[a-zA-Z0-9_-]+\.status\.[a-zA-Z0-9_-]+|flow\.[a-zA-Z0-9_-]+|task\.[a-zA-Z0-9_-]+|context\.[a-zA-Z0-9_-]+)$/;
+		/^(inputs\.[a-zA-Z0-9_.-]+|steps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_.-]+|steps\.[a-zA-Z0-9_-]+\.meta\.[a-zA-Z0-9_.-]+|subSteps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_.-]+|subSteps\.[a-zA-Z0-9_-]+\.status\.[a-zA-Z0-9_-]+|flow\.[a-zA-Z0-9_-]+|task\.[a-zA-Z0-9_.-]+|context\.[a-zA-Z0-9_.-]+|subStepFeedback)$/;
 
 	/**
 	 * Validate a single template expression against the whitelist.
@@ -352,15 +356,32 @@ export class SimulationValidator {
 					path: `${flow.id}.steps[${step.id}]`,
 				},
 				suggestion:
-					'Valid forms: ${{ inputs.name }}, ${{ steps.step-id.outputs.varName }}, ${{ subSteps.step-id.outputs.stderr }}, ${{ subSteps.step-id.status.failed }}, ${{ context.cwd }}.' +
+					'Valid forms: ${{ inputs.name }}, ${{ steps.step-id.outputs.varName }}, ${{ subSteps.step-id.outputs.stderr }}, ${{ subSteps.step-id.status.failed }}, ${{ context.cwd }}, ${{ subStepFeedback }}.' +
 					' To write a literal (not evaluated), prefix with an extra dollar sign: double-dollar then braces.',
 				context: {
 					actual: expression,
 					expected:
-						'inputs.<id> | steps.<id>.outputs.<id> | subSteps.<id>.outputs.<id> | subSteps.<id>.status.<field> | context.<id>',
+						'inputs.<id> | steps.<id>.outputs.<id> | subSteps.<id>.outputs.<id> | subSteps.<id>.status.<field> | context.<id> | subStepFeedback',
 				},
 			});
 			return;
+		}
+
+		// subStepFeedback renders as '' unless the step is the parent of sub-steps (declared via `parent:`).
+		// The renderer does not fail, so mirror it with a warning that names the cause.
+		if (expression === 'subStepFeedback' && !flow.steps.some(s => s.parent === step.id)) {
+			this.issueCollector.addIssue({
+				severity: 'warning',
+				code: ValidationCode.UNDEFINED_VARIABLE,
+				message: `\${{ subStepFeedback }} in step '${step.id}' will always be empty: no step declares parent '${step.id}'`,
+				location: {
+					stepId: step.id,
+					field: step.type === 'model' ? 'prompt' : 'script',
+					path: `${flow.id}.steps[${step.id}]`,
+				},
+				suggestion: `Add sub-steps with 'parent: ${step.id}' or remove the reference`,
+				context: { actual: expression, expected: 'a step that is the parent of at least one other step' },
+			});
 		}
 
 		// Check undeclared output key: steps.<sourceId>.outputs.<key>

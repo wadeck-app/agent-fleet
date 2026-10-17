@@ -10,7 +10,9 @@
  * - ${{ subSteps.stepId.status.failed }} - whether a sub-step failed (boolean as string)
  * - ${{ subStepFeedback }} - every failed sub-step's own feedback, pre-aggregated into one string
  * - {% if expr %}...{% endif %} / {% if expr %}...{% else %}...{% endif %} - conditional blocks
+ * - $${{ expr }} - escaped literal, rendered as ${{ expr }} (see TemplateEscape)
  */
+import { TemplateEscape } from './TemplateEscape';
 
 /**
  * Context for template rendering
@@ -55,6 +57,13 @@ export interface TemplateContext {
 	 */
 	subStepFeedback?: string;
 
+	/**
+	 * Set only on the launch of a parent model step that was re-queued because a sub-step failed.
+	 * `feedback` is the failed sub-steps' aggregated feedback (`buildSubStepFeedback`). The step
+	 * then resumes its previous session with just that feedback instead of rendering its prompt.
+	 */
+	subStepRelaunch?: { feedback: string };
+
 	/** Callback when Claude process starts */
 	onClaudeProcessStarted?: (process: any) => void;
 }
@@ -91,7 +100,7 @@ export class TemplateRenderer {
 		//    placeholder is restored as a literal ${{ ... }} in the output.
 		//    This lets users write $${{ inputs.taskId }} to produce ${{ inputs.taskId }}.
 		const escapedLiterals: string[] = [];
-		const escapedTemplate = template.replace(/\$\$\{\{(.*?)\}\}/g, (_, inner: string) => {
+		const escapedTemplate = template.replace(TemplateEscape.pattern(), (_, inner: string) => {
 			const index = escapedLiterals.length;
 			escapedLiterals.push(`\${{${inner}}}`);
 			return `\x00ESCAPED_EXPR_${index}\x00`;

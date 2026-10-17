@@ -88,6 +88,24 @@ describe('ExecutionStore', () => {
 			expect(state.currentSteps).toContain('step-a');
 			expect(state.status).toBe('running');
 		});
+
+		// A step run again (sub-step restart, retry, loop) must not look like "completed with an
+		// error" once it finally succeeds: the previous attempt's failure is not this run's.
+		it('clears the previous attempt failure details when the step runs again', () => {
+			store.create({ executionId: EXEC_ID, flowFile: 'flow.yaml', flowId: 'my-flow', stepIds: ['step-a'] });
+			store.markStepRunning(EXEC_ID, 'step-a');
+			store.markStepFailed(EXEC_ID, 'step-a', 'boom', 'out', 'err');
+
+			const rerun = store.markStepRunning(EXEC_ID, 'step-a');
+			expect(rerun.steps['step-a'].status).toBe('running');
+			expect(rerun.steps['step-a'].error).toBeUndefined();
+			expect(rerun.steps['step-a'].stdout).toBeUndefined();
+			expect(rerun.steps['step-a'].stderr).toBeUndefined();
+			expect(rerun.steps['step-a'].completedAt).toBeUndefined();
+
+			const done = store.markStepCompleted(EXEC_ID, 'step-a');
+			expect(done.steps['step-a'].error).toBeUndefined();
+		});
 	});
 
 	describe('markStepCompleted()', () => {

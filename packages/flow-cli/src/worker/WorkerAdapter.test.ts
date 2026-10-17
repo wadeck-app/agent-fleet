@@ -105,6 +105,38 @@ describe('WorkerAdapter', () => {
 		expect(templateContext.taskId).toBe('testexec');
 	});
 
+	// The daemon decides a model step is a sub-step-failure relaunch; the worker must hand that
+	// to the engine (ModelStepExecutor) or the step would re-render its whole prompt instead of
+	// resuming its session with just the feedback.
+	it('forwards the sub-step relaunch payload and the previous step meta to the engine', async () => {
+		const context: ExecutionContext = {
+			...makeContext(),
+			stepMeta: { 'model-step': { model: 'm', session_id: 'ses_first', session_file: '' } as never },
+			subStepRelaunch: { feedback: '[verify]\nE1' },
+		};
+
+		await adapter.execute(makeModelStep(), context, sendMessage);
+
+		const [, , templateContext] = mockExecuteStep.mock.calls[0] as [
+			unknown,
+			unknown,
+			{ subStepRelaunch?: { feedback: string }; stepMeta?: Map<string, Record<string, unknown>> },
+		];
+		expect(templateContext.subStepRelaunch).toEqual({ feedback: '[verify]\nE1' });
+		expect(templateContext.stepMeta?.get('model-step')?.['session_id']).toBe('ses_first');
+	});
+
+	it('leaves the template context without a relaunch payload on a normal launch', async () => {
+		await adapter.execute(makeModelStep(), makeContext(), sendMessage);
+
+		const [, , templateContext] = mockExecuteStep.mock.calls[0] as [
+			unknown,
+			unknown,
+			{ subStepRelaunch?: unknown },
+		];
+		expect(templateContext.subStepRelaunch).toBeUndefined();
+	});
+
 	it('returns outputs for a script step', async () => {
 		const result = await adapter.execute(makeScriptStep(), makeContext(), sendMessage);
 		expect(result.output).toEqual({ result: 'ok' });

@@ -34,6 +34,8 @@ export interface RegisteredWorker {
 	hasUserInterface: boolean;
 	/** Shells this worker can actually run -- never an authorization decision, routing only. */
 	shellCapabilities: ('bash' | 'cmd' | 'pwsh')[];
+	/** Protocol features this worker declared (`WORKER_FEATURE_*`); empty for a worker that predates them. */
+	features: string[];
 	/**
 	 * True when this daemon created the worker, so it exists only to serve this daemon
 	 * and may be told to exit once there is nothing left to run.
@@ -99,6 +101,7 @@ export class WorkerRegistry {
 			attachedProjects: registration.attachedProjects ?? [],
 			hasUserInterface: registration.hasUserInterface ?? false,
 			shellCapabilities: registration.shellCapabilities ?? [],
+			features: registration.features ?? [],
 		});
 	}
 

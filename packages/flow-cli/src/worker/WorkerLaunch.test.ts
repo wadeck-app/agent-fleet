@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VERSION } from '../cli/version.js';
+import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol.js';
 import {
 	buildRegistration,
 	buildStepRunnerConfig,
@@ -106,6 +107,14 @@ describe('buildRegistration', () => {
 		const reg = buildRegistration({ projectRoot: 'C:/proj', isTty: false, canPrompt: false, pid: 7 });
 
 		expect(reg.version).toBe(VERSION);
+	});
+
+	// The daemon names a worker that lacks this in the log when it dispatches a sub-step relaunch
+	// to it (the worker would re-render the whole parent prompt instead of resuming its session).
+	it('declares the sub-step session resume feature', () => {
+		const reg = buildRegistration({ projectRoot: 'C:/proj', isTty: false, canPrompt: false, pid: 7 });
+
+		expect(reg.features).toContain(WORKER_FEATURE_SUB_STEP_SESSION_RESUME);
 	});
 
 	it('adds explicitly requested projects without dropping the launch one', () => {

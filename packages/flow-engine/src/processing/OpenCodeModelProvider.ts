@@ -322,6 +322,8 @@ export interface OpenCodeModelProviderOptions {
 }
 
 export class OpenCodeModelProvider implements ModelProvider {
+	/** Passes `resumeSessionId` to the CLI, so a sub-step failure can be delivered into the parent's session. */
+	readonly supportsSessionResume = true;
 	private currentProcess: ChildProcess | null = null;
 	private readonly maxInlineConfigBytes: number;
 

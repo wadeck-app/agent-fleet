@@ -175,7 +175,13 @@ export class FlowOrchestrator {
 						resolvedGlobalEnv && (rawStep.type === 'script' || rawStep.type === 'model')
 							? { ...rawStep, env: { ...resolvedGlobalEnv, ...(rawStep.env ?? {}) } }
 							: rawStep;
-					return this.stepRunner.executeStep(step, workspace, context, inProgressTrace => {
+					// Per step, not on the shared context: only the restarted parent is a sub-step relaunch
+					const relaunchFeedback = scheduler.getSubStepRelaunchFeedback(item.stepId);
+					const stepContext: TemplateContext =
+						relaunchFeedback === undefined
+							? context
+							: { ...context, subStepRelaunch: { feedback: relaunchFeedback } };
+					return this.stepRunner.executeStep(step, workspace, stepContext, inProgressTrace => {
 						// Add or replace the in-progress trace for real-time visibility
 						const existingIndex = trace.steps.findIndex(t => t.stepId === inProgressTrace.stepId);
 						if (existingIndex >= 0) {
@@ -202,6 +208,12 @@ export class FlowOrchestrator {
 					trace.steps.push(stepTrace);
 				}
 				onTraceUpdate?.(trace);
+
+				// A model step's session is what a later sub-step relaunch of it resumes
+				if (!stepTrace.error && stepTrace.meta !== undefined) {
+					context.stepMeta ??= new Map();
+					context.stepMeta.set(item.stepId, stepTrace.meta as unknown as Record<string, unknown>);
+				}
 
 				const outcome: StepOutcome = stepTrace.error
 					? { type: 'failed', error: stepTrace.error, outputs: stepTrace.outputs ?? {} }

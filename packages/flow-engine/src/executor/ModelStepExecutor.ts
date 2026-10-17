@@ -16,6 +16,7 @@ import { StreamEventMapper } from '../processing/StreamEventMapper';
 import type { TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
 import type { ExecutionConfig, LiveLogEntry, ModelFlowStep, ModelStepMeta, StepTrace } from '../types';
 import { writeOutputFiles } from './ScriptStepExecutor';
+import { buildSubStepRelaunch } from './SubStepRelaunch';
 
 export interface ModelStepConfig {
 	interactive: boolean;
@@ -109,7 +110,28 @@ export async function executeModelStep(
 	// overridden by config.providerName, which must not change what contextLimit validates.
 	const actualProvider = step.provider ?? 'claude';
 
-	const renderedPrompt = templateRenderer.render(step.prompt, context, true);
+	// A relaunch caused by a failed sub-step continues the previous session with only the feedback:
+	// the original prompt is neither rendered nor sent again.
+	let renderedPrompt: string;
+	let relaunchSessionId: string | undefined;
+	if (context.subStepRelaunch !== undefined) {
+		const relaunch = buildSubStepRelaunch({
+			step,
+			feedback: context.subStepRelaunch.feedback,
+			context,
+			provider,
+			providerLabel,
+			templateRenderer,
+		});
+		if ('error' in relaunch) {
+			stepTrace.error = relaunch.error;
+			return stepTrace;
+		}
+		renderedPrompt = relaunch.message;
+		relaunchSessionId = relaunch.resumeSessionId;
+	} else {
+		renderedPrompt = templateRenderer.render(step.prompt, context, true);
+	}
 	stepTrace.prompt = renderedPrompt;
 	stepTrace.model = effectiveModel;
 
@@ -196,8 +218,10 @@ export async function executeModelStep(
 		}, 500);
 	}
 
-	let resumeSessionId: string | undefined;
-	if (step.session?.continue) {
+	// The parent's own previous session wins over `session.continue`: that one only applies to a
+	// first launch, and the relaunch continues the conversation the parent already has.
+	let resumeSessionId: string | undefined = relaunchSessionId;
+	if (relaunchSessionId === undefined && step.session?.continue) {
 		const prevMeta = context.stepMeta?.get(step.session.continue);
 		const prevSessionId = prevMeta?.['session_id'] as string | undefined;
 		const prevSessionFile = prevMeta?.['session_file'] as string | undefined;

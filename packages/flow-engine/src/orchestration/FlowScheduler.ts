@@ -136,6 +136,14 @@ export class FlowScheduler {
 	 * them after each parent run as needed (e.g., MCP provideSteps pattern).
 	 */
 	private readonly staticChildren = new Map<string, Set<string>>();
+	/**
+	 * Per-parent feedback of the sub-steps that failed in the run that just ended, set when the
+	 * parent is re-queued because of them and kept until the relaunched parent completes (so a
+	 * retry or a re-dispatch of the same launch still carries it). Its presence is what tells a
+	 * consumer "this launch of the parent is a sub-step relaunch": it must resume the parent's
+	 * session with this text instead of re-rendering the original prompt.
+	 */
+	private readonly subStepRelaunchFeedback = new Map<string, string>();
 	/** Registered sub-step strategies, keyed by strategy name. */
 	private readonly strategies: Map<string, SubStepStrategy>;
 
@@ -213,6 +221,8 @@ export class FlowScheduler {
 		this.inFlightSteps.delete(stepId);
 
 		if (outcome.type === 'completed') {
+			// The launch that consumed the relaunch feedback is over; a later launch is a plain one
+			this.subStepRelaunchFeedback.delete(stepId);
 			// Store outputs immediately so children can use them for template rendering
 			this.outputs.set(stepId, outcome.outputs);
 			this.context.stepOutputs.set(stepId, outcome.outputs);
@@ -372,6 +382,7 @@ export class FlowScheduler {
 				});
 			}
 			this.context.subSteps = subStepsMap;
+			this.subStepRelaunchFeedback.set(parentId, buildSubStepFeedback(subStepsMap));
 
 			// Re-queue static children for the next run so they validate the fresh parent
 			// output. Dynamic (inject()-based) children are re-injected by the caller.
@@ -429,6 +440,15 @@ export class FlowScheduler {
 	 */
 	getSubSteps(): Map<string, { outputs: Record<string, unknown>; status: string }> | undefined {
 		return this.context.subSteps;
+	}
+
+	/**
+	 * Feedback of the failed sub-steps when the next (or current) launch of `stepId` is a relaunch
+	 * caused by them, `undefined` for any other launch. Unlike `getSubSteps()` this is per step:
+	 * the consumer resumes the parent's own session with it instead of re-rendering the prompt.
+	 */
+	getSubStepRelaunchFeedback(stepId: string): string | undefined {
+		return this.subStepRelaunchFeedback.get(stepId);
 	}
 
 	/** Inject steps dynamically (MCP provideSteps). Returns newly ready items. */
@@ -740,6 +760,7 @@ export class FlowScheduler {
 			});
 		}
 		this.context.subSteps = subStepsMap;
+		this.subStepRelaunchFeedback.set(parentId, buildSubStepFeedback(subStepsMap));
 
 		// Re-queue static children for the next run so they validate the fresh parent output.
 		this.requeueChildrenForParent(parentId);
@@ -827,6 +848,8 @@ export class FlowScheduler {
 			// Clear any deferred, sub-step, or superseded state for invalidated steps
 			this.deferredOutcomes.delete(invId);
 			this.subStepLoopIterations.delete(invId);
+			// A loop re-runs the step from scratch, so it is not a sub-step relaunch any more
+			this.subStepRelaunchFeedback.delete(invId);
 			this.supersededSteps.delete(invId);
 			this.subStepFailedChildren.delete(invId);
 

@@ -11,6 +11,7 @@
  * 2. Extract all step output references from templates
  * 3. For each reference, check if consumer depends on producer
  */
+import { TemplateEscape } from '../processing/TemplateEscape';
 import type { FlowDefinition, FlowStep, ModelFlowStep, ScriptFlowStep, SubFlowStep } from '../types';
 import { type IssueCollector, ValidationCode, type VariableReference } from './ValidationTypes';
 
@@ -79,7 +80,9 @@ export class DependencyOrderValidator {
 		for (const step of flow.steps) {
 			const texts = this.getTemplateTexts(step);
 
-			for (const { text, field } of texts) {
+			for (const { text: rawText, field } of texts) {
+				// $${{ ... }} is an escaped literal for the renderer: not a reference
+				const text = TemplateEscape.strip(rawText);
 				let match;
 				while ((match = templateRegex.exec(text)) !== null) {
 					const expression = match[1].trim();

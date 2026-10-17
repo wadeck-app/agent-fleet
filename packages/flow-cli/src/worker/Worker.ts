@@ -4,6 +4,7 @@ import type { StepRunnerConfig } from 'flow-engine';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
 
+import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { AssignmentScopedMessage, DaemonToWorker, WorkerToDaemon } from '../ipc/Protocol';
 import type { McpServerConfig } from './McpServer';
 import { WorkerAdapter } from './WorkerAdapter';
@@ -22,6 +23,8 @@ function send(message: WorkerToDaemon): void {
 	}
 }
 
+const WORKER_FEATURES = [WORKER_FEATURE_SUB_STEP_SESSION_RESUME];
+
 const baseConfig: StepRunnerConfig = { interactive: false };
 
 const adapter = new WorkerAdapter((mcpServers: McpServerConfig[]) => {
@@ -32,7 +35,7 @@ const adapter = new WorkerAdapter((mcpServers: McpServerConfig[]) => {
 });
 
 ws.on('open', () => {
-	send({ type: 'ready', pid: process.pid });
+	send({ type: 'ready', pid: process.pid, features: WORKER_FEATURES });
 });
 
 ws.on('message', (data: Buffer) => {
@@ -89,7 +92,7 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 					stderr,
 				});
 			}
-			send({ type: 'ready', pid: process.pid });
+			send({ type: 'ready', pid: process.pid, features: WORKER_FEATURES });
 			break;
 		}
 		case 'idle':

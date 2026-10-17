@@ -22,6 +22,7 @@ function candidate(workerId: string, overrides: Partial<RegisteredWorker> = {}):
 			hasUserInterface: false,
 			ephemeral: true,
 			shellCapabilities: [],
+			features: [],
 			...overrides,
 		},
 	};
