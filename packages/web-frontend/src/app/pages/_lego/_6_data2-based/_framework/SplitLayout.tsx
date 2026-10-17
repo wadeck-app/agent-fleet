@@ -34,9 +34,19 @@ export function SplitLayout({ left, right, rightWidth = 'md' }: SplitLayoutProps
 	const rightWidthClass = RIGHT_WIDTH_CLASSES[rightWidth];
 
 	return (
-		<div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+		<div
+			className={`
+    flex flex-col gap-4
+    lg:flex-row lg:gap-6
+  `}
+		>
 			<div className="flex-1 overflow-hidden">{left}</div>
-			<div className={`flex-shrink-0 ${rightWidthClass}`}>
+			<div
+				className={`
+     flex-shrink-0
+     ${rightWidthClass}
+   `}
+			>
 				<div className="sticky top-4">{right}</div>
 			</div>
 		</div>

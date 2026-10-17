@@ -29,7 +29,7 @@ When a model step runs Claude in agentic mode, tool calls happen silently by def
 | `name`    | `→ Bash` — tool name only                                      |
 | `full`    | `→ Bash: sleep 5` / `← Bash: (result)` — name + input + output |
 
-**Watchdog independence:** `toolLog`/`log` only control what's *displayed*. The daemon's
+**Watchdog independence:** `toolLog`/`log` only control what's _displayed_. The daemon's
 `stepSilenceLimitSeconds` watchdog is fed separately, via an `onActivity` hook that fires on
 every stream event regardless of these settings (a throttled `step_progress` IPC message, no
 content). A narration-free, tool-call-only step with `toolLog: none` (or `log: 'end'`) no

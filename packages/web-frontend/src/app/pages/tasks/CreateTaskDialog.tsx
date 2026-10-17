@@ -544,9 +544,9 @@ export function CreateTaskDialog({
 				isDragging
 					? 'bg-primary/50'
 					: `
-           bg-border
-           hover:bg-primary/30
-         `
+       bg-border
+       hover:bg-primary/30
+     `
 			}
          transition-colors
        `}
@@ -560,9 +560,9 @@ export function CreateTaskDialog({
 				isDragging
 					? 'text-primary'
 					: `
-             text-muted-foreground
-             group-hover:text-primary
-           `
+       text-muted-foreground
+       group-hover:text-primary
+     `
 			}
          `}
 								/>
@@ -570,7 +570,7 @@ export function CreateTaskDialog({
 						</div>
 
 						{/* Right Column - Flow Configuration */}
-						<div className="flex flex-col space-y-4 pl-3 pb-6" style={{ width: `${100 - leftWidth}%` }}>
+						<div className="flex flex-col space-y-4 pb-6 pl-3" style={{ width: `${100 - leftWidth}%` }}>
 							<h3 className="text-sm font-semibold text-foreground">Flow configuration</h3>
 
 							<ComboboxField

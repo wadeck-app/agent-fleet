@@ -54,7 +54,9 @@ describe('SchemaValidator - script step shell field', () => {
 	});
 
 	it('warns (not errors) when shell is omitted on a script step, and the flow still validates', () => {
-		const result = validator.validateSchema(flowWithStep({ type: 'script', id: 's1', name: 'S1', script: 'echo hi' }));
+		const result = validator.validateSchema(
+			flowWithStep({ type: 'script', id: 's1', name: 'S1', script: 'echo hi' })
+		);
 
 		const issues = shellIssues();
 		expect(issues).toHaveLength(1);

@@ -8,15 +8,16 @@ Inventory of what already exists in the repo, so the design reuses rather than d
 
 ## Two independent worker systems exist
 
-| | flow-cli daemon worker | legacy orchestrator worker |
-|---|---|---|
-| Creation | daemon `fork`s it | worker dials the orchestrator |
-| Identity | PID only | `preferredId`, `projectId`, `workspacePath`, `gitBranch` |
-| Capability declaration | none | `availableFlows` |
-| Registry | `WorkerPool` -- `Map<WebSocket, 'idle' \| 'busy'>` | `WebSocketConnectionManager` assigns/dedups IDs |
-| Ready message | `{ type: 'ready', pid }` | `W2OWorkerReadyMessage` |
+|                        | flow-cli daemon worker                             | legacy orchestrator worker                               |
+| ---------------------- | -------------------------------------------------- | -------------------------------------------------------- |
+| Creation               | daemon `fork`s it                                  | worker dials the orchestrator                            |
+| Identity               | PID only                                           | `preferredId`, `projectId`, `workspacePath`, `gitBranch` |
+| Capability declaration | none                                               | `availableFlows`                                         |
+| Registry               | `WorkerPool` -- `Map<WebSocket, 'idle' \| 'busy'>` | `WebSocketConnectionManager` assigns/dedups IDs          |
+| Ready message          | `{ type: 'ready', pid }`                           | `W2OWorkerReadyMessage`                                  |
 
 Key references:
+
 - `packages/flow-cli/src/worker/Worker.ts:10-14,34,68`
 - `packages/flow-cli/src/daemon/WorkerPool.ts:64-88,98,125-127`
 - `packages/flow-cli/src/ipc/Protocol.ts:47-53,69-74`
@@ -34,8 +35,8 @@ Verified 2026-09-11: `packages/flow-cli` has **zero** reference to `orchestrator
 
 **Correction (an earlier draft of this file was wrong).** It described the orchestrator path as a "reference implementation to learn from" and cited two items as prior art. Both claims are withdrawn:
 
-- *Server-side worker ID assignment* -- a trivial design point that needs no precedent.
-- *`availableFlows` as a capability declaration* -- a list of runnable flows, which is not a routing label. Reading it as "evidence that per-worker attributes were already felt necessary" infers intent from abandoned code.
+- _Server-side worker ID assignment_ -- a trivial design point that needs no precedent.
+- _`availableFlows` as a capability declaration_ -- a list of runnable flows, which is not a routing label. Reading it as "evidence that per-worker attributes were already felt necessary" infers intent from abandoned code.
 
 An abandoned design was abandoned for reasons. Copying it risks importing whatever made it fail. The only genuinely useful thing it could tell us is **why** it was abandoned, which is currently unknown -- ask before treating any part of it as a model.
 
@@ -50,6 +51,7 @@ Adding a `worker-pool` extension point requires three edits:
 3. A config section -- `ProjectPluginsConfig` already has a `[key: string]` passthrough (`packages/flow-cli/src/config/PluginConfig.ts:29`)
 
 Loader: `packages/flow-cli/src/config/PluginLoader.ts` is the entire discovery mechanism.
+
 - Config typeRef format: `plugins.<pluginId>.<implName>` (`:48-55`)
 - Resolution: explicit `pluginsDir` -> constructor override -> `require.resolve('plugin-<pluginId>/plugin.config')` (`:186-211`)
 - Manifest: `plugin.config.js` preferred, else `plugin.manifest.json` (`:151-184`)
@@ -82,17 +84,17 @@ Applied to inbound workers: the worker reads a token from `~/.config/flow/` and 
 
 The notion of "project" does exist in flow-cli, contrary to an earlier draft of this file that said otherwise -- but it is implemented three different ways that disagree.
 
-| Mechanism | Marker | Walks up the tree? |
-|---|---|---|
-| `findProjectRoot(startDir)` -- `RunCommand.ts:119-127` | `.agent-fleet/` | **Yes**, up to FS root; returns `null` if absent |
-| `ConfigLoader` -- `ConfigLoader.ts:80` | `.flow/config.yml` | **No** -- literal `process.cwd()` |
-| Hooks config -- `Daemon.ts:48` | `.flows/config.yml` | **No** -- literal `cwd` |
+| Mechanism                                              | Marker              | Walks up the tree?                               |
+| ------------------------------------------------------ | ------------------- | ------------------------------------------------ |
+| `findProjectRoot(startDir)` -- `RunCommand.ts:119-127` | `.agent-fleet/`     | **Yes**, up to FS root; returns `null` if absent |
+| `ConfigLoader` -- `ConfigLoader.ts:80`                 | `.flow/config.yml`  | **No** -- literal `process.cwd()`                |
+| Hooks config -- `Daemon.ts:48`                         | `.flows/config.yml` | **No** -- literal `cwd`                          |
 
 `findProjectRoot` is used only to resolve a flow ID against `<projectRoot>/.agent-fleet/flows.yml` (`RunCommand.ts:139-147`).
 
 ### Pre-existing bug: per-project plugin config silently ignored from a subdirectory
 
-Running `flow run` from a subdirectory of a project: `findProjectRoot` correctly locates the root via `.agent-fleet/`, but `ConfigLoader` looks for `.flow/config.yml` in the *subdirectory*, misses it, and `loadProjectConfig()` returns `{}` (`ConfigLoader.ts:117-119`). The user's per-project plugin configuration is dropped with no warning.
+Running `flow run` from a subdirectory of a project: `findProjectRoot` correctly locates the root via `.agent-fleet/`, but `ConfigLoader` looks for `.flow/config.yml` in the _subdirectory_, misses it, and `loadProjectConfig()` returns `{}` (`ConfigLoader.ts:117-119`). The user's per-project plugin configuration is dropped with no warning.
 
 The inconsistency is visible within the same file: a missing `FLOW_CONFIG` target throws loudly (`:95-97`), while a missing project config is silent. Violates the project's own no-silent-fallback rule.
 
@@ -102,15 +104,15 @@ The inconsistency is visible within the same file: a missing `FLOW_CONFIG` targe
 
 Code-verified. This matters because D#32 (interactive steps surface in the worker) is not a display tweak -- it lifts a deliberate restriction.
 
-| Fact | Reference |
-|---|---|
-| Any flow containing a `user_intervention` step is rejected: `UNSUPPORTED_STEP_TYPE ... not supported in v1` | `CommandHandler.ts:155-162` |
-| Intervention steps are not even assignable: `AssignableStep = Extract<FlowStep, {type:'model'\|'script'}>` | `ipc/Protocol.ts:4` |
-| `approvalProvider` is resolved daemon-side then never read -- dead field with the comment "stored for future worker injection (requires IPC protocol changes)" | `CommandHandler.ts:61-62`, `Daemon.ts:87,150` |
-| The worker hardcodes `interactive: false` | `worker/Worker.ts:24,30` |
-| `launchInteractive()` relies on `stdio: 'inherit'`, which in a forked worker inherits `['ignore','ignore','pipe']` -- no stdin | `ClaudeLauncher.ts:266`, `WorkerPool.ts:89` |
-| No IPC message type exists for prompt/answer relay: `DaemonToWorker = assign \| idle \| done`, `WorkerToDaemon = ready \| log \| step_completed \| step_failed \| inject_steps` | `ipc/Protocol.ts:48-53,68-73` |
-| No capability notion anywhere (`hasTty`, `canInteract`, `isTTY`) -- only a commented-out `process.stdout.isTTY` | `FlowIndex.ts:141` |
+| Fact                                                                                                                                                                            | Reference                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Any flow containing a `user_intervention` step is rejected: `UNSUPPORTED_STEP_TYPE ... not supported in v1`                                                                     | `CommandHandler.ts:155-162`                   |
+| Intervention steps are not even assignable: `AssignableStep = Extract<FlowStep, {type:'model'\|'script'}>`                                                                      | `ipc/Protocol.ts:4`                           |
+| `approvalProvider` is resolved daemon-side then never read -- dead field with the comment "stored for future worker injection (requires IPC protocol changes)"                  | `CommandHandler.ts:61-62`, `Daemon.ts:87,150` |
+| The worker hardcodes `interactive: false`                                                                                                                                       | `worker/Worker.ts:24,30`                      |
+| `launchInteractive()` relies on `stdio: 'inherit'`, which in a forked worker inherits `['ignore','ignore','pipe']` -- no stdin                                                  | `ClaudeLauncher.ts:266`, `WorkerPool.ts:89`   |
+| No IPC message type exists for prompt/answer relay: `DaemonToWorker = assign \| idle \| done`, `WorkerToDaemon = ready \| log \| step_completed \| step_failed \| inject_steps` | `ipc/Protocol.ts:48-53,68-73`                 |
+| No capability notion anywhere (`hasTty`, `canInteract`, `isTTY`) -- only a commented-out `process.stdout.isTTY`                                                                 | `FlowIndex.ts:141`                            |
 
 ### The daemon cannot host the approval provider -- this is forced, not a choice
 

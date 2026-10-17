@@ -128,11 +128,7 @@ export function FileField({
 						</Button>
 					</div>
 				) : (
-					<div
-						className={`
-       flex flex-col items-center justify-center gap-2 text-center
-     `}
-					>
+					<div className={`flex flex-col items-center justify-center gap-2 text-center`}>
 						<Upload className="h-8 w-8 text-muted-foreground" />
 						<div className="text-sm">
 							<span className="font-medium text-primary">Click to upload</span>

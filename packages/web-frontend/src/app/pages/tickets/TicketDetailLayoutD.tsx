@@ -276,7 +276,19 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 						onChange={e => handleTitleChange(e.target.value)}
 						placeholder="Ticket title"
 						autoComplete="off"
-						className={`mt-1 text-lg font-medium ${dirtyFields.title ? 'ring-2 ring-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary' : ''} ${saving ? 'opacity-50 transition-opacity' : ''}`}
+						className={`
+        mt-1 text-lg font-medium
+        ${
+			dirtyFields.title
+				? `
+          ring-2 ring-primary
+          focus-visible:border-primary focus-visible:ring-2
+          focus-visible:ring-primary
+        `
+				: ''
+		}
+        ${saving ? `opacity-50 transition-opacity` : ''}
+      `}
 					/>
 				</div>
 				<div className="w-48">
@@ -322,7 +334,19 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 					onChange={e => handleDescriptionChange(e.target.value)}
 					placeholder="Ticket description"
 					rows={6}
-					className={`mt-1 ${dirtyFields.description ? 'ring-2 ring-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary' : ''} ${saving ? 'opacity-50 transition-opacity' : ''}`}
+					className={`
+       mt-1
+       ${
+			dirtyFields.description
+				? `
+         ring-2 ring-primary
+         focus-visible:border-primary focus-visible:ring-2
+         focus-visible:ring-primary
+       `
+				: ''
+		}
+       ${saving ? `opacity-50 transition-opacity` : ''}
+     `}
 				/>
 			</div>
 
@@ -333,13 +357,22 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 				<div className="mt-2 space-y-2">
 					<div className="flex flex-wrap gap-2">
 						{localLabels.map(label => (
-							<Badge key={label} variant="outline" className="cursor-pointer px-3 py-1 text-sm">
+							<Badge
+								key={label}
+								variant="outline"
+								className={`
+         cursor-pointer px-3 py-1 text-sm
+       `}
+							>
 								{label}
 								<Button
 									type="button"
 									variant="ghost"
 									onClick={() => handleRemoveLabel(label)}
-									className="ml-2 h-auto p-0 text-muted-foreground hover:text-foreground"
+									className={`
+           ml-2 h-auto p-0 text-muted-foreground
+           hover:text-foreground
+         `}
 								>
 									<X className="size-3" aria-hidden="true" />
 								</Button>
@@ -364,14 +397,21 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 							className="w-full"
 						/>
 						{showLabelSuggestions && labelSuggestions.length > 0 && (
-							<div className="absolute z-10 mt-1 w-full rounded-md border bg-popover p-1 shadow-md">
+							<div
+								className={`
+         absolute z-10 mt-1 w-full rounded-md border bg-popover p-1 shadow-md
+       `}
+							>
 								{labelSuggestions.slice(0, 5).map(suggestion => (
 									<Button
 										key={suggestion}
 										type="button"
 										variant="ghost"
 										onClick={() => handleAddLabel(suggestion)}
-										className="block w-full rounded-sm px-2 py-1 text-left text-sm hover:bg-accent"
+										className={`
+            block w-full rounded-sm px-2 py-1 text-left text-sm
+            hover:bg-accent
+          `}
 									>
 										{suggestion}
 									</Button>
@@ -429,7 +469,10 @@ export function TicketDetailLayoutD({ ticket, ticketId, onRefresh }: TicketDetai
 							<Link
 								key={subTicket.id}
 								to={`/tickets/${subTicket.id}`}
-								className="block rounded-md border bg-card p-3 hover:bg-accent"
+								className={`
+          block rounded-md border bg-card p-3
+          hover:bg-accent
+        `}
 							>
 								<div className="flex items-center justify-between">
 									<span className="font-medium">{subTicket.title}</span>

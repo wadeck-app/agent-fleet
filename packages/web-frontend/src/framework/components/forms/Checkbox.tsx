@@ -13,8 +13,9 @@ const Checkbox = React.forwardRef<
 			data-slot="checkbox"
 			className={cn(
 				`
-      peer relative flex size-4 shrink-0 cursor-pointer items-center justify-center
-      rounded-[4px] border border-input transition-colors outline-none
+      peer relative flex size-4 shrink-0 cursor-pointer items-center
+      justify-center rounded-[4px] border border-input transition-colors
+      outline-none
       group-has-disabled/field:opacity-50
       after:absolute after:-inset-x-3 after:-inset-y-2
       focus-visible:border-ring focus-visible:ring-[3px]
@@ -42,7 +43,13 @@ const Checkbox = React.forwardRef<
       [&>svg]:size-3.5
     `}
 			>
-				{props.checked === 'indeterminate' && <div className={`h-[3px] w-2.5 rounded-full bg-current`} />}
+				{props.checked === 'indeterminate' && (
+					<div
+						className={`
+      h-[3px] w-2.5 rounded-full bg-current
+    `}
+					/>
+				)}
 			</CheckboxPrimitive.Indicator>
 		</CheckboxPrimitive.Root>
 	);

@@ -111,7 +111,19 @@ export function TicketDetailLayoutA({ ticket, ticketId, onUpdate, onRefresh }: T
 						value={localDescription}
 						onChange={e => handleDescriptionChange(e.target.value)}
 						rows={10}
-						className={`mt-1 ${dirtyFields.description ? 'ring-2 ring-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary' : ''} ${saving ? 'opacity-50 transition-opacity' : ''}`}
+						className={`
+        mt-1
+        ${
+			dirtyFields.description
+				? `
+          ring-2 ring-primary
+          focus-visible:border-primary focus-visible:ring-2
+          focus-visible:ring-primary
+        `
+				: ''
+		}
+        ${saving ? `opacity-50 transition-opacity` : ''}
+      `}
 					/>
 				</div>
 
@@ -166,17 +178,26 @@ export function TicketDetailLayoutA({ ticket, ticketId, onUpdate, onRefresh }: T
 					</div>
 				</div>
 
-				<div className={dirtyFields.labels ? 'rounded-md ring-2 ring-primary/30 p-2' : ''}>
+				<div className={dirtyFields.labels ? 'rounded-md p-2 ring-2 ring-primary/30' : ''}>
 					<Label>Labels</Label>
 					<div className="mt-2 flex flex-wrap gap-2">
 						{localLabels.map(label => (
-							<Badge key={label} variant="outline" className="cursor-pointer px-2 py-1 text-xs">
+							<Badge
+								key={label}
+								variant="outline"
+								className={`
+         cursor-pointer px-2 py-1 text-xs
+       `}
+							>
 								{label}
 								<Button
 									type="button"
 									variant="ghost"
 									onClick={() => handleRemoveLabel(label)}
-									className="ml-1 h-auto p-0 text-muted-foreground hover:text-foreground"
+									className={`
+           ml-1 h-auto p-0 text-muted-foreground
+           hover:text-foreground
+         `}
 								>
 									<X className="size-3" aria-hidden="true" />
 								</Button>

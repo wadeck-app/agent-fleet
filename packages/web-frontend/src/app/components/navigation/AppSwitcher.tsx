@@ -15,15 +15,15 @@ export function AppSwitcher({ className, compact = false }: AppSwitcherProps) {
 	return (
 		<div
 			className={`
-    flex items-center
-    ${className || ''}
-  `}
+     flex items-center
+     ${className || ''}
+   `}
 		>
 			<h1
 				className={`
-     font-bold text-primary
-     ${compact ? 'text-lg' : 'text-xl'}
-   `}
+      font-bold text-primary
+      ${compact ? 'text-lg' : 'text-xl'}
+    `}
 			>
 				Agent Fleet
 			</h1>

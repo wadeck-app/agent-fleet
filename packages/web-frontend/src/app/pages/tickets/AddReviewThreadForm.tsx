@@ -52,11 +52,16 @@ export function AddReviewThreadForm({ ticketId, proposalId, onAdded, onCancel }:
 	};
 
 	return (
-		<div className="rounded-md border bg-card p-4 space-y-3">
+		<div className="space-y-3 rounded-md border bg-card p-4">
 			<p className="text-sm font-medium">Add review thread</p>
 			<div className="flex gap-2">
 				<div className="flex-1 space-y-1">
-					<Label htmlFor="review-start-line" className="text-xs text-muted-foreground">
+					<Label
+						htmlFor="review-start-line"
+						className={`
+       text-xs text-muted-foreground
+     `}
+					>
 						Start line
 					</Label>
 					<Input

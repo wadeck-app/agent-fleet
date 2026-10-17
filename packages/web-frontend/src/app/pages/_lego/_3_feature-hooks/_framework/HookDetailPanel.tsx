@@ -88,14 +88,22 @@ export function HookDetailPanel<T extends { id: string }>({ service, columns, se
 
 	if (!item) {
 		return (
-			<div className="flex h-full items-center justify-center text-muted-foreground">
+			<div
+				className={`
+     flex h-full items-center justify-center text-muted-foreground
+   `}
+			>
 				Select an item to view details
 			</div>
 		);
 	}
 
 	return (
-		<div className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4">
+		<div
+			className={`
+    flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4
+  `}
+		>
 			<h2 className="text-lg font-semibold">Product Details</h2>
 			<div className="space-y-4">
 				{columns.map(col => {
@@ -103,7 +111,12 @@ export function HookDetailPanel<T extends { id: string }>({ service, columns, se
 					const isEditing = editingField === col.key;
 
 					return (
-						<div key={col.key as string} className="flex items-start justify-between gap-2">
+						<div
+							key={col.key as string}
+							className={`
+        flex items-start justify-between gap-2
+      `}
+						>
 							<div className="flex-1">
 								<div className="text-sm font-semibold text-muted-foreground">{col.label}</div>
 								{isEditing ? (
@@ -111,7 +124,9 @@ export function HookDetailPanel<T extends { id: string }>({ service, columns, se
 										type="text"
 										value={editValue}
 										onChange={e => setEditValue(e.target.value)}
-										className="mt-1 w-full rounded border border-border bg-background px-2 py-1"
+										className={`
+            mt-1 w-full rounded border border-border bg-background px-2 py-1
+          `}
 									/>
 								) : (
 									<div className="mt-1">

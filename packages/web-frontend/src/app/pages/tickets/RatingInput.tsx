@@ -16,7 +16,17 @@ export function RatingInput({ value, onChange }: RatingInputProps) {
 					variant="ghost"
 					size="sm"
 					onClick={() => onChange(n)}
-					className={`h-auto p-0.5 ${n <= value ? 'text-warning' : 'text-muted-foreground/30 hover:text-warning/60'}`}
+					className={`
+       h-auto p-0.5
+       ${
+			n <= value
+				? 'text-warning'
+				: `
+         text-muted-foreground/30
+         hover:text-warning/60
+       `
+		}
+     `}
 					aria-label={`Rate ${n} out of 5`}
 				>
 					<Star className="size-6 fill-current" />

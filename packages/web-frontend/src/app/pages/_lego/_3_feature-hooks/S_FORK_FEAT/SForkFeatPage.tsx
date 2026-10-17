@@ -108,7 +108,13 @@ export function SForkFeatPage() {
 						}}
 					>
 						<Star
-							className={bookmarkedIds.includes(item.id) ? 'size-4 fill-primary text-primary' : 'size-4'}
+							className={
+								bookmarkedIds.includes(item.id)
+									? `
+         size-4 fill-primary text-primary
+       `
+									: `size-4`
+							}
 						/>
 					</Button>
 				),

@@ -123,7 +123,12 @@ export const InFormContext: Story = {
 					/>
 				</div>
 				// violations-suppress: react/no-raw-button story fixture
-				<button type="submit" className={`w-full rounded-md bg-primary px-4 py-2 text-primary-foreground`}>
+				<button
+					type="submit"
+					className={`
+      w-full rounded-md bg-primary px-4 py-2 text-primary-foreground
+    `}
+				>
 					Create Account
 				</button>
 			</form>

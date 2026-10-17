@@ -111,15 +111,7 @@ export function LoginForm({ onSubmit, loading = false, error }: LoginFormProps) 
 			)}
 
 			{/* Submit Button */}
-			<Button
-				type="submit"
-				variant="default"
-				size="default"
-				disabled={loading}
-				className={`
-     w-full
-   `}
-			>
+			<Button type="submit" variant="default" size="default" disabled={loading} className={`w-full`}>
 				{loading ? (
 					<>
 						<LoadingSpinner size="sm" />

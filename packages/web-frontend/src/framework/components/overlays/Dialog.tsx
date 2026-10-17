@@ -1,4 +1,3 @@
-// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 'use client';
 
 import * as React from 'react';
@@ -7,8 +6,6 @@ import { Button } from '@framework/components/primitives/Button';
 import { cn } from '@framework/lib/utils';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { XIcon } from 'lucide-react';
-
-// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 
 // violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 
@@ -95,32 +92,12 @@ function DialogContent({
 }
 
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
-	return (
-		<div
-			data-slot="dialog-header"
-			className={cn(
-				`
-   flex flex-shrink-0 flex-col gap-2
- `,
-				className
-			)}
-			{...props}
-		/>
-	);
+	return <div data-slot="dialog-header" className={cn(`flex flex-shrink-0 flex-col gap-2`, className)} {...props} />;
 }
 
 function DialogBody({ className, ...props }: React.ComponentProps<'div'>) {
 	return (
-		<div
-			data-slot="dialog-body"
-			className={cn(
-				`
-   -mx-4 flex-1 overflow-y-auto px-4 pb-4
- `,
-				className
-			)}
-			{...props}
-		/>
+		<div data-slot="dialog-body" className={cn(`-mx-4 flex-1 overflow-y-auto px-4 pb-4`, className)} {...props} />
 	);
 }
 

@@ -182,7 +182,11 @@ export function ViewDetailPanel<T extends Product = Product>({ columns, features
 
 	if (!selectedItem) {
 		return (
-			<div className="flex h-full items-center justify-center text-muted-foreground">
+			<div
+				className={`
+     flex h-full items-center justify-center text-muted-foreground
+   `}
+			>
 				Select an item to view details
 			</div>
 		);

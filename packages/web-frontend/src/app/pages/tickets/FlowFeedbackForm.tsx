@@ -42,12 +42,17 @@ export function FlowFeedbackForm({ initialValues, onSubmit, onCancel }: FlowFeed
 
 	return (
 		<div className="relative">
-			<div className={`space-y-4 ${isSubmitting ? 'pointer-events-none opacity-50' : ''}`}>
+			<div
+				className={`
+     space-y-4
+     ${isSubmitting ? 'pointer-events-none opacity-50' : ''}
+   `}
+			>
 				<p className="text-sm font-medium">Submit Flow Execution Feedback</p>
 
 				{/* Rating */}
 				<div className="space-y-1">
-					<Label className="text-xs font-medium text-muted-foreground tracking-wide">
+					<Label className="text-xs font-medium tracking-wide text-muted-foreground">
 						Rating <span className="text-destructive">*</span>
 					</Label>
 					<RatingInput value={rating} onChange={setRating} />

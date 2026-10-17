@@ -26,7 +26,12 @@ export function KeyValueRenderer({
 		!isAddedRow && originalKey !== undefined && item.value !== (originalFields ?? {})[originalKey];
 
 	return (
-		<div className={`flex gap-2 rounded-md border bg-card p-3 ${isAddedRow ? 'ring-1 ring-primary' : ''}`}>
+		<div
+			className={`
+    flex gap-2 rounded-md border bg-card p-3
+    ${isAddedRow ? `ring-1 ring-primary` : ''}
+  `}
+		>
 			<div className="flex-1 space-y-1">
 				<Label htmlFor={`key-${item.id}`} className="text-xs">
 					Key
@@ -36,7 +41,10 @@ export function KeyValueRenderer({
 					value={item.key}
 					onChange={e => actions.update({ key: e.target.value })}
 					placeholder="key"
-					className={`h-8 ${isKeyModified ? 'ring-1 ring-primary' : ''}`}
+					className={`
+       h-8
+       ${isKeyModified ? 'ring-1 ring-primary' : ''}
+     `}
 				/>
 			</div>
 
@@ -49,7 +57,10 @@ export function KeyValueRenderer({
 					value={item.value}
 					onChange={e => actions.update({ value: e.target.value })}
 					placeholder="value"
-					className={`h-8 ${isValueModified ? 'ring-1 ring-primary' : ''}`}
+					className={`
+       h-8
+       ${isValueModified ? 'ring-1 ring-primary' : ''}
+     `}
 				/>
 			</div>
 

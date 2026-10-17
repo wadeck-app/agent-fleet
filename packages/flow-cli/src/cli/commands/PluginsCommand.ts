@@ -2,6 +2,7 @@ import type { Command } from 'commander';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { BUILTIN_PLUGIN_MANIFESTS } from '../../config/BuiltinPlugins.js';
+
 // violations-suppress-end: ts/no-deep-relative
 
 interface PluginEntry {
@@ -125,9 +126,7 @@ export function registerPluginsCommand(program: Command): void {
 		.action((pluginId: string, options: { json?: boolean }) => {
 			const cfg = PLUGIN_CONFIGS[pluginId];
 			if (cfg === undefined) {
-				console.error(
-					`Error: unknown plugin '${pluginId}'. Run 'flow plugins list' to see available plugins.`
-				);
+				console.error(`Error: unknown plugin '${pluginId}'. Run 'flow plugins list' to see available plugins.`);
 				process.exit(1);
 			}
 			if (options.json) {

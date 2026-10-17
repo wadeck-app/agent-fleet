@@ -190,7 +190,12 @@ export function FlowEditorPropertiesPanel({
 							<Label htmlFor="constantValue">Value</Label>
 						)}
 						{readOnly ? (
-							<pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs font-mono whitespace-pre-wrap">
+							<pre
+								className={`
+         overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs
+         whitespace-pre-wrap
+       `}
+							>
 								{constantData.type === 'object'
 									? JSON.stringify(constantData.value, null, 2)
 									: String(constantData.value ?? '')}
@@ -364,9 +369,9 @@ export function FlowEditorPropertiesPanel({
 													</div>
 													<span
 														className={`
-               flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
-               text-muted-foreground
-             `}
+                flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono
+                text-xs text-muted-foreground
+              `}
 													>
 														{port.type}
 													</span>
@@ -398,9 +403,9 @@ export function FlowEditorPropertiesPanel({
 													</div>
 													<span
 														className={`
-               flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono text-xs
-               text-muted-foreground
-             `}
+                flex-shrink-0 rounded bg-background px-2 py-0.5 font-mono
+                text-xs text-muted-foreground
+              `}
 													>
 														{port.type}
 													</span>
@@ -434,9 +439,9 @@ export function FlowEditorPropertiesPanel({
 									value={step.model}
 									onChange={e => handleUpdate('model', e.target.value)}
 									className={`
-          flex h-10 w-full rounded-md border border-input bg-background px-3
-          py-2 text-sm
-        `}
+           flex h-10 w-full rounded-md border border-input bg-background px-3
+           py-2 text-sm
+         `}
 								>
 									<option value="sonnet">Sonnet</option>
 									<option value="haiku">Haiku</option>
@@ -452,7 +457,12 @@ export function FlowEditorPropertiesPanel({
 								<Label htmlFor="prompt">Prompt</Label>
 							)}
 							{readOnly ? (
-								<pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs font-mono whitespace-pre-wrap">
+								<pre
+									className={`
+          overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs
+          whitespace-pre-wrap
+        `}
+								>
 									{step.prompt}
 								</pre>
 							) : (
@@ -515,7 +525,12 @@ export function FlowEditorPropertiesPanel({
 								<Label htmlFor="script">Script</Label>
 							)}
 							{readOnly ? (
-								<pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs font-mono whitespace-pre-wrap">
+								<pre
+									className={`
+          overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs
+          whitespace-pre-wrap
+        `}
+								>
 									{step.script}
 								</pre>
 							) : (
@@ -619,7 +634,12 @@ export function FlowEditorPropertiesPanel({
 								<Label htmlFor="inputs">Inputs (JSON)</Label>
 							)}
 							{readOnly ? (
-								<pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs font-mono whitespace-pre-wrap">
+								<pre
+									className={`
+          overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs
+          whitespace-pre-wrap
+        `}
+								>
 									{JSON.stringify(step.inputs, null, 2)}
 								</pre>
 							) : (
@@ -883,7 +903,12 @@ export function FlowEditorPropertiesPanel({
 											</p>
 										</>
 									) : (
-										<Label htmlFor="approval-allowReject" className={`flex items-center gap-2`}>
+										<Label
+											htmlFor="approval-allowReject"
+											className={`
+            flex items-center gap-2
+          `}
+										>
 											<Checkbox
 												id="approval-allowReject"
 												checked={step.approval?.allowReject ?? true}
@@ -913,7 +938,12 @@ export function FlowEditorPropertiesPanel({
 										<Label htmlFor="question-text">Question</Label>
 									)}
 									{readOnly ? (
-										<pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs font-mono whitespace-pre-wrap">
+										<pre
+											className={`
+            overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs
+            whitespace-pre-wrap
+          `}
+										>
 											{step.question?.question || ''}
 										</pre>
 									) : (
@@ -984,7 +1014,12 @@ export function FlowEditorPropertiesPanel({
 										<Label htmlFor="choice-question">Question</Label>
 									)}
 									{readOnly ? (
-										<pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs font-mono whitespace-pre-wrap">
+										<pre
+											className={`
+            overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs
+            whitespace-pre-wrap
+          `}
+										>
 											{step.choice?.question || ''}
 										</pre>
 									) : (
@@ -1015,7 +1050,12 @@ export function FlowEditorPropertiesPanel({
 										<Label htmlFor="choice-options">Options (JSON)</Label>
 									)}
 									{readOnly ? (
-										<pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs font-mono whitespace-pre-wrap">
+										<pre
+											className={`
+            overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs
+            whitespace-pre-wrap
+          `}
+										>
 											{JSON.stringify(step.choice?.options || [], null, 2)}
 										</pre>
 									) : (
@@ -1059,7 +1099,12 @@ export function FlowEditorPropertiesPanel({
 											</p>
 										</>
 									) : (
-										<Label htmlFor="choice-allowMultiple" className={`flex items-center gap-2`}>
+										<Label
+											htmlFor="choice-allowMultiple"
+											className={`
+            flex items-center gap-2
+          `}
+										>
 											<Checkbox
 												id="choice-allowMultiple"
 												checked={step.choice?.allowMultiple ?? false}
@@ -1092,16 +1137,16 @@ export function FlowEditorPropertiesPanel({
 							size="sm"
 							onClick={() => setShowAdvanced(!showAdvanced)}
 							className={`
-        flex items-center gap-1 text-sm font-medium
-        hover:underline
-      `}
+         flex items-center gap-1 text-sm font-medium
+         hover:underline
+       `}
 						>
 							Advanced Options
 							<ChevronDown
 								className={`
-         size-4 transition-transform
-         ${showAdvanced ? `rotate-180` : ''}
-       `}
+          size-4 transition-transform
+          ${showAdvanced ? `rotate-180` : ''}
+        `}
 							/>
 						</Button>
 						{showAdvanced && (

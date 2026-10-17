@@ -116,9 +116,13 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 						No flow design has been requested yet for this ticket.
 					</p>
 					{requestError && (
-						<div className="mt-2 rounded-md border border-destructive/50 bg-destructive/10 p-3">
+						<div
+							className={`
+        mt-2 rounded-md border border-destructive/50 bg-destructive/10 p-3
+      `}
+						>
 							<p className="text-sm font-medium text-destructive">Request failed</p>
-							<p className="mt-1 whitespace-pre-wrap text-xs text-destructive/80">{requestError}</p>
+							<p className="mt-1 text-xs whitespace-pre-wrap text-destructive/80">{requestError}</p>
 						</div>
 					)}
 					<div className="mt-4 space-y-2">
@@ -182,7 +186,7 @@ export function FlowProposalSection({ ticketId, onTicketRefresh }: FlowProposalS
 			)}
 
 			{currentProposal && currentProposal.status !== 'pending_review' && !isRedesigning && (
-				<div className="border-t pt-4 space-y-3">
+				<div className="space-y-3 border-t pt-4">
 					<Label htmlFor="new-design-context" className="text-sm font-medium">
 						Request a new flow design
 					</Label>

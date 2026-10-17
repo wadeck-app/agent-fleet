@@ -76,7 +76,15 @@ export class ColumnHelpers {
 		return {
 			key: 'id',
 			label: 'ID',
-			render: (item: T) => <span className={`font-mono text-xs text-muted-foreground`}>{item.id}</span>,
+			render: (item: T) => (
+				<span
+					className={`
+     font-mono text-xs text-muted-foreground
+   `}
+				>
+					{item.id}
+				</span>
+			),
 			canHide: true,
 		};
 	}

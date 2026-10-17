@@ -33,7 +33,15 @@ export function renderColumnValue<T>(col: ColumnDef<T>, item: T): ReactNode {
 
 	// Boolean type: render Check or X icon
 	if (col.type === 'boolean') {
-		return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+		return value ? (
+			<Check className="size-4 text-primary" />
+		) : (
+			<X
+				className={`
+    size-4 text-muted-foreground
+  `}
+			/>
+		);
 	}
 
 	// Number type: format with prefix/suffix

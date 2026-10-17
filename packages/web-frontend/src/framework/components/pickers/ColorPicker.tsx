@@ -65,7 +65,13 @@ export function ColorPicker({ value, onChange, defaultColor = '#6366F1' }: Color
          relative h-10 w-10 cursor-pointer rounded-md border-2 transition-all
          hover:scale-110
          focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:outline-none
-         ${isSelected ? 'border-foreground ring-2 ring-primary' : `border-border`}
+         ${
+				isSelected
+					? 'border-foreground ring-2 ring-primary'
+					: `
+           border-border
+         `
+			}
        `}
 							style={{ backgroundColor: color.value }}
 							title={color.name}

@@ -55,7 +55,7 @@ export function useFlowFeedbackCount(
 	// Subscribe to feedback submissions for auto-refresh
 	useRealtimeRefresh({
 		events: [B2F_TICKET_FEEDBACK_SUBMITTED],
-		// eslint-disable-next-line @typescript-eslint/no-misused-promises
+
 		onEvent: () => void refresh(),
 		filters: filter,
 		logPrefix: 'useFlowFeedbackCount',

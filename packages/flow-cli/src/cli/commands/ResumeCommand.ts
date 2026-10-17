@@ -4,6 +4,7 @@ import type { Command } from 'commander';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import type { ClientCommand, DaemonResponse } from '../../ipc/Protocol';
+
 // violations-suppress-end: ts/no-deep-relative
 
 type FlowCommands = { resume?: (payload: unknown) => Promise<DaemonResponse> };

@@ -103,7 +103,10 @@ export function TaskInfoPanel({ task }: TaskInfoPanelProps) {
 						<Link
 							to={`/tickets/${task.ticketId}?tab=tasks#task-${task.id}`}
 							title={`Ticket ID: ${task.ticketId}`}
-							className="shrink-0 text-xs text-primary hover:underline"
+							className={`
+         shrink-0 text-xs text-primary
+         hover:underline
+       `}
 						>
 							view ticket: <span className="font-mono">{task.ticketId.slice(0, 8)}…</span>
 						</Link>

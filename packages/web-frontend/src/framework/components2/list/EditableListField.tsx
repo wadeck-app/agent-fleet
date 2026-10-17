@@ -147,7 +147,11 @@ export function EditableListField<T>({
 
 			{/* Items List or Empty State */}
 			{fstate.isEmpty ? (
-				<div className="rounded-md border border-dashed bg-muted/30 px-8 py-4 text-center">
+				<div
+					className={`
+      rounded-md border border-dashed bg-muted/30 px-8 py-4 text-center
+    `}
+				>
 					{renderEmpty ? renderEmpty() : <p className="text-sm text-muted-foreground">{emptyMessage}</p>}
 				</div>
 			) : (

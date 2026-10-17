@@ -43,10 +43,18 @@ export function CollapsibleSection({
 					className={collapsibleToggleCls}
 					aria-expanded={open}
 				>
-					{open ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
+					{open ? (
+						<ChevronDown className="size-4 shrink-0" />
+					) : (
+						<ChevronRight
+							className={`
+       size-4 shrink-0
+     `}
+						/>
+					)}
 					{title}
 				</Button>
-				{headerRight && <div className="px-3 py-2 flex items-center">{headerRight}</div>}
+				{headerRight && <div className="flex items-center px-3 py-2">{headerRight}</div>}
 			</div>
 			{open && <div className="px-3 py-3">{children}</div>}
 		</div>

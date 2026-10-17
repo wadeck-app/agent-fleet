@@ -125,7 +125,10 @@ export function DualListItem({
 		'flex items-center gap-2 rounded-sm transition-colors',
 		'hover:bg-accent',
 		// Loading state disables interactions and reduces opacity
-		(isLoading || (variant === 'sortable' && isReordering)) && 'pointer-events-none opacity-50',
+		(isLoading || (variant === 'sortable' && isReordering)) &&
+			`
+    pointer-events-none opacity-50
+  `,
 		// Dragging state increases z-index
 		variant === 'sortable' && isDragging && 'z-50'
 	);
@@ -143,7 +146,10 @@ export function DualListItem({
 						onAction(itemId);
 					}}
 					disabled={isLoading}
-					className="opacity-70 hover:opacity-100"
+					className={`
+       opacity-70
+       hover:opacity-100
+     `}
 					aria-label={actionLabel}
 					title={actionLabel}
 				>
@@ -202,7 +208,13 @@ export function DualListItem({
 					}
 				}}
 				disabled={isLoading}
-				className={cn('mr-1 opacity-70 hover:opacity-100', isDragging && 'pointer-events-none')}
+				className={cn(
+					`
+      mr-1 opacity-70
+      hover:opacity-100
+    `,
+					isDragging && `pointer-events-none`
+				)}
 				aria-label={actionLabel}
 				title={actionLabel}
 			>

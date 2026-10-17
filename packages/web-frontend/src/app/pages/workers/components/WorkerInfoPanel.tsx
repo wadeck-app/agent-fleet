@@ -49,7 +49,15 @@ export function WorkerInfoPanel({ worker, onRename }: WorkerInfoPanelProps) {
 				<p className="font-mono text-xs text-foreground">{worker.workerId}</p>
 			</div>
 
-			<div className={cn('transition-opacity', isSavingName && 'pointer-events-none opacity-50 blur-sm')}>
+			<div
+				className={cn(
+					'transition-opacity',
+					isSavingName &&
+						`
+     pointer-events-none opacity-50 blur-sm
+   `
+				)}
+			>
 				<h3 className="mb-2 text-sm font-semibold text-muted-foreground">Name</h3>
 				<EditableText
 					value={worker.name}
@@ -64,13 +72,23 @@ export function WorkerInfoPanel({ worker, onRename }: WorkerInfoPanelProps) {
 			<div className="flex gap-2">
 				<div className="flex-1">
 					<h3 className="mb-2 text-sm font-semibold text-muted-foreground">State</h3>
-					<Badge variant={worker.state === 'busy' ? 'warning' : 'success'} className="font-medium">
+					<Badge
+						variant={worker.state === 'busy' ? 'warning' : 'success'}
+						className={`
+       font-medium
+     `}
+					>
 						{worker.state === 'busy' ? 'Busy' : 'Idle'}
 					</Badge>
 				</div>
 				<div className="flex-1">
 					<h3 className="mb-2 text-sm font-semibold text-muted-foreground">Connection</h3>
-					<Badge variant={worker.connected ? 'success' : 'destructive'} className="font-medium">
+					<Badge
+						variant={worker.connected ? 'success' : 'destructive'}
+						className={`
+       font-medium
+     `}
+					>
 						{worker.connected ? 'Connected' : 'Disconnected'}
 					</Badge>
 				</div>
@@ -96,7 +114,13 @@ export function WorkerInfoPanel({ worker, onRename }: WorkerInfoPanelProps) {
 			{worker.taskId && (
 				<div>
 					<h3 className="mb-2 text-sm font-semibold text-muted-foreground">Current Task</h3>
-					<Link to={`/tasks/${worker.taskId}`} className="font-mono text-xs text-primary hover:underline">
+					<Link
+						to={`/tasks/${worker.taskId}`}
+						className={`
+       font-mono text-xs text-primary
+       hover:underline
+     `}
+					>
 						{worker.taskId}
 					</Link>
 					{worker.taskStartedAt && (

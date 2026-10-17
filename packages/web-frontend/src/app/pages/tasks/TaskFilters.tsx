@@ -63,7 +63,12 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 			{/* Status Filter */}
 			<div>
 				{/* TK1 fix: use Label with htmlFor */}
-				<Label htmlFor="status-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+				<Label
+					htmlFor="status-filter"
+					className={`
+      mb-2 block text-xs font-medium text-muted-foreground
+    `}
+				>
 					Status
 				</Label>
 				<SelectInput
@@ -76,7 +81,12 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 
 			{/* Priority Filter */}
 			<div>
-				<Label htmlFor="priority-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+				<Label
+					htmlFor="priority-filter"
+					className={`
+      mb-2 block text-xs font-medium text-muted-foreground
+    `}
+				>
 					Priority
 				</Label>
 				<SelectInput
@@ -89,7 +99,12 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 
 			{/* Worker ID Filter */}
 			<div>
-				<Label htmlFor="worker-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+				<Label
+					htmlFor="worker-filter"
+					className={`
+      mb-2 block text-xs font-medium text-muted-foreground
+    `}
+				>
 					Worker ID
 				</Label>
 				<Input
@@ -103,7 +118,12 @@ export function TaskFilters({ filters }: TaskFiltersProps) {
 
 			{/* Flow ID Filter */}
 			<div>
-				<Label htmlFor="flow-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+				<Label
+					htmlFor="flow-filter"
+					className={`
+      mb-2 block text-xs font-medium text-muted-foreground
+    `}
+				>
 					Flow ID
 				</Label>
 				<Input

@@ -145,7 +145,11 @@ export function ProposalView({
 					<TooltipProvider>
 						<Tooltip>
 							<TooltipTrigger asChild>
-								<span className="cursor-help text-sm text-muted-foreground underline decoration-dotted">
+								<span
+									className={`
+          cursor-help text-sm text-muted-foreground underline decoration-dotted
+        `}
+								>
 									Confidence: {Math.round(proposal.confidenceScore)}%
 								</span>
 							</TooltipTrigger>
@@ -166,8 +170,8 @@ export function ProposalView({
 
 			{proposal.adaptations && proposal.adaptations.length > 0 && proposal.version > 1 && (
 				<div className="space-y-1">
-					<p className="text-xs font-medium text-muted-foreground tracking-wide">Adaptations</p>
-					<ul className="list-disc list-inside space-y-0.5">
+					<p className="text-xs font-medium tracking-wide text-muted-foreground">Adaptations</p>
+					<ul className="list-inside list-disc space-y-0.5">
 						{proposal.adaptations.map((a, i) => (
 							<li key={i} className="text-sm">
 								{a}
@@ -213,7 +217,7 @@ export function ProposalView({
 
 			<CollapsibleSection title="Reasoning" defaultOpen={false}>
 				{reasoningSentences.length > 1 ? (
-					<ul className="list-disc list-inside space-y-1">
+					<ul className="list-inside list-disc space-y-1">
 						{reasoningSentences.map((sentence, i) => (
 							<li key={i} className="text-sm">
 								{sentence.trim().replace(/\.$/, '')}
@@ -234,7 +238,10 @@ export function ProposalView({
 							href={`/flows/${proposedFlowId}/edit`}
 							target="_blank"
 							rel="noopener noreferrer"
-							className="text-xs text-primary hover:underline"
+							className={`
+         text-xs text-primary
+         hover:underline
+       `}
 						>
 							Open in Flow Editor
 						</a>
@@ -243,14 +250,18 @@ export function ProposalView({
 					)
 				}
 			>
-				<pre className="overflow-x-auto rounded-md bg-muted p-4 text-xs font-mono leading-relaxed">
+				<pre
+					className={`
+      overflow-x-auto rounded-md bg-muted p-4 font-mono text-xs leading-relaxed
+    `}
+				>
 					{proposalYaml}
 				</pre>
 			</CollapsibleSection>
 
 			{proposal.reviewThreads.length > 0 && (
 				<div className="space-y-2">
-					<p className="text-xs font-medium text-muted-foreground tracking-wide">
+					<p className="text-xs font-medium tracking-wide text-muted-foreground">
 						Review threads ({proposal.reviewThreads.length})
 					</p>
 					{proposal.reviewThreads.map(thread => (

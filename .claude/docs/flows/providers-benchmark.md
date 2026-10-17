@@ -6,23 +6,23 @@ Cold-start outliers (>30s) excluded. Source flow: `_test-tasks/parallel-provider
 
 ## Latency (ms) — p50 / avg / max
 
-| Rank | Terminal | Model | p50 | avg | max |
-|---|---|---|---|---|---|
-| 🥇 | codex | gpt-5.6-luna | 3612 | 3808 | 4216 |
-| 🥈 | codex | gpt-5.6-sol | 3673 | 3876 | 4248 |
-| 🥉 | codex | gpt-5.6-terra | 3863 | 3889 | 4243 |
-| 4 | opencode | gpt-5.6-luna | 5399 | 5488 | 6316 |
-| 5 | opencode | claude sonnet-4-6 | 5565 | 5754 | 6624 |
-| 6 | opencode | gpt-5.6-sol | 5518 | 5756 | 6920 |
-| 7 | opencode | gpt-5.6-terra | 5834 | 5966 | 6854 |
-| 8 | opencode | claude opus-4-8 | 5901 | 5984 | 6359 |
-| 9 | opencode | claude opus-5 | 6012 | 6202 | 7052 |
-| 10 | opencode | claude sonnet-5 | 6207 | 6747 | 7812 |
-| 11 | claude CLI | sonnet-4-6 (default) | 8086 | 8138 | 8764 |
-| 12 | claude CLI | sonnet-4-6 (explicit) | 8146 | 8308 | 8917 |
-| 13 | claude CLI | opus-5 | 8422 | 8761 | 9773 |
-| 14 | claude CLI | haiku | 8554 | 8826 | 9533 |
-| 15 | claude CLI | sonnet-5 | 8888 | 9143 | 10026 |
+| Rank | Terminal   | Model                 | p50  | avg  | max   |
+| ---- | ---------- | --------------------- | ---- | ---- | ----- |
+| 🥇   | codex      | gpt-5.6-luna          | 3612 | 3808 | 4216  |
+| 🥈   | codex      | gpt-5.6-sol           | 3673 | 3876 | 4248  |
+| 🥉   | codex      | gpt-5.6-terra         | 3863 | 3889 | 4243  |
+| 4    | opencode   | gpt-5.6-luna          | 5399 | 5488 | 6316  |
+| 5    | opencode   | claude sonnet-4-6     | 5565 | 5754 | 6624  |
+| 6    | opencode   | gpt-5.6-sol           | 5518 | 5756 | 6920  |
+| 7    | opencode   | gpt-5.6-terra         | 5834 | 5966 | 6854  |
+| 8    | opencode   | claude opus-4-8       | 5901 | 5984 | 6359  |
+| 9    | opencode   | claude opus-5         | 6012 | 6202 | 7052  |
+| 10   | opencode   | claude sonnet-5       | 6207 | 6747 | 7812  |
+| 11   | claude CLI | sonnet-4-6 (default)  | 8086 | 8138 | 8764  |
+| 12   | claude CLI | sonnet-4-6 (explicit) | 8146 | 8308 | 8917  |
+| 13   | claude CLI | opus-5                | 8422 | 8761 | 9773  |
+| 14   | claude CLI | haiku                 | 8554 | 8826 | 9533  |
+| 15   | claude CLI | sonnet-5              | 8888 | 9143 | 10026 |
 
 ## Key numbers
 
@@ -32,22 +32,22 @@ Cold-start outliers (>30s) excluded. Source flow: `_test-tasks/parallel-provider
 
 ## Unavailable models
 
-| Terminal | Model | Error |
-|---|---|---|
-| opencode | anthropic.claude-haiku-4-5 | Bedrock model not enabled for this AWS profile |
-| opencode | anthropic.claude-sonnet-4-5 | Bedrock model not enabled |
-| opencode | anthropic.claude-fable-5-1 | IAM Marketplace subscription required |
-| codex | openai.gpt-6-astra | 404 — not yet available in Bedrock |
+| Terminal | Model                       | Error                                          |
+| -------- | --------------------------- | ---------------------------------------------- |
+| opencode | anthropic.claude-haiku-4-5  | Bedrock model not enabled for this AWS profile |
+| opencode | anthropic.claude-sonnet-4-5 | Bedrock model not enabled                      |
+| opencode | anthropic.claude-fable-5-1  | IAM Marketplace subscription required          |
+| codex    | openai.gpt-6-astra          | 404 — not yet available in Bedrock             |
 
 ## Reasoning effort (codex native, 3 runs each)
 
 No measurable impact on short prompts. Variance (~±300ms) is larger than the difference between levels.
 
-| Model | low | medium | high |
-|---|---|---|---|
-| gpt-5.6-luna | 3543 | 3260 | 3332 |
-| gpt-5.6-sol | 3395 | 3414 | 3442 |
-| gpt-5.6-terra | 3622 | 3365 | 3451 |
+| Model         | low  | medium | high |
+| ------------- | ---- | ------ | ---- |
+| gpt-5.6-luna  | 3543 | 3260   | 3332 |
+| gpt-5.6-sol   | 3395 | 3414   | 3442 |
+| gpt-5.6-terra | 3622 | 3365   | 3451 |
 
 Use `model_reasoning_effort` to control this: `-c model_reasoning_effort=high` in flow step env, or set globally in `~/.codex/config.toml`. Quality impact on real tasks not yet measured — see TODO below.
 
@@ -61,10 +61,11 @@ OpenCode supports per-step config files via the `env.OPENCODE_CONFIG` field on m
   provider: opencode
   model: amazon-bedrock/anthropic.claude-sonnet-5
   env:
-    OPENCODE_CONFIG: "C:/Users/Wadeck/.config/opencode/config_claude.json"
+      OPENCODE_CONFIG: 'C:/Users/Wadeck/.config/opencode/config_claude.json'
 ```
 
 Two profiles in use:
+
 - `config_claude.json` — AWS profile for Anthropic models (Bedrock)
 - `config_codex.json` — AWS profile for OpenAI models (Bedrock)
 

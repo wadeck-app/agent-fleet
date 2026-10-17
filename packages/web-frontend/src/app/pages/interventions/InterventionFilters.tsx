@@ -58,7 +58,12 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 			{/* Status Filter */}
 			<div>
 				{/* IV1 fix: use Label with htmlFor */}
-				<Label htmlFor="status-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+				<Label
+					htmlFor="status-filter"
+					className={`
+      mb-2 block text-xs font-medium text-muted-foreground
+    `}
+				>
 					Status
 				</Label>
 				<SelectInput
@@ -73,7 +78,12 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Type Filter */}
 			<div>
-				<Label htmlFor="type-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+				<Label
+					htmlFor="type-filter"
+					className={`
+      mb-2 block text-xs font-medium text-muted-foreground
+    `}
+				>
 					Type
 				</Label>
 				<SelectInput
@@ -86,7 +96,12 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Blocking Filter */}
 			<div>
-				<Label htmlFor="blocking-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+				<Label
+					htmlFor="blocking-filter"
+					className={`
+      mb-2 block text-xs font-medium text-muted-foreground
+    `}
+				>
 					Blocking
 				</Label>
 				<SelectInput
@@ -101,7 +116,12 @@ export function InterventionFilters({ filters }: InterventionFiltersProps) {
 
 			{/* Task ID Filter */}
 			<div>
-				<Label htmlFor="task-filter" className="mb-2 block text-xs font-medium text-muted-foreground">
+				<Label
+					htmlFor="task-filter"
+					className={`
+      mb-2 block text-xs font-medium text-muted-foreground
+    `}
+				>
 					Task ID
 				</Label>
 				<Input

@@ -82,7 +82,14 @@ describe('PageHeader', () => {
 	});
 
 	it('should accept additional className', () => {
-		const { container } = render(<PageHeader title="Test Page" className={`custom-header`} />);
+		const { container } = render(
+			<PageHeader
+				title="Test Page"
+				className={`
+    custom-header
+  `}
+			/>
+		);
 
 		const headerDiv = container.firstChild as HTMLElement;
 		expect(headerDiv).toHaveClass('mb-6');
@@ -92,7 +99,14 @@ describe('PageHeader', () => {
 	it('should render complete example with all props', () => {
 		const { getByRole, getByText, container } = render(
 			// violations-suppress: react/no-raw-button test fixture
-			<PageHeader title="Books" badge={150} action={<button>Add Book</button>} className={`border-b`} />
+			<PageHeader
+				title="Books"
+				badge={150}
+				action={<button>Add Book</button>}
+				className={`
+     border-b
+   `}
+			/>
 		);
 
 		expect(getByRole('heading', { level: 1 })).toHaveTextContent('Books');

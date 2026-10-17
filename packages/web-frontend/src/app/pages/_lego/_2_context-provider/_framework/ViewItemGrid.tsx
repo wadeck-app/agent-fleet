@@ -138,7 +138,15 @@ export function ViewItemGrid<T extends Product = Product>({ columns, features }:
 		const value = item[col.key];
 
 		if (col.type === 'boolean') {
-			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+			return value ? (
+				<Check className="size-4 text-primary" />
+			) : (
+				<X
+					className={`
+     size-4 text-muted-foreground
+   `}
+				/>
+			);
 		}
 
 		if (col.type === 'number' && typeof value === 'number') {
@@ -192,7 +200,14 @@ export function ViewItemGrid<T extends Product = Product>({ columns, features }:
 			) : context.items.length === 0 ? (
 				<div className="p-8 text-center">No items found</div>
 			) : (
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+				<div
+					className={`
+      grid grid-cols-1 gap-4
+      sm:grid-cols-2
+      lg:grid-cols-3
+      xl:grid-cols-4
+    `}
+				>
 					{(context.items as T[]).map(item => (
 						<div key={item.id} className="rounded-lg border border-border bg-card p-4">
 							{bulkDeleteConfig && (

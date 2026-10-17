@@ -178,7 +178,7 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 	return (
 		<div className="flex h-[calc(100vh-8rem)] gap-4">
 			{/* Left panel: ticket content */}
-			<div className="flex-1 space-y-6 overflow-y-auto pl-1 pr-4">
+			<div className="flex-1 space-y-6 overflow-y-auto pr-4 pl-1">
 				<div>
 					<h1 className="text-2xl font-bold">{ticket.title}</h1>
 					<div className="mt-2 flex items-center gap-2">
@@ -223,7 +223,19 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 						value={localDescription}
 						onChange={e => handleDescriptionChange(e.target.value)}
 						rows={6}
-						className={`mt-1 ${dirtyFields.description ? 'ring-2 ring-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary' : ''} ${saving ? 'opacity-50 transition-opacity' : ''}`}
+						className={`
+        mt-1
+        ${
+			dirtyFields.description
+				? `
+          ring-2 ring-primary
+          focus-visible:border-primary focus-visible:ring-2
+          focus-visible:ring-primary
+        `
+				: ''
+		}
+        ${saving ? `opacity-50 transition-opacity` : ''}
+      `}
 					/>
 				</div>
 
@@ -255,7 +267,15 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 								{label}
 							</Badge>
 						))}
-						{ticket.labels.length === 0 && <p className="text-sm text-muted-foreground">No labels</p>}
+						{ticket.labels.length === 0 && (
+							<p
+								className={`
+        text-sm text-muted-foreground
+      `}
+							>
+								No labels
+							</p>
+						)}
 					</div>
 				</div>
 
@@ -285,7 +305,12 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 					<h2 className="font-semibold">AI Assistant</h2>
 				</div>
 
-				<div ref={scrollContainerRef} className="flex-1 space-y-4 overflow-y-auto p-4">
+				<div
+					ref={scrollContainerRef}
+					className={`
+      flex-1 space-y-4 overflow-y-auto p-4
+    `}
+				>
 					{!commentsLoading && comments.length === 0 ? (
 						<p className="text-sm text-muted-foreground">No comments yet.</p>
 					) : (
@@ -296,7 +321,10 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 									<div
 										key={comment.id}
 										id={`comment-${comment.id}`}
-										className={`rounded-md border p-3 ${isWorker ? 'bg-accent' : 'bg-background'}`}
+										className={`
+            rounded-md border p-3
+            ${isWorker ? 'bg-accent' : `bg-background`}
+          `}
 									>
 										<div className="mb-1 flex items-center gap-2">
 											{comment.author && (
@@ -310,7 +338,16 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 											<ReactMarkdown
 												remarkPlugins={[remarkGfm]}
 												components={{
-													p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+													p: ({ children }) => (
+														<p
+															className={`
+               mb-1
+               last:mb-0
+             `}
+														>
+															{children}
+														</p>
+													),
 													strong: ({ children }) => (
 														<strong className="font-semibold">{children}</strong>
 													),
@@ -321,13 +358,21 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 															return <code className={className}>{children}</code>;
 														}
 														return (
-															<code className="rounded bg-muted px-1 py-0.5 text-[0.85em] font-mono">
+															<code
+																className={`
+                 rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]
+               `}
+															>
 																{children}
 															</code>
 														);
 													},
 													pre: ({ children }) => (
-														<pre className="my-2 overflow-x-auto rounded-md bg-muted p-3 text-xs">
+														<pre
+															className={`
+                my-2 overflow-x-auto rounded-md bg-muted p-3 text-xs
+              `}
+														>
 															{children}
 														</pre>
 													),
@@ -339,14 +384,22 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 													),
 													li: ({ children }) => <li className="my-0.5">{children}</li>,
 													blockquote: ({ children }) => (
-														<blockquote className="my-1 border-l-2 border-muted-foreground pl-3 text-muted-foreground">
+														<blockquote
+															className={`
+                my-1 border-l-2 border-muted-foreground pl-3
+                text-muted-foreground
+              `}
+														>
 															{children}
 														</blockquote>
 													),
 													a: ({ children, href }) => (
 														<a
 															href={href}
-															className="text-primary underline hover:no-underline"
+															className={`
+                 text-primary underline
+                 hover:no-underline
+               `}
 															target="_blank"
 															rel="noopener noreferrer"
 														>
@@ -391,7 +444,15 @@ export function TicketDetailLayoutF({ ticket, ticketId, onUpdate, onRefresh }: T
 							disabled={!replyContent.trim() || sending}
 							size="sm"
 						>
-							{sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+							{sending ? (
+								<Loader2 className="size-4 animate-spin" />
+							) : (
+								<Send
+									className={`
+         size-4
+       `}
+								/>
+							)}
 						</Button>
 					</div>
 				</div>

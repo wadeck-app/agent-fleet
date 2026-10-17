@@ -77,7 +77,15 @@ export function WidgetCarousel<T extends { id: string }>({ service, columns, fea
 		const value = item[col.key];
 
 		if (col.type === 'boolean') {
-			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+			return value ? (
+				<Check className="size-4 text-primary" />
+			) : (
+				<X
+					className={`
+     size-4 text-muted-foreground
+   `}
+				/>
+			);
 		}
 
 		if (col.type === 'number' && typeof value === 'number') {
@@ -155,7 +163,12 @@ export function WidgetCarousel<T extends { id: string }>({ service, columns, fea
 				) : (
 					<div className="flex gap-4 overflow-x-auto">
 						{items.map(item => (
-							<div key={item.id} className="min-w-[300px] rounded-lg border border-border bg-card p-4">
+							<div
+								key={item.id}
+								className={`
+         min-w-[300px] rounded-lg border border-border bg-card p-4
+       `}
+							>
 								<div className="space-y-2">
 									{visibleColumnDefs.map(col => (
 										<div key={col.key as string} className="text-sm">

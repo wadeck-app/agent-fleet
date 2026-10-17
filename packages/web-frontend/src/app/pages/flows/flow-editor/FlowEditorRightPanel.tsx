@@ -308,7 +308,7 @@ export function FlowEditorRightPanel({
 															{hasBar && (
 																<span
 																	className={cn(
-																		'absolute left-0 top-0 bottom-0 w-0.5',
+																		'absolute top-0 bottom-0 left-0 w-0.5',
 																		barColor
 																	)}
 																/>

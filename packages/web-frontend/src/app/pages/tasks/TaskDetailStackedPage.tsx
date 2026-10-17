@@ -99,7 +99,11 @@ export function TaskDetailStackedPage() {
 	}
 
 	return (
-		<Page className="flex h-[calc(100vh-theme(spacing.16))] flex-col overflow-hidden">
+		<Page
+			className={`
+    flex h-[calc(100vh-theme(spacing.16))] flex-col overflow-hidden
+  `}
+		>
 			<PageHeader
 				title={`Task #${task.id.substring(0, 8)}`}
 				action={
@@ -116,7 +120,11 @@ export function TaskDetailStackedPage() {
 			</div>
 
 			{/* Logs Viewer - fills remaining space, single scroll inside */}
-			<div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-card">
+			<div
+				className={`
+     min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-card
+   `}
+			>
 				<TaskLogsViewer
 					logs={logs}
 					isRunning={isRunning}

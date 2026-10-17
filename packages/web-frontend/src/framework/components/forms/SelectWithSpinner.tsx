@@ -35,7 +35,12 @@ export function SelectWithSpinner({ loading, children, disabled, ...props }: Sel
 				</Select>
 			</div>
 			{loading && (
-				<Loader2 data-testid="select-spinner" className="size-3 shrink-0 animate-spin text-muted-foreground" />
+				<Loader2
+					data-testid="select-spinner"
+					className={`
+      size-3 shrink-0 animate-spin text-muted-foreground
+    `}
+				/>
 			)}
 		</div>
 	);

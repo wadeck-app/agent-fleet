@@ -75,7 +75,15 @@ export function HookDetailPanelNav<T extends { id: string }>({
 		const value = item[col.key];
 
 		if (col.type === 'boolean') {
-			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+			return value ? (
+				<Check className="size-4 text-primary" />
+			) : (
+				<X
+					className={`
+     size-4 text-muted-foreground
+   `}
+				/>
+			);
 		}
 
 		if (col.type === 'number' && typeof value === 'number') {
@@ -110,7 +118,11 @@ export function HookDetailPanelNav<T extends { id: string }>({
 
 	if (!item) {
 		return (
-			<div className="flex h-full items-center justify-center text-muted-foreground">
+			<div
+				className={`
+     flex h-full items-center justify-center text-muted-foreground
+   `}
+			>
 				Select an item to view details
 			</div>
 		);
@@ -133,7 +145,11 @@ export function HookDetailPanelNav<T extends { id: string }>({
 	};
 
 	return (
-		<div className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4">
+		<div
+			className={`
+    flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4
+  `}
+		>
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">Details</h2>
 				<div className="flex gap-1">

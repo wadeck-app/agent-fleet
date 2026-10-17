@@ -185,9 +185,9 @@ export function UserMenu({
 					<Button
 						variant="ghost"
 						className={`
-       w-full justify-start gap-3
-       ${className}
-     `}
+        w-full justify-start gap-3
+        ${className}
+      `}
 					>
 						<div
 							className={`
@@ -213,9 +213,9 @@ export function UserMenu({
 						<div className="flex flex-1 flex-col items-start gap-0.5">
 							<span
 								className={`
-         ${textSize}
-         font-medium
-       `}
+          ${textSize}
+          font-medium
+        `}
 							>
 								{userName}
 							</span>
@@ -223,9 +223,9 @@ export function UserMenu({
 						</div>
 						<ChevronDown
 							className={`
-        ${iconSize}
-        opacity-50
-      `}
+         ${iconSize}
+         opacity-50
+       `}
 						/>
 					</Button>
 				);
@@ -236,17 +236,17 @@ export function UserMenu({
 						variant="ghost"
 						size="icon"
 						className={`
-       relative
-       ${className}
-     `}
+        relative
+        ${className}
+      `}
 					>
 						<User className={iconSize} />
 						{/* Status badge */}
 						<span
 							className={`
-        absolute right-0 bottom-0 size-2 rounded-full bg-accent ring-2
-        ring-background
-      `}
+         absolute right-0 bottom-0 size-2 rounded-full bg-accent ring-2
+         ring-background
+       `}
 						/>
 						<span className="sr-only">User menu</span>
 					</Button>
@@ -275,9 +275,9 @@ export function UserMenu({
 							<div className="flex flex-col gap-1">
 								<p
 									className={`
-          ${textSize}
-          font-medium
-        `}
+           ${textSize}
+           font-medium
+         `}
 								>
 									{userName}
 								</p>
@@ -302,9 +302,9 @@ export function UserMenu({
 				{showProfile && (
 					<DropdownMenuItem
 						className={`
-       cursor-pointer
-       ${itemPadding}
-     `}
+        cursor-pointer
+        ${itemPadding}
+      `}
 					>
 						<User className={iconSize} />
 						Profile
@@ -314,9 +314,9 @@ export function UserMenu({
 				{/* Settings */}
 				<DropdownMenuItem
 					className={`
-      cursor-pointer
-      ${itemPadding}
-    `}
+       cursor-pointer
+       ${itemPadding}
+     `}
 				>
 					<Settings className={iconSize} />
 					Settings
@@ -355,9 +355,9 @@ export function UserMenu({
 						<DropdownMenuItem
 							onClick={onToggleTheme}
 							className={`
-        cursor-pointer
-        ${itemPadding}
-      `}
+         cursor-pointer
+         ${itemPadding}
+       `}
 						>
 							{isDark ? (
 								<>
@@ -379,9 +379,9 @@ export function UserMenu({
 				<DropdownMenuItem
 					variant="destructive"
 					className={`
-      cursor-pointer
-      ${itemPadding}
-    `}
+       cursor-pointer
+       ${itemPadding}
+     `}
 				>
 					<LogOut className={iconSize} />
 					Logout

@@ -1,4 +1,3 @@
-// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 'use client';
 
 import * as React from 'react';
@@ -11,8 +10,6 @@ import { InputGroupInput } from '@framework/components/advanced/InputGroup/Input
 import { Button } from '@framework/components/primitives/Button';
 import { cn } from '@framework/lib/utils';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-
-// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 
 // violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 

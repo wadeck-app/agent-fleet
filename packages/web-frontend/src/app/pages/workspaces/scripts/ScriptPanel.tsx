@@ -93,7 +93,11 @@ export function ScriptPanel({
    `}
 		>
 			{/* Panel Header */}
-			<div className={`flex items-center gap-2 border-b border-border bg-muted/30 p-3`}>
+			<div
+				className={`
+     flex items-center gap-2 border-b border-border bg-muted/30 p-3
+   `}
+			>
 				{/* Script Selector */}
 				<ScriptSelector
 					workspaceId={workspaceId}

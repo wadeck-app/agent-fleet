@@ -35,7 +35,10 @@ export function CommentPermalink({ commentId, createdAt }: CommentPermalinkProps
 			<CopyLinkButton
 				url={url}
 				label={formatRelativeTime(createdAt)}
-				className="h-auto p-0 text-xs text-muted-foreground hover:underline"
+				className={`
+      h-auto p-0 text-xs text-muted-foreground
+      hover:underline
+    `}
 			/>
 		</div>
 	);

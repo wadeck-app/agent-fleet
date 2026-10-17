@@ -68,14 +68,7 @@ export function SidebarNav({ items, className, mobile = false }: SidebarNavProps
 				{items.map((item, index) => {
 					// Check if this is a separator
 					if ('type' in item && item.type === 'separator') {
-						return (
-							<div
-								key={`separator-${index}`}
-								className={`
-        my-2 border-t border-border
-      `}
-							/>
-						);
+						return <div key={`separator-${index}`} className={`my-2 border-t border-border`} />;
 					}
 
 					// Check if this is a group
@@ -91,19 +84,29 @@ export function SidebarNav({ items, className, mobile = false }: SidebarNavProps
 								<Button
 									variant="ghost"
 									className={`
-                   w-full justify-start
-                   ${mobile ? 'h-12 gap-3 text-base' : 'gap-2'}
-                   ${groupHasActiveChild ? 'bg-accent/20' : ''}
-                 `}
+           w-full justify-start
+           ${mobile ? 'h-12 gap-3 text-base' : 'gap-2'}
+           ${groupHasActiveChild ? 'bg-accent/20' : ''}
+         `}
 									size={mobile ? 'default' : 'sm'}
 									onClick={() => toggleGroup(index)}
 								>
 									<Icon className={mobile ? 'size-5' : 'size-4'} />
 									{groupItem.label}
-									<ChevronIcon className={`ml-auto ${mobile ? 'size-5' : 'size-4'}`} />
+									<ChevronIcon
+										className={`
+           ml-auto
+           ${mobile ? 'size-5' : 'size-4'}
+         `}
+									/>
 								</Button>
 								{isExpanded && (
-									<div className={`${mobile ? 'ml-8 mt-1' : 'ml-6 mt-1'} space-y-1`}>
+									<div
+										className={`
+           ${mobile ? 'mt-1 ml-8' : 'mt-1 ml-6'}
+           space-y-1
+         `}
+									>
 										{groupItem.items.map(childItem => {
 											const ChildIcon = childItem.icon;
 											return (
@@ -112,9 +115,9 @@ export function SidebarNav({ items, className, mobile = false }: SidebarNavProps
 													asChild
 													variant={isActive(childItem.path) ? 'default' : 'ghost'}
 													className={`
-                             w-full justify-start
-                             ${mobile ? 'h-11 gap-3 text-base' : 'gap-2'}
-                           `}
+               w-full justify-start
+               ${mobile ? 'h-11 gap-3 text-base' : 'gap-2'}
+             `}
 													size={mobile ? 'default' : 'sm'}
 												>
 													<Link to={childItem.path}>

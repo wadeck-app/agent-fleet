@@ -45,7 +45,12 @@ export function WorkerFlowsList({ workerId }: WorkerFlowsListProps) {
 								{flow.id} v{flow.version}
 							</p>
 						</div>
-						<Badge variant={flow.isValid ? 'success' : 'destructive'} className="font-medium">
+						<Badge
+							variant={flow.isValid ? 'success' : 'destructive'}
+							className={`
+        font-medium
+      `}
+						>
 							{flow.isValid ? 'Valid' : 'Invalid'}
 						</Badge>
 					</div>

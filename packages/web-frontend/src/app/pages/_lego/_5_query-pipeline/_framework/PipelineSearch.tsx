@@ -16,5 +16,14 @@ import { usePipelineContext } from './PipelineContext';
 export function PipelineSearch() {
 	const { query, setSearch } = usePipelineContext();
 
-	return <SearchInput value={query.search ?? ''} onChange={setSearch} placeholder="Search..." className="flex-1" />;
+	return (
+		<SearchInput
+			value={query.search ?? ''}
+			onChange={setSearch}
+			placeholder="Search..."
+			className={`
+   flex-1
+ `}
+		/>
+	);
 }

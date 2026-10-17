@@ -20,7 +20,16 @@ import { ticketsApi } from './tickets.api';
 // creates a new reference on every render, which ReactMarkdown treats as a config
 // change and fully re-renders the markdown DOM (visible as content "flickering").
 const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['components'] = {
-	p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+	p: ({ children }) => (
+		<p
+			className={`
+   mb-1
+   last:mb-0
+ `}
+		>
+			{children}
+		</p>
+	),
 	strong: ({ children }) => <strong className="font-bold">{children}</strong>,
 	em: ({ children }) => <em className="italic">{children}</em>,
 	code: ({ children, className }) => {
@@ -28,19 +37,39 @@ const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['component
 		if (isBlock) {
 			return <code className={className}>{children}</code>;
 		}
-		return <code className="rounded bg-muted px-1 py-0.5 text-[0.85em] font-mono">{children}</code>;
+		return <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{children}</code>;
 	},
-	pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-md bg-muted p-3 text-xs">{children}</pre>,
+	pre: ({ children }) => (
+		<pre
+			className={`
+   my-2 overflow-x-auto rounded-md bg-muted p-3 text-xs
+ `}
+		>
+			{children}
+		</pre>
+	),
 	ul: ({ children }) => <ul className="my-1 ml-4 list-disc">{children}</ul>,
 	ol: ({ children }) => <ol className="my-1 ml-4 list-decimal">{children}</ol>,
 	li: ({ children }) => <li className="my-0.5">{children}</li>,
 	blockquote: ({ children }) => (
-		<blockquote className="my-1 border-l-2 border-muted-foreground pl-3 text-muted-foreground">
+		<blockquote
+			className={`
+    my-1 border-l-2 border-muted-foreground pl-3 text-muted-foreground
+  `}
+		>
 			{children}
 		</blockquote>
 	),
 	a: ({ children, href }) => (
-		<a href={href} className="text-primary underline hover:no-underline" target="_blank" rel="noopener noreferrer">
+		<a
+			href={href}
+			className={`
+    text-primary underline
+    hover:no-underline
+  `}
+			target="_blank"
+			rel="noopener noreferrer"
+		>
 			{children}
 		</a>
 	),
@@ -182,7 +211,10 @@ export function TicketCommentsSection({ ticketId, sortOrder = 'asc', showLabel =
 						<div
 							key={comment.id}
 							id={`comment-${comment.id}`}
-							className={`rounded-md border bg-card p-4 ${selectedCommentId === comment.id ? 'border-l-2 border-l-primary' : ''}`}
+							className={`
+         rounded-md border bg-card p-4
+         ${selectedCommentId === comment.id ? `border-l-2 border-l-primary` : ''}
+       `}
 						>
 							<div className="mb-2 flex items-center gap-2">
 								{comment.author && (

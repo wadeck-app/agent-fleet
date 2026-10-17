@@ -162,7 +162,14 @@ export function FlowEditorToolbar({
 				{/* Flow Actions */}
 				<div className="flex items-center gap-2">
 					<span className="mr-1 text-xs font-medium text-muted-foreground">Actions:</span>
-					<Button variant="outline" size="sm" onClick={onOpenSettings} className="h-8">
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={onOpenSettings}
+						className={`
+       h-8
+     `}
+					>
 						<Settings className="mr-2 size-4" />
 						Settings
 					</Button>

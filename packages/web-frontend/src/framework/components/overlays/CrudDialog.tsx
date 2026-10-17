@@ -73,8 +73,8 @@ export function CrudDialog({
 				{isRefreshing ? (
 					<DialogBody
 						className={`
-       pointer-events-none opacity-50 blur-[1px] transition-all duration-200
-     `}
+        pointer-events-none opacity-50 blur-[1px] transition-all duration-200
+      `}
 					>
 						{children}
 					</DialogBody>

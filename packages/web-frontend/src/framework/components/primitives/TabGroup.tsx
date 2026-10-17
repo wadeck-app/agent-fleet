@@ -5,9 +5,7 @@ import { type VariantProps, cva } from 'class-variance-authority';
 
 const tabGroupVariants = cva(
 	// @formatter:off
-	`
-   border-b border-border
- `,
+	`border-b border-border`,
 	// @formatter:on
 	{
 		variants: {
@@ -24,17 +22,13 @@ const tabGroupVariants = cva(
 
 const tabGroupWrapperVariants = cva(
 	// @formatter:off
-	`
-   flex items-center justify-between px-4 min-h-[inherit]
- `
+	`flex min-h-[inherit] items-center justify-between px-4`
 	// @formatter:on
 );
 
 const tabGroupContentVariants = cva(
 	// @formatter:off
-	`
-   flex items-center overflow-x-auto
- `,
+	`flex items-center overflow-x-auto`,
 	// @formatter:on
 	{
 		variants: {
@@ -51,17 +45,13 @@ const tabGroupContentVariants = cva(
 
 const tabGroupTabsVariants = cva(
 	// @formatter:off
-	`
-   flex items-center gap-1
- `
+	`flex items-center gap-1`
 	// @formatter:on
 );
 
 const tabGroupTitleVariants = cva(
 	// @formatter:off
-	`
-   text-sm font-medium text-muted-foreground
- `
+	`text-sm font-medium text-muted-foreground`
 	// @formatter:on
 );
 

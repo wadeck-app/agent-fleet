@@ -1,9 +1,9 @@
+import type { StepMeta } from 'flow-engine/types';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { ExecutionState, StepStatus } from '../ipc/Protocol';
-import type { StepMeta } from 'flow-engine/types';
 
 export function generateExecutionId(): string {
 	const hex = crypto.randomUUID().replace(/-/g, '');
@@ -141,7 +141,13 @@ export class ExecutionStore {
 		return state;
 	}
 
-	markStepFailed(executionId: string, stepId: string, error?: string, stdout?: string, stderr?: string): ExecutionState {
+	markStepFailed(
+		executionId: string,
+		stepId: string,
+		error?: string,
+		stdout?: string,
+		stderr?: string
+	): ExecutionState {
 		const state = this.read(executionId);
 		const step = state.steps[stepId];
 		if (step) {

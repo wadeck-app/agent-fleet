@@ -182,9 +182,11 @@ async function settledExecution(executionId: string): Promise<ExecutionState> {
  * first would race the daemon's own exit. With work already queued the daemon stays up, and
  * the step waits for capacity exactly as it would in a real run.
  */
-async function queueFlowThenConnectWorker(options: {
-	meta?: Record<string, unknown>;
-} = {}): Promise<{ executionId: string; assigned: string[] }> {
+async function queueFlowThenConnectWorker(
+	options: {
+		meta?: Record<string, unknown>;
+	} = {}
+): Promise<{ executionId: string; assigned: string[] }> {
 	const executionId = await runFlow();
 	const worker = await connectRegisteredWorker(options);
 	return { executionId, assigned: worker.assigned };

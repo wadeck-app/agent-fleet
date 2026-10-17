@@ -66,7 +66,15 @@ export function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 	return (
 		<div className="rounded-md border">
 			<Button type="button" variant="ghost" onClick={() => setOpen(v => !v)} className={retroToggleCls}>
-				{open ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
+				{open ? (
+					<ChevronDown className="size-4 shrink-0" />
+				) : (
+					<ChevronRight
+						className={`
+      size-4 shrink-0
+    `}
+					/>
+				)}
 				Agent Retrospective
 				<span className="ml-auto text-xs font-normal text-muted-foreground">
 					{new Date(retro.generatedAt).toISOString().replace('T', ' ').slice(0, 19)}
@@ -74,16 +82,16 @@ export function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 			</Button>
 
 			{open && (
-				<div className="border-t space-y-4 p-3">
+				<div className="space-y-4 border-t p-3">
 					<div className="space-y-1">
-						<p className="text-xs font-medium text-muted-foreground tracking-wide">Execution summary</p>
+						<p className="text-xs font-medium tracking-wide text-muted-foreground">Execution summary</p>
 						<p className="text-sm whitespace-pre-wrap">{retro.executionSummary}</p>
 					</div>
 
 					{retro.wentWell.length > 0 && (
 						<div className="space-y-1">
-							<p className="text-xs font-medium text-muted-foreground tracking-wide">What went well</p>
-							<ul className="list-disc list-inside space-y-0.5">
+							<p className="text-xs font-medium tracking-wide text-muted-foreground">What went well</p>
+							<ul className="list-inside list-disc space-y-0.5">
 								{retro.wentWell.map((item, i) => (
 									<li key={i} className="text-sm">
 										{item}
@@ -95,8 +103,8 @@ export function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 
 					{retro.wentWrong.length > 0 && (
 						<div className="space-y-1">
-							<p className="text-xs font-medium text-muted-foreground tracking-wide">What went wrong</p>
-							<ul className="list-disc list-inside space-y-0.5">
+							<p className="text-xs font-medium tracking-wide text-muted-foreground">What went wrong</p>
+							<ul className="list-inside list-disc space-y-0.5">
 								{retro.wentWrong.map((item, i) => (
 									<li key={i} className="text-sm">
 										{item}
@@ -108,8 +116,8 @@ export function RetrospectiveCard({ ticketId }: RetrospectiveCardProps) {
 
 					{retro.suggestions.length > 0 && (
 						<div className="space-y-1">
-							<p className="text-xs font-medium text-muted-foreground tracking-wide">Suggestions</p>
-							<ul className="list-disc list-inside space-y-0.5">
+							<p className="text-xs font-medium tracking-wide text-muted-foreground">Suggestions</p>
+							<ul className="list-inside list-disc space-y-0.5">
 								{retro.suggestions.map((item, i) => (
 									<li key={i} className="text-sm">
 										{item}

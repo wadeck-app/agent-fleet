@@ -20,6 +20,8 @@ export class CmdShellStrategy implements ShellStrategy {
 		const cmdPath = path.join(systemRoot, 'System32', 'cmd.exe');
 		if (fs.existsSync(cmdPath)) return cmdPath;
 
-		throw new Error(`cmd not found: checked ${cmdPath} (via SystemRoot). Verify the Windows installation is intact.`);
+		throw new Error(
+			`cmd not found: checked ${cmdPath} (via SystemRoot). Verify the Windows installation is intact.`
+		);
 	}
 }

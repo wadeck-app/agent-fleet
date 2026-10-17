@@ -18,20 +18,25 @@ import { useWorkspaceId } from './useWorkspaceId';
  * ===========================================================================================
  */
 
-const workspaceBadgeVariants = cva(`flex items-center gap-1 rounded px-2 py-1 text-xs font-bold`, {
-	variants: {
-		workspace: {
-			1: 'bg-primary text-primary-foreground',
-			2: 'bg-secondary text-secondary-foreground',
-			3: 'bg-accent text-accent-foreground',
-			4: 'border border-destructive/20 bg-destructive/10 text-destructive',
-			5: 'border border-border bg-muted text-muted-foreground',
+const workspaceBadgeVariants = cva(
+	`
+  flex items-center gap-1 rounded px-2 py-1 text-xs font-bold
+`,
+	{
+		variants: {
+			workspace: {
+				1: 'bg-primary text-primary-foreground',
+				2: 'bg-secondary text-secondary-foreground',
+				3: 'bg-accent text-accent-foreground',
+				4: 'border border-destructive/20 bg-destructive/10 text-destructive',
+				5: 'border border-border bg-muted text-muted-foreground',
+			},
 		},
-	},
-	defaultVariants: {
-		workspace: 1,
-	},
-});
+		defaultVariants: {
+			workspace: 1,
+		},
+	}
+);
 
 type WorkspaceVariant = VariantProps<typeof workspaceBadgeVariants>['workspace'];
 

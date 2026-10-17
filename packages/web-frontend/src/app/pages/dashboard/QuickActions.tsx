@@ -60,14 +60,7 @@ export function QuickActions({
 			</Button>
 
 			{/* Review Queue */}
-			<Button
-				onClick={onReviewQueue}
-				variant="outline"
-				size="sm"
-				className={`
-     relative
-   `}
-			>
+			<Button onClick={onReviewQueue} variant="outline" size="sm" className={`relative`}>
 				<Eye className="mr-2 size-4" />
 				Review Queue
 				{reviewQueueCount > 0 && (

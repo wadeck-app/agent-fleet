@@ -125,9 +125,9 @@ export function EnhancedNumberField({
 				{suffix && (
 					<div
 						className={`
-       pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm
-       text-muted-foreground
-     `}
+        pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm
+        text-muted-foreground
+      `}
 					>
 						{suffix}
 					</div>

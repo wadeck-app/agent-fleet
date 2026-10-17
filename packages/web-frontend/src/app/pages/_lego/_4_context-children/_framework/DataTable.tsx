@@ -236,7 +236,16 @@ DataTableRoot.Toolbar = function Toolbar({ children }: { children: ReactNode }) 
 // Search input
 DataTableRoot.Search = function Search({ placeholder = 'Search...' }: { placeholder?: string }) {
 	const ctx = useDataTable();
-	return <SearchInput value={ctx.search} onChange={ctx.setSearch} placeholder={placeholder} className="flex-1" />;
+	return (
+		<SearchInput
+			value={ctx.search}
+			onChange={ctx.setSearch}
+			placeholder={placeholder}
+			className={`
+   flex-1
+ `}
+		/>
+	);
 };
 
 // Column visibility toggle
@@ -339,7 +348,14 @@ DataTableRoot.Grid = function Grid() {
 	const visibleColumns = ctx.columns.slice(0, 4); // Show first 4 columns (matches WidgetItemGrid)
 
 	return (
-		<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+		<div
+			className={`
+    grid grid-cols-1 gap-4
+    sm:grid-cols-2
+    lg:grid-cols-3
+    xl:grid-cols-4
+  `}
+		>
 			{(ctx.items as any[]).map(item => (
 				<div key={item.id} className="rounded-lg border border-border bg-card p-4">
 					<div className="space-y-2">
@@ -555,7 +571,15 @@ DataTableRoot.DetailPanel = function DetailPanel<T extends { id: string }>({ col
 		const value = ctx.selectedItem[col.key];
 
 		if (col.type === 'boolean') {
-			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+			return value ? (
+				<Check className="size-4 text-primary" />
+			) : (
+				<X
+					className={`
+     size-4 text-muted-foreground
+   `}
+				/>
+			);
 		}
 
 		if (col.type === 'number' && typeof value === 'number') {
@@ -590,7 +614,11 @@ DataTableRoot.DetailPanel = function DetailPanel<T extends { id: string }>({ col
 
 	if (!ctx.selectedItem) {
 		return (
-			<div className="flex h-full items-center justify-center text-muted-foreground">
+			<div
+				className={`
+     flex h-full items-center justify-center text-muted-foreground
+   `}
+			>
 				Select an item to view details
 			</div>
 		);
@@ -613,7 +641,11 @@ DataTableRoot.DetailPanel = function DetailPanel<T extends { id: string }>({ col
 	};
 
 	return (
-		<div className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4">
+		<div
+			className={`
+    flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4
+  `}
+		>
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">Details</h2>
 				<div className="flex gap-1">

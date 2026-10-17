@@ -12,17 +12,17 @@ Per Decision #11: v1 ships the interfaces plus built-in in-process defaults, and
 
 ## Inventory
 
-| # | Strategy | Question it answers | Origin |
-|---|---|---|---|
-| S1 | Worker creation (a source's internal strategy) | How does a worker come into existence for this source? | User |
-| S2 | On-the-fly creation | Built-in default implementation of S1 | User |
-| S3 | Distribution / assignment | Which eligible worker receives this ready step? Examples given: priority, load | User |
-| S4 | Worker-side acceptance | Is this worker willing to take this step? | User |
-| S5 | Project root resolution | Which directory is "the project" for a given starting directory? | User |
-| S6 | Retention | When is an idle worker torn down? | **Claude**, imported from Jenkins. Never requested -- confirm or drop |
-| S7 | Authentication | How does a party prove who it is on registration? Shared token, public/private keypair, ... | User |
-| S8 | Provisioning | *When* and *how much* capacity to add, as distinct from S1's *how* | **Claude** -- mentioned early, then dropped from this inventory in error. Second omission found |
-| S9 | Interactivity policy | What happens to an interactive step when no worker has a user interface attached -- disable it, queue it, fail it? | User |
+| #   | Strategy                                       | Question it answers                                                                                                | Origin                                                                                          |
+| --- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| S1  | Worker creation (a source's internal strategy) | How does a worker come into existence for this source?                                                             | User                                                                                            |
+| S2  | On-the-fly creation                            | Built-in default implementation of S1                                                                              | User                                                                                            |
+| S3  | Distribution / assignment                      | Which eligible worker receives this ready step? Examples given: priority, load                                     | User                                                                                            |
+| S4  | Worker-side acceptance                         | Is this worker willing to take this step?                                                                          | User                                                                                            |
+| S5  | Project root resolution                        | Which directory is "the project" for a given starting directory?                                                   | User                                                                                            |
+| S6  | Retention                                      | When is an idle worker torn down?                                                                                  | **Claude**, imported from Jenkins. Never requested -- confirm or drop                           |
+| S7  | Authentication                                 | How does a party prove who it is on registration? Shared token, public/private keypair, ...                        | User                                                                                            |
+| S8  | Provisioning                                   | _When_ and _how much_ capacity to add, as distinct from S1's _how_                                                 | **Claude** -- mentioned early, then dropped from this inventory in error. Second omission found |
+| S9  | Interactivity policy                           | What happens to an interactive step when no worker has a user interface attached -- disable it, queue it, fail it? | User                                                                                            |
 
 ## Note on S9 and existing machinery
 
@@ -38,13 +38,13 @@ When a mechanism has more than one valid implementation, it is an extension poin
 
 The kinds the user enumerated:
 
-| Kind | Behaviour | Status |
-|---|---|---|
-| Local on-the-fly | Fork a child process on the daemon host, up to a concurrency limit. Today's `spawnWorker()` | Built-in default (S2) |
-| Inbound worker | The worker dials the daemon itself and waits to be contacted | In scope, primary feature |
-| Registered command | The daemon runs a stored command line to create a worker on demand | In scope (Decision #5) |
-| **Inbound host provider** | A machine dials the daemon and offers the *ability to create* workers; the daemon asks it to spawn N on demand | **In scope** -- Decision #17 |
-| Other, plugin-supplied | "des pool geres d'autres facon" | Open by construction |
+| Kind                      | Behaviour                                                                                                      | Status                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Local on-the-fly          | Fork a child process on the daemon host, up to a concurrency limit. Today's `spawnWorker()`                    | Built-in default (S2)        |
+| Inbound worker            | The worker dials the daemon itself and waits to be contacted                                                   | In scope, primary feature    |
+| Registered command        | The daemon runs a stored command line to create a worker on demand                                             | In scope (Decision #5)       |
+| **Inbound host provider** | A machine dials the daemon and offers the _ability to create_ workers; the daemon asks it to spawn N on demand | **In scope** -- Decision #17 |
+| Other, plugin-supplied    | "des pool geres d'autres facon"                                                                                | Open by construction         |
 
 ## Corrections found by auditing this inventory
 
@@ -52,7 +52,7 @@ The kinds the user enumerated:
 
 Decision #6 introduced a `Launcher` axis (`inbound` / `command`). That is exactly the user's "stratégie interne du pool" (S1). Two vocabularies were layered without flagging the overlap.
 
-**Resolution:** keep the user's framing. S1 is the creation strategy; `inbound` and `command` are two *implementations* of S1, not a separate axis. Decision #6's three-concept model (`Worker` / `WorkerSource` / elastic pool) stands; only the naming collapses.
+**Resolution:** keep the user's framing. S1 is the creation strategy; `inbound` and `command` are two _implementations_ of S1, not a separate axis. Decision #6's three-concept model (`Worker` / `WorkerSource` / elastic pool) stands; only the naming collapses.
 
 ### C2: the inbound host provider was silently dropped -- RESOLVED
 
@@ -62,8 +62,8 @@ Decision #12 restricted launchers to `inbound` + `command` and eliminated this c
 
 ### C3: Question #5 was closed having answered only half
 
-Question #5 asked where labels are declared *and* the matching syntax. Decision #7 answered only the step-side syntax (list, AND). **Where labels are declared is undecided.** The user's phrasing -- "il a accès à des pool/generateur, avec des labels" -- points to declaration on the source, with workers inheriting. Reopened.
+Question #5 asked where labels are declared _and_ the matching syntax. Decision #7 answered only the step-side syntax (list, AND). **Where labels are declared is undecided.** The user's phrasing -- "il a accès à des pool/generateur, avec des labels" -- points to declaration on the source, with workers inheriting. Reopened.
 
 ## Interfaces
 
-*Pending -- to be drafted once C2 is resolved, since it determines whether a source can itself be remote.*
+_Pending -- to be drafted once C2 is resolved, since it determines whether a source can itself be remote._

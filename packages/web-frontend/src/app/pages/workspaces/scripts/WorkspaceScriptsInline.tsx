@@ -99,9 +99,9 @@ export function WorkspaceScriptsInline({ workspaceId, onScriptClick }: Workspace
 	return (
 		<div
 			className={`
-    flex flex-1 flex-wrap items-start gap-x-3 gap-y-1.5 text-xs
-    text-muted-foreground
-  `}
+     flex flex-1 flex-wrap items-start gap-x-3 gap-y-1.5 text-xs
+     text-muted-foreground
+   `}
 		>
 			{sortedScripts.map(scriptConfig => {
 				const { script, process } = scriptConfig;

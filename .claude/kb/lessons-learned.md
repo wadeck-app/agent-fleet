@@ -6404,17 +6404,17 @@ untouched; an empty array disables all of them.
 Each provider translates the same list to its own native mechanism -- verified live, not
 assumed:
 
-| Provider | Mechanism | Verified |
-|---|---|---|
-| Claude | `--tools <PascalCase,names>` (`""` disables all) | `claude -p ... --tools "Read"` really refused to write a file |
-| OpenCode | `tools: {<name>: boolean}` in the per-run config.json | `tools: {write:false,edit:false,bash:false}` made the model report exactly `glob, grep, read, skill, task, todowrite, webfetch` as its own tools |
-| Codex | no per-tool list, only `--sandbox read-only/workspace-write/danger-full-access` | not independently verified; mapped only the unambiguous case |
+| Provider | Mechanism                                                                       | Verified                                                                                                                                         |
+| -------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Claude   | `--tools <PascalCase,names>` (`""` disables all)                                | `claude -p ... --tools "Read"` really refused to write a file                                                                                    |
+| OpenCode | `tools: {<name>: boolean}` in the per-run config.json                           | `tools: {write:false,edit:false,bash:false}` made the model report exactly `glob, grep, read, skill, task, todowrite, webfetch` as its own tools |
+| Codex    | no per-tool list, only `--sandbox read-only/workspace-write/danger-full-access` | not independently verified; mapped only the unambiguous case                                                                                     |
 
 ### Known gaps, by design, not oversight
 
 - **Codex only gets `--sandbox read-only` when `tools` excludes both `write` and `bash`.**
   Any other combination (e.g. allow `bash` but not `write`) has no Codex equivalent and is left
-  at Codex's default -- a wrong guess would be a silent *under*-restriction, worse than no
+  at Codex's default -- a wrong guess would be a silent _under_-restriction, worse than no
   restriction. Don't try to get clever here without a real per-tool Codex mechanism to map to.
 - **OpenCode's `patch` tool has no canonical name** (it's an alternate write path, confirmed
   live). `buildOpenCodeToolsConfig` folds it into `write`: excluding `write` also sets
@@ -6496,7 +6496,7 @@ window.
    byte-identical spawn options (`windowsHide:true`, same narrow env, confirmed by reading both
    providers' code) on the identical daemon/worker chain, and never pops a window. But "same env,
    different binary behavior" was read as "must be the binary's fault" without checking whether
-   codex's own narrow env was *also* missing something that happened not to matter for codex's
+   codex's own narrow env was _also_ missing something that happened not to matter for codex's
    internal command resolution. It was -- codex is missing `PATHEXT` too, and is simply not
    vulnerable to it, for reasons inside codex's own binary, not flow's code. Different root
    cause, same missing env var, no bug on codex's side.
@@ -6505,7 +6505,7 @@ window.
    minimal-repro script using the exact documented production spawn options (`windowsHide:true`,
    VBS-rooted hidden-console ancestor, matching the daemon's own launch mechanism) **failed to
    reproduce the bug twice** -- same flag, same console-inheritance shape, no window. That
-   negative result is what forced questioning the general theory for this *specific* bug, rather
+   negative result is what forced questioning the general theory for this _specific_ bug, rather
    than concluding the repro script was simply wrong somehow. Lesson: two bugs can look
    identical (a popping console window) and share surface-level conditions (same spawn flags,
    same daemon/worker chain) while having completely different, unrelated root causes. Confirming
@@ -6517,7 +6517,7 @@ window.
 
 1. Reproduced the known-buggy production spawn (`windowsHide:true`, `npm --version` prompt) in a
    **standalone script** passing the **full** environment -- no window. This was the pivotal
-   negative result: production's env is *not* the full environment (verified by reading
+   negative result: production's env is _not_ the full environment (verified by reading
    `buildSpawnParams()` directly), so a full-env repro that doesn't fail while production does is
    itself informative, not just an inconclusive miss.
 2. Swapped to the **exact production narrow allowlist** (`PATH`/`HOME`/`USERPROFILE`/`SystemRoot`
@@ -6593,9 +6593,9 @@ disconnect path instead of failing it.
 ## Daemon state is in memory only
 
 An execution's scheduler/context exist only in the daemon process; there is no reconstruction after a
-restart. So a "drain" before an update must refuse *new runs* (`DAEMON_DRAINING`) and let running
+restart. So a "drain" before an update must refuse _new runs_ (`DAEMON_DRAINING`) and let running
 executions finish; freezing step dispatch would strand them, and queuing runs would lose them at restart.
-The updater that runs is the one in the *installed* version, so a gate fix only helps from the version
+The updater that runs is the one in the _installed_ version, so a gate fix only helps from the version
 that contains it.
 
 ## Windows: killing a `shell: true` child leaves the command running

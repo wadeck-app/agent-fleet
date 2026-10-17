@@ -82,7 +82,14 @@ export function SWsPage() {
 			</div>
 
 			<div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-				<SearchInput value={search} onChange={setSearch} placeholder="Search products..." className="flex-1" />
+				<SearchInput
+					value={search}
+					onChange={setSearch}
+					placeholder="Search products..."
+					className={`
+      flex-1
+    `}
+				/>
 				<span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
 					{filteredProducts.length} of {products.length} products
 				</span>

@@ -1,4 +1,3 @@
-// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 'use client';
 
 import * as React from 'react';
@@ -9,14 +8,23 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 
 // violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
 
-// violations-suppress: ts/no-inline-subcomponent tightly-coupled primitive sub-parts belong in the same file
-
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
 	return <SelectPrimitive.Root data-slot="select" {...props} />;
 }
 
 function SelectGroup({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Group>) {
-	return <SelectPrimitive.Group data-slot="select-group" className={cn(`scroll-my-1 p-1`, className)} {...props} />;
+	return (
+		<SelectPrimitive.Group
+			data-slot="select-group"
+			className={cn(
+				`
+   scroll-my-1 p-1
+ `,
+				className
+			)}
+			{...props}
+		/>
+	);
 }
 
 function SelectValue({ ...props }: React.ComponentProps<typeof SelectPrimitive.Value>) {
@@ -37,9 +45,9 @@ function SelectTrigger({
 			data-size={size}
 			className={cn(
 				`
-      flex w-full cursor-pointer items-center justify-between gap-1.5 rounded-lg border
-      border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap
-      transition-colors outline-none select-none
+      flex w-full cursor-pointer items-center justify-between gap-1.5 rounded-lg
+      border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm
+      whitespace-nowrap transition-colors outline-none select-none
       focus-visible:border-ring focus-visible:ring-[3px]
       focus-visible:ring-ring/50
       disabled:cursor-not-allowed disabled:opacity-50
@@ -62,7 +70,11 @@ function SelectTrigger({
 		>
 			{children}
 			<SelectPrimitive.Icon asChild>
-				<ChevronDownIcon className={`pointer-events-none size-4 text-muted-foreground`} />
+				<ChevronDownIcon
+					className={`
+      pointer-events-none size-4 text-muted-foreground
+    `}
+				/>
 			</SelectPrimitive.Icon>
 		</SelectPrimitive.Trigger>
 	);

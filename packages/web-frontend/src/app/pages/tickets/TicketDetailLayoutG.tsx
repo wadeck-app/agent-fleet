@@ -263,12 +263,15 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 						suppressContentEditableWarning
 						onInput={e => handleTitleChange(e.currentTarget.textContent ?? '')}
 						onBlur={e => handleTitleChange(e.currentTarget.textContent ?? '')}
-						className={`mt-1 min-h-[2rem] rounded-md px-1 py-1 text-2xl font-bold outline-none
-							cursor-text empty:before:content-['Title...'] empty:before:text-muted-foreground
-							focus:ring-2 focus:ring-ring/20 hover:bg-muted/30
-							transition-colors
-							${dirtyFields.title ? 'ring-2 ring-primary' : ''}
-							${saving ? 'opacity-50 pointer-events-none' : ''}`}
+						className={`
+        mt-1 min-h-[2rem] cursor-text rounded-md px-1 py-1 text-2xl font-bold
+        transition-colors outline-none
+        empty:before:text-muted-foreground empty:before:content-['Title...']
+        hover:bg-muted/30
+        focus:ring-2 focus:ring-ring/20
+        ${dirtyFields.title ? 'ring-2 ring-primary' : ''}
+        ${saving ? 'pointer-events-none opacity-50' : ''}
+      `}
 					/>
 					<div
 						ref={descriptionRef}
@@ -276,13 +279,16 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 						suppressContentEditableWarning
 						onInput={e => handleDescriptionChange(e.currentTarget.textContent ?? '')}
 						onBlur={e => handleDescriptionChange(e.currentTarget.textContent ?? '')}
-						className={`mt-1 min-h-[120px] w-full rounded-md px-1 py-2 text-sm outline-none
-							whitespace-pre-wrap cursor-text
-							empty:before:content-['Description...'] empty:before:text-muted-foreground
-							focus:ring-2 focus:ring-ring/20 hover:bg-muted/30
-							transition-colors
-							${dirtyFields.description ? 'ring-2 ring-primary' : ''}
-							${saving ? 'opacity-50 pointer-events-none' : ''}`}
+						className={`
+        mt-1 min-h-[120px] w-full cursor-text rounded-md px-1 py-2 text-sm
+        whitespace-pre-wrap transition-colors outline-none
+        empty:before:text-muted-foreground
+        empty:before:content-['Description...']
+        hover:bg-muted/30
+        focus:ring-2 focus:ring-ring/20
+        ${dirtyFields.description ? 'ring-2 ring-primary' : ''}
+        ${saving ? 'pointer-events-none opacity-50' : ''}
+      `}
 					/>
 				</div>
 
@@ -370,7 +376,10 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 										variant="ghost"
 										size="sm"
 										onClick={() => setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))}
-										className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+										className={`
+            flex items-center gap-1.5 text-xs text-muted-foreground
+            hover:text-foreground
+          `}
 									>
 										{sortOrder === 'asc' ? (
 											<>
@@ -493,7 +502,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 							className={cn(
 								'rounded-md py-1 transition-all',
 								dirtyFields.labels && 'ring-2 ring-primary',
-								saving && 'opacity-50 pointer-events-none'
+								saving && 'pointer-events-none opacity-50'
 							)}
 						>
 							<div className="space-y-2">
@@ -514,14 +523,25 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 													type="button"
 													variant="ghost"
 													onClick={() => handleRemoveLabel(label)}
-													className="ml-1 h-auto p-0 text-muted-foreground hover:text-foreground"
+													className={`
+               ml-1 h-auto p-0 text-muted-foreground
+               hover:text-foreground
+             `}
 												>
 													<X className="size-3" aria-hidden="true" />
 												</Button>
 											</Badge>
 										);
 									})}
-									{localLabels.length === 0 && <p className="text-sm text-muted-foreground">None</p>}
+									{localLabels.length === 0 && (
+										<p
+											className={`
+           text-sm text-muted-foreground
+         `}
+										>
+											None
+										</p>
+									)}
 								</div>
 								<Input
 									value={labelInput}
@@ -577,7 +597,7 @@ export function TicketDetailLayoutG({ ticket, ticketId, onUpdate, onRefresh }: T
 							className={cn(
 								'rounded-md py-1 transition-all',
 								fieldsChanged && 'ring-2 ring-primary',
-								saving && 'opacity-50 pointer-events-none'
+								saving && 'pointer-events-none opacity-50'
 							)}
 						>
 							<div className="space-y-2">

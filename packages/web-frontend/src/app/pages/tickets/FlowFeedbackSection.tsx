@@ -203,7 +203,12 @@ export function FlowFeedbackSection({
 						onDeleteSuccess={() => {}}
 						onDeleteError={() => {}}
 					/>
-					<div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/40">
+					<div
+						className={`
+       absolute inset-0 flex items-center justify-center rounded-lg
+       bg-background/40
+     `}
+					>
 						<Loader2 className="size-5 animate-spin text-muted-foreground" />
 					</div>
 				</div>

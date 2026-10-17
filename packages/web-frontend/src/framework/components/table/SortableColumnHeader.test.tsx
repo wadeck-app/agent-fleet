@@ -68,7 +68,14 @@ describe('SortableColumnHeader', () => {
 
 	it('should apply custom className', () => {
 		render(
-			<SortableColumnHeader label="Name" sortDirection={null} onClick={mockOnClick} className={`custom-class`} />
+			<SortableColumnHeader
+				label="Name"
+				sortDirection={null}
+				onClick={mockOnClick}
+				className={`
+     custom-class
+   `}
+			/>
 		);
 
 		expect(screen.getByRole('button')).toHaveClass('custom-class');

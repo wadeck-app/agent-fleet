@@ -76,7 +76,10 @@ function getAuditEntryData(
 						<ReactMarkdown remarkPlugins={[remarkGfm]}>{`${content.slice(0, 100)}...`}</ReactMarkdown>
 						<Button
 							variant="ghost"
-							className="h-auto cursor-pointer p-0 text-xs underline hover:text-foreground"
+							className={`
+         h-auto cursor-pointer p-0 text-xs underline
+         hover:text-foreground
+       `}
 							onClick={() => onExpand(entry.id)}
 						>
 							Show more
@@ -122,28 +125,40 @@ function getAuditEntryData(
 										s.length > max ? s.slice(0, max) + '…' : s;
 									return (
 										<tr key={field}>
-											<td className="py-0.5 pr-3 pl-3 font-medium text-foreground align-top">
+											<td
+												className={`
+             py-0.5 pr-3 pl-3 align-top font-medium text-foreground
+           `}
+											>
 												{field}
 											</td>
 											{isMultiLine ? (
 												<>
-													<td className="py-0.5 pr-2 text-muted-foreground opacity-60 align-top">
-														<pre className="line-through whitespace-pre-wrap break-all">
+													<td
+														className={`
+               py-0.5 pr-2 align-top text-muted-foreground opacity-60
+             `}
+													>
+														<pre className="break-all whitespace-pre-wrap line-through">
 															{truncate(fromStr, 120)}
 														</pre>
 													</td>
-													<td className="py-0.5 text-muted-foreground align-top">
-														<pre className="whitespace-pre-wrap break-all">
+													<td className="py-0.5 align-top text-muted-foreground">
+														<pre className="break-all whitespace-pre-wrap">
 															{truncate(toStr, 120)}
 														</pre>
 													</td>
 												</>
 											) : (
 												<>
-													<td className="py-0.5 pr-2 text-muted-foreground opacity-60 align-top">
+													<td
+														className={`
+               py-0.5 pr-2 align-top text-muted-foreground opacity-60
+             `}
+													>
 														<span className="line-through">{truncate(fromStr, 40)}</span>
 													</td>
-													<td className="py-0.5 text-muted-foreground align-top">
+													<td className="py-0.5 align-top text-muted-foreground">
 														{truncate(toStr, 40)}
 													</td>
 												</>
@@ -191,7 +206,7 @@ function getAuditEntryData(
 						{wentWell && wentWell.length > 0 && (
 							<div className="space-y-0.5">
 								<p className="text-xs text-muted-foreground">What went well</p>
-								<ul className="list-disc list-inside">
+								<ul className="list-inside list-disc">
 									{wentWell.map((w, i) => (
 										<li key={i} className="text-xs">
 											{w}
@@ -203,7 +218,7 @@ function getAuditEntryData(
 						{wentWrong && wentWrong.length > 0 && (
 							<div className="space-y-0.5">
 								<p className="text-xs text-muted-foreground">What went wrong</p>
-								<ul className="list-disc list-inside">
+								<ul className="list-inside list-disc">
 									{wentWrong.map((w, i) => (
 										<li key={i} className="text-xs">
 											{w}
@@ -215,7 +230,7 @@ function getAuditEntryData(
 						{suggestions && suggestions.length > 0 && (
 							<div className="space-y-0.5">
 								<p className="text-xs text-muted-foreground">Suggestions</p>
-								<ul className="list-disc list-inside">
+								<ul className="list-inside list-disc">
 									{suggestions.map((s, i) => (
 										<li key={i} className="text-xs">
 											{s}
@@ -332,7 +347,15 @@ export function TicketAuditLogSection({
 	if (loading) {
 		return (
 			<div>
-				{showLabel && <p className="text-xs font-medium text-muted-foreground tracking-wide mb-2">Audit Log</p>}
+				{showLabel && (
+					<p
+						className={`
+      mb-2 text-xs font-medium tracking-wide text-muted-foreground
+    `}
+					>
+						Audit Log
+					</p>
+				)}
 				<div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
 					<Loader2 className="size-6 animate-spin" />
 					<p className="text-sm">Loading...</p>
@@ -343,7 +366,15 @@ export function TicketAuditLogSection({
 
 	return (
 		<div>
-			{showLabel && <p className="text-xs font-medium text-muted-foreground tracking-wide mb-2">Audit Log</p>}
+			{showLabel && (
+				<p
+					className={`
+     mb-2 text-xs font-medium tracking-wide text-muted-foreground
+   `}
+				>
+					Audit Log
+				</p>
+			)}
 			{sortedEntries.length === 0 ? (
 				<p className="text-sm text-muted-foreground">No activity yet</p>
 			) : (
@@ -352,7 +383,13 @@ export function TicketAuditLogSection({
 						const { label, content } = getAuditEntryData(entry, expanded, onExpand);
 						if (entry.event === 'ticket.updated' && !content) return null;
 						return (
-							<div key={entry.id} className="border-b py-2 last:border-b-0 text-xs">
+							<div
+								key={entry.id}
+								className={`
+         border-b py-2 text-xs
+         last:border-b-0
+       `}
+							>
 								<div className="flex flex-wrap items-center gap-1.5">
 									<span className="font-medium text-foreground">{label}</span>
 									{entry.author && (

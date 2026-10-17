@@ -34,7 +34,13 @@ function renderSegments(segments: DiffSegment[]) {
 export function FlowDiffViewer({ lines, summary }: FlowDiffViewerProps) {
 	if (lines.length === 0) {
 		return (
-			<div className={`flex h-full items-center justify-center text-muted-foreground`}>No changes detected</div>
+			<div
+				className={`
+     flex h-full items-center justify-center text-muted-foreground
+   `}
+			>
+				No changes detected
+			</div>
 		);
 	}
 

@@ -267,7 +267,12 @@ export const Interactive: Story = {
 		return (
 			<>
 				// violations-suppress: react/no-raw-button story fixture
-				<button onClick={() => setOpen(true)} className="rounded bg-info px-4 py-2 text-background">
+				<button
+					onClick={() => setOpen(true)}
+					className={`
+      rounded bg-info px-4 py-2 text-background
+    `}
+				>
 					Open Dialog
 				</button>
 				<DualListDialog

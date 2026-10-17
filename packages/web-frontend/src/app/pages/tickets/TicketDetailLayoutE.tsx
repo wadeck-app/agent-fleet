@@ -178,7 +178,19 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 						value={localDescription}
 						onChange={e => handleDescriptionChange(e.target.value)}
 						rows={8}
-						className={`mt-1 ${dirtyFields.description ? 'ring-2 ring-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary' : ''} ${saving ? 'opacity-50 transition-opacity' : ''}`}
+						className={`
+        mt-1
+        ${
+			dirtyFields.description
+				? `
+          ring-2 ring-primary
+          focus-visible:border-primary focus-visible:ring-2
+          focus-visible:ring-primary
+        `
+				: ''
+		}
+        ${saving ? `opacity-50 transition-opacity` : ''}
+      `}
 					/>
 				</div>
 
@@ -215,9 +227,10 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 								<div key={`${item.type}-${item.id}`} className="flex gap-3">
 									<div className="flex flex-col items-center">
 										<div
-											className={`flex size-8 items-center justify-center rounded-full ${
-												item.type === 'comment' ? 'bg-muted' : 'bg-accent'
-											}`}
+											className={`
+             flex size-8 items-center justify-center rounded-full
+             ${item.type === 'comment' ? 'bg-muted' : 'bg-accent'}
+           `}
 										>
 											{item.type === 'comment' ? (
 												<MessageSquare className="size-4 text-muted-foreground" />
@@ -252,7 +265,14 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 														remarkPlugins={[remarkGfm]}
 														components={{
 															p: ({ children }) => (
-																<p className="mb-1 last:mb-0">{children}</p>
+																<p
+																	className={`
+                  mb-1
+                  last:mb-0
+                `}
+																>
+																	{children}
+																</p>
 															),
 															strong: ({ children }) => (
 																<strong className="font-semibold">{children}</strong>
@@ -268,13 +288,21 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 																	);
 																}
 																return (
-																	<code className="rounded bg-muted px-1 py-0.5 text-[0.85em] font-mono">
+																	<code
+																		className={`
+                   rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]
+                 `}
+																	>
 																		{children}
 																	</code>
 																);
 															},
 															pre: ({ children }) => (
-																<pre className="my-2 overflow-x-auto rounded-md bg-muted p-3 text-xs">
+																<pre
+																	className={`
+                  my-2 overflow-x-auto rounded-md bg-muted p-3 text-xs
+                `}
+																>
 																	{children}
 																</pre>
 															),
@@ -288,14 +316,22 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 																<li className="my-0.5">{children}</li>
 															),
 															blockquote: ({ children }) => (
-																<blockquote className="my-1 border-l-2 border-muted-foreground pl-3 text-muted-foreground">
+																<blockquote
+																	className={`
+                  my-1 border-l-2 border-muted-foreground pl-3
+                  text-muted-foreground
+                `}
+																>
 																	{children}
 																</blockquote>
 															),
 															a: ({ children, href }) => (
 																<a
 																	href={href}
-																	className="text-primary underline hover:no-underline"
+																	className={`
+                   text-primary underline
+                   hover:no-underline
+                 `}
 																	target="_blank"
 																	rel="noopener noreferrer"
 																>
@@ -327,7 +363,10 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 												</div>
 												<Link
 													to={`/tasks/${item.data.id}`}
-													className="text-sm text-primary hover:underline"
+													className={`
+               text-sm text-primary
+               hover:underline
+             `}
 												>
 													Task {item.data.id}
 												</Link>
@@ -383,7 +422,15 @@ export function TicketDetailLayoutE({ ticket, ticketId, onUpdate, onRefresh }: T
 								{label}
 							</Badge>
 						))}
-						{ticket.labels.length === 0 && <p className="text-xs text-muted-foreground">None</p>}
+						{ticket.labels.length === 0 && (
+							<p
+								className={`
+        text-xs text-muted-foreground
+      `}
+							>
+								None
+							</p>
+						)}
 					</div>
 				</div>
 

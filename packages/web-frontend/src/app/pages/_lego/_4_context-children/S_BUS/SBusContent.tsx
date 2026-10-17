@@ -66,7 +66,15 @@ export function SBusContent() {
 		if (!ctx.selectedItem) return null;
 		const value = ctx.selectedItem[col.key];
 		if (col.type === 'boolean') {
-			return value ? <Check className="size-4 text-primary" /> : <X className="size-4 text-muted-foreground" />;
+			return value ? (
+				<Check className="size-4 text-primary" />
+			) : (
+				<X
+					className={`
+     size-4 text-muted-foreground
+   `}
+				/>
+			);
 		}
 		if (col.type === 'number' && typeof value === 'number') {
 			return (
@@ -108,7 +116,9 @@ export function SBusContent() {
 						<div className="flex h-full items-center justify-center">Loading...</div>
 					) : ctx.selectedItem ? (
 						<div
-							className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4"
+							className={`
+         flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4
+       `}
 							key={reloadKey}
 						>
 							<h2 className="text-lg font-semibold">Details</h2>
@@ -122,7 +132,11 @@ export function SBusContent() {
 							</div>
 						</div>
 					) : (
-						<div className="flex h-full items-center justify-center text-muted-foreground">
+						<div
+							className={`
+        flex h-full items-center justify-center text-muted-foreground
+      `}
+						>
 							Select an item to view details
 						</div>
 					)

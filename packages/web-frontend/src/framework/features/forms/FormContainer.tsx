@@ -126,9 +126,9 @@ export function FormContainerLegacy({
 			<div className="-mx-4 flex-1 overflow-y-auto px-4">
 				<div
 					className={`
-      grid gap-4
-      md:grid-cols-2
-    `}
+       grid gap-4
+       md:grid-cols-2
+     `}
 				>
 					{children}
 				</div>

@@ -35,7 +35,9 @@ export class PwshShellStrategy implements ShellStrategy {
 		} catch {
 			// fall through to fail-fast below
 		}
-		throw new Error("pwsh not found: checked PATH via 'which pwsh'. Install PowerShell 7+ (pwsh) or add it to PATH.");
+		throw new Error(
+			"pwsh not found: checked PATH via 'which pwsh'. Install PowerShell 7+ (pwsh) or add it to PATH."
+		);
 	}
 
 	private whereExe(binary: string): string | null {
@@ -43,10 +45,7 @@ export class PwshShellStrategy implements ShellStrategy {
 			// "2>nul" discards at the shell level, not just Node's stdio pipe -- where.exe writes
 			// its localized "could not find files" message straight to the console on a miss,
 			// bypassing stdio redirection otherwise (confirmed live: leaks even with stdio: 'pipe').
-			const resolved = execSync(`where.exe ${binary} 2>nul`, { encoding: 'utf8' })
-				.trim()
-				.split('\n')[0]
-				?.trim();
+			const resolved = execSync(`where.exe ${binary} 2>nul`, { encoding: 'utf8' }).trim().split('\n')[0]?.trim();
 			return resolved || null;
 		} catch {
 			return null;

@@ -21,9 +21,7 @@ export function VisualizeFlowDialog({ proposal }: VisualizeFlowDialogProps) {
 
 	// proposedFlow is typed as Record<string, unknown> (from StoredFlowDefinitionSchema = z.record)
 	const flowName =
-		typeof proposal.proposedFlow['name'] === 'string'
-			? String(proposal.proposedFlow['name'])
-			: 'Flow preview';
+		typeof proposal.proposedFlow['name'] === 'string' ? String(proposal.proposedFlow['name']) : 'Flow preview';
 
 	let nodes: FlowNode[] = [];
 	let edges: FlowEdge[] = [];
@@ -46,11 +44,20 @@ export function VisualizeFlowDialog({ proposal }: VisualizeFlowDialogProps) {
 					Visualize
 				</Button>
 			</DialogTrigger>
-			<DialogContent className="sm:max-w-[85vw] w-[85vw]">
+			<DialogContent
+				className={`
+     w-[85vw]
+     sm:max-w-[85vw]
+   `}
+			>
 				<DialogHeader>
 					<DialogTitle>{flowName}</DialogTitle>
 				</DialogHeader>
-				<div className="grid grid-cols-[1fr_384px] overflow-hidden rounded-md border">
+				<div
+					className={`
+      grid grid-cols-[1fr_384px] overflow-hidden rounded-md border
+    `}
+				>
 					<div className="h-[75vh] w-full overflow-hidden">
 						<ReactFlowProvider>
 							<ReactFlow

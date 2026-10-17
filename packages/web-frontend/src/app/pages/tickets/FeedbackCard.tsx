@@ -107,12 +107,15 @@ export function FeedbackCard({
 	if (isEditing) {
 		return (
 			<div
-				className={`rounded-md border bg-card p-4 space-y-4 ${item.isSaving ? 'pointer-events-none opacity-50' : ''}`}
+				className={`
+      space-y-4 rounded-md border bg-card p-4
+      ${item.isSaving ? `pointer-events-none opacity-50` : ''}
+    `}
 			>
 				<p className="text-sm font-medium">Edit Feedback</p>
 
 				<div className="space-y-1">
-					<Label className="text-xs font-medium text-muted-foreground tracking-wide">
+					<Label className="text-xs font-medium tracking-wide text-muted-foreground">
 						Rating <span className="text-destructive">*</span>
 					</Label>
 					<RatingInput value={editRating} onChange={setEditRating} />
@@ -158,13 +161,21 @@ export function FeedbackCard({
 
 	return (
 		<>
-			<div className={`rounded-md border bg-card p-4 space-y-3 ${pendingClass}`}>
+			<div
+				className={`
+     space-y-3 rounded-md border bg-card p-4
+     ${pendingClass}
+   `}
+			>
 				<div className="flex items-center gap-2">
 					<div className="flex gap-0.5">
 						{[1, 2, 3, 4, 5].map(n => (
 							<Star
 								key={n}
-								className={`size-4 fill-current ${n <= item.rating ? 'text-warning' : 'text-muted-foreground/20'}`}
+								className={`
+          size-4 fill-current
+          ${n <= item.rating ? 'text-warning' : `text-muted-foreground/20`}
+        `}
 							/>
 						))}
 					</div>
@@ -189,9 +200,9 @@ export function FeedbackCard({
 					</div>
 				</div>
 				<div className="space-y-1">
-					<p className="text-xs font-medium text-muted-foreground tracking-wide">What went well</p>
+					<p className="text-xs font-medium tracking-wide text-muted-foreground">What went well</p>
 					{item.wentWell.length > 0 ? (
-						<ul className="list-disc list-inside space-y-0.5">
+						<ul className="list-inside list-disc space-y-0.5">
 							{item.wentWell.map((w, i) => (
 								<li key={i} className="text-sm">
 									{w}
@@ -203,9 +214,9 @@ export function FeedbackCard({
 					)}
 				</div>
 				<div className="space-y-1">
-					<p className="text-xs font-medium text-muted-foreground tracking-wide">What went wrong</p>
+					<p className="text-xs font-medium tracking-wide text-muted-foreground">What went wrong</p>
 					{item.wentWrong.length > 0 ? (
-						<ul className="list-disc list-inside space-y-0.5">
+						<ul className="list-inside list-disc space-y-0.5">
 							{item.wentWrong.map((w, i) => (
 								<li key={i} className="text-sm">
 									{w}
@@ -217,9 +228,9 @@ export function FeedbackCard({
 					)}
 				</div>
 				<div className="space-y-1">
-					<p className="text-xs font-medium text-muted-foreground tracking-wide">Suggestions</p>
+					<p className="text-xs font-medium tracking-wide text-muted-foreground">Suggestions</p>
 					{item.suggestions && item.suggestions.length > 0 ? (
-						<ul className="list-disc list-inside space-y-0.5">
+						<ul className="list-inside list-disc space-y-0.5">
 							{item.suggestions.map((s, i) => (
 								<li key={i} className="text-sm">
 									{s}

@@ -111,10 +111,19 @@ export function FileBrowserPanel({ workspaceId }: FileBrowserPanelProps) {
 			{/* File Tree */}
 			<div
 				data-tree-panel
-				className="flex h-full flex-shrink-0 flex-col overflow-auto border-r border-border bg-card"
+				className={`
+      flex h-full flex-shrink-0 flex-col overflow-auto border-r border-border
+      bg-card
+    `}
 				style={{ width: `${treeWidth}px` }}
 			>
-				<div className="border-b border-border bg-muted/30 px-4 py-2 text-sm font-medium">Files</div>
+				<div
+					className={`
+      border-b border-border bg-muted/30 px-4 py-2 text-sm font-medium
+    `}
+				>
+					Files
+				</div>
 				<div className="flex-1 overflow-auto">
 					<FileTree
 						workspaceId={workspaceId}
@@ -131,9 +140,11 @@ export function FileBrowserPanel({ workspaceId }: FileBrowserPanelProps) {
 				onMouseDown={handleMouseDown}
 			>
 				<div
-					className={`absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-all group-hover:w-1 group-hover:bg-primary/30 ${
-						isDragging ? 'w-1 bg-primary/40' : ''
-					}`}
+					className={`
+       absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-all
+       group-hover:w-1 group-hover:bg-primary/30
+       ${isDragging ? 'w-1 bg-primary/40' : ''}
+     `}
 				/>
 			</div>
 

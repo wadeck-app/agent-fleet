@@ -83,11 +83,24 @@ export function FileEditorPanel({ workspaceId, filePath, selectedLines, onLineSe
 	return (
 		<div className="flex h-full flex-col">
 			{/* Breadcrumb */}
-			<div className="flex items-center gap-1 border-b border-border bg-muted/30 px-4 py-2 text-sm">
+			<div
+				className={`
+     flex items-center gap-1 border-b border-border bg-muted/30 px-4 py-2
+     text-sm
+   `}
+			>
 				{pathParts.map((part, index) => (
 					<div key={index} className="flex items-center gap-1">
 						{index > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-						<span className={index === pathParts.length - 1 ? 'font-medium' : 'text-muted-foreground'}>
+						<span
+							className={
+								index === pathParts.length - 1
+									? 'font-medium'
+									: `
+        text-muted-foreground
+      `
+							}
+						>
 							{part}
 						</span>
 					</div>
@@ -109,7 +122,12 @@ export function FileEditorPanel({ workspaceId, filePath, selectedLines, onLineSe
 
 			{/* Save/Discard buttons */}
 			{isDirty && (
-				<div className="flex items-center justify-end gap-2 border-t border-border bg-muted/30 px-4 py-2">
+				<div
+					className={`
+      flex items-center justify-end gap-2 border-t border-border bg-muted/30
+      px-4 py-2
+    `}
+				>
 					<Button variant="outline" size="sm" onClick={handleDiscard} disabled={saving}>
 						Discard
 					</Button>

@@ -175,14 +175,22 @@ export function ReviewThreadItem({
 
 	return (
 		<div
-			className={`rounded-md border bg-card p-3 space-y-2 transition-opacity${isPendingDelete ? ' opacity-50 pointer-events-none' : ''}`}
+			className={`
+     space-y-2 rounded-md border bg-card p-3
+     transition-opacity${isPendingDelete ? `pointer-events-none opacity-50` : ''}
+   `}
 		>
 			{isEditingSelector ? (
 				<div className="space-y-2">
 					<p className="text-xs font-medium text-muted-foreground">Edit line range</p>
 					<div className="flex gap-2">
 						<div className="flex-1 space-y-1">
-							<Label htmlFor={`edit-start-${thread.id}`} className="text-xs text-muted-foreground">
+							<Label
+								htmlFor={`edit-start-${thread.id}`}
+								className={`
+         text-xs text-muted-foreground
+       `}
+							>
 								Start line
 							</Label>
 							<Input
@@ -195,7 +203,12 @@ export function ReviewThreadItem({
 							/>
 						</div>
 						<div className="flex-1 space-y-1">
-							<Label htmlFor={`edit-end-${thread.id}`} className="text-xs text-muted-foreground">
+							<Label
+								htmlFor={`edit-end-${thread.id}`}
+								className={`
+         text-xs text-muted-foreground
+       `}
+							>
 								End line
 							</Label>
 							<Input
@@ -208,7 +221,12 @@ export function ReviewThreadItem({
 							/>
 						</div>
 						<div className="flex-[2] space-y-1">
-							<Label htmlFor={`edit-text-${thread.id}`} className="text-xs text-muted-foreground">
+							<Label
+								htmlFor={`edit-text-${thread.id}`}
+								className={`
+         text-xs text-muted-foreground
+       `}
+							>
 								Selected text (optional)
 							</Label>
 							<Input
@@ -242,11 +260,20 @@ export function ReviewThreadItem({
 						{'-'}
 						{localSelector.endLine}
 					</span>
-					<Badge variant={thread.status === 'open' ? 'warning' : 'success'} className="text-xs">
+					<Badge
+						variant={thread.status === 'open' ? 'warning' : 'success'}
+						className={`
+       text-xs
+     `}
+					>
 						{thread.status}
 					</Badge>
 					{localSelector.selectedText && (
-						<code className="max-w-[200px] truncate rounded bg-muted px-1 py-0.5 font-mono text-xs">
+						<code
+							className={`
+        max-w-[200px] truncate rounded bg-muted px-1 py-0.5 font-mono text-xs
+      `}
+						>
 							{localSelector.selectedText}
 						</code>
 					)}
@@ -265,7 +292,10 @@ export function ReviewThreadItem({
 						<Button
 							variant="ghost"
 							size="icon-xs"
-							className="text-muted-foreground hover:text-destructive"
+							className={`
+         text-muted-foreground
+         hover:text-destructive
+       `}
 							onClick={handleDeleteThread}
 							title="Delete thread"
 						>
@@ -283,9 +313,18 @@ export function ReviewThreadItem({
 					return (
 						<div
 							key={comment.id}
-							className={`rounded border-l-2 border-muted-foreground/30 pl-3 transition-opacity${isPendingCommentDelete ? ' opacity-50 line-through pointer-events-none' : ''}`}
+							className={`
+         rounded border-l-2 border-muted-foreground/30 pl-3
+         transition-opacity${
+				isPendingCommentDelete
+					? `
+           pointer-events-none line-through opacity-50
+         `
+					: ''
+			}
+       `}
 						>
-							<div className="flex items-center gap-2 mb-1">
+							<div className="mb-1 flex items-center gap-2">
 								<Badge variant="outline" className="text-xs">
 									{comment.author}
 								</Badge>
@@ -305,7 +344,10 @@ export function ReviewThreadItem({
 									<Button
 										variant="ghost"
 										size="icon-xs"
-										className="text-muted-foreground hover:text-destructive"
+										className={`
+            text-muted-foreground
+            hover:text-destructive
+          `}
 										onClick={() => handleDeleteComment(comment.id)}
 										title="Delete comment"
 									>
@@ -314,7 +356,7 @@ export function ReviewThreadItem({
 								</div>
 							</div>
 							{isEditingThis ? (
-								<div className="space-y-2 mt-1">
+								<div className="mt-1 space-y-2">
 									<Textarea
 										value={editCommentContent}
 										onChange={e => setEditCommentContent(e.target.value)}

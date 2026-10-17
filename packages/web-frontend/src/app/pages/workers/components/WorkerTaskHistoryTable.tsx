@@ -45,7 +45,13 @@ function createTaskHistoryColumns(): Table2Column<Task>[] {
 			key: 'id',
 			label: 'Task ID',
 			render: (task: Task) => (
-				<Link to={`/tasks/${task.id}`} className="font-mono text-xs text-primary hover:underline">
+				<Link
+					to={`/tasks/${task.id}`}
+					className={`
+      font-mono text-xs text-primary
+      hover:underline
+    `}
+				>
 					{task.id.substring(0, 8)}...
 				</Link>
 			),

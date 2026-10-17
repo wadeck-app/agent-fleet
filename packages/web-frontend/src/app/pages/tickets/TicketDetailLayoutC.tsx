@@ -151,7 +151,19 @@ export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: T
 						value={localDescription}
 						onChange={e => handleDescriptionChange(e.target.value)}
 						rows={10}
-						className={`mt-1 ${dirtyFields.description ? 'ring-2 ring-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary' : ''} ${saving ? 'opacity-50 transition-opacity' : ''}`}
+						className={`
+        mt-1
+        ${
+			dirtyFields.description
+				? `
+          ring-2 ring-primary
+          focus-visible:border-primary focus-visible:ring-2
+          focus-visible:ring-primary
+        `
+				: ''
+		}
+        ${saving ? `opacity-50 transition-opacity` : ''}
+      `}
 					/>
 				</div>
 
@@ -183,7 +195,15 @@ export function TicketDetailLayoutC({ ticket, ticketId, onUpdate, onRefresh }: T
 								{label}
 							</Badge>
 						))}
-						{ticket.labels.length === 0 && <p className="text-sm text-muted-foreground">No labels</p>}
+						{ticket.labels.length === 0 && (
+							<p
+								className={`
+        text-sm text-muted-foreground
+      `}
+							>
+								No labels
+							</p>
+						)}
 					</div>
 				</div>
 

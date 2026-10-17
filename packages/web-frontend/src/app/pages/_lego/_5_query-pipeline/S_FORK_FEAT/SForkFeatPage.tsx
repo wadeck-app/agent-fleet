@@ -103,7 +103,15 @@ export function SForkFeatPage() {
 					toggleBookmark(item.id);
 				}}
 			>
-				<Star className={bookmarks.has(item.id) ? 'size-4 fill-primary text-primary' : 'size-4'} />
+				<Star
+					className={
+						bookmarks.has(item.id)
+							? 'size-4 fill-primary text-primary'
+							: `
+      size-4
+    `
+					}
+				/>
 			</Button>
 		),
 	};

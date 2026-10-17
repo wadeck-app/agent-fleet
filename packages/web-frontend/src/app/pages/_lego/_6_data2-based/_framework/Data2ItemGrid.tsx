@@ -52,7 +52,14 @@ export function Data2ItemGrid<T>({
 			)}
 
 			{isLoading && data.length === 0 && (
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+				<div
+					className={`
+      grid grid-cols-1 gap-4
+      sm:grid-cols-2
+      lg:grid-cols-3
+      xl:grid-cols-4
+    `}
+				>
 					{Array.from({ length: pagination?.pageSize ?? 12 }).map((_, idx) => (
 						<Card key={idx} className="animate-pulse">
 							<CardContent className="p-4">
@@ -72,7 +79,14 @@ export function Data2ItemGrid<T>({
 			)}
 
 			{data.length > 0 && (
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+				<div
+					className={`
+      grid grid-cols-1 gap-4
+      sm:grid-cols-2
+      lg:grid-cols-3
+      xl:grid-cols-4
+    `}
+				>
 					{data.map(item => {
 						const itemId = getItemId(item);
 

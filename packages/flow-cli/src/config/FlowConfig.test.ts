@@ -176,7 +176,10 @@ describe('FlowConfigLoader.load', () => {
 		});
 
 		it('expands a leading ~ to the home directory', () => {
-			const file = writeConfig('cfg.yaml', 'opencode:\n  configAnthropic: ~/.config/opencode/config_claude.json\n');
+			const file = writeConfig(
+				'cfg.yaml',
+				'opencode:\n  configAnthropic: ~/.config/opencode/config_claude.json\n'
+			);
 			const { opencode } = FlowConfigLoader.load(file);
 			expect(opencode.configAnthropic).toBe(path.join(os.homedir(), '.config', 'opencode', 'config_claude.json'));
 		});

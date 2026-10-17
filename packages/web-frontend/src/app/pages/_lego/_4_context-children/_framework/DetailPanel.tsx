@@ -35,11 +35,23 @@ export function DetailPanel<T extends { id: string }>({
 	const selectedItem = ctx.items.find(item => item.id === ctx.selectedItemId);
 
 	if (!ctx.selectedItemId || !selectedItem) {
-		return <div className="flex h-full items-center justify-center text-muted-foreground">{emptyMessage}</div>;
+		return (
+			<div
+				className={`
+    flex h-full items-center justify-center text-muted-foreground
+  `}
+			>
+				{emptyMessage}
+			</div>
+		);
 	}
 
 	return (
-		<div className="flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4">
+		<div
+			className={`
+    flex h-full flex-col gap-4 rounded-lg border border-border bg-card p-4
+  `}
+		>
 			<h3 className="text-lg font-semibold">Details</h3>
 			<div className="flex flex-col gap-3">
 				{columns.map(col => (

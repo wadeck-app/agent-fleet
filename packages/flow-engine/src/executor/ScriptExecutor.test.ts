@@ -6,7 +6,7 @@ import { EventEmitter } from 'events';
 import { setupTest } from 'test-utils/helpers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { normalizePathKey, ScriptExecutionError, ScriptExecutor } from './ScriptExecutor';
+import { ScriptExecutionError, ScriptExecutor, normalizePathKey } from './ScriptExecutor';
 import { BashShellStrategy } from './shell/BashShellStrategy';
 import { CmdShellStrategy } from './shell/CmdShellStrategy';
 import { PwshShellStrategy } from './shell/PwshShellStrategy';
@@ -523,7 +523,9 @@ describe('ScriptExecutor', () => {
 		});
 
 		it('should dispatch to CmdShellStrategy and spawn the resolved binary with /d /c', async () => {
-			const resolveSpy = vi.spyOn(CmdShellStrategy.prototype, 'resolve').mockReturnValue('C:\\Windows\\System32\\cmd.exe');
+			const resolveSpy = vi
+				.spyOn(CmdShellStrategy.prototype, 'resolve')
+				.mockReturnValue('C:\\Windows\\System32\\cmd.exe');
 
 			const executePromise = executor.execute({
 				script: 'echo hello',
@@ -563,7 +565,14 @@ describe('ScriptExecutor', () => {
 			expect(resolveSpy).toHaveBeenCalled();
 			expect(child_process.spawn).toHaveBeenCalledWith(
 				'/resolved/pwsh',
-				['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', expect.stringMatching(/\.ps1$/)],
+				[
+					'-NoProfile',
+					'-NonInteractive',
+					'-ExecutionPolicy',
+					'Bypass',
+					'-File',
+					expect.stringMatching(/\.ps1$/),
+				],
 				expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
 			);
 			expect(result.stdout).toBe('hello');
@@ -693,7 +702,9 @@ describe('ScriptExecutor', () => {
 		describe('cmd/pwsh dispatch is left untouched', () => {
 			it('does not add a PATH key for shellKind: cmd when only "Path" exists (Windows env lookup is case-insensitive)', async () => {
 				stubEnvWithPathOnly('C:\\only\\path\\dir');
-				const resolveSpy = vi.spyOn(CmdShellStrategy.prototype, 'resolve').mockReturnValue('C:\\Windows\\System32\\cmd.exe');
+				const resolveSpy = vi
+					.spyOn(CmdShellStrategy.prototype, 'resolve')
+					.mockReturnValue('C:\\Windows\\System32\\cmd.exe');
 
 				const executePromise = executor.execute({
 					script: 'echo hello',

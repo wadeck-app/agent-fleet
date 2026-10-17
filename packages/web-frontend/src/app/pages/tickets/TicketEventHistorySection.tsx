@@ -147,7 +147,12 @@ export function TicketEventHistorySection({
 					{sortedEntries.map(entry => (
 						<div key={entry.id} className="rounded-md border bg-card p-3">
 							<div className="flex flex-wrap items-center gap-2">
-								<Badge variant={EVENT_VARIANTS[entry.event] ?? 'default'} className="text-xs">
+								<Badge
+									variant={EVENT_VARIANTS[entry.event] ?? 'default'}
+									className={`
+          text-xs
+        `}
+								>
 									{entry.event}
 								</Badge>
 								<span className="text-sm">{renderEventDescription(entry)}</span>

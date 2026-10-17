@@ -49,11 +49,7 @@ export const ScriptStepNode = memo(({ data, selected }: ScriptStepNodeProps) => 
 					type="target"
 					position={Position.Left}
 					id={port.id}
-					className={cn(
-						// eslint-disable-next-line no-restricted-syntax -- Flow editor uses specific colors for port types (blue=input, green=output, yellow=warning)
-						'!h-3 !w-3 !bg-info',
-						port.uncertain && '!border-2 !border-warning'
-					)}
+					className={cn('!h-3 !w-3 !bg-info', port.uncertain && '!border-2 !border-warning')}
 					style={{
 						top: `${20 + index * 24}px`,
 					}}
@@ -71,14 +67,7 @@ export const ScriptStepNode = memo(({ data, selected }: ScriptStepNodeProps) => 
 			/>
 
 			{/* Bottom Handle (loop target) */}
-			<Handle
-				type="target"
-				position={Position.Bottom}
-				id="bottom"
-				className={`
-     !bg-destructive
-   `}
-			/>
+			<Handle type="target" position={Position.Bottom} id="bottom" className={`!bg-destructive`} />
 
 			{/* Header */}
 			<div className="mb-3 flex items-center gap-2">
@@ -120,7 +109,7 @@ export const ScriptStepNode = memo(({ data, selected }: ScriptStepNodeProps) => 
 					type="source"
 					position={Position.Right}
 					id={port.id}
-					// eslint-disable-next-line no-restricted-syntax -- Flow editor uses specific colors for port types (blue=input, green=output, yellow=warning)
+
 					className="!h-3 !w-3 !bg-success"
 					style={{
 						top: `${20 + index * 24}px`,
@@ -139,14 +128,7 @@ export const ScriptStepNode = memo(({ data, selected }: ScriptStepNodeProps) => 
 			/>
 
 			{/* Bottom Handle (loop source) */}
-			<Handle
-				type="source"
-				position={Position.Bottom}
-				id="bottom"
-				className={`
-     !bg-destructive
-   `}
-			/>
+			<Handle type="source" position={Position.Bottom} id="bottom" className={`!bg-destructive`} />
 		</div>
 	);
 });

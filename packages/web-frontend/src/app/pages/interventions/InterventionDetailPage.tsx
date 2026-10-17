@@ -102,7 +102,12 @@ export function InterventionDetailPage() {
 						#{interventionId?.slice(0, 8)}
 					</Badge>
 					<Badge variant={getInterventionStatusVariant(intervention.status)}>{intervention.status}</Badge>
-					<Badge variant={getInterventionTypeVariant(intervention.type)} className={`capitalize`}>
+					<Badge
+						variant={getInterventionTypeVariant(intervention.type)}
+						className={`
+       capitalize
+     `}
+					>
 						{intervention.type}
 					</Badge>
 				</div>
@@ -178,7 +183,12 @@ export function InterventionDetailPage() {
 											</Badge>
 										</Link>
 									) : (
-										<Badge variant="outline" className={`font-mono text-xs text-muted-foreground`}>
+										<Badge
+											variant="outline"
+											className={`
+            font-mono text-xs text-muted-foreground
+          `}
+										>
 											-
 										</Badge>
 									)

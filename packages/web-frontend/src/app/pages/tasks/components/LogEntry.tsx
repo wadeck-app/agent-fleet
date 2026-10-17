@@ -74,31 +74,13 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 					p: ({ children }) => <div className="my-0.5">{children}</div>,
 					// Headings: distinct sizes, bold, with slight top margin
 					h1: ({ children }) => (
-						<div
-							className={`
-       mt-2 mb-1 text-base font-bold text-foreground
-     `}
-						>
-							{children}
-						</div>
+						<div className={`mt-2 mb-1 text-base font-bold text-foreground`}>{children}</div>
 					),
 					h2: ({ children }) => (
-						<div
-							className={`
-       mt-2 mb-1 text-sm font-bold text-foreground
-     `}
-						>
-							{children}
-						</div>
+						<div className={`mt-2 mb-1 text-sm font-bold text-foreground`}>{children}</div>
 					),
 					h3: ({ children }) => (
-						<div
-							className={`
-       mt-1.5 mb-0.5 text-xs font-bold text-foreground
-     `}
-						>
-							{children}
-						</div>
+						<div className={`mt-1.5 mb-0.5 text-xs font-bold text-foreground`}>{children}</div>
 					),
 					h4: ({ children }) => (
 						<div className="mt-1 mb-0.5 text-xs font-semibold text-muted-foreground">{children}</div>
@@ -114,11 +96,7 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 							return <code className={className}>{children}</code>;
 						}
 						return (
-							<code
-								className={`
-        rounded bg-muted/70 px-1 py-0.5 text-[0.85em] text-warning
-      `}
-							>
+							<code className={`rounded bg-muted/70 px-1 py-0.5 text-[0.85em] text-warning`}>
 								{children}
 							</code>
 						);
@@ -126,9 +104,9 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 					pre: ({ children }) => (
 						<pre
 							className={`
-        my-1 overflow-x-auto rounded border border-border bg-muted/50 p-2
-        text-xs
-      `}
+         my-1 overflow-x-auto rounded border border-border bg-muted/50 p-2
+         text-xs
+       `}
 						>
 							{children}
 						</pre>
@@ -138,9 +116,9 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 						<a
 							href={href}
 							className={`
-        text-info underline
-        hover:text-info/80
-      `}
+         text-info underline
+         hover:text-info/80
+       `}
 							target="_blank"
 							rel="noopener noreferrer"
 						>
@@ -155,9 +133,9 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 					blockquote: ({ children }) => (
 						<blockquote
 							className={`
-        my-1 border-l-2 border-muted-foreground/50 pl-3 text-muted-foreground
-        italic
-      `}
+         my-1 border-l-2 border-muted-foreground/50 pl-3 text-muted-foreground
+         italic
+       `}
 						>
 							{children}
 						</blockquote>
@@ -169,8 +147,8 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 					th: ({ children }) => (
 						<th
 							className={`
-        border border-border bg-muted/50 px-2 py-1 text-left font-semibold
-      `}
+         border border-border bg-muted/50 px-2 py-1 text-left font-semibold
+       `}
 						>
 							{children}
 						</th>
@@ -203,9 +181,9 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 			{/* Level label */}
 			<span
 				className={`
-     font-mono
-     ${levelColors[log.level]}
-   `}
+      font-mono
+      ${levelColors[log.level]}
+    `}
 			>
 				{levelLabel}
 			</span>
@@ -230,7 +208,12 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 							onExpand(log);
 						}}
 					>
-						<Info className="size-4 text-muted-foreground hover:text-info" />
+						<Info
+							className={`
+        size-4 text-muted-foreground
+        hover:text-info
+      `}
+						/>
 					</span>
 				)}
 				{shouldShowExpandButton && (
@@ -244,9 +227,19 @@ export function LogEntry({ log, onExpand, isSelected = false, onClick }: LogEntr
 						}}
 					>
 						{isExpanded ? (
-							<ChevronsDownUp className="size-4 text-muted-foreground hover:text-info" />
+							<ChevronsDownUp
+								className={`
+         size-4 text-muted-foreground
+         hover:text-info
+       `}
+							/>
 						) : (
-							<ChevronsUpDown className="size-4 text-muted-foreground hover:text-info" />
+							<ChevronsUpDown
+								className={`
+         size-4 text-muted-foreground
+         hover:text-info
+       `}
+							/>
 						)}
 					</span>
 				)}

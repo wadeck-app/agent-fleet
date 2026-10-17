@@ -41,7 +41,11 @@ export function DragHandle({ disabled = false, className, ...props }: DragHandle
 			variant="ghost"
 			size="icon-xs"
 			className={cn(
-				'cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing',
+				`
+      cursor-grab touch-none text-muted-foreground
+      hover:text-foreground
+      active:cursor-grabbing
+    `,
 				disabled && 'cursor-not-allowed opacity-50',
 				className
 			)}

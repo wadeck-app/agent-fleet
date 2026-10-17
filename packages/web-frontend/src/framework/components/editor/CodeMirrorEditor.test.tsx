@@ -64,7 +64,14 @@ describe('CodeMirrorEditor', () => {
 	});
 
 	it('should apply custom className', async () => {
-		const { container } = render(<CodeMirrorEditor value="test" className="custom-class" />);
+		const { container } = render(
+			<CodeMirrorEditor
+				value="test"
+				className={`
+    custom-class
+  `}
+			/>
+		);
 
 		await waitFor(() => {
 			const editorContainer = container.firstChild as HTMLElement;

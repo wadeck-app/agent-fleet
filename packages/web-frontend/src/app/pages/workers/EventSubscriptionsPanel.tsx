@@ -59,8 +59,8 @@ export function EventSubscriptionsPanel() {
 
 	if (error) {
 		return (
-			<Card className="p-6 mt-6">
-				<h2 className="text-lg font-semibold mb-4">Event Subscriptions</h2>
+			<Card className="mt-6 p-6">
+				<h2 className="mb-4 text-lg font-semibold">Event Subscriptions</h2>
 				<p className="text-sm text-destructive">Error: {error}</p>
 			</Card>
 		);
@@ -68,8 +68,8 @@ export function EventSubscriptionsPanel() {
 
 	if (isLoading && subscriptions.length === 0) {
 		return (
-			<Card className="p-6 mt-6">
-				<h2 className="text-lg font-semibold mb-4">Event Subscriptions</h2>
+			<Card className="mt-6 p-6">
+				<h2 className="mb-4 text-lg font-semibold">Event Subscriptions</h2>
 				<p className="text-sm text-muted-foreground">Loading...</p>
 			</Card>
 		);
@@ -77,33 +77,60 @@ export function EventSubscriptionsPanel() {
 
 	if (subscriptions.length === 0) {
 		return (
-			<Card className="p-6 mt-6">
-				<h2 className="text-lg font-semibold mb-4">Event Subscriptions</h2>
+			<Card className="mt-6 p-6">
+				<h2 className="mb-4 text-lg font-semibold">Event Subscriptions</h2>
 				<p className="text-sm text-muted-foreground">No active event subscriptions</p>
 			</Card>
 		);
 	}
 
 	return (
-		<Card className="p-6 mt-6">
-			<h2 className="text-lg font-semibold mb-4">Event Subscriptions</h2>
+		<Card className="mt-6 p-6">
+			<h2 className="mb-4 text-lg font-semibold">Event Subscriptions</h2>
 
 			<div className="overflow-x-auto">
 				<table className="w-full">
 					<thead>
 						<tr className="border-b border-border">
-							<th className="text-left text-sm font-medium text-muted-foreground pb-2 pr-4">Event</th>
-							<th className="text-left text-sm font-medium text-muted-foreground pb-2 pr-4">Filter</th>
-							<th className="text-left text-sm font-medium text-muted-foreground pb-2 pr-4">Project</th>
-							<th className="text-left text-sm font-medium text-muted-foreground pb-2 pr-4">Worker</th>
-							<th className="text-left text-sm font-medium text-muted-foreground pb-2">Flow</th>
+							<th
+								className={`
+         pr-4 pb-2 text-left text-sm font-medium text-muted-foreground
+       `}
+							>
+								Event
+							</th>
+							<th
+								className={`
+         pr-4 pb-2 text-left text-sm font-medium text-muted-foreground
+       `}
+							>
+								Filter
+							</th>
+							<th
+								className={`
+         pr-4 pb-2 text-left text-sm font-medium text-muted-foreground
+       `}
+							>
+								Project
+							</th>
+							<th
+								className={`
+         pr-4 pb-2 text-left text-sm font-medium text-muted-foreground
+       `}
+							>
+								Worker
+							</th>
+							<th className="pb-2 text-left text-sm font-medium text-muted-foreground">Flow</th>
 						</tr>
 					</thead>
 					<tbody>
 						{subscriptions.map((sub, index) => (
 							<tr
 								key={`${sub.workerId}-${sub.flowId}-${sub.event}-${index}`}
-								className="border-b border-border last:border-0"
+								className={`
+          border-b border-border
+          last:border-0
+        `}
 							>
 								<td className="py-3 pr-4">
 									<span className="font-mono text-xs">{sub.event}</span>

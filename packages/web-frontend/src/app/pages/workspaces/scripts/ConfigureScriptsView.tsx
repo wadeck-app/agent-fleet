@@ -137,7 +137,11 @@ export function ConfigureScriptsView({
 
 				{configuredScripts.length === 0 ? (
 					leftEmptyState || (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							<p className="text-sm text-muted-foreground">No scripts configured</p>
 							<p className="text-xs text-muted-foreground">Add scripts from the right panel</p>
 						</div>
@@ -178,7 +182,12 @@ export function ConfigureScriptsView({
 					<div className="flex items-center justify-between">
 						<h3 className="text-sm font-semibold">Available Scripts</h3>
 						<Button variant="outline" size="sm" onClick={onDiscover} disabled={isDiscovering}>
-							<RefreshCw className={`mr-1 size-3 ${isDiscovering ? 'animate-spin' : ''}`} />
+							<RefreshCw
+								className={`
+         mr-1 size-3
+         ${isDiscovering ? 'animate-spin' : ''}
+       `}
+							/>
 							Discover
 						</Button>
 					</div>
@@ -199,7 +208,11 @@ export function ConfigureScriptsView({
 
 				{availableScripts.length === 0 ? (
 					rightEmptyState || (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							{isDiscovering ? (
 								<>
 									<Loader2 className="mb-2 size-8 animate-spin text-muted-foreground" />
@@ -215,13 +228,21 @@ export function ConfigureScriptsView({
 					)
 				) : availableNonConfiguredScripts.length === 0 ? (
 					rightEmptyStateAllConfigured || (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							<p className="text-sm text-muted-foreground">All scripts are configured</p>
 						</div>
 					)
 				) : filteredAvailableScripts.length === 0 ? (
 					rightEmptyStateNoResults || (
-						<div className="flex flex-col items-center justify-center py-8 text-center">
+						<div
+							className={`
+        flex flex-col items-center justify-center py-8 text-center
+      `}
+						>
 							<p className="text-sm text-muted-foreground">No scripts match your search</p>
 						</div>
 					)

@@ -47,7 +47,13 @@ function createWorkersColumns(
 			key: 'workerId',
 			label: 'Worker ID',
 			render: (w: Worker) => (
-				<Link to={`/workers/${w.workerId}`} className="font-mono text-xs text-primary hover:underline">
+				<Link
+					to={`/workers/${w.workerId}`}
+					className={`
+      font-mono text-xs text-primary
+      hover:underline
+    `}
+				>
 					{w.workerId}
 				</Link>
 			),
@@ -69,7 +75,12 @@ function createWorkersColumns(
 			key: 'state',
 			label: 'State',
 			render: (w: Worker) => (
-				<Badge variant={w.state === 'busy' ? 'warning' : 'success'} className={`font-medium`}>
+				<Badge
+					variant={w.state === 'busy' ? 'warning' : 'success'}
+					className={`
+      font-medium
+    `}
+				>
 					{w.state === 'busy' ? 'Busy' : 'Idle'}
 				</Badge>
 			),
@@ -78,7 +89,12 @@ function createWorkersColumns(
 			key: 'connected',
 			label: 'Connection',
 			render: (w: Worker) => (
-				<Badge variant={w.connected ? 'success' : 'destructive'} className={`font-medium`}>
+				<Badge
+					variant={w.connected ? 'success' : 'destructive'}
+					className={`
+      font-medium
+    `}
+				>
 					{w.connected ? 'Connected' : 'Disconnected'}
 				</Badge>
 			),

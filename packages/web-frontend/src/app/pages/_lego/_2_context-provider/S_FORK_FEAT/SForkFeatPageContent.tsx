@@ -70,7 +70,15 @@ export function SForkFeatPageContent() {
 							toggleBookmark(item.id);
 						}}
 					>
-						<Star className={bookmarkedIds.has(item.id) ? 'size-4 fill-primary text-primary' : 'size-4'} />
+						<Star
+							className={
+								bookmarkedIds.has(item.id)
+									? `
+        size-4 fill-primary text-primary
+      `
+									: `size-4`
+							}
+						/>
 					</Button>
 				),
 			},

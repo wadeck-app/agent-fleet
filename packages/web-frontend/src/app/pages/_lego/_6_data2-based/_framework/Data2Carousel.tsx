@@ -84,7 +84,10 @@ export function Data2Carousel<T>({ data, isLoading, error, pagination, columns, 
 						return (
 							<Card
 								key={itemId}
-								className={`min-w-[280px] flex-shrink-0 ${isLoading ? 'opacity-50' : ''}`}
+								className={`
+          min-w-[280px] flex-shrink-0
+          ${isLoading ? 'opacity-50' : ''}
+        `}
 							>
 								<CardContent className="p-4">
 									<div className="space-y-2">

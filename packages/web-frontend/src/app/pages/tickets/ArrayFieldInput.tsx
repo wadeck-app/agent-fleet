@@ -48,7 +48,12 @@ export function ArrayFieldInput({ label, items, onChange, placeholder, required 
 
 	return (
 		<div className="space-y-1">
-			<Label htmlFor={inputId} className="text-xs font-medium text-muted-foreground tracking-wide">
+			<Label
+				htmlFor={inputId}
+				className={`
+     text-xs font-medium tracking-wide text-muted-foreground
+   `}
+			>
 				{label}
 				{required && <span className="ml-1 text-destructive">*</span>}
 			</Label>
@@ -58,7 +63,10 @@ export function ArrayFieldInput({ label, items, onChange, placeholder, required 
 						<Input
 							value={item}
 							onChange={e => handleItemChange(i, e.target.value)}
-							className="flex-1 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+							className={`
+         flex-1 border-0 bg-transparent p-0 text-sm shadow-none
+         focus-visible:ring-0
+       `}
 						/>
 						<RemoveItemButton onRemove={() => handleRemove(i)} title="Remove item" />
 					</div>

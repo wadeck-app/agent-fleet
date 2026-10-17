@@ -134,9 +134,9 @@ export function KeyValueField({
 				{pairs.length === 0 ? (
 					<div
 						className={`
-       rounded-md border border-input bg-muted/50 p-4 text-center text-sm
-       text-muted-foreground
-     `}
+        rounded-md border border-input bg-muted/50 p-4 text-center text-sm
+        text-muted-foreground
+      `}
 					>
 						No key-value pairs. Click "Add Pair" to start.
 					</div>

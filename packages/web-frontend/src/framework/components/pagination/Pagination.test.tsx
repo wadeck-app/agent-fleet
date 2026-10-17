@@ -271,7 +271,14 @@ describe('Pagination', () => {
 	describe('Custom Styling', () => {
 		it('should apply custom className', () => {
 			const { container } = render(
-				<Pagination currentPage={1} totalPages={5} onPageChange={() => {}} className={`custom-pagination`} />
+				<Pagination
+					currentPage={1}
+					totalPages={5}
+					onPageChange={() => {}}
+					className={`
+      custom-pagination
+    `}
+				/>
 			);
 
 			const nav = container.querySelector('nav');

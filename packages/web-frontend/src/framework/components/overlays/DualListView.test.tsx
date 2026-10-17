@@ -136,7 +136,16 @@ describe('DualListView - Visual States', () => {
 	it('should pass isLoading=true to renderItem for loading items', () => {
 		const loadingItems = new Set(['item-1']);
 		const renderItem = vi.fn((item, _side, visualState) => (
-			<div data-testid={`item-${item.id}`} className={visualState.isLoading ? 'loading' : ''}>
+			<div
+				data-testid={`item-${item.id}`}
+				className={
+					visualState.isLoading
+						? `
+     loading
+   `
+						: ''
+				}
+			>
 				{item.name}
 			</div>
 		));
@@ -172,7 +181,16 @@ describe('DualListView - Visual States', () => {
 	it('should pass isReordering=true to renderItem for reordering items', () => {
 		const reorderingItems = new Set(['item-1', 'item-2']);
 		const renderItem = vi.fn((item, _side, visualState) => (
-			<div data-testid={`item-${item.id}`} className={visualState.isReordering ? 'reordering' : ''}>
+			<div
+				data-testid={`item-${item.id}`}
+				className={
+					visualState.isReordering
+						? `
+     reordering
+   `
+						: ''
+				}
+			>
 				{item.name}
 			</div>
 		));
@@ -217,7 +235,10 @@ describe('DualListView - Visual States', () => {
 		const renderItem = vi.fn((item, _side, visualState) => (
 			<div
 				data-testid={`item-${item.id}`}
-				className={`${visualState.isLoading ? 'loading' : ''} ${visualState.isReordering ? 'reordering' : ''}`}
+				className={`
+      ${visualState.isLoading ? 'loading' : ''}
+      ${visualState.isReordering ? `reordering` : ''}
+    `}
 			>
 				{item.name}
 			</div>

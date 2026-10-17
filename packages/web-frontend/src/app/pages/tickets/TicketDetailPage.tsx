@@ -112,7 +112,10 @@ export function TicketDetailPage() {
 					<Button
 						variant="ghost"
 						onClick={() => navigate('/tickets')}
-						className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+						className={`
+        flex items-center gap-1 text-sm text-muted-foreground
+        hover:text-foreground
+      `}
 					>
 						<ArrowLeft size={16} /> Tickets
 					</Button>

@@ -208,7 +208,12 @@ export function TicketsPage() {
 
 			{/* Tickets List */}
 			{loading && (
-				<div className="rounded-lg border border-border bg-card p-4 text-center text-muted-foreground">
+				<div
+					className={`
+      rounded-lg border border-border bg-card p-4 text-center
+      text-muted-foreground
+    `}
+				>
 					Loading tickets...
 				</div>
 			)}
@@ -223,13 +228,21 @@ export function TicketsPage() {
 			{localTickets.length > 0 && (
 				<DndContext sensors={dnd.sensors} collisionDetection={closestCenter} onDragEnd={dnd.handleDragEnd}>
 					<SortableContext items={dnd.sortableIds} strategy={verticalListSortingStrategy}>
-						<div className={cn('space-y-2', isSaving && 'pointer-events-none opacity-50 blur-sm')}>
+						<div
+							className={cn(
+								'space-y-2',
+								isSaving &&
+									`
+        pointer-events-none opacity-50 blur-sm
+      `
+							)}
+						>
 							{localTickets.map(ticket => (
 								<SortableItem key={ticket.id} id={ticket.id}>
 									<div className={ticketItemCls} onClick={() => handleTicketClick(ticket)}>
 										<h3 className="font-medium text-foreground">{ticket.title}</h3>
 										{ticket.description && (
-											<p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+											<p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
 												{ticket.description}
 											</p>
 										)}
@@ -243,7 +256,11 @@ export function TicketsPage() {
 												</Badge>
 											))}
 										</div>
-										<div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+										<div
+											className={`
+            mt-2 flex items-center gap-3 text-xs text-muted-foreground
+          `}
+										>
 											<span>Updated {formatRelativeTime(ticket.updatedAt)}</span>
 											<span>Created {formatRelativeTime(ticket.createdAt)}</span>
 										</div>

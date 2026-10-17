@@ -115,10 +115,25 @@ export function TriggeredTasksSection({
 						<div
 							key={task.id}
 							id={`task-${task.id}`}
-							className={`flex items-center gap-2 border-b py-1.5 last:border-b-0 text-xs ${selectedTaskId === task.id ? 'border-l-2 border-l-primary pl-1' : 'pl-0'}`}
+							className={`
+         flex items-center gap-2 border-b py-1.5 text-xs
+         last:border-b-0
+         ${
+				selectedTaskId === task.id
+					? `border-l-2 border-l-primary pl-1`
+					: `
+           pl-0
+         `
+			}
+       `}
 						>
 							{task.flowId && <span className="font-mono text-muted-foreground">{task.flowId}</span>}
-							<Badge variant={STATUS_VARIANTS[task.status] ?? 'secondary'} className="shrink-0 text-xs">
+							<Badge
+								variant={STATUS_VARIANTS[task.status] ?? 'secondary'}
+								className={`
+         shrink-0 text-xs
+       `}
+							>
 								{task.status}
 							</Badge>
 							{task.metadata?.triggerEvent && (
@@ -131,7 +146,10 @@ export function TriggeredTasksSection({
 							<Link
 								to={`/tasks/${task.id}`}
 								title={`Task ID: ${task.id}`}
-								className="shrink-0 text-xs text-primary hover:underline"
+								className={`
+          shrink-0 text-xs text-primary
+          hover:underline
+        `}
 							>
 								view task: <span className="font-mono">{task.id.slice(0, 8)}…</span>
 							</Link>

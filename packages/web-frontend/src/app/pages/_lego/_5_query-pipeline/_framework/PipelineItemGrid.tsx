@@ -48,7 +48,14 @@ export function PipelineItemGrid<T extends { id: string }>({
 			{loading && <div className="p-8 text-center">Loading...</div>}
 			{!loading && items.length === 0 && <div className="p-8 text-center">No items found</div>}
 			{!loading && items.length > 0 && (
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+				<div
+					className={`
+      grid grid-cols-1 gap-4
+      sm:grid-cols-2
+      lg:grid-cols-3
+      xl:grid-cols-4
+    `}
+				>
 					{items.map(item => (
 						<div key={item.id} className="rounded-lg border border-border bg-card p-4">
 							<div className="space-y-2">

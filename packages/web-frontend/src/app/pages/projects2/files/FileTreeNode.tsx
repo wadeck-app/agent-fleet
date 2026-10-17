@@ -39,9 +39,11 @@ export function FileTreeNode({
 	return (
 		<div>
 			<div
-				className={`flex cursor-pointer items-center py-1 pr-2 text-sm hover:bg-accent ${
-					isSelected ? 'bg-accent' : ''
-				}`}
+				className={`
+      flex cursor-pointer items-center py-1 pr-2 text-sm
+      hover:bg-accent
+      ${isSelected ? 'bg-accent' : ''}
+    `}
 				style={{ paddingLeft: `${depth * 16 + 8}px` }}
 				onClick={handleClick}
 			>
@@ -49,9 +51,10 @@ export function FileTreeNode({
 				<span className="flex h-4 w-4 shrink-0 items-center justify-center">
 					{isDirectory && (
 						<ChevronRight
-							className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${
-								isExpanded ? 'rotate-90' : ''
-							}`}
+							className={`
+         h-3.5 w-3.5 text-muted-foreground transition-transform
+         ${isExpanded ? 'rotate-90' : ''}
+       `}
 						/>
 					)}
 				</span>

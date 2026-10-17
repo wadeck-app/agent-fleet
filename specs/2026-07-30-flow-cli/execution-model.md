@@ -40,18 +40,18 @@ Responsibility split
 
 The daemon owns all execution intelligence. Workers are dumb step executors.
 
-| Responsibility                                    | Owner                       |
-| ------------------------------------------------- | --------------------------- |
-| Graph construction and dependency tracking        | Daemon                      |
-| Deciding which steps are ready                    | Daemon                      |
-| Global ready-step queue across all executions     | Daemon                      |
-| Assigning a step to a free worker (via WebSocket) | Daemon                      |
-| Writing execution state to disk                   | Daemon (single writer)      |
-| Executing a step (Claude, script, subflow)        | Worker                      |
+| Responsibility                                    | Owner                        |
+| ------------------------------------------------- | ---------------------------- |
+| Graph construction and dependency tracking        | Daemon                       |
+| Deciding which steps are ready                    | Daemon                       |
+| Global ready-step queue across all executions     | Daemon                       |
+| Assigning a step to a free worker (via WebSocket) | Daemon                       |
+| Writing execution state to disk                   | Daemon (single writer)       |
+| Executing a step (Claude, script, subflow)        | Worker                       |
 | Streaming log entries                             | Worker -> Daemon (WebSocket) |
 | Reporting step completion/failure                 | Worker -> Daemon (WebSocket) |
-| Liveness signal                                   | WebSocket connection health |
-| Crash detection and idempotency decision          | Daemon                      |
+| Liveness signal                                   | WebSocket connection health  |
+| Crash detection and idempotency decision          | Daemon                       |
 
 Worker pool model
 
