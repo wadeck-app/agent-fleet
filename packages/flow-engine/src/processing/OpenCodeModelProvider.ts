@@ -541,7 +541,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 						// Every turn is billed on its own: step_finish carries that turn's tokens and cost, not
 						// a running total (verified on a real run: a tool-calls turn cost 0.0157, the stop turn
 						// after it 0.0014). "error" turns are left out -- unverified, no real capture of one.
-						if (part?.['reason'] !== 'error') {
+						if (part !== undefined && part['reason'] !== 'error') {
 							costUsd += (part['cost'] as number | undefined) ?? 0;
 							const tokensValue = part['tokens'];
 							const tokens = isRecord(tokensValue) ? tokensValue : undefined;
