@@ -10,6 +10,7 @@ import {
 	runCompactHook,
 	validateOnCompact,
 } from './CompactHook';
+import { type StreamJsonEvent, StreamJsonParser } from './StreamJsonParser';
 
 describe('validateOnCompact', () => {
 	it('accepts a command on provider claude, with or without a timeout', () => {
@@ -195,5 +196,48 @@ describe('runCompactHook', () => {
 
 	it('exports a default timeout of 30 seconds', () => {
 		expect(DEFAULT_COMPACT_HOOK_TIMEOUT_SECONDS).toBe(30);
+	});
+});
+
+// Lines trimmed from real Claude Code 2.1.296 (Haiku 5.5) stream-json captures: same field names and
+// nesting, only unrelated fields removed. Run through the real parser so a schema drift shows up here.
+describe('extractCompactEvent -- real stream-json captures', () => {
+	function parse(line: string): StreamJsonEvent {
+		const events: StreamJsonEvent[] = [];
+		const parser = new StreamJsonParser(e => events.push(e));
+		parser.feed(line + '\n');
+		return events[0]!;
+	}
+
+	it('success: system/compact_boundary', () => {
+		const event = parse(
+			'{"type":"system","subtype":"compact_boundary","compact_metadata":{"trigger":"auto","pre_tokens":90957,"post_tokens":1055,"cumulative_dropped_tokens":89902,"duration_ms":2077,"preserved_segment":{"head_uuid":"a","anchor_uuid":"b","tail_uuid":"c"}}}'
+		);
+		expect(extractCompactEvent(event)).toEqual({
+			event: 'success',
+			trigger: 'auto',
+			preTokens: 90957,
+			postTokens: 1055,
+			durationMs: 2077,
+		});
+	});
+
+	it('failure: system/status carrying compact_result "failed"', () => {
+		const event = parse(
+			'{"type":"system","subtype":"status","status":null,"compact_result":"failed","compact_error":"too_few_groups","session_id":"s","uuid":"u"}'
+		);
+		expect(extractCompactEvent(event)).toEqual({ event: 'failed', error: 'too_few_groups' });
+	});
+
+	it('does not mistake the preceding "compacting" status for a compaction outcome', () => {
+		const event = parse('{"type":"system","subtype":"status","status":"compacting","session_id":"s","uuid":"u"}');
+		expect(extractCompactEvent(event)).toBeUndefined();
+	});
+
+	it('thrashing: final result with terminal_reason rapid_refill_breaker at the top level', () => {
+		const event = parse(
+			'{"type":"result","subtype":"success","is_error":true,"modelUsage":{"claude-haiku-5-5":{"inputTokens":1}},"permission_denials":[],"terminal_reason":"rapid_refill_breaker","fast_mode_state":"off"}'
+		);
+		expect(extractCompactEvent(event)).toEqual({ event: 'thrashing' });
 	});
 });
