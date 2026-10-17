@@ -6572,3 +6572,34 @@ real users actually run. Always check which of the two entry points sets a given
 independent code review** (not by the original author of the change) that ran the two new test
 files directly against the working tree and found both failing despite the kb previously
 documenting this as already fixed -- the lesson had been written before the fix actually landed.
+
+## Daemon: "busy" and "work in flight" must be derived from real state
+
+**Problem:** the updater deferred forever. `/health`'s `running_executions` was `workerRegistry.liveCount`
+(every connected worker, idle included), and permanent `flow worker`s are always connected.
+**Rule:** the update gate is `work_in_flight` (the daemon's `isIdle()` inverted: queue, active
+executions, busy workers, resumable interventions). A health field named after one thing must measure
+that thing.
+
+**Problem:** a worker whose step the stall watchdog killed stayed "busy" for good. Only the worker's own
+`ready` frees it, and a wedged worker never sends one, so the daemon could not hibernate. **Rule:** when
+the daemon gives up on an assignment, drop that worker's connection (`WorkerRegistry.disconnect`); the
+normal disconnect path then cleans the registry.
+
+**Problem:** the watchdog started at `step_started`, so an assignment never confirmed was never watched.
+**Rule:** watch from hand-over; an unconfirmed assignment has had no effect, so re-queue it through the
+disconnect path instead of failing it.
+
+## Daemon state is in memory only
+
+An execution's scheduler/context exist only in the daemon process; there is no reconstruction after a
+restart. So a "drain" before an update must refuse *new runs* (`DAEMON_DRAINING`) and let running
+executions finish; freezing step dispatch would strand them, and queuing runs would lose them at restart.
+The updater that runs is the one in the *installed* version, so a gate fix only helps from the version
+that contains it.
+
+## Windows: killing a `shell: true` child leaves the command running
+
+`child.kill()` ends `cmd.exe` but not the command it started. Kill the tree (`taskkill /PID <pid> /T /F`,
+awaited -- it is asynchronous; a process group on POSIX). Found because the test's temp dir could not be
+removed (EPERM) while the orphan held it as its cwd.
