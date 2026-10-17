@@ -180,12 +180,14 @@ describe('check-mock-drift', () => {
 			expect(script.main(['--cache-dir'], {})).toBe(2);
 			expect(script.main(['--status'], { MOCK_DRIFT_ALLOW_MISSING: 'nope' })).toBe(2);
 		});
+		// Spawns the real `<cli> --version` of each installed CLI twice (claude alone can take seconds), so the
+		// default 5s timeout flakes under parallel suites.
 		it('exits 1 when drifted and 0 for --status, using whatever CLIs are installed here', () => {
 			// The directory is empty, so every installed CLI is NEVER-VERIFIED and every absent one NOT-INSTALLED.
 			const empty = join(dir, 'empty');
 			mkdirSync(empty);
 			expect(script.main(['--cache-dir', empty], {})).toBe(1);
 			expect(script.main(['--cache-dir', empty, '--status'], {})).toBe(0);
-		});
+		}, 60_000);
 	});
 });

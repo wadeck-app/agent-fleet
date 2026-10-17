@@ -41,7 +41,7 @@ export function S4Content() {
 		refresh();
 	};
 
-	const handleDialogSave = async (data: any) => {
+	const handleDialogSave = async (data: unknown) => {
 		console.log('Save:', data);
 	};
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import type { Product } from '@shared/api/products.contract';
+import type { CreateProduct, Product } from '@shared/api/products.contract';
 import { Plus } from 'lucide-react';
 
 import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
@@ -48,11 +48,11 @@ export function S11Content({ editMode }: { editMode: EditMode }) {
 		refresh();
 	};
 
-	const handleDialogSave = async (data: any) => {
+	const handleDialogSave = async (data: unknown) => {
 		console.log('Save:', data);
 	};
 
-	const handleSaveBelow = async (data: any) => {
+	const handleSaveBelow = async (data: CreateProduct) => {
 		if (editingItem) {
 			await productsService.updateProduct(editingItem.id, { ...data, version: editingItem.version });
 			setEditingItem(null);

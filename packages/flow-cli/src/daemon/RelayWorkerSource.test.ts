@@ -21,7 +21,7 @@ function fakeRelay(answer: { accepted: boolean; reason?: string } | 'silent'): {
 			sent.push(message);
 			if (answer === 'silent') return;
 			// Answers on the next tick, as a real peer would.
-			setTimeout(() => {
+			setImmediate(() => {
 				for (const handler of handlers) {
 					handler(
 						Buffer.from(
@@ -29,7 +29,7 @@ function fakeRelay(answer: { accepted: boolean; reason?: string } | 'silent'): {
 						)
 					);
 				}
-			}, 0);
+			});
 		},
 		on: (event: string, handler: (data: Buffer) => void) => {
 			if (event === 'message') handlers.push(handler);

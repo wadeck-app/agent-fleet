@@ -165,14 +165,22 @@ describe('FileApprovalProvider partially written response', () => {
 	// A human or a script answers with a shell redirect, so the file can be seen while still
 	// half-written. Failing the step on that transient state would make answering a lottery.
 	it('waits for a file that is still being written instead of failing on truncated JSON', async () => {
-		const pending = provider.requestApproval(APPROVAL_REQUEST);
-		await waitForRequestFile();
+		// Fake time: the provider's poll loop then advances only when the test says so, so the
+		// truncated file is deterministically read (and tolerated) many times before it is completed.
+		vi.useFakeTimers();
+		try {
+			const pending = provider.requestApproval(APPROVAL_REQUEST);
+			await waitForRequestFile();
 
-		fs.writeFileSync(responsePath(), '{ "appro', 'utf8');
-		await new Promise(resolve => setTimeout(resolve, 30));
-		fs.writeFileSync(responsePath(), JSON.stringify({ approved: true }), 'utf8');
+			fs.writeFileSync(responsePath(), '{ "appro', 'utf8');
+			await vi.advanceTimersByTimeAsync(30);
+			fs.writeFileSync(responsePath(), JSON.stringify({ approved: true }), 'utf8');
+			await vi.advanceTimersByTimeAsync(30);
 
-		await expect(pending).resolves.toBe(true);
+			await expect(pending).resolves.toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	// The grace period must not become a way to accept a broken answer in silence.

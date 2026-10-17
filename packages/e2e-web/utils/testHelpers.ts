@@ -189,7 +189,7 @@ export async function waitForCondition(
 		try {
 			const result = await checkFn();
 			if (result) return;
-		} catch (error) {
+		} catch {
 			// Ignore errors and continue trying
 		}
 		await delay(interval);

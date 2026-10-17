@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import type { FeatureContract } from '@framework/types/FeatureContract';
+import type { FeatureAction, FeatureContract } from '@framework/types/FeatureContract';
 
 /**
  * ===========================================================================================
@@ -58,7 +58,7 @@ export interface MultiSelectState {
 /**
  * Actions for multi-selection feature.
  */
-export interface MultiSelectActions extends Record<string, (...args: any[]) => any> {
+export interface MultiSelectActions extends Record<string, FeatureAction> {
 	/** Toggle selection for a single item */
 	toggle: (id: string) => void;
 	/** Select all items (replaces current selection) */

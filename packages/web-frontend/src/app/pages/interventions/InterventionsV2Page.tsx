@@ -248,7 +248,7 @@ export function InterventionsV2Page() {
 				pagination={pagination}
 				sorting={sorting}
 				search={search}
-				filter={filters as any}
+				filter={filters}
 				cache={cache}
 				selection={selection}
 				delegateLoadingToChildren={true}

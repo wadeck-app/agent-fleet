@@ -49,8 +49,8 @@ export interface PipelineResult<T> {
 }
 
 export interface PipelineService {
-	getProducts: (params?: any) => Promise<{
-		items: any[];
+	getProducts: (params?: BaseQuery) => Promise<{
+		items: unknown[];
 		pagination?: {
 			page: number;
 			pageSize: number;

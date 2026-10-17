@@ -65,6 +65,25 @@ import type {
 import type { ITransportClient } from '../ITransportClient';
 
 /**
+ * Error already in TransportError shape (e.g. thrown by this client on non-2xx responses)
+ */
+interface TransportErrorLike {
+	status: number;
+	code: string;
+}
+
+/**
+ * Check whether a caught value is already a TransportError-shaped object (truthy status and code)
+ */
+function isTransportErrorLike(error: unknown): error is TransportErrorLike {
+	if (typeof error !== 'object' || error === null) {
+		return false;
+	}
+	const candidate = error as Partial<TransportErrorLike>;
+	return Boolean(candidate.status && candidate.code);
+}
+
+/**
  * REST Transport Client
  *
  * Implements ITransportClient using HTTP/REST (fetch API) for request/response communication.
@@ -161,8 +180,10 @@ export class RestTransportClient implements ITransportClient {
 
 		// Add query parameters
 		if (options?.query) {
-			// violations-suppress: ts/no-unsafe-type-cast options.query is typed generically; URLSearchParams accepts Record<string,string> which the actual values conform to at runtime
-			const queryString = new URLSearchParams(options.query as any).toString();
+			// URLSearchParams stringifies each value with String(), same as its record constructor
+			const queryString = new URLSearchParams(
+				Object.entries(options.query).map(([key, value]): [string, string] => [key, String(value)])
+			).toString();
 			if (queryString) {
 				url += `?${queryString}`;
 			}
@@ -197,10 +218,10 @@ export class RestTransportClient implements ITransportClient {
 			}
 
 			return response.json();
-		} catch (error: any) {
+		} catch (error) {
 			// Re-throw with TransportError format if not already
 			const message = getErrorMessage(error);
-			if (error.status && message && error.code) {
+			if (message && isTransportErrorLike(error)) {
 				throw error;
 			}
 

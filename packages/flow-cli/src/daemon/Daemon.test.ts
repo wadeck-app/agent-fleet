@@ -3,6 +3,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { observeFor } from '../test-utils/WaitHelpers';
+
 // Test the writeDaemonLog helper (exported from Daemon.ts)
 describe('writeDaemonLog', () => {
 	let tmpDir: string;
@@ -183,7 +185,7 @@ describe('periodic update check', () => {
 		}
 
 		const callsAtStop = scheduleSpy.mock.calls.length;
-		await new Promise(resolve => setTimeout(resolve, 60));
+		await observeFor(60);
 		// Not cleared would mean the timer keeps firing against a torn-down daemon.
 		expect(scheduleSpy.mock.calls.length).toBe(callsAtStop);
 

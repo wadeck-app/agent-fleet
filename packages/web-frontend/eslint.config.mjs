@@ -141,7 +141,9 @@ export default tseslint.config(
 					ignore: ['no-scrollbar', 'animate-typing-dot', 'animate-pulse-once'],
 				},
 			],
-			'better-tailwindcss/enforce-consistent-line-wrapping': 'warn',
+			// Prettier owns line wrapping: this rule and prettier-plugin-tailwindcss rewrite each other's
+			// output forever (verified: eslint --fix + prettier --write alternate between two file states).
+			'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
 		},
 	},
 
@@ -212,6 +214,25 @@ export default tseslint.config(
 					selector: 'ExportAllDeclaration',
 					message: 'export * is forbidden. Use explicit named exports instead.',
 				},
+			],
+		},
+	},
+
+	// Framework input primitives: these three files ARE the <input> wrappers (each carries a
+	// "primitive wrapper implementation" marker), so they must render the native element.
+	// Every other restricted-syntax selector stays enforced; only the native <input> ban is dropped.
+	{
+		files: [
+			'src/framework/components/forms/Input.tsx',
+			'src/framework/features/forms/inputs/NumberInput.tsx',
+			'src/framework/features/forms/inputs/TextInput.tsx',
+		],
+		rules: {
+			'no-restricted-syntax': [
+				'error',
+				...frontendRules['no-restricted-syntax']
+					.slice(1)
+					.filter(entry => entry.selector !== 'JSXElement[openingElement.name.name="input"]'),
 			],
 		},
 	},

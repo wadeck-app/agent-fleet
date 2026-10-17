@@ -15,9 +15,7 @@ import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	wsInstances: [] as any[],
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	loadForDaemonConfig: { worker: { wsPort: null }, queue: {}, limits: {}, workspace: {}, opencode: {} } as any,
 	cache: { lastCheckedAt: 0, latestVersion: '9999.99.99' as string | null },
 	intervalCallbacks: [] as (() => void)[],
@@ -67,7 +65,7 @@ vi.mock('../../worker/WorkerLaunch', () => ({
 	probeShellCapabilities: () => ['bash', 'cmd'],
 	reconnectDelayMs: () => 500,
 	resolveDaemonWsUrl: () => 'ws://127.0.0.1:9999',
-	scheduleReconnectTimer: () => setTimeout(() => {}, 0),
+	scheduleReconnectTimer: () => undefined as unknown as NodeJS.Timeout,
 	withFreshToken: (registration: unknown) => registration,
 }));
 
@@ -146,12 +144,10 @@ describe('WorkerCommand -- self re-exec Windows console inheritance (no windowsH
 		vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 		hoisted.wsInstances.length = 0;
 		hoisted.intervalCallbacks.length = 0;
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(global as any).setInterval = (fn: () => void): any => {
 			hoisted.intervalCallbacks.push(fn);
 			return { unref: () => {} };
 		};
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(global as any).clearInterval = (): void => {};
 		spawnMock.mockClear();
 		spawnMock.mockImplementation(() => {

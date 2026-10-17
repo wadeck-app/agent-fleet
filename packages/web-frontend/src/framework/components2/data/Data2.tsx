@@ -1,7 +1,6 @@
 import { type ReactElement, type ReactNode, cloneElement } from 'react';
 
 import { LoadingDots } from '@framework/components/loading/LoadingDots';
-import type { FilterContract } from '@framework/hooks2/data/useCategoryFilter2';
 import { type FetchDataResult, useDataFetch } from '@framework/hooks2/data/useDataFetch';
 import type { PaginationContract } from '@framework/hooks2/data/usePagination2';
 import { useQueryComposition } from '@framework/hooks2/data/useQueryComposition';
@@ -68,7 +67,8 @@ export interface Data2Props<T> {
 	/** Search feature contract (optional) */
 	search?: SearchContract | null;
 	/** Filter feature contract (optional) */
-	filter?: FilterContract | null;
+	// Any domain filter feature: Data2 only reads its `fillQuery` and `fstate`, never its state shape
+	filter?: FeatureContract<unknown> | null;
 	/** Cache control feature contract (optional) */
 	cache?: FeatureContract<unknown> | null;
 	/** Multi-selection feature contract (optional) */

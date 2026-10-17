@@ -1,5 +1,7 @@
 import type { ComponentType } from 'react';
 
+import type { CrudDialogProps } from '@framework/lego/types/FeatureTypes';
+
 /**
  * ===========================================================================================
  * USE CRUD FEATURE - CRUD Operations Feature Hook
@@ -19,12 +21,10 @@ import type { ComponentType } from 'react';
 
 export interface CrudFeatureHook {
 	type: 'crud';
-	dialog: ComponentType<{ item: any; onSave: (data: unknown) => Promise<void>; onClose: () => void }>;
+	dialog: ComponentType<CrudDialogProps>;
 }
 
-export function useCrudFeature(
-	dialog: ComponentType<{ item: any; onSave: (data: unknown) => Promise<void>; onClose: () => void }>
-): CrudFeatureHook {
+export function useCrudFeature(dialog: ComponentType<CrudDialogProps>): CrudFeatureHook {
 	return {
 		type: 'crud',
 		dialog,

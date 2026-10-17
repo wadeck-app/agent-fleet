@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 
 import { EditableListField } from '@framework/components2/list/EditableListField';
 import { type KeyValueItem, KeyValueItemRenderer } from '@framework/components2/list/renderers/KeyValueItemRenderer';
-import { type OutputItem, OutputItemRenderer } from '@framework/components2/list/renderers/OutputItemRenderer';
+import {
+	type OutputItem,
+	OutputItemRenderer,
+	type OutputType,
+} from '@framework/components2/list/renderers/OutputItemRenderer';
 import { Checkbox } from '@framework/components/forms/Checkbox';
 import { Input } from '@framework/components/forms/Input';
 import { Label } from '@framework/components/forms/Label';
@@ -31,7 +35,7 @@ import { ReadOnlyFieldLabel } from './ReadOnlyFieldLabel';
 import type { ConstantNodeData } from './nodes/ConstantNode';
 import type { FlowNode } from './types';
 import { isConstantNodeData, isStepNodeData } from './types';
-import type { FlowStep } from './types/flow-engine.types';
+import type { FlowStep, OutputVariableConfig } from './types/flow-engine.types';
 
 /**
  * Update data type - can be either FlowStep updates or ConstantNodeData updates
@@ -71,9 +75,10 @@ export function FlowEditorPropertiesPanel({
 
 	// Output configuration list management
 	const outputItems = useListItems<OutputItem>({
-		initialItems: Object.entries(step?.output || {}).map(([name, config]: [string, any]) => ({
+		initialItems: Object.entries(step?.output || {}).map(([name, config]) => ({
 			name,
-			type: config.type || 'string',
+			// The renderer only offers the basic output types; backend VariableType is a superset kept as-is at runtime
+			type: (config.type || 'string') as OutputType,
 			pattern: config.pattern,
 		})),
 		minItems: 0,
@@ -111,7 +116,7 @@ export function FlowEditorPropertiesPanel({
 			outputItems.fstate.items
 				.filter(item => item.name.trim())
 				.map(item => {
-					const config: any = { type: item.type };
+					const config: OutputVariableConfig = { type: item.type };
 					if (item.pattern) {
 						config.pattern = item.pattern;
 					}

@@ -58,7 +58,7 @@ export async function createTempTestDir(prefix: string = 'test-'): Promise<{
 		cleanup: async () => {
 			try {
 				await fs.promises.rm(tempPath, { recursive: true, force: true });
-			} catch (error) {
+			} catch {
 				// Ignore cleanup errors
 			}
 		},

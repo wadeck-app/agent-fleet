@@ -33,6 +33,7 @@
  *
  * ===========================================================================================
  */
+import type { FeatureAction } from '@framework/types/FeatureContract';
 import type { BaseListQueryMutable } from '@shared/common/api-helpers';
 
 /**
@@ -63,7 +64,7 @@ export interface SearchState {
 /**
  * Search actions (all ways to modify search state)
  */
-export interface SearchActions extends Record<string, (...args: any[]) => void> {
+export interface SearchActions extends Record<string, FeatureAction> {
 	/**
 	 * Set search query and update URL parameter
 	 * Removes parameter if query is empty (keeps URLs clean)

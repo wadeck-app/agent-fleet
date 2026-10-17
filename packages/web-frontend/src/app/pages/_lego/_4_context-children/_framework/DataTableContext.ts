@@ -24,6 +24,32 @@ import type { ColumnDef } from '@framework/lego/types/ColTypes';
  * ===========================================================================================
  */
 
+/** Query sent by DataTable to the service */
+export interface DataTableQuery {
+	search?: string;
+	page?: number;
+	pageSize?: number;
+	sortBy?: string;
+	sortOrder?: string;
+}
+
+/** Service contract consumed by DataTable (productsService and wrappers around it satisfy it) */
+export interface DataTableService<T> {
+	getProducts: (query: DataTableQuery) => Promise<{
+		items: T[];
+		total?: number;
+		page?: number;
+		pageSize?: number;
+		pagination?: { total: number; page: number; pageSize: number; totalPages: number };
+	}>;
+	getProduct?: (id: string) => Promise<T>;
+	// Method syntax on purpose (bivariant parameters): callers hold unvalidated form data (unknown), while productsService expects CreateProduct
+	createProduct?(data: unknown): Promise<unknown>;
+	updateProduct?(id: string, data: unknown): Promise<unknown>;
+	deleteProduct?: (id: string) => Promise<void>;
+	bulkDeleteProducts?: (ids: string[]) => Promise<unknown>;
+}
+
 export interface DataTableContextValue<T> {
 	// Data
 	items: T[];
@@ -61,21 +87,14 @@ export interface DataTableContextValue<T> {
 	setDialogOpen: (open: boolean) => void;
 
 	// Config
-	service: {
-		getProducts: (q: any) => Promise<any>;
-		getProduct?: (id: string) => Promise<any>;
-		createProduct?: (data: any) => Promise<any>;
-		updateProduct?: (id: string, data: any) => Promise<any>;
-		deleteProduct?: (id: string) => Promise<void>;
-		bulkDeleteProducts?: (ids: string[]) => Promise<unknown>;
-	};
+	service: DataTableService<T>;
 	columns: ColumnDef<T>[];
 	enableSorting: boolean;
 	enableCrud: boolean;
 }
 
 // Create context with null default (must be used within DataTable)
-export const DataTableContext = createContext<DataTableContextValue<any> | null>(null);
+export const DataTableContext = createContext<DataTableContextValue<unknown> | null>(null);
 
 /**
  * Hook to access DataTable context
@@ -86,5 +105,6 @@ export function useDataTable<T>(): DataTableContextValue<T> {
 	if (!context) {
 		throw new Error('useDataTable must be used within a DataTable component');
 	}
-	return context;
+	// The context is stored with an erased item type; each consumer picks T. Safe: the provider is the only writer.
+	return context as DataTableContextValue<T>;
 }

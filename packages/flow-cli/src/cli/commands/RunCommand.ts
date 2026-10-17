@@ -14,7 +14,6 @@ import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
-import { Daemon } from '../../daemon/Daemon';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
@@ -476,7 +475,7 @@ export function registerRunCommand(program: Command): void {
 				let response: DaemonResponse;
 				try {
 					response = await sendToDaemon(cmd, config, daemonDir);
-				} catch (err) {
+				} catch {
 					console.error('Failed to contact the daemon.');
 					process.exit(1);
 				}

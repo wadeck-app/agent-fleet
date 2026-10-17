@@ -7,7 +7,9 @@ import { unlink } from 'node:fs/promises';
 const debug = false;
 
 async function storybookTeardown() {
-	debug && console.log('\n === CLEANING UP STORYBOOK FILES ===\n');
+	if (debug) {
+		console.log('\n === CLEANING UP STORYBOOK FILES ===\n');
+	}
 
 	try {
 		// Use RUN_ID from environment to read the correct port file
@@ -17,7 +19,9 @@ async function storybookTeardown() {
 		try {
 			const filename = `.storybook-port-${runId}.json`;
 			await unlink(filename);
-			debug && console.log(`  Cleaned up ${filename}`);
+			if (debug) {
+				console.log(`  Cleaned up ${filename}`);
+			}
 		} catch {
 			// File might not exist if Storybook wasn't started
 			console.log(`  No .storybook-port-${runId}.json file to clean up`);

@@ -71,8 +71,8 @@ export interface WidgetDataTableProps<T> {
 			pageSize?: number;
 			pagination?: { total: number; page: number; pageSize: number; totalPages: number };
 		}>;
-		createProduct?: (data: any) => Promise<any>;
-		updateProduct?: (id: string, data: any) => Promise<any>;
+		createProduct?(data: unknown): Promise<unknown>;
+		updateProduct?(id: string, data: unknown): Promise<unknown>;
 		deleteProduct?: (id: string) => Promise<void>;
 		bulkDeleteProducts?: (ids: string[]) => Promise<unknown>;
 	};

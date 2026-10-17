@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 
-import type { FilterContract } from '@framework/hooks2/data/useCategoryFilter2';
 import type { UseDataFetchState } from '@framework/hooks2/data/useDataFetch';
 import type { PaginationContract } from '@framework/hooks2/data/usePagination2';
 import type { SortingContract } from '@framework/hooks2/data/useSorting2';
 import type { MultiSelectContract } from '@framework/hooks2/utility/useMultiSelect2';
+import type { FeatureContract } from '@framework/types/FeatureContract';
 import type { QueryResultDisplayerProps } from '@framework/types/QueryResultDisplayerContract';
 import type { SearchContract } from '@framework/types/contracts/SearchContract';
 
@@ -51,7 +51,8 @@ export interface InjectableFeatures {
 	/** Search feature (optional) */
 	search?: SearchContract | null;
 	/** Filter feature (optional) */
-	filter?: FilterContract | null;
+	/** Filter feature (optional): any domain filter, only `fstate` is read here */
+	filter?: FeatureContract<unknown> | null;
 	/** Multi-selection feature (optional) */
 	selection?: MultiSelectContract | null;
 }

@@ -14,7 +14,7 @@ export function registerDocsCommand(program: Command): void {
 			if (options.output) {
 				try {
 					fs.writeFileSync(options.output, content, 'utf-8');
-				} catch (err) {
+				} catch {
 					console.error(`Failed to write to ${options.output}.`);
 					process.exit(1);
 				}

@@ -26,7 +26,7 @@ export function validateFlowFile(filePath: string): ValidateResult {
 	let content: string;
 	try {
 		content = fs.readFileSync(filePath, 'utf8');
-	} catch (err) {
+	} catch {
 		// Raw OS error detail (path, permission code) suppressed -- not exposed to terminal.
 		return { exit: 2, message: 'Flow file could not be read.' };
 	}
@@ -47,7 +47,7 @@ export function validateFlowFile(filePath: string): ValidateResult {
 			};
 		}
 		flow = raw as FlowDefinition;
-	} catch (err) {
+	} catch {
 		// exit 3 = YAML parse error. D34 defines exit 1 (validation errors) and exit 2
 		// (file not found). Exit 3 is an intentional extension: a YAML parse error is
 		// distinct from a semantic validation error and callers need to differentiate

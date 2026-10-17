@@ -1,5 +1,5 @@
 import * as net from 'node:net';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { InjectedStep } from '../ipc/Protocol';
 import { McpServer } from './McpServer';
@@ -67,9 +67,7 @@ describe('McpServer (stdio transport)', () => {
 			socket.once('error', reject);
 		});
 
-		// Give a tick for the callback to fire
-		await new Promise(r => setTimeout(r, 50));
-		expect(injectedSteps).toHaveLength(1);
+		await vi.waitFor(() => expect(injectedSteps).toHaveLength(1));
 		expect(injectedSteps[0]).toEqual(testSteps);
 	});
 
@@ -90,15 +88,14 @@ describe('McpServer (stdio transport)', () => {
 			const socket = net.createConnection(callbackPort, '127.0.0.1', () => {
 				const payload =
 					JSON.stringify({ token: 'WRONG_TOKEN', executionId: 'test-exec', steps: testSteps }) + '\n';
-				socket.write(payload, () => {
-					socket.end();
-					resolve();
-				});
+				socket.write(payload, () => socket.end());
 			});
+			// The server destroys a rejected connection after handling its data, so 'close' means the
+			// payload has been processed and refused.
+			socket.once('close', () => resolve());
 			socket.once('error', reject);
 		});
 
-		await new Promise(r => setTimeout(r, 50));
 		expect(injectedSteps).toHaveLength(0);
 	});
 
@@ -113,15 +110,14 @@ describe('McpServer (stdio transport)', () => {
 			const socket = net.createConnection(callbackPort, '127.0.0.1', () => {
 				const payload =
 					JSON.stringify({ token: correctToken, executionId: 'WRONG_EXEC_ID', steps: testSteps }) + '\n';
-				socket.write(payload, () => {
-					socket.end();
-					resolve();
-				});
+				socket.write(payload, () => socket.end());
 			});
+			// The server destroys a rejected connection after handling its data, so 'close' means the
+			// payload has been processed and refused.
+			socket.once('close', () => resolve());
 			socket.once('error', reject);
 		});
 
-		await new Promise(r => setTimeout(r, 50));
 		expect(injectedSteps).toHaveLength(0);
 	});
 
@@ -150,8 +146,7 @@ describe('McpServer (stdio transport)', () => {
 			socket.once('error', reject);
 		});
 
-		await new Promise(r => setTimeout(r, 80));
-		expect(injectedSteps).toHaveLength(2);
+		await vi.waitFor(() => expect(injectedSteps).toHaveLength(2));
 	});
 
 	it('stop() closes the TCP server so no new connections are accepted', async () => {

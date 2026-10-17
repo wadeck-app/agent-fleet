@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { PageContainer } from '@framework/components/layout/PageContainer';
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
-import type { Product } from '@shared/api/products.contract';
+import type { CreateProduct, Product } from '@shared/api/products.contract';
 
 import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
 import { ProductForm } from '@app/pages/_lego/_shared/ProductForm';
@@ -28,7 +28,7 @@ export function S11Content() {
 		ctx.refresh();
 	};
 
-	const handleSaveBelow = async (data: any) => {
+	const handleSaveBelow = async (data: CreateProduct) => {
 		if (ctx.selectedItem) {
 			await productsService.updateProduct(ctx.selectedItem.id, {
 				...data,

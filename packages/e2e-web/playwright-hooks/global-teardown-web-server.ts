@@ -29,7 +29,7 @@ async function globalTeardownWebServer() {
 		let data;
 		try {
 			data = await readFile(filename, 'utf-8');
-		} catch (error) {
+		} catch {
 			console.log(`[info] No backend servers file found for RUN_ID: ${runId}, nothing to stop.`);
 			return;
 		}
@@ -49,7 +49,7 @@ async function globalTeardownWebServer() {
 					process.kill(server.pid, 'SIGKILL');
 				}
 				console.log(` Stopped server on port ${server.port} (PID: ${server.pid})`);
-			} catch (error) {
+			} catch {
 				// Process might already be dead, that's okay
 				console.log(`  Server on port ${server.port} already stopped`);
 			}

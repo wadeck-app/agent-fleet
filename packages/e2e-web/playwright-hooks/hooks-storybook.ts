@@ -29,7 +29,9 @@ export const test = base.extend<TestFixtures>({
 			const dataJson = JSON.parse(data);
 			const port = dataJson.port;
 			const url = `http://localhost:${port}`;
-			debug && console.log(` [Storybook Fixture] Using Storybook URL: ${url} (RUN_ID: ${runId})`);
+			if (debug) {
+				console.log(` [Storybook Fixture] Using Storybook URL: ${url} (RUN_ID: ${runId})`);
+			}
 			await use(url);
 		} catch {
 			throw new Error('Port file not found, filename=' + filename);

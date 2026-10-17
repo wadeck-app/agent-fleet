@@ -9,6 +9,7 @@ import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contr
 import { Star } from 'lucide-react';
 
 import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
+import type { GetProductsParams } from '@app/pages/_lego/_shared/api/ProductsService';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { HookDataTable } from '../_framework/HookDataTable';
@@ -65,10 +66,10 @@ export function SForkFeatPage() {
 
 	const bookmarkedService = useMemo(
 		() => ({
-			getProducts: async (params?: any) => {
+			getProducts: async (params?: GetProductsParams) => {
 				const result = await productsService.getProducts(params);
 				if (showBookmarked) {
-					const filtered = result.items.filter(p => bookmarkedIds.includes(p.id));
+					const filtered = (result.items || []).filter(p => bookmarkedIds.includes(p.id));
 					return {
 						...result,
 						items: filtered,

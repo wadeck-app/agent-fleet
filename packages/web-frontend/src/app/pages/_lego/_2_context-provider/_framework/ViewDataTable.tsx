@@ -18,7 +18,7 @@ import type {
 	SortingConfig,
 } from '@framework/lego/types/FeatureTypes';
 import { resolveFeature } from '@framework/lego/types/FeatureTypes';
-import type { Product } from '@shared/api/products.contract';
+import type { CreateProduct, Product } from '@shared/api/products.contract';
 import { Edit, Plus, Trash2 } from 'lucide-react';
 
 import { useProductDomain } from './ProductDomainContext';
@@ -155,13 +155,12 @@ export function ViewDataTable<T extends Product = Product>({
 		}
 	};
 
-	const handleSave = async (data: T) => {
+	// The dialog hands back untyped form data (CrudDialogProps.onSave); the product domain expects CreateProduct
+	const handleSave = async (data: unknown) => {
 		if (editingItem) {
-			// violations-suppress: ts/no-unsafe-type-cast context.actions.update expects the domain type; generic T matches at runtime but TypeScript requires cast at lego-framework boundary
-			await context.actions.update(editingItem.id, data as any);
+			await context.actions.update(editingItem.id, data as CreateProduct & { version: number });
 		} else {
-			// violations-suppress: ts/no-unsafe-type-cast context.actions.create expects the domain type; generic T matches at runtime but TypeScript requires cast at lego-framework boundary
-			await context.actions.create(data as any);
+			await context.actions.create(data as CreateProduct);
 		}
 		setDialogOpen(false);
 	};
@@ -268,9 +267,8 @@ export function ViewDataTable<T extends Product = Product>({
 
 			{crudConfig && dialogOpen && (
 				<crudConfig.dialog
-					// violations-suppress: ts/no-unsafe-type-cast crudConfig.dialog is a generic component; item and onSave are typed as any at the dynamic dialog boundary
-					item={editingItem as any}
-					onSave={handleSave as any}
+					item={editingItem}
+					onSave={handleSave}
 					onClose={() => {
 						setDialogOpen(false);
 						setEditingItem(null);

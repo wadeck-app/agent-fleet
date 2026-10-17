@@ -20,6 +20,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { pollUntil } from '../test-utils/WaitHelpers';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const flowBin = resolve(__dirname, '..', '..', 'bin', 'flow.js');
 
@@ -201,10 +203,7 @@ function spawnBundledDaemon(installedFlow: string, projectDir: string, configHom
 async function stopDaemon(daemon: SpawnedDaemon): Promise<void> {
 	if (daemon.exit() !== undefined) return;
 	daemon.child.kill();
-	for (let attempt = 0; attempt < 50; attempt++) {
-		if (daemon.exit() !== undefined) return;
-		await new Promise(done => setTimeout(done, 100));
-	}
+	if (await pollUntil(() => daemon.exit() !== undefined, { timeoutMs: 5_000, intervalMs: 100 })) return;
 	// Only ever this one child: nothing else is signalled.
 	daemon.child.kill('SIGKILL');
 }
@@ -244,10 +243,10 @@ describe('the standalone bundle in daemon mode', () => {
 		try {
 			const portFile = join(configHome, 'flow', 'config.port');
 			// Generous but bounded: a cold daemon needs a few seconds on Windows.
-			const deadline = Date.now() + 45_000;
-			while (Date.now() < deadline && !existsSync(portFile) && daemon.exit() === undefined) {
-				await new Promise(done => setTimeout(done, 100));
-			}
+			await pollUntil(() => existsSync(portFile) || daemon.exit() !== undefined, {
+				timeoutMs: 45_000,
+				intervalMs: 100,
+			});
 
 			const exit = daemon.exit();
 			expect(

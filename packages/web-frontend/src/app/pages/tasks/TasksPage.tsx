@@ -20,7 +20,7 @@ import { useErrorToast } from '@framework/hooks/useErrorToast';
 import { useMutationCleanup } from '@framework/hooks/useMutationCleanup';
 import { useUrlState } from '@framework/hooks/useUrlState';
 import type { ComposedQuery } from '@framework/utils2/buildQuery';
-import type { Task } from '@shared/api/tasks.contract';
+import type { Task, TaskPriority, TaskStatus } from '@shared/api/tasks.contract';
 import { B2F_TASK_CREATED, B2F_TASK_DELETED, B2F_TASK_UPDATED } from '@shared/transport';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -158,8 +158,8 @@ export function TasksPage() {
 			// violations-suppress-start: ts/no-unsafe-type-cast ComposedQuery index signature widens extra fields to unknown type; casts assert the expected types set by task filter hooks
 			sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
 			search: query.search,
-			status: query.status as any,
-			priority: query.priority as any,
+			status: query.status as TaskStatus | undefined,
+			priority: query.priority as TaskPriority | undefined,
 			workerId: query.workerId as string | undefined,
 			flowId: query.flowId as string | undefined,
 			// violations-suppress-end: ts/no-unsafe-type-cast
@@ -277,8 +277,7 @@ export function TasksPage() {
 				pagination={pagination}
 				sorting={sorting}
 				search={search}
-				// violations-suppress: ts/no-unsafe-type-cast filters is TaskFilterState which Data2's generic filter prop types as any at this integration boundary
-				filter={filters as any}
+				filter={filters}
 				cache={cache}
 				selection={selection}
 				delegateLoadingToChildren={true}

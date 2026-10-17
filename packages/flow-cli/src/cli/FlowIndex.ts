@@ -178,7 +178,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 				} else {
 					process.stdout.write(`[flow] running  pid=${info.pid}  version=${info.version}\n`);
 				}
-			} catch (err) {
+			} catch {
 				if (useJson) {
 					process.stdout.write(JSON.stringify({ running: true, version: null, pid: null }) + '\n');
 				} else {

@@ -37,7 +37,7 @@ export async function waitForService(
 			}
 
 			console.log(`  Service returned ${response.status} at ${url} (attempt ${attempt}/${maxRetries})`);
-		} catch (error) {
+		} catch {
 			console.log(`[wait] Waiting for service at ${url} (attempt ${attempt}/${maxRetries})`);
 		}
 

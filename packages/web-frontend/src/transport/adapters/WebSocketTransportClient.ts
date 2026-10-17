@@ -62,6 +62,7 @@ import type {
 	UnsubscribeFunction,
 } from '@shared/transport';
 
+import { type ErasedEventHandler, eraseEventHandler } from '../ErasedEventHandler';
 import type { ITransportClient, TransportStatus } from '../ITransportClient';
 import { TokenRefreshManager } from '../TokenRefreshManager';
 import { getConnId } from '../connection-id';
@@ -71,8 +72,8 @@ import { getConnId } from '../connection-id';
  * Tracks a request waiting for a response
  */
 interface PendingRequest {
-	resolve: (value: any) => void;
-	reject: (error: any) => void;
+	resolve: (value: unknown) => void;
+	reject: (error: unknown) => void;
 	timeout: ReturnType<typeof setTimeout>;
 }
 
@@ -100,7 +101,7 @@ export class WebSocketTransportClient implements ITransportClient {
 	/**
 	 * Event handlers by event type
 	 */
-	private eventHandlers = new Map<string, Set<EventHandler<any>>>();
+	private eventHandlers = new Map<string, Set<ErasedEventHandler>>();
 
 	/**
 	 * Event filters by event type
@@ -367,12 +368,10 @@ export class WebSocketTransportClient implements ITransportClient {
 			method,
 			// violations-suppress: ts/no-unsafe-type-cast P extends PathsForMethod<M> (a string type); TransportRequest.path requires plain string
 			path: path as string,
-			// violations-suppress-start: ts/no-unsafe-type-cast options fields are generically typed; TransportRequest requires concrete types and runtime values conform to expected shapes
-			query: options?.query as any,
-			params: options?.params as any,
-			body: options?.body as any,
-			headers: options?.headers as any,
-			// violations-suppress-end: ts/no-unsafe-type-cast
+			query: options?.query,
+			params: options?.params,
+			body: options?.body,
+			headers: options?.headers,
 			timestamp: Date.now(),
 		};
 
@@ -382,7 +381,12 @@ export class WebSocketTransportClient implements ITransportClient {
 				reject(new Error('Request timeout'));
 			}, this.config.requestTimeout || 30000);
 
-			this.pendingRequests.set(request.id, { resolve, reject, timeout });
+			this.pendingRequests.set(request.id, {
+				// The server response body is not validated here; the typed request() signature is the contract
+				resolve: body => resolve(body as ResponseType<M, P>),
+				reject,
+				timeout,
+			});
 			this.ws!.send(JSON.stringify(request));
 		});
 	}
@@ -406,7 +410,7 @@ export class WebSocketTransportClient implements ITransportClient {
 		if (!this.eventHandlers.has(event)) {
 			this.eventHandlers.set(event, new Set());
 		}
-		this.eventHandlers.get(event)!.add(handler);
+		this.eventHandlers.get(event)!.add(eraseEventHandler(handler));
 
 		// Store filters for this event
 		if (filters) {
@@ -419,7 +423,7 @@ export class WebSocketTransportClient implements ITransportClient {
 		}
 
 		return () => {
-			this.eventHandlers.get(event)?.delete(handler);
+			this.eventHandlers.get(event)?.delete(eraseEventHandler(handler));
 
 			// If no more handlers, unsubscribe from server
 			if (this.eventHandlers.get(event)?.size === 0) {
@@ -444,10 +448,10 @@ export class WebSocketTransportClient implements ITransportClient {
 		if (!this.eventHandlers.has(event)) {
 			this.eventHandlers.set(event, new Set());
 		}
-		this.eventHandlers.get(event)!.add(handler);
+		this.eventHandlers.get(event)!.add(eraseEventHandler(handler));
 
 		return () => {
-			this.eventHandlers.get(event)?.delete(handler);
+			this.eventHandlers.get(event)?.delete(eraseEventHandler(handler));
 			// Clean up empty Set
 			if (this.eventHandlers.get(event)?.size === 0) {
 				this.eventHandlers.delete(event);
@@ -798,14 +802,14 @@ export class WebSocketTransportClient implements ITransportClient {
 	/**
 	 * Check if data is a response
 	 */
-	private isResponse(data: any): boolean {
+	private isResponse(data: object): boolean {
 		return 'id' in data && 'status' in data;
 	}
 
 	/**
 	 * Check if data is an event
 	 */
-	private isEvent(data: any): boolean {
+	private isEvent(data: object): boolean {
 		return 'type' in data && 'data' in data && !('status' in data);
 	}
 

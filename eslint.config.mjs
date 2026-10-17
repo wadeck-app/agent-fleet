@@ -198,6 +198,22 @@ export default [
 		},
 	},
 
+	// flow-cli MCP stdio server: a hand-written CommonJS script that is shipped and spawned as-is
+	// (`node mcp-server.cjs`), never bundled, so `require` and Node globals are its module system,
+	// not a lapse. Scoped to this one file; everything else keeps the TypeScript import rules.
+	{
+		files: ['packages/flow-cli/src/worker/mcp-server.cjs'],
+		languageOptions: {
+			sourceType: 'commonjs',
+			globals: {
+				...globals.node,
+			},
+		},
+		rules: {
+			'@typescript-eslint/no-require-imports': 'off',
+		},
+	},
+
 	// CLI package - allow console
 	{
 		files: ['packages/cli/src/**/*.ts'],

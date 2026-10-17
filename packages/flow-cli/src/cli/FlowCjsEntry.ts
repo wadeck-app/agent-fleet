@@ -15,7 +15,6 @@ import { registerRunCommand } from './commands/RunCommand';
 import { registerShowCommand } from './commands/ShowCommand';
 import { registerValidateCommand } from './commands/ValidateCommand';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const version: string = (createRequire(__filename)('../../package.json') as { version: string }).version;
 
 const program = new Command();

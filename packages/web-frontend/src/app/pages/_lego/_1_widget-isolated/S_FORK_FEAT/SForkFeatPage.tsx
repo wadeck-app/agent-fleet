@@ -118,14 +118,14 @@ export function SForkFeatPage() {
 			if (showOnlyBookmarked) {
 				return {
 					...result,
-					items: result.items.filter(p => bookmarkedIds.has(p.id)),
-					total: result.items.filter(p => bookmarkedIds.has(p.id)).length,
+					items: (result.items || []).filter(p => bookmarkedIds.has(p.id)),
+					total: (result.items || []).filter(p => bookmarkedIds.has(p.id)).length,
 					pagination: result.pagination
 						? {
 								...result.pagination,
-								total: result.items.filter(p => bookmarkedIds.has(p.id)).length,
+								total: (result.items || []).filter(p => bookmarkedIds.has(p.id)).length,
 								totalPages: Math.ceil(
-									result.items.filter(p => bookmarkedIds.has(p.id)).length /
+									(result.items || []).filter(p => bookmarkedIds.has(p.id)).length /
 										result.pagination.pageSize
 								),
 							}

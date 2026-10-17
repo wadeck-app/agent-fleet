@@ -49,13 +49,17 @@ async function killProcessTree(proc: ChildProcess, backendPid?: number): Promise
 		if (process.platform === 'win32') {
 			// Windows: Use /T (tree) flag to kill all child processes
 			await execAsync(`taskkill /PID ${proc.pid} /T /F`);
-			debug && console.log(`       Killed process tree for PID ${proc.pid}`);
+			if (debug) {
+				console.log(`       Killed process tree for PID ${proc.pid}`);
+			}
 
 			// Belt and suspenders: also kill backend if we have its PID
 			if (backendPid) {
 				try {
 					await execAsync(`taskkill /PID ${backendPid} /F`);
-					debug && console.log(`       Also killed backend PID ${backendPid}`);
+					if (debug) {
+						console.log(`       Also killed backend PID ${backendPid}`);
+					}
 				} catch {
 					// Backend might already be dead
 				}
@@ -64,7 +68,9 @@ async function killProcessTree(proc: ChildProcess, backendPid?: number): Promise
 			// Unix: Kill process group (negative PID)
 			try {
 				process.kill(-proc.pid, 'SIGKILL');
-				debug && console.log(`       Killed process group for PID ${proc.pid}`);
+				if (debug) {
+					console.log(`       Killed process group for PID ${proc.pid}`);
+				}
 			} catch {
 				// Process might already be dead
 			}
@@ -73,7 +79,9 @@ async function killProcessTree(proc: ChildProcess, backendPid?: number): Promise
 			if (backendPid) {
 				try {
 					process.kill(backendPid, 'SIGKILL');
-					debug && console.log(`       Also killed backend PID ${backendPid}`);
+					if (debug) {
+						console.log(`       Also killed backend PID ${backendPid}`);
+					}
 				} catch {
 					// Backend might already be dead
 				}
@@ -81,7 +89,9 @@ async function killProcessTree(proc: ChildProcess, backendPid?: number): Promise
 		}
 	} catch (error) {
 		// Process might already be dead, that's okay
-		debug && console.log(`       Could not kill PID ${proc.pid}: ${error}`);
+		if (debug) {
+			console.log(`       Could not kill PID ${proc.pid}: ${error}`);
+		}
 	}
 }
 
@@ -131,25 +141,34 @@ async function startServerOnAvailablePort(
 	expectedRunId: string,
 	maxPortAttempts: number = 100
 ): Promise<{ port: number; actualPid: number; process: ChildProcess }> {
-	debug &&
+	if (debug) {
 		console.log(
 			` Searching for available port in range ${startPort}-${startPort + maxPortAttempts - 1} (RUN_ID: ${expectedRunId})`
 		);
+	}
 
 	for (let portOffset = 0; portOffset < maxPortAttempts; portOffset++) {
 		const port = startPort + portOffset;
 
-		debug && console.log(`  [${portOffset + 1}/${maxPortAttempts}] Trying port ${port}...`);
+		if (debug) {
+			console.log(`  [${portOffset + 1}/${maxPortAttempts}] Trying port ${port}...`);
+		}
 
 		// Check if port is available BEFORE spawning
 		const available = await isPortAvailable(port);
 		if (!available) {
-			debug && console.log(`      Port ${port} is occupied`);
+			if (debug) {
+				console.log(`      Port ${port} is occupied`);
+			}
 			continue;
 		}
 
-		debug && console.log(`      Port ${port} is available, spawning backend process...`);
-		debug && console.log(`      Worker ID: ${workerId}, PROJECT_ID will be: ${workerId}`);
+		if (debug) {
+			console.log(`      Port ${port} is available, spawning backend process...`);
+		}
+		if (debug) {
+			console.log(`      Worker ID: ${workerId}, PROJECT_ID will be: ${workerId}`);
+		}
 
 		const command = 'npm run start:only-for-e2e --workspace=web-backend';
 		const serverProcess = spawn(command, {
@@ -181,8 +200,6 @@ async function startServerOnAvailablePort(
 
 		// Wait for server to confirm it successfully bound to the port
 		// We listen to stdout for the E2E_BACKEND_READY message instead of doing fetchs
-		const silentLogs = process.env.E2E_SILENT_LOGS === 'true';
-
 		const serverReady = new Promise<{ actualPort: number; actualPid: number }>((resolve, reject) => {
 			let alreadyResolved = false;
 			let portBindError = false;
@@ -241,11 +258,14 @@ async function startServerOnAvailablePort(
 					const actualPid = parseInt(match[2], 10);
 					const actualRunId = match[3];
 
-					debug &&
+					if (debug) {
 						console.log(
 							`      Received E2E_BACKEND_READY: port=${actualPort}, pid=${actualPid}, runId=${actualRunId}`
 						);
-					debug && console.log(`      Expected: port=${port}, runId=${expectedRunId}`);
+					}
+					if (debug) {
+						console.log(`      Expected: port=${port}, runId=${expectedRunId}`);
+					}
 
 					// Verify this is OUR backend (not one from another terminal)
 					if (actualPort !== port) {
@@ -268,7 +288,9 @@ async function startServerOnAvailablePort(
 					}
 
 					// Success! This is our backend and it's ready
-					debug && console.log(`      Backend on port ${port} verified and ready!`);
+					if (debug) {
+						console.log(`      Backend on port ${port} verified and ready!`);
+					}
 
 					alreadyResolved = true;
 					resolve({ actualPort, actualPid });
@@ -305,23 +327,30 @@ async function startServerOnAvailablePort(
 			const { actualPid } = await serverReady;
 
 			// Success! Return the port, actual backend PID, and process
-			debug && console.log(` Backend successfully started on port ${port}`);
+			if (debug) {
+				console.log(` Backend successfully started on port ${port}`);
+			}
 			return { port, actualPid, process: serverProcess };
 		} catch (error) {
 			// Server failed to start, kill it and try next port
-			debug && console.log(`       Killing failed process on port ${port}...`);
+			if (debug) {
+				console.log(`       Killing failed process on port ${port}...`);
+			}
 			await killProcessTree(serverProcess);
 
 			if (error instanceof Error && messageOf(error) === 'PORT_IN_USE') {
-				debug && console.log(`       Port ${port} is in use, will try next port`);
+				if (debug) {
+					console.log(`       Port ${port} is in use, will try next port`);
+				}
 				continue;
 			}
 
 			// Other errors (timeout, mismatch, etc.) - also retry
-			debug &&
+			if (debug) {
 				console.log(
 					`       Server failed on port ${port}: ${error instanceof Error ? messageOf(error) : error}. Will try next port`
 				);
+			}
 			continue;
 		}
 	}
@@ -336,7 +365,7 @@ async function startServerOnAvailablePort(
  * Detects if this is a single test case run (e.g., from IntelliJ)
  * Only detects explicit single test targeting, not file-level runs
  */
-function isSingleTestRun(config: FullConfig): boolean {
+function isSingleTestRun(): boolean {
 	const args = process.argv.slice(2);
 
 	// Heuristic 1: Line number specified (e.g., file.spec.ts:42)
@@ -446,7 +475,7 @@ async function cleanupOrphanedFiles(): Promise<void> {
 					await unlink(filePath);
 					cleanedCount++;
 				}
-			} catch (err) {
+			} catch {
 				// File might have been deleted by another process, ignore
 			}
 		}
@@ -454,7 +483,7 @@ async function cleanupOrphanedFiles(): Promise<void> {
 		if (cleanedCount > 0) {
 			console.log(` Cleaned up ${cleanedCount} orphaned port file(s) older than 1 hour`);
 		}
-	} catch (err) {
+	} catch {
 		// Directory read failed, not critical - continue with test setup
 	}
 }
@@ -523,7 +552,7 @@ async function globalSetupWebServer(config: FullConfig) {
 	// This is a fallback in case it's not set
 	const runId = process.env.RUN_ID || `${Date.now()}-${process.pid}`;
 	if (!process.env.RUN_ID) {
-		// @ts-ignore - Store RUN_ID in process.env for global-teardown and hooks to use
+		// Store RUN_ID in process.env for global-teardown and hooks to use
 		process.env.RUN_ID = runId;
 	}
 
@@ -534,7 +563,7 @@ async function globalSetupWebServer(config: FullConfig) {
 	await cleanupOrphanedFiles();
 
 	// Detect if this is likely a single test run (e.g., from IntelliJ)
-	const isSingleTest = isSingleTestRun(config);
+	const isSingleTest = isSingleTestRun();
 
 	// Adjust workers: use 1 for single test, configured amount for full suite
 	const configuredWorkers = config.workers;
@@ -575,21 +604,27 @@ async function globalSetupWebServer(config: FullConfig) {
 
 	// Start all servers in parallel with individual retry logic
 	const serverPromises = Array.from({ length: numWorkers }, async (_, i) => {
-		debug && console.log(`\n Setting up backend server ${i + 1}/${numWorkers}...`);
+		if (debug) {
+			console.log(`\n Setting up backend server ${i + 1}/${numWorkers}...`);
+		}
 
 		let retryCount = 0;
 		const maxRetries = 5; // Reduced from 100 to avoid infinite loops
 
 		while (retryCount < maxRetries) {
 			try {
-				debug && console.log(`   Attempt ${retryCount + 1}/${maxRetries} for worker ${i + 1}`);
+				if (debug) {
+					console.log(`   Attempt ${retryCount + 1}/${maxRetries} for worker ${i + 1}`);
+				}
 
 				// Calculate port with offset to reduce collisions
 				const startPort = basePort + i * 10 + retryCount;
 
 				// Skip already reserved ports
 				if (reservedPorts.has(startPort)) {
-					debug && console.log(`   Port ${startPort} already reserved, incrementing retry count`);
+					if (debug) {
+						console.log(`   Port ${startPort} already reserved, incrementing retry count`);
+					}
 					retryCount++;
 					continue;
 				}
@@ -638,17 +673,20 @@ async function globalSetupWebServer(config: FullConfig) {
 					}
 				});
 
-				debug && console.log(` Worker ${i + 1} successfully started on port ${port}`);
+				if (debug) {
+					console.log(` Worker ${i + 1} successfully started on port ${port}`);
+				}
 
 				// CRITICAL: Use actualPid (from E2E_BACKEND_READY), not serverProcess.pid
 				// serverProcess.pid is npm's PID, actualPid is the Node.js backend's PID
 				// This ensures SIGINT is sent to the actual server process, not npm
 				return { port, pid: actualPid, npmPid: serverProcess.pid! };
 			} catch (error) {
-				debug &&
+				if (debug) {
 					console.log(
 						`    Worker ${i + 1} failed on attempt ${retryCount + 1}: ${error instanceof Error ? messageOf(error) : error}`
 					);
+				}
 				retryCount++;
 
 				// If this is the last retry, give up on this worker
@@ -659,7 +697,9 @@ async function globalSetupWebServer(config: FullConfig) {
 				}
 
 				// Small delay before retry to avoid hammering
-				debug && console.log(`   [wait] Waiting 500ms before retry...`);
+				if (debug) {
+					console.log(`   [wait] Waiting 500ms before retry...`);
+				}
 				await sleep(500);
 			}
 		}

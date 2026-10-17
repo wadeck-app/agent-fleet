@@ -3,11 +3,9 @@
  *
  * Reusable mock classes and objects for testing.
  */
-import { EventEmitter } from 'node:events';
 // import type { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
 // import type { FlowDefinition } from 'flow-engine/types';
 // import type { IssueCollector, ValidationCode, ValidationIssue } from 'flow-engine/validation/ValidationTypes';
-import { vi } from 'vitest';
 
 // /**
 //  * Mock IssueCollector for validation testing

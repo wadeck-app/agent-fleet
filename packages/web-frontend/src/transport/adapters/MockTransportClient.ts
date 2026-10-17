@@ -77,6 +77,7 @@ import type {
 	UnsubscribeFunction,
 } from '@shared/transport';
 
+import { type ErasedEventHandler, eraseEventHandler } from '../ErasedEventHandler';
 import type { ITransportClient } from '../ITransportClient';
 
 /**
@@ -84,7 +85,7 @@ import type { ITransportClient } from '../ITransportClient';
  */
 interface MockResponse {
 	status?: number;
-	body?: any;
+	body?: unknown;
 	error?: TransportError;
 	delay?: number;
 }
@@ -108,7 +109,7 @@ export class MockTransportClient implements ITransportClient {
 	/**
 	 * Event handlers by event type
 	 */
-	private eventHandlers = new Map<string, Set<EventHandler<any>>>();
+	private eventHandlers = new Map<string, Set<ErasedEventHandler>>();
 
 	/**
 	 * Request history
@@ -191,12 +192,10 @@ export class MockTransportClient implements ITransportClient {
 			method,
 			// violations-suppress: ts/no-unsafe-type-cast P extends PathsForMethod<M> (a string type); TransportRequest.path requires plain string
 			path: path as string,
-			// violations-suppress-start: ts/no-unsafe-type-cast options fields are generically typed; TransportRequest requires concrete types and runtime values conform to expected shapes
-			query: options?.query as any,
-			params: options?.params as any,
-			body: options?.body as any,
-			headers: options?.headers as any,
-			// violations-suppress-end: ts/no-unsafe-type-cast
+			query: options?.query,
+			params: options?.params,
+			body: options?.body,
+			headers: options?.headers,
 			timestamp: Date.now(),
 		};
 
@@ -232,10 +231,10 @@ export class MockTransportClient implements ITransportClient {
 		if (!this.eventHandlers.has(event)) {
 			this.eventHandlers.set(event, new Set());
 		}
-		this.eventHandlers.get(event)!.add(handler);
+		this.eventHandlers.get(event)!.add(eraseEventHandler(handler));
 
 		return () => {
-			this.eventHandlers.get(event)?.delete(handler);
+			this.eventHandlers.get(event)?.delete(eraseEventHandler(handler));
 		};
 	}
 

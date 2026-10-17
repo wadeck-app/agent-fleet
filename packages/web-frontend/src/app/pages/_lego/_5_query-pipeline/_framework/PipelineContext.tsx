@@ -37,13 +37,14 @@ export interface PipelineContextValue<T> {
 	service: PipelineService;
 }
 
-const PipelineContext = createContext<PipelineContextValue<any> | null>(null);
+const PipelineContext = createContext<PipelineContextValue<unknown> | null>(null);
 
 export function usePipelineContext<T>(): PipelineContextValue<T> {
 	const context = useContext(PipelineContext);
 	if (!context) {
 		throw new Error('usePipelineContext must be used within PipelineProvider');
 	}
+	// Context is stored with an erased item type; each consumer picks T. Safe: PipelineProvider is the only writer.
 	return context as PipelineContextValue<T>;
 }
 
@@ -63,5 +64,7 @@ export function PipelineProvider<T>({ service, columns, modifiers, children }: P
 		service,
 	};
 
-	return <PipelineContext.Provider value={value}>{children}</PipelineContext.Provider>;
+	return (
+		<PipelineContext.Provider value={value as PipelineContextValue<unknown>}>{children}</PipelineContext.Provider>
+	);
 }

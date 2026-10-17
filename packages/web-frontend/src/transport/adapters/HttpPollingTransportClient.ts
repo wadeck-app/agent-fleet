@@ -70,6 +70,7 @@ import type {
 	UnsubscribeFunction,
 } from '@shared/transport';
 
+import { type ErasedEventHandler, eraseEventHandler } from '../ErasedEventHandler';
 import type { ITransportClient, Subscription, TransportStatus } from '../ITransportClient';
 import { TokenRefreshManager } from '../TokenRefreshManager';
 import { getConnId } from '../connection-id';
@@ -113,7 +114,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 	/**
 	 * Event handlers by event type
 	 */
-	private eventHandlers = new Map<string, Set<EventHandler<any>>>();
+	private eventHandlers = new Map<string, Set<ErasedEventHandler>>();
 
 	/**
 	 * Event filters by event type
@@ -286,7 +287,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 		if (!this.eventHandlers.has(event)) {
 			this.eventHandlers.set(event, new Set());
 		}
-		this.eventHandlers.get(event)!.add(handler);
+		this.eventHandlers.get(event)!.add(eraseEventHandler(handler));
 
 		// Store filters for this event
 		if (filters) {
@@ -299,7 +300,7 @@ export class HttpPollingTransportClient implements ITransportClient {
 		}
 
 		return () => {
-			this.eventHandlers.get(event)?.delete(handler);
+			this.eventHandlers.get(event)?.delete(eraseEventHandler(handler));
 
 			// If no more handlers, unsubscribe from server
 			if (this.eventHandlers.get(event)?.size === 0) {

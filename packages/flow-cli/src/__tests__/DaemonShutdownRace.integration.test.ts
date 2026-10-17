@@ -16,6 +16,7 @@ import { WebSocket } from 'ws';
 
 import type { DaemonToWorker, ExecutionState } from '../ipc/Protocol';
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
+import { observeFor, waitUntil } from '../test-utils/WaitHelpers';
 
 const FLOW_YAML = `\
 id: shutdown-race-flow
@@ -58,23 +59,20 @@ afterEach(async () => {
 });
 
 async function waitForFile(path: string): Promise<void> {
-	for (let attempt = 0; attempt < 200; attempt++) {
-		if (existsSync(path)) return;
-		await new Promise(resolve => setTimeout(resolve, 20));
-	}
-	throw new Error(`the daemon never wrote "${path}", so it never became reachable`);
+	await waitUntil(() => existsSync(path), {
+		timeoutMs: 4_000,
+		failureMessage: `the daemon never wrote "${path}", so it never became reachable`,
+	});
 }
 
 async function workerUrl(): Promise<string> {
 	const portFile = join(ctx.daemonDir, 'worker.port');
-	for (let attempt = 0; attempt < 100; attempt++) {
-		if (existsSync(portFile)) {
-			const { port } = JSON.parse(readFileSync(portFile, 'utf8')) as { port: number };
-			return `ws://127.0.0.1:${String(port)}`;
-		}
-		await new Promise(resolve => setTimeout(resolve, 20));
-	}
-	throw new Error('the daemon never published a worker port');
+	await waitUntil(() => existsSync(portFile), {
+		timeoutMs: 2_000,
+		failureMessage: 'the daemon never published a worker port',
+	});
+	const { port } = JSON.parse(readFileSync(portFile, 'utf8')) as { port: number };
+	return `ws://127.0.0.1:${String(port)}`;
 }
 
 /** Connects a worker and sends its `'ready'` registration -- nothing is queued yet. */
@@ -136,15 +134,17 @@ async function runFlow(): Promise<string> {
 
 async function settledExecution(executionId: string): Promise<ExecutionState> {
 	const stateFile = join(ctx.daemonDir, 'executions', `${executionId}.json`);
-	const deadline = Date.now() + 15_000;
-	while (Date.now() < deadline) {
-		if (existsSync(stateFile)) {
-			const state = JSON.parse(readFileSync(stateFile, 'utf8')) as ExecutionState;
-			if (state.status === 'completed' || state.status === 'failed') return state;
-		}
-		await new Promise(resolve => setTimeout(resolve, 100));
-	}
-	throw new Error(`execution ${executionId} did not settle within 15s`);
+	const read = (): ExecutionState | undefined => {
+		if (!existsSync(stateFile)) return undefined;
+		const state = JSON.parse(readFileSync(stateFile, 'utf8')) as ExecutionState;
+		return state.status === 'completed' || state.status === 'failed' ? state : undefined;
+	};
+	await waitUntil(() => read() !== undefined, {
+		timeoutMs: 15_000,
+		intervalMs: 100,
+		failureMessage: `execution ${executionId} did not settle`,
+	});
+	return read()!;
 }
 
 describe('the idle-shutdown race between a worker ready and a run landing', () => {
@@ -175,7 +175,7 @@ describe('the idle-shutdown race between a worker ready and a run landing', () =
 
 		// Long enough to clear Daemon.ts's SHUTDOWN_GRACE_MS (1s) with margin, short enough
 		// to keep the test fast.
-		await new Promise(resolve => setTimeout(resolve, 2_500));
+		await observeFor(2_500);
 
 		await expect(runFlow()).rejects.toThrow();
 	});

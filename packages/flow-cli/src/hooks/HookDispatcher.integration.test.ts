@@ -74,7 +74,6 @@ describe('HookDispatcher (integration)', () => {
 					data += chunk;
 				});
 				req.on('end', () => {
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 					receivedBody = JSON.parse(data);
 					res.writeHead(200);
 					res.end();

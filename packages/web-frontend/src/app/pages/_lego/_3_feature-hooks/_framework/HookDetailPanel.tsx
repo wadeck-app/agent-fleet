@@ -20,7 +20,7 @@ import { Check, Edit, Save, X } from 'lucide-react';
 export interface HookDetailPanelProps<T> {
 	service: {
 		getProduct: (id: string) => Promise<T>;
-		updateProduct?: (id: string, data: any) => Promise<any>;
+		updateProduct?(id: string, data: unknown): Promise<unknown>;
 	};
 	columns: ColumnDef<T>[];
 	selectedId?: string;
@@ -53,7 +53,7 @@ export function HookDetailPanel<T extends { id: string }>({ service, columns, se
 		fetchItem();
 	}, [selectedId, service]);
 
-	const handleEdit = (key: string, currentValue: any) => {
+	const handleEdit = (key: string, currentValue: unknown) => {
 		setEditingField(key);
 		setEditValue(String(currentValue || ''));
 	};
@@ -78,7 +78,7 @@ export function HookDetailPanel<T extends { id: string }>({ service, columns, se
 		setEditValue('');
 	};
 
-	const getFieldValue = (item: T, key: string | number | symbol): any => {
+	const getFieldValue = (item: T, key: string | number | symbol): unknown => {
 		return item[key as keyof T];
 	};
 

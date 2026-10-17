@@ -4,6 +4,7 @@ import { col } from '@framework/lego/helpers/col';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
+import type { GetProductsParams } from '@app/pages/_lego/_shared/api/ProductsService';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { DataTable } from '../_framework/DataTable';
@@ -40,7 +41,7 @@ const columns = [
 ];
 
 const recentProductsService = {
-	getProducts: async (params?: any) => {
+	getProducts: async (params?: GetProductsParams) => {
 		const result = await productsService.getProducts({
 			...params,
 			sortBy: 'createdAt',

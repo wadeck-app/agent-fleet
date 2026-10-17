@@ -58,7 +58,8 @@ export class McpServer {
 			const server = this.tcpServer!;
 			this.tcpServer = null;
 			server.close(err => {
-				err ? reject(err) : resolve();
+				if (err) reject(err);
+				else resolve();
 			});
 		});
 	}

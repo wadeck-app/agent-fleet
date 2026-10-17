@@ -64,7 +64,7 @@ export function S9Page() {
 
 	const fetchFeaturedProducts = useCallback(async (query: ComposedQuery): Promise<FetchDataResult<Product>> => {
 		const response = await productsService.getProducts(query);
-		const featuredItems = response.items.filter(p => p.featured);
+		const featuredItems = (response.items || []).filter(p => p.featured);
 		const pageSize = response.pagination?.pageSize ?? query.pageSize ?? 10;
 		return {
 			items: featuredItems,

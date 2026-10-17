@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { observeFor } from '../test-utils/WaitHelpers';
 import { watchForDaemon } from './DaemonWatch.js';
 
 let dir: string;
@@ -56,7 +57,7 @@ describe('watchForDaemon', () => {
 		writeFileSync(join(dir, 'config.port'), JSON.stringify({ port: 4100 }), 'utf8');
 		writeFileSync(join(dir, 'health_token'), 'abc', 'utf8');
 
-		await new Promise(resolve => setTimeout(resolve, 200));
+		await observeFor(200);
 		expect(fired).toBe(0);
 	});
 
@@ -69,7 +70,7 @@ describe('watchForDaemon', () => {
 
 		writeFileSync(join(dir, 'worker.port'), JSON.stringify({ port: 4101 }), 'utf8');
 
-		await new Promise(resolve => setTimeout(resolve, 200));
+		await observeFor(200);
 		expect(fired).toBe(0);
 	});
 

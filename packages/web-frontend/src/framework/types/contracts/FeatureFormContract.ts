@@ -33,6 +33,7 @@
  *
  * ===========================================================================================
  */
+import type { FeatureAction } from '@framework/types/FeatureContract';
 
 /**
  * Contract for form-specific feature hooks.
@@ -69,7 +70,7 @@ export interface FeatureFormContract<TState> {
 	 * }), []);
 	 * ```
 	 */
-	actions: Record<string, (...args: any[]) => void>;
+	actions: Record<string, FeatureAction>;
 }
 
 /**

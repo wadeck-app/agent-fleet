@@ -61,3 +61,12 @@ packages/web-frontend/src/app/hooks/useAuth.test.ts
 # Intentionally broken YAML fixture for parse error tests
 packages/flow-cli/src/test-utils/fixtures/broken.yml
 .violations/.reports/
+
+# Tool-rewritten runtime state (gitignored; the tools rewrite their own formatting on every run)
+.claude/w-guardrails/
+**/.claude/w-learning/
+.flow/workspaces/
+
+# Working files owned by the developer / Claude Code (plans are drafts, settings.local.json is machine-local)
+.claude/plans/
+.claude/settings.local.json

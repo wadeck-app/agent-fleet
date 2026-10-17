@@ -8,9 +8,9 @@ const REST_API_URL = 'http://localhost:3737';
 interface CreateTaskRequest {
 	description: string;
 	priority?: 'low' | 'medium' | 'high' | 'urgent';
-	metadata?: Record<string, any>;
+	metadata?: Record<string, unknown>;
 	flowId?: string;
-	flowInputs?: Record<string, any>;
+	flowInputs?: Record<string, unknown>;
 	workspacePath?: string;
 }
 

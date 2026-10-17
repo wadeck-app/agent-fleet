@@ -253,14 +253,20 @@ export function UserMenu({
 				);
 
 			case 'icon':
-			// violations-suppress: ts/no-switch-default-break default returns a valid React element, not a silent fallback
-			default:
 				return (
 					<Button variant="ghost" size="icon" className={className}>
 						<User className={iconSize} />
 						<span className="sr-only">User menu</span>
 					</Button>
 				);
+
+			default: {
+				// Exhaustiveness guard: `variant` is `never` here unless a new variant is added without a case
+				const unsupportedVariant: never = variant;
+				throw new Error(
+					`UserMenu: unsupported variant "${String(unsupportedVariant)}". Expected 'icon', 'enhanced' or 'compact'.`
+				);
+			}
 		}
 	};
 

@@ -8,7 +8,6 @@ import type { Command } from 'commander';
 import type { ApprovalProvider } from 'extension-points';
 import { StepRunner } from 'flow-engine';
 import { spawn } from 'node:child_process';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
@@ -893,12 +892,10 @@ function scheduleReconnect(
 	// 3. The backoff timer: always fires regardless of the above two, so a missed notification
 	//    costs only latency.
 	let fired = false;
-	let timer: NodeJS.Timeout | undefined;
-
 	const reconnect = (wsUrlFromNudge?: string): void => {
 		if (fired) return;
 		fired = true;
-		if (timer !== undefined) clearTimeout(timer);
+		clearTimeout(timer);
 		// Disarm all notifiers so a late-arriving nudge does not trigger a second connect.
 		for (const n of notifiers) n.onNotify(undefined);
 		connect(
@@ -916,7 +913,7 @@ function scheduleReconnect(
 		);
 	};
 
-	timer = scheduleReconnectTimer(reconnectDelayMs(attempt), () => reconnect(undefined));
+	const timer = scheduleReconnectTimer(reconnectDelayMs(attempt), () => reconnect(undefined));
 	for (const n of notifiers) {
 		n.onNotify(wsUrl => reconnect(wsUrl));
 	}

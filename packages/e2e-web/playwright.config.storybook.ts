@@ -1,8 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 
-import { PIXEL_9A } from './utils/devices';
-
 // Generate unique RUN_ID early (before webServer starts)
 // This allows webServer to use it for port file naming
 const runId = process.env.RUN_ID || `${Date.now()}-${process.pid}`;
@@ -18,14 +16,6 @@ process.env.RUN_ID = runId;
 const desktopDevice = {
 	...devices['Desktop Chrome'],
 	viewport: { width: 1280, height: 720 },
-};
-
-const mobileDevice = {
-	viewport: { width: PIXEL_9A.width, height: PIXEL_9A.height },
-	userAgent: PIXEL_9A.userAgent,
-	deviceScaleFactor: PIXEL_9A.deviceScaleFactor,
-	isMobile: PIXEL_9A.isMobile,
-	hasTouch: PIXEL_9A.hasTouch,
 };
 
 const projectRoot = path.resolve(__dirname, '../..');

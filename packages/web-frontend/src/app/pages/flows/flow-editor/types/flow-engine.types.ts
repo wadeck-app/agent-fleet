@@ -76,7 +76,7 @@ export interface OutputVariableConfig {
 	transform?: TransformFunction | string; // violations-suppress: ts/no-union-with-string string is a named transform function reference
 
 	/** Default value if extraction fails (only for non-required fields) */
-	default?: any;
+	default?: unknown;
 }
 
 /**
@@ -139,7 +139,7 @@ export interface UserInterventionStep extends BaseFlowStep {
 	timeout?: {
 		minutes: number;
 		onTimeout: 'fail' | 'continue' | 'default';
-		defaultValue?: any;
+		defaultValue?: unknown;
 	};
 	approval?: {
 		title: string;

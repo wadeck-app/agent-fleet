@@ -113,7 +113,7 @@ export function useRealtimeRefresh(options: {
 		// Use registerLocalHandler (if available) to avoid duplicate subscription messages
 		// Otherwise fallback to subscribe() for transports that don't support state-based API
 		const unsubscribers = events.map(event => {
-			const handler = (data: any) => {
+			const handler = (data: unknown) => {
 				console.log(`[${logPrefix}] Received event: ${event}`, data);
 				onEventRef.current();
 			};

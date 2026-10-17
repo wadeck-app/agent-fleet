@@ -5,7 +5,7 @@ import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
 import { col } from '@framework/lego/helpers/col';
 import type { DataTableFeature } from '@framework/lego/types/FeatureTypes';
-import type { Product } from '@shared/api/products.contract';
+import type { CreateProduct, Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
 import { ProductForm } from '@app/pages/_lego/_shared/ProductForm';
@@ -32,7 +32,7 @@ export function S11Content() {
 	const [editMode, setEditMode] = useState<EditMode>('dialog');
 	const { selectedItem, actions } = useProductDomain();
 
-	const handleSaveBelow = async (data: any) => {
+	const handleSaveBelow = async (data: CreateProduct) => {
 		if (selectedItem) {
 			await actions.update(selectedItem.id, { ...data, version: selectedItem.version });
 			actions.select(null);

@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
+import { observeFor, waitUntil } from '../test-utils/WaitHelpers';
 
 let ctx: TestDaemonContext;
 
@@ -35,14 +36,12 @@ afterEach(async () => {
  */
 async function wsUrl(daemonDir: string): Promise<string> {
 	const portFile = join(daemonDir, 'worker.port');
-	for (let attempt = 0; attempt < 50; attempt++) {
-		if (existsSync(portFile)) {
-			const { port } = JSON.parse(readFileSync(portFile, 'utf8')) as { port: number };
-			return `ws://127.0.0.1:${String(port)}`;
-		}
-		await new Promise(resolve => setTimeout(resolve, 20));
-	}
-	throw new Error(`The daemon never published "${portFile}", so it never bound a worker listener`);
+	await waitUntil(() => existsSync(portFile), {
+		timeoutMs: 1_000,
+		failureMessage: `The daemon never published "${portFile}", so it never bound a worker listener`,
+	});
+	const { port } = JSON.parse(readFileSync(portFile, 'utf8')) as { port: number };
+	return `ws://127.0.0.1:${String(port)}`;
 }
 
 describe('a worker the daemon did not create', () => {
@@ -62,7 +61,7 @@ describe('a worker the daemon did not create', () => {
 		ws.send(JSON.stringify({ type: 'ready', pid: 999_001, authToken: token }));
 
 		// Long enough for the daemon to notice it has nothing to do and shut down.
-		await new Promise(resolve => setTimeout(resolve, 1200));
+		await observeFor(1200);
 		ws.close();
 
 		const types = received.map(raw => (JSON.parse(raw) as { type: string }).type);

@@ -91,7 +91,6 @@ describe('cli rollback', () => {
 	beforeEach(() => {
 		exitSpy = vi.spyOn(process, 'exit').mockImplementation((_code?: string | number | null) => {
 			throw new Error(`process.exit(${_code})`);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		}) as any;
 		stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 	});
@@ -120,7 +119,6 @@ describe('cli self-check', () => {
 
 		exitSpy = vi.spyOn(process, 'exit').mockImplementation((_code?: string | number | null) => {
 			throw new Error(`process.exit(${_code})`);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		}) as any;
 	});
 

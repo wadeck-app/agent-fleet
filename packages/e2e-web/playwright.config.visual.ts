@@ -125,7 +125,7 @@ export default defineConfig({
 			name: 'visual-desktop',
 			testMatch: '**/*.storybook.visual.ts',
 			use: desktopDevice,
-			// @ts-ignore TODO it's supported but I imagine the IDE typed support is not up-to-date
+			// @ts-expect-error TS2769: the installed Playwright `Project` typings reject `expect` here (believed to be supported at runtime, not verified: typings may lag)
 			expect: visualRegressionExpect,
 		},
 		// Visual Regression Tests - Mobile
@@ -133,7 +133,7 @@ export default defineConfig({
 			name: 'visual-mobile',
 			testMatch: '**/*.storybook.visual.ts',
 			use: mobileDevice,
-			// @ts-ignore TODO it's supported but I imagine the IDE typed support is not up-to-date
+			// @ts-expect-error TS2769: the installed Playwright `Project` typings reject `expect` here (believed to be supported at runtime, not verified: typings may lag)
 			expect: visualRegressionExpect,
 		},
 	],

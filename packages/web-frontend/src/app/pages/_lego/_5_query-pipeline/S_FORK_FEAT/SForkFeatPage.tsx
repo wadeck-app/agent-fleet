@@ -7,6 +7,7 @@ import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 import { Star } from 'lucide-react';
 
+import type { GetProductsParams } from '@app/pages/_lego/_shared/api/ProductsService';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { PageLayout } from '../_framework/PageLayout';
@@ -119,12 +120,12 @@ export function SForkFeatPage() {
 	const columns = [bookmarkColumn, ...baseColumns];
 
 	const serviceWrapper = {
-		getProducts: async (params?: any) => {
+		getProducts: async (params?: GetProductsParams) => {
 			const result = await productsService.getProducts(params);
 			if (!showBookmarked) {
 				return result;
 			}
-			const filteredItems = result.items.filter(item => bookmarks.has(item.id));
+			const filteredItems = (result.items || []).filter(item => bookmarks.has(item.id));
 			return {
 				items: filteredItems,
 				pagination: result.pagination

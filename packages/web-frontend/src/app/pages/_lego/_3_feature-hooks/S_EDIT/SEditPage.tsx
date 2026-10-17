@@ -4,7 +4,7 @@ import { PageContainer } from '@framework/components/layout/PageContainer';
 import { Button } from '@framework/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@framework/components/primitives/Card';
 import { col } from '@framework/lego/helpers/col';
-import type { Product } from '@shared/api/products.contract';
+import type { CreateProduct, Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
 import { ProductDialogAdapter } from '@app/pages/_lego/_shared/ProductDialogAdapter';
@@ -74,7 +74,7 @@ export function SEditPage() {
 		}
 	};
 
-	const handleSaveBelow = async (data: any) => {
+	const handleSaveBelow = async (data: CreateProduct) => {
 		if (selectedProduct) {
 			await productsService.updateProduct(selectedProduct.id, {
 				...data,

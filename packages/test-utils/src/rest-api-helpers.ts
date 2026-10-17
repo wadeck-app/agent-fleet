@@ -147,7 +147,7 @@ export function testCRUDEndpoint(options: {
 				method: 'get',
 				path: basePath,
 				mockSuccess: () => mocks.list.mockReturnValue([]),
-				mockError: fn => {
+				mockError: () => {
 					mocks.list.mockImplementation(() => {
 						throw new Error('List error');
 					});
@@ -163,7 +163,7 @@ export function testCRUDEndpoint(options: {
 				method: 'get',
 				path: `${basePath}/test-id`,
 				mockSuccess: () => mocks.get.mockReturnValue({ id: 'test-id' }),
-				mockError: fn => {
+				mockError: () => {
 					mocks.get.mockReturnValue(undefined);
 				},
 				errorStatus: 404,
@@ -179,7 +179,7 @@ export function testCRUDEndpoint(options: {
 				path: basePath,
 				body: { test: 'data' },
 				mockSuccess: () => mocks.create.mockReturnValue({ id: 'new-id' }),
-				mockError: fn => {
+				mockError: () => {
 					mocks.create.mockImplementation(() => {
 						throw new Error('Create error');
 					});
@@ -197,7 +197,7 @@ export function testCRUDEndpoint(options: {
 				path: `${basePath}/test-id`,
 				body: { test: 'updated' },
 				mockSuccess: () => mocks.update.mockReturnValue({ id: 'test-id' }),
-				mockError: fn => {
+				mockError: () => {
 					mocks.update.mockImplementation(() => {
 						throw new Error('Update error');
 					});
@@ -213,7 +213,7 @@ export function testCRUDEndpoint(options: {
 				method: 'delete',
 				path: `${basePath}/test-id`,
 				mockSuccess: () => mocks.delete.mockReturnValue(true),
-				mockError: fn => {
+				mockError: () => {
 					mocks.delete.mockImplementation(() => {
 						throw new Error('Delete error');
 					});

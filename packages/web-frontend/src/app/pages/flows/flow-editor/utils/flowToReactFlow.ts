@@ -105,7 +105,7 @@ export function reactFlowToFlowDefinition(
 	// Build dependency map from edges
 	const dependencyMap = new Map<string, string[]>();
 	const conditionalMap = new Map<string, string>();
-	const loopMap = new Map<string, any>();
+	const loopMap = new Map<string, FlowStep['onFailure']>();
 
 	backendEdges.forEach(edge => {
 		if (edge.data?.edgeType === 'dependency') {

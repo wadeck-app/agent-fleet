@@ -23,7 +23,7 @@ import { getErrorMessage } from '@framework/utils/errors/errorUtils';
 
 const errorBannerCls = 'rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive';
 
-export interface Data2DetailPanelProps<T> {
+export interface Data2DetailPanelProps<T extends object> {
 	service: {
 		getProduct: (id: string) => Promise<T>;
 	};
@@ -36,7 +36,7 @@ export interface Data2DetailPanelProps<T> {
 	title?: string;
 }
 
-export function Data2DetailPanel<T>({
+export function Data2DetailPanel<T extends object>({
 	service,
 	columns,
 	selectedId,
@@ -96,8 +96,10 @@ export function Data2DetailPanel<T>({
 				{item && !isLoading && (
 					<div className="space-y-3">
 						{columns.map(column => {
-							// violations-suppress: ts/no-unsafe-type-cast T is generic with no key constraint; column.key is a dynamic string accessor that cannot be typed at this render boundary
-							const value = column.render ? column.render(item) : String((item as any)[column.key] ?? '');
+							// violations-suppress: ts/no-unsafe-type-cast column.key is a dynamic string accessor; T is only constrained to object, so the lookup is widened to Record<string, unknown>
+							const value = column.render
+								? column.render(item)
+								: String((item as Record<string, unknown>)[column.key] ?? '');
 
 							return (
 								<div key={column.key} className="flex flex-col gap-1">

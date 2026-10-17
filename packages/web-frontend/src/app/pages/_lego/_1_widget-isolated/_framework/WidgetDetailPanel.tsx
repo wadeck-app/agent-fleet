@@ -75,9 +75,9 @@ export function WidgetDetailPanel<T extends { id: string }>({
 			return;
 		}
 
-		const unsubscribe = eventBus.on('product:selected', (payload: any) => {
+		const unsubscribe = eventBus.on('product:selected', (payload: unknown) => {
 			if (payload && typeof payload === 'object' && 'id' in payload) {
-				// violations-suppress: ts/no-unsafe-type-cast payload is typed as any from eventBus; 'id' in payload guard confirms id exists but not its type
+				// violations-suppress: ts/no-unsafe-type-cast payload is unknown from eventBus; 'id' in payload guard confirms id exists but not its type
 				void loadItem(payload.id as string);
 			}
 

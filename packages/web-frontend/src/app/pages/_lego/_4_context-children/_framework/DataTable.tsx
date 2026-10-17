@@ -13,11 +13,16 @@ import type { TableColumn } from '@framework/components/table/Table';
 import { Table } from '@framework/components/table/Table';
 import { renderColumnValue } from '@framework/lego/helpers/renderColumnValue';
 import type { ColumnDef } from '@framework/lego/types/ColTypes';
+import type { CrudDialogProps } from '@framework/lego/types/FeatureTypes';
 import { Check, ChevronLeft, ChevronRight, Edit, Plus, Trash2, X } from 'lucide-react';
 
+import type { DataTableContextValue, DataTableService } from './DataTableContext';
 import { DataTableContext } from './DataTableContext';
 import { useDataTable } from './DataTableContext';
 import { useTableDataFetch } from './useTableDataFetch';
+
+// Minimal row shape needed by the generic sub-components (Grid, Body)
+type RowItem = { id: string };
 
 /**
  * ===========================================================================================
@@ -64,26 +69,7 @@ import { useTableDataFetch } from './useTableDataFetch';
  */
 
 export interface DataTableRootProps<T extends { id: string }> {
-	service: {
-		getProducts: (query: {
-			search?: string;
-			page?: number;
-			pageSize?: number;
-			sortBy?: string;
-			sortOrder?: string;
-		}) => Promise<{
-			items: T[];
-			total?: number;
-			page?: number;
-			pageSize?: number;
-			pagination?: { total: number; page: number; pageSize: number; totalPages: number };
-		}>;
-		createProduct?: (data: any) => Promise<any>;
-		updateProduct?: (id: string, data: any) => Promise<any>;
-		deleteProduct?: (id: string) => Promise<void>;
-		bulkDeleteProducts?: (ids: string[]) => Promise<unknown>;
-		getProduct?: (id: string) => Promise<T>;
-	};
+	service: DataTableService<T>;
 	columns: ColumnDef<T>[];
 	children: ReactNode;
 	defaultPageSize?: number;
@@ -179,40 +165,41 @@ function DataTableRoot<T extends { id: string }>({
 		void loadItem();
 	}, [selectedItemId, service, setSearchParams]);
 
+	const contextValue: DataTableContextValue<T> = {
+		items,
+		loading,
+		pagination,
+		refresh,
+		search,
+		setSearch,
+		page,
+		pageSize,
+		setPage,
+		setPageSize,
+		sortBy,
+		sortOrder,
+		setSort,
+		selectedIds,
+		setSelectedIds,
+		selectedItemId,
+		setSelectedItemId,
+		selectedItem,
+		selectedItemLoading,
+		visibleColumns,
+		setVisibleColumns,
+		editingItem,
+		setEditingItem,
+		dialogOpen,
+		setDialogOpen,
+		service,
+		columns,
+		enableSorting,
+		enableCrud,
+	};
+
 	return (
-		<DataTableContext.Provider
-			value={{
-				items,
-				loading,
-				pagination,
-				refresh,
-				search,
-				setSearch,
-				page,
-				pageSize,
-				setPage,
-				setPageSize,
-				sortBy,
-				sortOrder,
-				setSort,
-				selectedIds,
-				setSelectedIds,
-				selectedItemId,
-				setSelectedItemId,
-				selectedItem,
-				selectedItemLoading,
-				visibleColumns,
-				setVisibleColumns,
-				editingItem,
-				setEditingItem,
-				dialogOpen,
-				setDialogOpen,
-				service,
-				columns,
-				enableSorting,
-				enableCrud,
-			}}
-		>
+		// Context stores an erased item type; consumers pick T through useDataTable<T>()
+		<DataTableContext.Provider value={contextValue as DataTableContextValue<unknown>}>
 			{children}
 		</DataTableContext.Provider>
 	);
@@ -273,7 +260,7 @@ DataTableRoot.ColumnVisibility = function ColVis() {
 };
 
 // Create button
-DataTableRoot.CreateButton = function CreateButton({ dialog: _Dialog }: { dialog: ComponentType<any> }) {
+DataTableRoot.CreateButton = function CreateButton({ dialog: _Dialog }: { dialog: ComponentType<CrudDialogProps> }) {
 	const ctx = useDataTable();
 	return (
 		<Button
@@ -322,9 +309,9 @@ DataTableRoot.BulkBar = function BulkBar() {
 
 // Grid body -- renders items as CSS grid of cards (for S4 Grid Popup scenario)
 DataTableRoot.Grid = function Grid() {
-	const ctx = useDataTable();
+	const ctx = useDataTable<RowItem>();
 
-	const handleEdit = (item: any) => {
+	const handleEdit = (item: RowItem) => {
 		ctx.setEditingItem(item);
 		ctx.setDialogOpen(true);
 	};
@@ -356,7 +343,7 @@ DataTableRoot.Grid = function Grid() {
     xl:grid-cols-4
   `}
 		>
-			{(ctx.items as any[]).map(item => (
+			{ctx.items.map(item => (
 				<div key={item.id} className="rounded-lg border border-border bg-card p-4">
 					<div className="space-y-2">
 						{visibleColumns.map(col => (
@@ -407,7 +394,7 @@ DataTableRoot.GridFooter = function GridFooter() {
 
 // Table body
 DataTableRoot.Body = function Body() {
-	const ctx = useDataTable();
+	const ctx = useDataTable<RowItem>();
 	const [sortConfigs, setSortConfigs] = useState<Array<{ key: string; direction: 'asc' | 'desc' }>>([]);
 
 	const handleSortChange = useCallback(
@@ -458,16 +445,16 @@ DataTableRoot.Body = function Body() {
 	const visibleColumnDefs = ctx.columns.filter(col => ctx.visibleColumns.has(col.key as string));
 
 	// Build TableColumn[] from ColumnDef[]
-	const tableColumns: TableColumn<any>[] = visibleColumnDefs.map(col => {
+	const tableColumns: TableColumn<RowItem>[] = visibleColumnDefs.map(col => {
 		return {
 			key: col.key as string,
 			label: col.label,
-			render: (item: any) => renderColumnValue(col, item),
+			render: (item: RowItem) => renderColumnValue(col, item),
 			sortable: col.sortable,
 		};
 	});
 
-	const handleEdit = (item: any) => {
+	const handleEdit = (item: RowItem) => {
 		ctx.setEditingItem(item);
 		ctx.setDialogOpen(true);
 	};
@@ -482,7 +469,7 @@ DataTableRoot.Body = function Body() {
 		}
 	};
 
-	const renderActions = (item: any) => {
+	const renderActions = (item: RowItem) => {
 		return (
 			<div className="flex gap-1">
 				{ctx.service.updateProduct && (
@@ -505,7 +492,7 @@ DataTableRoot.Body = function Body() {
 		<Table
 			data={ctx.items}
 			columns={tableColumns}
-			getItemId={(item: any) => item.id}
+			getItemId={(item: RowItem) => item.id}
 			selectable={Boolean(hasActions)}
 			selectedIds={ctx.selectedIds}
 			onSelectionChange={ctx.setSelectedIds}
@@ -513,7 +500,7 @@ DataTableRoot.Body = function Body() {
 			loading={ctx.loading}
 			emptyMessage="No items found"
 			sorting={ctx.enableSorting ? { sortConfigs, onSortChange: handleSortChange } : undefined}
-			onRowClick={(item: any) => ctx.setSelectedItemId(item.id)}
+			onRowClick={(item: RowItem) => ctx.setSelectedItemId(item.id)}
 			getRowClassName={() => 'cursor-pointer hover:bg-accent/20'}
 		/>
 	);

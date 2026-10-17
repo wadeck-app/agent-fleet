@@ -31,7 +31,7 @@
 export interface DeferredPromise<T> {
 	promise: Promise<T>;
 	resolve: (value: T | PromiseLike<T>) => void;
-	reject: (reason?: any) => void;
+	reject: (reason?: unknown) => void;
 	isResolved: boolean;
 	isRejected: boolean;
 }
@@ -61,7 +61,7 @@ export interface DeferredPromise<T> {
  */
 export function createDeferredPromise<T = void>(): DeferredPromise<T> {
 	let resolve!: (value: T | PromiseLike<T>) => void;
-	let reject!: (reason?: any) => void;
+	let reject!: (reason?: unknown) => void;
 	let isResolved = false;
 	let isRejected = false;
 
@@ -70,7 +70,7 @@ export function createDeferredPromise<T = void>(): DeferredPromise<T> {
 			isResolved = true;
 			res(value);
 		};
-		reject = (reason?: any) => {
+		reject = (reason?: unknown) => {
 			isRejected = true;
 			rej(reason);
 		};

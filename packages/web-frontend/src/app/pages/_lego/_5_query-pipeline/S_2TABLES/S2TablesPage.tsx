@@ -4,6 +4,7 @@ import { col } from '@framework/lego/helpers/col';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
+import type { GetProductsParams } from '@app/pages/_lego/_shared/api/ProductsService';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { PageLayout } from '../_framework/PageLayout';
@@ -47,9 +48,9 @@ const columns = [
 ];
 
 const recentService = {
-	getProducts: async (params?: any) => {
+	getProducts: async (params?: GetProductsParams) => {
 		const result = await productsService.getProducts(params);
-		const sortedItems = [...result.items].sort(
+		const sortedItems = [...(result.items || [])].sort(
 			(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
 		const pageSize = params?.pageSize ?? 5;

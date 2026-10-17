@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import type { ValidationIssue } from 'flow-engine/validation/ValidationTypes';
+import type { ValidationIssue, ValidationResult } from 'flow-engine/validation/ValidationTypes';
 
 import type { ConstantNodeData } from './nodes/ConstantNode';
 import type { FlowDefinition, FlowStep, VariableType } from './types/flow-engine.types';
@@ -92,5 +92,5 @@ export interface FlowEditorState {
 	error: string | null;
 
 	// Validation
-	validationResult: any | null;
+	validationResult: ValidationResult | null;
 }

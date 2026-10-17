@@ -4,6 +4,7 @@ import { col } from '@framework/lego/helpers/col';
 import type { Product } from '@shared/api/products.contract';
 import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from '@shared/api/products.contract';
 
+import type { GetProductsParams } from '@app/pages/_lego/_shared/api/ProductsService';
 import { productsService } from '@app/pages/_lego/_shared/api/ProductsService';
 
 import { PageLayout } from '../_framework/PageEventContext';
@@ -41,12 +42,12 @@ const columns = [
 ];
 
 const featuredService = {
-	getProducts: async (params?: any) => {
+	getProducts: async (params?: GetProductsParams) => {
 		const result = await productsService.getProducts(params);
 		return {
 			...result,
-			items: result.items.filter(p => p.featured),
-			totalCount: result.items.filter(p => p.featured).length,
+			items: (result.items || []).filter(p => p.featured),
+			totalCount: (result.items || []).filter(p => p.featured).length,
 		};
 	},
 };

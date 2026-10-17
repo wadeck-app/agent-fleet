@@ -85,7 +85,7 @@ test.describe('Books Page - Partial Update', () => {
 		await booksPage.verifyNoErrorMessage('Book was modified by another user');
 	});
 
-	test('should validate ISBN uniqueness during partial update', async ({ page }) => {
+	test('should validate ISBN uniqueness during partial update', async () => {
 		// Use fixed ISBNs for this test
 		const isbn1 = '978-6666666666';
 		const isbn2 = '978-7777777777';

@@ -7,7 +7,6 @@ const { spawn, exec } = require('node:child_process');
 const { writeFileSync } = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
-const { performance } = require('node:perf_hooks');
 const { mkdirSync } = require('node:fs');
 const { promisify } = require('node:util');
 
@@ -43,7 +42,7 @@ async function killProcessTree(proc) {
 				// Process might already be dead
 			}
 		}
-	} catch (error) {
+	} catch {
 		// Process might already be dead, that's okay
 	}
 }

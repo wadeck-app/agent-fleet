@@ -17,6 +17,7 @@ import { WebSocket } from 'ws';
 
 import type { DaemonToWorker, ExecutionState } from '../ipc/Protocol';
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
+import { observeFor, waitUntil } from '../test-utils/WaitHelpers';
 
 const FLOW_YAML = `\
 id: registered-worker-flow
@@ -57,11 +58,10 @@ beforeEach(async () => {
 
 /** Waits for a file the daemon writes when it becomes reachable. */
 async function waitForFile(path: string): Promise<void> {
-	for (let attempt = 0; attempt < 200; attempt++) {
-		if (existsSync(path)) return;
-		await new Promise(resolve => setTimeout(resolve, 20));
-	}
-	throw new Error(`the daemon never wrote "${path}", so it never became reachable`);
+	await waitUntil(() => existsSync(path), {
+		timeoutMs: 4_000,
+		failureMessage: `the daemon never wrote "${path}", so it never became reachable`,
+	});
 }
 
 afterEach(async () => {
@@ -74,14 +74,12 @@ afterEach(async () => {
 /** Reads the port the daemon published, exactly as a worker does. */
 async function workerUrl(): Promise<string> {
 	const portFile = join(ctx.daemonDir, 'worker.port');
-	for (let attempt = 0; attempt < 100; attempt++) {
-		if (existsSync(portFile)) {
-			const { port } = JSON.parse(readFileSync(portFile, 'utf8')) as { port: number };
-			return `ws://127.0.0.1:${String(port)}`;
-		}
-		await new Promise(resolve => setTimeout(resolve, 20));
-	}
-	throw new Error('the daemon never published a worker port');
+	await waitUntil(() => existsSync(portFile), {
+		timeoutMs: 2_000,
+		failureMessage: 'the daemon never published a worker port',
+	});
+	const { port } = JSON.parse(readFileSync(portFile, 'utf8')) as { port: number };
+	return `ws://127.0.0.1:${String(port)}`;
 }
 
 /**
@@ -268,18 +266,21 @@ async function connectVanishingWorker(options: { reportStarted: boolean }): Prom
 		const message = JSON.parse(data.toString()) as DaemonToWorker;
 		if (message.type !== 'assign') return;
 		assigned.push(message.stepId);
+		// Drops the connection holding the step, exactly as closing a terminal would.
 		if (options.reportStarted) {
+			// Only once the report has been flushed to the socket, so the daemon still sees it first.
 			ws.send(
 				JSON.stringify({
 					type: 'step_started',
 					assignmentId: message.assignmentId,
 					executionId: message.executionContext.executionId,
 					stepId: message.stepId,
-				})
+				}),
+				() => ws.terminate()
 			);
+		} else {
+			setImmediate(() => ws.terminate());
 		}
-		// Drops the connection holding the step, exactly as closing a terminal would.
-		setTimeout(() => ws.terminate(), 50);
 	});
 
 	ws.send(
@@ -351,7 +352,7 @@ describe('a registered worker serving a project it never declared', () => {
 		);
 
 		// Long enough for a dispatch to have happened had one been going to.
-		await new Promise(resolve => setTimeout(resolve, 1_500));
+		await observeFor(1_500);
 
 		expect(assigned).toEqual([]);
 		expect(executionId).toBeTruthy();

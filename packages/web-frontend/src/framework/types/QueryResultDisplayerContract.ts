@@ -127,10 +127,9 @@ export interface QueryResultDisplayerProps<T> {
 			query: string;
 			isEmpty: boolean;
 		};
-		filter?: {
-			value: string | null;
-			options: string[];
-		};
+		// State of whichever filter feature was passed to Data2: category filters expose
+		// `{ value, options }` but domain filters (tasks, interventions) have their own shape.
+		filter?: unknown;
 		selection?: {
 			selectedIds: Set<string>;
 			count: number;

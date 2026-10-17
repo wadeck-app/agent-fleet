@@ -42,6 +42,17 @@ import { type BaseListQueryMutable } from '@shared/common/api-helpers';
 export type QueryFiller = (query: BaseListQueryMutable) => void;
 
 /**
+ * Type of one entry in a feature's `actions` record.
+ *
+ * Each feature declares its own action signatures (`setPage(page: number)`, `toggle(id: string)`...),
+ * and all of them must stay assignable to the generic record used by the composition layer.
+ * Method-style declaration makes TypeScript compare parameters bivariantly, which is what
+ * lets `(page: number) => void` fit here without resorting to `any`. This is the same
+ * technique React uses for its own `EventHandler` type.
+ */
+export type FeatureAction = { bivarianceHack(...args: unknown[]): unknown }['bivarianceHack'];
+
+/**
  * Base contract that ALL feature hooks must implement.
  * Ensures composability and predictable behavior across the entire headless architecture.
  *
@@ -77,7 +88,7 @@ export interface FeatureContract<TState> {
 	 * }), []);
 	 * ```
 	 */
-	actions: Record<string, (...args: any[]) => void>;
+	actions: Record<string, FeatureAction>;
 
 	/**
 	 * Fill the backend query schema with this feature's state.

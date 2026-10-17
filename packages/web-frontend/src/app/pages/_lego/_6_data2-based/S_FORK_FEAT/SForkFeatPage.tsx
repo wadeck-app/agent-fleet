@@ -105,7 +105,7 @@ export function SForkFeatPage() {
 				};
 			}
 
-			const filteredItems = response.items.filter(item => bookmarks.has(item.id));
+			const filteredItems = (response.items || []).filter(item => bookmarks.has(item.id));
 			return {
 				items: filteredItems,
 				pagination: response.pagination

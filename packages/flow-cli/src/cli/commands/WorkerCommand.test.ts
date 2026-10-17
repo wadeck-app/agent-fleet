@@ -10,7 +10,6 @@ import { registerWorkerCommand } from './WorkerCommand';
 // Mutable so individual tests (the opencode-env-defaults ones) can hand runWorker a config with
 // an `opencode` section, while the startup-banner/list/update tests keep the plain default.
 const hoistedState = vi.hoisted(() => ({
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	loadForDaemonConfig: { worker: { wsPort: null }, queue: {}, limits: {}, workspace: {}, opencode: {} } as any,
 }));
 
@@ -61,7 +60,7 @@ vi.mock('../../worker/WorkerLaunch', () => ({
 	probeShellCapabilities: () => ['bash', 'cmd'],
 	reconnectDelayMs: () => 500,
 	resolveDaemonWsUrl: () => 'ws://127.0.0.1:9999',
-	scheduleReconnectTimer: () => setTimeout(() => {}, 0),
+	scheduleReconnectTimer: () => undefined as unknown as NodeJS.Timeout,
 	withFreshToken: (registration: unknown) => registration,
 }));
 

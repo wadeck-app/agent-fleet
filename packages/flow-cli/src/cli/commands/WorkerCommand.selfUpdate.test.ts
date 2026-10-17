@@ -5,14 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Hoisted state shared between the mocked modules and the tests below.
 // ---------------------------------------------------------------------------
 const hoisted = vi.hoisted(() => ({
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	wsInstances: [] as any[],
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	loadForDaemonConfig: { worker: { wsPort: null }, queue: {}, limits: {}, workspace: {}, opencode: {} } as any,
 	updateConfig: { channel: 'stable', checkIntervalMs: 1000, disabled: false },
 	cache: { lastCheckedAt: 0, latestVersion: null as string | null },
 	intervalCallbacks: [] as (() => void)[],
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	spawnedChildren: [] as any[],
 }));
 
@@ -63,7 +60,7 @@ vi.mock('../../worker/WorkerLaunch', () => ({
 	probeShellCapabilities: () => ['bash', 'cmd'],
 	reconnectDelayMs: () => 500,
 	resolveDaemonWsUrl: () => 'ws://127.0.0.1:9999',
-	scheduleReconnectTimer: () => setTimeout(() => {}, 0),
+	scheduleReconnectTimer: () => undefined as unknown as NodeJS.Timeout,
 	withFreshToken: (registration: unknown) => registration,
 }));
 
@@ -158,12 +155,10 @@ const realClearInterval = global.clearInterval;
 
 function installManualInterval(): void {
 	hoisted.intervalCallbacks.length = 0;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	(global as any).setInterval = (fn: () => void): any => {
 		hoisted.intervalCallbacks.push(fn);
 		return { unref: () => {}, [Symbol.toPrimitive]: () => 0 };
 	};
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	(global as any).clearInterval = (): void => {};
 }
 

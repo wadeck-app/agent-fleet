@@ -9,7 +9,7 @@ import { Card } from '@framework/components/primitives/Card';
 import type { ColumnDef } from '@framework/lego/types/ColTypes';
 import type { DetailPanelFeature } from '@framework/lego/types/FeatureTypes';
 import { resolveFeature } from '@framework/lego/types/FeatureTypes';
-import type { Product } from '@shared/api/products.contract';
+import type { CreateProduct, Product } from '@shared/api/products.contract';
 import { Check, Edit, Minus, Save, X } from 'lucide-react';
 
 import { useProductDomain } from './ProductDomainContext';
@@ -78,8 +78,7 @@ export function ViewDetailPanel<T extends Product = Product>({ columns, features
 	 */
 	const handleSave = async () => {
 		if (selectedItem && editData) {
-			// violations-suppress: ts/no-unsafe-type-cast editData is Record<string,unknown>; context.actions.update expects the domain type at lego-framework boundary
-			await context.actions.update(selectedItem.id, editData as any);
+			await context.actions.update(selectedItem.id, editData as CreateProduct & { version: number });
 			setIsEditing(false);
 			setEditData({});
 		}
@@ -88,7 +87,7 @@ export function ViewDetailPanel<T extends Product = Product>({ columns, features
 	/**
 	 * Update field value
 	 */
-	const updateField = (key: keyof T, value: any) => {
+	const updateField = (key: keyof T, value: unknown) => {
 		setEditData(prev => ({ ...prev, [key]: value }));
 	};
 

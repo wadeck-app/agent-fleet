@@ -5,6 +5,18 @@ import * as path from 'node:path';
 import { CommandHandler, MAX_REDISPATCHES } from './CommandHandler';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy';
 
+// Every handler a test builds, so afterEach can cancel its pending demand re-check. That timer is a
+// real one (unref'd, 250ms) and, left running, fires during a LATER test -- after `mockReset` has
+// wiped the registry mocks -- and throws from inside a timer, which vitest reports as an unhandled error.
+const startedHandlers: CommandHandler[] = [];
+
+class TrackedCommandHandler extends CommandHandler {
+	constructor(...args: ConstructorParameters<typeof CommandHandler>) {
+		super(...args);
+		startedHandlers.push(this);
+	}
+}
+
 const { mockAllocate, mockRelease, hoistedState } = vi.hoisted(() => ({
 	mockAllocate: vi.fn().mockResolvedValue({ path: '/tmp/test-workspace', id: 'ws-test-id' }),
 	mockRelease: vi.fn().mockResolvedValue(undefined),
@@ -215,12 +227,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	// Must run before the mocks are reset/restored, see startedHandlers.
+	for (const handler of startedHandlers.splice(0)) handler.stopBackgroundWork();
 	vi.restoreAllMocks();
 	fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
 function makeHandler(workerPool = createMockWorkerPool()): CommandHandler {
-	return new CommandHandler(
+	return new TrackedCommandHandler(
 		daemonDir,
 		workerPool as never,
 		workerPool as never,
@@ -351,7 +365,11 @@ describe('handleRun path restriction', () => {
 		const flowFile = path.join(outsideDir, 'test.yml');
 		fs.writeFileSync(flowFile, 'id: test\n');
 
-		const handler = new CommandHandler(tmpDir, createMockWorkerPool() as never, createMockWorkerPool() as never);
+		const handler = new TrackedCommandHandler(
+			tmpDir,
+			createMockWorkerPool() as never,
+			createMockWorkerPool() as never
+		);
 		const result = await handler.handleRun({
 			type: 'run',
 			flowFile,
@@ -371,7 +389,7 @@ describe('handleRun path restriction', () => {
 		const flowFile = path.join(tmpDir, 'allowed.yml');
 		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			tmpDir,
 			createMockWorkerPool() as never,
 			createMockWorkerPool() as never,
@@ -397,7 +415,7 @@ describe('handleRun path restriction', () => {
 		const flowFile = path.join(outsideDir, 'test.yml');
 		fs.writeFileSync(flowFile, 'invalid yaml: [');
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			tmpDir,
 			createMockWorkerPool() as never,
 			createMockWorkerPool() as never,
@@ -450,7 +468,7 @@ describe('CommandHandler — scheduling via FlowScheduler', () => {
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -509,7 +527,7 @@ steps:
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -560,7 +578,7 @@ steps:
 		workerPool.getIdle.mockImplementation(() => (dispatchCount++ < 1 ? {} : undefined));
 		workerPool.send.mockReturnValue(true);
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -590,7 +608,7 @@ steps:
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -660,7 +678,7 @@ steps:
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -710,7 +728,7 @@ steps:
 			.mockReturnValueOnce(false) // first attempt: transport failure
 			.mockReturnValue(true); // subsequent: success
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -774,7 +792,7 @@ steps:
 		globalProvider: { allocate: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn> } | undefined,
 		resolveWorkspaceProvider: ((config: unknown) => Promise<unknown>) | undefined
 	): CommandHandler {
-		return new CommandHandler(
+		return new TrackedCommandHandler(
 			daemonDir,
 			createMockWorkerPool() as never,
 			createMockWorkerPool() as never,
@@ -868,7 +886,7 @@ describe('CommandHandler — plugin workspace provider', () => {
 		allocate: ReturnType<typeof vi.fn>;
 		release: ReturnType<typeof vi.fn>;
 	}): CommandHandler {
-		return new CommandHandler(
+		return new TrackedCommandHandler(
 			daemonDir,
 			createMockWorkerPool() as never,
 			createMockWorkerPool() as never,
@@ -942,10 +960,8 @@ describe('CommandHandler — plugin workspace provider', () => {
 
 		handler.onStepFailed(executionId, 's1', 'step error');
 
-		await new Promise(resolve => setTimeout(resolve, 10));
-
 		// releaseWorkspace uses console.warn when prior error exists (not process.stderr)
-		expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('release failed'));
+		await vi.waitFor(() => expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('release failed')));
 
 		warnSpy.mockRestore();
 	});
@@ -1133,7 +1149,7 @@ steps:
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -1231,7 +1247,7 @@ steps:
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -1340,7 +1356,7 @@ steps:
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -1424,7 +1440,7 @@ steps:
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -1505,7 +1521,7 @@ steps:
 		fs.writeFileSync(
 			flowFile,
 			INTERVENTION_FLOW_YAML.replace(
-				/  - id: confirm[\s\S]*$/,
+				/ {2}- id: confirm[\s\S]*$/,
 				'  - id: nested\n    name: Nested\n    type: subflow\n    flowId: other-flow\n    inputs: {}\n'
 			)
 		);
@@ -1526,7 +1542,7 @@ describe('CommandHandler — covering unmet demand (S8, D#25)', () => {
 		workerPool.listIdle.mockReturnValue([]);
 		workerPool.planProvisioning.mockReturnValue(plan);
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -1549,7 +1565,7 @@ describe('CommandHandler — covering unmet demand (S8, D#25)', () => {
 		workerPool.planProvisioning.mockReturnValue({ fork: 0 });
 		const askedSources = vi.fn();
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -1580,7 +1596,7 @@ describe('CommandHandler — covering unmet demand (S8, D#25)', () => {
 		workerPool.planProvisioning.mockReturnValue({ fork: 0 });
 		const askedSources = vi.fn();
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -1716,7 +1732,7 @@ describe('CommandHandler — covering unmet demand (S8, D#25)', () => {
 		workerPool.getIdle.mockReturnValue({} as never);
 		workerPool.send.mockReturnValue(true);
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -1746,7 +1762,7 @@ describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -1871,7 +1887,7 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 			return true;
 		});
 
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,
@@ -2041,7 +2057,7 @@ steps:
 			dispatched.push({ stepId: m.stepId, env: m.stepConfig.env });
 			return true;
 		});
-		const handler = new CommandHandler(
+		const handler = new TrackedCommandHandler(
 			daemonDir,
 			workerPool as never,
 			workerPool as never,

@@ -19,9 +19,35 @@ import {
 } from '@framework/utils/table/ColumnConfig';
 
 /**
- * Configuration for useCrudPage hook
+ * Query parameters sent to the data hook (and reused to reload items)
  */
-export interface CrudPageConfig<TItem extends { id: string; version: number }> {
+export interface CrudQueryParams {
+	page: number;
+	pageSize: number;
+	sortBy?: string;
+	sortOrder?: string;
+	search?: string;
+}
+
+/**
+ * Parameters accepted by loadItems: the query parameters plus the cache-busting id added by useCrudPage
+ */
+export interface CrudLoadParams extends CrudQueryParams {
+	cacheId?: number;
+}
+
+/**
+ * Configuration for useCrudPage hook
+ *
+ * @typeParam TItem - Entity handled by the page
+ * @typeParam TFormData - Form payload; sent as-is on create and with the current `version` added on update
+ * @typeParam TBulkDeleteResult - Value resolved by the data hook's bulk delete
+ */
+export interface CrudPageConfig<
+	TItem extends { id: string; version: number },
+	TFormData extends object,
+	TBulkDeleteResult,
+> {
 	/**
 	 * Storage identifier for persisting table state (pagination, sorting, columns)
 	 */
@@ -56,14 +82,16 @@ export interface CrudPageConfig<TItem extends { id: string; version: number }> {
 			totalPages: number;
 			total: number;
 		} | null;
-		createItem: (data: any) => Promise<TItem>;
-		updateItem: (id: string, data: any) => Promise<TItem>;
+		createItem: (data: TFormData) => Promise<TItem>;
+		// NoInfer: TFormData is the create payload; the update payload must not drive the inference (it also carries `version`)
+		updateItem: (id: string, data: NoInfer<TFormData> & { version: number }) => Promise<TItem>;
 		deleteItem: (id: string) => Promise<void>;
-		bulkDeleteItems: (ids: string[]) => Promise<any>;
-		refreshItem: (id: string) => Promise<any>;
+		bulkDeleteItems: (ids: string[]) => Promise<TBulkDeleteResult>;
+		// The resolved value is not used by useCrudPage
+		refreshItem: (id: string) => Promise<unknown>;
 		clearError: () => void;
 		totalCount: number;
-		loadItems: (params: any) => Promise<void>;
+		loadItems: (params: CrudLoadParams) => Promise<void>;
 	};
 
 	/**
@@ -91,7 +119,11 @@ export interface CrudPageConfig<TItem extends { id: string; version: number }> {
 /**
  * Return type for useCrudPage hook
  */
-export interface CrudPageState<TItem extends { id: string; version: number }> {
+export interface CrudPageState<
+	TItem extends { id: string; version: number },
+	TFormData extends object,
+	TBulkDeleteResult,
+> {
 	// Data & loading
 	items: TItem[];
 	loading: boolean;
@@ -181,18 +213,18 @@ export interface CrudPageState<TItem extends { id: string; version: number }> {
 		handleEdit: (item: TItem) => void;
 		handleDelete: (id: string) => Promise<void>;
 		handleBulkDelete: () => void;
-		handleSubmit: (data: any) => Promise<void>;
+		handleSubmit: (data: TFormData) => Promise<void>;
 		handleRefresh: () => Promise<void>;
 		handleCloseDialog: () => void;
 	};
 
 	// Data operations
 	operations: {
-		createItem: (data: any) => Promise<TItem>;
-		updateItem: (id: string, data: any) => Promise<TItem>;
+		createItem: (data: TFormData) => Promise<TItem>;
+		updateItem: (id: string, data: TFormData & { version: number }) => Promise<TItem>;
 		deleteItem: (id: string) => Promise<void>;
-		bulkDeleteItems: (ids: string[]) => Promise<void>;
-		loadItems: (params: any) => Promise<void>;
+		bulkDeleteItems: (ids: string[]) => Promise<TBulkDeleteResult>;
+		loadItems: (params: CrudQueryParams) => Promise<void>;
 	};
 
 	// Utility
@@ -256,9 +288,9 @@ export interface CrudPageState<TItem extends { id: string; version: number }> {
  * );
  * ```
  */
-export function useCrudPage<TItem extends { id: string; version: number }>(
-	config: CrudPageConfig<TItem>
-): CrudPageState<TItem> {
+export function useCrudPage<TItem extends { id: string; version: number }, TFormData extends object, TBulkDeleteResult>(
+	config: CrudPageConfig<TItem, TFormData, TBulkDeleteResult>
+): CrudPageState<TItem, TFormData, TBulkDeleteResult> {
 	const { id, mode } = useParams<{ id?: string; mode?: string }>();
 	const navigate = useNavigate();
 
@@ -355,7 +387,7 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 	// Add comment above the target line, not at the end
 	// Wrap loadItems to increment cacheId and pass it to backend
 	const loadItemsWithCache = useCallback(
-		async (params: any) => {
+		async (params: CrudQueryParams) => {
 			// Increment cacheId first
 			cache.actions.refresh();
 			// Pass cacheId to backend for cache busting and logging
@@ -452,7 +484,7 @@ export function useCrudPage<TItem extends { id: string; version: number }>(
 		setShowBulkDeleteDialog(true);
 	};
 
-	const handleSubmit = async (data: any) => {
+	const handleSubmit = async (data: TFormData) => {
 		const isEditing = !!editingItem;
 		if (editingItem) {
 			// Add comment above the target line, not at the end
