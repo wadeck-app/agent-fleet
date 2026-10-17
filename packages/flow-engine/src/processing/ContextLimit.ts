@@ -110,9 +110,9 @@ const HAIKU_5_5_MODEL_ID = 'claude-haiku-5-5';
  * HAIKU_MODEL`, honoured by the real CLI, not by flow-engine's own `MODEL_ALIASES` table --
  * see `ModelAliases.ts`, which deliberately leaves `claude` unmapped). Without reading that
  * override, this warning would never fire for the common case of a step just writing
- * `model: haiku`. Absent an override, "haiku" is assumed to resolve to Haiku 5.5 -- Claude
- * Code's own current default for that family name as of this writing; this is a stated
- * assumption, not something flow-engine can verify without calling the CLI itself.
+ * `model: haiku`. Absent an override the alias is NOT assumed to mean 5.5: a real
+ * `claude --model haiku` on Bedrock (Claude Code 2.1.302) resolved to `claude-haiku-4-5`, so
+ * warning on the bare alias would be a false positive on every haiku step.
  */
 export function haikuContextLimitWarning(params: {
 	provider: string;
@@ -120,8 +120,10 @@ export function haikuContextLimitWarning(params: {
 	contextLimit: number | undefined;
 	stepEnv: Record<string, string> | undefined;
 	claudeEnv: Record<string, string> | undefined;
+	/** Where the CLI will also look for the alias override. Defaults to this process's environment. */
+	processEnv?: NodeJS.ProcessEnv;
 }): string | undefined {
-	const { provider, model, contextLimit, stepEnv, claudeEnv } = params;
+	const { provider, model, contextLimit, stepEnv, claudeEnv, processEnv = process.env } = params;
 	if (provider !== 'claude' || model === undefined || contextLimit !== undefined) return undefined;
 
 	const normalized = model.trim().toLowerCase();
@@ -129,8 +131,13 @@ export function haikuContextLimitWarning(params: {
 	if (normalized === HAIKU_5_5_MODEL_ID) {
 		resolvesToHaiku55 = true;
 	} else if (normalized === 'haiku') {
-		const override = stepEnv?.['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? claudeEnv?.['ANTHROPIC_DEFAULT_HAIKU_MODEL'];
-		resolvesToHaiku55 = override === undefined || override.trim() === HAIKU_5_5_MODEL_ID;
+		const override =
+			stepEnv?.['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ??
+			claudeEnv?.['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ??
+			processEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'];
+		// Only an explicit override counts: with none, the CLI picks its own default for the alias,
+		// which depends on its version and provider and cannot be known from here.
+		resolvesToHaiku55 = override?.trim() === HAIKU_5_5_MODEL_ID;
 	} else {
 		resolvesToHaiku55 = false;
 	}

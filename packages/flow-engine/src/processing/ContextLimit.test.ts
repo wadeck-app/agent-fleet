@@ -154,15 +154,32 @@ describe('haikuContextLimitWarning', () => {
 		expect(warning).toContain('100K');
 	});
 
-	it('warns when the model is the bare "haiku" alias (resolves to claude-haiku-5-5 by default) and no contextLimit is set', () => {
+	// A real `claude --model haiku` on Bedrock (Claude Code 2.1.302) resolved to claude-haiku-4-5, so the
+	// bare alias cannot be assumed to mean 5.5: warning would be a false positive on every haiku step.
+	it('does not warn for the bare "haiku" alias when nothing says it resolves to 5.5', () => {
 		const warning = haikuContextLimitWarning({
 			provider: 'claude',
 			model: 'haiku',
 			contextLimit: undefined,
 			stepEnv: undefined,
 			claudeEnv: undefined,
+			processEnv: {},
 		});
-		expect(warning).toBeDefined();
+		expect(warning).toBeUndefined();
+	});
+
+	it('warns for the bare "haiku" alias when ANTHROPIC_DEFAULT_HAIKU_MODEL says claude-haiku-5-5, from step env, claude env or process env', () => {
+		const base = { provider: 'claude', model: 'haiku', contextLimit: undefined } as const;
+		const override = { ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-haiku-5-5' };
+		expect(
+			haikuContextLimitWarning({ ...base, stepEnv: override, claudeEnv: undefined, processEnv: {} })
+		).toBeDefined();
+		expect(
+			haikuContextLimitWarning({ ...base, stepEnv: undefined, claudeEnv: override, processEnv: {} })
+		).toBeDefined();
+		expect(
+			haikuContextLimitWarning({ ...base, stepEnv: undefined, claudeEnv: undefined, processEnv: override })
+		).toBeDefined();
 	});
 
 	it('does not warn when ANTHROPIC_DEFAULT_HAIKU_MODEL overrides the alias to a different model', () => {

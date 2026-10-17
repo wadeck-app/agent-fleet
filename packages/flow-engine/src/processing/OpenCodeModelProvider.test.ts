@@ -1010,6 +1010,51 @@ describe('OpenCodeModelProvider', () => {
 			await expect(resultPromise).resolves.toBeDefined();
 		});
 
+		// Numbers from a real `opencode run --format json` (1.19.3, Bedrock Haiku 4.5, two bash calls):
+		// step_finish values are per turn, NOT cumulative -- the final "stop" turn carried input 7 /
+		// output 4 and cost 0.0014, while the tool-calls turn before it carried 11179 tokens and 0.0157.
+		// Counting only "stop" reported 0.0014 for a run that cost 0.0172.
+		it('counts the tokens and cost of tool-calls turns as well as the final stop turn', async () => {
+			const events: StreamJsonEvent[] = [];
+			const resultPromise = provider.launchBackground(makeBaseOptions({ onStreamEvent: e => events.push(e) }));
+
+			setImmediate(() => {
+				const sessionID = 'ses_real_cost';
+				const finish = (reason: string, tokens: unknown, cost: number): string =>
+					JSON.stringify({
+						type: 'step_finish',
+						timestamp: 1,
+						sessionID,
+						part: { type: 'step-finish', reason, messageID: 'm', sessionID, tokens, cost },
+					});
+				emitLines([
+					JSON.stringify({ type: 'step_start', timestamp: 1, sessionID, part: { type: 'step-start' } }),
+					finish(
+						'tool-calls',
+						{ total: 11179, input: 3, output: 88, reasoning: 0, cache: { write: 11088, read: 0 } },
+						0.0157333
+					),
+					JSON.stringify({ type: 'step_start', timestamp: 2, sessionID, part: { type: 'step-start' } }),
+					finish(
+						'stop',
+						{ total: 11246, input: 7, output: 4, reasoning: 0, cache: { write: 147, read: 11088 } },
+						0.001451505
+					),
+				]);
+				(mockProcess as EventEmitter).emit('exit', 0);
+			});
+
+			await resultPromise;
+
+			const data = events.find(e => e.type === 'result')?.data as Record<string, any>;
+			expect(data['cost_usd']).toBeCloseTo(0.0157333 + 0.001451505, 9);
+			const usage = Object.values(data['modelUsage'] as Record<string, any>)[0];
+			expect(usage.inputTokens).toBe(10);
+			expect(usage.outputTokens).toBe(92);
+			expect(usage.cacheWriteTokens).toBe(11088 + 147);
+			expect(usage.cacheReadTokens).toBe(11088);
+		});
+
 		it('does not count cost from step_finish with reason other than stop', async () => {
 			const events: StreamJsonEvent[] = [];
 			const resultPromise = provider.launchBackground(makeBaseOptions({ onStreamEvent: e => events.push(e) }));
