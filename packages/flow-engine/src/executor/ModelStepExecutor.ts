@@ -3,6 +3,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+import {
+	DEFAULT_COMPACT_HOOK_TIMEOUT_SECONDS,
+	extractCompactEvent,
+	runCompactHook,
+	validateOnCompact,
+} from '../processing/CompactHook';
 import { buildContextLimitEnv, haikuContextLimitWarning, validateContextLimit } from '../processing/ContextLimit';
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import type { OutputExtractor } from '../processing/OutputExtractor';
@@ -125,6 +131,17 @@ export async function executeModelStep(
 			return stepTrace;
 		}
 	}
+	if (step.onCompact !== undefined) {
+		try {
+			validateOnCompact({ onCompact: step.onCompact, provider: actualProvider });
+		} catch (err) {
+			stepTrace.error = normalizeError(err).message;
+			return stepTrace;
+		}
+	}
+	// Awaited before the step returns so no hook command outlives its step; each is bounded by its
+	// own timeout. Never awaited mid-step, so a slow hook cannot delay the next model call.
+	const pendingCompactHooks: Promise<void>[] = [];
 	const haikuWarning = haikuContextLimitWarning({
 		provider: actualProvider,
 		model: effectiveModel,
@@ -232,6 +249,27 @@ export async function executeModelStep(
 			streamJson && !config.interactive
 				? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
 						onActivity?.();
+						const onCompact = step.onCompact;
+						if (onCompact !== undefined) {
+							const compactEvent = extractCompactEvent(event);
+							if (compactEvent !== undefined) {
+								pendingCompactHooks.push(
+									runCompactHook({
+										command: onCompact.command,
+										timeoutMs: (onCompact.timeout ?? DEFAULT_COMPACT_HOOK_TIMEOUT_SECONDS) * 1000,
+										cwd: workspacePath,
+										env: stringEnv({
+											...process.env,
+											...(config.claudeEnv ?? {}),
+											...(step.env ?? {}),
+										}),
+										event: compactEvent,
+										context: { stepId: step.id, taskId: context.taskId },
+										onWarning: message => process.stderr.write(`[warn] ${message}\n`),
+									})
+								);
+							}
+						}
 						if (event.type === 'result' && event.data.result !== undefined && event.data.result !== null) {
 							finalResultText = event.data.result;
 						}
@@ -419,5 +457,12 @@ export async function executeModelStep(
 		stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
 		stepTrace.error = normalizeError(error).message;
 		return stepTrace;
+	} finally {
+		await Promise.allSettled(pendingCompactHooks);
 	}
+}
+
+/** `process.env` values may be undefined; a child process environment may not. */
+function stringEnv(env: Record<string, string | undefined>): Record<string, string> {
+	return Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
 }

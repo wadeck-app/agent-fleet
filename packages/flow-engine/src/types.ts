@@ -709,6 +709,22 @@ export interface ModelFlowStep extends BaseFlowStep {
 	contextLimit?: number;
 
 	/**
+	 * Shell command run each time Claude compacts the context (success, failure, or the
+	 * auto-compact thrashing breaker), so a flow can log or react to it. Claude provider only:
+	 * the events come from Claude Code's stream-json.
+	 *
+	 * Receives `{ event: 'success'|'failed'|'thrashing', trigger, pre_tokens, post_tokens,
+	 * duration_ms, error, stepId, taskId }` as JSON on stdin, and `FLOW_COMPACT_EVENT` /
+	 * `FLOW_COMPACT_TRIGGER` / `FLOW_COMPACT_PRE_TOKENS` / `FLOW_COMPACT_POST_TOKENS` /
+	 * `FLOW_COMPACT_ERROR` in its environment. The compaction summary is never passed.
+	 *
+	 * Observer only: a non-zero exit or a timeout prints a warning and never fails the step,
+	 * and nothing here can block a compaction. `timeout` is in seconds (default 30).
+	 * @see ./processing/CompactHook
+	 */
+	onCompact?: { command: string; timeout?: number };
+
+	/**
 	 * Fine-grained permission overrides for providers that ask before certain actions
 	 * (currently opencode only -- ignored by other providers, which have no equivalent knob).
 	 * Omit for the provider's own default. Scoped to the step rather than project-wide

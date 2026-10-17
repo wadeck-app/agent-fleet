@@ -2,6 +2,9 @@
  * Tests for the model-step timeout mechanism (step.timeout, in minutes).
  * Uses a hand-written mock ModelProvider -- no real CLI launch, no vi.mock on a concrete provider.
  */
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ModelProvider } from '../processing/ModelProvider';
@@ -357,5 +360,77 @@ describe('ModelStepExecutor -- onActivity', () => {
 		);
 
 		expect(trace.error).toBeUndefined();
+	});
+});
+
+describe('ModelStepExecutor -- onCompact', () => {
+	function compactingProvider(): ModelProvider {
+		return {
+			launchInteractive: () => Promise.resolve({ response: 'ok', exitCode: 0 }),
+			launchBackground: options => {
+				options.onStreamEvent?.({
+					type: 'system',
+					subtype: 'compact_boundary',
+					data: {
+						compact_metadata: { trigger: 'auto', pre_tokens: 90000, post_tokens: 1000, duration_ms: 5 },
+					},
+				} as any);
+				options.onStreamEvent?.({ type: 'result', subtype: 'result', data: { result: 'done' } } as any);
+				return Promise.resolve({ stdout: 'ok', stderr: '', exitCode: 0 });
+			},
+			kill: vi.fn(),
+		};
+	}
+
+	async function runWith(step: ModelFlowStep, providerName: string): Promise<StepTrace> {
+		return executeModelStep(
+			step,
+			process.cwd(),
+			{ inputs: {}, stepOutputs: new Map(), taskId: 'task-9' } as any,
+			makeTrace(step),
+			{ interactive: false, provider: compactingProvider(), providerName, resolvedModel: 'terra' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any }
+		);
+	}
+
+	it('runs the onCompact command with the compaction details before the step ends', async () => {
+		const dir = mkdtempSync(join(tmpdir(), 'on-compact-'));
+		try {
+			const out = join(dir, 'seen.txt');
+			const script = join(dir, 'hook.cjs');
+			writeFileSync(
+				script,
+				`require('fs').writeFileSync(${JSON.stringify(out)}, process.env.FLOW_COMPACT_EVENT + ':' + process.env.FLOW_COMPACT_PRE_TOKENS);`
+			);
+			const step = makeStep({ provider: 'claude', onCompact: { command: `node "${script}"` } });
+
+			const trace = await runWith(step, 'claude');
+
+			expect(trace.error).toBeUndefined();
+			expect(readFileSync(out, 'utf8')).toBe('success:90000');
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('never fails the step when the onCompact command exits non-zero', async () => {
+		const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		const step = makeStep({ provider: 'claude', onCompact: { command: 'node -e "process.exit(5)"' } });
+
+		const trace = await runWith(step, 'claude');
+
+		expect(trace.error).toBeUndefined();
+		const written = stderrSpy.mock.calls.map(c => String(c[0])).join('');
+		expect(written).toContain('exited with code 5');
+		stderrSpy.mockRestore();
+	});
+
+	it('fails the step with an actionable error when onCompact is set on a non-claude provider', async () => {
+		const step = makeStep({ provider: 'opencode', onCompact: { command: 'echo hi' } });
+
+		const trace = await runWith(step, 'opencode');
+
+		expect(trace.error).toContain('onCompact');
+		expect(trace.error).toContain('opencode');
 	});
 });

@@ -66,6 +66,8 @@ Key fields:
 - \`model\` (string, optional) -- model identifier for the chosen provider (e.g. \`claude-3-5-haiku\`, \`anthropic/claude-3-5-sonnet\`)
 - \`provider\` (string, optional) -- AI CLI provider: \`claude\` (default) or \`opencode\`
 - \`prompt\` (string, required) -- prompt template with \`${TMPL} }}\` variable interpolation
+- \`contextLimit\` (integer >= 30000, optional, claude only) -- tokens at which Claude auto-compacts the context; approximate upper bound. Rejected with \`session.mode: compact\` or an explicit \`CLAUDE_CODE_AUTO_COMPACT_WINDOW\`
+- \`onCompact\` (\`{ command, timeout? }\`, optional, claude only) -- shell command run on each compaction (success, failed, thrashing). Gets the event as JSON on stdin and \`FLOW_COMPACT_*\` env vars. Observer only: a non-zero exit or a timeout (seconds, default 30) warns and never fails the step
 
 ### script
 
