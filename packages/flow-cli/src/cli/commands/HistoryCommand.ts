@@ -56,7 +56,7 @@ function pad(s: string, width: number): string {
 	return s.length >= width ? s.slice(0, width) : s + ' '.repeat(width - s.length);
 }
 
-function formatDuration(startedAt: string, completedAt: string | null): string {
+export function formatDuration(startedAt: string, completedAt: string | null): string {
 	if (!completedAt) return 'running';
 	const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime();
 	if (ms < 1000) return `${ms}ms`;
@@ -64,7 +64,7 @@ function formatDuration(startedAt: string, completedAt: string | null): string {
 	return `${Math.floor(ms / 60000)}m${Math.round((ms % 60000) / 1000)}s`;
 }
 
-function formatStarted(iso: string): string {
+export function formatStarted(iso: string): string {
 	return iso.replace('T', ' ').slice(0, 19);
 }
 
@@ -134,10 +134,16 @@ function renderDetailView(exec: ExecutionRecord): string {
 }
 
 /** `meta.cost` only exists on ModelStepMeta -- a script step's meta has no such field. */
-function formatModelCost(meta: StepMeta | undefined): string | undefined {
+export function formatModelCost(meta: StepMeta | undefined): string | undefined {
 	if (!meta || !('cost' in meta)) return undefined;
 	const { cost } = meta as {
-		cost: { input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number; usd: number };
+		cost: {
+			input_tokens: number;
+			output_tokens: number;
+			cache_read_tokens: number;
+			cache_write_tokens: number;
+			usd: number;
+		};
 	};
 	const cacheTokens = (cost.cache_read_tokens ?? 0) + (cost.cache_write_tokens ?? 0);
 	// Cache tokens are an ADDITIONAL volume on top of "in" tokens, not already counted there --

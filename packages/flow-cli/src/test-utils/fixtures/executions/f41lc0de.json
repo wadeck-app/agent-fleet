@@ -1,0 +1,41 @@
+{
+  "executionId": "f41lc0de",
+  "flowFile": "/project/flows/triage.yml",
+  "flowId": "factory_triage",
+  "projectRoot": "/project",
+  "status": "failed",
+  "currentSteps": [],
+  "startedAt": "2026-10-04T14:49:03.694Z",
+  "completedAt": "2026-10-04T14:49:22.772Z",
+  "steps": {
+    "announce": {
+      "status": "completed",
+      "startedAt": "2026-10-04T14:49:03.702Z",
+      "completedAt": "2026-10-04T14:49:03.741Z",
+      "meta": { "duration_ms": 39, "exit_code": 0 }
+    },
+    "classify": {
+      "status": "completed",
+      "startedAt": "2026-10-04T14:49:18.220Z",
+      "completedAt": "2026-10-04T14:49:22.716Z",
+      "meta": {
+        "duration_ms": 4496,
+        "model": "claude-haiku-4-5",
+        "session_id": "sess",
+        "session_file": "",
+        "ttft_ms": 900,
+        "cost": { "input_tokens": 120, "output_tokens": 40, "cache_read_tokens": 0, "cache_write_tokens": 0, "usd": 0.0123 }
+      }
+    },
+    "validate_type": {
+      "status": "failed",
+      "startedAt": "2026-10-04T14:49:22.721Z",
+      "completedAt": "2026-10-04T14:49:22.771Z",
+      "error": "Script exited with code 1",
+      "stdout": "START-OF-STDOUT followed by a long single-line output that gets truncated, END-OF-STDOUT",
+      "stderr": "boom: type is invalid"
+    },
+    "set_type": { "status": "pending" }
+  },
+  "lastError": "Script exited with code 1"
+}

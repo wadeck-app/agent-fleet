@@ -99,6 +99,17 @@ status:    ok -> approved   fail -> todo
 - `N: if(expr)` in DEPENDS — conditional dependency (step runs only when expr is true)
 - `err -> N  max:Mx` — `onFailure.goto` feedback loop back to step N, at most M iterations
 
+**Inspecting an execution:** `flow show <execution-id>` (id from `flow history`, unique prefix accepted) prints the run's steps with status, duration, model, cost and error. Failed steps also show the tail of stdout/stderr.
+
+```bash
+flow show a6wug7bh               # last 2000 chars of failed-step stdout/stderr
+flow show a6wug7bh --tail 500    # keep the last 500 chars
+flow show a6wug7bh --full        # no truncation
+flow show a6wug7bh --json        # raw execution record
+```
+
+An existing file path wins over an id. A truncated stream ends with `(N more chars, see <path>)` pointing at the raw `~/.config/flow/executions/<id>.json`.
+
 ### flow validate
 
 Validate a flow file against the schema and engine rules. Exits 0 on valid (warnings printed but non-fatal). Exits 1 on errors, with a list of issues.
