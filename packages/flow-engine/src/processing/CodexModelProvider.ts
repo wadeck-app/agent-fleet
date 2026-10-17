@@ -1,7 +1,8 @@
 /**
  * CodexModelProvider -- implements ModelProvider for the Codex CLI.
  *
- * Invocation: codex exec [resume <sessionId>] [message] --json [--approve-for-me] [-m model]
+ * Invocation: codex exec [resume <threadId>] [message] --json [--approve-for-me | --sandbox read-only] [-m model]
+ * Output: real codex JSONL (thread.started / item.completed / turn.completed ...), see codex-mock.mjs
  * MCP config: Same as OpenCode (OPENCODE_CONFIG_CONTENT or OPENCODE_CONFIG)
  * Env isolation: only options.env is forwarded; process.env is never inherited.
  * Prompt limit: 32KB -- throws PromptTooLargeError if exceeded.
@@ -118,27 +119,30 @@ function buildSpawnParams(
 	// Always skip git repo check -- flow can be run from any directory
 	args.push('--skip-git-repo-check');
 
+	// Codex has no per-tool allow-list -- only a sandbox level. The one case we can map
+	// faithfully is "no file writes, no shell commands": excluding both from `tools` gets
+	// `--sandbox read-only`. Any other combination (e.g. allowing bash but not write) has no
+	// Codex equivalent and is left at Codex's own default, deliberately -- a wrong guess here
+	// would be a silent under-restriction, which is worse than not restricting at all.
+	const readOnly = options.tools !== undefined && !options.tools.includes('write') && !options.tools.includes('bash');
+
 	// Approve without prompting. `--auto` does not exist in codex -- sending it exited on a
 	// usage error -- and `--approve-for-me` is the flag that does this while keeping the
 	// workspace-write sandbox. The full escape hatch is
 	// `--dangerously-bypass-approvals-and-sandbox`, deliberately not used here: it drops the
 	// sandbox too, which is more than a step asking not to be prompted has asked for.
-	if (options.skipPermissions === true) {
+	// `--approve-for-me` conflicts with `--sandbox` (codex exits 2: "cannot be used with"), and
+	// it implies workspace-write. Read-only is the stricter request, so it wins; a read-only
+	// sandbox has no writes or commands left to approve.
+	if (readOnly) {
+		args.push('--sandbox', 'read-only');
+	} else if (options.skipPermissions === true) {
 		args.push('--approve-for-me');
 	}
 
 	// -m provider/model
 	if (options.model) {
 		args.push('-m', options.model);
-	}
-
-	// Codex has no per-tool allow-list -- only a sandbox level. The one case we can map
-	// faithfully is "no file writes, no shell commands": excluding both from `tools` gets
-	// `--sandbox read-only`. Any other combination (e.g. allowing bash but not write) has no
-	// Codex equivalent and is left at Codex's own default, deliberately -- a wrong guess here
-	// would be a silent under-restriction, which is worse than not restricting at all.
-	if (options.tools !== undefined && !options.tools.includes('write') && !options.tools.includes('bash')) {
-		args.push('--sandbox', 'read-only');
 	}
 
 	// Env isolation: forward infrastructure env vars
@@ -299,11 +303,22 @@ export class CodexModelProvider implements ModelProvider {
 				let lineBuffer = '';
 				let responseText = '';
 				let capturedSessionId = '';
-				let costUsd = 0;
 				let inputTokens = 0;
 				let outputTokens = 0;
-				let firstStepStartFired = false;
+				let initFired = false;
+				const failureMessages: string[] = [];
+				const warnedUnknown = new Set<string>();
 
+				const warnUnknown = (kind: string): void => {
+					if (warnedUnknown.has(kind)) return;
+					warnedUnknown.add(kind);
+					console.warn(
+						`[CodexModelProvider] unrecognized codex event "${kind}" ignored -- the codex JSONL schema may have changed; run StepRunner.codex.integration.test with CODEX_INTEGRATION=1`
+					);
+				};
+
+				// Event schema verified against codex-cli 0.163.0 (see codex-mock.mjs and
+				// StepRunner.codex.integration.test.ts). Real codex reports no cost, so cost stays 0.
 				const processLine = (line: string): void => {
 					let raw: unknown;
 					try {
@@ -316,69 +331,87 @@ export class CodexModelProvider implements ModelProvider {
 						return;
 					}
 					const parsed = raw;
+					const eventType = parsed['type'];
 
-					const eventType = parsed['type'] as string | undefined;
-					const sessionID = parsed['sessionID'] as string | undefined;
-
-					// Capture sessionID from any event
-					if (sessionID && !capturedSessionId) {
-						capturedSessionId = sessionID;
-					}
-
-					if (eventType === 'step_start' && !firstStepStartFired) {
-						firstStepStartFired = true;
-						const initEvent: StreamJsonEvent = {
-							type: 'system',
-							subtype: 'init',
-							data: {
-								session_id: capturedSessionId,
-								model: options.model ?? 'codex',
-							},
-						};
-						options.onStreamEvent?.(initEvent);
-					} else if (eventType === 'text') {
-						const partValue = parsed['part'];
-						const part = isRecord(partValue) ? partValue : undefined;
-						const text = part?.['text'] as string | undefined;
-						if (text) {
-							responseText += text;
-							if (options.onStreamEvent) {
-								options.onStreamEvent({
-									type: 'text',
-									subtype: 'text',
-									data: { text },
-								});
+					switch (eventType) {
+						case 'thread.started': {
+							const threadId = parsed['thread_id'];
+							if (typeof threadId === 'string' && threadId && !capturedSessionId) {
+								capturedSessionId = threadId;
 							}
+							if (!initFired) {
+								initFired = true;
+								const initEvent: StreamJsonEvent = {
+									type: 'system',
+									subtype: 'init',
+									data: {
+										session_id: capturedSessionId,
+										model: options.model ?? 'codex',
+									},
+								};
+								options.onStreamEvent?.(initEvent);
+							}
+							break;
 						}
-					} else if (eventType === 'tool_use') {
-						const partValue = parsed['part'];
-						const part = isRecord(partValue) ? partValue : undefined;
-						const stateValue = part?.['state'];
-						const state = isRecord(stateValue) ? stateValue : undefined;
-						if (state && options.onStreamEvent) {
-							const toolEvent: StreamJsonEvent = {
-								type: 'tool_use',
-								subtype: 'tool_use',
-								data: {
-									tool: (part?.['tool'] as string | undefined) ?? '',
-									callID: (part?.['callID'] as string | undefined) ?? '',
-									input: state['input'],
-									output: (state['output'] as string | undefined) ?? '',
-									status: (state['status'] as string | undefined) ?? '',
-								},
-							};
-							options.onStreamEvent(toolEvent);
+						case 'turn.started':
+						case 'item.started':
+							// item.started carries no information item.completed does not repeat.
+							break;
+						case 'item.completed': {
+							const item = isRecord(parsed['item']) ? parsed['item'] : undefined;
+							const itemType = item?.['type'];
+							if (itemType === 'agent_message') {
+								const text = item?.['text'];
+								if (typeof text === 'string' && text) {
+									responseText += text;
+									options.onStreamEvent?.({ type: 'text', subtype: 'text', data: { text } });
+								}
+							} else if (itemType === 'command_execution') {
+								options.onStreamEvent?.({
+									type: 'tool_use',
+									subtype: 'tool_use',
+									data: {
+										tool: 'command_execution',
+										callID: typeof item?.['id'] === 'string' ? item['id'] : '',
+										input: { command: item?.['command'] },
+										output:
+											typeof item?.['aggregated_output'] === 'string'
+												? item['aggregated_output']
+												: '',
+										status: typeof item?.['status'] === 'string' ? item['status'] : '',
+									},
+								});
+							} else if (itemType === 'error') {
+								// Non-fatal diagnostics (e.g. ignored config settings): codex still exits 0.
+								const message = item?.['message'];
+								console.warn(
+									`[CodexModelProvider] codex reported: ${typeof message === 'string' ? message : '(no message)'}`
+								);
+							} else {
+								warnUnknown(`item.completed/${String(itemType)}`);
+							}
+							break;
 						}
-					} else if (eventType === 'step_finish') {
-						const partValue = parsed['part'];
-						const part = isRecord(partValue) ? partValue : undefined;
-						if (part?.['reason'] === 'stop') {
-							costUsd += (part['cost'] as number | undefined) ?? 0;
-							const tokensValue = part['tokens'];
-							const tokens = isRecord(tokensValue) ? tokensValue : undefined;
-							inputTokens += (tokens?.['input'] as number | undefined) ?? 0;
-							outputTokens += (tokens?.['output'] as number | undefined) ?? 0;
+						case 'turn.completed': {
+							const usage = isRecord(parsed['usage']) ? parsed['usage'] : undefined;
+							inputTokens += typeof usage?.['input_tokens'] === 'number' ? usage['input_tokens'] : 0;
+							outputTokens += typeof usage?.['output_tokens'] === 'number' ? usage['output_tokens'] : 0;
+							break;
 						}
+						case 'error': {
+							// Intermediate (e.g. "Reconnecting... 1/5"); the terminal outcome is turn.failed.
+							break;
+						}
+						case 'turn.failed': {
+							const error = isRecord(parsed['error']) ? parsed['error'] : undefined;
+							const message = error?.['message'];
+							failureMessages.push(
+								typeof message === 'string' ? message : 'codex turn failed (no message)'
+							);
+							break;
+						}
+						default:
+							warnUnknown(String(eventType));
 					}
 				};
 
@@ -413,13 +446,14 @@ export class CodexModelProvider implements ModelProvider {
 					this.currentProcess = null;
 					flushLineBuffer();
 
-					if (options.onStreamEvent && firstStepStartFired) {
+					if (options.onStreamEvent && initFired) {
 						const resultEvent: StreamJsonEvent = {
 							type: 'result',
 							subtype: 'result',
 							data: {
 								result: responseText,
-								cost_usd: costUsd,
+								// codex reports no cost
+								cost_usd: 0,
 								duration_ms: Date.now() - launchStartTime,
 								modelUsage: {
 									codex: {
@@ -432,7 +466,15 @@ export class CodexModelProvider implements ModelProvider {
 						options.onStreamEvent(resultEvent);
 					}
 
-					resolve({ stdout, stderr, exitCode: code ?? -1 });
+					// Real codex writes the failure reason only to the JSONL stream (stderr stays empty), so surface it
+					// where callers look for an actionable error.
+					const failureSuffix = failureMessages.map(m => `codex: ${m}`).join('\n');
+					const separator = stderr && !stderr.endsWith('\n') ? '\n' : '';
+					resolve({
+						stdout,
+						stderr: failureSuffix ? `${stderr}${separator}${failureSuffix}` : stderr,
+						exitCode: code ?? -1,
+					});
 				});
 				proc.on('error', reject);
 			});

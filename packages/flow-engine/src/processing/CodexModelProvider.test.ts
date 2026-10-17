@@ -154,6 +154,19 @@ describe('CodexModelProvider', () => {
 				expect(args[idx + 1]).toBe('read-only');
 			});
 
+			// Real codex rejects `--approve-for-me --sandbox ...` together (exit 2, "cannot be used with").
+			it('sends --sandbox read-only WITHOUT --approve-for-me when both are requested', async () => {
+				const resultPromise = provider.launchBackground(
+					makeBaseOptions({ tools: ['read'], skipPermissions: true })
+				);
+				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+				await resultPromise;
+
+				const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+				expect(args).toContain('--sandbox');
+				expect(args).not.toContain('--approve-for-me');
+			});
+
 			it('does not pass --sandbox when tools includes write', async () => {
 				const resultPromise = provider.launchBackground(makeBaseOptions({ tools: ['read', 'write'] }));
 				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
@@ -214,67 +227,115 @@ describe('CodexModelProvider', () => {
 			expect(result.exitCode).toBe(0);
 		});
 
-		it('parses JSONL output and emits events', async () => {
+		// Real `codex exec --json` shapes captured from codex-cli 0.163.0 (no cost field exists).
+		it('parses real codex JSONL: thread id, agent_message, command_execution, usage', async () => {
 			const onStreamEvent = vi.fn();
 			const resultPromise = provider.launchBackground(makeBaseOptions({ onStreamEvent }));
+			const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
+			const lines = [
+				{ type: 'thread.started', thread_id: '01a14a23-e936-7571-9110-f15a92322574' },
+				{
+					type: 'item.completed',
+					item: {
+						id: 'item_0',
+						type: 'error',
+						message: 'Codex is ignoring 1 unrecognized configuration setting.',
+					},
+				},
+				{ type: 'turn.started' },
+				{
+					type: 'item.started',
+					item: {
+						id: 'item_2',
+						type: 'command_execution',
+						command: 'cat f.txt',
+						aggregated_output: '',
+						exit_code: null,
+						status: 'in_progress',
+					},
+				},
+				{
+					type: 'item.completed',
+					item: {
+						id: 'item_2',
+						type: 'command_execution',
+						command: 'cat f.txt',
+						aggregated_output: 'hello-content\r\n',
+						exit_code: 0,
+						status: 'completed',
+					},
+				},
+				{ type: 'item.completed', item: { id: 'item_3', type: 'agent_message', text: 'hello-content' } },
+				{
+					type: 'turn.completed',
+					usage: {
+						input_tokens: 21405,
+						cached_input_tokens: 10583,
+						cache_write_input_tokens: 10738,
+						output_tokens: 111,
+						reasoning_output_tokens: 42,
+					},
+				},
+			];
 			setImmediate(() => {
 				const stdout = (mockProcess as unknown as Record<string, EventEmitter>)['stdout'];
-				// Emit step_start
-				stdout.emit(
-					'data',
-					Buffer.from(
-						JSON.stringify({
-							type: 'step_start',
-							timestamp: Date.now(),
-							sessionID: 'test-session',
-							part: { type: 'step-start', messageID: 'msg-1', sessionID: 'test-session' },
-						}) + '\n'
-					)
-				);
-				// Emit text
-				stdout.emit(
-					'data',
-					Buffer.from(
-						JSON.stringify({
-							type: 'text',
-							timestamp: Date.now(),
-							sessionID: 'test-session',
-							part: { type: 'text', text: 'hello' },
-						}) + '\n'
-					)
-				);
-				// Emit step_finish
-				stdout.emit(
-					'data',
-					Buffer.from(
-						JSON.stringify({
-							type: 'step_finish',
-							timestamp: Date.now(),
-							sessionID: 'test-session',
-							part: {
-								type: 'step-finish',
-								reason: 'stop',
-								messageID: 'msg-1',
-								sessionID: 'test-session',
-								tokens: { input: 10, output: 5 },
-								cost: 0.001,
-							},
-						}) + '\n'
-					)
-				);
+				stdout.emit('data', Buffer.from(lines.map(l => JSON.stringify(l)).join('\n') + '\n'));
 				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
-			await resultPromise;
+			const result = await resultPromise;
+			expect(result.stderr).toBe('');
 
-			// Check that events were emitted
-			expect(onStreamEvent).toHaveBeenCalled();
-			const calls = onStreamEvent.mock.calls;
-			// Should have: init, text, result
-			expect(calls.length).toBeGreaterThanOrEqual(2);
-			expect(calls.some((c: unknown[]) => (c[0] as Record<string, unknown>)['type'] === 'system')).toBe(true);
-			expect(calls.some((c: unknown[]) => (c[0] as Record<string, unknown>)['type'] === 'text')).toBe(true);
+			const events = onStreamEvent.mock.calls.map((c: unknown[]) => c[0] as Record<string, unknown>);
+			expect(events.map(e => e['type'])).toEqual(['system', 'tool_use', 'text', 'result']);
+			expect(events[0]['data']).toMatchObject({ session_id: '01a14a23-e936-7571-9110-f15a92322574' });
+			expect(events[1]['data']).toEqual({
+				tool: 'command_execution',
+				callID: 'item_2',
+				input: { command: 'cat f.txt' },
+				output: 'hello-content\r\n',
+				status: 'completed',
+			});
+			expect(events[2]['data']).toEqual({ text: 'hello-content' });
+			expect(events[3]['data']).toMatchObject({
+				result: 'hello-content',
+				cost_usd: 0,
+				modelUsage: { codex: { inputTokens: 21405, outputTokens: 111 } },
+			});
+			// The non-fatal config warning item is surfaced, not swallowed.
+			expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignoring 1 unrecognized configuration'));
+		});
+
+		it('puts the turn.failed message in stderr so the failure is actionable', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			setImmediate(() => {
+				const stdout = (mockProcess as unknown as Record<string, EventEmitter>)['stdout'];
+				const lines = [
+					{ type: 'thread.started', thread_id: 't-1' },
+					{ type: 'turn.started' },
+					{ type: 'error', message: 'Reconnecting... 1/5 (unexpected status 404 Not Found)' },
+					{ type: 'turn.failed', error: { message: "The model 'nope' does not exist" } },
+				];
+				stdout.emit('data', Buffer.from(lines.map(l => JSON.stringify(l)).join('\n') + '\n'));
+				(mockProcess as EventEmitter).emit('exit', 1);
+			});
+
+			const result = await resultPromise;
+			expect(result.exitCode).toBe(1);
+			expect(result.stderr).toContain("codex: The model 'nope' does not exist");
+		});
+
+		it('warns loudly on an unrecognized event type instead of silently ignoring it', async () => {
+			const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			setImmediate(() => {
+				const stdout = (mockProcess as unknown as Record<string, EventEmitter>)['stdout'];
+				stdout.emit('data', Buffer.from('{"type":"step_start"}\n'));
+				(mockProcess as EventEmitter).emit('exit', 0);
+			});
+			await resultPromise;
+			expect(warn).toHaveBeenCalledWith(expect.stringContaining('unrecognized codex event "step_start"'));
 		});
 	});
 

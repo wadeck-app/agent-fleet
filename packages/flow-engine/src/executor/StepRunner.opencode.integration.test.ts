@@ -23,7 +23,7 @@
  * See also: StepRunner.model.integration.test.ts for the Claude equivalent.
  */
 import { execSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dirname } from 'node:path';
@@ -35,6 +35,7 @@ import { CodexModelProvider } from '../processing/CodexModelProvider';
 import { OpenCodeModelProvider } from '../processing/OpenCodeModelProvider';
 import type { StreamJsonEvent } from '../processing/StreamJsonParser';
 import type { TemplateContext } from '../processing/TemplateRenderer';
+import { VersionBaseline } from '../testing/VersionBaseline';
 import type { FlowDefinition, LiveLogEntry, ModelFlowStep, ModelStepMeta, Workspace } from '../types';
 import { FlowOrchestrator } from './FlowOrchestrator';
 import { StepRunner } from './StepRunner';
@@ -62,44 +63,7 @@ function currentOpenCodeVersion(): string | null {
 	}
 }
 
-/**
- * Walks up from `startDir` to the nearest ancestor containing `.git`.
- *
- * The previous version-tracking attempt resolved its baseline path relative to something other
- * than the actual repo root, so the file was never found, every run read as "no baseline", and
- * the gate treated that as "skip forever" -- three provider flags drifted unnoticed for months.
- * Walking to the real `.git` root instead of hardcoding a relative `../../..` count survives the
- * file moving to a different nesting depth.
- */
-function findRepoRoot(startDir: string): string {
-	let dir = startDir;
-	while (!existsSync(join(dir, '.git'))) {
-		const parent = dirname(dir);
-		if (parent === dir) throw new Error(`findRepoRoot: no .git found above ${startDir}`);
-		dir = parent;
-	}
-	return dir;
-}
-
-const VERSION_FILE = join(findRepoRoot(__dirname), '.claude', 'opencode-version-tested.json');
-
-/** The version this suite last confirmed compatible, or null when never recorded / unreadable. */
-function lastTestedVersion(): string | null {
-	try {
-		const parsed = JSON.parse(readFileSync(VERSION_FILE, 'utf8'));
-		return typeof parsed['testedVersion'] === 'string' ? parsed['testedVersion'] : null;
-	} catch {
-		return null;
-	}
-}
-
-function recordTestedVersion(version: string): void {
-	mkdirSync(dirname(VERSION_FILE), { recursive: true });
-	writeFileSync(
-		VERSION_FILE,
-		JSON.stringify({ testedVersion: version, testedAt: new Date().toISOString() }, null, 2)
-	);
-}
+const baseline = new VersionBaseline('opencode', __dirname, 'OPENCODE_INTEGRATION');
 
 /**
  * Runs locally when the installed opencode version has not yet been confirmed compatible, or
@@ -107,11 +71,7 @@ function recordTestedVersion(version: string): void {
  * to a real CLI, and `ProviderFlagContract.test.ts` already covers flag drift on every commit.
  */
 function shouldRunIntegration(): boolean {
-	if (process.env['CI']) return false;
-	const current = currentOpenCodeVersion();
-	if (current === null) return false;
-	if (process.env['OPENCODE_INTEGRATION']) return true;
-	return current !== lastTestedVersion();
+	return baseline.shouldRun(currentOpenCodeVersion());
 }
 
 function runProcess(
@@ -185,7 +145,7 @@ describe.skipIf(!shouldRunIntegration())('OpenCode real vs mock compatibility', 
 				// about that scope; it is not the same depth of guarantee as the Claude suite's
 				// field-by-field mock-vs-real comparison.
 				const version = currentOpenCodeVersion();
-				if (version) recordTestedVersion(version);
+				if (version) baseline.recordTestedVersion(version);
 			}
 		},
 		INTEGRATION_TIMEOUT
@@ -843,7 +803,8 @@ describe('Flow-level feature tests (mock providers)', () => {
 				const meta = trace.meta as ModelStepMeta;
 				expect(meta).toBeDefined();
 				expect(meta.session_id.length).toBeGreaterThan(0);
-				expect(meta.cost.usd).toBeGreaterThan(0);
+				// Real codex reports tokens but no cost, so the mock reports none either.
+				expect(meta.cost.usd).toBe(0);
 			} finally {
 				if (prevMockPath === undefined) {
 					delete process.env['CODEX_MOCK_PATH'];

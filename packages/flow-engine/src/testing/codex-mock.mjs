@@ -2,151 +2,162 @@
 /**
  * Mock codex CLI for deterministic testing.
  *
- * Emits the same NDJSON format as `codex exec --json`.
- * Parses: positional args (prompt is first non-flag arg after "exec")
+ * Emits the same JSONL event schema as the real `codex exec --json` (verified against
+ * codex-cli 0.163.0 by StepRunner.codex.integration.test.ts):
+ *
+ *   {"type":"thread.started","thread_id":"<uuid>"}
+ *   {"type":"turn.started"}
+ *   {"type":"item.started"|"item.completed","item":{"id":"item_N","type":"command_execution",
+ *       "command":...,"aggregated_output":...,"exit_code":N|null,"status":"in_progress"|"completed"}}
+ *   {"type":"item.completed","item":{"id":"item_N","type":"agent_message","text":...}}
+ *   {"type":"turn.completed","usage":{input_tokens,cached_input_tokens,cache_write_input_tokens,
+ *       output_tokens,reasoning_output_tokens}}
+ *   failure: {"type":"error","message":...} then {"type":"turn.failed","error":{"message":...}}, exit 1
+ *
+ * Real codex reports NO cost: there is no cost field anywhere, so this mock has none either.
+ *
+ * Args: `codex exec [resume <threadId>] [flags] [prompt]` -- the prompt is the first positional
+ * after `exec` (after the thread id when resuming). A resumed run reuses the given thread id.
  *
  * CODEX_MOCK_RESPONSE env var overrides response text.
- * CODEX_MOCK_EXIT_CODE env var (default 0) to simulate failure.
+ * CODEX_MOCK_EXIT_CODE env var (default 0) simulates failure (real codex exits 1 on turn.failed).
  *
  * Special prompt keywords:
- *   "use_tool"  — emits tool call sequence
- *   "echo_xdg"  — includes XDG_CONFIG_HOME value in response
+ *   "use_tool"    -- emits a command_execution item (started + completed) before the answer
+ *   "echo_xdg"    -- includes XDG_CONFIG_HOME value in response
+ *   "echo_config" -- includes CODEX_CONFIG_CONTENT in response
  */
 
-// Parse args: find positional prompt after "exec" subcommand
+// Flags that consume the next argument as their value (from `codex exec --help`).
+const FLAGS_WITH_VALUE = new Set([
+	'-c',
+	'--config',
+	'--enable',
+	'--disable',
+	'-i',
+	'--image',
+	'-m',
+	'--model',
+	'--local-provider',
+	'-p',
+	'--profile',
+	'-s',
+	'--sandbox',
+	'-C',
+	'--cd',
+	'--add-dir',
+	'--thread-source',
+	'--cyber-access-program',
+	'--output-schema',
+	'--color',
+	'-o',
+	'--output-last-message',
+]);
+// Flags without a value (from `codex exec --help`).
+const BOOLEAN_FLAGS = new Set([
+	'--strict-config',
+	'--oss',
+	'--approve-for-me',
+	'--dangerously-bypass-approvals-and-sandbox',
+	'--dangerously-bypass-hook-trust',
+	'--worktree',
+	'--skip-git-repo-check',
+	'--ephemeral',
+	'--ignore-user-config',
+	'--ignore-rules',
+	'--json',
+	'-h',
+	'--help',
+	'-V',
+	'--version',
+]);
+
 const args = process.argv.slice(2);
 let prompt = '';
-let inExecSubcommand = false;
+let resumeThreadId = '';
+let inExec = false;
+let resumeSeen = false;
 for (let i = 0; i < args.length; i++) {
 	const arg = args[i];
-	if (arg === 'exec') {
-		inExecSubcommand = true;
+	if (!inExec) {
+		if (arg === 'exec') inExec = true;
 		continue;
 	}
-	if (!inExecSubcommand) continue;
-	// Skip known flags and their values
-	if (arg === '--json' || arg === '-m' || arg === '--resume') {
-		i++;
+	if (arg.startsWith('-')) {
+		if (FLAGS_WITH_VALUE.has(arg)) {
+			i++;
+		} else if (!BOOLEAN_FLAGS.has(arg)) {
+			// Real codex rejects unknown flags with a usage error (exit 2); an unknown flag here
+			// means the provider sends something the real CLI does not accept.
+			process.stderr.write(`error: unexpected argument '${arg}' found\n`);
+			process.exit(2);
+		}
 		continue;
 	}
-	if (arg.startsWith('-')) continue;
-	// First non-flag positional arg after "exec" is the prompt
+	if (arg === 'resume' && !resumeSeen && prompt === '') {
+		resumeSeen = true;
+		resumeThreadId = args[++i] ?? '';
+		continue;
+	}
 	prompt = arg;
 	break;
 }
 
 const exitCode = parseInt(process.env['CODEX_MOCK_EXIT_CODE'] ?? '0', 10);
-const sessionId = 'codex-mock-session-' + Math.random().toString(36).slice(2, 10);
-const messageId = 'msg-' + Math.random().toString(36).slice(2, 10);
+
+function uuid() {
+	const hex = () => Math.random().toString(16).slice(2, 6).padEnd(4, '0');
+	return `${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}`;
+}
+const threadId = resumeThreadId || uuid();
 
 function emit(obj) {
 	process.stdout.write(JSON.stringify(obj) + '\n');
 }
 
+emit({ type: 'thread.started', thread_id: threadId });
+emit({ type: 'turn.started' });
+
 if (exitCode !== 0) {
-	emit({
-		type: 'step_start',
-		timestamp: Date.now(),
-		sessionID: sessionId,
-		part: { type: 'step-start', messageID: messageId, sessionID: sessionId, snapshot: 'mock' },
-	});
-	emit({
-		type: 'step_finish',
-		timestamp: Date.now(),
-		sessionID: sessionId,
-		part: {
-			type: 'step-finish',
-			reason: 'error',
-			messageID: messageId,
-			sessionID: sessionId,
-			tokens: { total: 0, input: 0, output: 0, reasoning: 0, cache: { write: 0, read: 0 } },
-			cost: 0,
-		},
-	});
+	const message = 'mock codex failure (CODEX_MOCK_EXIT_CODE)';
+	emit({ type: 'error', message });
+	emit({ type: 'turn.failed', error: { message } });
 	process.exit(exitCode);
 }
 
+let itemCounter = 0;
+const nextItemId = () => `item_${itemCounter++}`;
+
 // ── use_tool scenario ──────────────────────────────────────────────────────
 if (prompt.includes('use_tool')) {
-	const callId = 'tooluse_codex_' + Math.random().toString(36).slice(2, 8);
-	const toolPartId = 'prt_' + Math.random().toString(36).slice(2, 8);
-	const toolMsgId = 'msg-' + Math.random().toString(36).slice(2, 8);
-	const step2MsgId = 'msg-' + Math.random().toString(36).slice(2, 8);
-	const now = Date.now();
-
-	// Step 1: tool call
+	const id = nextItemId();
+	const command = 'cat mock.txt';
 	emit({
-		type: 'step_start',
-		timestamp: now,
-		sessionID: sessionId,
-		part: { type: 'step-start', messageID: toolMsgId, sessionID: sessionId, snapshot: 'mock' },
+		type: 'item.started',
+		item: { id, type: 'command_execution', command, aggregated_output: '', exit_code: null, status: 'in_progress' },
 	});
 	emit({
-		type: 'tool_use',
-		timestamp: now + 10,
-		sessionID: sessionId,
-		part: {
-			type: 'tool',
-			tool: 'test_tool',
-			callID: callId,
-			state: {
-				status: 'completed',
-				input: { query: 'mock query' },
-				output: 'tool result output',
-				metadata: { truncated: false },
-				title: '',
-				time: { start: now, end: now + 5 },
-			},
-			id: toolPartId,
-			sessionID: sessionId,
-			messageID: toolMsgId,
+		type: 'item.completed',
+		item: {
+			id,
+			type: 'command_execution',
+			command,
+			aggregated_output: 'tool result output\n',
+			exit_code: 0,
+			status: 'completed',
 		},
 	});
+	emit({ type: 'item.completed', item: { id: nextItemId(), type: 'agent_message', text: 'Done with tool.' } });
 	emit({
-		type: 'step_finish',
-		timestamp: now + 20,
-		sessionID: sessionId,
-		part: {
-			type: 'step-finish',
-			reason: 'tool-calls',
-			messageID: toolMsgId,
-			sessionID: sessionId,
-			tokens: { total: 50, input: 10, output: 5, reasoning: 0, cache: { write: 35, read: 0 } },
-			cost: 0.0005,
+		type: 'turn.completed',
+		usage: {
+			input_tokens: 200,
+			cached_input_tokens: 100,
+			cache_write_input_tokens: 90,
+			output_tokens: 20,
+			reasoning_output_tokens: 10,
 		},
 	});
-
-	// Step 2: final text response
-	emit({
-		type: 'step_start',
-		timestamp: now + 30,
-		sessionID: sessionId,
-		part: { type: 'step-start', messageID: step2MsgId, sessionID: sessionId, snapshot: 'mock' },
-	});
-	emit({
-		type: 'text',
-		timestamp: now + 40,
-		sessionID: sessionId,
-		part: {
-			type: 'text',
-			text: 'Done with tool.',
-			time: { start: now + 40, end: now + 50 },
-		},
-	});
-	emit({
-		type: 'step_finish',
-		timestamp: now + 60,
-		sessionID: sessionId,
-		part: {
-			type: 'step-finish',
-			reason: 'stop',
-			messageID: step2MsgId,
-			sessionID: sessionId,
-			tokens: { total: 100, input: 10, output: 5, reasoning: 0, cache: { write: 85, read: 0 } },
-			cost: 0.001,
-		},
-	});
-
 	process.exit(0);
 }
 
@@ -164,39 +175,15 @@ if (process.env['CODEX_MOCK_RESPONSE']) {
 	responseText = `Mock codex response for: ${prompt.slice(0, 60)}`;
 }
 
-// step_start
+emit({ type: 'item.completed', item: { id: nextItemId(), type: 'agent_message', text: responseText } });
 emit({
-	type: 'step_start',
-	timestamp: Date.now(),
-	sessionID: sessionId,
-	part: { type: 'step-start', messageID: messageId, sessionID: sessionId, snapshot: 'mock' },
-});
-
-// text event
-const textStart = Date.now();
-emit({
-	type: 'text',
-	timestamp: Date.now(),
-	sessionID: sessionId,
-	part: {
-		type: 'text',
-		text: responseText,
-		time: { start: textStart, end: textStart + 50 },
-	},
-});
-
-// step_finish
-emit({
-	type: 'step_finish',
-	timestamp: Date.now(),
-	sessionID: sessionId,
-	part: {
-		type: 'step-finish',
-		reason: 'stop',
-		messageID: messageId,
-		sessionID: sessionId,
-		tokens: { total: 100, input: 10, output: 5, reasoning: 0, cache: { write: 85, read: 0 } },
-		cost: 0.001,
+	type: 'turn.completed',
+	usage: {
+		input_tokens: 100,
+		cached_input_tokens: 0,
+		cache_write_input_tokens: 90,
+		output_tokens: 5,
+		reasoning_output_tokens: 0,
 	},
 });
 

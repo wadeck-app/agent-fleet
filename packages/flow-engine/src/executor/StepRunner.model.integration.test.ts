@@ -16,35 +16,17 @@
  * fixed.
  */
 import { execSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+
+import { VersionBaseline } from '../testing/VersionBaseline';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MOCK_PATH = join(__dirname, '../testing/claude-mock.mjs');
 const INTEGRATION_TIMEOUT = 60_000;
 
-/**
- * Walks up from `startDir` to the nearest ancestor containing `.git`.
- *
- * The previous version-tracking attempt resolved its baseline path relative to something other
- * than the actual repo root, so the file was never found, every run read as "no baseline", and
- * the gate treated that as "skip forever" -- three provider flags drifted unnoticed for months.
- * Walking to the real `.git` root instead of hardcoding a relative `../../..` count survives the
- * file moving to a different nesting depth.
- */
-function findRepoRoot(startDir: string): string {
-	let dir = startDir;
-	while (!existsSync(join(dir, '.git'))) {
-		const parent = dirname(dir);
-		if (parent === dir) throw new Error(`findRepoRoot: no .git found above ${startDir}`);
-		dir = parent;
-	}
-	return dir;
-}
-
-const VERSION_FILE = join(findRepoRoot(__dirname), '.claude', 'claude-version-tested.json');
+const baseline = new VersionBaseline('claude', __dirname, 'CLAUDE_INTEGRATION');
 
 function currentClaudeVersion(): string | null {
 	try {
@@ -54,24 +36,6 @@ function currentClaudeVersion(): string | null {
 	}
 }
 
-/** The version this suite last confirmed compatible, or null when never recorded / unreadable. */
-function lastTestedVersion(): string | null {
-	try {
-		const parsed = JSON.parse(readFileSync(VERSION_FILE, 'utf8'));
-		return typeof parsed['testedVersion'] === 'string' ? parsed['testedVersion'] : null;
-	} catch {
-		return null;
-	}
-}
-
-function recordTestedVersion(version: string): void {
-	mkdirSync(dirname(VERSION_FILE), { recursive: true });
-	writeFileSync(
-		VERSION_FILE,
-		JSON.stringify({ testedVersion: version, testedAt: new Date().toISOString() }, null, 2)
-	);
-}
-
 /**
  * Runs locally when the installed Claude version has not yet been confirmed compatible, or when
  * CLAUDE_INTEGRATION=1 forces it regardless of the cache. Never in CI -- this suite calls a real
@@ -79,11 +43,7 @@ function recordTestedVersion(version: string): void {
  * instead, cheaply, by reading `--help` with no model call.
  */
 function shouldRunIntegration(): boolean {
-	if (process.env['CI']) return false;
-	const current = currentClaudeVersion();
-	if (current === null) return false;
-	if (process.env['CLAUDE_INTEGRATION']) return true;
-	return current !== lastTestedVersion();
+	return baseline.shouldRun(currentClaudeVersion());
 }
 
 function runProcess(
@@ -256,7 +216,7 @@ describe.skipIf(!shouldRunIntegration())('Claude real vs mock compatibility', ()
 			// Every assertion above passed -- only now is this version safe to cache as "compatible",
 			// so the next local run skips until the installed Claude version changes again.
 			const version = currentClaudeVersion();
-			if (version) recordTestedVersion(version);
+			if (version) baseline.recordTestedVersion(version);
 			console.log(`✓ Mock compatible with Claude ${version ?? 'unknown'}`);
 		},
 		INTEGRATION_TIMEOUT
