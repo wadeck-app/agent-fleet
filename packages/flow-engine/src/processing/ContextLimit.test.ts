@@ -182,6 +182,19 @@ describe('haikuContextLimitWarning', () => {
 		).toBeDefined();
 	});
 
+	it('warns for the Bedrock inference-profile id of Haiku 5.5, which is what the alias now resolves to', () => {
+		for (const model of ['us.anthropic.claude-haiku-5-5', 'global.anthropic.claude-haiku-5-5']) {
+			const warning = haikuContextLimitWarning({
+				provider: 'claude',
+				model,
+				contextLimit: undefined,
+				stepEnv: undefined,
+				claudeEnv: undefined,
+			});
+			expect(warning, model).toBeDefined();
+		}
+	});
+
 	it('does not warn when ANTHROPIC_DEFAULT_HAIKU_MODEL overrides the alias to a different model', () => {
 		const warning = haikuContextLimitWarning({
 			provider: 'claude',

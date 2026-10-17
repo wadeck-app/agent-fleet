@@ -25,8 +25,8 @@ export const MODEL_ALIASES: Record<string, Record<string, string>> = {
 		// The `amazon-bedrock/` prefix is required, not decoration: `opencode run -m` takes
 		// `provider/model`, and a bare model id comes back as an unexplained server error rather
 		// than "unknown model". Leaving it off made every aliased step fail this way.
-		haiku: 'amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0',
-		sonnet: 'amazon-bedrock/us.anthropic.claude-sonnet-5',
+		haiku: 'amazon-bedrock/us.anthropic.claude-haiku-5-5',
+		sonnet: 'amazon-bedrock/us.anthropic.claude-sonnet-5-5',
 		opus: 'amazon-bedrock/us.anthropic.claude-opus-5',
 		// OpenAI-on-Bedrock ids: no `us.` inference-profile prefix, unlike the Anthropic ones
 		// above -- verified live, adding it makes opencode fail with "unexpected server error".
@@ -42,14 +42,45 @@ export const MODEL_ALIASES: Record<string, Record<string, string>> = {
 };
 
 /**
+ * What `haiku` and `sonnet` mean for `claude` when nobody has chosen: the 5.5 models. The user's own
+ * `ANTHROPIC_DEFAULT_<FAMILY>_MODEL` still wins -- the name is then left for the CLI to resolve.
+ * Bedrock needs the `us.` inference-profile id, the Anthropic API the bare one. Checked against
+ * `aws bedrock list-inference-profiles` and a real `claude -p --model <id>` (canonicalModel
+ * claude-haiku-5-5 / claude-sonnet-5-5).
+ */
+const CLAUDE_DEFAULTS: Record<string, { anthropic: string; bedrock: string }> = {
+	haiku: { anthropic: 'claude-haiku-5-5', bedrock: 'us.anthropic.claude-haiku-5-5' },
+	sonnet: { anthropic: 'claude-sonnet-5-5', bedrock: 'us.anthropic.claude-sonnet-5-5' },
+};
+
+function resolveClaudeDefault(model: string, env: NodeJS.ProcessEnv): string {
+	const family = model.trim().toLowerCase();
+	const defaults = CLAUDE_DEFAULTS[family];
+	if (defaults === undefined) return model;
+
+	const override = env[`ANTHROPIC_DEFAULT_${family.toUpperCase()}_MODEL`];
+	if (override !== undefined && override.trim() !== '') return model;
+
+	const bedrock = env['CLAUDE_CODE_USE_BEDROCK'];
+	const usesBedrock = bedrock !== undefined && bedrock !== '' && bedrock !== '0' && bedrock.toLowerCase() !== 'false';
+	return usesBedrock ? defaults.bedrock : defaults.anthropic;
+}
+
+/**
  * The model id to hand the provider.
  *
  * @param provider - the provider name from the step (`claude`, `opencode`, `codex`, ...)
  * @param model - what the step asked for, or undefined to use the provider's own default
  * @returns the resolved id, or the input unchanged when it is not a family name
  */
-export function resolveModelAlias(provider: string, model: string | undefined): string | undefined {
+export function resolveModelAlias(
+	provider: string,
+	model: string | undefined,
+	env: NodeJS.ProcessEnv = process.env
+): string | undefined {
 	if (model === undefined) return undefined;
+
+	if (provider === 'claude') return resolveClaudeDefault(model, env);
 
 	const table = MODEL_ALIASES[provider];
 	if (table === undefined) return model;

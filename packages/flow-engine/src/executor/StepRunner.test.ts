@@ -1,7 +1,7 @@
 /**
  * Step Runner Tests
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
 import { OutputExtractor } from '../processing/OutputExtractor';
@@ -22,7 +22,16 @@ describe('StepRunner', () => {
 	let runner: StepRunner;
 	let testWorkspace: Workspace;
 
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	// The alias default depends on the ambient environment (Bedrock, ANTHROPIC_DEFAULT_*_MODEL), which
+	// differs between a developer machine and CI: pin it so the resolved model id is deterministic.
 	beforeEach(() => {
+		vi.stubEnv('ANTHROPIC_DEFAULT_SONNET_MODEL', '');
+		vi.stubEnv('ANTHROPIC_DEFAULT_HAIKU_MODEL', '');
+		vi.stubEnv('CLAUDE_CODE_USE_BEDROCK', '');
 		runner = new StepRunner({ interactive: false });
 		testWorkspace = {
 			id: 'test-workspace',
@@ -178,7 +187,7 @@ describe('StepRunner', () => {
 			expect(trace.stepType).toBe('model');
 			expect(trace.error).toBeUndefined();
 			expect(trace.response).toBe('function test() {}');
-			expect(trace.model).toBe('sonnet');
+			expect(trace.model).toBe('claude-sonnet-5-5');
 		});
 
 		it('should handle model step failure', async () => {
@@ -1187,7 +1196,9 @@ describe('StepRunner', () => {
 			expect(meta.cost.cache_read_tokens).toBe(3);
 			expect(meta.cost.cache_write_tokens).toBe(7);
 			expect(meta.duration_ms).toBeGreaterThanOrEqual(1);
-			expect(meta.model).toBe('haiku');
+			// The model that actually ran, not the family name: `haiku` resolves to Haiku 5.5, as the bare id
+			// (the environment is pinned above to the Anthropic API form).
+			expect(meta.model).toBe('claude-haiku-5-5');
 		});
 
 		it('model step defaults cache token counts to 0 when provider does not report them', async () => {

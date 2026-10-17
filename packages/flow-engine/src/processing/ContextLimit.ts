@@ -128,7 +128,9 @@ export function haikuContextLimitWarning(params: {
 
 	const normalized = model.trim().toLowerCase();
 	let resolvesToHaiku55: boolean;
-	if (normalized === HAIKU_5_5_MODEL_ID) {
+	// Includes Bedrock's `us.anthropic.claude-haiku-5-5` / `global.anthropic...`, which is what the
+	// bare alias resolves to there (see ModelAliases).
+	if (normalized.includes(HAIKU_5_5_MODEL_ID)) {
 		resolvesToHaiku55 = true;
 	} else if (normalized === 'haiku') {
 		const override =

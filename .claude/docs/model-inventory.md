@@ -15,6 +15,8 @@ are not consistent: some carry a date, some do not, one carries a bare `-v1`.
 | sonnet-4-5 | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | works      | works     |
 | sonnet-4-6 | `us.anthropic.claude-sonnet-4-6`               | works      | works     |
 | sonnet-5   | `us.anthropic.claude-sonnet-5`                 | works      | works     |
+| haiku-5-5  | `us.anthropic.claude-haiku-5-5`                | unverified | works     |
+| sonnet-5-5 | `us.anthropic.claude-sonnet-5-5`               | unverified | works     |
 | opus-4-6   | `us.anthropic.claude-opus-4-6-v1`              | works      | works     |
 | opus-4-7   | `us.anthropic.claude-opus-4-7`                 | works      | works     |
 | opus-4-8   | `us.anthropic.claude-opus-4-8`                 | works      | works     |
@@ -31,9 +33,14 @@ Model access is denied due to IAM user or service role is not authorized to perf
 That is a permission to request, not a configuration to fix. Nothing in flow should alias to
 them until it is granted.
 
+The 5.5 rows are ACTIVE in `aws bedrock list-inference-profiles` and answered a real
+`claude -p --model <id>` (`canonicalModel` `claude-haiku-5-5` / `claude-sonnet-5-5`). Through
+opencode they are **unverified**: the ids must be in the `whitelist` of `config_claude.json`
+(added locally), and the opencode calls hung on that machine even for the known-good Haiku 4.5 id,
+so the cause was not the new ids but was not resolved.
+
 `claude` also accepts the family names `haiku`, `sonnet`, `opus` directly, and honours
-`ANTHROPIC_DEFAULT_*_MODEL` — so flow leaves claude model names untouched rather than overriding
-a choice made in the environment.
+`ANTHROPIC_DEFAULT_*_MODEL`.
 
 ## OpenAI models — profile `cloudbees-bedrock-openai-codex-codex-user` (codex)
 
@@ -88,17 +95,21 @@ must be **declared and whitelisted**:
 
 ## How flow uses this
 
-`packages/flow-engine/src/processing/ModelAliases.ts` maps the family names for **opencode only**:
+`packages/flow-engine/src/processing/ModelAliases.ts` maps the family names:
 
-| A step writing  | gets                                          |
-| --------------- | --------------------------------------------- |
-| `model: haiku`  | `us.anthropic.claude-haiku-4-5-20251001-v1:0` |
-| `model: sonnet` | `us.anthropic.claude-sonnet-5`                |
-| `model: opus`   | `us.anthropic.claude-opus-5`                  |
+| A step writing  | opencode                                        | claude, no `ANTHROPIC_DEFAULT_*_MODEL` set                            |
+| --------------- | ----------------------------------------------- | --------------------------------------------------------------------- |
+| `model: haiku`  | `amazon-bedrock/us.anthropic.claude-haiku-5-5`  | `us.anthropic.claude-haiku-5-5` on Bedrock, else `claude-haiku-5-5`   |
+| `model: sonnet` | `amazon-bedrock/us.anthropic.claude-sonnet-5-5` | `us.anthropic.claude-sonnet-5-5` on Bedrock, else `claude-sonnet-5-5` |
+| `model: opus`   | `amazon-bedrock/us.anthropic.claude-opus-5`     | left to the CLI                                                       |
+
+For `claude`, an `ANTHROPIC_DEFAULT_<FAMILY>_MODEL` in the step, `claudeEnv` or process environment
+wins: the name is passed through so the CLI honours it. Bedrock is detected from
+`CLAUDE_CODE_USE_BEDROCK`. `codex` is left alone.
 
 Anything else passes through unchanged, so an explicit id still works and an older version can be
-pinned deliberately (`model: us.anthropic.claude-sonnet-4-6`). `claude` and `codex` are left
-alone. The execution trace records the **resolved** id, so a run always says which sonnet it was.
+pinned deliberately (`model: us.anthropic.claude-sonnet-4-6`). The execution trace records the
+**resolved** id, so a run always says which sonnet it was.
 
 A test asserts the table only ever points at ids proven above, and never at the IAM-denied fable
 models — so a typo cannot reach a flow as a dispatch-time failure.

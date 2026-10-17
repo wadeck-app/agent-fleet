@@ -183,7 +183,11 @@ export class StepRunner {
 						// Resolved here because this is where the provider is known: "sonnet" means a
 						// different id for opencode than for claude, and nothing for codex. An id
 						// that is not a family name passes through untouched.
-						resolvedModel: resolveModelAlias(providerName, modelStep.model),
+						resolvedModel: resolveModelAlias(providerName, modelStep.model, {
+							...process.env,
+							...this.config.claudeEnv,
+							...modelStep.env,
+						}),
 						providerName,
 					},
 					services,

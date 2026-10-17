@@ -8,18 +8,14 @@ describe('resolveModelAlias - opencode', () => {
 	// The provider prefix is not decoration: `opencode run -m` takes `provider/model` and rejects
 	// a bare model id with an unexplained server error. Omitting it made every aliased step fail.
 	it('maps the family names to provider-qualified bedrock ids', () => {
-		expect(resolveModelAlias('opencode', 'sonnet')).toBe('amazon-bedrock/us.anthropic.claude-sonnet-5');
-		expect(resolveModelAlias('opencode', 'haiku')).toBe(
-			'amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0'
-		);
+		expect(resolveModelAlias('opencode', 'sonnet')).toBe('amazon-bedrock/us.anthropic.claude-sonnet-5-5');
+		expect(resolveModelAlias('opencode', 'haiku')).toBe('amazon-bedrock/us.anthropic.claude-haiku-5-5');
 		expect(resolveModelAlias('opencode', 'opus')).toBe('amazon-bedrock/us.anthropic.claude-opus-5');
 	});
 
 	it('accepts the family name whatever the casing', () => {
-		expect(resolveModelAlias('opencode', 'Sonnet')).toBe('amazon-bedrock/us.anthropic.claude-sonnet-5');
-		expect(resolveModelAlias('opencode', 'HAIKU')).toBe(
-			'amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0'
-		);
+		expect(resolveModelAlias('opencode', 'Sonnet')).toBe('amazon-bedrock/us.anthropic.claude-sonnet-5-5');
+		expect(resolveModelAlias('opencode', 'HAIKU')).toBe('amazon-bedrock/us.anthropic.claude-haiku-5-5');
 	});
 
 	it('always produces something with a provider prefix', () => {
@@ -46,11 +42,30 @@ describe('resolveModelAlias - opencode', () => {
 });
 
 describe('resolveModelAlias - other providers', () => {
-	// claude resolves haiku/sonnet/opus itself, and honours ANTHROPIC_DEFAULT_*_MODEL. Mapping
-	// them here would override a user's own choice with ours.
-	it('leaves claude to resolve its own family names', () => {
-		expect(resolveModelAlias('claude', 'sonnet')).toBe('sonnet');
-		expect(resolveModelAlias('claude', 'haiku')).toBe('haiku');
+	// claude honours ANTHROPIC_DEFAULT_*_MODEL itself, so a user's own choice must never be
+	// overridden with ours: with an override set, the family name goes through untouched.
+	it('leaves claude to resolve a family name the user has overridden', () => {
+		const env = {
+			ANTHROPIC_DEFAULT_SONNET_MODEL: 'us.anthropic.claude-sonnet-5',
+			ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-haiku-4-5',
+		};
+		expect(resolveModelAlias('claude', 'sonnet', env)).toBe('sonnet');
+		expect(resolveModelAlias('claude', 'haiku', env)).toBe('haiku');
+	});
+
+	// Without an override, haiku and sonnet mean 5.5. Ids checked against AWS (list-inference-profiles)
+	// and with a real `claude -p --model <id>` call (canonicalModel claude-haiku-5-5 / claude-sonnet-5-5).
+	it('defaults claude haiku and sonnet to 5.5, with the Bedrock id when Bedrock is in use', () => {
+		expect(resolveModelAlias('claude', 'haiku', {})).toBe('claude-haiku-5-5');
+		expect(resolveModelAlias('claude', 'sonnet', {})).toBe('claude-sonnet-5-5');
+		const bedrock = { CLAUDE_CODE_USE_BEDROCK: '1' };
+		expect(resolveModelAlias('claude', 'Haiku', bedrock)).toBe('us.anthropic.claude-haiku-5-5');
+		expect(resolveModelAlias('claude', 'sonnet', bedrock)).toBe('us.anthropic.claude-sonnet-5-5');
+	});
+
+	it('only applies the claude default to the families it was asked to change', () => {
+		expect(resolveModelAlias('claude', 'opus', {})).toBe('opus');
+		expect(resolveModelAlias('claude', 'claude-sonnet-4-6', {})).toBe('claude-sonnet-4-6');
 	});
 
 	// codex runs OpenAI models on a different bedrock account, where "sonnet" means nothing --
@@ -91,6 +106,11 @@ describe('MODEL_ALIASES', () => {
 			'amazon-bedrock/us.anthropic.claude-opus-4-7',
 			'amazon-bedrock/us.anthropic.claude-opus-4-8',
 			'amazon-bedrock/us.anthropic.claude-opus-5',
+			// 5.5 ids: listed ACTIVE by `aws bedrock list-inference-profiles` and answered by a real
+			// `claude -p --model us.anthropic.claude-{haiku,sonnet}-5-5`. Not yet called through opencode
+			// itself: its calls hung for an unrelated reason, even for the known-good Haiku 4.5 id.
+			'amazon-bedrock/us.anthropic.claude-haiku-5-5',
+			'amazon-bedrock/us.anthropic.claude-sonnet-5-5',
 			// Verified live in this session: opencode run -m amazon-bedrock/openai.gpt-5.6-luna
 			// (and -terra) with OPENCODE_CONFIG pointed at the openai-codex-profile config.
 			'amazon-bedrock/openai.gpt-5.6-luna',
