@@ -646,6 +646,18 @@ export class CommandHandler {
 			const step = this.dispatched.get(assignmentId);
 			const assignment = this.assignments.describe(assignmentId);
 			if (assignment === undefined) continue;
+			if (!assignment.started) {
+				// Nothing ran, so there is nothing to protect: drop the worker and let the normal
+				// disconnect path hand the step to another one, instead of failing it.
+				const connection = this.assignments.connectionOf(assignmentId);
+				this.logWriter.writeExecution(
+					assignment.executionId,
+					`Worker never confirmed starting step ${assignment.stepId} within ${String(Math.round(this.stalledStepLimitMs / 1000))}s; dropping its connection so the step is handed over again`,
+					'warning'
+				);
+				if (connection !== undefined) this.registry.disconnect(connection);
+				continue;
+			}
 			this.dispatched.delete(assignmentId);
 			const connection = this.assignments.connectionOf(assignmentId);
 			this.assignments.settle(assignmentId);
@@ -1030,6 +1042,10 @@ export class CommandHandler {
 					stepConfig: step.stepConfig,
 					executionContext: step.executionContext,
 				});
+				// Watched from the hand-over, not only from step_started: a worker confirms with
+				// step_started before anything else, so an assignment it never confirms would
+				// otherwise be waited on forever.
+				if (sent) this.stalledSteps.started(assignment.assignmentId);
 				if (!sent) {
 					// Never handed over, so the assignment must not stay outstanding.
 					this.assignments.settle(assignment.assignmentId);

@@ -1857,7 +1857,7 @@ describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
 
 describe('CommandHandler — a step whose worker went quiet', () => {
 	/** Runs the one-step flow to the point where s1 is executing, with a short silence limit. */
-	async function startOneStep(limitMs: number) {
+	async function startOneStep(limitMs: number, started = true) {
 		const flowFile = path.join(tmpDir, 'quiet.yml');
 		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
 
@@ -1892,7 +1892,7 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 		const { executionId } = result as { executionId: string };
 		const assignmentId = sent[0]?.assignmentId;
 		if (assignmentId === undefined) throw new Error('no step was dispatched, so nothing can stall');
-		handler.onStepStarted(worker, assignmentId, executionId, 's1');
+		if (started) handler.onStepStarted(worker, assignmentId, executionId, 's1');
 
 		return { handler, assignmentId, workerPool, worker };
 	}
@@ -1938,6 +1938,28 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 			handler.failStalledSteps();
 
 			expect(workerPool.disconnect).toHaveBeenCalledWith(worker);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// A worker sends step_started before anything else, so an assignment it never confirms was lost
+	// in transit or the worker is wedged. Nothing ran, so the step is handed over again (via the
+	// normal disconnect path) rather than failed.
+	it('drops a worker that never confirmed starting its step, without failing the step', async () => {
+		vi.useFakeTimers();
+		try {
+			const { handler, workerPool, worker } = await startOneStep(60_000, false);
+
+			vi.advanceTimersByTime(59_000);
+			handler.failStalledSteps();
+			expect(workerPool.disconnect).not.toHaveBeenCalled();
+
+			vi.advanceTimersByTime(2_000);
+			handler.failStalledSteps();
+
+			expect(workerPool.disconnect).toHaveBeenCalledWith(worker);
+			expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
 		} finally {
 			vi.useRealTimers();
 		}
