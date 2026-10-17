@@ -662,7 +662,9 @@ export interface ModelFlowStep extends BaseFlowStep {
 
 	/**
 	 * Hooks to intercept tool calls made during this step.
-	 * Applied to both Claude and OpenCode providers.
+	 * Applied to the Claude, OpenCode and Codex providers. `toolPattern` is matched against each
+	 * provider's own tool names (codex: `Bash`, `apply_patch`, `mcp__<server>__<tool>`; matching
+	 * there is case-insensitive and `write`/`edit` mean `apply_patch`).
 	 * @see ToolHook
 	 */
 	toolHooks?: import('./processing/ToolHook').ToolHook[];
@@ -670,8 +672,8 @@ export interface ModelFlowStep extends BaseFlowStep {
 	/**
 	 * Restricts this step to the named tools (e.g. `['read']` for a text-only step that must
 	 * not write files or run shell commands). Omit for no restriction (provider default).
-	 * Codex has no per-tool mechanism and only honors the write/bash-exclusion case via its
-	 * sandbox level -- see `CodexModelProvider`.
+	 * Codex has no per-tool allow-list: it enforces what it can (read-only sandbox, no shell, no web
+	 * search) and throws for exclusions it cannot honour -- see `CodexToolPolicy`.
 	 * @see ./processing/ToolAccess
 	 */
 	tools?: import('./processing/ToolAccess').ToolName[];
@@ -726,7 +728,7 @@ export interface ModelFlowStep extends BaseFlowStep {
 
 	/**
 	 * Fine-grained permission overrides for providers that ask before certain actions
-	 * (currently opencode only -- ignored by other providers, which have no equivalent knob).
+	 * (opencode only -- codex fails the step with an actionable error, claude ignores it).
 	 * Omit for the provider's own default. Scoped to the step rather than project-wide
 	 * (`.flow/opencode.json`'s `permission` block) for the same reason as `skipPermissions`:
 	 * most steps never need to touch anything outside the project, and a global allow/deny

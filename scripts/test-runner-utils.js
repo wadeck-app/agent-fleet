@@ -7,9 +7,9 @@
 // Track all spawned processes for cleanup
 // Windows: Use taskkill with /T (tree) and /F (force)
 // /T kills the entire process tree (npm → node → backend)
-import { exec } from 'node:child_process';
-import fs from 'node:fs';
 import { globSync } from 'glob';
+import { exec, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const spawnedProcesses = new Set();
@@ -252,7 +252,22 @@ function getTrackedProcessCount() {
 	return spawnedProcesses.size;
 }
 
+/**
+ * Fails the run (exit 1) when an installed LLM CLI changed version since its mock was last
+ * confirmed. No-op in CI. Prints the exact command to run; see .claude/docs/mock-fidelity.md.
+ */
+function assertMocksUpToDate() {
+	const check = spawnSync(process.execPath, [path.join(import.meta.dirname, 'check-mock-drift.js')], {
+		stdio: 'inherit',
+	});
+	if (check.status !== 0) {
+		console.error('✗ Tests not started: mock-vs-real verification required first (see above).');
+		process.exit(1);
+	}
+}
+
 export {
+	assertMocksUpToDate,
 	killProcessTree,
 	cleanupAllProcesses,
 	cleanupOrphanedBackendServers,

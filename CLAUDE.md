@@ -98,6 +98,7 @@ If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a
 ## Additional references (only consult when needed)
 
 - `.claude/kb/lessons-learned.md` - Project-specific gotchas and solutions. **Important**: Append it with what you are learning!
+- `.claude/docs/mock-fidelity.md` - **Read when a claude/opencode/codex CLI is updated, when `npm run check`/`npm test` reports "Mock drift", or when touching a model provider or its mock**
 - `.claude/docs/collaboration-rules.md` - **Always apply**: proposals must include pros/cons/recommendation
 
 ## Agent reference docs

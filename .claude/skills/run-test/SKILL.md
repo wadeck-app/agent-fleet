@@ -38,6 +38,8 @@ npm run test:agent:frontend
 
 For filtering options and advanced usage, see [examples.md](examples.md).
 
+The run aborts before any test when an installed claude/opencode/codex CLI changed version since its mock was verified. Run the command it prints (spends tokens); see `.claude/docs/mock-fidelity.md`.
+
 ## Interpreting Results
 
 **On Success (minimal output):**

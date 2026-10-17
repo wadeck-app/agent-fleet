@@ -3,8 +3,8 @@
  *
  * A step's `tools: string[]` names which of these it may use; omitting `tools` leaves every
  * provider at its own default (unrestricted). Each provider maps the canonical name to its own
- * native identifier -- Claude and OpenCode support this per-tool; Codex does not (see
- * `CodexModelProvider`'s `--sandbox` fallback) and only honors the write/bash-adjacent cases.
+ * native identifier -- Claude and OpenCode support this per-tool; Codex has no allow-list and
+ * enforces only what its sandbox and feature switches can (see `CodexToolPolicy`).
  */
 
 export const TOOL_NAMES = [

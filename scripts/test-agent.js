@@ -13,7 +13,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { testSuiteType_E2E_FUNC, testSuiteType_UNIT, testSuites } from './test-config.js';
-import { cleanupAllProcesses, registerCleanupHandlers, trackProcess } from './test-runner-utils.js';
+import {
+	assertMocksUpToDate,
+	cleanupAllProcesses,
+	registerCleanupHandlers,
+	trackProcess,
+} from './test-runner-utils.js';
 
 // Use chalk if available, otherwise fallback to plain text
 let chalk;
@@ -278,6 +283,11 @@ async function main() {
 		console.log(chalk.gray('Available filters: --suite, --type, --exclude, --grep'));
 		await cleanupAllProcesses(chalk);
 		process.exit(1);
+	}
+
+	// Mocks of the LLM CLIs are only trustworthy if the real CLIs were re-checked after an update
+	if (suitesToRun.some(suite => suite.args.includes('--workspace=flow-engine'))) {
+		assertMocksUpToDate();
 	}
 
 	// Display what we're running

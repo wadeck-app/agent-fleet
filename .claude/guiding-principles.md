@@ -49,6 +49,7 @@
 
 - Vitest requires its own path alias config in `vitest.config.ts` — `tsconfig.json` path mappings are NOT inherited; a missing alias produces "Failed to load url @/..." only in tests, not in TS compilation.
 - TDD: write tests in the red phase, verify they fail, implement, verify they pass — never write a stub implementation labeled "tests will fail first" without that verification step being explicit.
+- LLM CLI mocks must match the real CLIs; a CLI version change forces a real-vs-mock run (`npm run mocks:verify`) — see `.claude/docs/mock-fidelity.md`.
 - Run the full test suite (`npm test`) before declaring any implementation complete; build success alone is not sufficient.
 
 ### Debugging

@@ -1,7 +1,7 @@
 /**
  * ModelProvider -- shared interface and types for AI model CLI providers.
  *
- * Both ClaudeModelProvider and OpenCodeModelProvider implement this interface.
+ * ClaudeModelProvider, OpenCodeModelProvider and CodexModelProvider implement this interface.
  * Validation utilities are also exported here so each provider can reuse them.
  */
 import type { ChildProcess } from 'node:child_process';
@@ -41,16 +41,16 @@ export interface LaunchOptions {
 	/**
 	 * Unified tool hooks -- provider-agnostic declarations of what should happen
 	 * before/after tool calls. Each provider translates these into its native format
-	 * (OpenCode ESM plugin JS, Claude settings JSON).
+	 * (OpenCode ESM plugin JS, Claude settings JSON, Codex command-hook script).
 	 */
 	toolHooks?: ToolHook[];
 	/** Restricts the model to these tools. Omit for no restriction. @see ToolAccess */
 	tools?: ToolName[];
 	/**
-	 * Per-permission overrides for providers that ask before certain actions. Currently read
-	 * only by OpenCodeModelProvider; ignored by providers with no equivalent knob. Omit for
-	 * that provider's own default (opencode's default is `ask` for everything not otherwise
-	 * configured). @see OpenCodePermissions
+	 * Per-permission overrides for providers that ask before certain actions. Read by
+	 * OpenCodeModelProvider; CodexModelProvider throws on a non-empty value (it has no equivalent
+	 * per-action knob); ClaudeModelProvider ignores it. Omit for that provider's own default
+	 * (opencode's default is `ask` for everything not otherwise configured). @see OpenCodePermissions
 	 */
 	permission?: OpenCodePermissionOverrides;
 }

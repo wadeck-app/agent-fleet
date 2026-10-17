@@ -11,7 +11,12 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { testSuiteType_E2E_FUNC, testSuiteType_UNIT, testSuiteType_VISUAL, testSuites } from './test-config.js';
-import { cleanupAllProcesses, registerCleanupHandlers, trackProcess } from './test-runner-utils.js';
+import {
+	assertMocksUpToDate,
+	cleanupAllProcesses,
+	registerCleanupHandlers,
+	trackProcess,
+} from './test-runner-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -377,6 +382,9 @@ function displaySummary() {
 async function main() {
 	// Register cleanup handlers FIRST
 	registerCleanupHandlers(chalk);
+
+	// Mocks of the LLM CLIs are only trustworthy if the real CLIs were re-checked after an update
+	assertMocksUpToDate();
 
 	console.log(chalk.bold.cyan('Starting comprehensive test suite...\n'));
 

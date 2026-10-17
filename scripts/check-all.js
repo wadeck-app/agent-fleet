@@ -61,6 +61,8 @@ async function main() {
 		{ script: 'check-ts.js', name: 'TypeScript' },
 		{ script: 'check-eslint.js', name: 'ESLint' },
 		{ script: 'check-format.js', name: 'Prettier' },
+		// Fails when an installed LLM CLI changed version since its mock was last confirmed (skipped in CI)
+		{ script: 'check-mock-drift.js', name: 'Mock drift' },
 	];
 
 	const results = [];
@@ -92,6 +94,11 @@ async function main() {
 		}
 		// console.log(chalk.blue('╚═══════════════════════════════════════════╝'));
 		console.log('');
+		if (results.find(r => r.name === 'Mock drift' && !r.passed)) {
+			console.log(
+				chalk.yellow('   - Mock drift: run the command(s) printed above (see .claude/docs/mock-fidelity.md)')
+			);
+		}
 		console.log(chalk.yellow('📄 Check the error logs for details:'));
 		if (results.find(r => r.name === 'TypeScript' && !r.passed)) {
 			console.log(chalk.yellow('   - ts-errors.log'));

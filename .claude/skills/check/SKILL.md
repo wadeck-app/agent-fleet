@@ -26,3 +26,5 @@ Use this skill whenever you need to:
 ```bash
 npm run check
 ```
+
+Also fails with "Mock drift" when an installed claude/opencode/codex CLI changed version since its mock was verified. Run the command it prints (spends tokens); see `.claude/docs/mock-fidelity.md`.

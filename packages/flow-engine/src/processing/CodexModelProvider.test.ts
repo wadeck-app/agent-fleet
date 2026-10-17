@@ -25,6 +25,7 @@ vi.mock('node:fs', async () => {
 		chmodSync: vi.fn(),
 		copyFileSync: vi.fn(),
 		rmSync: vi.fn(),
+		readFileSync: vi.fn(actual.readFileSync),
 	};
 });
 
@@ -62,7 +63,11 @@ describe('CodexModelProvider', () => {
 	let provider: CodexModelProvider;
 	let mockProcess: child_process.ChildProcess;
 
+	const originalMockPath = process.env['CODEX_MOCK_PATH'];
+
 	beforeEach(() => {
+		// Pins the command: otherwise the Windows where.exe lookup runs and falls back to a shell
+		process.env['CODEX_MOCK_PATH'] = '/mock/codex';
 		provider = new CodexModelProvider();
 		mockProcess = makeMockProcess();
 		vi.mocked(child_process.spawn).mockReturnValue(mockProcess);
@@ -72,6 +77,8 @@ describe('CodexModelProvider', () => {
 
 	afterEach(() => {
 		vi.restoreAllMocks();
+		if (originalMockPath === undefined) delete process.env['CODEX_MOCK_PATH'];
+		else process.env['CODEX_MOCK_PATH'] = originalMockPath;
 	});
 
 	// -------------------------------------------------------------------------
@@ -95,15 +102,15 @@ describe('CodexModelProvider', () => {
 			expect(args).toContain('--json');
 		});
 
-		it('passes prompt as positional arg after exec', async () => {
-			const resultPromise = provider.launchBackground(makeBaseOptions({ prompt: 'test prompt' }));
+		// A prompt starting with "-" (a markdown bullet) was read by codex as a flag:
+		// `codex exec "- hi"` exits 2 with "unexpected argument". Everything after `--` is positional.
+		it('passes the prompt last, after a -- separator', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ prompt: '- a bullet prompt' }));
 			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
-			const execIdx = args.indexOf('exec');
-			// Prompt should be after 'exec'
-			expect(args[execIdx + 1]).toBe('test prompt');
+			expect(args.slice(-2)).toEqual(['--', '- a bullet prompt']);
 		});
 
 		it('passes -m flag when model is specified', async () => {
@@ -140,55 +147,114 @@ describe('CodexModelProvider', () => {
 			expect(args).not.toContain('--auto');
 		});
 
-		// Codex has no per-tool allow-list, only a sandbox level. Excluding both write and bash
-		// is the one case that maps faithfully to --sandbox read-only.
-		describe('tools (--sandbox fallback)', () => {
-			it('passes --sandbox read-only when tools excludes both write and bash', async () => {
-				const resultPromise = provider.launchBackground(makeBaseOptions({ tools: ['read'] }));
+		// Codex has no `--tools` allow-list; CodexToolPolicy maps what it can and refuses the rest.
+		describe('tools', () => {
+			async function argsFor(overrides: Partial<LaunchOptions>): Promise<string[]> {
+				const resultPromise = provider.launchBackground(makeBaseOptions(overrides));
 				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 				await resultPromise;
+				return vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			}
 
-				const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
-				const idx = args.indexOf('--sandbox');
-				expect(idx).toBeGreaterThanOrEqual(0);
-				expect(args[idx + 1]).toBe('read-only');
+			it('excluding write and edit selects the read-only sandbox, leaving the shell available', async () => {
+				vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+				const args = await argsFor({ tools: ['read', 'glob', 'grep', 'bash', 'webfetch', 'websearch'] });
+
+				expect(args.slice(args.indexOf('--sandbox'), args.indexOf('--sandbox') + 2)).toEqual([
+					'--sandbox',
+					'read-only',
+				]);
+				expect(args).not.toContain('--disable');
+			});
+
+			it('excluding bash removes the shell tool', async () => {
+				const args = await argsFor({
+					tools: ['read', 'write', 'edit', 'glob', 'grep', 'webfetch', 'websearch', 'task', 'todowrite'],
+				});
+
+				expect(args.slice(args.indexOf('--disable'), args.indexOf('--disable') + 2)).toEqual([
+					'--disable',
+					'shell_tool',
+				]);
+				expect(args).not.toContain('--sandbox');
+			});
+
+			it('excluding both web tools turns web search off', async () => {
+				vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+				const args = await argsFor({ tools: ['read', 'write', 'edit', 'bash', 'glob', 'grep'] });
+
+				expect(args).toContain('web_search="disabled"');
+			});
+
+			it('sends no restriction flag when tools is not set', async () => {
+				const args = await argsFor({});
+
+				expect(args).not.toContain('--sandbox');
+				expect(args).not.toContain('--disable');
+				expect(args.join(' ')).not.toContain('web_search');
 			});
 
 			// Real codex rejects `--approve-for-me --sandbox ...` together (exit 2, "cannot be used with").
 			it('sends --sandbox read-only WITHOUT --approve-for-me when both are requested', async () => {
-				const resultPromise = provider.launchBackground(
-					makeBaseOptions({ tools: ['read'], skipPermissions: true })
-				);
-				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
-				await resultPromise;
+				vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+				const args = await argsFor({ tools: ['read', 'bash'], skipPermissions: true });
 
-				const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
 				expect(args).toContain('--sandbox');
 				expect(args).not.toContain('--approve-for-me');
 			});
 
-			it('does not pass --sandbox when tools includes write', async () => {
-				const resultPromise = provider.launchBackground(makeBaseOptions({ tools: ['read', 'write'] }));
-				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
-				await resultPromise;
+			it('warns, instead of staying silent, about exclusions codex cannot enforce', async () => {
+				const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+				await argsFor({ tools: ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'webfetch', 'websearch'] });
 
-				const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
-				expect(args).not.toContain('--sandbox');
+				expect(warn).toHaveBeenCalledWith(expect.stringContaining("excludes 'task'"));
+				expect(warn).toHaveBeenCalledWith(expect.stringContaining("excludes 'todowrite'"));
 			});
 
-			it('does not pass --sandbox when tools is not set', async () => {
-				const resultPromise = provider.launchBackground(makeBaseOptions());
-				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
-				await resultPromise;
-
-				const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
-				expect(args).not.toContain('--sandbox');
+			it('throws, rather than under-restricting, when only one of write/edit is excluded', async () => {
+				await expect(provider.launchBackground(makeBaseOptions({ tools: ['read', 'write'] }))).rejects.toThrow(
+					/single apply_patch tool/
+				);
+				expect(child_process.spawn).not.toHaveBeenCalled();
 			});
 		});
 
-		// Resuming is a subcommand now (`codex exec resume <id> [prompt]`), not a flag. The old
+		// `exec resume` accepts neither --sandbox nor --approve-for-me (verified: exit 2 "unexpected
+		// argument"), so the same settings travel as -c overrides there.
+		describe('resume + permissions', () => {
+			async function resumeArgs(overrides: Partial<LaunchOptions>): Promise<string[]> {
+				const resultPromise = provider.launchBackground(
+					makeBaseOptions({ resumeSessionId: 'abc-123', ...overrides })
+				);
+				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+				await resultPromise;
+				return vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			}
+
+			it('skipPermissions becomes config overrides, not --approve-for-me', async () => {
+				const args = await resumeArgs({ skipPermissions: true });
+
+				expect(args).not.toContain('--approve-for-me');
+				expect(args).not.toContain('--sandbox');
+				expect(args).toContain('sandbox_mode="workspace-write"');
+				expect(args).toContain('approval_policy="on-request"');
+				expect(args).toContain('approvals_reviewer="auto_review"');
+			});
+
+			it('a read-only tools restriction becomes -c sandbox_mode, not --sandbox', async () => {
+				vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+				const args = await resumeArgs({ tools: ['read'], skipPermissions: true });
+
+				expect(args).not.toContain('--sandbox');
+				expect(args).not.toContain('--approve-for-me');
+				expect(args).toContain('sandbox_mode="read-only"');
+				expect(args).not.toContain('sandbox_mode="workspace-write"');
+			});
+		});
+
+		// Resuming is a subcommand (`codex exec resume <id> [prompt]`), not a flag. The old
 		// `--resume <id>` form is rejected outright.
-		it('resumes through the exec subcommand, with the session id before the prompt', async () => {
+		it('resumes through the exec subcommand, with the session id right after it', async () => {
 			const resultPromise = provider.launchBackground(
 				makeBaseOptions({ prompt: 'continue please', resumeSessionId: 'abc-123' })
 			);
@@ -196,7 +262,15 @@ describe('CodexModelProvider', () => {
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
-			expect(args.slice(0, 4)).toEqual(['exec', 'resume', 'abc-123', 'continue please']);
+			expect(args).toEqual([
+				'exec',
+				'resume',
+				'abc-123',
+				'--json',
+				'--skip-git-repo-check',
+				'--',
+				'continue please',
+			]);
 			expect(args).not.toContain('--resume');
 		});
 
@@ -206,8 +280,7 @@ describe('CodexModelProvider', () => {
 			await resultPromise;
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
-			expect(args.slice(0, 2)).toEqual(['exec', 'fresh start']);
-			expect(args).not.toContain('resume');
+			expect(args).toEqual(['exec', '--json', '--skip-git-repo-check', '--', 'fresh start']);
 		});
 
 		it('returns stdout, stderr, exitCode', async () => {
@@ -307,6 +380,85 @@ describe('CodexModelProvider', () => {
 			expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignoring 1 unrecognized configuration'));
 		});
 
+		// Shapes captured from a real codex-cli 0.163.0 run against a stdio MCP server and an
+		// apply_patch call (see StepRunner.codex.integration.test.ts).
+		it('maps mcp_tool_call and file_change items to tool_use events', async () => {
+			const onStreamEvent = vi.fn();
+			const resultPromise = provider.launchBackground(makeBaseOptions({ onStreamEvent }));
+			const lines = [
+				{ type: 'thread.started', thread_id: 't-1' },
+				{
+					type: 'item.completed',
+					item: {
+						id: 'item_2',
+						type: 'mcp_tool_call',
+						server: 'echo',
+						tool: 'echo_tool',
+						arguments: { text: 'ping' },
+						result: { content: [{ type: 'text', text: 'ECHO[M1]: ping' }], structured_content: null },
+						error: null,
+						status: 'completed',
+					},
+				},
+				{
+					type: 'item.completed',
+					item: {
+						id: 'item_3',
+						type: 'mcp_tool_call',
+						server: 'echo',
+						tool: 'fail_tool',
+						arguments: {},
+						result: null,
+						error: { message: 'MCP tool call requires approval, but approval policy is never' },
+						status: 'failed',
+					},
+				},
+				{
+					type: 'item.completed',
+					item: {
+						id: 'item_4',
+						type: 'file_change',
+						changes: [{ path: 'C:\\w\\note.txt', kind: 'add' }],
+						status: 'completed',
+					},
+				},
+			];
+			setImmediate(() => {
+				const stdout = (mockProcess as unknown as Record<string, EventEmitter>)['stdout'];
+				stdout.emit('data', Buffer.from(lines.map(l => JSON.stringify(l)).join('\n') + '\n'));
+				(mockProcess as EventEmitter).emit('exit', 0);
+			});
+			await resultPromise;
+
+			const toolEvents = onStreamEvent.mock.calls
+				.map((c: unknown[]) => c[0] as { type: string; data: Record<string, unknown> })
+				.filter(e => e.type === 'tool_use')
+				.map(e => e.data);
+			expect(toolEvents).toEqual([
+				{
+					tool: 'mcp__echo__echo_tool',
+					callID: 'item_2',
+					input: { text: 'ping' },
+					output: 'ECHO[M1]: ping',
+					status: 'completed',
+				},
+				{
+					tool: 'mcp__echo__fail_tool',
+					callID: 'item_3',
+					input: {},
+					output: 'error: MCP tool call requires approval, but approval policy is never',
+					status: 'failed',
+				},
+				{
+					tool: 'apply_patch',
+					callID: 'item_4',
+					input: { changes: [{ path: 'C:\\w\\note.txt', kind: 'add' }] },
+					output: 'add C:\\w\\note.txt',
+					status: 'completed',
+				},
+			]);
+		});
+
 		it('puts the turn.failed message in stderr so the failure is actionable', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 			setImmediate(() => {
@@ -344,19 +496,31 @@ describe('CodexModelProvider', () => {
 	// -------------------------------------------------------------------------
 
 	describe('launchInteractive', () => {
-		it('spawns codex exec in interactive mode', async () => {
-			const resultPromise = provider.launchInteractive(makeBaseOptions());
-
-			setImmediate(() => {
-				(mockProcess as EventEmitter).emit('exit', 0);
-			});
-
+		async function interactiveArgs(overrides: Partial<LaunchOptions> = {}): Promise<string[]> {
+			const resultPromise = provider.launchInteractive(makeBaseOptions(overrides));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
+			return vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+		}
 
-			expect(child_process.spawn).toHaveBeenCalled();
-			const spawnCall = vi.mocked(child_process.spawn).mock.calls[0];
-			// stdio should be 'inherit' for interactive
-			expect(spawnCall[2]).toMatchObject({ stdio: 'inherit' });
+		it('inherits stdio', async () => {
+			await interactiveArgs();
+
+			expect(vi.mocked(child_process.spawn).mock.calls[0][2]).toMatchObject({ stdio: 'inherit' });
+		});
+
+		// Interactive means the TUI (`codex [PROMPT]`), not `codex exec --json` dumping JSONL on the
+		// terminal. The TUI has neither --json nor --skip-git-repo-check (not in `codex --help`).
+		it('launches the TUI, not exec, without the exec-only flags', async () => {
+			const args = await interactiveArgs({ prompt: 'hello' });
+
+			expect(args).toEqual(['--', 'hello']);
+		});
+
+		it('resumes with the top-level resume subcommand and keeps native permission flags', async () => {
+			const args = await interactiveArgs({ resumeSessionId: 'abc-123', skipPermissions: true });
+
+			expect(args).toEqual(['resume', 'abc-123', '--approve-for-me', '--', 'do something']);
 		});
 	});
 
@@ -365,10 +529,6 @@ describe('CodexModelProvider', () => {
 	// -------------------------------------------------------------------------
 
 	describe('CODEX_MOCK_PATH', () => {
-		afterEach(() => {
-			delete process.env['CODEX_MOCK_PATH'];
-		});
-
 		it('uses CODEX_MOCK_PATH from options.env (per-step mock-config overlay) even when unset in process.env', async () => {
 			delete process.env['CODEX_MOCK_PATH'];
 
@@ -435,32 +595,206 @@ describe('CodexModelProvider', () => {
 	});
 
 	// -------------------------------------------------------------------------
+	// Options codex cannot honour: loud failure, never silently weaker
+	// -------------------------------------------------------------------------
+
+	describe('unsupported options', () => {
+		it('rejects a step-level permission override (opencode-only) with an actionable message', async () => {
+			await expect(
+				provider.launchBackground(makeBaseOptions({ permission: { external_directory: 'allow' } }))
+			).rejects.toThrow(/'permission' \(external_directory\) is an opencode feature.*skipPermissions/);
+			expect(child_process.spawn).not.toHaveBeenCalled();
+		});
+
+		it('accepts an empty permission object, which asks for nothing', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ permission: {} }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await expect(resultPromise).resolves.toMatchObject({ exitCode: 0 });
+		});
+
+		it("rejects session.mode 'compact' (autoCompact)", async () => {
+			await expect(provider.launchBackground(makeBaseOptions({ autoCompact: true }))).rejects.toThrow(
+				/session\.mode 'compact' is not supported by codex.*'append'/
+			);
+			expect(child_process.spawn).not.toHaveBeenCalled();
+		});
+
+		it('rejects the same options for the interactive launch', async () => {
+			await expect(provider.launchInteractive(makeBaseOptions({ autoCompact: true }))).rejects.toThrow(
+				/not supported by codex/
+			);
+		});
+	});
+
+	// -------------------------------------------------------------------------
+	// Environment
+	// -------------------------------------------------------------------------
+
+	describe('environment', () => {
+		it('forwards options.env and the infrastructure variables, and no codex/opencode config variables', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({
+					env: { MY_FLAG: '1' },
+					mcpServers: [{ name: 'srv', command: ['node', 'srv.js'] }],
+				})
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const env = vi.mocked(child_process.spawn).mock.calls[0][2]?.env as Record<string, string>;
+			expect(env['MY_FLAG']).toBe('1');
+			expect(env['PATH']).toBe(process.env['PATH']);
+			// Not read by codex: it has no config-by-env, and its home is CODEX_HOME rather than XDG.
+			for (const key of ['CODEX_CONFIG', 'CODEX_CONFIG_CONTENT', 'OPENCODE_CONFIG', 'OPENCODE_CONFIG_CONTENT']) {
+				expect(env).not.toHaveProperty(key);
+			}
+			expect(env).not.toHaveProperty('XDG_CONFIG_HOME');
+			// CODEX_HOME holds auth, model provider settings and sessions: it must stay the user's
+			expect(env).not.toHaveProperty('CODEX_HOME');
+		});
+
+		it('does not leak unrelated process env variables', async () => {
+			process.env['SOME_SECRET_FOR_TEST'] = 'leak';
+			try {
+				const resultPromise = provider.launchBackground(makeBaseOptions());
+				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+				await resultPromise;
+
+				const env = vi.mocked(child_process.spawn).mock.calls[0][2]?.env as Record<string, string>;
+				expect(env).not.toHaveProperty('SOME_SECRET_FOR_TEST');
+			} finally {
+				delete process.env['SOME_SECRET_FOR_TEST'];
+			}
+		});
+	});
+
+	// -------------------------------------------------------------------------
 	// MCP servers
 	// -------------------------------------------------------------------------
 
 	describe('mcpServers', () => {
-		it('sets CODEX_CONFIG_CONTENT env var when mcpServers provided', async () => {
+		it('registers each server through -c mcp_servers.* overrides, with required and approve', async () => {
 			const resultPromise = provider.launchBackground(
 				makeBaseOptions({
 					mcpServers: [
 						{
 							name: 'test-server',
-							command: ['node', 'test.js'],
+							command: ['node', 'C:\\path\\test.js', '--flag'],
+							env: { API_KEY: 'a "quoted" value' },
+							cwd: 'C:\\work',
 						},
 					],
 				})
 			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
 
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			const overrides = args.filter((_, i) => args[i - 1] === '-c');
+			expect(overrides).toEqual([
+				'mcp_servers.test-server.command="node"',
+				'mcp_servers.test-server.args=["C:\\\\path\\\\test.js", "--flag"]',
+				'mcp_servers.test-server.env={ "API_KEY" = "a \\"quoted\\" value" }',
+				'mcp_servers.test-server.cwd="C:\\\\work"',
+				'mcp_servers.test-server.required=true',
+				'mcp_servers.test-server.default_tools_approval_mode="approve"',
+			]);
+		});
+
+		it('does not mark a disabled server required', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({ mcpServers: [{ name: 'off', command: ['node'], enabled: false }] })
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args).toContain('mcp_servers.off.enabled=false');
+			expect(args).not.toContain('mcp_servers.off.required=true');
+		});
+
+		it('passes no mcp override when there are no servers', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ mcpServers: [] }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args.join(' ')).not.toContain('mcp_servers');
+		});
+	});
+
+	// -------------------------------------------------------------------------
+	// Tool hooks
+	// -------------------------------------------------------------------------
+
+	describe('toolHooks', () => {
+		it('registers the hook script and ALWAYS trusts it (codex silently skips untrusted hooks)', async () => {
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({
+					toolHooks: [
+						{ timing: 'before', action: { type: 'deny', reason: 'no rm', toolPattern: 'bash' } },
+						{ timing: 'after', action: { type: 'log' } },
+					],
+				})
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args).toContain('--dangerously-bypass-hook-trust');
+			const hookOverrides = args.filter(a => a.startsWith('hooks.'));
+			expect(hookOverrides).toHaveLength(2);
+			expect(hookOverrides[0]).toMatch(
+				/^hooks\.PreToolUse=\[\{ matcher = "\*", hooks = \[\{ type = "command", command = "node \\"[^"]*hook\.cjs\\" pre"/
+			);
+			expect(hookOverrides[1]).toMatch(/^hooks\.PostToolUse=.*hook\.cjs\\" post"/);
+			// The script is written before spawn and removed afterwards
+			expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringMatching(/hook\.cjs$/), expect.any(String), {
+				encoding: 'utf8',
+			});
+			expect(fs.rmSync).toHaveBeenCalledWith(expect.stringContaining('codex-run-'), {
+				recursive: true,
+				force: true,
+			});
+		});
+
+		it('appends the lines the log hooks wrote to the returned stderr', async () => {
+			vi.mocked(fs.readFileSync).mockReturnValueOnce('[tool-use] Bash {"command":"ls"}\n');
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({ toolHooks: [{ timing: 'before', action: { type: 'log' } }] })
+			);
 			setImmediate(() => {
+				(mockProcess as unknown as Record<string, EventEmitter>)['stderr'].emit('data', Buffer.from('warn'));
 				(mockProcess as EventEmitter).emit('exit', 0);
 			});
 
+			const result = await resultPromise;
+			expect(result.stderr).toBe('warn\n[tool-use] Bash {"command":"ls"}');
+		});
+
+		it('does not pass the trust bypass when the step has no hooks', async () => {
+			const resultPromise = provider.launchBackground(makeBaseOptions({ toolHooks: [] }));
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
 			await resultPromise;
 
-			const spawnCall = vi.mocked(child_process.spawn).mock.calls[0];
-			const env = spawnCall[2]?.env as Record<string, string>;
-			expect(env['CODEX_CONFIG_CONTENT']).toBeDefined();
-			expect(env['CODEX_CONFIG_CONTENT']).toContain('test-server');
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args).not.toContain('--dangerously-bypass-hook-trust');
+			expect(args.join(' ')).not.toContain('hooks.');
+		});
+
+		it("warns about, and does not register, a deny hook with timing 'after'", async () => {
+			const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+			const resultPromise = provider.launchBackground(
+				makeBaseOptions({ toolHooks: [{ timing: 'after', action: { type: 'deny', reason: 'late' } }] })
+			);
+			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+			await resultPromise;
+
+			expect(warn).toHaveBeenCalledWith(
+				expect.stringContaining("'deny' tool hook with timing 'after' was ignored")
+			);
+			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
+			expect(args).not.toContain('--dangerously-bypass-hook-trust');
 		});
 	});
 });
