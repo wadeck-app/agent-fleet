@@ -1,10 +1,18 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { ExecutionLookupError, renderExecutionDetail, resolveExecution, tailText } from './ExecutionDetail';
+import {
+	DEFAULT_TAIL_CHARS,
+	ExecutionLookupError,
+	looksLikeExecutionId,
+	renderExecutionDetail,
+	resolveExecution,
+	tailText,
+} from './ExecutionDetail.js';
 
-const FIXTURE_DIR = path.resolve(__dirname, '../../test-utils/fixtures/executions');
+const FIXTURE_DIR = path.resolve(__dirname, '../testing/fixtures/executions');
 
 describe('ExecutionDetail', () => {
 	let tmpDir: string;
@@ -79,6 +87,42 @@ describe('ExecutionDetail', () => {
 		it('rejects JSON that is not an execution record', () => {
 			writeExec('bad00001', '{"foo":1}');
 			expect(() => resolveExecution(tmpDir, 'bad00001')).toThrow(/not a valid execution record/);
+		});
+	});
+
+	describe('error kinds', () => {
+		const kindOf = (fn: () => unknown): string => {
+			try {
+				fn();
+			} catch (err) {
+				if (err instanceof ExecutionLookupError) return err.kind;
+				throw err;
+			}
+			throw new Error('expected ExecutionLookupError');
+		};
+
+		it('classifies every failure so callers never parse messages', () => {
+			writeExec('abcd1234', minimal('abcd1234'));
+			writeExec('abce5678', minimal('abce5678'));
+			writeExec('bad00000', '{ not json');
+			writeExec('bad00001', '{"foo":1}');
+			expect(kindOf(() => resolveExecution(tmpDir, '../x'))).toBe('invalid-id');
+			expect(kindOf(() => resolveExecution(tmpDir, 'nope'))).toBe('not-found');
+			expect(kindOf(() => resolveExecution(tmpDir, 'abc'))).toBe('ambiguous');
+			expect(kindOf(() => resolveExecution(tmpDir, 'bad00000'))).toBe('corrupt');
+			expect(kindOf(() => resolveExecution(tmpDir, 'bad00001'))).toBe('invalid-record');
+		});
+	});
+
+	describe('looksLikeExecutionId', () => {
+		it('accepts lowercase letters and digits only', () => {
+			expect(looksLikeExecutionId('a6wug7bh')).toBe(true);
+			expect(looksLikeExecutionId('A6')).toBe(false);
+			expect(looksLikeExecutionId('a/b')).toBe(false);
+			expect(looksLikeExecutionId('')).toBe(false);
+		});
+		it('exposes a default tail of 2000 characters', () => {
+			expect(DEFAULT_TAIL_CHARS).toBe(2000);
 		});
 	});
 

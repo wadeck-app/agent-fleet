@@ -1,3 +1,4 @@
+import { BUILTIN_PLUGIN_CATALOG, listPlugins } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
 import { BUILTIN_PLUGIN_MANIFESTS } from './BuiltinPlugins';
@@ -44,5 +45,17 @@ describe('BUILTIN_PLUGIN_MANIFESTS', () => {
 	// sitting at a terminal.
 	it('provides the approval point from file-approval too', () => {
 		expect(BUILTIN_PLUGIN_MANIFESTS['file-approval']?.implementations['approval']?.['default']).toBeDefined();
+	});
+});
+
+// flow-core carries a metadata-only copy of the manifests (no plugin code, so app-module-flow's bundle does not
+// embed the plugins and their dependencies). The listing of one must be the listing of the other.
+describe('BUILTIN_PLUGIN_CATALOG (flow-core) against BUILTIN_PLUGIN_MANIFESTS', () => {
+	it('lists exactly the same plugins, extension points and type strings', () => {
+		expect(listPlugins(BUILTIN_PLUGIN_CATALOG)).toEqual(listPlugins(BUILTIN_PLUGIN_MANIFESTS));
+	});
+
+	it('is keyed by the same plugin ids', () => {
+		expect(Object.keys(BUILTIN_PLUGIN_CATALOG).sort()).toEqual(Object.keys(BUILTIN_PLUGIN_MANIFESTS).sort());
 	});
 });

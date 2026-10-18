@@ -1,0 +1,19 @@
+# Built-in plugins (`flow plugins list`). A row opens the plugin's configuration (`flow plugins show <id>`).
+$sources:
+    plugins:
+        url: GET /api/modules/flow/plugins
+
+$type: PageContent
+sections:
+    - $type: PageHeader
+      title: Flow plugins
+      subtitle: Plugins shipped with flow, and the type string that selects each in .flow/config.yml
+
+    - $type: DataTable
+      rows: $sources.plugins.plugins
+      navigateTo: '/modules/flow/plugins/{id}'
+      emptyMessage: No plugin is shipped
+      columns:
+          - { key: 'id', label: 'Plugin', mono: true }
+          - { key: 'extensionPoint', label: 'Extension point' }
+          - { key: 'typeString', label: 'Type string', mono: true }

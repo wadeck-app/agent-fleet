@@ -1,10 +1,11 @@
 /**
  * Bundles the flow CLI, its worker, and the auto-updater into standalone CommonJS files.
- * Outputs: dist-bundle/flow.cjs, dist-bundle/worker.cjs, dist-bundle/flow-updater.cjs
+ * Outputs: dist-bundle/flow.cjs, dist-bundle/worker.cjs, dist-bundle/flow-updater.cjs, dist-bundle/app-module/
  * Usage:   npx tsx ci/scripts/bundle.ts
  */
 import { build } from 'esbuild';
-import { statSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { cpSync, existsSync, rmSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -87,6 +88,26 @@ await Promise.all([
 		logLevel: 'warning',
 	}),
 ]);
+
+// The app-module is built by its own package: `npm run bundle` there runs `app-core-cli package` (backend bundle,
+// JSON views, packaged manifest stamped with this build's version). The CLI only copies the resulting dist-module/
+// next to flow.cjs, where the daemon looks for it (see src/daemon/AppModuleLocator.ts).
+const appModuleDir = path.join(root, '../app-module-flow');
+const appModuleOutDir = path.join(root, 'dist-bundle/app-module');
+execSync('npm run bundle', {
+	cwd: appModuleDir,
+	env: { ...process.env, BUNDLE_VERSION: version },
+	stdio: 'inherit',
+	windowsHide: true,
+});
+const packagedModule = path.join(appModuleDir, 'dist-module');
+if (!existsSync(path.join(packagedModule, 'manifest.json'))) {
+	throw new Error(
+		`app-module-flow produced no ${packagedModule}/manifest.json: run "npm run bundle" in packages/app-module-flow and read its output.`
+	);
+}
+rmSync(appModuleOutDir, { recursive: true, force: true });
+cpSync(packagedModule, appModuleOutDir, { recursive: true });
 
 const updaterSize = statSync(updaterOutfile).size;
 if (updaterSize > MAX_UPDATER_SIZE) {

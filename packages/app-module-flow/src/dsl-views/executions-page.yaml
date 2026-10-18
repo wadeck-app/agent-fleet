@@ -1,0 +1,56 @@
+# Executions history (`flow history`). Filters and pagination live in the URL: ?status=failed&flow=deploy&page=1&size=50
+# The status links reload the page with the filter applied; the flow filter is the `flow` URL parameter (dsl-ui has no
+# URL-backed text/select control to set it from the page: only Pagination and PageSizeSelect take `urlParam`).
+$sources:
+    executions:
+        url: GET /api/modules/flow/executions
+        params:
+            status: $urlParam.status
+            flow: $urlParam.flow
+            page: $urlParam.page
+            limit: $urlParam.size
+
+$type: PageContent
+sections:
+    - $type: PageHeader
+      title: Flow executions
+      subtitle: 'Filter by flow with ?flow=<flowId> in the URL'
+
+    - $type: HorizontalStack
+      gap: gap-3
+      align: items-center
+      items:
+          - { $type: Link, label: All, href: /modules/flow/executions }
+          - { $type: Link, label: Running, href: '/modules/flow/executions?status=running' }
+          - { $type: Link, label: Queued, href: '/modules/flow/executions?status=queued' }
+          - { $type: Link, label: Completed, href: '/modules/flow/executions?status=completed' }
+          - { $type: Link, label: Failed, href: '/modules/flow/executions?status=failed', variant: danger }
+
+    - $type: DataTable
+      rows: $sources.executions.items
+      navigateTo: '/modules/flow/executions/{executionId}'
+      emptyMessage: No execution matches
+      columns:
+          - { key: 'startedAt', label: 'Started', format: 'datetime' }
+          - { key: 'executionId', label: 'Execution', mono: true }
+          - { key: 'flowId', label: 'Flow' }
+          - { key: 'status', label: 'Status' }
+          - { key: 'duration', label: 'Duration' }
+          - { key: 'failedStepCount', label: 'Failed steps' }
+          - { key: 'lastError', label: 'Last error', truncate: true, muted: true }
+
+    - $type: HorizontalStack
+      justify: justify-between
+      align: items-center
+      gap: gap-3
+      items:
+          - $type: Pagination
+            urlParam: page
+            total: $sources.executions.total
+            size: $sources.executions.limit
+
+          # With urlParam the component reads and writes ?size= itself (its `value` is ignored), and shows options[0]
+          # while the parameter is absent: that must be the backend's default page size (checked in views.test.ts).
+          - $type: PageSizeSelect
+            urlParam: size
+            options: [20, 50, 100]

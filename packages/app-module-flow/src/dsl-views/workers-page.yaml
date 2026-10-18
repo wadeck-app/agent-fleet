@@ -1,0 +1,42 @@
+# Workers (`flow worker list`): live workers, declared sources, and why the list is empty when it is.
+$sources:
+    workers:
+        url: GET /api/modules/flow/workers
+
+$type: PageContent
+sections:
+    - $type: PageHeader
+      title: Flow workers
+      subtitle: Live workers as the daemon reports them
+
+    - $type: Section
+      title: Live workers
+      items:
+          - $type: DataTable
+            rows: $sources.workers.workers
+            emptyMessage: No worker is connected
+            columns:
+                - { key: 'workerId', label: 'Worker', mono: true }
+                - { key: 'state', label: 'State' }
+                - { key: 'pid', label: 'PID' }
+                - { key: 'version', label: 'Version' }
+                - { key: 'sourceId', label: 'Source' }
+                - { key: 'hasUserInterface', label: 'Interactive' }
+
+    - $type: Section
+      title: Declared sources (capacity that can be started, not workers)
+      items:
+          - $type: DataTable
+            rows: $sources.workers.declaredSources
+            emptyMessage: No source declared
+            columns:
+                - { key: 'sourceId', label: 'Source', mono: true }
+                - { key: 'provider', label: 'Provider' }
+                - { key: 'maxWorkers', label: 'Max workers' }
+
+    - $type: Section
+      title: Why the list may be empty
+      items:
+          - $type: JsonViewer
+            row: $sources.workers
+            field: emptyExplanation

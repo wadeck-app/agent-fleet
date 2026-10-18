@@ -1,8 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type { ExecutionRecord, StepStateRecord } from './HistoryCommand';
-import { formatDuration, formatModelCost, formatStarted } from './HistoryCommand';
+import { FlowCoreError, errorMessage } from '../errors.js';
+import type { ExecutionRecord, StepStateRecord } from '../execution/ExecutionRecord.js';
+import { formatDuration, formatModelCost, formatStarted } from '../history/ExecutionFormat.js';
 
 /** Default number of trailing characters printed for a failed step's stdout/stderr. */
 export const DEFAULT_TAIL_CHARS = 2000;
@@ -20,13 +21,15 @@ export interface RenderOptions {
 	full: boolean;
 }
 
-/** Thrown for every user-facing resolution failure; the message is already actionable. */
-export class ExecutionLookupError extends Error {
+export type ExecutionLookupErrorKind = 'invalid-id' | 'not-found' | 'ambiguous' | 'corrupt' | 'invalid-record';
+
+/** Thrown for every resolution failure; the message is already actionable and `kind` tells which one. */
+export class ExecutionLookupError extends FlowCoreError {
 	constructor(
 		message: string,
-		readonly kind: 'not-found' | 'other' = 'other'
+		override readonly kind: ExecutionLookupErrorKind
 	) {
-		super(message);
+		super(message, kind);
 	}
 }
 
@@ -42,7 +45,8 @@ export function looksLikeExecutionId(target: string): boolean {
 export function resolveExecution(executionsDir: string, idOrPrefix: string): ResolvedExecution {
 	if (!looksLikeExecutionId(idOrPrefix)) {
 		throw new ExecutionLookupError(
-			`'${idOrPrefix}' is not a valid execution id (expected lowercase letters/digits).`
+			`'${idOrPrefix}' is not a valid execution id (expected lowercase letters/digits).`,
+			'invalid-id'
 		);
 	}
 	const ids = fs.existsSync(executionsDir)
@@ -59,7 +63,8 @@ export function resolveExecution(executionsDir: string, idOrPrefix: string): Res
 	if (matches.length > 1) {
 		throw new ExecutionLookupError(
 			`Ambiguous execution id prefix '${idOrPrefix}' matches ${matches.length} executions: ${matches.sort().join(', ')}. ` +
-				'Use a longer prefix.'
+				'Use a longer prefix.',
+			'ambiguous'
 		);
 	}
 	const filePath = path.join(executionsDir, `${matches[0]}.json`);
@@ -68,13 +73,15 @@ export function resolveExecution(executionsDir: string, idOrPrefix: string): Res
 		record = JSON.parse(fs.readFileSync(filePath, 'utf8')) as ExecutionRecord;
 	} catch (err) {
 		throw new ExecutionLookupError(
-			`Cannot read execution file ${filePath}: ${err instanceof Error ? err.message : String(err)}. ` +
-				'The file is corrupt or unreadable; inspect or delete it.'
+			`Cannot read execution file ${filePath}: ${errorMessage(err)}. ` +
+				'The file is corrupt or unreadable; inspect or delete it.',
+			'corrupt'
 		);
 	}
 	if (!record || typeof record !== 'object' || typeof record.steps !== 'object' || record.steps === null) {
 		throw new ExecutionLookupError(
-			`Execution file ${filePath} is not a valid execution record (missing 'steps'). Inspect or delete it.`
+			`Execution file ${filePath} is not a valid execution record (missing 'steps'). Inspect or delete it.`,
+			'invalid-record'
 		);
 	}
 	return { record, filePath };

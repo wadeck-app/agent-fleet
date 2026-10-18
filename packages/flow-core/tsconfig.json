@@ -1,0 +1,17 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "dist",
+		"rootDir": "src",
+		"types": ["node"],
+		// Types only: flow-core must not pull flow-engine/extension-points code at runtime.
+		"paths": {
+			"extension-points": ["../extension-points/src/index"],
+			"flow-engine": ["../flow-engine/src"],
+			"flow-engine/*": ["../flow-engine/src/*"]
+		}
+	},
+	"include": ["src"],
+	"exclude": ["dist", "**/*.test.ts", "src/testing"],
+	"references": [{ "path": "../extension-points" }, { "path": "../flow-engine" }]
+}

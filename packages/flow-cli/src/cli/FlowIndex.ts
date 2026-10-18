@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { FlowConfigLoader } from '../config/FlowConfig.js';
+import { appCoreModuleOption, defaultAppModuleLocations } from '../daemon/AppModuleLocator.js';
 import { Daemon, writeDaemonLog } from '../daemon/Daemon.js';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
@@ -209,7 +210,11 @@ async function main(): Promise<void> {
 		// Must run before any worker is forked: ForkWorkerSource/WindowsDaemonEnv forward these
 		// two vars from this process's own env, never overriding an operator's explicit export.
 		FlowConfigLoader.applyOpenCodeEnvDefaults(config);
-		await Daemon.start(config, DAEMON_DIR);
+		// The packaged app-module is registered with app-core (best-effort) once the daemon is up.
+		const appCoreModule = appCoreModuleOption(defaultAppModuleLocations(import.meta.url), message =>
+			writeDaemonLog(path.join(DAEMON_DIR, 'logs'), 'error', `[AppCoreRegistration] ${message}`)
+		);
+		await Daemon.start(config, DAEMON_DIR, { appCoreModule });
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).
 		return;
 	}

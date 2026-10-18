@@ -18,6 +18,7 @@
 			"extension-points": ["./packages/extension-points/src/index"],
 			"e2e-web/*": ["./packages/e2e-web/src/*"],
 			"flow-cli/*": ["./packages/flow-cli/src/*"],
+			"flow-core": ["./packages/flow-core/src/index"],
 			"flow-engine": ["./packages/flow-engine/src/index"],
 			"flow-engine/*": ["./packages/flow-engine/src/*"],
 			"orchestrator/*": ["./packages/orchestrator/src/*"],

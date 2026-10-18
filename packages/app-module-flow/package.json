@@ -1,0 +1,38 @@
+{
+	"name": "app-module-flow",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"files": [
+		"dist-module"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.json --noEmit",
+		"check": "app-core-cli check .",
+		"prebundle": "cd ../flow-core && npm run build",
+		"bundle": "app-core-cli package .",
+		"pretest": "cd ../flow-core && npm run build",
+		"test": "vitest run --bail=1",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"lint": "eslint src",
+		"lint:fix": "eslint src --fix",
+		"clean": "rimraf dist-module"
+	},
+	"dependencies": {
+		"@wadeck-app/shared-cli": "^2026.10.11-039-30df8da0",
+		"flow-core": "file:../flow-core"
+	},
+	"devDependencies": {
+		"@types/js-yaml": "^4.0.9",
+		"@types/node": "^24.0.0",
+		"@wadeck-app/app-core-cli": "latest",
+		"@wadeck-app/app-core-sdk": "latest",
+		"js-yaml": "^4.1.1",
+		"typescript": "^7.0.0",
+		"vitest": "^4.0.14"
+	},
+	"engines": {
+		"node": ">=22"
+	}
+}

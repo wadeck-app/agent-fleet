@@ -12,4 +12,6 @@ chmod +x packages/flow-cli-darwin-arm64/flow packages/flow-cli-darwin-x64/flow
 cp packages/flow-cli/dist-bundle/flow.cjs          packages/flow-cli-dist/flow.cjs
 cp packages/flow-cli/dist-bundle/worker.cjs        packages/flow-cli-dist/worker.cjs
 cp packages/flow-cli/dist-bundle/flow-updater.cjs  packages/flow-cli-dist/flow-updater.cjs
+# The packaged app-module (manifest.json, backend, views) the daemon registers with app-core.
+cp -r packages/flow-cli/dist-bundle/app-module     packages/flow-cli-dist/app-module
 echo "flow artifacts copied"

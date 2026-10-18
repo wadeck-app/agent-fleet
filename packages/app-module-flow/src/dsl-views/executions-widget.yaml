@@ -1,0 +1,18 @@
+# Dashboard widget: the five most recent executions.
+$sources:
+    executions:
+        url: GET /api/modules/flow/executions
+        params:
+            limit: '5'
+
+$type: Card
+items:
+    - $type: DataTable
+      rows: $sources.executions.items
+      navigateTo: '/modules/flow/executions/{executionId}'
+      emptyMessage: No execution yet
+      columns:
+          - { key: 'startedAt', label: 'Started', format: 'datetime' }
+          - { key: 'flowId', label: 'Flow' }
+          - { key: 'status', label: 'Status' }
+          - { key: 'duration', label: 'Duration' }

@@ -52,6 +52,18 @@ const testSuites = [
 		type: testSuiteType_UNIT,
 	},
 	{
+		name: 'Flow Core Unit Tests',
+		command: 'npm',
+		args: ['run', 'test', '--workspace=flow-core'],
+		type: testSuiteType_UNIT,
+	},
+	{
+		name: 'Flow App Module Tests',
+		command: 'npm',
+		args: ['run', 'test', '--workspace=app-module-flow'],
+		type: testSuiteType_UNIT,
+	},
+	{
 		name: 'Flow Engine Unit Tests',
 		command: 'npm',
 		args: ['run', 'test', '--workspace=flow-engine'],

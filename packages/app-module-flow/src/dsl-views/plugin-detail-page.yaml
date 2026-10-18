@@ -1,0 +1,41 @@
+# One plugin (`flow plugins show <id>`), mounted at /modules/flow/plugins/:id. ":id" of the manifest path is $route.id.
+$sources:
+    plugin:
+        # A placeholder is filled from params; the module id stays literal.
+        url: GET /api/modules/flow/plugins/{id}
+        params:
+            id: $route.id
+
+$type: PageContent
+sections:
+    - $type: Link
+      label: Back to plugins
+      href: /modules/flow/plugins
+      variant: muted
+
+    - $type: PageHeader
+      title: $sources.plugin.id
+      subtitle: $sources.plugin.typeString
+
+    - $type: HorizontalStack
+      gap: gap-3
+      align: items-center
+      items:
+          - { $type: Badge, label: $sources.plugin.extensionPoint, variant: info }
+
+    - $type: Section
+      title: Configuration
+      items:
+          - $type: JsonViewer
+            row: $sources.plugin
+            field: snippet
+
+    - $type: Section
+      title: Options
+      items:
+          - $type: DataTable
+            rows: $sources.plugin.optionRows
+            emptyMessage: This plugin has no option
+            columns:
+                - { key: 'name', label: 'Option', mono: true }
+                - { key: 'description', label: 'Description' }

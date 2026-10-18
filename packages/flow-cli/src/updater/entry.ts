@@ -15,6 +15,8 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import { join } from 'node:path';
 
+import { registerWithAppCore } from '../daemon/AppCoreRegistration';
+import { readAppModuleVersion, registerAfterUpdate } from './RegisterAfterUpdate';
 import { decideUpdate } from './UpdateDeferral';
 
 declare const __FLOW_CLI_VERSION__: string;
@@ -42,8 +44,9 @@ const configDir = (() => {
 
 const currentVersion = typeof __FLOW_CLI_VERSION__ !== 'undefined' ? __FLOW_CLI_VERSION__ : '0.0.0-dev';
 
+let npmRoot: string | undefined;
 try {
-	const npmRoot = execNpm(['root', '-g'], { timeout: 10_000 }).trim();
+	npmRoot = execNpm(['root', '-g'], { timeout: 10_000 }).trim();
 	const selfCheckCmd = `${process.execPath} ${join(npmRoot, PKG_NAME, 'flow.cjs')} cli self-check`;
 	if (!process.env['UPDATER_SELF_CHECK_CMD']) {
 		process.env['UPDATER_SELF_CHECK_CMD'] = selfCheckCmd;
@@ -51,6 +54,10 @@ try {
 } catch {
 	// Skip self-check if npm root unavailable.
 }
+
+const appModuleManifest = npmRoot === undefined ? undefined : join(npmRoot, PKG_NAME, 'app-module', 'manifest.json');
+// Read before the install replaces the files: registerAfterUpdate registers only if this changed.
+const appModuleBefore = appModuleManifest === undefined ? undefined : readAppModuleVersion(appModuleManifest);
 
 /**
  * Query GET /health on the flow daemon. Returns the parsed JSON body, or null if
@@ -233,9 +240,22 @@ runUpdater({
 		return 'apply-now';
 	},
 })
-	.then(() => {
-		if (!force) return;
-		reportOutcome(startedAt, echoUpdaterLog(logPathBeforeRun, logSizeBeforeRun));
+	.then(async () => {
+		if (force) reportOutcome(startedAt, echoUpdaterLog(logPathBeforeRun, logSizeBeforeRun));
+		// An update does not restart the daemon (it registers on its own start), so a running app-core would keep
+		// the previous app-module until the next daemon start: tell it now, from the new install.
+		if (appModuleManifest === undefined || appModuleBefore === undefined) {
+			process.stderr.write(
+				'[flow-updater] app-core: not re-registering the app-module, "npm root -g" failed earlier\n'
+			);
+			return;
+		}
+		await registerAfterUpdate({
+			manifestPath: appModuleManifest,
+			before: appModuleBefore,
+			register: registerWithAppCore,
+			log: line => process.stdout.write(`[flow-updater] ${line}\n`),
+		});
 	})
 	.catch(err => {
 		// Surface whatever the updater managed to log before failing, then the failure itself.

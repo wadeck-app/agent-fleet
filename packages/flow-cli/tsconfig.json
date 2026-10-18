@@ -9,6 +9,7 @@
 		"resolveJsonModule": true,
 		"paths": {
 			"extension-points": ["../extension-points/src/index"],
+			"flow-core": ["../flow-core/src/index"],
 			"flow-engine": ["../flow-engine/src"],
 			"flow-engine/*": ["../flow-engine/src/*"],
 			"shared-common": ["../shared-common/src"],
@@ -16,5 +17,10 @@
 		}
 	},
 	"include": ["src"],
-	"references": [{ "path": "../extension-points" }, { "path": "../flow-engine" }, { "path": "../shared-common" }]
+	"references": [
+		{ "path": "../extension-points" },
+		{ "path": "../flow-core" },
+		{ "path": "../flow-engine" },
+		{ "path": "../shared-common" }
+	]
 }

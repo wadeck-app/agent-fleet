@@ -1,0 +1,25 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ES2022"],
+		"strict": true,
+		"skipLibCheck": true,
+		"useDefineForClassFields": true,
+		"verbatimModuleSyntax": true,
+		"forceConsistentCasingInFileNames": true,
+		"noEmit": true,
+		"types": ["vitest/globals", "node"],
+		// Sources, not flow-core's build output: `npm run build --workspaces` visits this package before flow-core.
+		"paths": {
+			"flow-core": ["../flow-core/src/index"],
+			"extension-points": ["../extension-points/src/index"],
+			"flow-engine": ["../flow-engine/src/index"],
+			"flow-engine/*": ["../flow-engine/src/*"],
+			"shared-common": ["../shared-common/src"],
+			"shared-common/*": ["../shared-common/src/*"]
+		}
+	},
+	"include": ["src"]
+}

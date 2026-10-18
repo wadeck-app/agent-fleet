@@ -3,9 +3,11 @@ import { FOLLOW_POLL_INTERVAL_MS } from '@wadeck-app/shared-cli/FollowSnapshot';
 import { LiveRegion } from '@wadeck-app/shared-cli/LiveRegion';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { cacheFilePath, readCache, readUpdateConfig, semverLte } from '@wadeck-app/shared-updater';
-import { DaemonNotRunningError, createDaemonClient, readPortFile } from '@wadeck-app/singleton-daemon-kit';
+import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import type { ApprovalProvider } from 'extension-points';
+import { FlowQueryService, WorkerListError, formatWorkerLine } from 'flow-core';
+import type { WorkerListResult } from 'flow-core';
 import { StepRunner } from 'flow-engine';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -16,8 +18,6 @@ import { WebSocket } from 'ws';
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { FlowConfigLoader } from '../../config/FlowConfig';
 import { PluginResolver } from '../../config/PluginResolver';
-import { WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
-import type { WorkerSourceEntry } from '../../daemon/WorkerSourceRegistry';
 import type {
 	AssignmentScopedMessage,
 	DaemonToWorker,
@@ -44,8 +44,6 @@ import {
 	scheduleReconnectTimer,
 	withFreshToken,
 } from '../../worker/WorkerLaunch';
-import { describeNoLiveWorkers } from '../../worker/WorkerListing';
-import type { DaemonStatus } from '../../worker/WorkerListing';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 import { VERSION } from '../version.js';
 
@@ -167,21 +165,6 @@ function parseShells(raw: string): ('bash' | 'cmd' | 'pwsh')[] {
 	return shells as ('bash' | 'cmd' | 'pwsh')[];
 }
 
-/**
- * Declared sources, or none if the registry cannot be read.
- *
- * A damaged registry must not turn `flow worker list` into a failure: the question asked was about
- * live workers, and the answer to that is already known. The reason is reported rather than hidden.
- */
-function readDeclaredSources(daemonDir: string): WorkerSourceEntry[] {
-	try {
-		return new WorkerSourceRegistry(daemonDir).list();
-	} catch (err) {
-		report('[warn]', `could not read the declared worker sources: ${normalizeError(err).message}`);
-		return [];
-	}
-}
-
 function ts(): string {
 	return new Date().toISOString().slice(11, 19);
 }
@@ -250,90 +233,32 @@ export function registerWorkerCommand(worker: Command): void {
 		});
 }
 
-/** One formatted text line for a worker, as printed by `flow worker list` without `--json`. */
-function formatWorkerLine(w: WorkerSummary): string {
-	const labels = w.labels.length > 0 ? w.labels.join(',') : '-';
-	const shells = w.shellCapabilities && w.shellCapabilities.length > 0 ? w.shellCapabilities.join(',') : '-';
-	const origin = w.ephemeral ? 'daemon-forked' : (w.sourceId ?? 'external');
-	return `${w.workerId}\t${w.state}\tpid=${String(w.pid)}\tversion=${w.version ?? '-'}\t${origin}\tlabels=${labels}\tshells=${shells}\tinteractive=${String(w.hasUserInterface)}`;
-}
-
-/**
- * The identity of the daemon that just answered, read only when the list is empty (the only case
- * that prints it). The port file is advisory here: the daemon answered, so an unreadable file
- * degrades to "details unavailable" in the output rather than failing the listing.
- */
-async function describeRunningDaemon(daemonDir: string, needed: boolean): Promise<DaemonStatus> {
-	const unknown: DaemonStatus = { running: true, pid: undefined, port: undefined, startedAt: undefined };
-	if (!needed) return unknown;
-	try {
-		const data = await readPortFile(daemonDir);
-		if (data) return { running: true, pid: data.pid, port: data.port, startedAt: data.startedAt };
-	} catch {
-		// Falls through to the "details unavailable" status.
-	}
-	return unknown;
-}
-
-/**
- * Reads the live worker list once, without printing anything.
- *
- * Shared between the one-shot and `--follow` paths. `DaemonNotRunningError` is reported
- * as an empty list, not a failure: no daemon simply means no live workers. Any other
- * error (most commonly an outdated daemon that predates this command) is fatal -- the
- * one-shot caller reports it and exits; `--follow` reports it once per distinct failure
- * rather than every tick, so an unchanging condition does not spam the identical line
- * for however long the operator leaves it running.
- */
-async function readWorkerList(
-	daemonDir: string
-): Promise<{ ok: true; workers: WorkerSummary[]; daemon: DaemonStatus } | { ok: false; message: string }> {
-	try {
-		// The command is declared optional and left unimplemented on purpose: a local
-		// handler here would be used as an in-process fallback and would answer with
-		// its own empty list, so `flow worker list` would report "no workers" while a
-		// daemon with live workers was running.
-		const client = createDaemonClient<{ workers?: () => Promise<WorkerSummary[]> }>({
-			configDir: daemonDir,
-			commands: {},
-		});
-		const workers = (await client.send('workers', undefined)) as WorkerSummary[];
-		return { ok: true, workers, daemon: await describeRunningDaemon(daemonDir, workers.length === 0) };
-	} catch (err) {
-		if (err instanceof DaemonNotRunningError) {
-			return { ok: true, workers: [], daemon: { running: false, reason: err.message } };
-		}
-		const message = normalizeError(err).message;
-		if (/unknown command/i.test(message)) {
-			// The daemon is a long-lived process, so it can predate the CLI asking it
-			// something new. Saying "unknown command" alone sends the user looking for a
-			// typo in their own command line.
-			return {
-				ok: false,
-				message:
-					'The running daemon does not support "flow worker list" -- it started before this command existed. Restart it with "flow stop" then "flow start", or run "flow cli update" first if its version is older than this CLI.',
-			};
-		}
-		return { ok: false, message };
-	}
-}
-
 /** `flow worker list` with neither `--json` nor `--follow`: one full read, then exit. */
-async function runWorkerListOnce(daemonDir: string, json: boolean): Promise<void> {
-	const result = await readWorkerList(daemonDir);
-	if (!result.ok) {
-		report('[fail]', result.message);
+async function runWorkerListOnce(service: FlowQueryService, json: boolean): Promise<void> {
+	let result: WorkerListResult;
+	try {
+		result = await service.listWorkers();
+	} catch (err) {
+		if (!(err instanceof WorkerListError)) throw err;
+		report('[fail]', err.message);
 		process.exit(1);
 	}
+	warnIfSourcesUnreadable(result);
 	if (json) {
 		console.log(JSON.stringify(result.workers, null, 2));
 		return;
 	}
-	if (result.workers.length === 0) {
-		console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), result.daemon, Date.now()));
+	if (result.emptyExplanation !== undefined) {
+		console.log(result.emptyExplanation);
 		return;
 	}
 	for (const w of result.workers) console.log(formatWorkerLine(w));
+}
+
+/** A damaged source registry does not fail the listing (the live workers are known); it is reported. */
+function warnIfSourcesUnreadable(result: WorkerListResult): void {
+	if (result.declaredSourcesError === undefined) return;
+	report('[warn]', `could not read the declared worker sources: ${result.declaredSourcesError}`);
 }
 
 /**
@@ -344,21 +269,25 @@ async function runWorkerListOnce(daemonDir: string, json: boolean): Promise<void
  * (erasing exactly its own last render), so the operator always sees the actual current
  * state -- including a worker that just dropped off -- without the terminal scrolling.
  */
-async function runWorkerListFollow(daemonDir: string, json: boolean): Promise<void> {
+async function runWorkerListFollow(service: FlowQueryService, json: boolean): Promise<void> {
 	const region = new LiveRegion();
 	let lastFailureMessage: string | undefined;
 
 	const renderOnce = async (): Promise<void> => {
-		const result = await readWorkerList(daemonDir);
-		if (!result.ok) {
+		let result: WorkerListResult;
+		try {
+			result = await service.listWorkers();
+		} catch (err) {
+			if (!(err instanceof WorkerListError)) throw err;
 			// A condition that stays fatal (e.g. the daemon staying too old) must not spam
 			// the identical line every tick -- report it once per distinct failure only. The
 			// region itself is left showing the last known-good state rather than cleared.
-			if (result.message !== lastFailureMessage) report('[fail]', result.message);
-			lastFailureMessage = result.message;
+			if (err.message !== lastFailureMessage) report('[fail]', err.message);
+			lastFailureMessage = err.message;
 			return;
 		}
 		lastFailureMessage = undefined;
+		warnIfSourcesUnreadable(result);
 		if (json) {
 			// Split on embedded newlines so LiveRegion's line count (used to erase the
 			// previous render) matches what actually prints -- it tracks array entries, not
@@ -366,8 +295,8 @@ async function runWorkerListFollow(daemonDir: string, json: boolean): Promise<vo
 			region.render(JSON.stringify(result.workers, null, 2).split('\n'));
 			return;
 		}
-		if (result.workers.length === 0) {
-			region.render(describeNoLiveWorkers(readDeclaredSources(daemonDir), result.daemon, Date.now()).split('\n'));
+		if (result.emptyExplanation !== undefined) {
+			region.render(result.emptyExplanation.split('\n'));
 			return;
 		}
 		region.render(result.workers.map(formatWorkerLine));
@@ -401,12 +330,12 @@ function registerListCommand(worker: Command): void {
 			'Keep following the worker list (tail -f style: only new/changed workers are printed after the initial read) until interrupted (Ctrl-C), instead of exiting after one read'
 		)
 		.action(async (options: { json?: boolean; follow?: boolean }) => {
-			const daemonDir = ConfigDir.get('flow');
+			const service = FlowQueryService.forConfigDir(ConfigDir.get('flow'));
 			const json = options.json === true;
 			if (options.follow === true) {
-				await runWorkerListFollow(daemonDir, json);
+				await runWorkerListFollow(service, json);
 			} else {
-				await runWorkerListOnce(daemonDir, json);
+				await runWorkerListOnce(service, json);
 			}
 		});
 }

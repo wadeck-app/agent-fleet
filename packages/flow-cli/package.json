@@ -22,11 +22,13 @@
 		"bundle": "tsx ci/scripts/bundle.ts"
 	},
 	"dependencies": {
+		"@wadeck-app/app-core-sdk": "latest",
 		"@wadeck-app/shared-cli": "^2026.10.11-039-30df8da0",
 		"@wadeck-app/shared-updater": "latest",
 		"@wadeck-app/singleton-daemon-kit": "latest",
 		"commander": "^12.1.0",
 		"extension-points": "file:../extension-points",
+		"flow-core": "file:../flow-core",
 		"flow-engine": "file:../flow-engine",
 		"js-yaml": "^4.1.1",
 		"plugin-cli-approval": "file:../plugin-cli-approval",

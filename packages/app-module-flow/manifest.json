@@ -1,0 +1,51 @@
+{
+	"id": "flow",
+	"extensionPoints": [
+		{
+			"kind": "widget",
+			"slot": "dashboard",
+			"label": "Flow Executions",
+			"view": { "type": "path", "value": "./src/dsl-views/executions-widget.yaml" }
+		},
+		{
+			"kind": "page",
+			"slot": "nav",
+			"label": "Flow Executions",
+			"path": "/executions",
+			"view": { "type": "path", "value": "./src/dsl-views/executions-page.yaml" }
+		},
+		{
+			"kind": "page",
+			"slot": "route",
+			"path": "/executions/:id",
+			"view": { "type": "path", "value": "./src/dsl-views/execution-detail-page.yaml" }
+		},
+		{
+			"kind": "page",
+			"slot": "nav",
+			"label": "Flow Workers",
+			"path": "/workers",
+			"view": { "type": "path", "value": "./src/dsl-views/workers-page.yaml" }
+		},
+		{
+			"kind": "page",
+			"slot": "nav",
+			"label": "Flow Logs",
+			"path": "/logs",
+			"view": { "type": "path", "value": "./src/dsl-views/logs-page.yaml" }
+		},
+		{
+			"kind": "page",
+			"slot": "nav",
+			"label": "Flow Plugins",
+			"path": "/plugins",
+			"view": { "type": "path", "value": "./src/dsl-views/plugins-page.yaml" }
+		},
+		{
+			"kind": "page",
+			"slot": "route",
+			"path": "/plugins/:id",
+			"view": { "type": "path", "value": "./src/dsl-views/plugin-detail-page.yaml" }
+		}
+	]
+}

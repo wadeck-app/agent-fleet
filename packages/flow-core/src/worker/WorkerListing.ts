@@ -1,4 +1,4 @@
-import type { WorkerSourceEntry } from '../daemon/WorkerSourceRegistry.js';
+import type { DeclaredWorkerSource } from './WorkerSources.js';
 
 /** What `flow worker list` could establish about the daemon it asked. */
 export type DaemonStatus =
@@ -62,7 +62,7 @@ function describeDaemon(daemon: DaemonStatus, now: number): string[] {
  *
  * Deliberately never says "available": a declared source is intent, not capacity.
  */
-export function describeNoLiveWorkers(declared: WorkerSourceEntry[], daemon: DaemonStatus, now: number): string {
+export function describeNoLiveWorkers(declared: DeclaredWorkerSource[], daemon: DaemonStatus, now: number): string {
 	const lines: string[] = ['No worker is connected.', ...describeDaemon(daemon, now)];
 	const daemonRunning = daemon.running;
 

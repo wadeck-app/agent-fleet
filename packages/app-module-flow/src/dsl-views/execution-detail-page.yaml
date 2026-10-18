@@ -1,0 +1,52 @@
+# Execution detail (`flow show <id>`), mounted at /modules/flow/executions/:id. ":id" of the manifest path is $route.id.
+# ?tail=<chars> sets how much of a failed step's output is kept; ?full=true lifts the limit.
+$sources:
+    execution:
+        # A placeholder is filled from params; the module id stays literal.
+        url: GET /api/modules/flow/executions/{id}
+        params:
+            id: $route.id
+            tail: $urlParam.tail
+            full: $urlParam.full
+
+$type: PageContent
+sections:
+    - $type: Link
+      label: Back to executions
+      href: /modules/flow/executions
+      variant: muted
+
+    - $type: PageHeader
+      title: $sources.execution.flowId
+      subtitle: $sources.execution.executionId
+
+    - $type: HorizontalStack
+      gap: gap-3
+      align: items-center
+      items:
+          - { $type: Badge, label: $sources.execution.status }
+          - { $type: Badge, label: $sources.execution.duration, variant: info }
+          - { $type: Badge, label: $sources.execution.startedAt, variant: default }
+
+    - $type: Section
+      title: Steps
+      items:
+          - $type: DataTable
+            rows: $sources.execution.steps
+            emptyMessage: This execution has no step
+            columns:
+                - { key: 'stepId', label: 'Step', mono: true }
+                - { key: 'status', label: 'Status' }
+                - { key: 'duration', label: 'Duration' }
+                - { key: 'attempts', label: 'Attempts' }
+                - { key: 'model', label: 'Model' }
+                - { key: 'workerId', label: 'Worker', mono: true }
+                - { key: 'error', label: 'Error', truncate: true, muted: true }
+
+    - $type: Section
+      title: Output (same text as `flow show`, failed steps carry the tail of their output)
+      items:
+          - $type: JsonViewer
+            row: $sources.execution
+            field: text
+            maxHeight: 40rem

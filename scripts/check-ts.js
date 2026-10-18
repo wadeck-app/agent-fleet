@@ -36,6 +36,8 @@ const PACKAGES = [
 	'shared-common',
 	'web-backend',
 	'web-frontend',
+	'flow-core',
+	'app-module-flow',
 	'flow-engine',
 	'flow-cli',
 	'orchestrator',

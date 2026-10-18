@@ -11,6 +11,7 @@ import testBestPracticesRules from './scripts/eslint-rules/test-best-practices-r
 // ═══════════════════════════════════════════════════════════════════
 const dependencyMatrix = {
 	cli: ['shared-common', 'orchestrator', 'worker', 'flow-engine'],
+	'flow-core': [],
 	'flow-engine': ['shared-common', 'shared-orch-worker', 'test-utils'],
 	orchestrator: ['shared-orch-worker', 'shared-orch-backend', 'shared-common', 'flow-engine', 'test-utils'],
 	'shared-common': ['shared-orch-worker'],

@@ -1,230 +1,14 @@
 import { ConfigDir } from '@wadeck-app/shared-cli';
 import type { Command } from 'commander';
-import type { StepMeta } from 'flow-engine/types';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import { FlowQueryService, InvalidQueryError } from 'flow-core';
+import type { ExecutionFilterOptions } from 'flow-core';
 
-export interface StepStateRecord {
-	status: string;
-	startedAt?: string;
-	completedAt?: string;
-	injected?: boolean;
-	error?: string;
-	stdout?: string;
-	stderr?: string;
-	/** Cost/token/duration metadata reported by the worker, when the step completed. */
-	meta?: StepMeta;
-	/** Times the step was started, and time spent in the attempts before the current one. */
-	attempts?: number;
-	priorAttemptsMs?: number;
-	/** One entry per relaunch of this step caused by a failed sub-step, with the feedback it was resumed with (truncated). */
-	relaunches?: { at: string; feedback: string }[];
+/** Default flow config directory, resolved lazily so ConfigDir is read at run time. */
+function defaultConfigDir(): string {
+	return ConfigDir.get('flow');
 }
 
-export interface ExecutionRecord {
-	executionId: string;
-	flowFile: string;
-	flowId: string;
-	status: string;
-	startedAt: string;
-	completedAt: string | null;
-	steps: Record<string, StepStateRecord>;
-	lastError?: string;
-}
-
-export interface HistoryOptions {
-	limit?: number;
-	offset?: number;
-	status?: string;
-	flow?: string;
-	id?: string;
-}
-
-export function loadExecutions(dir: string): ExecutionRecord[] {
-	if (!fs.existsSync(dir)) return [];
-	const results: ExecutionRecord[] = [];
-	for (const file of fs.readdirSync(dir)) {
-		if (!file.endsWith('.json')) continue;
-		try {
-			const raw = fs.readFileSync(path.join(dir, file), 'utf8');
-			const rec = JSON.parse(raw) as ExecutionRecord;
-			if (rec.executionId) results.push(rec);
-		} catch {
-			// skip malformed
-		}
-	}
-	results.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-	return results;
-}
-
-function pad(s: string, width: number): string {
-	return s.length >= width ? s.slice(0, width) : s + ' '.repeat(width - s.length);
-}
-
-export function formatDuration(startedAt: string, completedAt: string | null): string {
-	if (!completedAt) return 'running';
-	const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime();
-	if (ms < 1000) return `${ms}ms`;
-	if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-	return `${Math.floor(ms / 60000)}m${Math.round((ms % 60000) / 1000)}s`;
-}
-
-export function formatStarted(iso: string): string {
-	return iso.replace('T', ' ').slice(0, 19);
-}
-
-function renderDetailView(exec: ExecutionRecord): string {
-	const lines: string[] = [];
-	lines.push(`Execution: ${exec.executionId}`);
-	lines.push(`Flow:      ${exec.flowId}`);
-	lines.push(`File:      ${exec.flowFile}`);
-	lines.push(`Status:    ${exec.status}`);
-	lines.push(`Started:   ${formatStarted(exec.startedAt)}`);
-	if (exec.completedAt) lines.push(`Completed: ${formatStarted(exec.completedAt)}`);
-	lines.push(`Duration:  ${formatDuration(exec.startedAt, exec.completedAt)}`);
-	lines.push('');
-	lines.push('Steps:');
-
-	const COL_STEP = 32;
-	const COL_STATUS = 12;
-	const COL_DURATION = 12;
-	const header = '  ' + pad('STEP', COL_STEP) + pad('STATUS', COL_STATUS) + 'DURATION';
-	const sep = '  ' + '-'.repeat(COL_STEP + COL_STATUS + COL_DURATION);
-	lines.push(header);
-	lines.push(sep);
-
-	let hasInjectedStep = false;
-	let totalCostUsd = 0;
-	let hasCost = false;
-	for (const [stepId, step] of Object.entries(exec.steps)) {
-		if (step.injected) hasInjectedStep = true;
-		const name = step.injected ? `${stepId}*` : stepId;
-		const dur = step.startedAt ? formatDuration(step.startedAt, step.completedAt ?? null) : '-';
-		lines.push('  ' + pad(name, COL_STEP) + pad(step.status, COL_STATUS) + dur);
-		const costLine = formatModelCost(step.meta);
-		if (costLine) lines.push('      ' + costLine);
-		if (step.meta && 'cost' in step.meta) {
-			hasCost = true;
-			totalCostUsd += (step.meta as { cost: { usd: number } }).cost.usd;
-		}
-	}
-
-	if (hasCost) {
-		lines.push('');
-		lines.push(`  Total cost: $${totalCostUsd.toFixed(4)}`);
-	}
-
-	if (hasInjectedStep) {
-		lines.push('');
-		lines.push('  * = dynamically injected step');
-	}
-
-	const failedSteps = Object.entries(exec.steps).filter(([, step]) => step.status === 'failed');
-	for (const [stepId, step] of failedSteps) {
-		if (!step.error && !step.stdout && !step.stderr) continue;
-		lines.push('');
-		lines.push(`Step '${stepId}' failed:`);
-		if (step.error) lines.push(`  Error:  ${step.error}`);
-		if (step.stdout) {
-			lines.push('  Stdout:');
-			lines.push(indentBlock(step.stdout));
-		}
-		if (step.stderr) {
-			lines.push('  Stderr:');
-			lines.push(indentBlock(step.stderr));
-		}
-	}
-
-	return lines.join('\n');
-}
-
-/** `meta.cost` only exists on ModelStepMeta -- a script step's meta has no such field. */
-export function formatModelCost(meta: StepMeta | undefined): string | undefined {
-	if (!meta || !('cost' in meta)) return undefined;
-	const { cost } = meta as {
-		cost: {
-			input_tokens: number;
-			output_tokens: number;
-			cache_read_tokens: number;
-			cache_write_tokens: number;
-			usd: number;
-		};
-	};
-	const cacheTokens = (cost.cache_read_tokens ?? 0) + (cost.cache_write_tokens ?? 0);
-	// Cache tokens are an ADDITIONAL volume on top of "in" tokens, not already counted there --
-	// surfacing them separately avoids misreading "in" as the total processed input.
-	const cacheSuffix = cacheTokens > 0 ? ` + ${cacheTokens} cache` : '';
-	return `cost: $${cost.usd.toFixed(4)} (${cost.input_tokens} in / ${cost.output_tokens} out${cacheSuffix} tokens, ${meta.duration_ms}ms)`;
-}
-
-function indentBlock(text: string): string {
-	return text
-		.split('\n')
-		.map(line => `    ${line}`)
-		.join('\n');
-}
-
-export function buildHistoryTable(execs: ExecutionRecord[], opts: HistoryOptions): string {
-	// Detail view
-	if (opts.id) {
-		// Prefix matching: "6u84" matches "6u84r8gf" -- lenient like task ID resolution
-		const matches = execs.filter(e => e.executionId.startsWith(opts.id!));
-		if (matches.length > 1) {
-			return `Ambiguous execution ID prefix "${opts.id}" -- matches: ${matches.map(e => e.executionId).join(', ')}`;
-		}
-		const exec = matches[0];
-		if (!exec) return `Execution '${opts.id}' not found.`;
-		return renderDetailView(exec);
-	}
-
-	// List view -- apply filters
-	let filtered = execs;
-	if (opts.status) filtered = filtered.filter(e => e.status === opts.status);
-	if (opts.flow) filtered = filtered.filter(e => e.flowId === opts.flow);
-	const limit = opts.limit ?? 20;
-	const offset = opts.offset ?? 0;
-	const total = filtered.length;
-	filtered = filtered.slice(offset, offset + limit);
-
-	if (filtered.length === 0) return offset > 0 ? `No more executions (showing ${offset}+).` : 'No executions found.';
-
-	const COL_ID = 12;
-	const COL_FLOW = 32;
-	const COL_STATUS = 12;
-	const COL_STARTED = 22;
-	const lines: string[] = [];
-	lines.push(
-		pad('EXECUTION', COL_ID) +
-			pad('FLOW', COL_FLOW) +
-			pad('STATUS', COL_STATUS) +
-			pad('STARTED', COL_STARTED) +
-			'DURATION'
-	);
-	lines.push('-'.repeat(COL_ID + COL_FLOW + COL_STATUS + COL_STARTED + 12));
-
-	for (const e of filtered) {
-		lines.push(
-			pad(e.executionId, COL_ID) +
-				pad(e.flowId, COL_FLOW) +
-				pad(e.status, COL_STATUS) +
-				pad(formatStarted(e.startedAt), COL_STARTED) +
-				formatDuration(e.startedAt, e.completedAt)
-		);
-	}
-
-	// Pagination footer
-	if (total > offset + limit) {
-		lines.push(
-			`\n  Showing ${offset + 1}-${offset + filtered.length} of ${total}. Use --offset ${offset + limit} for next page.`
-		);
-	} else if (offset > 0) {
-		lines.push(`\n  Showing ${offset + 1}-${offset + filtered.length} of ${total}.`);
-	}
-
-	return lines.join('\n');
-}
-
-export function registerHistoryCommand(program: Command): void {
+export function registerHistoryCommand(program: Command, getConfigDir: () => string = defaultConfigDir): void {
 	program
 		.command('history')
 		.description(
@@ -241,37 +25,21 @@ export function registerHistoryCommand(program: Command): void {
 		.option('--flow <flowId>', 'Filter by flow ID')
 		.option('--id <executionId>', 'Show detail for a specific execution (steps + injected* markers)')
 		.option('--json', 'Machine-readable JSON output')
-		.action(
-			(opts: {
-				limit?: number;
-				offset?: number;
-				status?: string;
-				flow?: string;
-				id?: string;
-				json?: boolean;
-			}) => {
-				const daemonDir = ConfigDir.get('flow');
-				const executionsDir = path.join(daemonDir, 'executions');
-				const execs = loadExecutions(executionsDir);
-
-				if (opts.json) {
-					// Apply same filters as the table view, but output raw records
-					let filtered = execs;
-					if (opts.status) filtered = filtered.filter(e => e.status === opts.status);
-					if (opts.flow) filtered = filtered.filter(e => e.flowId === opts.flow);
-					if (opts.id) {
-						const matches = filtered.filter(e => e.executionId.startsWith(opts.id!));
-						process.stdout.write(JSON.stringify(matches.length === 1 ? matches[0] : matches) + '\n');
-						return;
-					}
-					const limit = opts.limit ?? 20;
-					const offset = opts.offset ?? 0;
-					filtered = filtered.slice(offset, offset + limit);
-					process.stdout.write(JSON.stringify(filtered) + '\n');
+		.action((opts: ExecutionFilterOptions & { json?: boolean }) => {
+			const service = FlowQueryService.forConfigDir(getConfigDir());
+			try {
+				if (!opts.json) {
+					console.log(service.renderHistory(opts));
 					return;
 				}
-
-				console.log(buildHistoryTable(execs, opts));
+				// Same selection as the table, but raw records
+				const { items } = service.listExecutions(opts);
+				const output = opts.id && items.length === 1 ? items[0] : items;
+				process.stdout.write(JSON.stringify(output) + '\n');
+			} catch (err) {
+				if (!(err instanceof InvalidQueryError)) throw err;
+				console.error(err.message);
+				process.exit(1);
 			}
-		);
+		});
 }

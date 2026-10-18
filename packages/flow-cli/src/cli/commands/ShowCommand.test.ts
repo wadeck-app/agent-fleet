@@ -21,12 +21,10 @@ describe('ShowCommand', () => {
 		vi.restoreAllMocks();
 	});
 
-	const EXECUTIONS_DIR = path.join(FIXTURES_DIR, 'executions');
-
 	const runShow = (file: string, ...extra: string[]): void => {
 		const program = new Command();
 		program.exitOverride();
-		registerShowCommand(program, () => EXECUTIONS_DIR);
+		registerShowCommand(program, () => FIXTURES_DIR);
 		program.parse(['node', 'test', 'show', file, ...extra]);
 	};
 

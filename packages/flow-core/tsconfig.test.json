@@ -1,0 +1,9 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"types": ["vitest/globals", "node"]
+	},
+	"exclude": ["dist"],
+	// "references" is not inherited through "extends".
+	"references": [{ "path": "../extension-points" }, { "path": "../flow-engine" }]
+}

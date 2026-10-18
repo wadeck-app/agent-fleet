@@ -1,0 +1,27 @@
+# Daemon log (`flow logs`): the tail of one day. ?date=YYYY-MM-DD picks the day (UTC, default today), ?lines=<n> the tail size.
+$sources:
+    logs:
+        url: GET /api/modules/flow/logs
+        params:
+            date: $urlParam.date
+            lines: $urlParam.lines
+
+$type: PageContent
+sections:
+    - $type: PageHeader
+      title: Flow daemon log
+      subtitle: $sources.logs.filePath
+
+    - $type: HorizontalStack
+      gap: gap-3
+      align: items-center
+      items:
+          - { $type: Badge, label: $sources.logs.date, variant: info }
+          - { $type: Link, label: Last 200 lines, href: '/modules/flow/logs?lines=200' }
+          - { $type: Link, label: Last 1000 lines, href: '/modules/flow/logs?lines=1000' }
+          - { $type: Link, label: Last 5000 lines, href: '/modules/flow/logs?lines=5000' }
+
+    - $type: JsonViewer
+      row: $sources.logs
+      field: text
+      maxHeight: 40rem

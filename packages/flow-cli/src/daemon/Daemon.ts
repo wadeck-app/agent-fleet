@@ -21,6 +21,7 @@ import { PluginResolver } from '../config/PluginResolver.js';
 import type { ClientCommand, SourceReady, UpdateWorkerRequest, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
+import { registerWithAppCore } from './AppCoreRegistration.js';
 import { CommandHandler } from './CommandHandler';
 import { buildDaemonHealth } from './DaemonHealth';
 import { writeDaemonLog } from './DaemonLog.js';
@@ -259,6 +260,11 @@ export interface StartDaemonOptions {
 	 * daemon, so they collide and the loser writes a port file nothing is listening on.
 	 */
 	port?: number;
+	/**
+	 * The packaged app-module to register with app-core on start. Omitted means the daemon does not
+	 * talk to app-core at all (tests and embedders); the CLI entry always passes it.
+	 */
+	appCoreModule?: { manifestPath: string };
 }
 
 async function startDaemon(
@@ -368,6 +374,20 @@ async function startDaemon(
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
 				fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
 				writeDaemonLog(logsDir, 'info', 'Daemon started');
+
+				// Fire-and-forget: app-core being absent or slow (the SDK waits up to 3 s) must not delay or break the
+				// daemon start. Whatever app-core answers lands in the daemon log, `flow logs` shows it.
+				if (options.appCoreModule) {
+					registerWithAppCore(options.appCoreModule.manifestPath, entry =>
+						writeDaemonLog(logsDir, entry.level, `[${entry.source}] ${entry.message}`)
+					).catch((err: unknown) =>
+						writeDaemonLog(
+							logsDir,
+							'error',
+							`[AppCoreRegistration] unexpected failure registering with app-core: ${getErrorMessage(err)}`
+						)
+					);
+				}
 
 				const wsPort = config.worker.wsPort ?? port + 1;
 				executionStore = new ExecutionStore(executionsDir, config.logs.retainDays);
