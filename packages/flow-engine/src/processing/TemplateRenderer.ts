@@ -15,6 +15,18 @@
 import { TemplateEscape } from './TemplateEscape';
 
 /**
+ * Roots resolvable by `resolveVariable`. Single source for the renderer's "Unknown root" error and
+ * the validators' rejection message; TemplateContract.test.ts checks that every root has a sample.
+ */
+export const TEMPLATE_ROOTS = ['inputs', 'steps', 'task', 'context', 'subSteps', 'subStepFeedback'] as const;
+
+/** `'a', 'b', or 'c'` -- the format the renderer error and the validator message share. */
+export function formatTemplateRoots(): string {
+	const quoted = TEMPLATE_ROOTS.map(root => `'${root}'`);
+	return `${quoted.slice(0, -1).join(', ')}, or ${quoted[quoted.length - 1]}`;
+}
+
+/**
  * Context for template rendering
  */
 export interface TemplateContext {
@@ -269,7 +281,7 @@ export class TemplateRenderer {
 			}
 		} else {
 			throw new TemplateRenderError(
-				`Unknown root context: '${root}'. Use 'inputs', 'steps', 'task', 'context', 'subSteps', or 'subStepFeedback'`,
+				`Unknown root context: '${root}'. Use ${formatTemplateRoots()}`,
 				expression,
 				root
 			);

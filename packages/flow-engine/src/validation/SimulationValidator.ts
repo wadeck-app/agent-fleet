@@ -12,6 +12,7 @@
  * caught by structural or semantic validation.
  */
 import { TemplateEscape } from '../processing/TemplateEscape';
+import { TEMPLATE_ROOTS, formatTemplateRoots } from '../processing/TemplateRenderer';
 import type { FlowDefinition, FlowStep } from '../types';
 import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
@@ -329,14 +330,13 @@ export class SimulationValidator {
 	 * Valid forms:
 	 *   inputs.<id>
 	 *   steps.<id>.outputs.<id>
-	 *   flow.<id>
 	 *   task.<id>  (prompt template only -- task is NOT available in when: conditions)
 	 *   context.<id>
 	 *   subStepFeedback  (bare root; '' without failed sub-steps, see TemplateRenderer)
 	 * Where <id> is [a-zA-Z0-9_-]+ (inputs/task/context accept dotted paths, like TemplateRenderer.resolveNested)
 	 */
 	private static readonly VALID_TEMPLATE_EXPRESSION =
-		/^(inputs\.[a-zA-Z0-9_.-]+|steps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_.-]+|steps\.[a-zA-Z0-9_-]+\.meta\.[a-zA-Z0-9_.-]+|subSteps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_.-]+|subSteps\.[a-zA-Z0-9_-]+\.status\.[a-zA-Z0-9_-]+|flow\.[a-zA-Z0-9_-]+|task\.[a-zA-Z0-9_.-]+|context\.[a-zA-Z0-9_.-]+|subStepFeedback)$/;
+		/^(inputs\.[a-zA-Z0-9_.-]+|steps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_.-]+|steps\.[a-zA-Z0-9_-]+\.meta\.[a-zA-Z0-9_.-]+|subSteps\.[a-zA-Z0-9_-]+\.outputs\.[a-zA-Z0-9_.-]+|subSteps\.[a-zA-Z0-9_-]+\.status\.[a-zA-Z0-9_-]+|task\.[a-zA-Z0-9_.-]+|context\.[a-zA-Z0-9_.-]+|subStepFeedback)$/;
 
 	/**
 	 * Validate a single template expression against the whitelist.
@@ -346,10 +346,16 @@ export class SimulationValidator {
 	 */
 	private validateTemplateExpression(expression: string, step: FlowStep, flow: FlowDefinition): void {
 		if (!SimulationValidator.VALID_TEMPLATE_EXPRESSION.test(expression)) {
+			// A well-formed identifier root the renderer does not know (e.g. `flow`): name it and list the valid roots
+			const rootMatch = /^([a-zA-Z_][a-zA-Z0-9_-]*)(?:\.|$)/.exec(expression);
+			const unknownRoot =
+				rootMatch && !(TEMPLATE_ROOTS as readonly string[]).includes(rootMatch[1]!) ? rootMatch[1] : undefined;
 			this.issueCollector.addIssue({
 				severity: 'error',
 				code: ValidationCode.INVALID_TEMPLATE_SYNTAX,
-				message: `Invalid template expression: \${{ ${expression} }}`,
+				message: unknownRoot
+					? `Invalid template expression: \${{ ${expression} }} -- Unknown root '${unknownRoot}'. Use ${formatTemplateRoots()}`
+					: `Invalid template expression: \${{ ${expression} }}`,
 				location: {
 					stepId: step.id,
 					field: step.type === 'model' ? 'prompt' : 'script',

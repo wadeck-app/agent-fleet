@@ -5,6 +5,7 @@ import type { OutputExtractor } from '../processing/OutputExtractor';
 import type { TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
 import type { ScriptFlowStep, ScriptStepMeta, StepOutput, StepTrace } from '../types';
 import type { ScriptExecutor } from './ScriptExecutor';
+import { ScriptFailureMessageBuilder } from './ScriptFailureMessageBuilder';
 
 /** Shared output-file-writing helper used by script and model executors. */
 export function writeOutputFiles(
@@ -38,7 +39,8 @@ export async function executeScriptStep(
 		templateRenderer: TemplateRenderer;
 		scriptExecutor: ScriptExecutor;
 		outputExtractor: OutputExtractor;
-	}
+	},
+	failureMessageBuilder: ScriptFailureMessageBuilder = new ScriptFailureMessageBuilder()
 ): Promise<StepTrace> {
 	const { templateRenderer, scriptExecutor, outputExtractor } = services;
 
@@ -83,7 +85,7 @@ export async function executeScriptStep(
 	stepTrace.meta = scriptMeta;
 
 	if (!result.success) {
-		stepTrace.error = `Script exited with code ${result.exitCode}`;
+		stepTrace.error = await failureMessageBuilder.build(result);
 	}
 
 	return stepTrace;

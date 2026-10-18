@@ -119,6 +119,12 @@ export interface ScriptExecutionResult {
 
 	/** Whether execution was successful (exitCode === 0) */
 	success: boolean;
+
+	/** Shell/binary the script was run with (for failure diagnostics) */
+	shellPath?: string;
+
+	/** Working directory the script ran in (for failure diagnostics) */
+	workingDir?: string;
 }
 
 /**
@@ -330,6 +336,8 @@ export class ScriptExecutor {
 							exitCode,
 							durationMs,
 							success: exitCode === 0,
+							shellPath: bashExecutable,
+							workingDir,
 						});
 					});
 					child.on('error', (err: Error) => {
@@ -347,6 +355,8 @@ export class ScriptExecutor {
 								exitCode: -1,
 								durationMs: Date.now() - startTime,
 								success: false,
+								shellPath: bashExecutable,
+								workingDir,
 							});
 						}, options.timeout);
 					}
@@ -359,6 +369,15 @@ export class ScriptExecutor {
 			let stdout = '';
 			let stderr = '';
 			let killed = false;
+			// shell: true means cmd.exe (via ComSpec) on Windows, /bin/sh elsewhere
+			const genericShellPath =
+				typeof shell === 'string'
+					? shell
+					: shell
+						? process.platform === 'win32'
+							? (process.env['ComSpec'] ?? 'cmd.exe')
+							: '/bin/sh'
+						: undefined;
 
 			// Helper to clean up temp file
 			const cleanupTempFile = () => {
@@ -453,6 +472,8 @@ export class ScriptExecutor {
 					stderr: stderr.trim(),
 					durationMs,
 					success: exitCode === 0,
+					shellPath: genericShellPath,
+					workingDir,
 				};
 
 				// Clean up temp file if created
@@ -534,6 +555,8 @@ export class ScriptExecutor {
 					exitCode,
 					durationMs,
 					success: exitCode === 0,
+					shellPath: binary,
+					workingDir,
 				});
 			});
 			child.on('error', (err: Error) => {
@@ -551,6 +574,8 @@ export class ScriptExecutor {
 						exitCode: -1,
 						durationMs: Date.now() - startTime,
 						success: false,
+						shellPath: binary,
+						workingDir,
 					});
 				}, options.timeout);
 			}

@@ -8,7 +8,7 @@
 import { createMockFlow, createMockModelStep } from 'flow-engine/test-utils/factories';
 import { describe, expect, it } from 'vitest';
 
-import { TemplateRenderer } from '../processing/TemplateRenderer';
+import { TEMPLATE_ROOTS, TemplateRenderer } from '../processing/TemplateRenderer';
 import type { TemplateContext } from '../processing/TemplateRenderer';
 import { FlowValidator } from './FlowValidator';
 import { ValidationCode } from './ValidationTypes';
@@ -23,8 +23,8 @@ const SAMPLES: Record<string, string[]> = {
 	subStepFeedback: ['subStepFeedback'],
 };
 
-/** Expressions the validator accepts although the renderer rejects them (documented, owner decision pending). */
-const VALIDATOR_ONLY_ROOTS = ['flow'];
+/** Roots neither side supports: `flow` was historically whitelisted by the validator only. */
+const UNSUPPORTED_ROOTS = ['flow', 'env', 'zzz'];
 
 function buildContext(): TemplateContext {
 	return {
@@ -94,9 +94,20 @@ describe('template contract: renderer vs validators', () => {
 		expect(templateErrors(`Use \${{ ${expression} }} here`)).toEqual([]);
 	});
 
-	it('documents the validator-only roots as rejected by the renderer', () => {
-		for (const root of VALIDATOR_ONLY_ROOTS) {
-			expect(() => new TemplateRenderer().render(`\${{ ${root}.x }}`, buildContext())).toThrow();
+	it('exposes the same roots from the shared list as the renderer error advertises', () => {
+		expect(rendererRoots().sort()).toEqual([...TEMPLATE_ROOTS].sort());
+	});
+
+	it.each(UNSUPPORTED_ROOTS)('root "%s": renderer and validator both reject it (strict agreement)', root => {
+		expect(() => new TemplateRenderer().render(`\${{ ${root}.x }}`, buildContext())).toThrow(
+			`Unknown root context: '${root}'`
+		);
+		const errors = templateErrors(`Use \${{ ${root}.x }} here`);
+		expect(errors).toHaveLength(1);
+		expect(errors[0]!.code).toBe(ValidationCode.INVALID_TEMPLATE_SYNTAX);
+		expect(errors[0]!.message).toContain(`Unknown root '${root}'`);
+		for (const valid of rendererRoots()) {
+			expect(errors[0]!.message).toContain(`'${valid}'`);
 		}
 	});
 

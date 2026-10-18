@@ -1279,6 +1279,10 @@ Workers built before this feature (no `sub-step-session-resume` in `ready.featur
 
 Same set as the renderer (enforced by `TemplateContract.test.ts`): `inputs.*`, `steps.<id>.outputs.*`, `steps.<id>.meta.*`, `task.*`, `context.*` (dotted paths allowed for `inputs`/`task`/`context`), `subSteps.<id>.outputs.*`, `subSteps.<id>.status.failed`, `subStepFeedback`. Escaped `$${{ ... }}` is ignored by all validators, as by the renderer.
 
+Any other root (e.g. `flow.allLogs`, `env.X`) is an `INVALID_TEMPLATE_SYNTAX` error naming the root and listing the valid ones; `flow.*` was previously accepted by the validator but failed at runtime.
+
+On Windows, a script step killed by an NTSTATUS exit code (>= 0xC0000000, e.g. 3221225794) reports it as hex + name (`0xC0000142 STATUS_DLL_INIT_FAILED`) plus the shell and cwd used. `0xC0000142` adds a hint and bash/conhost/node process counts (`unavailable (<cause>)` if `tasklist` fails). Other exit codes keep `Script exited with code N`.
+
 ### Escape Syntax (`$${{ }}`)
 
 `$${{ expr }}` outputs a **literal** `${{ expr }}` without substitution. Use this when a step generates content that will itself be interpreted as a flow template (e.g., a model step that generates a YAML flow).

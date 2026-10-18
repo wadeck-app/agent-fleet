@@ -9,6 +9,7 @@
 import { MockIssueCollector } from 'flow-engine/test-utils/mocks';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { TEMPLATE_ROOTS } from '../processing/TemplateRenderer';
 import type { FlowDefinition } from '../types';
 import { SimulationValidator } from './SimulationValidator';
 import { ValidationCode } from './ValidationTypes';
@@ -98,10 +99,17 @@ describe('SimulationValidator', () => {
 			expect(syntaxErrors(issueCollector)).toHaveLength(0);
 		});
 
-		it('should accept flow.allLogs', () => {
+		it('should reject flow.allLogs: the renderer has no flow root, naming it and listing the valid roots', () => {
 			const { flow, stepIds } = makeFlow('Logs: ${{ flow.allLogs }}');
 			validator.validateSimulation(flow, stepIds);
-			expect(syntaxErrors(issueCollector)).toHaveLength(0);
+			const errors = syntaxErrors(issueCollector);
+			expect(errors).toHaveLength(1);
+			expect(errors[0].severity).toBe('error');
+			expect(errors[0].message).toContain('flow.allLogs');
+			expect(errors[0].message).toContain("Unknown root 'flow'");
+			for (const root of TEMPLATE_ROOTS) {
+				expect(errors[0].message).toContain(`'${root}'`);
+			}
 		});
 
 		it('should accept task.priority', () => {
