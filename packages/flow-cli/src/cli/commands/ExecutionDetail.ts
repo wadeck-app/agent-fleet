@@ -99,6 +99,18 @@ function stepDuration(step: StepStateRecord): string {
 	return formatDuration(step.startedAt, step.completedAt ?? null);
 }
 
+/** `  attempts: 3 (total 4m58s)` when the step ran more than once; the duration above is the last attempt only. */
+function attemptsLabel(step: StepStateRecord): string {
+	if (!step.attempts || step.attempts < 2) return '';
+	const lastMs =
+		step.startedAt && step.completedAt
+			? new Date(step.completedAt).getTime() - new Date(step.startedAt).getTime()
+			: 0;
+	const base = new Date(0).toISOString();
+	const total = formatDuration(base, new Date((step.priorAttemptsMs ?? 0) + lastMs).toISOString());
+	return `  attempts: ${step.attempts} (total ${total})`;
+}
+
 function modelOf(step: StepStateRecord): string | undefined {
 	const meta = step.meta;
 	return meta && 'model' in meta ? (meta as { model: string }).model : undefined;
@@ -113,7 +125,14 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	lines.push(`Started:   ${formatStarted(record.startedAt)}`);
 	if (record.completedAt) lines.push(`Completed: ${formatStarted(record.completedAt)}`);
 	lines.push(`Duration:  ${formatDuration(record.startedAt, record.completedAt)}`);
-	if (record.lastError) lines.push(`Error:     ${record.lastError}`);
+	// lastError is the last step failure ever seen; on a completed run it is a recovered retry, not the outcome.
+	if (record.lastError) {
+		lines.push(
+			record.status === 'completed'
+				? `Last error (recovered, run completed): ${record.lastError}`
+				: `Error:     ${record.lastError}`
+		);
+	}
 	lines.push(`Record:    ${filePath}`);
 	if (record.status === 'running' || record.status === 'queued') {
 		lines.push('');
@@ -127,7 +146,9 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	for (const [stepId, step] of Object.entries(record.steps)) {
 		const name = step.injected ? `${stepId}*` : stepId;
 		const model = modelOf(step);
-		lines.push(`  ${name}  [${step.status}]  ${stepDuration(step)}${model ? `  model: ${model}` : ''}`);
+		lines.push(
+			`  ${name}  [${step.status}]  ${stepDuration(step)}${model ? `  model: ${model}` : ''}${attemptsLabel(step)}`
+		);
 		if (step.error) lines.push(`      error: ${step.error}`);
 		const cost = formatModelCost(step.meta);
 		if (cost) lines.push(`      ${cost}`);

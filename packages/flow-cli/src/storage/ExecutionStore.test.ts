@@ -89,6 +89,24 @@ describe('ExecutionStore', () => {
 			expect(state.status).toBe('running');
 		});
 
+		it('counts attempts and accumulates the time of earlier attempts', () => {
+			store.create({ executionId: EXEC_ID, flowFile: 'flow.yaml', flowId: 'my-flow', stepIds: ['step-a'] });
+			const first = store.markStepRunning(EXEC_ID, 'step-a');
+			expect(first.steps['step-a'].attempts).toBe(1);
+			expect(first.steps['step-a'].priorAttemptsMs).toBe(0);
+
+			// Pin the first attempt to 4 minutes so the accumulation is deterministic
+			const state = store.read(EXEC_ID);
+			state.steps['step-a'].startedAt = '2026-10-18T10:00:00.000Z';
+			state.steps['step-a'].completedAt = '2026-10-18T10:04:00.000Z';
+			state.steps['step-a'].status = 'failed';
+			store.update(EXEC_ID, { steps: state.steps });
+
+			const second = store.markStepRunning(EXEC_ID, 'step-a');
+			expect(second.steps['step-a'].attempts).toBe(2);
+			expect(second.steps['step-a'].priorAttemptsMs).toBe(240000);
+		});
+
 		// A step run again (sub-step restart, retry, loop) must not look like "completed with an
 		// error" once it finally succeeds: the previous attempt's failure is not this run's.
 		it('clears the previous attempt failure details when the step runs again', () => {

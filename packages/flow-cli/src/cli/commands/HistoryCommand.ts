@@ -14,6 +14,9 @@ export interface StepStateRecord {
 	stderr?: string;
 	/** Cost/token/duration metadata reported by the worker, when the step completed. */
 	meta?: StepMeta;
+	/** Times the step was started, and time spent in the attempts before the current one. */
+	attempts?: number;
+	priorAttemptsMs?: number;
 }
 
 export interface ExecutionRecord {

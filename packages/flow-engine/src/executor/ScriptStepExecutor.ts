@@ -86,7 +86,7 @@ export async function executeScriptStep(
 	stepTrace.meta = scriptMeta;
 
 	if (!result.success) {
-		stepTrace.error = await failureMessageBuilder.build(result);
+		stepTrace.error = await failureMessageBuilder.build({ ...result, script: renderedScript });
 	}
 
 	return stepTrace;

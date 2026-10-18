@@ -88,6 +88,20 @@ describe('ForkWorkerSource - obtaining a worker', () => {
 		await expect(source.obtainWorker(request)).rejects.toThrow(/no pid/i);
 	});
 
+	it('forwards PATHEXT to the worker so model CLIs can resolve npm.cmd', async () => {
+		const previous = process.env['PATHEXT'];
+		process.env['PATHEXT'] = '.COM;.EXE;.BAT;.CMD';
+		try {
+			spawnMock.mockReturnValue(fakeChild(1));
+			await new ForkWorkerSource(100, 200).obtainWorker(request);
+			const env = (spawnMock.mock.calls[0]![2] as { env: Record<string, string> }).env;
+			expect(env['PATHEXT']).toBe('.COM;.EXE;.BAT;.CMD');
+		} finally {
+			if (previous === undefined) delete process.env['PATHEXT'];
+			else process.env['PATHEXT'] = previous;
+		}
+	});
+
 	it('passes the claude path only when one was provided', async () => {
 		spawnMock.mockReturnValue(fakeChild(1));
 		await new ForkWorkerSource(100, 200, 'C:/claude.exe').obtainWorker(request);

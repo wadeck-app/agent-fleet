@@ -7,6 +7,10 @@ export interface ScriptFailureInfo {
 	exitCode: number;
 	shellPath?: string;
 	workingDir?: string;
+	/** Rendered script text; lets the strict hint be skipped for a deliberate `exit N`. */
+	script?: string;
+	/** Script stderr; "unbound variable" always keeps the strict hint. */
+	stderr?: string;
 	/** True when the step ran under bash strict mode (-e -u); adds the opt-out hint. */
 	strictApplied?: boolean;
 }
@@ -26,7 +30,21 @@ export class ScriptFailureMessageBuilder {
 
 	async build(info: ScriptFailureInfo): Promise<string> {
 		const message = await this.buildBase(info);
-		return info.strictApplied ? `${message}\n${BashInvocation.STRICT_FAILURE_HINT}` : message;
+		return info.strictApplied && this.strictMayHaveCausedFailure(info)
+			? `${message}\n${BashInvocation.STRICT_FAILURE_HINT}`
+			: message;
+	}
+
+	/**
+	 * False when the script itself says `exit <code>` and bash reported no unbound variable: the
+	 * failure is then deliberate and the hint would point at a shell problem that did not happen.
+	 * Unknown script text keeps the hint.
+	 */
+	private strictMayHaveCausedFailure(info: ScriptFailureInfo): boolean {
+		if (info.script === undefined) return true;
+		if (/unbound variable/i.test(info.stderr ?? '')) return true;
+		const deliberateExit = new RegExp(`(^|[;&|(\\s])exit\\s+${info.exitCode}(\\s|;|$)`, 'm');
+		return !deliberateExit.test(info.script);
 	}
 
 	private async buildBase(info: ScriptFailureInfo): Promise<string> {

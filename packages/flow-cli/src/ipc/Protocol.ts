@@ -349,6 +349,10 @@ export interface StepState {
 	stderr?: string;
 	/** Execution metadata reported by the worker on step_completed (cost/tokens/duration). */
 	meta?: StepMeta;
+	/** Number of times the step was started (retries, onFailure loops, resumes); absent on records written before this existed. */
+	attempts?: number;
+	/** Wall-clock time spent in attempts before the current one, so retries stay visible in `flow show`. */
+	priorAttemptsMs?: number;
 	/**
 	 * Which source supplied the worker that ran this step, and which worker it was
 	 * (T-06). Without this, a step's outcome cannot be attributed to the machine that

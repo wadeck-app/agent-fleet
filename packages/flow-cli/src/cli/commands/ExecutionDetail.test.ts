@@ -96,6 +96,17 @@ describe('ExecutionDetail', () => {
 	describe('renderExecutionDetail', () => {
 		const fixture = () => resolveExecution(FIXTURE_DIR, 'f41lc0de');
 
+		it('labels a lastError on a completed run as recovered and shows attempts with the total time', () => {
+			const record = minimal('retry000');
+			Object.assign(record, { lastError: 'Script exited with code 1' });
+			Object.assign(record.steps.a, { attempts: 3, priorAttemptsMs: 290000 });
+			writeExec('retry000', record);
+			const out = renderExecutionDetail(resolveExecution(tmpDir, 'retry000'), { tail: 10, full: false });
+			expect(out).toContain('Last error (recovered, run completed): Script exited with code 1');
+			expect(out).not.toMatch(/^Error:/m);
+			expect(out).toContain('a  [completed]  1.0s  attempts: 3 (total 4m51s)');
+		});
+
 		it('shows status, duration, error, model and cost per step', () => {
 			const out = renderExecutionDetail(fixture(), { tail: 2000, full: false });
 			expect(out).toContain('Execution: f41lc0de');

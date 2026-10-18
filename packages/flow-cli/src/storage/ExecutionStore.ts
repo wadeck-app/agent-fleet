@@ -114,9 +114,16 @@ export class ExecutionStore {
 		provenance?: { sourceId?: string; workerId?: string }
 	): ExecutionState {
 		const state = this.read(executionId);
+		const previous = state.steps[stepId];
+		const previousMs =
+			previous?.startedAt && previous.completedAt
+				? new Date(previous.completedAt).getTime() - new Date(previous.startedAt).getTime()
+				: 0;
 		// Preserve existing fields (e.g. injected: true) when transitioning to running
 		state.steps[stepId] = {
-			...state.steps[stepId],
+			...previous,
+			attempts: (previous?.attempts ?? 0) + 1,
+			priorAttemptsMs: (previous?.priorAttemptsMs ?? 0) + previousMs,
 			status: 'running',
 			startedAt: new Date().toISOString(),
 			// A new attempt: the previous one's failure must not linger on a step that may now succeed

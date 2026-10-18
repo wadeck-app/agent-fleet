@@ -132,6 +132,9 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 			...(process.platform === 'win32' && process.env['USERPROFILE']
 				? { USERPROFILE: process.env['USERPROFILE'] }
 				: {}),
+			// Providers forward PATHEXT to model CLIs only when the worker has it (OpenCodeModelProvider);
+			// without it the model's shell cannot resolve `npm` -> npm.cmd ("Broken PATHEXT in this shell").
+			...(process.env['PATHEXT'] ? { PATHEXT: process.env['PATHEXT'] } : {}),
 			...(process.env['TEMP'] ? { TEMP: process.env['TEMP'] } : {}),
 			...(process.env['TMP'] ? { TMP: process.env['TMP'] } : {}),
 			// Absolute path to bash.exe, resolved by the launcher before VBScript discards the Git

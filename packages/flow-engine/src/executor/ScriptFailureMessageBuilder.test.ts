@@ -96,6 +96,27 @@ describe('ScriptFailureMessageBuilder - strict hint', () => {
 		await expect(builder.build({ exitCode: 1 })).resolves.toBe('Script exited with code 1');
 	});
 
+	it('skips the hint for a deliberate `exit N` matching the exit code', async () => {
+		const builder = new ScriptFailureMessageBuilder('linux', okCounter);
+		const script = 'npm test || { echo gate failed; exit 1; }';
+		await expect(builder.build({ exitCode: 1, strictApplied: true, script, stderr: '' })).resolves.toBe(
+			'Script exited with code 1'
+		);
+	});
+
+	it('keeps the hint when the exit code differs from the explicit exit or bash reports an unbound variable', async () => {
+		const builder = new ScriptFailureMessageBuilder('linux', okCounter);
+		const withHint = await builder.build({ exitCode: 127, strictApplied: true, script: 'foo\nexit 1', stderr: '' });
+		expect(withHint).toContain('strict: false');
+		const unbound = await builder.build({
+			exitCode: 1,
+			strictApplied: true,
+			script: 'echo $X\nexit 1',
+			stderr: 'line 1: X: unbound variable',
+		});
+		expect(unbound).toContain('strict: false');
+	});
+
 	it('keeps the NTSTATUS rendering and appends the hint last', async () => {
 		const builder = new ScriptFailureMessageBuilder('win32', okCounter);
 		const message = await builder.build({ exitCode: 3221225794, strictApplied: true });
