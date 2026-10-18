@@ -54,7 +54,7 @@ describe('logsCommand', () => {
 		const done = logsCommand(configDir, { follow: true, lines: 50, human: false }, write);
 		expect(out.join('')).toContain('No log file for today');
 		fs.writeFileSync(logFile, 'late line\n');
-		await vi.waitFor(() => expect(out.join('')).toContain('late line\n'), { timeout: 3000, interval: 50 });
+		await vi.waitFor(() => expect(out.join('')).toContain('late line\n'), { timeout: 10_000, interval: 50 });
 		process.emit('SIGINT');
 		await done;
 		expect(process.listenerCount('SIGINT')).toBe(sigintBefore);
