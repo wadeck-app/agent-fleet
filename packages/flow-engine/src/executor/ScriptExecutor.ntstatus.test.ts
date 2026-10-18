@@ -94,3 +94,28 @@ describe('script step failure message (spawn mocked)', () => {
 		expect(trace.error).toBeUndefined();
 	});
 });
+
+describe('executeOrThrow (spawn mocked)', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	function failWith(exitCode: number) {
+		const child = makeMockChild();
+		vi.spyOn(child_process, 'spawn').mockReturnValue(child as unknown as child_process.ChildProcess);
+		vi.spyOn(BashShellStrategy.prototype, 'resolve').mockReturnValue('C:\\Git\\usr\\bin\\bash.exe');
+		const promise = new ScriptExecutor().executeOrThrow({ script: 'echo hi', shellKind: 'bash' });
+		setImmediate(() => child.emit('close', exitCode));
+		return promise;
+	}
+
+	it('renders an NTSTATUS exit as hex, name and hint', async () => {
+		await expect(failWith(3221225794)).rejects.toThrow(
+			/Script failed with exit code 0xC0000142 STATUS_DLL_INIT_FAILED: .*leaked bash\.exe/
+		);
+	});
+
+	it('keeps a plain exit code as is', async () => {
+		await expect(failWith(3)).rejects.toThrow('Script failed with exit code 3');
+	});
+});

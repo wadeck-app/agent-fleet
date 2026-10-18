@@ -6611,3 +6611,19 @@ never exited (every attempt timed out), including with model ids that were fine.
 the same calls returned in ~3s. Flow's provider is unaffected (`stdio: ['ignore', ...]`), so do not
 chase model ids or config when a manual `opencode run` hangs: close stdin first. A model missing from
 `whitelist` in the opencode config is a separate failure (it is simply not listed by `opencode models`).
+
+## Read the version from the package manager, and say which version a number belongs to
+
+An `npm list -g` shows the installed package version; a binary's `--version` can report another one (agent-browser
+0.7.6 installed, binary printing 0.6.0). Quote both with their label, and take the package version from
+`npm list -g <pkg>` rather than from the binary or from memory.
+
+## Verify a cleanup claim with the process table, not with the absence of a symptom
+
+"No bash.exe has live children" was asserted from a partial listing and was wrong. Before saying a process set is
+idle or gone, list it with its parent/children (`wmic`/`Get-CimInstance Win32_Process`) and re-list after the kill.
+
+## `shell: bash` and the implicit Windows multiline path must prepare the same environment
+
+Both go through `runViaTempFileBinary`; the explicit path used to skip `ensureGitCoreutilsOnPath`, so a daemon
+started without Git Bash on PATH failed `sed`/`dirname` only for steps with an explicit `shell: bash`.

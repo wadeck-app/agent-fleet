@@ -9,98 +9,15 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { NtStatusDescriber } from './NtStatusDescriber';
 import { BashInvocation } from './shell/BashInvocation';
 import { BashShellStrategy } from './shell/BashShellStrategy';
 import { CmdShellStrategy } from './shell/CmdShellStrategy';
 import { PwshShellStrategy } from './shell/PwshShellStrategy';
 import type { ShellStrategy } from './shell/ShellStrategy';
+import { ensureGitCoreutilsOnPath, normalizePathKey, resolveBashOnWindows } from './shell/WindowsBashEnvironment';
 
-/**
- * Finds bash.exe on Windows without relying on the system PATH.
- *
- * WScript.Shell.Run (used to start the daemon) spawns with the system PATH, which does not
- * include Git Bash's MSYS2 directories. A plain 'bash' lookup finds WSL bash first, which
- * starts in 3-6s and cannot access Windows temp-file paths. This function searches PATH,
- * then falls back to the Git for Windows install directories.
- */
-function resolveBashOnWindows(env: Record<string, string>): string {
-	// Explicit pin from the environment (set by launcher before PATH is lost).
-	const pinned = env['FLOW_BASH_PATH'];
-	if (pinned && fs.existsSync(pinned)) return pinned;
-
-	// Known Git for Windows installation paths, in preference order. Checked before the PATH
-	// search below: System32 (which carries the WSL bash.exe stub) is on nearly every Windows
-	// PATH, so searching PATH first would find WSL before ever reaching Git -- the exact bug
-	// this function exists to avoid.
-	const knownLocations = [
-		'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
-		'C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe',
-		'C:\\Program Files\\Git\\bin\\bash.exe',
-	];
-	for (const loc of knownLocations) {
-		if (fs.existsSync(loc)) return loc;
-	}
-
-	// Search the worker's own PATH for bash.exe -- only reached when Git isn't in any of the
-	// well-known locations above (e.g. a custom install path).
-	const pathEnv = env['PATH'] ?? '';
-	for (const dir of pathEnv.split(path.delimiter)) {
-		const candidate = path.join(dir, 'bash.exe');
-		if (fs.existsSync(candidate)) return candidate;
-	}
-
-	// Last resort: let the OS find it. May resolve to WSL bash.
-	return 'bash';
-}
-
-/**
- * Returns an env object guaranteed to have an exact-case `PATH` key, if any case variant of it
- * exists at all.
- *
- * On Windows, `process.env` is an internal case-insensitive proxy, but spreading it
- * (`{...process.env}`) yields a plain object whose keys keep whatever casing the OS actually
- * handed this process -- observed in production as `Path`, never `PATH`. MSYS2/Git-for-Windows'
- * bash does a case-SENSITIVE lookup for `PATH` (POSIX semantics); finding no exact match, it
- * silently falls back to its own hardcoded `/usr/bin:/bin`, breaking every script that relies on
- * an npm-installed binary. cmd.exe/PowerShell are unaffected (Windows env lookups are
- * case-insensitive), so this must only be applied before handing an env object to bash.
- *
- * The original-cased key is kept alongside -- some other reader may depend on its exact casing.
- * If an exact-case `PATH` already exists, it is never overwritten by another casing's value.
- */
-export function normalizePathKey(env: Record<string, string>): Record<string, string> {
-	if (Object.prototype.hasOwnProperty.call(env, 'PATH')) return env;
-	const existingKey = Object.keys(env).find(key => key.toUpperCase() === 'PATH');
-	if (existingKey === undefined) return env;
-	return { ...env, PATH: env[existingKey] };
-}
-
-/**
- * Git for Windows' bash is a thin shell: coreutils the shim scripts rely on (sed, dirname,
- * uname, ...) live in `<gitRoot>\usr\bin`, not next to bash.exe's own directory on PATH.
- * The daemon's own PATH (inherited from WScript.Shell.Run) carries neither, so any script
- * invoking an npm-installed POSIX shim fails with "command not found" despite bash itself
- * being found correctly via resolveBashOnWindows above.
- */
-function gitRootFromBash(bashExecutable: string): string | null {
-	const dir = path.dirname(bashExecutable); // .../usr/bin or .../bin
-	const parent = path.dirname(dir);
-	return path.basename(parent).toLowerCase() === 'usr' ? path.dirname(parent) : parent;
-}
-
-/** Mutates env['PATH'] in place to prepend Git's coreutils dirs, if found and not already present. */
-function ensureGitCoreutilsOnPath(env: Record<string, string>, bashExecutable: string): void {
-	const gitRoot = gitRootFromBash(bashExecutable);
-	if (!gitRoot) return;
-	const existingPath = env['PATH'] ?? '';
-	const existingDirs = new Set(existingPath.split(path.delimiter).map(d => d.toLowerCase()));
-	const toPrepend = [path.join(gitRoot, 'usr', 'bin'), path.join(gitRoot, 'bin')].filter(
-		d => fs.existsSync(d) && !existingDirs.has(d.toLowerCase())
-	);
-	if (toPrepend.length > 0) {
-		env['PATH'] = [...toPrepend, existingPath].filter(Boolean).join(path.delimiter);
-	}
-}
+export { normalizePathKey };
 
 /**
  * Result of script execution
@@ -263,6 +180,10 @@ export class ScriptExecutor {
 			// Synchronous throw inside this async method becomes a rejected promise --
 			// no try/catch here on purpose, so resolve() errors propagate verbatim.
 			const binary = strategy.resolve(shellEnv);
+			// Git's bash is a thin shell: without its coreutils dirs on PATH, `sed`/`dirname` and npm
+			// POSIX shims fail with "command not found" when the daemon started without Git Bash on
+			// PATH (same as the implicit-bash path below).
+			if (shellKind === 'bash' && process.platform === 'win32') ensureGitCoreutilsOnPath(shellEnv, binary);
 
 			const tempDir = os.tmpdir();
 			const timestamp = Date.now();
@@ -309,81 +230,22 @@ export class ScriptExecutor {
 				// This avoids cmd.exe which doesn't support bash syntax ($VAR, pipes, etc.).
 				tempFilePath = path.join(tempDir, `agent-fleet-script-${timestamp}-${random}.sh`);
 				fs.writeFileSync(tempFilePath, options.script, { encoding: 'utf8' });
-				// shell: false so we control the binary explicitly
-				return new Promise<ScriptExecutionResult>((innerResolve, innerReject) => {
-					let stdout = '';
-					let stderr = '';
-					let killed = false;
-					const cleanupSh = () => {
-						try {
-							fs.unlinkSync(tempFilePath!);
-						} catch {
-							/* ignore */
-						}
-					};
-					// Resolve bash.exe: prefer explicit env, then PATH, then known Git for Windows
-					// locations. WScript.Shell.Run (used to start the daemon on Windows) spawns
-					// with the system PATH, not the enriched Git Bash PATH, so 'bash' alone finds
-					// C:\Windows\System32\bash.exe (WSL) first. An explicit path avoids that.
-					// normalizePathKey first: {...process.env} on Windows can yield a `Path` key
-					// instead of `PATH` (see normalizePathKey's doc comment), which bash's
-					// case-sensitive lookup would otherwise miss entirely.
-					const bashEnv = normalizePathKey(cleanEnv);
-					const bashExecutable = resolveBashOnWindows(bashEnv);
-					ensureGitCoreutilsOnPath(bashEnv, bashExecutable);
-					// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
-					const child = spawn(bashExecutable, BashInvocation.buildArgs(tempFilePath!, strict), {
-						cwd: workingDir,
-						env: bashEnv,
-						// No windowsHide / detached: CREATE_NO_WINDOW and DETACHED_PROCESS strip the
-						// console handle, so grandchildren allocate a visible console. The script
-						// must inherit the daemon's hidden console instead (see d032e7e).
-						stdio: ['ignore', 'pipe', 'pipe'],
-					});
-					child.stdout?.on('data', (d: Buffer) => {
-						stdout += d.toString();
-					});
-					child.stderr?.on('data', (d: Buffer) => {
-						stderr += d.toString();
-					});
-					child.on('close', (code: number | null) => {
-						cleanupSh();
-						const exitCode = code ?? 1;
-						const durationMs = Date.now() - startTime;
-						// Trim to keep the same contract as the non-bash path below
-						innerResolve({
-							stdout: stdout.trim(),
-							stderr: stderr.trim(),
-							exitCode,
-							durationMs,
-							success: exitCode === 0,
-							shellPath: bashExecutable,
-							strictApplied: strict,
-							workingDir,
-						});
-					});
-					child.on('error', (err: Error) => {
-						cleanupSh();
-						innerReject(err);
-					});
-					if (options.timeout) {
-						setTimeout(() => {
-							killed = true;
-							child.kill();
-							cleanupSh();
-							innerResolve({
-								stdout,
-								stderr,
-								exitCode: -1,
-								durationMs: Date.now() - startTime,
-								success: false,
-								shellPath: bashExecutable,
-								workingDir,
-							});
-						}, options.timeout);
-					}
-					void killed; // suppress unused warning
-				});
+				// Resolve bash.exe explicitly: WScript.Shell.Run (daemon launcher) spawns with the system PATH,
+				// where a bare `bash` finds System32's WSL bash first. normalizePathKey: `{...process.env}`
+				// can yield `Path` instead of `PATH`, which bash's case-sensitive lookup would miss.
+				const bashEnv = normalizePathKey(cleanEnv);
+				const bashExecutable = resolveBashOnWindows(bashEnv);
+				ensureGitCoreutilsOnPath(bashEnv, bashExecutable);
+				return this.runViaTempFileBinary(
+					bashExecutable,
+					BashInvocation.buildArgs(tempFilePath, strict),
+					tempFilePath,
+					options,
+					startTime,
+					workingDir,
+					bashEnv,
+					strict
+				);
 			}
 		}
 
@@ -618,8 +480,11 @@ export class ScriptExecutor {
 		const result = await this.execute(options);
 
 		if (!result.success) {
+			const ntStatus = NtStatusDescriber.isNtStatus(result.exitCode);
+			const hint = ntStatus ? NtStatusDescriber.hint(result.exitCode) : null;
+			const exitDescription = ntStatus ? NtStatusDescriber.format(result.exitCode) : String(result.exitCode);
 			throw new ScriptExecutionError(
-				`Script failed with exit code ${result.exitCode}`,
+				`Script failed with exit code ${exitDescription}${hint ? `: ${hint}` : ''}`,
 				result.exitCode,
 				result.stdout,
 				result.stderr
