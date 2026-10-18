@@ -149,6 +149,12 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 		lines.push(
 			`  ${name}  [${step.status}]  ${stepDuration(step)}${model ? `  model: ${model}` : ''}${attemptsLabel(step)}`
 		);
+		for (const [i, relaunch] of (step.relaunches ?? []).entries()) {
+			const firstLine = relaunch.feedback.split('\n').find(l => l.trim() !== '') ?? '';
+			lines.push(
+				`      relaunch ${i + 1} (sub-step failed) ${formatStarted(relaunch.at)}: ${firstLine.slice(0, 160)}`
+			);
+		}
 		if (step.error) lines.push(`      error: ${step.error}`);
 		const cost = formatModelCost(step.meta);
 		if (cost) lines.push(`      ${cost}`);

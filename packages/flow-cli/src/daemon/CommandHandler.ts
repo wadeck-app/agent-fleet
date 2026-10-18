@@ -1049,10 +1049,12 @@ export class CommandHandler {
 				// Provenance recorded at dispatch: this is the only moment both the source
 				// and the worker identity are known (T-06).
 				const worker = this.registry.describe(idleWorker);
-				this.executionStore.markStepRunning(step.executionContext.executionId, step.stepId, {
-					sourceId: worker?.sourceId,
-					workerId: worker?.workerId,
-				});
+				this.executionStore.markStepRunning(
+					step.executionContext.executionId,
+					step.stepId,
+					{ sourceId: worker?.sourceId, workerId: worker?.workerId },
+					relaunchFeedback
+				);
 				this.dispatchHook(step.executionContext.executionId, 'onStepStart', {
 					executionId: step.executionContext.executionId,
 					stepId: step.stepId,

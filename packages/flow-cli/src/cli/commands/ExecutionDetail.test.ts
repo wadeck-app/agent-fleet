@@ -107,6 +107,20 @@ describe('ExecutionDetail', () => {
 			expect(out).toContain('a  [completed]  1.0s  attempts: 3 (total 4m51s)');
 		});
 
+		it('lists sub-step relaunches under the step with the first feedback line', () => {
+			const record = minimal('relaunch');
+			Object.assign(record.steps.a, {
+				attempts: 2,
+				relaunches: [
+					{ at: '2026-10-04T14:00:02.000Z', feedback: '\ngate_ui failed: 2 tests red\nmore detail' },
+				],
+			});
+			writeExec('relaunch', record);
+			const out = renderExecutionDetail(resolveExecution(tmpDir, 'relaunch'), { tail: 10, full: false });
+			expect(out).toContain('relaunch 1 (sub-step failed) 2026-10-04 14:00:02: gate_ui failed: 2 tests red');
+			expect(out).not.toContain('more detail');
+		});
+
 		it('shows status, duration, error, model and cost per step', () => {
 			const out = renderExecutionDetail(fixture(), { tail: 2000, full: false });
 			expect(out).toContain('Execution: f41lc0de');

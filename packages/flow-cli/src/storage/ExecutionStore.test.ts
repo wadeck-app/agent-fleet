@@ -89,6 +89,19 @@ describe('ExecutionStore', () => {
 			expect(state.status).toBe('running');
 		});
 
+		it('records each sub-step relaunch with its (truncated) feedback', () => {
+			store.create({ executionId: EXEC_ID, flowFile: 'flow.yaml', flowId: 'my-flow', stepIds: ['step-a'] });
+			store.markStepRunning(EXEC_ID, 'step-a');
+			store.markStepRunning(EXEC_ID, 'step-a', undefined, 'gate failed: 3 tests red');
+			const state = store.markStepRunning(EXEC_ID, 'step-a', undefined, 'x'.repeat(5000));
+
+			const relaunches = state.steps['step-a'].relaunches!;
+			expect(relaunches).toHaveLength(2);
+			expect(relaunches[0].feedback).toBe('gate failed: 3 tests red');
+			expect(relaunches[1].feedback).toHaveLength(2000);
+			expect(state.steps['step-a'].attempts).toBe(3);
+		});
+
 		it('counts attempts and accumulates the time of earlier attempts', () => {
 			store.create({ executionId: EXEC_ID, flowFile: 'flow.yaml', flowId: 'my-flow', stepIds: ['step-a'] });
 			const first = store.markStepRunning(EXEC_ID, 'step-a');

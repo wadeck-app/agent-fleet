@@ -17,6 +17,8 @@ export interface StepStateRecord {
 	/** Times the step was started, and time spent in the attempts before the current one. */
 	attempts?: number;
 	priorAttemptsMs?: number;
+	/** One entry per relaunch of this step caused by a failed sub-step, with the feedback it was resumed with (truncated). */
+	relaunches?: { at: string; feedback: string }[];
 }
 
 export interface ExecutionRecord {

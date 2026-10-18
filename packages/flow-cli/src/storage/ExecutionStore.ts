@@ -18,6 +18,9 @@ function assertExecutionIdSafe(executionId: string): void {
 	}
 }
 
+/** Feedback kept per relaunch in the execution record (truncated). */
+const MAX_RELAUNCH_FEEDBACK_CHARS = 2000;
+
 export class ExecutionStore {
 	constructor(
 		private readonly executionsDir: string,
@@ -111,7 +114,9 @@ export class ExecutionStore {
 	markStepRunning(
 		executionId: string,
 		stepId: string,
-		provenance?: { sourceId?: string; workerId?: string }
+		provenance?: { sourceId?: string; workerId?: string },
+		/** Set when this start re-runs a parent because a sub-step failed; kept in `relaunches`. */
+		relaunchFeedback?: string
 	): ExecutionState {
 		const state = this.read(executionId);
 		const previous = state.steps[stepId];
@@ -124,6 +129,17 @@ export class ExecutionStore {
 			...previous,
 			attempts: (previous?.attempts ?? 0) + 1,
 			priorAttemptsMs: (previous?.priorAttemptsMs ?? 0) + previousMs,
+			...(relaunchFeedback === undefined
+				? {}
+				: {
+						relaunches: [
+							...(previous?.relaunches ?? []),
+							{
+								at: new Date().toISOString(),
+								feedback: relaunchFeedback.slice(0, MAX_RELAUNCH_FEEDBACK_CHARS),
+							},
+						],
+					}),
 			status: 'running',
 			startedAt: new Date().toISOString(),
 			// A new attempt: the previous one's failure must not linger on a step that may now succeed

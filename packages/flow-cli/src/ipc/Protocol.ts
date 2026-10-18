@@ -353,6 +353,8 @@ export interface StepState {
 	attempts?: number;
 	/** Wall-clock time spent in attempts before the current one, so retries stay visible in `flow show`. */
 	priorAttemptsMs?: number;
+	/** One entry per relaunch of this step caused by a failed sub-step, with the feedback it was resumed with (truncated). */
+	relaunches?: { at: string; feedback: string }[];
 	/**
 	 * Which source supplied the worker that ran this step, and which worker it was
 	 * (T-06). Without this, a step's outcome cannot be attributed to the machine that
