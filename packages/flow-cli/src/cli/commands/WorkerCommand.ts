@@ -3,7 +3,7 @@ import { FOLLOW_POLL_INTERVAL_MS } from '@wadeck-app/shared-cli/FollowSnapshot';
 import { LiveRegion } from '@wadeck-app/shared-cli/LiveRegion';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { cacheFilePath, readCache, readUpdateConfig, semverLte } from '@wadeck-app/shared-updater';
-import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
+import { DaemonNotRunningError, createDaemonClient, readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import type { ApprovalProvider } from 'extension-points';
 import { StepRunner } from 'flow-engine';
@@ -45,6 +45,7 @@ import {
 	withFreshToken,
 } from '../../worker/WorkerLaunch';
 import { describeNoLiveWorkers } from '../../worker/WorkerListing';
+import type { DaemonStatus } from '../../worker/WorkerListing';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 import { VERSION } from '../version.js';
 
@@ -258,6 +259,23 @@ function formatWorkerLine(w: WorkerSummary): string {
 }
 
 /**
+ * The identity of the daemon that just answered, read only when the list is empty (the only case
+ * that prints it). The port file is advisory here: the daemon answered, so an unreadable file
+ * degrades to "details unavailable" in the output rather than failing the listing.
+ */
+async function describeRunningDaemon(daemonDir: string, needed: boolean): Promise<DaemonStatus> {
+	const unknown: DaemonStatus = { running: true, pid: undefined, port: undefined, startedAt: undefined };
+	if (!needed) return unknown;
+	try {
+		const data = await readPortFile(daemonDir);
+		if (data) return { running: true, pid: data.pid, port: data.port, startedAt: data.startedAt };
+	} catch {
+		// Falls through to the "details unavailable" status.
+	}
+	return unknown;
+}
+
+/**
  * Reads the live worker list once, without printing anything.
  *
  * Shared between the one-shot and `--follow` paths. `DaemonNotRunningError` is reported
@@ -269,7 +287,7 @@ function formatWorkerLine(w: WorkerSummary): string {
  */
 async function readWorkerList(
 	daemonDir: string
-): Promise<{ ok: true; workers: WorkerSummary[] } | { ok: false; message: string }> {
+): Promise<{ ok: true; workers: WorkerSummary[]; daemon: DaemonStatus } | { ok: false; message: string }> {
 	try {
 		// The command is declared optional and left unimplemented on purpose: a local
 		// handler here would be used as an in-process fallback and would answer with
@@ -280,10 +298,10 @@ async function readWorkerList(
 			commands: {},
 		});
 		const workers = (await client.send('workers', undefined)) as WorkerSummary[];
-		return { ok: true, workers };
+		return { ok: true, workers, daemon: await describeRunningDaemon(daemonDir, workers.length === 0) };
 	} catch (err) {
 		if (err instanceof DaemonNotRunningError) {
-			return { ok: true, workers: [] };
+			return { ok: true, workers: [], daemon: { running: false, reason: err.message } };
 		}
 		const message = normalizeError(err).message;
 		if (/unknown command/i.test(message)) {
@@ -312,7 +330,7 @@ async function runWorkerListOnce(daemonDir: string, json: boolean): Promise<void
 		return;
 	}
 	if (result.workers.length === 0) {
-		console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), true));
+		console.log(describeNoLiveWorkers(readDeclaredSources(daemonDir), result.daemon, Date.now()));
 		return;
 	}
 	for (const w of result.workers) console.log(formatWorkerLine(w));
@@ -349,7 +367,7 @@ async function runWorkerListFollow(daemonDir: string, json: boolean): Promise<vo
 			return;
 		}
 		if (result.workers.length === 0) {
-			region.render(describeNoLiveWorkers(readDeclaredSources(daemonDir), true).split('\n'));
+			region.render(describeNoLiveWorkers(readDeclaredSources(daemonDir), result.daemon, Date.now()).split('\n'));
 			return;
 		}
 		region.render(result.workers.map(formatWorkerLine));

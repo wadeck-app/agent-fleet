@@ -606,3 +606,77 @@ describe('flow worker — opencode env defaults (external, non-daemon-forked wor
 		expect(process.env['OPENCODE_CONFIG_ANTHROPIC']).toBe('/operator/own-config.json');
 	});
 });
+
+describe('flow worker list — empty list explains the daemon state', () => {
+	let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.resetModules();
+	});
+
+	async function runList(kit: Record<string, unknown>): Promise<string> {
+		vi.resetModules();
+		vi.doMock('@wadeck-app/singleton-daemon-kit', () => kit);
+		const { registerWorkerCommand: freshRegisterWorkerCommand } = await import('./WorkerCommand');
+		const program = new Command();
+		program.exitOverride();
+		const workerCommand = new Command('worker');
+		program.addCommand(workerCommand);
+		freshRegisterWorkerCommand(workerCommand);
+		await program.parseAsync(['node', 'test', 'worker', 'list']);
+		return consoleLogSpy.mock.calls.map((call: unknown[]) => call.join(' ')).join('\n');
+	}
+
+	class DaemonNotRunningError extends Error {}
+
+	// The reported bug: the CLI answered "No worker is connected" with text assuming a running
+	// daemon, whether or not one existed.
+	it('says no daemon is running when the daemon cannot be reached', async () => {
+		const output = await runList({
+			DaemonNotRunningError,
+			readPortFile: async () => Promise.resolve(null),
+			createDaemonClient: () => ({
+				send: async () =>
+					Promise.reject(new DaemonNotRunningError('Daemon is not running (no port file found in /cfg)')),
+			}),
+		});
+
+		expect(output).toContain('No worker is connected.');
+		expect(output).toContain('no daemon is running');
+		expect(output).toContain('no port file found in /cfg');
+	});
+
+	it('shows pid, port and uptime of the daemon that answered with an empty list', async () => {
+		const output = await runList({
+			DaemonNotRunningError,
+			readPortFile: async () =>
+				Promise.resolve({
+					sdkVersion: 1,
+					port: 51234,
+					pid: 4242,
+					startedAt: new Date(Date.now() - 5_000).toISOString(),
+				}),
+			createDaemonClient: () => ({ send: async () => Promise.resolve([]) }),
+		});
+
+		expect(output).toContain('pid=4242');
+		expect(output).toContain('port=51234');
+		expect(output).toMatch(/still be reconnecting/);
+	});
+
+	it('still reports a running daemon when its port file cannot be read', async () => {
+		const output = await runList({
+			DaemonNotRunningError,
+			readPortFile: async () => Promise.reject(new Error('EACCES')),
+			createDaemonClient: () => ({ send: async () => Promise.resolve([]) }),
+		});
+
+		expect(output).toContain('details unavailable');
+	});
+});
