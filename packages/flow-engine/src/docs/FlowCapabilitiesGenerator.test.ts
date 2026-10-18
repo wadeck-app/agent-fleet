@@ -32,6 +32,13 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).toContain('user_intervention');
 	});
 
+	it('documents script strict mode, its default, the behaviour change and the pipefail opt-in', () => {
+		expect(result).toContain('`strict`');
+		expect(result).toContain('BEHAVIOUR CHANGE');
+		expect(result).toContain('strict: false');
+		expect(result).toContain('set -o pipefail');
+	});
+
 	it('contains all major variable types', () => {
 		expect(result).toContain('string');
 		expect(result).toContain('boolean');

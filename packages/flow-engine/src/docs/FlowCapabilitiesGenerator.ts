@@ -90,6 +90,8 @@ Key fields:
 - \`workingDir\` (string, optional) -- working directory for execution
 - \`env\` (Record<string, string>, optional) -- environment variables
 - \`captureOutput\` (boolean, optional) -- whether to capture stdout/stderr
+- \`shell\` (\`bash\` | \`cmd\` | \`pwsh\`, recommended) -- execution shell; omitting it makes the shell depend on the platform and line count
+- \`strict\` (boolean, optional, default \`true\`, bash only) -- bash steps run with \`bash -e -u\`: a failing command mid-script or an unset variable fails the step (BEHAVIOUR CHANGE: before, only the last command's exit code counted). Set \`strict: false\` to restore the old behaviour. \`pipefail\` is not enabled; add \`set -o pipefail\` in the script to opt in. Setting \`strict\` on \`shell: cmd|pwsh\` is a validation error
 
 ### subflow
 

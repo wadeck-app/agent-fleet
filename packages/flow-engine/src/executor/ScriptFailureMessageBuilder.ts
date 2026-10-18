@@ -1,11 +1,14 @@
 import { NtStatusDescriber } from './NtStatusDescriber';
 import type { ProcessCountResult } from './WindowsProcessCounter';
 import { WindowsProcessCounter } from './WindowsProcessCounter';
+import { BashInvocation } from './shell/BashInvocation';
 
 export interface ScriptFailureInfo {
 	exitCode: number;
 	shellPath?: string;
 	workingDir?: string;
+	/** True when the step ran under bash strict mode (-e -u); adds the opt-out hint. */
+	strictApplied?: boolean;
 }
 
 const NOT_REPORTED = 'unknown (not reported by the executor)';
@@ -22,6 +25,11 @@ export class ScriptFailureMessageBuilder {
 	) {}
 
 	async build(info: ScriptFailureInfo): Promise<string> {
+		const message = await this.buildBase(info);
+		return info.strictApplied ? `${message}\n${BashInvocation.STRICT_FAILURE_HINT}` : message;
+	}
+
+	private async buildBase(info: ScriptFailureInfo): Promise<string> {
 		const base = `Script exited with code ${info.exitCode}`;
 		if (this.platform !== 'win32' || !NtStatusDescriber.isNtStatus(info.exitCode)) return base;
 

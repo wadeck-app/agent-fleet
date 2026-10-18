@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { BashInvocation } from './shell/BashInvocation';
 import { BashShellStrategy } from './shell/BashShellStrategy';
 import { CmdShellStrategy } from './shell/CmdShellStrategy';
 import { PwshShellStrategy } from './shell/PwshShellStrategy';
@@ -125,6 +126,9 @@ export interface ScriptExecutionResult {
 
 	/** Working directory the script ran in (for failure diagnostics) */
 	workingDir?: string;
+
+	/** True when the script ran under bash `-e -u` (strict mode). Drives the failure hint. */
+	strictApplied?: boolean;
 }
 
 /**
@@ -166,6 +170,13 @@ export interface ScriptExecutionOptions {
 	 * Set to false only when full env inheritance is explicitly required.
 	 */
 	isolateEnv?: boolean;
+
+	/**
+	 * Run bash scripts with errexit + nounset (`bash -e -u`). Default true; false restores the
+	 * historical behaviour (exit code = last command). Only meaningful for bash (explicit
+	 * `shellKind: 'bash'` or the implicit Windows multi-line path); cmd/pwsh ignore it.
+	 */
+	strict?: boolean;
 }
 
 /**
@@ -225,6 +236,7 @@ export class ScriptExecutor {
 			if (v !== undefined) cleanEnv[k] = v;
 		}
 		const shell = options.shell !== undefined ? options.shell : true;
+		const strict = options.strict !== false;
 
 		// Handle multiline scripts on Windows: cmd.exe cannot handle multi-line shell commands,
 		// so we write them to a temp file and execute that instead.
@@ -261,12 +273,21 @@ export class ScriptExecutor {
 
 			const args =
 				shellKind === 'bash'
-					? [kindTempFilePath]
+					? BashInvocation.buildArgs(kindTempFilePath, strict)
 					: shellKind === 'cmd'
 						? ['/d', '/c', kindTempFilePath]
 						: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', kindTempFilePath];
 
-			return this.runViaTempFileBinary(binary, args, kindTempFilePath, options, startTime, workingDir, shellEnv);
+			return this.runViaTempFileBinary(
+				binary,
+				args,
+				kindTempFilePath,
+				options,
+				startTime,
+				workingDir,
+				shellEnv,
+				shellKind === 'bash' && strict
+			);
 		}
 
 		if (isWindows && isMultiline && shell) {
@@ -311,7 +332,7 @@ export class ScriptExecutor {
 					const bashExecutable = resolveBashOnWindows(bashEnv);
 					ensureGitCoreutilsOnPath(bashEnv, bashExecutable);
 					// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
-					const child = spawn(bashExecutable, [tempFilePath!], {
+					const child = spawn(bashExecutable, BashInvocation.buildArgs(tempFilePath!, strict), {
 						cwd: workingDir,
 						env: bashEnv,
 						// No windowsHide / detached: CREATE_NO_WINDOW and DETACHED_PROCESS strip the
@@ -337,6 +358,7 @@ export class ScriptExecutor {
 							durationMs,
 							success: exitCode === 0,
 							shellPath: bashExecutable,
+							strictApplied: strict,
 							workingDir,
 						});
 					});
@@ -520,7 +542,8 @@ export class ScriptExecutor {
 		options: ScriptExecutionOptions,
 		startTime: number,
 		workingDir: string,
-		cleanEnv: Record<string, string>
+		cleanEnv: Record<string, string>,
+		strictApplied: boolean
 	): Promise<ScriptExecutionResult> {
 		return new Promise<ScriptExecutionResult>((resolve, reject) => {
 			let stdout = '';
@@ -555,6 +578,7 @@ export class ScriptExecutor {
 					exitCode,
 					durationMs,
 					success: exitCode === 0,
+					strictApplied,
 					shellPath: binary,
 					workingDir,
 				});

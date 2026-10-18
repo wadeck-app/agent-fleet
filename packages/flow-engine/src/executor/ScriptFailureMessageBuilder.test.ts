@@ -80,3 +80,26 @@ describe('ScriptFailureMessageBuilder', () => {
 		expect(message).toContain('Cwd: unknown (not reported by the executor)');
 	});
 });
+
+describe('ScriptFailureMessageBuilder - strict hint', () => {
+	it('appends the one-line strict hint after the historical message', async () => {
+		const builder = new ScriptFailureMessageBuilder('linux', okCounter);
+		const message = await builder.build({ exitCode: 1, strictApplied: true });
+		expect(message).toBe(
+			'Script exited with code 1\nStep ran in strict mode (set -eu): add `strict: false` to the step to disable.'
+		);
+	});
+
+	it('adds nothing when strict was not applied or not reported', async () => {
+		const builder = new ScriptFailureMessageBuilder('linux', okCounter);
+		await expect(builder.build({ exitCode: 1, strictApplied: false })).resolves.toBe('Script exited with code 1');
+		await expect(builder.build({ exitCode: 1 })).resolves.toBe('Script exited with code 1');
+	});
+
+	it('keeps the NTSTATUS rendering and appends the hint last', async () => {
+		const builder = new ScriptFailureMessageBuilder('win32', okCounter);
+		const message = await builder.build({ exitCode: 3221225794, strictApplied: true });
+		expect(message).toContain('0xC0000142');
+		expect(message.split('\n').at(-1)).toContain('strict: false');
+	});
+});

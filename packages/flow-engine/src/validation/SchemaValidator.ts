@@ -814,6 +814,47 @@ export class SchemaValidator {
 				suggestion: `Add shell: bash, cmd, or pwsh to make the execution shell explicit`,
 			});
 		}
+
+		this.validateScriptStrict(step);
+	}
+
+	/**
+	 * `strict` is bash-only (`bash -e -u`): boolean, and never silently ignored on other shells.
+	 */
+	private validateScriptStrict(step: ScriptFlowStep): void {
+		if (step.strict === undefined) return;
+		if (typeof step.strict !== 'boolean') {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_TYPE,
+				message: `Script step '${step.id}' strict must be a boolean`,
+				location: { stepId: step.id, field: 'strict' },
+				suggestion: 'Use strict: true or false (YAML booleans, not quoted strings)',
+				context: { expected: 'boolean', actual: step.strict === null ? 'null' : typeof step.strict },
+			});
+			return;
+		}
+		if (step.shell === 'cmd' || step.shell === 'pwsh') {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_VALUE,
+				message: `Script step '${step.id}' sets strict but uses shell '${step.shell}'; strict mode (bash -e -u) is bash-only`,
+				location: { stepId: step.id, field: 'strict' },
+				suggestion:
+					step.shell === 'cmd'
+						? 'Remove `strict` (cmd has no equivalent), or switch to shell: bash. In cmd, check `if errorlevel 1 exit /b 1` after each command'
+						: 'Remove `strict` (pwsh has no equivalent), or switch to shell: bash. In pwsh, start the script with `$ErrorActionPreference = "Stop"`',
+				context: { actual: step.shell, expected: ['bash'] },
+			});
+		} else if (step.shell === undefined) {
+			this.issueCollector.addIssue({
+				severity: 'warning',
+				code: ValidationCode.MISSING_FIELD,
+				message: `Script step '${step.id}' sets strict without a shell: field; strict mode only applies when the step runs in bash`,
+				location: { stepId: step.id, field: 'strict' },
+				suggestion: 'Add shell: bash so that strict is applied on every platform',
+			});
+		}
 	}
 
 	/**

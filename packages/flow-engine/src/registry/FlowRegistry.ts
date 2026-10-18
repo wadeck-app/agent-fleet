@@ -689,6 +689,8 @@ export class FlowRegistry {
 				script: data.script || '',
 				workingDir: data.workingDir,
 				env: data.env,
+				shell: data.shell,
+				strict: data.strict,
 				captureOutput: data.captureOutput !== false, // Default to true
 			};
 		} else if (stepType === 'subflow') {

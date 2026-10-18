@@ -786,6 +786,13 @@ export interface ScriptFlowStep extends BaseFlowStep {
 	 * If omitted, behavior depends on the executing platform and script line count (see SchemaValidator warning).
 	 */
 	shell?: 'bash' | 'cmd' | 'pwsh';
+
+	/**
+	 * Bash only. Default true: the script runs with `bash -e -u` (errexit + nounset), so a failing
+	 * command mid-script fails the step. `strict: false` restores the old behaviour (exit code =
+	 * last command). Rejected by the validator on `shell: cmd|pwsh`.
+	 */
+	strict?: boolean;
 }
 
 /**

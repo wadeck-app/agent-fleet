@@ -495,6 +495,31 @@ Executes a shell script or command in the workspace.
     ```
 - **Common Mistakes**: Setting to false when output extraction is needed
 
+#### `shell`
+
+- **Type**: `'bash' | 'cmd' | 'pwsh'` (optional, recommended)
+- **Description**: Execution shell. Omitted: the shell depends on the platform and line count (validator warning).
+
+#### `strict`
+
+- **Type**: `boolean` (optional, bash only)
+- **Default**: `true`
+- **Description**: Bash steps run as `bash -e -u <script>`: a failing command mid-script (errexit) or an unset variable (nounset) fails the step. **Behaviour changed**: previously the exit code was the last command's, so `false` then `echo after` completed. Opt out per step with `strict: false`.
+- **pipefail**: not enabled (scripts such as `cmd | grep -q` would fail with SIGPIPE, exit 141). Opt in with `set -o pipefail` in the script.
+- **Scope**: applies to `shell: bash` and to the implicit multi-line bash path on Windows. Setting `strict` with `shell: cmd|pwsh` is a validation error; without `shell:` it is a warning.
+- **Failure message**: `Script exited with code N` plus a line recalling strict mode and the opt-out.
+- **Example**:
+    ```yaml
+    - type: script
+      id: cleanup
+      name: 'Best-effort cleanup'
+      shell: bash
+      strict: false # keep going when a command fails
+      script: |
+          rm ./cache/tmp
+          echo done
+    ```
+
 #### Other Properties
 
 See [Common Step Properties](#common-step-properties) for `context`, `output`, `depends`, `when`, `skipOnLoop`, `retry`, `onFailure`, `contract`.

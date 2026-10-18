@@ -512,7 +512,7 @@ describe('ScriptExecutor', () => {
 			expect(resolveSpy).toHaveBeenCalled();
 			expect(child_process.spawn).toHaveBeenCalledWith(
 				'/resolved/bash',
-				[expect.stringMatching(/\.sh$/)],
+				['-e', '-u', expect.stringMatching(/\.sh$/)],
 				expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
 			);
 			expect(result.stdout).toBe('hello');

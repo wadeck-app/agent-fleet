@@ -1521,6 +1521,7 @@ idea-refiner:
           name: 'Generate Custom Flow'
           depends: [flow-decision]
           when: "${{ steps.flow-decision.outputs.decision === 'generate' }}"
+          shell: pwsh
           script: |
               $requirements = '${{ steps.analyze-idea.outputs.requirements }}'
               $flowReq = @{
@@ -1543,6 +1544,7 @@ idea-refiner:
           name: 'Validate Flow Definition'
           depends: [adapt-flow, generate-flow]
           when: "${{ steps.flow-decision.outputs.decision !== 'manual' }}"
+          shell: pwsh
           script: |
               $yaml = if ('${{ steps.adapt-flow.outputs.flowYaml }}' -ne '') {
                   '${{ steps.adapt-flow.outputs.flowYaml }}'

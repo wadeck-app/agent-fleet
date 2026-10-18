@@ -385,6 +385,30 @@ custom-flow:
 			expect((step as any).env).toEqual({ NODE_ENV: 'test' });
 		});
 
+		it('should carry the script step shell and strict fields to the loaded step (not drop them)', async () => {
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+			vi.mocked(yaml.load).mockReturnValue({
+				'strict-flow': {
+					version: '1.0.0',
+					name: 'Strict Flow',
+					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					steps: [
+						{ id: 'a', name: 'A', type: 'script', script: 'false', shell: 'bash', strict: false },
+						{ id: 'b', name: 'B', type: 'script', script: 'true', shell: 'bash' },
+					],
+				},
+			});
+
+			await registry.loadProjectFlows();
+
+			const steps = registry.getFlow('strict-flow')?.steps as any[];
+			expect(steps[0].shell).toBe('bash');
+			expect(steps[0].strict).toBe(false);
+			expect(steps[1].shell).toBe('bash');
+			expect(steps[1].strict).toBeUndefined();
+		});
+
 		it('should not load flow when step is missing required type field', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('yaml');

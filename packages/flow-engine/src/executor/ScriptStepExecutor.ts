@@ -59,6 +59,7 @@ export async function executeScriptStep(
 		streaming: true,
 		stepId: step.id,
 		isolateEnv: false,
+		strict: step.strict,
 		shellKind: step.shell,
 	});
 

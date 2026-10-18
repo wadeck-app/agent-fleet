@@ -13,6 +13,7 @@ import { PROCESS_COUNT_COMMAND } from './NtStatusDescriber';
 import { ScriptExecutor } from './ScriptExecutor';
 import { ScriptFailureMessageBuilder } from './ScriptFailureMessageBuilder';
 import { executeScriptStep } from './ScriptStepExecutor';
+import { BashInvocation } from './shell/BashInvocation';
 import { BashShellStrategy } from './shell/BashShellStrategy';
 
 vi.mock('child_process');
@@ -79,12 +80,13 @@ describe('script step failure message (spawn mocked)', () => {
 
 	it("exit code 1 keeps today's exact message", async () => {
 		const trace = await run(1, new ScriptFailureMessageBuilder('win32', { count: vi.fn() }));
-		expect(trace.error).toBe('Script exited with code 1');
+		// Historical first line is unchanged; bash steps are strict by default so the opt-out hint follows
+		expect(trace.error).toBe(`Script exited with code 1\n${BashInvocation.STRICT_FAILURE_HINT}`);
 	});
 
 	it("non-Windows keeps today's exact message for the same raw code", async () => {
 		const trace = await run(3221225794, new ScriptFailureMessageBuilder('linux', { count: vi.fn() }));
-		expect(trace.error).toBe('Script exited with code 3221225794');
+		expect(trace.error).toBe(`Script exited with code 3221225794\n${BashInvocation.STRICT_FAILURE_HINT}`);
 	});
 
 	it('success leaves error unset', async () => {
