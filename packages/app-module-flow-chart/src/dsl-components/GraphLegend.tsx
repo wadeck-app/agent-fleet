@@ -1,4 +1,5 @@
-import { EDGE_LEGEND, edgeStyle } from './EdgeStyle.js';
+import { EdgeSample } from './EdgeSample.js';
+import { EDGE_LEGEND } from './EdgeStyle.js';
 import { STATUS_LEGEND, statusStyle } from './StatusStyle.js';
 
 interface GraphLegendProps {
@@ -6,15 +7,6 @@ interface GraphLegendProps {
 	showStatuses: boolean;
 	/** Edge kinds present in the graph: the legend explains what is drawn, not what could be. */
 	edgeKinds: ReadonlySet<string>;
-}
-
-function EdgeSample({ kind }: { kind: (typeof EDGE_LEGEND)[number]['kind'] }) {
-	const style = edgeStyle(kind);
-	return (
-		<svg width="28" height="8" aria-hidden="true">
-			<line x1="1" y1="4" x2="27" y2="4" stroke={style.stroke} strokeWidth="2" strokeDasharray={style.dash} />
-		</svg>
-	);
 }
 
 export function GraphLegend({ showStatuses, edgeKinds }: GraphLegendProps) {

@@ -63,7 +63,9 @@ export async function callRoute(
 	request: Record<string, unknown> = {}
 ): Promise<{ status: number; body: unknown }> {
 	const handler = routes.get(route);
-	if (!handler) throw new Error(`No route registered for '${route}'. Registered: ${[...routes.keys()].join(', ')}`);
+	if (!handler) {
+		throw new Error(`No route registered for '${route}'. Registered: ${[...routes.keys()].join(', ')}`);
+	}
 	const reply = fakeReply();
 	await handler(request, reply);
 	return replied(reply);

@@ -130,7 +130,9 @@ export function formatPluginTable(entries: PluginEntry[]): string {
 /** Config snippet and options of one plugin. Throws {@link UnknownPluginError} for an undocumented id. */
 export function describePlugin(pluginId: string, manifests: Record<string, PluginCatalogSource>): PluginDescription {
 	const cfg = PLUGIN_CONFIGS[pluginId];
-	if (cfg === undefined) throw new UnknownPluginError(pluginId);
+	if (cfg === undefined) {
+		throw new UnknownPluginError(pluginId);
+	}
 	const entry = listPlugins(manifests).find(e => e.id === pluginId);
 	return {
 		id: pluginId,

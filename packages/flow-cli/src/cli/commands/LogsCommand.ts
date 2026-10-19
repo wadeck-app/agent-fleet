@@ -48,17 +48,23 @@ export async function logsCommand(
 	if (!initial.exists) {
 		write(`No log file for today: ${initial.filePath}
 `);
-		if (!options.follow) return;
+		if (!options.follow) {
+			return;
+		}
 	} else {
 		write(initial.text);
 	}
-	if (!options.follow) return;
+	if (!options.follow) {
+		return;
+	}
 
 	let offset = initial.size;
 	await new Promise<void>(resolve => {
 		const stop = runtime.every(FOLLOW_POLL_INTERVAL_MS, () => {
 			const appended = readAppendedLog(initial.filePath, offset, { human: options.human });
-			if (!appended) return;
+			if (!appended) {
+				return;
+			}
 			offset = appended.offset;
 			write(appended.text);
 		});

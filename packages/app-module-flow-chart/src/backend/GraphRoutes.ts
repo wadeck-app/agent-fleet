@@ -22,8 +22,12 @@ function readTarget(query: QueryParams): FlowGraphTarget {
 			"Give only one of 'executionId' (a run, with its step states) or 'flowId' (the definition)."
 		);
 	}
-	if (executionId !== undefined) return { executionId };
-	if (flowId !== undefined) return { flowId };
+	if (executionId !== undefined) {
+		return { executionId };
+	}
+	if (flowId !== undefined) {
+		return { flowId };
+	}
 	throw new InvalidQueryError("Give 'executionId' (a run, with its step states) or 'flowId' (the definition alone).");
 }
 

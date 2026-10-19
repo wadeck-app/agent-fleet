@@ -6653,3 +6653,9 @@ The module tsconfig `paths` make `app-core-cli package` bundle flow-core from it
 Module ids, exposed slots and page paths (`appModule/`), execution-id and config layout rules: each package asserts its own
 manifest against the flow-core constant. `flow-core/src/architecture/DependencyDirection.test.ts` fails on any reference between
 flow-cli and app-module-* (flow-chart's package.json dependency on app-module-flow is the one allowed: app-core-cli needs it).
+
+## Run `violations check --files <touched>` before finishing; app-module code is ASCII-only
+
+**Problem:** Check marks, ellipsis and em dashes were written into app-module code; `shared/no-emoji` flags them but nobody ran `violations check`, and it ignores yaml/json and (via `globalExclude`) tests.
+**Fix:** Run `violations check --files <touched files>` at the end of every task. Rule `local/app-module-ascii-only` errors on any non-ASCII character in `packages/app-module-*` and `packages/flow-core/src`, tests included (the rule discovers sibling test files itself, because `globalExclude` cannot be bypassed). Use plain ASCII: ok/FAIL, three dots for the ellipsis.
+**Context:** Violations stays an optional extra check (not in `check-all`). `violations rules info <id>` prints "Rule not found" for every rule (CLI bug, not a stale cache): use `violations rules list`.

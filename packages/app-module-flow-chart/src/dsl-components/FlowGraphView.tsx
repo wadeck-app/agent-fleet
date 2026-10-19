@@ -1,80 +1,24 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { Badge, ButtonLink } from '@wadeck-app/dsl-ui';
-import {
-	Background,
-	ReactFlow,
-	ReactFlowProvider,
-	getNodesBounds,
-	getViewportForBounds,
-	useReactFlow,
-	useStore,
-} from '@xyflow/react';
+import { Background, ReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { FlowGraphResult } from 'flow-core';
 
-import { FIT_PADDING, MAX_FIT_ZOOM, planChartView } from './ChartViewPlan.js';
+import { ChartToolbar } from './ChartToolbar.js';
+import { planChartView } from './ChartViewPlan.js';
 import { FlowStepNode } from './FlowStepNode.js';
 import { pickFocusStep } from './FocusStep.js';
 import type { LayoutDirection } from './GraphLayout.js';
 import { GraphLegend } from './GraphLegend.js';
+import { InitialViewport } from './InitialViewport.js';
 import { useShellColorMode } from './ShellColorMode.js';
 import { summarizeStatuses } from './StatusSummary.js';
 import { StepDetailsPanel } from './StepDetailsPanel.js';
 import { toFlowElements } from './ToFlowElements.js';
 
 const NODE_TYPES = { step: FlowStepNode };
-const FIT_OPTIONS = { padding: FIT_PADDING, minZoom: 0.1, maxZoom: MAX_FIT_ZOOM };
-const FOCUS_ZOOM = 0.85;
-const FOCUS_TOP_SHARE = 0.15;
 
-/**
- * Fits the whole chart once the nodes are measured. When the plan says the chart cannot be readable even fitted
- * on the tallest canvas (`focus`), it opens on the step that matters (first failed, running, or first) and says
- * so; "Fit to view" shows everything.
- */
-function InitialViewport({
-	focusId,
-	focus,
-	onFocused,
-}: {
-	focusId: string;
-	focus: boolean;
-	onFocused: (focusedOn: boolean) => void;
-}) {
-	const flow = useReactFlow();
-	const width = useStore(state => state.width);
-	const height = useStore(state => state.height);
-	const done = useRef(false);
-	useEffect(() => {
-		// Wait for the canvas to be measured; the node sizes are known from the layout.
-		if (width === 0 || height === 0 || done.current) return;
-		done.current = true;
-		const nodes = flow.getNodes();
-		const fitted = getViewportForBounds(
-			getNodesBounds(nodes),
-			width,
-			height,
-			FIT_OPTIONS.minZoom,
-			FIT_OPTIONS.maxZoom,
-			FIT_OPTIONS.padding
-		);
-		const target = nodes.find(node => node.id === focusId);
-		if (!focus || target === undefined) {
-			void flow.setViewport(fitted);
-			return;
-		}
-		// The step is centered horizontally and sits in the upper part, so its successors are visible below it.
-		const centerX = target.position.x + (target.width ?? 0) / 2;
-		const topY = target.position.y;
-		void flow.setViewport({
-			x: width / 2 - centerX * FOCUS_ZOOM,
-			y: height * FOCUS_TOP_SHARE - topY * FOCUS_ZOOM,
-			zoom: FOCUS_ZOOM,
-		});
-		onFocused(true);
-	}, [width, height, flow, focusId, focus, onFocused]);
-	return null;
-}
+const WARNING_BANNER_CLASS = 'rounded-md border border-warning bg-warning-bg px-3 py-2 text-sm text-warning-text';
 
 type BadgeVariant = NonNullable<Parameters<typeof Badge>[0]['variant']>;
 
@@ -94,49 +38,6 @@ function executionBadge(status: string): BadgeVariant {
 	return variant;
 }
 
-/** Above the canvas, not over it: a floating toolbar covers the first steps of the chart. */
-function Toolbar({
-	direction,
-	onToggleDirection,
-	onFit,
-	hint,
-}: {
-	direction: LayoutDirection;
-	onToggleDirection: () => void;
-	onFit: () => void;
-	hint: string | undefined;
-}) {
-	const flow = useReactFlow();
-	const button =
-		'rounded-md border border-border bg-surface px-2 py-1 text-xs text-content hover:bg-muted-bg focus:outline-none focus:ring-2 focus:ring-primary';
-	return (
-		<div className="flex flex-wrap items-center justify-between gap-2">
-			<p className="min-w-0 text-xs text-muted">{hint}</p>
-			<div className="flex flex-wrap gap-1" role="toolbar" aria-label="Chart controls">
-				<button type="button" className={button} onClick={() => void flow.zoomIn()} aria-label="Zoom in">
-					+
-				</button>
-				<button type="button" className={button} onClick={() => void flow.zoomOut()} aria-label="Zoom out">
-					-
-				</button>
-				<button
-					type="button"
-					className={button}
-					onClick={() => {
-						onFit();
-						void flow.fitView({ ...FIT_OPTIONS, duration: 200 });
-					}}
-				>
-					Fit to view
-				</button>
-				<button type="button" className={button} onClick={onToggleDirection}>
-					{direction === 'LR' ? 'Switch to vertical layout' : 'Switch to horizontal layout'}
-				</button>
-			</div>
-		</div>
-	);
-}
-
 /**
  * The chart of a loaded graph: header, canvas (pan, zoom, fit; read-only), legend and the details of the selected
  * step. Only draws; loading and errors are FlowGraph's job.
@@ -150,7 +51,9 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 	const [chosenDirection, setChosenDirection] = useState<LayoutDirection | undefined>(undefined);
 	useLayoutEffect(() => {
 		const width = columnRef.current?.offsetWidth ?? 0;
-		if (baseline === undefined && width > 0 && graph.nodes.length > 0) setBaseline({ graph, width });
+		if (baseline === undefined && width > 0 && graph.nodes.length > 0) {
+			setBaseline({ graph, width });
+		}
 	}, [baseline, graph]);
 	const plan = useMemo(
 		() =>
@@ -209,21 +112,14 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 			</header>
 
 			{refreshError !== undefined && (
-				<div
-					role="alert"
-					className="rounded-md border border-warning bg-warning-bg px-3 py-2 text-sm text-warning-text"
-				>
+				<div role="alert" className={WARNING_BANNER_CLASS}>
 					The chart could not be refreshed: {refreshError} The last known state is shown; it is retried every
 					few seconds.
 				</div>
 			)}
 
 			{graph.warnings && graph.warnings.length > 0 && (
-				<div
-					role="status"
-					aria-label="Chart warnings"
-					className="rounded-md border border-warning bg-warning-bg px-3 py-2 text-sm text-warning-text"
-				>
+				<div role="status" aria-label="Chart warnings" className={WARNING_BANNER_CLASS}>
 					{graph.warnings.map(warning => (
 						<p key={warning}>{warning}</p>
 					))}
@@ -233,7 +129,7 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 			<div className="flex flex-col gap-3 lg:flex-row">
 				<div ref={columnRef} className="flex min-w-0 flex-1 flex-col gap-2">
 					<ReactFlowProvider>
-						<Toolbar
+						<ChartToolbar
 							onFit={() => setFocusedOnStep(false)}
 							direction={direction}
 							onToggleDirection={() => {

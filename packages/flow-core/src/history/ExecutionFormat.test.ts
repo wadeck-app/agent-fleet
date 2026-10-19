@@ -15,6 +15,16 @@ describe('formatDuration', () => {
 	it('uses minutes and rounded seconds from a minute on', () => {
 		expect(formatDuration('2026-08-16T12:00:00.000Z', '2026-08-16T12:02:30.400Z')).toBe('2m30s');
 	});
+	it('carries rounded seconds into the minute instead of printing 60s', () => {
+		expect(formatDuration('2026-08-16T12:00:00.000Z', '2026-08-16T12:01:59.600Z')).toBe('2m0s');
+		expect(formatDuration('2026-08-16T12:00:00.000Z', '2026-08-16T12:00:59.960Z')).toBe('1m0s');
+		expect(formatDuration('2026-08-16T12:00:00.000Z', '2026-08-16T12:00:59.600Z')).toBe('59.6s');
+	});
+	it('switches to hours and minutes from an hour on (no seconds), carrying instead of printing 60m', () => {
+		expect(formatDuration('2026-08-16T12:00:00.000Z', '2026-08-16T12:59:59.600Z')).toBe('1h');
+		expect(formatDuration('2026-08-16T12:00:00.000Z', '2026-08-16T13:01:40.000Z')).toBe('1h1m');
+		expect(formatDuration('2026-08-16T12:00:00.000Z', '2026-08-16T14:05:00.000Z')).toBe('2h5m');
+	});
 });
 
 describe('formatStarted', () => {

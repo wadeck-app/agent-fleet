@@ -164,7 +164,9 @@ export class FlowQueryService {
 	/** Live workers as the daemon reports them. A missing daemon is an empty list; other daemon failures throw WorkerListError. */
 	async listWorkers(): Promise<WorkerListResult> {
 		const { workers, daemon } = await readWorkerList(this.directories.daemonDir);
-		if (workers.length > 0) return { workers, daemon, declaredSources: [] };
+		if (workers.length > 0) {
+			return { workers, daemon, declaredSources: [] };
+		}
 
 		let declaredSources: DeclaredWorkerSource[] = [];
 		let declaredSourcesError: string | undefined;

@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 import { APP_MODULES, type AppModuleDescriptor } from './AppModules.js';
 
@@ -36,8 +37,12 @@ export function appCoreModuleOption(
 	try {
 		return { manifestPath: locateAppModuleManifest(locations, module) };
 	} catch (err) {
-		if (!(err instanceof AppModuleNotFoundError)) throw err;
-		reportError(`${err.message} The daemon starts without registering the "${module.id}" module with app-core.`);
+		if (!(err instanceof AppModuleNotFoundError)) {
+			throw err;
+		}
+		reportError(
+			`${getErrorMessage(err)} The daemon starts without registering the "${module.id}" module with app-core.`
+		);
 		return undefined;
 	}
 }
@@ -63,7 +68,9 @@ export function appCoreModuleOptions(
 	const options: { id: string; manifestPath: string }[] = [];
 	for (const module of APP_MODULES) {
 		const option = appCoreModuleOption(defaultAppModuleLocations(cliModuleUrl, module), module, reportError);
-		if (option) options.push({ id: module.id, ...option });
+		if (option) {
+			options.push({ id: module.id, ...option });
+		}
 	}
 	return options;
 }
@@ -74,7 +81,9 @@ export function appCoreModuleOptions(
  */
 export function locateAppModuleManifest(locations: AppModuleLocations, module: AppModuleDescriptor): string {
 	for (const candidate of [locations.bundled, locations.dev]) {
-		if (fs.existsSync(candidate)) return candidate;
+		if (fs.existsSync(candidate)) {
+			return candidate;
+		}
 	}
 	throw new AppModuleNotFoundError([locations.bundled, locations.dev], module);
 }

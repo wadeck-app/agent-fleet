@@ -17,7 +17,9 @@ export function renderDetailView(exec: ExecutionState): string {
 	lines.push(`File:      ${exec.flowFile}`);
 	lines.push(`Status:    ${exec.status}`);
 	lines.push(`Started:   ${formatStarted(exec.startedAt)}`);
-	if (exec.completedAt) lines.push(`Completed: ${formatStarted(exec.completedAt)}`);
+	if (exec.completedAt) {
+		lines.push(`Completed: ${formatStarted(exec.completedAt)}`);
+	}
 	lines.push(`Duration:  ${formatDuration(exec.startedAt, exec.completedAt)}`);
 	lines.push('');
 	lines.push('Steps:');
@@ -32,12 +34,16 @@ export function renderDetailView(exec: ExecutionState): string {
 	let totalCostUsd = 0;
 	let hasCost = false;
 	for (const [stepId, step] of Object.entries(exec.steps)) {
-		if (step.injected) hasInjectedStep = true;
+		if (step.injected) {
+			hasInjectedStep = true;
+		}
 		const name = step.injected ? `${stepId}*` : stepId;
 		const dur = step.startedAt ? formatDuration(step.startedAt, step.completedAt ?? null) : '-';
 		lines.push('  ' + padTruncate(name, COL_STEP) + padTruncate(step.status, COL_STATUS) + dur);
 		const costLine = formatModelCost(step.meta);
-		if (costLine) lines.push('      ' + costLine);
+		if (costLine) {
+			lines.push('      ' + costLine);
+		}
 		if (step.meta && 'cost' in step.meta) {
 			hasCost = true;
 			totalCostUsd += (step.meta as { cost: { usd: number } }).cost.usd;
@@ -56,10 +62,14 @@ export function renderDetailView(exec: ExecutionState): string {
 
 	const failedSteps = Object.entries(exec.steps).filter(([, step]) => step.status === 'failed');
 	for (const [stepId, step] of failedSteps) {
-		if (!step.error && !step.stdout && !step.stderr) continue;
+		if (!step.error && !step.stdout && !step.stderr) {
+			continue;
+		}
 		lines.push('');
 		lines.push(`Step '${stepId}' failed:`);
-		if (step.error) lines.push(`  Error:  ${step.error}`);
+		if (step.error) {
+			lines.push(`  Error:  ${step.error}`);
+		}
 		if (step.stdout) {
 			lines.push('  Stdout:');
 			lines.push(indentBlock(step.stdout));
@@ -82,13 +92,17 @@ export function buildHistoryTable(execs: ExecutionState[], opts: ExecutionFilter
 			return `Ambiguous execution ID prefix "${opts.id}" -- matches: ${items.map(e => e.executionId).join(', ')}`;
 		}
 		const exec = items[0];
-		if (!exec) return `Execution '${opts.id}' not found.`;
+		if (!exec) {
+			return `Execution '${opts.id}' not found.`;
+		}
 		return renderDetailView(exec);
 	}
 
 	const limit = opts.limit ?? 20;
 	const offset = opts.offset ?? 0;
-	if (items.length === 0) return offset > 0 ? `No more executions (showing ${offset}+).` : 'No executions found.';
+	if (items.length === 0) {
+		return offset > 0 ? `No more executions (showing ${offset}+).` : 'No executions found.';
+	}
 
 	const COL_ID = 12;
 	const COL_FLOW = 32;

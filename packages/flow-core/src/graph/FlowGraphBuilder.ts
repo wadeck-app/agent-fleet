@@ -24,36 +24,66 @@ function invalid(flowId: string, message: string): FlowCoreError {
 }
 
 function addStateMeta(meta: MetaValues, state: StepState): void {
-	if (state.startedAt) meta.startedAt = state.startedAt;
-	if (state.completedAt) meta.completedAt = state.completedAt;
-	if (state.error) meta.error = state.error;
-	if (state.workerId) meta.workerId = state.workerId;
-	if (state.sourceId) meta.sourceId = state.sourceId;
+	if (state.startedAt) {
+		meta.startedAt = state.startedAt;
+	}
+	if (state.completedAt) {
+		meta.completedAt = state.completedAt;
+	}
+	if (state.error) {
+		meta.error = state.error;
+	}
+	if (state.workerId) {
+		meta.workerId = state.workerId;
+	}
+	if (state.sourceId) {
+		meta.sourceId = state.sourceId;
+	}
 	const stepMeta = state.meta as { cost?: { usd?: number }; model?: string } | undefined;
-	if (stepMeta?.cost?.usd !== undefined) meta.costUsd = stepMeta.cost.usd;
-	if (stepMeta?.model !== undefined) meta.model = stepMeta.model;
+	if (stepMeta?.cost?.usd !== undefined) {
+		meta.costUsd = stepMeta.cost.usd;
+	}
+	if (stepMeta?.model !== undefined) {
+		meta.model = stepMeta.model;
+	}
 }
 
 function stepMeta(step: FlowStep, state: StepState | undefined): MetaValues {
 	const meta: MetaValues = { type: step.type };
 	if (step.type === 'model') {
-		if (step.provider) meta.provider = step.provider;
-		if (step.model) meta.model = step.model;
+		if (step.provider) {
+			meta.provider = step.provider;
+		}
+		if (step.model) {
+			meta.model = step.model;
+		}
 	}
-	if (step.type === 'subflow') meta.flowId = step.flowId;
+	if (step.type === 'subflow') {
+		meta.flowId = step.flowId;
+	}
 	if (step.type === 'user_intervention') {
 		meta.interventionType = step.interventionType;
 		meta.blocking = step.blocking !== false;
 	}
-	if (step.when) meta.when = step.when;
-	if (step.retry) meta.retryMaxAttempts = step.retry.maxAttempts;
+	if (step.when) {
+		meta.when = step.when;
+	}
+	if (step.retry) {
+		meta.retryMaxAttempts = step.retry.maxAttempts;
+	}
 	if (step.onFailure?.goto) {
 		meta.onFailureGoto = step.onFailure.goto;
 		meta.onFailureMaxIterations = step.onFailure.maxIterations ?? 3;
 	}
-	if (step.parent) meta.parent = step.parent;
-	if (step.labels?.length) meta.labels = step.labels.join(', ');
-	if (state) addStateMeta(meta, state);
+	if (step.parent) {
+		meta.parent = step.parent;
+	}
+	if (step.labels?.length) {
+		meta.labels = step.labels.join(', ');
+	}
+	if (state) {
+		addStateMeta(meta, state);
+	}
 	return meta;
 }
 
@@ -61,8 +91,12 @@ function stateFields(
 	state: StepState | undefined,
 	hasExecution: boolean
 ): Pick<FlowGraphNode, 'status' | 'durationLabel' | 'attempts'> {
-	if (!hasExecution) return {};
-	if (!state) return { status: 'pending' };
+	if (!hasExecution) {
+		return {};
+	}
+	if (!state) {
+		return { status: 'pending' };
+	}
 	return {
 		status: state.status,
 		...(state.startedAt ? { durationLabel: formatDuration(state.startedAt, state.completedAt ?? null) } : {}),
@@ -71,7 +105,9 @@ function stateFields(
 }
 
 function startTime(state: StepState | undefined): number {
-	if (state?.startedAt === undefined) return Number.POSITIVE_INFINITY;
+	if (state?.startedAt === undefined) {
+		return Number.POSITIVE_INFINITY;
+	}
 	const time = Date.parse(state.startedAt);
 	return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
 }
@@ -92,7 +128,9 @@ function addRecordedOnlySteps(
 ): string[] {
 	const known = new Set(nodes.map(n => n.id));
 	const orphans = Object.entries(execution.steps).filter(([id]) => !known.has(id));
-	if (orphans.length === 0) return [];
+	if (orphans.length === 0) {
+		return [];
+	}
 
 	for (const [id, state] of orphans) {
 		const removed = state.injected !== true;
@@ -112,7 +150,9 @@ function addRecordedOnlySteps(
 	const rank = (id: string): number => recordOrder.get(id) ?? Number.POSITIVE_INFINITY;
 	nodes.sort((a, b) => {
 		const byStart = startTime(execution.steps[a.id]) - startTime(execution.steps[b.id]);
-		if (byStart !== 0 && !Number.isNaN(byStart)) return byStart;
+		if (byStart !== 0 && !Number.isNaN(byStart)) {
+			return byStart;
+		}
 		return rank(a.id) - rank(b.id);
 	});
 
@@ -124,14 +164,20 @@ function addRecordedOnlySteps(
 				`step '${id}' of execution ${execution.executionId} has ${field} '${target}', which is not a step of this run.`
 			);
 		for (const dep of state.dependsOn ?? []) {
-			if (!known.has(dep)) throw fail('recorded dependency', dep);
+			if (!known.has(dep)) {
+				throw fail('recorded dependency', dep);
+			}
 			edges.push({ from: dep, to: id, kind: 'dependency' });
 		}
 		if (state.parent !== undefined) {
-			if (!known.has(state.parent)) throw fail('recorded parent', state.parent);
+			if (!known.has(state.parent)) {
+				throw fail('recorded parent', state.parent);
+			}
 			edges.push({ from: id, to: state.parent, kind: 'substep', label: 'sub-step of' });
 		}
-		if (state.dependsOn === undefined && state.parent === undefined) unlinked.push(id);
+		if (state.dependsOn === undefined && state.parent === undefined) {
+			unlinked.push(id);
+		}
 	}
 
 	const order = new Map(nodes.map((n, index) => [n.id, index]));
@@ -167,7 +213,9 @@ export function buildFlowGraph(flow: FlowDefinition, execution?: ExecutionState)
 	const steps = flow.steps;
 	const ids = new Set<string>();
 	for (const step of steps) {
-		if (ids.has(step.id)) throw invalid(flow.id, `step id '${step.id}' is declared twice. Make step ids unique.`);
+		if (ids.has(step.id)) {
+			throw invalid(flow.id, `step id '${step.id}' is declared twice. Make step ids unique.`);
+		}
 		ids.add(step.id);
 	}
 	const requireStep = (from: string, field: string, target: string): void => {
@@ -212,7 +260,9 @@ export function buildFlowGraph(flow: FlowDefinition, execution?: ExecutionState)
 		}
 	}
 
-	if (!execution) return { nodes, edges };
+	if (!execution) {
+		return { nodes, edges };
+	}
 	const warnings = addRecordedOnlySteps(flow, execution, nodes, edges);
 	return warnings.length > 0 ? { nodes, edges, warnings } : { nodes, edges };
 }

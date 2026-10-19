@@ -39,6 +39,7 @@ const HIDDEN_KEYS = new Set(['type', 'error']);
 function formatValue(key: string, value: string | number | boolean): string {
 	if (DATE_KEYS.has(key) && typeof value === 'string') {
 		const date = new Date(value);
+		// violations-suppress: ts/no-locale-date shows the reader's own timezone; @wadeck-app/dsl-ui exports no shared date formatter
 		return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 	}
 	return String(value);
@@ -50,16 +51,24 @@ export function describeStep(step: FlowGraphNode): StepDetail {
 		{ label: 'Status', value: statusStyle(step.status).label },
 		{ label: 'Kind', value: step.kind },
 	];
-	if (step.durationLabel !== undefined) rows.push({ label: 'Duration', value: step.durationLabel });
-	if (step.attempts !== undefined) rows.push({ label: 'Attempts', value: String(step.attempts) });
+	if (step.durationLabel !== undefined) {
+		rows.push({ label: 'Duration', value: step.durationLabel });
+	}
+	if (step.attempts !== undefined) {
+		rows.push({ label: 'Attempts', value: String(step.attempts) });
+	}
 
 	const meta = step.meta ?? {};
 	for (const key of Object.keys(META_LABELS)) {
 		const value = meta[key];
-		if (value !== undefined) rows.push({ label: META_LABELS[key]!, value: formatValue(key, value) });
+		if (value !== undefined) {
+			rows.push({ label: META_LABELS[key]!, value: formatValue(key, value) });
+		}
 	}
 	for (const [key, value] of Object.entries(meta)) {
-		if (!(key in META_LABELS) && !HIDDEN_KEYS.has(key)) rows.push({ label: key, value: formatValue(key, value) });
+		if (!(key in META_LABELS) && !HIDDEN_KEYS.has(key)) {
+			rows.push({ label: key, value: formatValue(key, value) });
+		}
 	}
 	const error = meta['error'];
 	return { rows, error: error === undefined ? undefined : String(error) };

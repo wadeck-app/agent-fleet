@@ -1,11 +1,28 @@
 import type { StepMeta } from 'flow-engine/types';
 
+/** Largest duration still written as seconds with one decimal: 59.95s would round to "60.0s". */
+const SECONDS_FORMAT_LIMIT_MS = 59950;
+
 export function formatDuration(startedAt: string, completedAt: string | null): string {
-	if (!completedAt) return 'running';
+	if (!completedAt) {
+		return 'running';
+	}
 	const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime();
-	if (ms < 1000) return `${ms}ms`;
-	if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-	return `${Math.floor(ms / 60000)}m${Math.round((ms % 60000) / 1000)}s`;
+	if (ms < 1000) {
+		return `${ms}ms`;
+	}
+	// Below 59.95s the one-decimal form cannot round up to "60.0s".
+	if (ms < SECONDS_FORMAT_LIMIT_MS) {
+		return `${(ms / 1000).toFixed(1)}s`;
+	}
+	// Round once on the total so a carry (59.6s past the minute) lands in the next unit instead of printing "60s".
+	const totalSeconds = Math.round(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	if (hours > 0) {
+		return minutes > 0 ? `${hours}h${minutes}m` : `${hours}h`;
+	}
+	return `${minutes}m${totalSeconds % 60}s`;
 }
 
 export function formatStarted(iso: string): string {
@@ -14,7 +31,9 @@ export function formatStarted(iso: string): string {
 
 /** `meta.cost` only exists on ModelStepMeta -- a script step's meta has no such field. */
 export function formatModelCost(meta: StepMeta | undefined): string | undefined {
-	if (!meta || !('cost' in meta)) return undefined;
+	if (!meta || !('cost' in meta)) {
+		return undefined;
+	}
 	const { cost } = meta as {
 		cost: {
 			input_tokens: number;

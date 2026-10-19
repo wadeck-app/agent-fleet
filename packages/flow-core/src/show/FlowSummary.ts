@@ -6,9 +6,15 @@ function pad(s: string, width: number): string {
 }
 
 export function stepType(step: FlowStep): string {
-	if (step.type === 'model') return (step as ModelFlowStep).model ?? 'model';
-	if (step.type === 'script') return 'script';
-	if (step.type === 'subflow') return `subflow:${(step as SubFlowStep).flowId}`;
+	if (step.type === 'model') {
+		return (step as ModelFlowStep).model ?? 'model';
+	}
+	if (step.type === 'script') {
+		return 'script';
+	}
+	if (step.type === 'subflow') {
+		return `subflow:${(step as SubFlowStep).flowId}`;
+	}
 	if (step.type === 'user_intervention') {
 		const s = step as UserInterventionStep;
 		return s.interventionType;
@@ -25,14 +31,18 @@ function shortWhen(expr: string): string {
 }
 
 export function stepDepends(step: FlowStep, steps: FlowStep[]): string {
-	if (!step.depends || step.depends.length === 0) return '-';
+	if (!step.depends || step.depends.length === 0) {
+		return '-';
+	}
 
 	const nums = step.depends.map((depId: string) => {
 		const idx = steps.findIndex(s => s.id === depId) + 1;
 		return idx > 0 ? String(idx) : depId;
 	});
 
-	if (!step.when) return nums.join(', ');
+	if (!step.when) {
+		return nums.join(', ');
+	}
 
 	// When all depends share the same condition, show it once: "1, 2: if(cond)"
 	const cond = shortWhen(step.when);
@@ -40,13 +50,17 @@ export function stepDepends(step: FlowStep, steps: FlowStep[]): string {
 }
 
 function stepOutputs(step: FlowStep): string {
-	if (!step.output) return '-';
+	if (!step.output) {
+		return '-';
+	}
 	const keys = Object.keys(step.output);
 	return keys.length > 0 ? keys.join(', ') : '-';
 }
 
 function stepLoop(step: FlowStep, steps: FlowStep[]): string {
-	if (!step.onFailure?.goto) return '';
+	if (!step.onFailure?.goto) {
+		return '';
+	}
 	const targetIdx = steps.findIndex(s => s.id === step.onFailure!.goto) + 1;
 	const target = targetIdx > 0 ? String(targetIdx) : step.onFailure.goto;
 	const max = step.onFailure.maxIterations != null ? `  max:${step.onFailure.maxIterations}x` : '';
@@ -54,7 +68,9 @@ function stepLoop(step: FlowStep, steps: FlowStep[]): string {
 }
 
 function stepRetry(step: FlowStep): string {
-	if (!step.retry) return '';
+	if (!step.retry) {
+		return '';
+	}
 	return `  retry:${step.retry.maxAttempts}x`;
 }
 
@@ -63,10 +79,14 @@ function isBlocking(step: FlowStep): boolean {
 }
 
 export function formatInputs(inputs: FlowDefinition['inputs']): string {
-	if (!inputs || Object.keys(inputs).length === 0) return '(none)';
+	if (!inputs || Object.keys(inputs).length === 0) {
+		return '(none)';
+	}
 	return Object.entries(inputs)
 		.map(([name, spec]) => {
-			if (typeof spec === 'string') return `${name} (${spec})`;
+			if (typeof spec === 'string') {
+				return `${name} (${spec})`;
+			}
 			const s = spec as { type?: string; required?: boolean; default?: unknown; description?: string };
 			const type = s.type ?? 'string';
 			const req = s.required === false ? '' : ', required';
@@ -77,7 +97,9 @@ export function formatInputs(inputs: FlowDefinition['inputs']): string {
 }
 
 export function formatStatus(flow: FlowDefinition): string {
-	if (!flow.statusTransitions) return '';
+	if (!flow.statusTransitions) {
+		return '';
+	}
 	const ok =
 		typeof flow.statusTransitions.onSuccess === 'string'
 			? flow.statusTransitions.onSuccess
@@ -90,7 +112,9 @@ export function formatStatus(flow: FlowDefinition): string {
 }
 
 export function formatTrigger(flow: FlowDefinition): string {
-	if (!flow.trigger) return '';
+	if (!flow.trigger) {
+		return '';
+	}
 	if (flow.trigger.type === 'event') {
 		const filter = flow.trigger.filter
 			? ' ' +
@@ -118,14 +142,22 @@ export function renderFlowSummary(flow: FlowDefinition): string {
 
 	const ws = flow.workspace;
 	const wsParts: string[] = [ws.mode];
-	if (ws.gitStrategy) wsParts.push(`git:${ws.gitStrategy}`);
-	if (ws.reusePolicy) wsParts.push(`reuse:${ws.reusePolicy}`);
+	if (ws.gitStrategy) {
+		wsParts.push(`git:${ws.gitStrategy}`);
+	}
+	if (ws.reusePolicy) {
+		wsParts.push(`reuse:${ws.reusePolicy}`);
+	}
 	out.push(`workspace: ${wsParts.join('  ')}`);
 	out.push(`inputs:    ${formatInputs(flow.inputs)}`);
 	const status = formatStatus(flow);
-	if (status) out.push(`status:    ${status}`);
+	if (status) {
+		out.push(`status:    ${status}`);
+	}
 	const trigger = formatTrigger(flow);
-	if (trigger) out.push(trigger);
+	if (trigger) {
+		out.push(trigger);
+	}
 
 	// --- Column widths (capped to keep output terminal-friendly) ---
 	const COL_NUM = 3;

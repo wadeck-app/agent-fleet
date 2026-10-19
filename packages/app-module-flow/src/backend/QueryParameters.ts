@@ -19,9 +19,15 @@ export interface IntegerBounds {
 /** `true` or `false` spelled out; anything else is refused rather than guessed at. */
 export function optionalBoolean(query: QueryParams, name: string, fallback: boolean): boolean {
 	const raw = optionalString(query, name);
-	if (raw === undefined) return fallback;
-	if (raw === 'true') return true;
-	if (raw === 'false') return false;
+	if (raw === undefined) {
+		return fallback;
+	}
+	if (raw === 'true') {
+		return true;
+	}
+	if (raw === 'false') {
+		return false;
+	}
 	throw new InvalidQueryError(`'${name}' must be 'true' or 'false', got '${raw}'.`);
 }
 
@@ -31,7 +37,9 @@ export function optionalBoolean(query: QueryParams, name: string, fallback: bool
  */
 export function optionalInteger(query: QueryParams, name: string, bounds: IntegerBounds): number | undefined {
 	const raw = optionalString(query, name);
-	if (raw === undefined) return undefined;
+	if (raw === undefined) {
+		return undefined;
+	}
 
 	const expected =
 		bounds.max === undefined ? `an integer >= ${bounds.min}` : `an integer between ${bounds.min} and ${bounds.max}`;

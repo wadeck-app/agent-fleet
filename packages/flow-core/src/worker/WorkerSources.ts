@@ -82,7 +82,9 @@ export class WorkerSourceRegistryError extends FlowCoreError {
  * A missing file is a registry with no source.
  */
 export function parseWorkerSourceFile(filePath: string): WorkerSourceEntry[] {
-	if (!existsSync(filePath)) return [];
+	if (!existsSync(filePath)) {
+		return [];
+	}
 
 	let parsed: unknown;
 	try {
@@ -111,7 +113,9 @@ export function parseWorkerSourceFile(filePath: string): WorkerSourceEntry[] {
  * re-declare look like one that already works.
  */
 export function assertProviderNotRetired(sourceId: string, provider: string, filePath: string): void {
-	if (provider !== RETIRED_RELAY_PROVIDER) return;
+	if (provider !== RETIRED_RELAY_PROVIDER) {
+		return;
+	}
 
 	throw new WorkerSourceRegistryError(
 		`Worker source "${sourceId}" uses provider "${RETIRED_RELAY_PROVIDER}", which no longer exists: the concept is now called a relay. ` +

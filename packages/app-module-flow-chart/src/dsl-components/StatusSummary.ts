@@ -9,7 +9,9 @@ import { STATUS_LEGEND } from './StatusStyle.js';
 export function summarizeStatuses(graph: FlowGraph): string {
 	const total = graph.nodes.length;
 	const noun = total === 1 ? 'step' : 'steps';
-	if (graph.nodes.every(node => node.status === undefined)) return `${total} ${noun}`;
+	if (graph.nodes.every(node => node.status === undefined)) {
+		return `${total} ${noun}`;
+	}
 	const parts = STATUS_LEGEND.map(status => ({
 		status,
 		count: graph.nodes.filter(node => node.status === status).length,

@@ -83,7 +83,9 @@ export function resolveExecution(executionsDir: string, idOrPrefix: string): Res
 
 /** Keeps the last `tail` characters; the marker tells how much was dropped and where the full text lives. */
 export function tailText(text: string, tail: number, filePath: string): string {
-	if (text.length <= tail) return text;
+	if (text.length <= tail) {
+		return text;
+	}
 	const dropped = text.length - tail;
 	return `(${dropped} more chars, see ${filePath}) ...${text.slice(-tail)}`;
 }
@@ -96,13 +98,17 @@ function indent(text: string, prefix: string): string {
 }
 
 function stepDuration(step: StepState): string {
-	if (!step.startedAt) return '-';
+	if (!step.startedAt) {
+		return '-';
+	}
 	return formatDuration(step.startedAt, step.completedAt ?? null);
 }
 
 /** `  attempts: 3 (total 4m58s)` when the step ran more than once; the duration above is the last attempt only. */
 function attemptsLabel(step: StepState): string {
-	if (!step.attempts || step.attempts < 2) return '';
+	if (!step.attempts || step.attempts < 2) {
+		return '';
+	}
 	const lastMs =
 		step.startedAt && step.completedAt
 			? new Date(step.completedAt).getTime() - new Date(step.startedAt).getTime()
@@ -124,7 +130,9 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	lines.push(`File:      ${record.flowFile}`);
 	lines.push(`Status:    ${record.status}`);
 	lines.push(`Started:   ${formatStarted(record.startedAt)}`);
-	if (record.completedAt) lines.push(`Completed: ${formatStarted(record.completedAt)}`);
+	if (record.completedAt) {
+		lines.push(`Completed: ${formatStarted(record.completedAt)}`);
+	}
 	lines.push(`Duration:  ${formatDuration(record.startedAt, record.completedAt)}`);
 	// lastError is the last step failure ever seen; on a completed run it is a recovered retry, not the outcome.
 	if (record.lastError) {
@@ -156,9 +164,13 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 				`      relaunch ${i + 1} (sub-step failed) ${formatStarted(relaunch.at)}: ${firstLine.slice(0, 160)}`
 			);
 		}
-		if (step.error) lines.push(`      error: ${step.error}`);
+		if (step.error) {
+			lines.push(`      error: ${step.error}`);
+		}
 		const cost = formatModelCost(step.meta);
-		if (cost) lines.push(`      ${cost}`);
+		if (cost) {
+			lines.push(`      ${cost}`);
+		}
 		if (step.meta && 'cost' in step.meta) {
 			hasCost = true;
 			totalCostUsd += (step.meta as { cost: { usd: number } }).cost.usd;
@@ -168,7 +180,9 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 				['stdout', step.stdout],
 				['stderr', step.stderr],
 			] as const) {
-				if (!text) continue;
+				if (!text) {
+					continue;
+				}
 				lines.push(`      ${label}:`);
 				lines.push(indent(options.full ? text : tailText(text, options.tail, filePath), '        '));
 			}

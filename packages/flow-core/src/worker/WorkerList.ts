@@ -41,10 +41,14 @@ export function formatWorkerLine(w: WorkerSummary): string {
  */
 export async function describeRunningDaemon(daemonDir: string, needed: boolean): Promise<DaemonStatus> {
 	const unknown: DaemonStatus = { running: true, pid: undefined, port: undefined, startedAt: undefined };
-	if (!needed) return unknown;
+	if (!needed) {
+		return unknown;
+	}
 	try {
 		const data = await readPortFile(daemonDir);
-		if (data) return { running: true, pid: data.pid, port: data.port, startedAt: data.startedAt };
+		if (data) {
+			return { running: true, pid: data.pid, port: data.port, startedAt: data.startedAt };
+		}
 	} catch {
 		// Falls through to the "details unavailable" status.
 	}
@@ -66,7 +70,7 @@ export async function readWorkerList(daemonDir: string): Promise<WorkerListSnaps
 		return { workers, daemon: await describeRunningDaemon(daemonDir, workers.length === 0) };
 	} catch (err) {
 		if (err instanceof DaemonNotRunningError) {
-			return { workers: [], daemon: { running: false, reason: err.message } };
+			return { workers: [], daemon: { running: false, reason: errorMessage(err) } };
 		}
 		const message = errorMessage(err);
 		if (isUnknownCommandError(message)) {

@@ -7,6 +7,8 @@ export const READABLE_ZOOM = 0.6;
 /** Share of the canvas kept free on each side when fitting. */
 export const FIT_PADDING = 0.1;
 export const MAX_FIT_ZOOM = 1.2;
+/** Options of every "fit the whole chart" viewport computation (initial view and the Fit to view control). */
+export const FIT_OPTIONS = { padding: FIT_PADDING, minZoom: 0.1, maxZoom: MAX_FIT_ZOOM };
 const MIN_CANVAS_HEIGHT = 420;
 const CANVAS_VIEWPORT_SHARE = 0.65;
 /** A taller canvas than this is a page of its own; beyond it the chart opens on one step. */
@@ -45,7 +47,9 @@ function planFor(graph: FlowGraph, direction: LayoutDirection, width: number, ba
 	const fittedZoom = fitZoom(graph, direction, width, canvasHeight);
 	const focus = graph.nodes.length > MAX_FIT_NODES && fittedZoom < READABLE_ZOOM;
 	// Opening on one step centers it in the canvas: a grown canvas would only add empty space around it.
-	if (focus) return { direction, canvasHeight: baseHeight, grown: false, fittedZoom, focus };
+	if (focus) {
+		return { direction, canvasHeight: baseHeight, grown: false, fittedZoom, focus };
+	}
 	return { direction, canvasHeight, grown: canvasHeight > baseHeight, fittedZoom, focus };
 }
 
@@ -67,10 +71,14 @@ export function planChartView(
 		throw new Error(`Cannot plan the chart: the canvas width is ${canvasWidth}px, it must be measured first.`);
 	}
 	const baseHeight = Math.max(MIN_CANVAS_HEIGHT, Math.round(viewportHeight * CANVAS_VIEWPORT_SHARE));
-	if (forcedDirection !== undefined) return planFor(graph, forcedDirection, canvasWidth, baseHeight);
+	if (forcedDirection !== undefined) {
+		return planFor(graph, forcedDirection, canvasWidth, baseHeight);
+	}
 
 	const horizontal = planFor(graph, 'LR', canvasWidth, baseHeight);
-	if (horizontal.fittedZoom >= READABLE_ZOOM) return horizontal;
+	if (horizontal.fittedZoom >= READABLE_ZOOM) {
+		return horizontal;
+	}
 	const vertical = planFor(graph, 'TB', canvasWidth, baseHeight);
 	return vertical.fittedZoom > horizontal.fittedZoom ? vertical : horizontal;
 }

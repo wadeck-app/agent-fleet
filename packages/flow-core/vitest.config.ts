@@ -8,9 +8,13 @@ function resolveJsToTs(): Plugin {
 		name: 'resolve-js-to-ts',
 		enforce: 'pre',
 		resolveId(source, importer) {
-			if (!importer || !source.startsWith('.')) return null;
+			if (!importer || !source.startsWith('.')) {
+				return null;
+			}
 			const tsPath = path.resolve(path.dirname(importer), source.replace(/\.js$/, '.ts'));
-			if (fs.existsSync(tsPath)) return tsPath;
+			if (fs.existsSync(tsPath)) {
+				return tsPath;
+			}
 			return null;
 		},
 	};

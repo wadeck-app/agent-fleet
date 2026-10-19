@@ -1,3 +1,4 @@
+// violations-suppress: ts/no-barrel-index app-core-cli requires src/dsl-components/index.ts as the DSL library entry (default export of the component registry entries); it is not a re-export barrel
 import { createElement } from 'react';
 
 import { type ComponentRegistryEntry, resolveExpressionValue } from '@wadeck-app/dsl-renderer';
@@ -9,8 +10,12 @@ import type { GraphTarget } from './FlowGraphLoader.js';
 function targetOf(node: Record<string, unknown>, ctx: Record<string, unknown>): GraphTarget | undefined {
 	const executionId = resolveExpressionValue(node['executionId'], ctx);
 	const flowId = resolveExpressionValue(node['flowId'], ctx);
-	if (typeof executionId === 'string' && executionId !== '') return { executionId };
-	if (typeof flowId === 'string' && flowId !== '') return { flowId };
+	if (typeof executionId === 'string' && executionId !== '') {
+		return { executionId };
+	}
+	if (typeof flowId === 'string' && flowId !== '') {
+		return { flowId };
+	}
 	return undefined;
 }
 

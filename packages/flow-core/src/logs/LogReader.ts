@@ -57,7 +57,9 @@ export function readLogs(configDir: string, options: ReadLogsOptions): LogReadRe
 		throw new InvalidQueryError(`Invalid lines '${String(options.lines)}': expected an integer.`);
 	}
 	const filePath = logFilePath(configDir, options.date ?? todayLogDate());
-	if (!fs.existsSync(filePath)) return { filePath, exists: false, text: '', size: 0 };
+	if (!fs.existsSync(filePath)) {
+		return { filePath, exists: false, text: '', size: 0 };
+	}
 
 	const content = fs.readFileSync(filePath, 'utf8');
 	const tail = tailLines(content, options.lines);
@@ -78,9 +80,13 @@ export function readAppendedLog(
 	offset: number,
 	options: { human?: boolean } = {}
 ): { text: string; offset: number } | null {
-	if (!fs.existsSync(filePath)) return null;
+	if (!fs.existsSync(filePath)) {
+		return null;
+	}
 	const size = fs.statSync(filePath).size;
-	if (size <= offset) return null;
+	if (size <= offset) {
+		return null;
+	}
 	const buf = Buffer.alloc(size - offset);
 	const fd = fs.openSync(filePath, 'r');
 	try {

@@ -17,9 +17,13 @@ const RECONNECT_WINDOW_MS = 60_000;
 
 function formatUptime(ms: number): string {
 	const seconds = Math.max(0, Math.floor(ms / 1_000));
-	if (seconds < 60) return `${String(seconds)}s`;
+	if (seconds < 60) {
+		return `${String(seconds)}s`;
+	}
 	const minutes = Math.floor(seconds / 60);
-	if (minutes < 60) return `${String(minutes)}m${String(seconds % 60)}s`;
+	if (minutes < 60) {
+		return `${String(minutes)}m${String(seconds % 60)}s`;
+	}
 	return `${String(Math.floor(minutes / 60))}h${String(minutes % 60)}m`;
 }
 

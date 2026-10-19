@@ -8,10 +8,14 @@ function resolveJsToTs(): Plugin {
 		name: 'resolve-js-to-ts',
 		enforce: 'pre',
 		resolveId(source, importer) {
-			if (!importer || !source.startsWith('.') || !source.endsWith('.js')) return null;
+			if (!importer || !source.startsWith('.') || !source.endsWith('.js')) {
+				return null;
+			}
 			const base = path.resolve(path.dirname(importer), source.replace(/\.js$/, ''));
 			for (const ext of ['.ts', '.tsx']) {
-				if (fs.existsSync(base + ext)) return base + ext;
+				if (fs.existsSync(base + ext)) {
+					return base + ext;
+				}
 			}
 			return null;
 		},

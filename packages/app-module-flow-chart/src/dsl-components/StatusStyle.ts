@@ -52,7 +52,9 @@ const STYLES: Record<NodeStatus | 'none', StatusStyle> = {
 
 /** `undefined` is a node of a definition drawn without any run. Any other value must be a flow-core status. */
 export function statusStyle(status: NodeStatus | undefined): StatusStyle {
-	if (status === undefined) return STYLES.none;
+	if (status === undefined) {
+		return STYLES.none;
+	}
 	const style = (STYLES as Record<string, StatusStyle | undefined>)[status];
 	if (style === undefined || status === ('none' as string)) {
 		throw new Error(

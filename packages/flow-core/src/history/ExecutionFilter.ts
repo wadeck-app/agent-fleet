@@ -37,8 +37,12 @@ export function filterExecutions(execs: ExecutionState[], opts: ExecutionFilterO
 	assertNonNegativeInteger('offset', offset);
 
 	let filtered = execs;
-	if (opts.status) filtered = filtered.filter(e => e.status === opts.status);
-	if (opts.flow) filtered = filtered.filter(e => e.flowId === opts.flow);
+	if (opts.status) {
+		filtered = filtered.filter(e => e.status === opts.status);
+	}
+	if (opts.flow) {
+		filtered = filtered.filter(e => e.flowId === opts.flow);
+	}
 	if (opts.id) {
 		// Prefix matching: "6u84" matches "6u84r8gf" -- lenient like task ID resolution
 		const prefix = opts.id;

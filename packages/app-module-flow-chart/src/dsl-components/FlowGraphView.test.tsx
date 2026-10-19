@@ -79,7 +79,7 @@ describe('FlowGraphView', () => {
 	it('closes the details', () => {
 		renderView(executionResult());
 		fireEvent.click(screen.getByTestId('step-test'));
-		fireEvent.click(screen.getByRole('button', { name: 'Close step details' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 		expect(screen.getByText(/Click a step to see/)).toBeInTheDocument();
 	});
 

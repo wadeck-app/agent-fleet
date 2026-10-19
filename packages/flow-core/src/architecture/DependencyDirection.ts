@@ -32,7 +32,10 @@ const SKIPPED_DIRECTORIES = new Set([
 	'coverage',
 	'.git',
 ]);
-const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'] as const;
+
+/** The part of a package.json read here: dependency sections map package names to version ranges. */
+type PackageJsonDependencies = Partial<Record<(typeof DEPENDENCY_SECTIONS)[number], Record<string, string>>>;
 const SCANNED_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.json']);
 
 // import x from 'a' / export ... from 'a' / import 'a' / import('a') / require('a')
@@ -46,7 +49,9 @@ function isAppModule(packageName: string): boolean {
 
 /** What `ownPackage` may not name, or undefined when `name` is fine for it. */
 function forbiddenReason(ownPackage: string, name: string): string | undefined {
-	if (name === ownPackage) return undefined;
+	if (name === ownPackage) {
+		return undefined;
+	}
 	if (ownPackage === FLOW_CORE_PACKAGE && (name === FLOW_CLI_PACKAGE || isAppModule(name))) {
 		return `${FLOW_CORE_PACKAGE} must not reference ${name}: it is the shared layer, hosts depend on it, not the reverse`;
 	}
@@ -87,19 +92,25 @@ export function findViolationsInSource(ownPackage: string, file: string, rawSour
 	// A relative import matches both patterns: one finding per line and reference.
 	const report = (index: number, reference: string, rule: string): void => {
 		const line = lineOf(index);
-		if (violations.some(v => v.line === line && v.reference === reference)) return;
+		if (violations.some(v => v.line === line && v.reference === reference)) {
+			return;
+		}
 		violations.push({ file, line, reference, rule });
 	};
 	for (const match of source.matchAll(SPECIFIER_PATTERN)) {
 		const specifier = match[2]!;
 		for (const name of packageNamesOfSpecifier(specifier)) {
 			const rule = forbiddenReason(ownPackage, name);
-			if (rule) report(match.index, specifier, rule);
+			if (rule) {
+				report(match.index, specifier, rule);
+			}
 		}
 	}
 	for (const match of source.matchAll(PATH_LITERAL_PATTERN)) {
 		const rule = forbiddenReason(ownPackage, match[3]!);
-		if (rule) report(match.index, match[2]!, rule);
+		if (rule) {
+			report(match.index, match[2]!, rule);
+		}
 	}
 	return violations;
 }
@@ -115,29 +126,37 @@ const MODULE_REQUIREMENTS: Readonly<Record<string, readonly string[]>> = {
 
 /** Violations in a package.json: dependencies on a sibling flow package. */
 export function findViolationsInPackageJson(ownPackage: string, file: string, source: string): DependencyViolation[] {
-	const manifest = JSON.parse(source) as Record<string, unknown>;
+	const manifest = JSON.parse(source) as PackageJsonDependencies;
 	const violations: DependencyViolation[] = [];
 	for (const section of DEPENDENCY_SECTIONS) {
-		const entries = (manifest[section] ?? {}) as Record<string, string>;
+		const entries = manifest[section] ?? {};
 		for (const [name, range] of Object.entries(entries)) {
-			if (MODULE_REQUIREMENTS[ownPackage]?.includes(name)) continue;
+			if (MODULE_REQUIREMENTS[ownPackage]?.includes(name)) {
+				continue;
+			}
 			const rule = forbiddenReason(ownPackage, name);
-			if (rule) violations.push({ file, line: 1, reference: `${section}: ${name}@${range}`, rule });
+			if (rule) {
+				violations.push({ file, line: 1, reference: `${section}: ${name}@${range}`, rule });
+			}
 		}
 	}
 	return violations;
 }
 
 function withoutDependencySections(packageJson: string): string {
-	const manifest = JSON.parse(packageJson) as Record<string, unknown>;
-	for (const section of DEPENDENCY_SECTIONS) delete manifest[section];
+	const manifest = JSON.parse(packageJson) as PackageJsonDependencies;
+	for (const section of DEPENDENCY_SECTIONS) {
+		delete manifest[section];
+	}
 	return JSON.stringify(manifest, null, '\t');
 }
 
 function* walk(directory: string): Generator<string> {
 	for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
 		if (entry.isDirectory()) {
-			if (!SKIPPED_DIRECTORIES.has(entry.name)) yield* walk(path.join(directory, entry.name));
+			if (!SKIPPED_DIRECTORIES.has(entry.name)) {
+				yield* walk(path.join(directory, entry.name));
+			}
 		} else if (SCANNED_EXTENSIONS.has(path.extname(entry.name))) {
 			yield path.join(directory, entry.name);
 		}
@@ -164,7 +183,9 @@ export function findDependencyViolations(
 		}
 		for (const absolute of walk(packageDir)) {
 			const file = path.relative(packagesDir, absolute).split(path.sep).join('/');
-			if (excludedFiles.includes(file)) continue;
+			if (excludedFiles.includes(file)) {
+				continue;
+			}
 			const source = fs.readFileSync(absolute, 'utf8');
 			if (path.basename(absolute) === 'package.json') {
 				violations.push(...findViolationsInPackageJson(packageName, file, source));

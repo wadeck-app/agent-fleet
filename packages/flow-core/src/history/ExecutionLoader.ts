@@ -22,11 +22,15 @@ export interface ExecutionReport {
  * A missing directory is an empty history.
  */
 export function loadExecutionReport(executionsDir: string): ExecutionReport {
-	if (!fs.existsSync(executionsDir)) return { executions: [], skipped: [] };
+	if (!fs.existsSync(executionsDir)) {
+		return { executions: [], skipped: [] };
+	}
 	const executions: ExecutionState[] = [];
 	const skipped: SkippedExecutionFile[] = [];
 	for (const name of fs.readdirSync(executionsDir)) {
-		if (!name.endsWith('.json')) continue;
+		if (!name.endsWith('.json')) {
+			continue;
+		}
 		const file = path.join(executionsDir, name);
 		let raw: string;
 		try {
@@ -65,7 +69,11 @@ export function loadExecutions(executionsDir: string): ExecutionState[] {
 /** One-line, actionable warning for skipped files; undefined when there is nothing to warn about. */
 export function describeSkippedExecutions(skipped: readonly SkippedExecutionFile[]): string | undefined {
 	const [first, ...rest] = skipped;
-	if (!first) return undefined;
-	if (rest.length === 0) return `1 execution file skipped: ${first.file} (${first.reason}). Fix or delete it.`;
+	if (!first) {
+		return undefined;
+	}
+	if (rest.length === 0) {
+		return `1 execution file skipped: ${first.file} (${first.reason}). Fix or delete it.`;
+	}
 	return `${skipped.length} execution files skipped; first: ${first.file} (${first.reason}), and ${rest.length} more. Fix or delete them.`;
 }

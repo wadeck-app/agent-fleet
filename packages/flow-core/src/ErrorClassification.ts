@@ -50,8 +50,12 @@ export function classifyFlowError(err: unknown): FlowErrorCategory {
 		return err.kind === 'flow-file-missing' ? 'not-found' : 'unreadable-data';
 	}
 	if (err instanceof FlowCoreError) {
-		if (err.kind === 'flow-not-found') return 'not-found';
-		if (err.kind === 'invalid-flow-graph') return 'unreadable-data';
+		if (err.kind === 'flow-not-found') {
+			return 'not-found';
+		}
+		if (err.kind === 'invalid-flow-graph') {
+			return 'unreadable-data';
+		}
 		return 'internal';
 	}
 	return 'unknown';

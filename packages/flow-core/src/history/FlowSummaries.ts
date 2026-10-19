@@ -19,7 +19,9 @@ export function summarizeFlows(execs: readonly ExecutionState[]): FlowSummary[] 
 			lastStartedAt: exec.startedAt,
 		};
 		summary.executionCount += 1;
-		if (exec.status === 'failed') summary.failedCount += 1;
+		if (exec.status === 'failed') {
+			summary.failedCount += 1;
+		}
 		if (new Date(exec.startedAt).getTime() > new Date(summary.lastStartedAt).getTime()) {
 			summary.lastStartedAt = exec.startedAt;
 		}

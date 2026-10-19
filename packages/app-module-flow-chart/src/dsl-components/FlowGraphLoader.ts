@@ -24,7 +24,9 @@ export function graphUrl(target: GraphTarget): string {
 }
 
 function isGraphResult(value: unknown): value is FlowGraphResult {
-	if (value === null || typeof value !== 'object') return false;
+	if (value === null || typeof value !== 'object') {
+		return false;
+	}
 	const graph = (value as { graph?: unknown }).graph as { nodes?: unknown; edges?: unknown } | undefined;
 	return graph !== undefined && Array.isArray(graph.nodes) && Array.isArray(graph.edges);
 }
@@ -39,7 +41,9 @@ export async function loadFlowGraph(
 	try {
 		response = await fetchFunction(url, { signal });
 	} catch (err) {
-		if (signal?.aborted) throw err;
+		if (signal?.aborted) {
+			throw err;
+		}
 		throw new Error(
 			`Cannot reach ${url}: ${(err as Error).message}. Check that app-core is running and that the flow and flow-chart modules are loaded.`
 		);
@@ -88,13 +92,19 @@ export function useFlowGraph(
 		const load = async (): Promise<void> => {
 			try {
 				const result = await loadFlowGraph(target, fetchFunction, controller.signal);
-				if (controller.signal.aborted) return;
+				if (controller.signal.aborted) {
+					return;
+				}
 				hasGraph = true;
 				shownLive = result.execution !== undefined && LIVE_STATUSES.has(result.execution.status);
 				setState({ state: 'ready', result, refreshError: undefined });
-				if (shownLive) schedule();
+				if (shownLive) {
+					schedule();
+				}
 			} catch (err) {
-				if (controller.signal.aborted) return;
+				if (controller.signal.aborted) {
+					return;
+				}
 				const message = (err as Error).message;
 				if (!hasGraph) {
 					setState({ state: 'error', message });
@@ -102,14 +112,18 @@ export function useFlowGraph(
 				}
 				setState(previous => (previous.state === 'ready' ? { ...previous, refreshError: message } : previous));
 				// The daemon may just be busy: a live run is tried again.
-				if (shownLive) schedule();
+				if (shownLive) {
+					schedule();
+				}
 			}
 		};
 		void load();
 
 		return () => {
 			controller.abort();
-			if (timer !== undefined) clearTimeout(timer);
+			if (timer !== undefined) {
+				clearTimeout(timer);
+			}
 		};
 		// `target` is represented by `key`; the fetch function is stable by contract.
 	}, [key]);

@@ -31,7 +31,9 @@ function padLogLevel(level: string): string {
  */
 export function formatLogLine(raw: string): string {
 	const trimmed = raw.trim();
-	if (!trimmed) return '';
+	if (!trimmed) {
+		return '';
+	}
 
 	let parsed: unknown;
 	try {
@@ -41,7 +43,9 @@ export function formatLogLine(raw: string): string {
 		return raw;
 	}
 
-	if (typeof parsed !== 'object' || parsed === null) return raw;
+	if (typeof parsed !== 'object' || parsed === null) {
+		return raw;
+	}
 	// violations-suppress: ts/no-unsafe-type-cast parsed JSON has no static shape; the fields are validated below rather than trusted
 	const obj = parsed as Record<string, unknown>;
 
@@ -75,11 +79,15 @@ export function formatLogContent(content: string): string {
  * When n <= 0, returns the original content unchanged.
  */
 export function tailLines(content: string, n: number): string {
-	if (n <= 0) return content;
+	if (n <= 0) {
+		return content;
+	}
 	// Split preserving trailing empty string from final newline; filter blank trailing entry
 	const lines = content.split('\n');
 	// Remove a single trailing empty element produced by a terminal newline
-	if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+	if (lines.length > 0 && lines[lines.length - 1] === '') {
+		lines.pop();
+	}
 	const sliced = lines.slice(-n);
 	return sliced.length > 0 ? sliced.join('\n') + '\n' : '';
 }

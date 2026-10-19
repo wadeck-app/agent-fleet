@@ -23,11 +23,15 @@ export interface RegisterAfterUpdateDeps {
 
 /** The version of the installed app-module, "absent" when the package ships none, or why it cannot be read. */
 export function readAppModuleVersion(manifestPath: string): AppModuleVersion {
-	if (!existsSync(manifestPath)) return { absent: true };
+	if (!existsSync(manifestPath)) {
+		return { absent: true };
+	}
 	try {
 		// violations-suppress: ts/no-unsafe-type-cast a JSON file is untyped at the boundary, the field is checked below
 		const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { version?: unknown };
-		if (typeof manifest.version !== 'string') return { error: `${manifestPath} has no "version" string` };
+		if (typeof manifest.version !== 'string') {
+			return { error: `${manifestPath} has no "version" string` };
+		}
 		return { version: manifest.version };
 	} catch (err) {
 		return { error: `cannot read ${manifestPath} (${String(err)})` };
@@ -56,7 +60,9 @@ export async function registerAfterUpdate(deps: RegisterAfterUpdateDeps): Promis
 		}
 		return;
 	}
-	if ('version' in deps.before && deps.before.version === after.version) return;
+	if ('version' in deps.before && deps.before.version === after.version) {
+		return;
+	}
 	await deps.register(deps.manifestPath, entry => deps.log(entry.message), deps.moduleId);
 }
 

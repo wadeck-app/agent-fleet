@@ -37,7 +37,9 @@ export function layoutGraph(graph: FlowGraph, direction: LayoutDirection): Map<s
 				);
 			}
 		}
-		if (edge.kind !== 'loop') layout.setEdge(edge.from, edge.to);
+		if (edge.kind !== 'loop') {
+			layout.setEdge(edge.from, edge.to);
+		}
 	}
 	dagre.layout(layout);
 
