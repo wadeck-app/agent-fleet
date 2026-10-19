@@ -109,6 +109,56 @@ describe('executions page', () => {
 	});
 });
 
+describe('DataTable columns', () => {
+	// dsl-ui normalizeColumn (2026.10.18-101 and the current source) copies only key and label from a YAML column:
+	// width, truncate, muted, mono and format are dropped without a warning, so a view that sets them lies.
+	it.each(viewFiles)('%s sets only key and label on a column (anything else is ignored by the renderer)', file => {
+		const columns = collectNodes(parseView(file).document, 'DataTable').flatMap(
+			table => table['columns'] as Record<string, unknown>[]
+		);
+		for (const column of columns) {
+			expect(Object.keys(column).sort(), `${file}: column ${JSON.stringify(column)}`).toEqual(['key', 'label']);
+		}
+	});
+});
+
+describe('executions page layout', () => {
+	it('shows the executions table before the flows summary, which asks for a short list', () => {
+		const view = parseView('executions-page.yaml');
+		const tables = collectNodes(view.document, 'DataTable');
+		expect(tables.map(table => table['rows'])).toEqual(['$sources.executions.items', '$sources.flows.flows']);
+		const flows = sourcesOf(view).find(source => source.name === 'flows');
+		expect(flows?.spec.url).toMatch(/\?limit=\d+$/);
+	});
+
+	it('shows the raw status and a one-line error excerpt, columns the executions route sends', () => {
+		const table = collectNodes(parseView('executions-page.yaml').document, 'DataTable')[0]!;
+		const keys = (table['columns'] as { key: string }[]).map(column => column.key);
+		expect(keys).toContain('status');
+		expect(keys).toContain('errorExcerpt');
+		expect(keys).not.toContain('lastError');
+	});
+});
+
+describe('execution detail page', () => {
+	it('colours the status badge from the variant the route sends and lists display-ready step columns', () => {
+		const document = parseView('execution-detail-page.yaml').document;
+		const badges = collectNodes(document, 'Badge');
+		expect(badges[0]).toMatchObject({
+			label: '$sources.execution.status',
+			variant: '$sources.execution.statusVariant',
+		});
+		const steps = collectNodes(document, 'DataTable')[0]!;
+		expect((steps['columns'] as { key: string }[]).map(column => column.key)).toEqual([
+			'stepId',
+			'status',
+			'duration',
+			'attempts',
+			'errorExcerpt',
+		]);
+	});
+});
+
 describe('executions page flow filter', () => {
 	it('links each flow row to ?flow=<flowId>, the URL parameter the executions source forwards', () => {
 		const view = parseView('executions-page.yaml');
@@ -261,6 +311,6 @@ describe('dashboard widget', () => {
 		const columns = collectNodes(view.document, 'DataTable').flatMap(
 			table => table['columns'] as { key: string }[]
 		);
-		expect(columns.map(column => column.key)).toEqual(['title', 'when']);
+		expect(columns.map(column => column.key)).toEqual(['title']);
 	});
 });

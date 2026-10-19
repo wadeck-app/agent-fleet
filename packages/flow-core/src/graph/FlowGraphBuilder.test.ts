@@ -222,3 +222,108 @@ describe('buildFlowGraph (with an execution)', () => {
 		expect(buildFlowGraph(buildAndReview, failedRun).edges).toHaveLength(6);
 	});
 });
+
+// Shape of a real failed run whose generated flow file was rewritten afterwards: the record holds steps the
+// current file no longer declares, none of them flagged `injected`, with no recorded dependencies.
+describe('buildFlowGraph (steps recorded by the run but absent from the flow file)', () => {
+	const rewrittenFlow = flowOf([{ id: 'finish', name: 'Finish', type: 'script', script: 'echo done' }]);
+	// Keys are deliberately not in execution order: the order must come from startedAt, not from the key order.
+	// @formatter:off
+	const run = makeExec({
+		executionId: 'stale1',
+		status: 'failed',
+		steps: {
+			second: {
+				status: 'completed',
+				startedAt: '2026-10-18T13:53:24.803Z',
+				completedAt: '2026-10-18T13:53:28.575Z',
+			},
+			first: {
+				status: 'completed',
+				startedAt: '2026-10-18T13:46:02.688Z',
+				completedAt: '2026-10-18T13:53:24.794Z',
+			},
+			fourth: { status: 'failed', startedAt: '2026-10-18T13:59:02.795Z', error: 'stuck' },
+			third: {
+				status: 'completed',
+				startedAt: '2026-10-18T13:55:16.965Z',
+				completedAt: '2026-10-18T13:55:17.034Z',
+			},
+			fifth: { status: 'pending' },
+			finish: { status: 'pending' },
+		},
+	});
+	// @formatter:on
+
+	it('orders the nodes by start time, then record order, never definition-first', () => {
+		const { nodes } = buildFlowGraph(rewrittenFlow, run);
+
+		expect(nodes.map(n => n.id)).toEqual(['first', 'second', 'third', 'fourth', 'fifth', 'finish']);
+	});
+
+	it('marks them removed (not injected) and keeps them out of the injected kind', () => {
+		const byId = Object.fromEntries(buildFlowGraph(rewrittenFlow, run).nodes.map(n => [n.id, n]));
+
+		expect(byId.first.kind).toBe('removed');
+		expect(byId.first.meta).toMatchObject({ removed: true });
+		expect(byId.finish.kind).toBe('script');
+	});
+
+	it('links the steps whose dependencies were not recorded in the order they ran', () => {
+		const { edges } = buildFlowGraph(rewrittenFlow, run);
+
+		expect(edges).toEqual([
+			{ from: 'first', to: 'second', kind: 'sequence', label: 'recorded order' },
+			{ from: 'second', to: 'third', kind: 'sequence', label: 'recorded order' },
+			{ from: 'third', to: 'fourth', kind: 'sequence', label: 'recorded order' },
+			{ from: 'fourth', to: 'fifth', kind: 'sequence', label: 'recorded order' },
+		]);
+	});
+
+	it('warns that the flow file changed since the run and the edges are inferred', () => {
+		const { warnings } = buildFlowGraph(rewrittenFlow, run);
+
+		expect(warnings).toHaveLength(1);
+		expect(warnings?.[0]).toContain('first, second, third, fourth, fifth');
+		expect(warnings?.[0]).toContain('changed since this run');
+	});
+
+	it('has no warning when every recorded step is in the flow file or flagged injected', () => {
+		const clean = makeExec({
+			executionId: 'ok1',
+			steps: { finish: { status: 'completed' }, extra: { status: 'completed', injected: true } },
+		});
+
+		expect(buildFlowGraph(rewrittenFlow, clean).warnings).toBeUndefined();
+	});
+
+	it('uses the dependencies and parent recorded on an injected step instead of inferring', () => {
+		const flow = flowOf([{ id: 'plan', name: 'Plan', type: 'model', prompt: 'p' }]);
+		const recorded = makeExec({
+			executionId: 'inj1',
+			steps: {
+				plan: { status: 'completed', startedAt: '2026-10-18T10:00:00.000Z' },
+				a: { status: 'completed', injected: true, parent: 'plan', startedAt: '2026-10-18T10:01:00.000Z' },
+				b: { status: 'pending', injected: true, dependsOn: ['a'] },
+			},
+		});
+
+		const { edges, nodes } = buildFlowGraph(flow, recorded);
+
+		expect(nodes.find(n => n.id === 'a')?.kind).toBe('injected');
+		expect(edges).toEqual([
+			{ from: 'a', to: 'plan', kind: 'substep', label: 'sub-step of' },
+			{ from: 'a', to: 'b', kind: 'dependency' },
+		]);
+	});
+
+	it('refuses a recorded dependency on a step that is not in the run', () => {
+		const flow = flowOf([{ id: 'plan', name: 'Plan', type: 'model', prompt: 'p' }]);
+		const broken = makeExec({
+			executionId: 'bad1',
+			steps: { plan: { status: 'completed' }, a: { status: 'pending', injected: true, dependsOn: ['ghost'] } },
+		});
+
+		expect(() => buildFlowGraph(flow, broken)).toThrow(/step 'a'.*'ghost'/);
+	});
+});

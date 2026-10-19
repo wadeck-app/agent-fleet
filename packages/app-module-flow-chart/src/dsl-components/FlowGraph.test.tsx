@@ -23,7 +23,7 @@ describe('FlowGraph', () => {
 			</MemoryRouter>
 		);
 		expect(screen.getByRole('status')).toHaveTextContent('Loading');
-		await waitFor(() => expect(screen.getByRole('heading', { name: 'Flow F' })).toBeInTheDocument());
+		await waitFor(() => expect(screen.getByRole('heading', { name: 'f' })).toBeInTheDocument());
 		expect(fetchFunction).toHaveBeenCalledWith('/api/modules/flow-chart/graph?flowId=f', expect.anything());
 	});
 
@@ -91,7 +91,7 @@ describe('registry entries', () => {
 				json(200, { graph: BUILD_GRAPH, flowId: 'deploy', flowName: 'Deploy', flowFile: '/d.yml' })
 			);
 		renderEntry('FlowGraph', { flowId: '$route.flowId' }, { $route: { flowId: 'deploy' } });
-		await screen.findByRole('heading', { name: 'Deploy' });
+		await screen.findByRole('heading', { name: 'deploy' });
 		expect(fetchSpy).toHaveBeenCalledWith('/api/modules/flow-chart/graph?flowId=deploy', expect.anything());
 	});
 });

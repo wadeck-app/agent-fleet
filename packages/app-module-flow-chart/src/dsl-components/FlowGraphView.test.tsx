@@ -5,7 +5,7 @@ import type { FlowGraphResult } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
 import { FlowGraphView } from './FlowGraphView.js';
-import { BUILD_GRAPH, chain } from './testing/GraphFixtures.js';
+import { BUILD_GRAPH, chain, node } from './testing/GraphFixtures.js';
 
 function executionResult(overrides: Partial<FlowGraphResult> = {}): FlowGraphResult {
 	return {
@@ -29,7 +29,8 @@ function renderView(result: FlowGraphResult, refreshError?: string) {
 describe('FlowGraphView', () => {
 	it('draws every step with its status, and names the flow and the run in the header', () => {
 		renderView(executionResult());
-		expect(screen.getByRole('heading', { name: 'Build a task' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'build_task' })).toBeInTheDocument();
+		expect(screen.getByText('Build a task', { exact: false })).toBeInTheDocument();
 		expect(screen.getByText('exec1', { exact: false })).toBeInTheDocument();
 		expect(screen.getByTestId('step-plan')).toHaveAttribute('data-status', 'completed');
 		expect(screen.getByTestId('step-test')).toHaveAttribute('data-status', 'failed');
@@ -118,5 +119,46 @@ describe('FlowGraphView', () => {
 	it('lays a long flow out vertically from the start', () => {
 		renderView(executionResult({ graph: chain(20) }));
 		expect(screen.getByRole('button', { name: /Switch to horizontal layout/ })).toBeInTheDocument();
+	});
+
+	it('titles the chart with the flow id, and shows the name only when it differs from the id', () => {
+		renderView(executionResult({ flowName: 'build_task' }));
+		expect(screen.getByRole('heading', { name: 'build_task' })).toBeInTheDocument();
+		expect(screen.queryByText(/Build a task/)).toBeNull();
+	});
+
+	it('shows the warnings of the graph, so an inferred chart is never mistaken for a recorded one', () => {
+		renderView(
+			executionResult({ graph: { ...BUILD_GRAPH, warnings: ['The flow file /x.yml changed since this run.'] } })
+		);
+		expect(screen.getByRole('status', { name: 'Chart warnings' })).toHaveTextContent('changed since this run');
+	});
+
+	it('explains the inferred "ran after" edges in the legend', () => {
+		const graph = {
+			nodes: [node('a', { kind: 'removed' }), node('b', { kind: 'removed' })],
+			edges: [{ from: 'a', to: 'b', kind: 'sequence' as const, label: 'recorded order' }],
+		};
+		renderView(executionResult({ graph }));
+		expect(within(screen.getByRole('list', { name: 'Legend' })).getByText(/ran after/)).toBeInTheDocument();
+	});
+
+	it('keeps the controls out of the canvas, where they would cover the steps', () => {
+		renderView(executionResult());
+		const canvas = screen.getByTestId('chart-canvas');
+		expect(within(canvas).queryByRole('toolbar')).toBeNull();
+		expect(screen.getByRole('toolbar', { name: 'Chart controls' })).toBeInTheDocument();
+	});
+
+	it('opens on the whole flow for a chain that fits readably, with no zoom-in hint', () => {
+		renderView(executionResult({ graph: chain(12), execution: undefined }));
+		expect(screen.queryByText(/Zoomed in on step/)).toBeNull();
+	});
+
+	it('says it zoomed in on a step, outside the canvas, when the flow is too big to be readable', () => {
+		renderView(executionResult({ graph: chain(80), execution: undefined }));
+		const hint = screen.getByText(/Zoomed in on step/);
+		expect(hint).toBeInTheDocument();
+		expect(within(screen.getByTestId('chart-canvas')).queryByText(/Zoomed in on step/)).toBeNull();
 	});
 });

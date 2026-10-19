@@ -6,13 +6,6 @@ export type LayoutDirection = 'LR' | 'TB';
 export const NODE_WIDTH = 240;
 export const NODE_HEIGHT = 76;
 
-// Above this many steps a left-to-right chain is wider than any screen; top-to-bottom scrolls and fits better.
-const MAX_STEPS_LEFT_TO_RIGHT = 12;
-
-export function defaultDirection(nodeCount: number): LayoutDirection {
-	return nodeCount <= MAX_STEPS_LEFT_TO_RIGHT ? 'LR' : 'TB';
-}
-
 export interface NodePosition {
 	/** Top-left corner, in flow coordinates. */
 	x: number;

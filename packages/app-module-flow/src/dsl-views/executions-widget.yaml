@@ -1,7 +1,10 @@
-# Dashboard widget, built for a narrow cell (about 250-350px): two counters, then the five most recent runs as one
-# line each (status mark + flow name truncated, short age), then a link to the full list.
+# Dashboard widget, built for a narrow cell (a 240px card): two counters, then the five most recent runs as one line
+# each, then a link to the full list.
 # One precomputed source (GET /widgets/executions): the DSL cannot put a status mark in front of a name or print "5m".
-# Column widths are in 4px units and are what makes `truncate` bite: without a width the cell grows with its text.
+# The DataTable renders every cell of a YAML column as `break-all` with no width limit and ignores `width`, `truncate`
+# and `muted` (dsl-ui normalizeColumn keeps key and label only), so a long value is broken letter by letter. The only
+# lever is a short value: `title` is "tag name - age" cut to MAX_WIDGET_TITLE_LENGTH characters by the backend, in a
+# single column so no second column steals width from the name.
 $sources:
     recent:
         url: GET /api/modules/flow/widgets/executions
@@ -21,7 +24,6 @@ items:
       navigateTo: '/modules/flow/executions/{executionId}'
       emptyMessage: No execution yet
       columns:
-          - { key: 'title', label: 'Recent', truncate: true, width: 36 }
-          - { key: 'when', label: 'Age', width: 20 }
+          - { key: 'title', label: 'Recent runs' }
 
     - { $type: Link, label: $sources.recent.viewAllLabel, href: /modules/flow/executions }

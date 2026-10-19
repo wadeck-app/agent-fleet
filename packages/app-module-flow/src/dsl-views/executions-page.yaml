@@ -1,6 +1,8 @@
 # Executions history (`flow history`). Filters and pagination live in the URL: ?status=failed&flow=deploy&page=1&size=50
 # The status links reload the page with the filter applied. The flow filter is the `flow` URL parameter, set by clicking
-# a row of the "Flows" table (GET /flows). A free-text/select control bound to ?flow= needs a dsl-ui change: today only
+# a row of the "Flows" table (GET /flows?limit=N, the most recent flows: the executions come first, they are the page).
+# Cells show what the routes precompute (startedLabel, errorExcerpt): the DataTable renders every
+# YAML-column cell as `break-all` and keeps only key and label of a column, so width/truncate/format/muted cannot be set. A free-text/select control bound to ?flow= needs a dsl-ui change: today only
 # Pagination and PageSizeSelect take `urlParam`, and SearchBar/CompactSelect cannot read the URL back into `value`.
 # Slot "flow:executions-actions" (manifest expose.slots): other modules add page-level buttons next to the status links.
 # DataTable has no per-row slot (its row actions are static), so nothing is contributed per row.
@@ -8,7 +10,7 @@ $sources:
     actions:
         url: GET /api/slots/flow:executions-actions
     flows:
-        url: GET /api/modules/flow/flows
+        url: GET /api/modules/flow/flows?limit=8
     executions:
         url: GET /api/modules/flow/executions
         params:
@@ -43,27 +45,15 @@ sections:
             items: $sources.actions
 
     - $type: DataTable
-      rows: $sources.flows.flows
-      navigateTo: '/modules/flow/executions?flow={flowId}'
-      emptyMessage: No flow has run yet
-      columns:
-          - { key: 'flowId', label: 'Flow' }
-          - { key: 'executionCount', label: 'Executions' }
-          - { key: 'failedCount', label: 'Failed' }
-          - { key: 'lastStartedAt', label: 'Last started', format: 'datetime' }
-
-    - $type: DataTable
       rows: $sources.executions.items
       navigateTo: '/modules/flow/executions/{executionId}'
       emptyMessage: No execution matches
       columns:
-          - { key: 'startedAt', label: 'Started', format: 'datetime' }
-          - { key: 'executionId', label: 'Execution', mono: true }
+          - { key: 'startedLabel', label: 'Started' }
           - { key: 'flowId', label: 'Flow' }
           - { key: 'status', label: 'Status' }
-          - { key: 'duration', label: 'Duration' }
-          - { key: 'failedStepCount', label: 'Failed steps' }
-          - { key: 'lastError', label: 'Last error', truncate: true, muted: true }
+          - { key: 'executionId', label: 'Execution' }
+          - { key: 'errorExcerpt', label: 'Last error' }
 
     - $type: HorizontalStack
       justify: justify-between
@@ -80,3 +70,16 @@ sections:
           - $type: PageSizeSelect
             urlParam: size
             options: [20, 50, 100]
+
+    - $type: Section
+      title: $sources.flows.caption
+      items:
+          - $type: DataTable
+            rows: $sources.flows.flows
+            navigateTo: '/modules/flow/executions?flow={flowId}'
+            emptyMessage: No flow has run yet
+            columns:
+                - { key: 'flowId', label: 'Flow' }
+                - { key: 'executionCount', label: 'Runs' }
+                - { key: 'failedCount', label: 'Failed' }
+                - { key: 'lastStartedLabel', label: 'Last started' }

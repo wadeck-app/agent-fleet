@@ -13,6 +13,10 @@ export interface StepState {
 	completedAt?: string;
 	/** True when this step was injected dynamically via provideSteps during execution. */
 	injected?: boolean;
+	/** Injected steps only: the steps it was declared to depend on (`depends`), so a chart can draw its edges. */
+	dependsOn?: string[];
+	/** Injected steps only: the step it was declared a sub-step of (`parent`). */
+	parent?: string;
 	/** Error message if the step failed. */
 	error?: string;
 	/** Full stdout captured during the step's execution, when the step failed. */

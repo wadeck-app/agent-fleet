@@ -14,6 +14,6 @@ sections:
       navigateTo: '/modules/flow/plugins/{id}'
       emptyMessage: No plugin is shipped
       columns:
-          - { key: 'id', label: 'Plugin', mono: true }
+          - { key: 'id', label: 'Plugin' }
           - { key: 'extensionPoint', label: 'Extension point' }
-          - { key: 'typeString', label: 'Type string', mono: true }
+          - { key: 'typeString', label: 'Type string' }

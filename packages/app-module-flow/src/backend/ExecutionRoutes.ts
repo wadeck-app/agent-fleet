@@ -11,6 +11,7 @@ import {
 } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
+import { toExecutionDetailRow, toExecutionRow, toFlowRow } from './ExecutionDisplay.js';
 import { type QueryParams, optionalBoolean, optionalInteger, optionalString } from './QueryParameters.js';
 
 export const MAX_EXECUTIONS_LIMIT = 500;
@@ -37,7 +38,9 @@ function readStatus(query: QueryParams): string | undefined {
 function readOffset(query: QueryParams, pageSize: number): number | undefined {
 	const offset = optionalInteger(query, 'offset', { min: 0 });
 	const page = optionalInteger(query, 'page', { min: 0 });
-	if (page === undefined) return offset;
+	if (page === undefined) {
+		return offset;
+	}
 	if (offset !== undefined) {
 		throw new InvalidQueryError(
 			"'page' and 'offset' cannot be combined: use page (with limit) or offset, not both."
@@ -48,6 +51,17 @@ function readOffset(query: QueryParams, pageSize: number): number | undefined {
 		throw new InvalidQueryError(`'page' is too large: page ${page} of ${pageSize} rows is not a valid offset.`);
 	}
 	return fromPage;
+}
+
+/** What the flows table says about itself: it is the only place the DSL can show that the list was cut. */
+function flowsCaption(shown: number, total: number): string {
+	if (total === 0) {
+		return 'No flow has run yet';
+	}
+	if (shown < total) {
+		return `${shown} most recent of ${total} flows. Click one to see only its executions, or open ?flow=<flowId>.`;
+	}
+	return `${total} ${total === 1 ? 'flow' : 'flows'}, most recent first. Click one to see only its executions.`;
 }
 
 /**
@@ -68,7 +82,7 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 				id: optionalString(query, 'id'),
 			});
 			const body = {
-				items: page.items.map(toExecutionSummary),
+				items: page.items.map(record => toExecutionRow(toExecutionSummary(record))),
 				total: page.total,
 				// Execution files that could not be read: the list is incomplete by this many, so a client can say so.
 				skipped: page.skipped.length,
@@ -81,9 +95,17 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 		}
 	});
 
-	ctx.registerRoute('GET', '/flows', (_req, reply) => {
+	ctx.registerRoute('GET', '/flows', (req, reply) => {
+		const query = (req as { query?: QueryParams }).query ?? {};
 		try {
-			return reply.code(200).send({ flows: service.listFlows() });
+			const limit = optionalInteger(query, 'limit', { min: 1, max: MAX_EXECUTIONS_LIMIT });
+			const all = service.listFlows();
+			const shown = limit === undefined ? all : all.slice(0, limit);
+			return reply.code(200).send({
+				flows: shown.map(toFlowRow),
+				total: all.length,
+				caption: flowsCaption(shown.length, all.length),
+			});
 		} catch (err) {
 			return replyWithError(reply, err);
 		}
@@ -97,7 +119,7 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const full = optionalBoolean(query, 'full', false);
 			const resolved = service.getExecution(id);
 			const detail = toExecutionDetail(resolved, renderExecutionDetail(resolved, { tail, full }));
-			return reply.code(200).send(detail);
+			return reply.code(200).send(toExecutionDetailRow(detail));
 		} catch (err) {
 			return replyWithError(reply, err);
 		}

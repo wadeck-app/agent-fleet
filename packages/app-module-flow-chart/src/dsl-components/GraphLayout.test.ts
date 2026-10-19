@@ -1,16 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { NODE_HEIGHT, NODE_WIDTH, defaultDirection, layoutGraph } from './GraphLayout.js';
+import { NODE_HEIGHT, NODE_WIDTH, layoutGraph } from './GraphLayout.js';
 import { BUILD_GRAPH, chain, node } from './testing/GraphFixtures.js';
-
-describe('defaultDirection', () => {
-	it('lays short flows out left to right and long ones top to bottom', () => {
-		expect(defaultDirection(1)).toBe('LR');
-		expect(defaultDirection(12)).toBe('LR');
-		expect(defaultDirection(13)).toBe('TB');
-		expect(defaultDirection(50)).toBe('TB');
-	});
-});
 
 describe('layoutGraph', () => {
 	it('puts a dependency to the right of what it depends on (LR), every node at its own spot', () => {

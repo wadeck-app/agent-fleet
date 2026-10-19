@@ -28,6 +28,7 @@ import { CommandHandler } from './CommandHandler';
 import { buildDaemonHealth } from './DaemonHealth';
 import { writeDaemonLog } from './DaemonLog.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
+import { injectedStepState } from './InjectedStepState.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { RelayRegistry } from './RelayRegistry.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
@@ -700,7 +701,7 @@ async function startDaemon(
 					const current = executionStore.read(executionId);
 					const newSteps = { ...current.steps };
 					for (const s of steps) {
-						newSteps[s.id] = { status: 'pending', injected: true };
+						newSteps[s.id] = injectedStepState(s);
 					}
 					executionStore.update(executionId, { steps: newSteps });
 					commandHandler.tryDispatch();

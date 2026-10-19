@@ -16,7 +16,7 @@ sections:
             rows: $sources.workers.workers
             emptyMessage: No worker is connected
             columns:
-                - { key: 'workerId', label: 'Worker', mono: true }
+                - { key: 'workerId', label: 'Worker' }
                 - { key: 'state', label: 'State' }
                 - { key: 'pid', label: 'PID' }
                 - { key: 'version', label: 'Version' }
@@ -30,7 +30,7 @@ sections:
             rows: $sources.workers.declaredSources
             emptyMessage: No source declared
             columns:
-                - { key: 'sourceId', label: 'Source', mono: true }
+                - { key: 'sourceId', label: 'Source' }
                 - { key: 'provider', label: 'Provider' }
                 - { key: 'maxWorkers', label: 'Max workers' }
 

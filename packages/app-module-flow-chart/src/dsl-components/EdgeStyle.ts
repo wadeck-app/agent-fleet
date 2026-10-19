@@ -15,6 +15,7 @@ const STYLES: Record<FlowGraphEdgeKind, EdgeStyle> = {
 	conditional: { stroke: 'var(--color-content)', dash: '6 4', animated: false, type: 'smoothstep' },
 	loop: { stroke: 'var(--color-warning)', dash: '4 4', animated: true, type: 'smoothstep' },
 	substep: { stroke: 'var(--color-primary)', dash: '2 3', animated: false, type: 'smoothstep' },
+	sequence: { stroke: 'var(--color-muted)', dash: '10 3 2 3', animated: false, type: 'smoothstep' },
 };
 
 const KINDS = Object.keys(STYLES).join(', ');
@@ -32,4 +33,5 @@ export const EDGE_LEGEND: readonly { kind: FlowGraphEdgeKind; description: strin
 	{ kind: 'conditional', description: 'runs only when the condition holds' },
 	{ kind: 'loop', description: 'on failure, goes back (retry loop)' },
 	{ kind: 'substep', description: 'sub-step of' },
+	{ kind: 'sequence', description: 'ran after (dependencies not recorded)' },
 ];

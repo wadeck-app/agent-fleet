@@ -20,31 +20,31 @@ export interface StatusStyle {
 const STYLES: Record<NodeStatus | 'none', StatusStyle> = {
 	completed: {
 		label: 'completed',
-		glyph: '✓',
+		glyph: '[ok]',
 		nodeClass: 'border-success bg-success-bg text-success-text',
 		badgeClass: 'bg-success text-surface',
 	},
 	failed: {
 		label: 'failed',
-		glyph: '✕',
+		glyph: '[x]',
 		nodeClass: 'border-danger bg-danger-bg text-danger-text',
 		badgeClass: 'bg-danger text-surface',
 	},
 	running: {
 		label: 'running',
-		glyph: '●',
+		glyph: '[>]',
 		nodeClass: 'border-primary bg-info-bg text-info-text',
 		badgeClass: 'bg-primary text-surface',
 	},
 	pending: {
 		label: 'pending',
-		glyph: '○',
+		glyph: '[ ]',
 		nodeClass: 'border-border bg-muted-bg text-muted',
 		badgeClass: 'bg-muted text-surface',
 	},
 	none: {
 		label: 'not run',
-		glyph: '·',
+		glyph: '[-]',
 		nodeClass: 'border-border bg-surface text-content',
 		badgeClass: 'bg-muted-bg text-muted',
 	},

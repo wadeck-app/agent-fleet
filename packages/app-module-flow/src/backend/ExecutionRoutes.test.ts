@@ -3,6 +3,7 @@ import { FlowQueryService } from 'flow-core';
 import { FlowConfigFixture, callRoute, collectRoutes } from 'flow-core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { MAX_ERROR_EXCERPT_LENGTH } from './ExecutionDisplay.js';
 import { registerExecutionRoutes } from './ExecutionRoutes.js';
 
 let fixture: FlowConfigFixture;
@@ -234,7 +235,10 @@ describe('GET /executions/:id', () => {
 
 describe('GET /flows', () => {
 	it('answers an empty list when nothing ran yet', async () => {
-		expect(await callRoute(routes, 'GET /flows', { query: {} })).toEqual({ status: 200, body: { flows: [] } });
+		expect(await callRoute(routes, 'GET /flows', { query: {} })).toEqual({
+			status: 200,
+			body: { flows: [], total: 0, caption: 'No flow has run yet' },
+		});
 	});
 
 	it('lists each flow that ran once, with counts, most recent first', async () => {
@@ -250,9 +254,98 @@ describe('GET /flows', () => {
 		expect(status).toBe(200);
 		expect(body).toEqual({
 			flows: [
-				{ flowId: 'build', executionCount: 1, failedCount: 0, lastStartedAt: '2026-08-17T10:00:00.000Z' },
-				{ flowId: 'deploy', executionCount: 2, failedCount: 1, lastStartedAt: '2026-08-16T10:00:00.000Z' },
+				{
+					flowId: 'build',
+					executionCount: 1,
+					failedCount: 0,
+					lastStartedAt: '2026-08-17T10:00:00.000Z',
+					lastStartedLabel: '2026-08-17 10:00',
+				},
+				{
+					flowId: 'deploy',
+					executionCount: 2,
+					failedCount: 1,
+					lastStartedAt: '2026-08-16T10:00:00.000Z',
+					lastStartedLabel: '2026-08-16 10:00',
+				},
 			],
+			total: 2,
+			caption: '2 flows, most recent first. Click one to see only its executions.',
 		});
+	});
+
+	it('limits the list to the most recent flows and says how many exist', async () => {
+		for (const [index, flowId] of ['a', 'b', 'c'].entries()) {
+			fixture.addExecution({ executionId: `x${index}`, flowId, startedAt: `2026-08-1${index}T10:00:00.000Z` });
+		}
+		const { body } = await callRoute(routes, 'GET /flows', { query: { limit: '2' } });
+		const page = body as { flows: { flowId: string }[]; total: number; caption: string };
+		expect(page.flows.map(flow => flow.flowId)).toEqual(['c', 'b']);
+		expect(page.total).toBe(3);
+		expect(page.caption).toBe(
+			'2 most recent of 3 flows. Click one to see only its executions, or open ?flow=<flowId>.'
+		);
+	});
+
+	it('rejects a bad limit with 400', async () => {
+		expect(await callRoute(routes, 'GET /flows', { query: { limit: '0' } })).toEqual({
+			status: 400,
+			body: { error: "'limit' must be an integer between 1 and 500, got '0'." },
+		});
+	});
+});
+
+describe('display fields (the DataTable shows a cell as is: it cannot style, truncate or format)', () => {
+	it('adds startedLabel and a one-line errorExcerpt to each execution row, keeping the raw fields', async () => {
+		fixture.addExecution({
+			executionId: 'bad1',
+			status: 'failed',
+			startedAt: '2026-08-16T10:05:09.000Z',
+			lastError: `first line
+${'word '.repeat(40)}`,
+		});
+		fixture.addExecution({ executionId: 'ok1', startedAt: '2026-08-15T10:00:00.000Z' });
+		const { body } = await callRoute(routes, 'GET /executions', { query: {} });
+		const [bad, ok] = (body as { items: Record<string, unknown>[] }).items;
+		expect(bad).toMatchObject({
+			status: 'failed',
+			startedAt: '2026-08-16T10:05:09.000Z',
+			startedLabel: '2026-08-16 10:05',
+		});
+		expect(String(bad!['errorExcerpt'])).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
+		expect(String(bad!['errorExcerpt'])).toMatch(/^first line word word .*...$/);
+		expect(bad!['lastError']).toContain('\n');
+		expect(ok).toMatchObject({ status: 'completed', errorExcerpt: '' });
+	});
+
+	it('adds statusVariant and per-step display fields to the detail', async () => {
+		fixture.addExecution({
+			executionId: 'abc123',
+			status: 'failed',
+			steps: {
+				build: { status: 'completed' },
+				test: { status: 'failed', error: 'e'.repeat(300) },
+				ship: { status: 'pending' },
+			},
+		});
+		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'abc123' }, query: {} });
+		const detail = body as { statusLabel: string; statusVariant: string; steps: Record<string, unknown>[] };
+		expect(detail).toMatchObject({ status: 'failed', statusVariant: 'danger' });
+		expect(detail.steps[0]).toMatchObject({ status: 'completed', errorExcerpt: '' });
+		expect(String(detail.steps[1]!['errorExcerpt'])).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
+		expect(detail.steps[1]!['error']).toHaveLength(300);
+		expect(detail.steps[2]).toMatchObject({ status: 'pending', errorExcerpt: '' });
+	});
+
+	it.each([
+		['completed', 'success'],
+		['failed', 'danger'],
+		['running', 'info'],
+		['queued', 'warning'],
+		['re-queued', 'warning'],
+	])('colours a %s run %s in the detail header', async (status, variant) => {
+		fixture.addExecution({ executionId: 'abc123', status: status as 'completed' });
+		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'abc123' }, query: {} });
+		expect(body).toMatchObject({ statusVariant: variant });
 	});
 });

@@ -84,6 +84,7 @@ export type {
 
 export { classifyFlowError, httpAnswerOfFlowError, httpStatusOfFlowError } from './ErrorClassification.js';
 export type { FlowErrorCategory, HttpErrorAnswer } from './ErrorClassification.js';
+export { ellipsize, excerptOf, startedLabel, statusTag } from './view/CellText.js';
 export { toExecutionDetail, toExecutionSummary } from './view/ExecutionView.js';
 export type { ExecutionDetailView, ExecutionSummary, StepView } from './view/ExecutionView.js';
 

@@ -33,7 +33,12 @@ sections:
             gap: gap-3
             align: items-center
             items:
-                - { $type: Badge, label: $sources.execution.status }
+                - {
+                      $type: Badge,
+                      label: $sources.execution.status,
+                      variant: $sources.execution.statusVariant,
+                      tone: subtle,
+                  }
                 - { $type: Badge, label: $sources.execution.duration, variant: info }
                 - { $type: Badge, label: $sources.execution.startedAt, variant: default }
 
@@ -48,13 +53,11 @@ sections:
             rows: $sources.execution.steps
             emptyMessage: This execution has no step
             columns:
-                - { key: 'stepId', label: 'Step', mono: true }
+                - { key: 'stepId', label: 'Step' }
                 - { key: 'status', label: 'Status' }
                 - { key: 'duration', label: 'Duration' }
                 - { key: 'attempts', label: 'Attempts' }
-                - { key: 'model', label: 'Model' }
-                - { key: 'workerId', label: 'Worker', mono: true }
-                - { key: 'error', label: 'Error', truncate: true, muted: true }
+                - { key: 'errorExcerpt', label: 'Error' }
 
     - $type: Section
       title: Output (same text as `flow show`, failed steps carry the tail of their output)

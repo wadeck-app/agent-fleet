@@ -19,7 +19,7 @@ export function FlowStepNode({ data, selected }: NodeProps<StepNode>) {
 		step.attempts !== undefined && step.attempts > 1 ? `${step.attempts} attempts` : undefined,
 	]
 		.filter(Boolean)
-		.join(' · ');
+		.join(' - ');
 
 	return (
 		<div

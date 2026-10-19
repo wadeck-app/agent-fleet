@@ -43,4 +43,11 @@ describe('statusStyle', () => {
 	it('lists the four statuses in run order for the legend', () => {
 		expect(STATUS_LEGEND).toEqual(['pending', 'running', 'completed', 'failed']);
 	});
+
+	it('uses plain ASCII only, in glyphs and labels', () => {
+		for (const status of [undefined, ...STATUS_LEGEND]) {
+			const style = statusStyle(status);
+			expect(`${style.glyph}${style.label}`).toMatch(/^[\x20-\x7E]+$/);
+		}
+	});
 });
