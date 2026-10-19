@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { logsCommand } from './LogsCommand';
+import { type FollowRuntime, logsCommand } from './LogsCommand';
 
 // Reading, tailing and formatting are covered in flow-core (logs/*.test.ts); this file covers what the
 // command adds: the "no log file" message, the stdout writes and the follow loop ended by SIGINT.
@@ -49,10 +49,65 @@ describe('logsCommand', () => {
 		expect(out.join('')).toMatch(/\[WARN \] careful\n$/);
 	});
 
-	it('follows appended lines until SIGINT, even when the file did not exist yet', async () => {
+	// Manual runtime: the test decides when a poll tick and the interrupt happen, no real timer, no real signal.
+	function manualRuntime(): { runtime: FollowRuntime; tick: () => void; interrupt: () => void; stopped: () => boolean } {
+		let tickHandler: (() => void) | undefined;
+		let interruptHandler: (() => void) | undefined;
+		let isStopped = false;
+		return {
+			runtime: {
+				every: (_ms, tick) => {
+					tickHandler = tick;
+					return () => {
+						isStopped = true;
+					};
+				},
+				onInterrupt: handler => {
+					interruptHandler = handler;
+				},
+			},
+			tick: () => tickHandler?.(),
+			interrupt: () => interruptHandler?.(),
+			stopped: () => isStopped,
+		};
+	}
+
+	it('prints what is appended on each poll, then stops polling on interrupt', async () => {
+		fs.writeFileSync(logFile, 'first\n');
+		const manual = manualRuntime();
+		const done = logsCommand(configDir, { follow: true, lines: 50, human: false }, write, manual.runtime);
+		expect(out.join('')).toBe('first\n');
+
+		fs.appendFileSync(logFile, 'second\n');
+		manual.tick();
+		manual.tick();
+		expect(out.join('')).toBe('first\nsecond\n');
+
+		manual.interrupt();
+		await done;
+		expect(manual.stopped()).toBe(true);
+	});
+
+	// A file appearing right after the command started used to be lost: fs.watchFile takes its baseline with an
+	// asynchronous stat, and a file created before that stat completed never produced a change event.
+	it('prints a file created after the command started, whenever the first poll runs', async () => {
+		const manual = manualRuntime();
+		const done = logsCommand(configDir, { follow: true, lines: 50, human: false }, write, manual.runtime);
+		expect(out.join('')).toContain('No log file for today');
+		manual.tick();
+		expect(out.join('')).not.toContain('late line');
+
+		fs.writeFileSync(logFile, 'late line\n');
+		manual.tick();
+		expect(out.join('')).toContain('late line\n');
+
+		manual.interrupt();
+		await done;
+	});
+
+	it('default runtime: follows with a real timer until SIGINT and leaves no SIGINT listener behind', async () => {
 		const sigintBefore = process.listenerCount('SIGINT');
 		const done = logsCommand(configDir, { follow: true, lines: 50, human: false }, write);
-		expect(out.join('')).toContain('No log file for today');
 		fs.writeFileSync(logFile, 'late line\n');
 		await vi.waitFor(() => expect(out.join('')).toContain('late line\n'), { timeout: 10_000, interval: 50 });
 		process.emit('SIGINT');

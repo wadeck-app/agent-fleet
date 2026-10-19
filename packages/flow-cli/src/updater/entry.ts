@@ -16,7 +16,7 @@ import * as os from 'node:os';
 import { join } from 'node:path';
 
 import { registerWithAppCore } from '../daemon/AppCoreRegistration';
-import { readAppModuleVersion, registerAfterUpdate } from './RegisterAfterUpdate';
+import { trackAppModuleUpdate } from './RegisterAfterUpdate';
 import { decideUpdate } from './UpdateDeferral';
 
 declare const __FLOW_CLI_VERSION__: string;
@@ -55,9 +55,14 @@ try {
 	// Skip self-check if npm root unavailable.
 }
 
-const appModuleManifest = npmRoot === undefined ? undefined : join(npmRoot, PKG_NAME, 'app-module', 'manifest.json');
-// Read before the install replaces the files: registerAfterUpdate registers only if this changed.
-const appModuleBefore = appModuleManifest === undefined ? undefined : readAppModuleVersion(appModuleManifest);
+// Reads the app-module version before the install replaces the files: the returned function registers only if it changed.
+const registerAppModuleAfterUpdate = trackAppModuleUpdate({
+	npmRoot,
+	pkgName: PKG_NAME,
+	register: registerWithAppCore,
+	log: line => process.stdout.write(`[flow-updater] ${line}\n`),
+	warn: line => process.stderr.write(`[flow-updater] ${line}\n`),
+});
 
 /**
  * Query GET /health on the flow daemon. Returns the parsed JSON body, or null if
@@ -244,18 +249,7 @@ runUpdater({
 		if (force) reportOutcome(startedAt, echoUpdaterLog(logPathBeforeRun, logSizeBeforeRun));
 		// An update does not restart the daemon (it registers on its own start), so a running app-core would keep
 		// the previous app-module until the next daemon start: tell it now, from the new install.
-		if (appModuleManifest === undefined || appModuleBefore === undefined) {
-			process.stderr.write(
-				'[flow-updater] app-core: not re-registering the app-module, "npm root -g" failed earlier\n'
-			);
-			return;
-		}
-		await registerAfterUpdate({
-			manifestPath: appModuleManifest,
-			before: appModuleBefore,
-			register: registerWithAppCore,
-			log: line => process.stdout.write(`[flow-updater] ${line}\n`),
-		});
+		await registerAppModuleAfterUpdate();
 	})
 	.catch(err => {
 		// Surface whatever the updater managed to log before failing, then the failure itself.

@@ -1,5 +1,6 @@
 // Imported by the updater entry: must stay free of flow runtime imports (the updater bundle has a size limit).
 import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 export type AppModuleVersion = { version: string } | { absent: true } | { error: string };
 
@@ -52,4 +53,40 @@ export async function registerAfterUpdate(deps: RegisterAfterUpdateDeps): Promis
 	}
 	if ('version' in deps.before && deps.before.version === after.version) return;
 	await deps.register(deps.manifestPath, entry => deps.log(entry.message));
+}
+
+export interface TrackAppModuleUpdateDeps {
+	/** Output of `npm root -g`, undefined when that command failed. */
+	npmRoot: string | undefined;
+	pkgName: string;
+	register: RegisterAfterUpdateDeps['register'];
+	/** Progress and diagnostics of the registration (stdout). */
+	log: (line: string) => void;
+	/** Reasons why nothing was registered (stderr). */
+	warn: (line: string) => void;
+}
+
+/**
+ * Wiring of {@link registerAfterUpdate} for the updater entry: locates the app-module manifest in the global
+ * install and reads its version NOW, so call it before the install replaces the files. The returned function
+ * is to run once the update is over; it never throws (a failed registration must not fail an update that
+ * succeeded), every reason for not registering is reported through `warn`.
+ */
+export function trackAppModuleUpdate(deps: TrackAppModuleUpdateDeps): () => Promise<void> {
+	if (deps.npmRoot === undefined) {
+		return async () => {
+			deps.warn('app-core: not re-registering the app-module, "npm root -g" failed earlier');
+		};
+	}
+	const manifestPath = join(deps.npmRoot, deps.pkgName, 'app-module', 'manifest.json');
+	const before = readAppModuleVersion(manifestPath);
+	return async () => {
+		try {
+			await registerAfterUpdate({ manifestPath, before, register: deps.register, log: deps.log });
+		} catch (err) {
+			deps.warn(
+				`app-core: re-registering the app-module failed (${String(err)}). Run \`flow cli update\` again or restart the flow daemon to register it`
+			);
+		}
+	};
 }

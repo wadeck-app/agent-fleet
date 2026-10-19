@@ -1,5 +1,4 @@
 import { FlowQueryService, readAppendedLog } from 'flow-core';
-import * as fs from 'node:fs';
 
 export interface LogsCommandOptions {
 	/** Keep printing what is appended until SIGINT. */
@@ -12,19 +11,43 @@ export interface LogsCommandOptions {
 
 const FOLLOW_POLL_INTERVAL_MS = 250;
 
+/** Timer and interrupt source of the follow loop, injectable so tests need no real timer nor real signal. */
+export interface FollowRuntime {
+	/** Calls `tick` every `ms` milliseconds; the returned function stops it. */
+	every(ms: number, tick: () => void): () => void;
+	/** Calls `handler` once, when the user interrupts the command. */
+	onInterrupt(handler: () => void): void;
+}
+
+const systemFollowRuntime: FollowRuntime = {
+	every: (ms, tick) => {
+		const timer = setInterval(tick, ms);
+		return () => clearInterval(timer);
+	},
+	onInterrupt: handler => {
+		process.once('SIGINT', handler);
+	},
+};
+
 /**
  * `flow cli logs`: prints the tail of today's daemon log, then optionally follows it.
  * A missing file is announced (the daemon may not have run today); with `follow` the command
  * keeps waiting and prints the file once it appears.
+ *
+ * Following polls the file size instead of using fs.watchFile: watchFile takes its baseline with an
+ * asynchronous stat, so a file created right after the command started (the "no log yet" case) could be
+ * the baseline itself and never fire a change event.
  */
 export async function logsCommand(
 	configDir: string,
 	options: LogsCommandOptions,
-	write: (text: string) => void = text => void process.stdout.write(text)
+	write: (text: string) => void = text => void process.stdout.write(text),
+	runtime: FollowRuntime = systemFollowRuntime
 ): Promise<void> {
 	const initial = FlowQueryService.forConfigDir(configDir).readLogs({ lines: options.lines, human: options.human });
 	if (!initial.exists) {
-		write(`No log file for today: ${initial.filePath}\n`);
+		write(`No log file for today: ${initial.filePath}
+`);
 		if (!options.follow) return;
 	} else {
 		write(initial.text);
@@ -33,14 +56,14 @@ export async function logsCommand(
 
 	let offset = initial.size;
 	await new Promise<void>(resolve => {
-		fs.watchFile(initial.filePath, { interval: FOLLOW_POLL_INTERVAL_MS }, () => {
+		const stop = runtime.every(FOLLOW_POLL_INTERVAL_MS, () => {
 			const appended = readAppendedLog(initial.filePath, offset, { human: options.human });
 			if (!appended) return;
 			offset = appended.offset;
 			write(appended.text);
 		});
-		process.once('SIGINT', () => {
-			fs.unwatchFile(initial.filePath);
+		runtime.onInterrupt(() => {
+			stop();
 			resolve();
 		});
 	});
