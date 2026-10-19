@@ -1,4 +1,4 @@
-import type { ExecutionRecord } from '../execution/ExecutionRecord.js';
+import type { ExecutionState } from '../execution/ExecutionState.js';
 import { type ExecutionFilterOptions, filterExecutions } from './ExecutionFilter.js';
 import { formatDuration, formatModelCost, formatStarted, padTruncate } from './ExecutionFormat.js';
 
@@ -10,7 +10,7 @@ function indentBlock(text: string): string {
 }
 
 /** Step-by-step view of one execution (the `flow history --id` output). */
-export function renderDetailView(exec: ExecutionRecord): string {
+export function renderDetailView(exec: ExecutionState): string {
 	const lines: string[] = [];
 	lines.push(`Execution: ${exec.executionId}`);
 	lines.push(`Flow:      ${exec.flowId}`);
@@ -74,7 +74,7 @@ export function renderDetailView(exec: ExecutionRecord): string {
 }
 
 /** The text `flow history` prints: a paginated table, or the detail view when `opts.id` is set. */
-export function buildHistoryTable(execs: ExecutionRecord[], opts: ExecutionFilterOptions): string {
+export function buildHistoryTable(execs: ExecutionState[], opts: ExecutionFilterOptions): string {
 	const { items, total } = filterExecutions(execs, opts);
 
 	if (opts.id) {

@@ -1,3 +1,4 @@
+import { FLOW_APP_MODULE_ID, FLOW_EXPOSED_SLOTS, FLOW_PAGE_PATHS } from 'flow-core';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,17 +9,14 @@ const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf
 	id?: string;
 	version?: unknown;
 	backendEntryPath?: unknown;
+	requires?: unknown;
+	expose?: { slots?: Record<string, { accepts: string[] }> };
 	extensionPoints: { kind: string; slot: string; path?: string; view: { type: string; value: string } }[];
 };
 
 describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 	it('declares the id the module is registered under: app-core refuses a manifest without it', () => {
-		expect(manifest.id).toBe('flow');
-	});
-
-	it('keeps the id flow-cli registers it as (flow-cli/src/daemon/AppCoreRegistration.ts APP_CORE_MODULE_ID)', () => {
-		const registration = readFileSync(join(packageDir, '../flow-cli/src/daemon/AppCoreRegistration.ts'), 'utf8');
-		expect(registration).toContain(`APP_CORE_MODULE_ID = '${String(manifest.id)}'`);
+		expect(manifest.id).toBe(FLOW_APP_MODULE_ID);
 	});
 
 	it('holds neither version nor backendEntryPath: `app-core-cli package` stamps the first and fixes the second', () => {
@@ -48,5 +46,32 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 				'widget:dashboard:',
 			])
 		);
+	});
+
+	it('declares exactly the pages of flow-core FLOW_PAGE_PATHS, the contract the modules linking to them are tested against', () => {
+		const pages = manifest.extensionPoints.filter(p => p.kind === 'page').map(p => p.path!);
+		expect([...pages].sort()).toEqual([...FLOW_PAGE_PATHS].sort());
+	});
+
+	describe('extension slots other modules can fill', () => {
+		const slots = manifest.expose?.slots ?? {};
+
+		it('exposes exactly the slots of flow-core FLOW_EXPOSED_SLOTS, the contract the modules filling them are tested against', () => {
+			expect(Object.keys(slots).sort()).toEqual(Object.keys(FLOW_EXPOSED_SLOTS).sort());
+			for (const [name, accepts] of Object.entries(FLOW_EXPOSED_SLOTS)) {
+				expect([...(slots[name]?.accepts ?? [])].sort(), `slot ${name}`).toEqual([...accepts].sort());
+			}
+		});
+
+		it('accepts button-like root $types only, never a page-sized component', () => {
+			for (const [name, slot] of Object.entries(slots)) {
+				expect(slot.accepts, `slot ${name}`).toEqual(expect.arrayContaining(['ActionBar', 'ButtonLink']));
+				expect(slot.accepts, `slot ${name}`).not.toContain('PageContent');
+			}
+		});
+
+		it('requires no other module: flow works with no contributor installed', () => {
+			expect(manifest.requires).toBeUndefined();
+		});
 	});
 });

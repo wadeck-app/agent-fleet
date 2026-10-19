@@ -1,0 +1,21 @@
+# Flow charts index (nav): the flows that ran on this machine. A row opens the chart of the flow definition;
+# the chart of one run is reached from that execution's page ("See flow chart").
+$sources:
+    flows:
+        url: GET /api/modules/flow-chart/flows
+
+$type: PageContent
+sections:
+    - $type: PageHeader
+      title: Flow charts
+      subtitle: Click a flow to see its steps and how they depend on each other
+
+    - $type: DataTable
+      rows: $sources.flows.flows
+      navigateTo: '/modules/flow-chart/flows/{flowId}'
+      emptyMessage: No flow has run yet. Run a flow (flow run <file>) and it will be listed here.
+      columns:
+          - { key: 'flowId', label: 'Flow' }
+          - { key: 'executionCount', label: 'Executions' }
+          - { key: 'failedCount', label: 'Failed' }
+          - { key: 'lastStartedAt', label: 'Last started', format: 'datetime' }

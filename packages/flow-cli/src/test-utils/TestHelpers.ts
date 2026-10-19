@@ -1,5 +1,6 @@
 import { createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import type { DaemonHandle } from '@wadeck-app/singleton-daemon-kit';
+import { executionsDirOf } from 'flow-core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -83,7 +84,7 @@ export async function waitForExecution(
 	executionId: string,
 	timeoutMs: number
 ): Promise<ExecutionState> {
-	const store = new ExecutionStore(path.join(daemonDir, 'executions'));
+	const store = new ExecutionStore(executionsDirOf(daemonDir));
 	const deadline = Date.now() + timeoutMs;
 	let delay = 200;
 	while (Date.now() < deadline) {

@@ -1,7 +1,7 @@
-import type { ExecutionRecord } from '../execution/ExecutionRecord.js';
+import type { ExecutionState } from '../execution/ExecutionState.js';
 
 /** Test fixture builder: a complete, valid completed execution with the given overrides. */
-export function makeExec(partial: Partial<ExecutionRecord> & { executionId: string }): ExecutionRecord {
+export function makeExec(partial: Partial<ExecutionState> & { executionId: string }): ExecutionState {
 	return {
 		flowId: 'test-flow',
 		flowFile: '/tmp/test-flow.yml',

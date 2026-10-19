@@ -17,6 +17,10 @@ function resolveJsToTs(): Plugin {
 	};
 }
 
+// These two files rebuild and delete packages/flow-cli/dist-bundle in beforeAll/afterAll. Run in parallel, one
+// removes the folder under the other (ENOENT on flow-updater.cjs), so they share a project that runs files one by one.
+const BUNDLING_TESTS = ['src/__tests__/CliSmoke.integration.test.ts', 'src/cli/FlowIndex.integration.test.ts'];
+
 export default defineConfig({
 	plugins: [resolveJsToTs()],
 	// Replace the esbuild bundle-time constant so updater tests see a real version string.
@@ -26,8 +30,18 @@ export default defineConfig({
 	test: {
 		globals: true,
 		environment: 'node',
-		include: ['src/**/*.test.ts'],
-		exclude: ['**/node_modules/**', '**/dist/**'],
+		// include/exclude live in the projects: an include set here would be merged into the bundling project.
+		projects: [
+			{
+				extends: true,
+				test: {
+					name: 'unit',
+					include: ['src/**/*.test.ts'],
+					exclude: ['**/node_modules/**', '**/dist/**', ...BUNDLING_TESTS],
+				},
+			},
+			{ extends: true, test: { name: 'bundling', include: BUNDLING_TESTS, fileParallelism: false } },
+		],
 		mockReset: true,
 		restoreMocks: true,
 		// Daemons started by tests register the "flow" module with app-core on every start. Without this they
@@ -48,6 +62,8 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			'shared-cli': path.resolve(__dirname, '../shared-cli/src'),
+			// Specific entries first: a plain 'flow-core' key would also capture 'flow-core/testing'.
+			'flow-core/testing': path.resolve(__dirname, '../flow-core/src/testing/index.ts'),
 			'flow-core': path.resolve(__dirname, '../flow-core/src/index.ts'),
 			'flow-engine': path.resolve(__dirname, '../flow-engine/src'),
 			'shared-common': path.resolve(__dirname, '../shared-common/src'),

@@ -56,7 +56,3 @@ export interface ExecutionState {
 	 */
 	projectRoot?: string;
 }
-
-/** An execution as read back from disk. Same shape as what the daemon writes. */
-export type ExecutionRecord = ExecutionState;
-export type StepStateRecord = StepState;

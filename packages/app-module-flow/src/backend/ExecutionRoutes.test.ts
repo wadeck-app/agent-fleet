@@ -1,16 +1,16 @@
+import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { FlowQueryService } from 'flow-core';
+import { FlowConfigFixture, callRoute, collectRoutes } from 'flow-core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { registerExecutionRoutes } from './ExecutionRoutes.js';
-import { FlowConfigFixture } from './testing/FlowConfigFixture.js';
-import { callRoute, collectRoutes } from './testing/HttpDoubles.js';
 
 let fixture: FlowConfigFixture;
 let routes: ReturnType<typeof collectRoutes>['routes'];
 
 beforeEach(() => {
 	fixture = new FlowConfigFixture();
-	const collected = collectRoutes();
+	const collected = collectRoutes<ModuleContext>();
 	routes = collected.routes;
 	registerExecutionRoutes(collected.ctx, FlowQueryService.forConfigDir(fixture.configDir));
 });
@@ -19,14 +19,23 @@ afterEach(() => fixture.dispose());
 
 describe('GET /executions', () => {
 	it('registers the list and the detail routes', () => {
-		expect([...routes.keys()].sort()).toEqual(['GET /executions', 'GET /executions/:id']);
+		expect([...routes.keys()].sort()).toEqual(['GET /executions', 'GET /executions/:id', 'GET /flows']);
 	});
 
 	it('answers an empty page, not an error, when nothing ran yet', async () => {
 		expect(await callRoute(routes, 'GET /executions', { query: {} })).toEqual({
 			status: 200,
-			body: { items: [], total: 0, limit: 20, offset: 0 },
+			body: { items: [], total: 0, skipped: 0, limit: 20, offset: 0 },
 		});
+	});
+
+	it('counts the execution files it could not read, so a client can say the list is incomplete', async () => {
+		fixture.addExecution({ executionId: 'good1' });
+		fixture.addRawExecutionFile('broken1', '{ not json');
+		fixture.addRawExecutionFile('broken2', JSON.stringify({ executionId: 'broken2' }));
+		const { status, body } = await callRoute(routes, 'GET /executions', { query: {} });
+		expect(status).toBe(200);
+		expect(body).toMatchObject({ total: 1, skipped: 2 });
 	});
 
 	it('lists summaries newest first with the pagination that was applied', async () => {
@@ -220,5 +229,30 @@ describe('GET /executions/:id', () => {
 			query: { full: 'maybe' },
 		});
 		expect(full).toEqual({ status: 400, body: { error: "'full' must be 'true' or 'false', got 'maybe'." } });
+	});
+});
+
+describe('GET /flows', () => {
+	it('answers an empty list when nothing ran yet', async () => {
+		expect(await callRoute(routes, 'GET /flows', { query: {} })).toEqual({ status: 200, body: { flows: [] } });
+	});
+
+	it('lists each flow that ran once, with counts, most recent first', async () => {
+		fixture.addExecution({
+			executionId: 'a1',
+			flowId: 'deploy',
+			status: 'failed',
+			startedAt: '2026-08-16T10:00:00.000Z',
+		});
+		fixture.addExecution({ executionId: 'a2', flowId: 'deploy', startedAt: '2026-08-15T10:00:00.000Z' });
+		fixture.addExecution({ executionId: 'b1', flowId: 'build', startedAt: '2026-08-17T10:00:00.000Z' });
+		const { status, body } = await callRoute(routes, 'GET /flows', { query: {} });
+		expect(status).toBe(200);
+		expect(body).toEqual({
+			flows: [
+				{ flowId: 'build', executionCount: 1, failedCount: 0, lastStartedAt: '2026-08-17T10:00:00.000Z' },
+				{ flowId: 'deploy', executionCount: 2, failedCount: 1, lastStartedAt: '2026-08-16T10:00:00.000Z' },
+			],
+		});
 	});
 });

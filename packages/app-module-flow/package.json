@@ -9,9 +9,7 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json --noEmit",
 		"check": "app-core-cli check .",
-		"prebundle": "cd ../flow-core && npm run build",
 		"bundle": "app-core-cli package .",
-		"pretest": "cd ../flow-core && npm run build",
 		"test": "vitest run --bail=1",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",

@@ -2,16 +2,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { FlowCoreError, errorMessage } from '../errors.js';
-import type { ExecutionRecord, StepStateRecord } from '../execution/ExecutionRecord.js';
+import { looksLikeExecutionId } from '../execution/ExecutionId.js';
+import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
 import { formatDuration, formatModelCost, formatStarted } from '../history/ExecutionFormat.js';
 
 /** Default number of trailing characters printed for a failed step's stdout/stderr. */
 export const DEFAULT_TAIL_CHARS = 2000;
 
-const EXECUTION_ID_PREFIX_RE = /^[a-z0-9]+$/;
-
 export interface ResolvedExecution {
-	record: ExecutionRecord;
+	record: ExecutionState;
 	filePath: string;
 }
 
@@ -31,11 +30,6 @@ export class ExecutionLookupError extends FlowCoreError {
 	) {
 		super(message, kind);
 	}
-}
-
-/** Whether `target` could be an execution id (or id prefix) as printed by `flow history`. */
-export function looksLikeExecutionId(target: string): boolean {
-	return EXECUTION_ID_PREFIX_RE.test(target);
 }
 
 /**
@@ -68,9 +62,9 @@ export function resolveExecution(executionsDir: string, idOrPrefix: string): Res
 		);
 	}
 	const filePath = path.join(executionsDir, `${matches[0]}.json`);
-	let record: ExecutionRecord;
+	let record: ExecutionState;
 	try {
-		record = JSON.parse(fs.readFileSync(filePath, 'utf8')) as ExecutionRecord;
+		record = JSON.parse(fs.readFileSync(filePath, 'utf8')) as ExecutionState;
 	} catch (err) {
 		throw new ExecutionLookupError(
 			`Cannot read execution file ${filePath}: ${errorMessage(err)}. ` +
@@ -101,13 +95,13 @@ function indent(text: string, prefix: string): string {
 		.join('\n');
 }
 
-function stepDuration(step: StepStateRecord): string {
+function stepDuration(step: StepState): string {
 	if (!step.startedAt) return '-';
 	return formatDuration(step.startedAt, step.completedAt ?? null);
 }
 
 /** `  attempts: 3 (total 4m58s)` when the step ran more than once; the duration above is the last attempt only. */
-function attemptsLabel(step: StepStateRecord): string {
+function attemptsLabel(step: StepState): string {
 	if (!step.attempts || step.attempts < 2) return '';
 	const lastMs =
 		step.startedAt && step.completedAt
@@ -118,7 +112,7 @@ function attemptsLabel(step: StepStateRecord): string {
 	return `  attempts: ${step.attempts} (total ${total})`;
 }
 
-function modelOf(step: StepStateRecord): string | undefined {
+function modelOf(step: StepState): string | undefined {
 	const meta = step.meta;
 	return meta && 'model' in meta ? (meta as { model: string }).model : undefined;
 }

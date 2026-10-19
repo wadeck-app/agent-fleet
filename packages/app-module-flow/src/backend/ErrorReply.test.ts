@@ -1,12 +1,12 @@
 import { ExecutionLookupError, InvalidQueryError, UnknownPluginError, WorkerListError } from 'flow-core';
+import { asReply, fakeReply, replied } from 'flow-core/testing';
 import { describe, expect, it } from 'vitest';
 
 import { replyWithError } from './ErrorReply.js';
-import { asReply, fakeReply, replied } from './testing/HttpDoubles.js';
 
 function statusAndBody(err: unknown): { status: number; body: unknown } {
 	const reply = fakeReply();
-	replyWithError(asReply(reply), err);
+	replyWithError(asReply<Parameters<typeof replyWithError>[0]>(reply), err);
 	return replied(reply);
 }
 

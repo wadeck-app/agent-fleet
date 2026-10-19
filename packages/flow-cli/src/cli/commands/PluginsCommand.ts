@@ -1,15 +1,15 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
 import type { Command } from 'commander';
 import { FlowQueryService, UnknownPluginError } from 'flow-core';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { BUILTIN_PLUGIN_MANIFESTS } from '../../config/BuiltinPlugins.js';
+import { flowConfigDir } from '../../config/FlowConfigDir.js';
 
 // violations-suppress-end: ts/no-deep-relative
 
 /** The plugins listed are the ones bundled in this CLI, so the service is given exactly those manifests. */
 function createService(): FlowQueryService {
-	return FlowQueryService.forConfigDir(ConfigDir.get('flow'), BUILTIN_PLUGIN_MANIFESTS);
+	return FlowQueryService.forConfigDir(flowConfigDir(), BUILTIN_PLUGIN_MANIFESTS);
 }
 
 export function registerPluginsCommand(program: Command): void {

@@ -104,6 +104,36 @@ describe('flow history command', () => {
 		expect(errorSpy.mock.calls.flat().join(' ')).toMatch(/Invalid limit.*non-negative integer/);
 	});
 
+	describe('execution files that cannot be used', () => {
+		const damage = (): string => {
+			const file = path.join(configDir, 'executions', 'broken01.json');
+			fs.writeFileSync(file, '{ not json');
+			return file;
+		};
+
+		it('says on stderr which file was skipped and why, and still prints the table', () => {
+			const file = damage();
+			run();
+			expect(printed()).toContain('bbb33333');
+			const warning = errorSpy.mock.calls.flat().join(' ');
+			expect(warning).toContain('1 execution file skipped');
+			expect(warning).toContain(file);
+			expect(warning).toContain('not valid JSON');
+		});
+
+		it('also warns with --json, keeping stdout a clean JSON document', () => {
+			damage();
+			run('--json');
+			expect(json()).toHaveLength(3);
+			expect(errorSpy.mock.calls.flat().join(' ')).toContain('1 execution file skipped');
+		});
+
+		it('stays silent when every file is readable', () => {
+			run();
+			expect(errorSpy).not.toHaveBeenCalled();
+		});
+	});
+
 	it('reads nothing but the injected directory (empty history is not an error)', () => {
 		const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-history-empty-'));
 		try {

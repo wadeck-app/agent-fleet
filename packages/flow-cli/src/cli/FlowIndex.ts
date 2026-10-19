@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
+import { UpdateManager } from '@wadeck-app/shared-cli';
 import { cliLogsCommand } from '@wadeck-app/shared-cli/CliMetaCommands';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
-import { createDaemonClient, readPortFile } from '@wadeck-app/singleton-daemon-kit';
+import { readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
+import { createRemoteDaemonClient, logsDirOf } from 'flow-core';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
@@ -12,7 +13,8 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { FlowConfigLoader } from '../config/FlowConfig.js';
-import { appCoreModuleOption, defaultAppModuleLocations } from '../daemon/AppModuleLocator.js';
+import { flowConfigDir } from '../config/FlowConfigDir.js';
+import { appCoreModuleOptions } from '../daemon/AppModuleLocator.js';
 import { Daemon, writeDaemonLog } from '../daemon/Daemon.js';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
@@ -53,7 +55,7 @@ Environment variables:
 Daemon-required commands: run, start, stop, status
 Standalone commands:      show, validate, history, docs, logs, cli`;
 
-const DAEMON_DIR = ConfigDir.get('flow');
+const DAEMON_DIR = flowConfigDir();
 
 // ---------------------------------------------------------------------------
 // Daemon lifecycle commands
@@ -65,7 +67,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 		.command('start')
 		.description('Start the flow daemon in the background')
 		.action(async () => {
-			const client = createDaemonClient({ configDir: DAEMON_DIR, commands: {} });
+			const client = createRemoteDaemonClient(DAEMON_DIR);
 			if (await client.isRunning()) {
 				process.stdout.write('[ok] daemon already running\n');
 				return;
@@ -152,7 +154,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 		.action(async (opts: { json?: boolean }) => {
 			// TTY detection disabled: always use human-readable format unless --json is passed
 			const useJson = opts.json === true; /* || !process.stdout.isTTY */
-			const client = createDaemonClient({ configDir: DAEMON_DIR, commands: {} });
+			const client = createRemoteDaemonClient(DAEMON_DIR);
 
 			let running: boolean;
 			try {
@@ -190,7 +192,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 }
 
 async function printDaemonPid(): Promise<void> {
-	const client = createDaemonClient({ configDir: DAEMON_DIR, commands: {} });
+	const client = createRemoteDaemonClient(DAEMON_DIR);
 	try {
 		const info = await client.version();
 		process.stdout.write(`pid=${info.pid}\n`);
@@ -210,11 +212,11 @@ async function main(): Promise<void> {
 		// Must run before any worker is forked: ForkWorkerSource/WindowsDaemonEnv forward these
 		// two vars from this process's own env, never overriding an operator's explicit export.
 		FlowConfigLoader.applyOpenCodeEnvDefaults(config);
-		// The packaged app-module is registered with app-core (best-effort) once the daemon is up.
-		const appCoreModule = appCoreModuleOption(defaultAppModuleLocations(import.meta.url), message =>
-			writeDaemonLog(path.join(DAEMON_DIR, 'logs'), 'error', `[AppCoreRegistration] ${message}`)
+		// The packaged app-modules (flow, flow-chart) are registered with app-core (best-effort) once the daemon is up.
+		const appCoreModules = appCoreModuleOptions(import.meta.url, message =>
+			writeDaemonLog(logsDirOf(DAEMON_DIR), 'error', `[AppCoreRegistration] ${message}`)
 		);
-		await Daemon.start(config, DAEMON_DIR, { appCoreModule });
+		await Daemon.start(config, DAEMON_DIR, { appCoreModules });
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).
 		return;
 	}
@@ -227,7 +229,7 @@ async function main(): Promise<void> {
 
 	// Log every CLI invocation to ~/.config/flow/logs/YYYY-MM-DD.ndjson
 	try {
-		const logsDir = path.join(ConfigDir.get('flow'), 'logs');
+		const logsDir = logsDirOf(flowConfigDir());
 		const args = process.argv.slice(2);
 		writeDaemonLog(logsDir, 'info', `cmd: flow ${args.join(' ')}`);
 	} catch {
@@ -273,7 +275,7 @@ async function main(): Promise<void> {
 		.description("Alias for: flow cli logs  (print today's daemon log)")
 		.option('--follow', 'Follow the log file (tail -f style)')
 		.action(async (opts: { follow?: boolean }) => {
-			await cliLogsCommand(ConfigDir.get('flow'), { follow: opts.follow ?? false });
+			await cliLogsCommand(flowConfigDir(), { follow: opts.follow ?? false });
 		});
 
 	// Catch unknown top-level commands (must be registered after all addCommand calls, before parseAsync)

@@ -4,25 +4,31 @@
 
 export { FlowCoreError, InvalidQueryError, errorMessage } from './errors.js';
 
-export type {
-	ExecutionRecord,
-	ExecutionState,
-	ExecutionStatus,
-	StepState,
-	StepStateRecord,
-	StepStatus,
-} from './execution/ExecutionRecord.js';
+export { FLOW_APP_MODULE_ID, FLOW_CHART_APP_MODULE_ID } from './appModule/AppModuleIds.js';
+export { FLOW_EXPOSED_SLOTS, FLOW_PAGE_PATHS } from './appModule/FlowModuleContract.js';
+export { FLOW_CONFIG_DIR_NAME, executionsDirOf, logsDirOf } from './config/FlowConfigLayout.js';
+export {
+	EXECUTION_ID_LENGTH,
+	generateExecutionId,
+	isExecutionId,
+	looksLikeExecutionId,
+} from './execution/ExecutionId.js';
 
+export type { ExecutionState, ExecutionStatus, StepState, StepStatus } from './execution/ExecutionState.js';
+
+export { createRemoteDaemonClient, isUnknownCommandError, outdatedDaemonMessage } from './daemon/RemoteDaemonClient.js';
 export { DEFAULT_HISTORY_LIMIT, filterExecutions } from './history/ExecutionFilter.js';
 export type { ExecutionFilterOptions, FilteredExecutions } from './history/ExecutionFilter.js';
+export { summarizeFlows } from './history/FlowSummaries.js';
+export type { FlowSummary } from './history/FlowSummaries.js';
 export { formatDuration, formatModelCost, formatStarted } from './history/ExecutionFormat.js';
-export { loadExecutions } from './history/ExecutionLoader.js';
+export { describeSkippedExecutions, loadExecutionReport, loadExecutions } from './history/ExecutionLoader.js';
+export type { ExecutionReport, SkippedExecutionFile } from './history/ExecutionLoader.js';
 export { buildHistoryTable, renderDetailView } from './history/HistoryTable.js';
 
 export {
 	DEFAULT_TAIL_CHARS,
 	ExecutionLookupError,
-	looksLikeExecutionId,
 	renderExecutionDetail,
 	resolveExecution,
 	tailText,
@@ -54,7 +60,7 @@ export type { DeclaredWorkerSource, WorkerSourceEntry, WorkerSourceRegistryFile 
 export type { WorkerSummary } from './worker/WorkerSummary.js';
 
 export { formatLogContent, formatLogLine, tailLines } from './logs/LogFormat.js';
-export { logFilePath, readAppendedLog, readLogs, todayLogDate } from './logs/LogReader.js';
+export { isLogFileName, logFileName, logFilePath, readAppendedLog, readLogs, todayLogDate } from './logs/LogReader.js';
 export type { LogReadResult, ReadLogsOptions } from './logs/LogReader.js';
 
 export {
@@ -68,4 +74,28 @@ export type { PluginCatalogSource, PluginConfig, PluginDescription, PluginEntry 
 export { BUILTIN_PLUGIN_CATALOG } from './plugins/BuiltinPluginCatalog.js';
 
 export { FlowQueryService } from './query/FlowQueryService.js';
-export type { FlowQueryDirectories, FlowQueryServiceOptions, WorkerListResult } from './query/FlowQueryService.js';
+export type {
+	FlowQueryDirectories,
+	FlowQueryServiceOptions,
+	QueriedExecutions,
+	RenderedHistory,
+	WorkerListResult,
+} from './query/FlowQueryService.js';
+
+export { classifyFlowError, httpAnswerOfFlowError, httpStatusOfFlowError } from './ErrorClassification.js';
+export type { FlowErrorCategory, HttpErrorAnswer } from './ErrorClassification.js';
+export { toExecutionDetail, toExecutionSummary } from './view/ExecutionView.js';
+export type { ExecutionDetailView, ExecutionSummary, StepView } from './view/ExecutionView.js';
+
+export { buildFlowGraph } from './graph/FlowGraphBuilder.js';
+export { FlowDefinitionError, loadFlowDefinition } from './graph/FlowDefinitionLoader.js';
+export type { FlowDefinitionErrorKind } from './graph/FlowDefinitionLoader.js';
+export type {
+	FlowGraph,
+	FlowGraphEdge,
+	FlowGraphEdgeKind,
+	FlowGraphNode,
+	FlowGraphNodeKind,
+	FlowGraphResult,
+	FlowGraphTarget,
+} from './graph/FlowGraph.js';

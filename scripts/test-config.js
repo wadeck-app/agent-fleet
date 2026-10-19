@@ -64,6 +64,12 @@ const testSuites = [
 		type: testSuiteType_UNIT,
 	},
 	{
+		name: 'Flow Chart App Module Tests',
+		command: 'npm',
+		args: ['run', 'test', '--workspace=app-module-flow-chart'],
+		type: testSuiteType_UNIT,
+	},
+	{
 		name: 'Flow Engine Unit Tests',
 		command: 'npm',
 		args: ['run', 'test', '--workspace=flow-engine'],

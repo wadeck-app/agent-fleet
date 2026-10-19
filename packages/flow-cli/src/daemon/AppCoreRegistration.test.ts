@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { APP_CORE_MODULE_ID, type AppCoreDiagnostic, registerWithAppCore } from './AppCoreRegistration.js';
+import { type AppCoreDiagnostic, registerWithAppCore } from './AppCoreRegistration.js';
 
 const sdk = vi.hoisted(() => ({
 	registerModule: vi.fn(),
@@ -24,9 +24,8 @@ describe('registerWithAppCore', () => {
 		sdk.registerModule.mockResolvedValue(outcome);
 		sdk.describeRegistration.mockReturnValue('app-core: module "flow" registered on port 4850');
 
-		await registerWithAppCore('/abs/manifest.json', log);
+		await registerWithAppCore('/abs/manifest.json', log, 'flow');
 
-		expect(APP_CORE_MODULE_ID).toBe('flow');
 		expect(sdk.registerModule).toHaveBeenCalledWith({ id: 'flow', manifestPath: '/abs/manifest.json' });
 		expect(sdk.describeRegistration).toHaveBeenCalledWith(outcome, 'flow');
 		expect(lines).toEqual([
@@ -38,13 +37,23 @@ describe('registerWithAppCore', () => {
 		]);
 	});
 
+	it('registers another module under ITS id, not the flow one (flow-chart is registered by the same function)', async () => {
+		sdk.registerModule.mockResolvedValue({ status: 'registered', port: 4850 });
+		sdk.describeRegistration.mockReturnValue('registered');
+
+		await registerWithAppCore('/abs/chart/manifest.json', log, 'flow-chart');
+
+		expect(sdk.registerModule).toHaveBeenCalledWith({ id: 'flow-chart', manifestPath: '/abs/chart/manifest.json' });
+		expect(sdk.describeRegistration).toHaveBeenCalledWith({ status: 'registered', port: 4850 }, 'flow-chart');
+	});
+
 	it.each(['deferred', 'skipped'])(
 		'logs %s (app-core not running or not installed) as information: it is a normal state, but never silent',
 		async status => {
 			sdk.registerModule.mockResolvedValue({ status });
 			sdk.describeRegistration.mockReturnValue(`app-core: ${status}`);
 
-			await registerWithAppCore('/abs/manifest.json', log);
+			await registerWithAppCore('/abs/manifest.json', log, 'flow');
 
 			expect(lines).toEqual([{ level: 'info', source: 'AppCoreRegistration', message: `app-core: ${status}` }]);
 		}
@@ -59,7 +68,7 @@ describe('registerWithAppCore', () => {
 		});
 		sdk.describeRegistration.mockReturnValue('app-core refused module "flow" (HTTP 400): bad manifest');
 
-		await registerWithAppCore('/abs/manifest.json', log);
+		await registerWithAppCore('/abs/manifest.json', log, 'flow');
 
 		expect(lines).toEqual([
 			{
@@ -76,7 +85,7 @@ describe('registerWithAppCore', () => {
 			'app-core: could not register: APP_CORE_PORT "abc" is not a port'
 		);
 
-		await expect(registerWithAppCore('/abs/manifest.json', log)).resolves.toBeUndefined();
+		await expect(registerWithAppCore('/abs/manifest.json', log, 'flow')).resolves.toBeUndefined();
 
 		expect(lines).toEqual([
 			{
@@ -92,9 +101,13 @@ describe('registerWithAppCore', () => {
 		sdk.describeRegistration.mockReturnValue('ok');
 
 		await expect(
-			registerWithAppCore('/abs/manifest.json', () => {
-				throw new Error('disk full');
-			})
+			registerWithAppCore(
+				'/abs/manifest.json',
+				() => {
+					throw new Error('disk full');
+				},
+				'flow'
+			)
 		).resolves.toBeUndefined();
 	});
 });

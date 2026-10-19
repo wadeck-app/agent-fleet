@@ -6,11 +6,14 @@ function source(pluginId: string, extensionPoint: string): PluginCatalogSource {
 
 /**
  * Which plugins flow ships, by id, extension point and implementation name: what `flow plugins list` and the
- * app-module need, without the plugin code. Same order as BUILTIN_PLUGIN_MANIFESTS, which is the order of the
- * listing. The real manifests (flow-cli's BUILTIN_PLUGIN_MANIFESTS) import
- * the implementations, and through them execa and its dependencies; a host that only lists plugins should not
- * bundle those. flow-cli's BuiltinPlugins.test.ts pins this list to the real manifests, so a plugin added or
- * renamed there fails that test until this is updated.
+ * app-module need, without the plugin code. Same order as flow-cli's BUILTIN_PLUGIN_MANIFESTS, which is the
+ * order of the listing.
+ *
+ * Accepted exception to "one definition": the real manifests (each plugin package's plugin.config) import the
+ * implementations, and through them execa and its dependencies, which an app-module bundle must not embed;
+ * and the plugin packages expose no metadata-only entry to read the ids from. So the four ids and extension
+ * points are written here and in flow-cli, and flow-cli's BuiltinPlugins.test.ts pins both lists together:
+ * a plugin added or renamed in one fails that test until the other is updated.
  */
 export const BUILTIN_PLUGIN_CATALOG: Record<string, PluginCatalogSource> = {
 	none: source('none', 'workspace'),

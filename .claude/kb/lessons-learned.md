@@ -6627,3 +6627,29 @@ idle or gone, list it with its parent/children (`wmic`/`Get-CimInstance Win32_Pr
 
 Both go through `runViaTempFileBinary`; the explicit path used to skip `ensureGitCoreutilsOnPath`, so a daemon
 started without Git Bash on PATH failed `sed`/`dirname` only for steps with an explicit `shell: bash`.
+
+## One loader, one validity rule: a record that passes the loader must not crash a reader
+
+`loadExecutions` only checked `executionId`; a file with an id but no `steps` made `GET /executions` (and every
+`Object.values(record.steps)`) fail for the whole listing. Validate the shape readers rely on at load time.
+
+## dsl-ui has no URL-bound text/select
+
+Only `Pagination` and `PageSizeSelect` accept `urlParam`; `$sources` params read `$urlParam.*` only, and `$ctx.navigate`
+is a full page reload. A free-text filter on a DSL page needs a dsl-ui component; until then, link rows to `?param=value`.
+
+## Daemon clients: one factory, empty command table
+
+Use `createRemoteDaemonClient` (flow-core) instead of `createDaemonClient({ commands: {} })` per command, and
+`flowConfigDir()` (flow-cli) instead of `ConfigDir.get('flow')`. Same for the "outdated daemon" message.
+
+## Vite string aliases also capture subpaths; app-core-cli bundles flow-core from source
+
+`alias: { 'flow-core': src/index.ts }` rewrites `flow-core/testing` to `src/index.ts/testing`: list the subpath aliases first.
+The module tsconfig `paths` make `app-core-cli package` bundle flow-core from its sources, so no `flow-core` build is needed before it.
+
+## Cross-package contracts live in flow-core, not in the sibling's files
+
+Module ids, exposed slots and page paths (`appModule/`), execution-id and config layout rules: each package asserts its own
+manifest against the flow-core constant. `flow-core/src/architecture/DependencyDirection.test.ts` fails on any reference between
+flow-cli and app-module-* (flow-chart's package.json dependency on app-module-flow is the one allowed: app-core-cli needs it).

@@ -1,19 +1,12 @@
+import { isExecutionId } from 'flow-core';
 import type { StepMeta } from 'flow-engine/types';
-import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { ExecutionState, StepStatus } from '../ipc/Protocol';
 
-export function generateExecutionId(): string {
-	const hex = crypto.randomUUID().replace(/-/g, '');
-	return parseInt(hex.slice(0, 11), 16).toString(36).padStart(8, '0').slice(-8);
-}
-
-const EXECUTION_ID_RE = /^[a-z0-9]{8}$/;
-
 function assertExecutionIdSafe(executionId: string): void {
-	if (!EXECUTION_ID_RE.test(executionId)) {
+	if (!isExecutionId(executionId)) {
 		throw new Error(`Invalid executionId format: ${JSON.stringify(executionId)}`);
 	}
 }

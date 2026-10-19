@@ -1,9 +1,9 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
 import type { Command } from 'commander';
 // normalizeError(...).message keeps the message bare: getErrorMessage() would render
 // "[fail] Error: ...", double-prefixing the CLI's own marker.
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
 
@@ -105,7 +105,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 				}
 			) => {
 				try {
-					const registry = new WorkerSourceRegistry(ConfigDir.get('flow'));
+					const registry = new WorkerSourceRegistry(flowConfigDir());
 					const { token, sourceToken, entry } = registry.declare({
 						sourceId,
 						provider: options.provider,
@@ -157,7 +157,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		)
 		.action((options: { json?: boolean; validate?: boolean }) => {
 			try {
-				const registry = new WorkerSourceRegistry(ConfigDir.get('flow'));
+				const registry = new WorkerSourceRegistry(flowConfigDir());
 				const entries = registry.list();
 				const liveness = options.validate
 					? new Map(entries.map(e => [e.sourceId, registry.livenessOf(e)]))
@@ -202,7 +202,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		.description('Remove declared sources whose recorded pid is no longer running')
 		.action(() => {
 			try {
-				const removed = new WorkerSourceRegistry(ConfigDir.get('flow')).pruneDead();
+				const removed = new WorkerSourceRegistry(flowConfigDir()).pruneDead();
 				if (removed.length === 0) {
 					console.log('[ok] No dead worker sources found.');
 					return;
@@ -220,7 +220,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		)
 		.action(() => {
 			try {
-				const result = new WorkerSourceRegistry(ConfigDir.get('flow')).repair();
+				const result = new WorkerSourceRegistry(flowConfigDir()).repair();
 				if (result === undefined) {
 					console.log('[ok] Worker source registry already parses fine -- nothing to repair.');
 					return;
@@ -239,7 +239,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		.description('Remove a declared worker source')
 		.action((sourceId: string) => {
 			try {
-				const removed = new WorkerSourceRegistry(ConfigDir.get('flow')).remove(sourceId);
+				const removed = new WorkerSourceRegistry(flowConfigDir()).remove(sourceId);
 				if (!removed) {
 					console.error(`[fail] No worker source declared with id '${sourceId}'`);
 					process.exit(1);

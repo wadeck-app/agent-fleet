@@ -1,0 +1,6 @@
+/* Source of style.css. No `@tailwind base` (the shell has Tailwind's base layer and the dsl-ui palette).
+   base.css is the structural CSS xyflow needs (viewport, pane, node and edge layers); its own theme (colors,
+   controls, minimap) is left out on purpose: the chart uses dsl-ui tokens only. */
+@import '@xyflow/react/dist/base.css';
+@tailwind components;
+@tailwind utilities;

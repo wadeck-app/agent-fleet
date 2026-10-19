@@ -1,5 +1,15 @@
 {
 	"id": "flow",
+	"expose": {
+		"slots": {
+			"execution-actions": {
+				"accepts": ["ActionBar", "HorizontalStack", "ButtonLink", "ButtonAction", "IconButton", "Link"]
+			},
+			"executions-actions": {
+				"accepts": ["ActionBar", "HorizontalStack", "ButtonLink", "ButtonAction", "IconButton", "Link"]
+			}
+		}
+	},
 	"extensionPoints": [
 		{
 			"kind": "widget",

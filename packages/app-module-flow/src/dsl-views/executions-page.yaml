@@ -1,7 +1,14 @@
 # Executions history (`flow history`). Filters and pagination live in the URL: ?status=failed&flow=deploy&page=1&size=50
-# The status links reload the page with the filter applied; the flow filter is the `flow` URL parameter (dsl-ui has no
-# URL-backed text/select control to set it from the page: only Pagination and PageSizeSelect take `urlParam`).
+# The status links reload the page with the filter applied. The flow filter is the `flow` URL parameter, set by clicking
+# a row of the "Flows" table (GET /flows). A free-text/select control bound to ?flow= needs a dsl-ui change: today only
+# Pagination and PageSizeSelect take `urlParam`, and SearchBar/CompactSelect cannot read the URL back into `value`.
+# Slot "flow:executions-actions" (manifest expose.slots): other modules add page-level buttons next to the status links.
+# DataTable has no per-row slot (its row actions are static), so nothing is contributed per row.
 $sources:
+    actions:
+        url: GET /api/slots/flow:executions-actions
+    flows:
+        url: GET /api/modules/flow/flows
     executions:
         url: GET /api/modules/flow/executions
         params:
@@ -14,17 +21,36 @@ $type: PageContent
 sections:
     - $type: PageHeader
       title: Flow executions
-      subtitle: 'Filter by flow with ?flow=<flowId> in the URL'
+      subtitle: 'Filter by status, or click a flow below to see only its executions (?flow=<flowId>)'
 
     - $type: HorizontalStack
       gap: gap-3
       align: items-center
+      justify: justify-between
       items:
-          - { $type: Link, label: All, href: /modules/flow/executions }
-          - { $type: Link, label: Running, href: '/modules/flow/executions?status=running' }
-          - { $type: Link, label: Queued, href: '/modules/flow/executions?status=queued' }
-          - { $type: Link, label: Completed, href: '/modules/flow/executions?status=completed' }
-          - { $type: Link, label: Failed, href: '/modules/flow/executions?status=failed', variant: danger }
+          - $type: HorizontalStack
+            gap: gap-3
+            align: items-center
+            items:
+                - { $type: Link, label: All, href: /modules/flow/executions }
+                - { $type: Link, label: Running, href: '/modules/flow/executions?status=running' }
+                - { $type: Link, label: Queued, href: '/modules/flow/executions?status=queued' }
+                - { $type: Link, label: Completed, href: '/modules/flow/executions?status=completed' }
+                - { $type: Link, label: Failed, href: '/modules/flow/executions?status=failed', variant: danger }
+
+          # Renders nothing while no module contributes.
+          - $type: ExtensionSlot
+            items: $sources.actions
+
+    - $type: DataTable
+      rows: $sources.flows.flows
+      navigateTo: '/modules/flow/executions?flow={flowId}'
+      emptyMessage: No flow has run yet
+      columns:
+          - { key: 'flowId', label: 'Flow' }
+          - { key: 'executionCount', label: 'Executions' }
+          - { key: 'failedCount', label: 'Failed' }
+          - { key: 'lastStartedAt', label: 'Last started', format: 'datetime' }
 
     - $type: DataTable
       rows: $sources.executions.items

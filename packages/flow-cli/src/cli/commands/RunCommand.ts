@@ -1,7 +1,7 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
-import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
+import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
+import { createRemoteDaemonClient, executionsDirOf, logFilePath, todayLogDate } from 'flow-core';
 import type { FlowDefinition, InputDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
 import { spawn } from 'node:child_process';
@@ -14,6 +14,7 @@ import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
+import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
@@ -97,8 +98,8 @@ async function waitForCompletion(
 	onLog?: (stepId: string, message: string) => void,
 	options?: { fastPoll?: boolean }
 ): Promise<ExecutionState> {
-	const store = new ExecutionStore(path.join(daemonDir, 'executions'));
-	const logFile = path.join(daemonDir, 'logs', `${new Date().toISOString().slice(0, 10)}.ndjson`);
+	const store = new ExecutionStore(executionsDirOf(daemonDir));
+	const logFile = logFilePath(daemonDir, todayLogDate());
 	const deadline = Date.now() + timeoutMs;
 	// fastPoll: fixed 50ms (streaming/polling log modes). Normal: starts 200ms, grows to 2000ms.
 	let delay = options?.fastPoll ? 50 : 200;
@@ -342,11 +343,7 @@ async function sendToDaemon(
 	config: FlowConfig,
 	daemonDir: string
 ): Promise<DaemonResponse> {
-	const makeClient = () =>
-		createDaemonClient<FlowCommands>({
-			configDir: daemonDir,
-			commands: {},
-		});
+	const makeClient = () => createRemoteDaemonClient<FlowCommands>(daemonDir);
 	try {
 		return (await makeClient().send('run', cmd)) as DaemonResponse;
 	} catch (err) {
@@ -430,7 +427,7 @@ export function registerRunCommand(program: Command): void {
 			) => {
 				const inputs = parseInputArgs([...options.input, ...options.inputs]);
 				const cwd = process.cwd();
-				const daemonDir = ConfigDir.get('flow');
+				const daemonDir = flowConfigDir();
 
 				const resolution = resolveFlowFile(flowRef, cwd);
 				if (!resolution.found) {

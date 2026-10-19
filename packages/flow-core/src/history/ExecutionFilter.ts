@@ -1,5 +1,5 @@
 import { InvalidQueryError } from '../errors.js';
-import type { ExecutionRecord } from '../execution/ExecutionRecord.js';
+import type { ExecutionState } from '../execution/ExecutionState.js';
 
 export interface ExecutionFilterOptions {
 	/** Max page size (default 20). Ignored when `id` is set. */
@@ -13,7 +13,7 @@ export interface ExecutionFilterOptions {
 }
 
 export interface FilteredExecutions {
-	items: ExecutionRecord[];
+	items: ExecutionState[];
 	/** Matches before pagination. */
 	total: number;
 }
@@ -30,7 +30,7 @@ function assertNonNegativeInteger(name: string, value: number): void {
  * The one place that decides which executions a history query returns, for the table and the
  * JSON output alike. `execs` must already be in display order (see loadExecutions).
  */
-export function filterExecutions(execs: ExecutionRecord[], opts: ExecutionFilterOptions): FilteredExecutions {
+export function filterExecutions(execs: ExecutionState[], opts: ExecutionFilterOptions): FilteredExecutions {
 	const limit = opts.limit ?? DEFAULT_HISTORY_LIMIT;
 	const offset = opts.offset ?? 0;
 	assertNonNegativeInteger('limit', limit);

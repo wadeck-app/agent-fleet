@@ -1,11 +1,11 @@
+import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { FlowQueryService, WorkerListError, type WorkerListResult } from 'flow-core';
+import { FlowConfigFixture, callRoute, collectRoutes } from 'flow-core/testing';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { registerWorkerRoutes } from './WorkerRoutes.js';
-import { FlowConfigFixture } from './testing/FlowConfigFixture.js';
-import { callRoute, collectRoutes } from './testing/HttpDoubles.js';
 
 let fixture: FlowConfigFixture;
 
@@ -16,7 +16,7 @@ beforeEach(() => {
 afterEach(() => fixture.dispose());
 
 function routesFor(service: Pick<FlowQueryService, 'listWorkers'>): ReturnType<typeof collectRoutes>['routes'] {
-	const { routes, ctx } = collectRoutes();
+	const { routes, ctx } = collectRoutes<ModuleContext>();
 	registerWorkerRoutes(ctx, service as FlowQueryService);
 	return routes;
 }

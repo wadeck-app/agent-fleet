@@ -1,0 +1,7 @@
+# Chart of a flow definition (no step state), mounted at /modules/flow-chart/flows/:flowId.
+# The component loads GET /api/modules/flow-chart/graph itself, to show the API's own error text, and offers the
+# way back to the flow list.
+$type: PageContent
+sections:
+    - $type: flow-chart:FlowGraph
+      flowId: $route.flowId

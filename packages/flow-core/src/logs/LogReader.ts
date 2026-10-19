@@ -1,10 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { logsDirOf } from '../config/FlowConfigLayout.js';
 import { InvalidQueryError } from '../errors.js';
 import { formatLogContent, tailLines } from './LogFormat.js';
 
 const LOG_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const LOG_FILE_RE = /^\d{4}-\d{2}-\d{2}\.ndjson$/;
 
 export interface ReadLogsOptions {
 	/** UTC calendar date `YYYY-MM-DD` (default: today). */
@@ -29,11 +31,21 @@ export function todayLogDate(now: Date = new Date()): string {
 	return now.toISOString().slice(0, 10);
 }
 
+/** `YYYY-MM-DD.ndjson`: the file the daemon writes a day's log to. */
+export function logFileName(date: string): string {
+	return `${date}.ndjson`;
+}
+
+/** Whether `fileName` is a daily log file name (`YYYY-MM-DD.ndjson`), e.g. when rotating the logs directory. */
+export function isLogFileName(fileName: string): boolean {
+	return LOG_FILE_RE.test(fileName);
+}
+
 export function logFilePath(configDir: string, date: string): string {
 	if (!LOG_DATE_RE.test(date)) {
 		throw new InvalidQueryError(`Invalid log date '${date}': expected YYYY-MM-DD.`);
 	}
-	return path.join(configDir, 'logs', `${date}.ndjson`);
+	return path.join(logsDirOf(configDir), logFileName(date));
 }
 
 /**

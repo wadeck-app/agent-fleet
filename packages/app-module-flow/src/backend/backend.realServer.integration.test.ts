@@ -1,5 +1,6 @@
+import { FlowConfigFixture } from 'flow-core/testing';
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -12,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * backend tests call the handlers directly, so they cannot see how the router fills `req.params`, nor
  * whether the packaged CJS bundle (flow-core, plugin manifests, ConfigDir) loads and runs.
  *
- * Needs flow-core built (`npm run build` in packages/flow-core; `npm test` of this package does it).
+ * flow-core is bundled from its sources (the module tsconfig maps it), so no prior flow-core build is needed.
  * Uses the app-core-cli installed as a devDependency, never a global binary or the developer's app-core.
  */
 
@@ -28,32 +29,22 @@ let workDir: string;
 let baseUrl: string;
 
 function writeFlowConfig(flowConfigDir: string): void {
-	const executions = join(flowConfigDir, 'executions');
-	mkdirSync(executions, { recursive: true });
-	const record = (executionId: string, status: string, startedAt: string): string =>
-		JSON.stringify({
+	const fixture = new FlowConfigFixture('app-module-flow-real-server', flowConfigDir);
+	const addRun = (executionId: string, status: 'completed' | 'failed', startedAt: string): void => {
+		fixture.addExecution({
 			executionId,
-			flowId: 'deploy',
-			flowFile: '/flows/deploy.yml',
 			status,
-			currentSteps: [],
 			startedAt,
 			completedAt: '2026-01-01T00:00:05.000Z',
-			steps: {
-				build: {
-					status: status === 'failed' ? 'failed' : 'completed',
-					error: status === 'failed' ? 'exit 1' : undefined,
-				},
-			},
+			steps: { build: { status, ...(status === 'failed' ? { error: 'exit 1' } : {}) } },
 			...(status === 'failed' ? { lastError: 'exit 1' } : {}),
 		});
-	writeFileSync(join(executions, 'aaa111.json'), record('aaa111', 'completed', '2026-01-01T00:00:00.000Z'));
-	writeFileSync(join(executions, 'bbb222.json'), record('bbb222', 'failed', '2026-01-02T00:00:00.000Z'));
-	mkdirSync(join(flowConfigDir, 'logs'), { recursive: true });
-	writeFileSync(
-		join(flowConfigDir, 'logs', '2026-01-01.ndjson'),
-		JSON.stringify({ ts: '2026-01-01T10:00:00.000Z', level: 'info', msg: 'Daemon started' }) + '\n'
-	);
+	};
+	addRun('aaa111', 'completed', '2026-01-01T00:00:00.000Z');
+	addRun('bbb222', 'failed', '2026-01-02T00:00:00.000Z');
+	fixture.addLog('2026-01-01', [
+		JSON.stringify({ ts: '2026-01-01T10:00:00.000Z', level: 'info', msg: 'Daemon started' }),
+	]);
 	// A declared source with credential hashes that must never reach the API.
 	writeFileSync(
 		join(flowConfigDir, 'worker-sources.json'),

@@ -1,12 +1,19 @@
-import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
+import { UpdateManager } from '@wadeck-app/shared-cli';
 import { FOLLOW_POLL_INTERVAL_MS } from '@wadeck-app/shared-cli/FollowSnapshot';
 import { LiveRegion } from '@wadeck-app/shared-cli/LiveRegion';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { cacheFilePath, readCache, readUpdateConfig, semverLte } from '@wadeck-app/shared-updater';
-import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
+import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import type { ApprovalProvider } from 'extension-points';
-import { FlowQueryService, WorkerListError, formatWorkerLine } from 'flow-core';
+import {
+	FlowQueryService,
+	WorkerListError,
+	createRemoteDaemonClient,
+	formatWorkerLine,
+	isUnknownCommandError,
+	outdatedDaemonMessage,
+} from 'flow-core';
 import type { WorkerListResult } from 'flow-core';
 import { StepRunner } from 'flow-engine';
 import { spawn } from 'node:child_process';
@@ -17,6 +24,7 @@ import { WebSocket } from 'ws';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { FlowConfigLoader } from '../../config/FlowConfig';
+import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { PluginResolver } from '../../config/PluginResolver';
 import type {
 	AssignmentScopedMessage,
@@ -330,7 +338,7 @@ function registerListCommand(worker: Command): void {
 			'Keep following the worker list (tail -f style: only new/changed workers are printed after the initial read) until interrupted (Ctrl-C), instead of exiting after one read'
 		)
 		.action(async (options: { json?: boolean; follow?: boolean }) => {
-			const service = FlowQueryService.forConfigDir(ConfigDir.get('flow'));
+			const service = FlowQueryService.forConfigDir(flowConfigDir());
 			const json = options.json === true;
 			if (options.follow === true) {
 				await runWorkerListFollow(service, json);
@@ -376,13 +384,12 @@ function registerUpdateCommand(worker: Command): void {
 				process.exit(1);
 			}
 
-			const daemonDir = ConfigDir.get('flow');
+			const daemonDir = flowConfigDir();
 			try {
-				// Declared optional and left unimplemented locally, same as "workers" above:
-				// an in-process fallback here would answer from nothing and look like success.
-				const client = createDaemonClient<{
+				// Declared optional: no local implementation (see createRemoteDaemonClient).
+				const client = createRemoteDaemonClient<{
 					updateWorker?: (payload?: unknown) => Promise<WorkerSummary>;
-				}>({ configDir: daemonDir, commands: {} });
+				}>(daemonDir);
 				const request: UpdateWorkerRequest = {
 					workerId,
 					...(options.labels !== undefined ? { labels: parseLabels(options.labels) } : {}),
@@ -404,11 +411,8 @@ function registerUpdateCommand(worker: Command): void {
 					process.exit(1);
 				}
 				const message = normalizeError(err).message;
-				if (/unknown command/i.test(message)) {
-					report(
-						'[fail]',
-						'The running daemon does not support "flow worker update" -- it started before this command existed. Restart it with "flow stop" then "flow start", or run "flow cli update" first if its version is older than this CLI.'
-					);
+				if (isUnknownCommandError(message)) {
+					report('[fail]', outdatedDaemonMessage('flow worker update'));
 					process.exit(1);
 				}
 				report('[fail]', message);
@@ -418,7 +422,7 @@ function registerUpdateCommand(worker: Command): void {
 }
 
 async function runWorker(options: WorkerOptions): Promise<void> {
-	const daemonDir = ConfigDir.get('flow');
+	const daemonDir = flowConfigDir();
 	// Same resolver the daemon uses, so a configured wsPort is honoured here too and the two
 	// cannot end up reading different files (D#58). The legacy-file warning is deliberately
 	// dropped here rather than printed by every command that reads config: the daemon reports

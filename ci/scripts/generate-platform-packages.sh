@@ -77,4 +77,4 @@ EOF
   echo "generated $dir/package.json"
 }
 
-generate_dist "flow" "worker.cjs" "app-module/"
+generate_dist "flow" "worker.cjs" "app-module/" "app-module-flow-chart/"

@@ -79,7 +79,14 @@ export class WorkerDisplay {
 	}
 }
 
-/** Renders a duration at a scale a reader can take in at a glance. */
+/**
+ * Renders a duration at a scale a reader can take in at a glance.
+ *
+ * Deliberately not flow-core's formatDuration(startedAt, completedAt): that one takes two ISO timestamps (a stored
+ * execution) and keeps one decimal up to a minute (12.3s), while a live worker line takes elapsed milliseconds and
+ * shows whole seconds from 10s (12s). The outputs differ for the same duration and tests pin both, so they are not
+ * unified.
+ */
 function formatDuration(elapsedMs: number): string {
 	if (elapsedMs < 1_000) return `${String(Math.round(elapsedMs))}ms`;
 	// One decimal up to ten seconds: rounding 1.5s to "2s" overstates a short step by a

@@ -10,19 +10,21 @@ import {
 	runUpdater,
 	stateFilePath,
 } from '@wadeck-app/shared-updater';
+import { FLOW_CONFIG_DIR_NAME, logFilePath, todayLogDate } from 'flow-core';
 import { cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { join } from 'node:path';
 
 import { registerWithAppCore } from '../daemon/AppCoreRegistration';
+import { APP_MODULES } from '../daemon/AppModules';
 import { trackAppModuleUpdate } from './RegisterAfterUpdate';
 import { decideUpdate } from './UpdateDeferral';
 
 declare const __FLOW_CLI_VERSION__: string;
 
 const PKG_NAME = '@wadeck-app/flow-cli';
-const baseConfigDir = process.env['FLOW_CONFIG_DIR'] ?? ConfigDir.get('flow');
+const baseConfigDir = process.env['FLOW_CONFIG_DIR'] ?? ConfigDir.get(FLOW_CONFIG_DIR_NAME);
 
 // When UPDATER_MANUAL=1 (explicit `flow cli update`), bypass autoUpdate:false by
 // running the updater against a temp config copy with the flag removed.
@@ -59,6 +61,7 @@ try {
 const registerAppModuleAfterUpdate = trackAppModuleUpdate({
 	npmRoot,
 	pkgName: PKG_NAME,
+	modules: APP_MODULES,
 	register: registerWithAppCore,
 	log: line => process.stdout.write(`[flow-updater] ${line}\n`),
 	warn: line => process.stderr.write(`[flow-updater] ${line}\n`),
@@ -109,7 +112,7 @@ const force = process.env['UPDATER_FORCE'] === '1';
 
 /** Path of the shared-updater NDJSON log for today (mirrors shared-updater's appendLog). */
 function updaterLogPath(): string {
-	return join(configDir, 'logs', `${new Date().toISOString().slice(0, 10)}.ndjson`);
+	return logFilePath(configDir, todayLogDate());
 }
 
 function logSize(file: string): number {

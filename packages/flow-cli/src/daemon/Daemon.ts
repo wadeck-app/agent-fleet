@@ -1,9 +1,10 @@
-import { ConfigDir, UpdateManager } from '@wadeck-app/shared-cli';
+import { UpdateManager } from '@wadeck-app/shared-cli';
 import { type HookConfig, HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { readUpdateConfig } from '@wadeck-app/shared-updater';
 import { type DaemonHandle, createDaemon } from '@wadeck-app/singleton-daemon-kit';
 import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
+import { executionsDirOf, logsDirOf } from 'flow-core';
 import { WorkspaceManager } from 'flow-engine';
 import * as yaml from 'js-yaml';
 import { execSync } from 'node:child_process';
@@ -17,6 +18,7 @@ import { FLOW_BUNDLE_NAME } from '../cli/FlowBundleName.js';
 import { VERSION } from '../cli/version.js';
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
+import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { PluginResolver } from '../config/PluginResolver.js';
 import type { ClientCommand, SourceReady, UpdateWorkerRequest, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
@@ -216,7 +218,7 @@ async function tryResolvePlugins(): Promise<{
 	workspaceProvider?: WorkspaceProvider;
 	approvalProvider?: ApprovalProvider;
 }> {
-	const globalConfigPath = path.join(ConfigDir.get('flow'), 'config.yml');
+	const globalConfigPath = path.join(flowConfigDir(), 'config.yml');
 	const envOverride = process.env['FLOW_CONFIG'];
 
 	// The daemon is a per-user machine-wide singleton, so it has no single project.
@@ -264,7 +266,7 @@ export interface StartDaemonOptions {
 	 * The packaged app-module to register with app-core on start. Omitted means the daemon does not
 	 * talk to app-core at all (tests and embedders); the CLI entry always passes it.
 	 */
-	appCoreModule?: { manifestPath: string };
+	appCoreModules?: { id: string; manifestPath: string }[];
 }
 
 async function startDaemon(
@@ -272,9 +274,9 @@ async function startDaemon(
 	daemonDir?: string,
 	options: StartDaemonOptions = {}
 ): Promise<DaemonHandle> {
-	const resolvedDaemonDir = daemonDir ?? ConfigDir.get('flow');
-	const executionsDir = path.join(resolvedDaemonDir, 'executions');
-	const logsDir = path.join(resolvedDaemonDir, 'logs');
+	const resolvedDaemonDir = daemonDir ?? flowConfigDir();
+	const executionsDir = executionsDirOf(resolvedDaemonDir);
+	const logsDir = logsDirOf(resolvedDaemonDir);
 
 	// Resolve plugins before createDaemon - onStart is synchronous so async must happen here
 	const pluginProviders = await tryResolvePlugins();
@@ -377,16 +379,28 @@ async function startDaemon(
 
 				// Fire-and-forget: app-core being absent or slow (the SDK waits up to 3 s) must not delay or break the
 				// daemon start. Whatever app-core answers lands in the daemon log, `flow logs` shows it.
-				if (options.appCoreModule) {
-					registerWithAppCore(options.appCoreModule.manifestPath, entry =>
-						writeDaemonLog(logsDir, entry.level, `[${entry.source}] ${entry.message}`)
-					).catch((err: unknown) =>
-						writeDaemonLog(
-							logsDir,
-							'error',
-							`[AppCoreRegistration] unexpected failure registering with app-core: ${getErrorMessage(err)}`
-						)
-					);
+				// Modules go one after the other, in the given order (flow-chart requires flow, so flow first). A
+				// failure on one never prevents the next from being tried: app-core states its own reason if a
+				// requirement is missing.
+				if (options.appCoreModules && options.appCoreModules.length > 0) {
+					const modules = options.appCoreModules;
+					void (async () => {
+						for (const appModule of modules) {
+							try {
+								await registerWithAppCore(
+									appModule.manifestPath,
+									entry => writeDaemonLog(logsDir, entry.level, `[${entry.source}] ${entry.message}`),
+									appModule.id
+								);
+							} catch (err) {
+								writeDaemonLog(
+									logsDir,
+									'error',
+									`[AppCoreRegistration] unexpected failure registering module "${appModule.id}" with app-core: ${getErrorMessage(err)}`
+								);
+							}
+						}
+					})();
 				}
 
 				const wsPort = config.worker.wsPort ?? port + 1;

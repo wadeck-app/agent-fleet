@@ -1,4 +1,3 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
 import { SENSITIVE_FIELDS } from 'extension-points';
 import { load as parseYaml } from 'js-yaml';
 import { readFileSync } from 'node:fs';
@@ -7,6 +6,7 @@ import { join } from 'node:path';
 import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { DefaultProjectResolver } from './DefaultProjectResolver.js';
+import { flowConfigDir } from './FlowConfigDir.js';
 import type {
 	GlobalConfig,
 	ProjectConfig,
@@ -78,7 +78,7 @@ export class ConfigLoader {
 
 	constructor(options: ConfigLoaderOptions = {}) {
 		this.envVarOverride = process.env['FLOW_CONFIG'];
-		this.globalConfigPath = options.globalConfigPath ?? join(ConfigDir.get('flow'), 'config.yml');
+		this.globalConfigPath = options.globalConfigPath ?? join(flowConfigDir(), 'config.yml');
 		// Resolved lazily: the project root depends on a filesystem walk that must
 		// not run (nor fail) merely because a ConfigLoader was constructed.
 		this.projectConfigPathOverride = options.projectConfigPath;

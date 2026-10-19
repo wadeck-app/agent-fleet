@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	DEFAULT_TAIL_CHARS,
 	ExecutionLookupError,
-	looksLikeExecutionId,
 	renderExecutionDetail,
 	resolveExecution,
 	tailText,
@@ -114,13 +113,7 @@ describe('ExecutionDetail', () => {
 		});
 	});
 
-	describe('looksLikeExecutionId', () => {
-		it('accepts lowercase letters and digits only', () => {
-			expect(looksLikeExecutionId('a6wug7bh')).toBe(true);
-			expect(looksLikeExecutionId('A6')).toBe(false);
-			expect(looksLikeExecutionId('a/b')).toBe(false);
-			expect(looksLikeExecutionId('')).toBe(false);
-		});
+	describe('constants', () => {
 		it('exposes a default tail of 2000 characters', () => {
 			expect(DEFAULT_TAIL_CHARS).toBe(2000);
 		});

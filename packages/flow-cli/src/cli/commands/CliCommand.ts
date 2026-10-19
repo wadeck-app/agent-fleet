@@ -8,9 +8,9 @@ import {
 	warnUnknownArgs,
 } from '@wadeck-app/shared-cli/CliMetaCommands';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
-import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
+import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
-import { InvalidQueryError } from 'flow-core';
+import { FLOW_CONFIG_DIR_NAME, InvalidQueryError, createRemoteDaemonClient } from 'flow-core';
 import { FlowExecutor, StepRunner } from 'flow-engine';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
@@ -22,6 +22,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
+import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 // violations-suppress-end: ts/no-deep-relative
@@ -38,10 +39,9 @@ const PKG_NAME = '@wadeck-app/flow-cli';
  */
 async function setDaemonDraining(draining: boolean): Promise<void> {
 	try {
-		const client = createDaemonClient<{ setDraining?: (payload?: unknown) => Promise<unknown> }>({
-			configDir: ConfigDir.get('flow'),
-			commands: {},
-		});
+		const client = createRemoteDaemonClient<{ setDraining?: (payload?: unknown) => Promise<unknown> }>(
+			flowConfigDir()
+		);
 		await client.send('setDraining', { draining });
 	} catch (err) {
 		if (err instanceof DaemonNotRunningError) {
@@ -87,7 +87,7 @@ function getUpdaterPath(): string | null {
 // Checks are defined inline in the self-check command action below.
 
 export function buildCliCommand(): Command {
-	ConfigDir.migrateIfNeeded('flow');
+	ConfigDir.migrateIfNeeded(FLOW_CONFIG_DIR_NAME);
 
 	const cli = new Command('cli');
 	cli.description('Meta-commands for managing the flow CLI itself');
@@ -97,7 +97,7 @@ export function buildCliCommand(): Command {
 		.description('Show installed and available version')
 		.action(async () => {
 			const current = getCurrentVersion();
-			const channel = readChannelFromConfig(ConfigDir.get('flow'));
+			const channel = readChannelFromConfig(flowConfigDir());
 			await cliVersionCommand(PKG_NAME, current, channel);
 		});
 
@@ -125,7 +125,7 @@ export function buildCliCommand(): Command {
 				return;
 			}
 			if (opts.log) {
-				const logFile = path.join(ConfigDir.get('flow'), 'update-log.txt');
+				const logFile = path.join(flowConfigDir(), 'update-log.txt');
 				if (fs.existsSync(logFile)) {
 					process.stdout.write(fs.readFileSync(logFile, 'utf-8'));
 				} else {
@@ -135,7 +135,7 @@ export function buildCliCommand(): Command {
 			}
 			if (opts.check) {
 				const current = getCurrentVersion();
-				const channel = readChannelFromConfig(ConfigDir.get('flow'));
+				const channel = readChannelFromConfig(flowConfigDir());
 				await cliVersionCommand(PKG_NAME, current, channel);
 				return;
 			}
@@ -160,7 +160,7 @@ export function buildCliCommand(): Command {
 	cli.command('rollback')
 		.description('Restore the previously installed version')
 		.action(async () => {
-			await cliRollbackCommand(PKG_NAME, ConfigDir.get('flow'));
+			await cliRollbackCommand(PKG_NAME, flowConfigDir());
 		});
 
 	// flow cli self-check -- run health checks
@@ -286,7 +286,7 @@ export function buildCliCommand(): Command {
 		.option('-n, --lines <n>', 'Limit output to the last N lines (0 or negative = no limit)', '50')
 		.action(async (opts: { follow?: boolean; human?: boolean; lines?: string }) => {
 			try {
-				await logsCommand(ConfigDir.get('flow'), {
+				await logsCommand(flowConfigDir(), {
 					follow: opts.follow ?? false,
 					human: opts.human ?? false,
 					lines: parseInt(opts.lines ?? '50', 10),

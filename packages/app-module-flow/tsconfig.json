@@ -14,6 +14,7 @@
 		// Sources, not flow-core's build output: `npm run build --workspaces` visits this package before flow-core.
 		"paths": {
 			"flow-core": ["../flow-core/src/index"],
+			"flow-core/testing": ["../flow-core/src/testing/index"],
 			"extension-points": ["../extension-points/src/index"],
 			"flow-engine": ["../flow-engine/src/index"],
 			"flow-engine/*": ["../flow-engine/src/*"],

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ExecutionRecord } from '../execution/ExecutionRecord.js';
+import type { ExecutionState } from '../execution/ExecutionState.js';
 import { makeExec } from '../testing/makeExec.js';
 import { buildHistoryTable } from './HistoryTable.js';
 
 describe('buildHistoryTable', () => {
-	const execs: ExecutionRecord[] = [
+	const execs: ExecutionState[] = [
 		makeExec({
 			executionId: 'aaa',
 			flowId: 'task-retry',

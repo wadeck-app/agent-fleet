@@ -1,9 +1,9 @@
-import type { ExecutionRecord } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
+import type { ExecutionState } from '../execution/ExecutionState.js';
 import { toExecutionDetail, toExecutionSummary } from './ExecutionView.js';
 
-function record(partial: Partial<ExecutionRecord> = {}): ExecutionRecord {
+function record(partial: Partial<ExecutionState> = {}): ExecutionState {
 	return {
 		executionId: 'abc123',
 		flowId: 'deploy',

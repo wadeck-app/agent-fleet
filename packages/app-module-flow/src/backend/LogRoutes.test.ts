@@ -1,9 +1,9 @@
+import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { FlowQueryService, todayLogDate } from 'flow-core';
+import { FlowConfigFixture, callRoute, collectRoutes } from 'flow-core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { registerLogRoutes } from './LogRoutes.js';
-import { FlowConfigFixture } from './testing/FlowConfigFixture.js';
-import { callRoute, collectRoutes } from './testing/HttpDoubles.js';
 
 let fixture: FlowConfigFixture;
 let routes: ReturnType<typeof collectRoutes>['routes'];
@@ -13,7 +13,7 @@ const entry = (message: string): string =>
 
 beforeEach(() => {
 	fixture = new FlowConfigFixture();
-	const collected = collectRoutes();
+	const collected = collectRoutes<ModuleContext>();
 	routes = collected.routes;
 	registerLogRoutes(collected.ctx, FlowQueryService.forConfigDir(fixture.configDir));
 });

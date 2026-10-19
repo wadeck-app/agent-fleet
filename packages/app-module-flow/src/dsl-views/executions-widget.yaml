@@ -1,18 +1,27 @@
-# Dashboard widget: the five most recent executions.
+# Dashboard widget, built for a narrow cell (about 250-350px): two counters, then the five most recent runs as one
+# line each (status mark + flow name truncated, short age), then a link to the full list.
+# One precomputed source (GET /widgets/executions): the DSL cannot put a status mark in front of a name or print "5m".
+# Column widths are in 4px units and are what makes `truncate` bite: without a width the cell grows with its text.
 $sources:
-    executions:
-        url: GET /api/modules/flow/executions
-        params:
-            limit: '5'
+    recent:
+        url: GET /api/modules/flow/widgets/executions
+        poll: 30s
 
-$type: Card
+$type: VerticalStack
+gap: gap-2
 items:
+    - $type: HorizontalStack
+      gap: gap-2
+      items:
+          - { $type: StatTile, label: Running, value: $sources.recent.running }
+          - { $type: StatTile, label: Failed, value: $sources.recent.failed }
+
     - $type: DataTable
-      rows: $sources.executions.items
+      rows: $sources.recent.items
       navigateTo: '/modules/flow/executions/{executionId}'
       emptyMessage: No execution yet
       columns:
-          - { key: 'startedAt', label: 'Started', format: 'datetime' }
-          - { key: 'flowId', label: 'Flow' }
-          - { key: 'status', label: 'Status' }
-          - { key: 'duration', label: 'Duration' }
+          - { key: 'title', label: 'Recent', truncate: true, width: 36 }
+          - { key: 'when', label: 'Age', width: 20 }
+
+    - { $type: Link, label: $sources.recent.viewAllLabel, href: /modules/flow/executions }

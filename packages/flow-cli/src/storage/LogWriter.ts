@@ -1,3 +1,4 @@
+import { isLogFileName, logFileName, todayLogDate } from 'flow-core';
 import type { LiveLogEntry } from 'flow-engine/types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -35,7 +36,7 @@ export class LogWriter {
 			level: entry.level,
 			message: entry.message,
 		};
-		const filePath = path.join(this.logsDir, `${this.todayDate()}.ndjson`);
+		const filePath = path.join(this.logsDir, logFileName(this.todayDate()));
 		try {
 			fs.appendFileSync(filePath, JSON.stringify(line) + '\n', 'utf8');
 		} catch (err) {
@@ -51,7 +52,7 @@ export class LogWriter {
 			level,
 			message,
 		};
-		const filePath = path.join(this.logsDir, `${this.todayDate()}.ndjson`);
+		const filePath = path.join(this.logsDir, logFileName(this.todayDate()));
 		try {
 			fs.appendFileSync(filePath, JSON.stringify(line) + '\n', 'utf8');
 		} catch (err) {
@@ -61,7 +62,7 @@ export class LogWriter {
 	}
 
 	private todayDate(): string {
-		return new Date().toISOString().slice(0, 10);
+		return todayLogDate();
 	}
 
 	private rotate(): void {
@@ -71,10 +72,7 @@ export class LogWriter {
 		const limit = Math.min(this.retainDays, HARD_CAP);
 		let files: string[];
 		try {
-			files = fs
-				.readdirSync(this.logsDir)
-				.filter(f => /^\d{4}-\d{2}-\d{2}\.ndjson$/.test(f))
-				.sort();
+			files = fs.readdirSync(this.logsDir).filter(isLogFileName).sort();
 		} catch {
 			return;
 		}

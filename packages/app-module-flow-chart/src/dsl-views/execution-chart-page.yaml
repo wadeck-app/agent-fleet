@@ -1,0 +1,7 @@
+# Chart of one run: the flow definition with each step colored by its status, mounted at
+# /modules/flow-chart/executions/:id. The component loads GET /api/modules/flow-chart/graph itself and
+# links back to /modules/flow/executions/<id> (it needs the id, which a DSL string cannot be concatenated with).
+$type: PageContent
+sections:
+    - $type: flow-chart:FlowGraph
+      executionId: $route.id

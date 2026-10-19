@@ -7,6 +7,7 @@ import type {
 	WorkspaceProvider,
 } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
+import { executionsDirOf, generateExecutionId, logsDirOf } from 'flow-core';
 import { FlowValidator, WorkspaceManager } from 'flow-engine';
 import { FlowScheduler, buildSubStepFeedback } from 'flow-engine';
 import type { ReadyItem, SchedulerContext, SchedulerStep } from 'flow-engine';
@@ -22,7 +23,7 @@ import type { WebSocket } from 'ws';
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
 import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
-import { ExecutionStore, generateExecutionId } from '../storage/ExecutionStore';
+import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { AssignmentLedger } from './AssignmentLedger.js';
 import { writeDaemonLog } from './DaemonLog.js';
@@ -205,8 +206,8 @@ export class CommandHandler {
 	) {
 		if (interactivityPolicy !== undefined) this.interactivityPolicy = interactivityPolicy;
 		this.stalledSteps = new StalledStepWatch(stalledStepLimitMs);
-		this.executionStore = executionStore ?? new ExecutionStore(path.join(daemonDir, 'executions'));
-		this.logWriter = logWriter ?? new LogWriter(path.join(daemonDir, 'logs'));
+		this.executionStore = executionStore ?? new ExecutionStore(executionsDirOf(daemonDir));
+		this.logWriter = logWriter ?? new LogWriter(logsDirOf(daemonDir));
 	}
 
 	dispatchHook(
@@ -584,7 +585,7 @@ export class CommandHandler {
 				if (step.type !== 'model' && step.type !== 'script') continue;
 				step.env = { ...(step.env ?? {}), ...overlay };
 				const banner = `MOCK: step '${step.id}' output replaced by ${cmd.mockConfigPath ?? '--mock-config'}`;
-				writeDaemonLog(path.join(this.daemonDir, 'logs'), 'info', `⚠ ${banner}`);
+				writeDaemonLog(logsDirOf(this.daemonDir), 'info', `⚠ ${banner}`);
 				this.logWriter.writeExecution(executionId, `⚠ ${banner}`, 'info');
 			}
 		}

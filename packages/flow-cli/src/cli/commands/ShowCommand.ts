@@ -1,4 +1,3 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
 import type { Command } from 'commander';
 import {
 	DEFAULT_TAIL_CHARS,
@@ -10,13 +9,9 @@ import {
 import type { FlowDefinition } from 'flow-engine/types';
 import * as fs from 'node:fs';
 
+import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { loadYaml } from '../../utils/loadYaml';
-
-/** Default flow config directory, resolved lazily so ConfigDir is read at run time. */
-function defaultConfigDir(): string {
-	return ConfigDir.get('flow');
-}
 
 function isExistingFile(target: string): boolean {
 	try {
@@ -73,7 +68,7 @@ function showExecution(
 	}
 }
 
-export function registerShowCommand(program: Command, getConfigDir: () => string = defaultConfigDir): void {
+export function registerShowCommand(program: Command, getConfigDir: () => string = flowConfigDir): void {
 	program
 		.command('show <target>')
 		.description(

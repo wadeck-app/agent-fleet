@@ -1,5 +1,7 @@
 # Execution detail (`flow show <id>`), mounted at /modules/flow/executions/:id. ":id" of the manifest path is $route.id.
 # ?tail=<chars> sets how much of a failed step's output is kept; ?full=true lifts the limit.
+# Slot "flow:execution-actions" (manifest expose.slots): other modules add buttons beside the badges. Their views are
+# rendered with this page's context, so they can read $route.id and $sources.execution.<field> (whole-string expressions only).
 $sources:
     execution:
         # A placeholder is filled from params; the module id stays literal.
@@ -8,6 +10,8 @@ $sources:
             id: $route.id
             tail: $urlParam.tail
             full: $urlParam.full
+    actions:
+        url: GET /api/slots/flow:execution-actions
 
 $type: PageContent
 sections:
@@ -23,10 +27,19 @@ sections:
     - $type: HorizontalStack
       gap: gap-3
       align: items-center
+      justify: justify-between
       items:
-          - { $type: Badge, label: $sources.execution.status }
-          - { $type: Badge, label: $sources.execution.duration, variant: info }
-          - { $type: Badge, label: $sources.execution.startedAt, variant: default }
+          - $type: HorizontalStack
+            gap: gap-3
+            align: items-center
+            items:
+                - { $type: Badge, label: $sources.execution.status }
+                - { $type: Badge, label: $sources.execution.duration, variant: info }
+                - { $type: Badge, label: $sources.execution.startedAt, variant: default }
+
+          # Renders nothing while no module contributes.
+          - $type: ExtensionSlot
+            items: $sources.actions
 
     - $type: Section
       title: Steps

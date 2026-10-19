@@ -50,7 +50,12 @@ describe('logsCommand', () => {
 	});
 
 	// Manual runtime: the test decides when a poll tick and the interrupt happen, no real timer, no real signal.
-	function manualRuntime(): { runtime: FollowRuntime; tick: () => void; interrupt: () => void; stopped: () => boolean } {
+	function manualRuntime(): {
+		runtime: FollowRuntime;
+		tick: () => void;
+		interrupt: () => void;
+		stopped: () => boolean;
+	} {
 		let tickHandler: (() => void) | undefined;
 		let interruptHandler: (() => void) | undefined;
 		let isStopped = false;

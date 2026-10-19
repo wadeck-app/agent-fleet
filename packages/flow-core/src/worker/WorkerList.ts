@@ -1,5 +1,10 @@
-import { DaemonNotRunningError, createDaemonClient, readPortFile } from '@wadeck-app/singleton-daemon-kit';
+import { DaemonNotRunningError, readPortFile } from '@wadeck-app/singleton-daemon-kit';
 
+import {
+	createRemoteDaemonClient,
+	isUnknownCommandError,
+	outdatedDaemonMessage,
+} from '../daemon/RemoteDaemonClient.js';
 import { FlowCoreError, errorMessage } from '../errors.js';
 import type { DaemonStatus } from './WorkerListing.js';
 import type { WorkerSummary } from './WorkerSummary.js';
@@ -55,14 +60,8 @@ export async function describeRunningDaemon(daemonDir: string, needed: boolean):
  */
 export async function readWorkerList(daemonDir: string): Promise<WorkerListSnapshot> {
 	try {
-		// The command is declared optional and left unimplemented on purpose: a local
-		// handler here would be used as an in-process fallback and would answer with
-		// its own empty list, so the listing would report "no workers" while a
-		// daemon with live workers was running.
-		const client = createDaemonClient<{ workers?: () => Promise<WorkerSummary[]> }>({
-			configDir: daemonDir,
-			commands: {},
-		});
+		// Declared optional: the client has no local implementation (see createRemoteDaemonClient).
+		const client = createRemoteDaemonClient<{ workers?: () => Promise<WorkerSummary[]> }>(daemonDir);
 		const workers = (await client.send('workers', undefined)) as WorkerSummary[];
 		return { workers, daemon: await describeRunningDaemon(daemonDir, workers.length === 0) };
 	} catch (err) {
@@ -70,14 +69,8 @@ export async function readWorkerList(daemonDir: string): Promise<WorkerListSnaps
 			return { workers: [], daemon: { running: false, reason: err.message } };
 		}
 		const message = errorMessage(err);
-		if (/unknown command/i.test(message)) {
-			// The daemon is a long-lived process, so it can predate the CLI asking it
-			// something new. Saying "unknown command" alone sends the user looking for a
-			// typo in their own command line.
-			throw new WorkerListError(
-				'The running daemon does not support "flow worker list" -- it started before this command existed. Restart it with "flow stop" then "flow start", or run "flow cli update" first if its version is older than this CLI.',
-				'daemon-outdated'
-			);
+		if (isUnknownCommandError(message)) {
+			throw new WorkerListError(outdatedDaemonMessage('flow worker list'), 'daemon-outdated');
 		}
 		throw new WorkerListError(message, 'daemon-error');
 	}

@@ -12,6 +12,6 @@
 		}
 	},
 	"include": ["src"],
-	"exclude": ["dist", "**/*.test.ts", "src/testing"],
+	"exclude": ["dist", "**/*.test.ts"],
 	"references": [{ "path": "../extension-points" }, { "path": "../flow-engine" }]
 }

@@ -38,6 +38,7 @@ const PACKAGES = [
 	'web-frontend',
 	'flow-core',
 	'app-module-flow',
+	'app-module-flow-chart',
 	'flow-engine',
 	'orchestrator',
 	'worker',

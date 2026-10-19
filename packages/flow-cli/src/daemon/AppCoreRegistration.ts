@@ -1,8 +1,5 @@
 import { describeRegistration, describeRegistrationFailure, registerModule } from '@wadeck-app/app-core-sdk/register';
 
-/** Must equal the `id` of packages/app-module-flow/manifest.json: app-core refuses a registration under another id. */
-export const APP_CORE_MODULE_ID = 'flow';
-
 export interface AppCoreDiagnostic {
 	level: 'info' | 'error';
 	source: string;
@@ -10,7 +7,7 @@ export interface AppCoreDiagnostic {
 }
 
 /**
- * Tells a running app-core where flow's app-module lives (POST /api/modules/register, which also reloads a
+ * Tells a running app-core where an app-module of flow lives (POST /api/modules/register, which also reloads a
  * module it already knows). Everything app-core answers is reported through `logDiagnostic`, a refusal with
  * its own reason at error level. app-core being absent is a normal state (the SDK answers `deferred` or
  * `skipped`), reported as information, not as an error. Best-effort: never throws, so neither the daemon
@@ -18,7 +15,9 @@ export interface AppCoreDiagnostic {
  */
 export async function registerWithAppCore(
 	manifestPath: string,
-	logDiagnostic: (entry: AppCoreDiagnostic) => void
+	logDiagnostic: (entry: AppCoreDiagnostic) => void,
+	/** Must equal the `id` of the manifest: app-core refuses a registration under another id. */
+	moduleId: string
 ): Promise<void> {
 	const report = (entry: AppCoreDiagnostic): void => {
 		try {
@@ -29,11 +28,11 @@ export async function registerWithAppCore(
 		}
 	};
 	try {
-		const outcome = await registerModule({ id: APP_CORE_MODULE_ID, manifestPath });
+		const outcome = await registerModule({ id: moduleId, manifestPath });
 		report({
 			level: outcome.status === 'refused' ? 'error' : 'info',
 			source: 'AppCoreRegistration',
-			message: describeRegistration(outcome, APP_CORE_MODULE_ID),
+			message: describeRegistration(outcome, moduleId),
 		});
 	} catch (err) {
 		report({ level: 'error', source: 'AppCoreRegistration', message: describeRegistrationFailure(err) });

@@ -1,7 +1,8 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
-import { DaemonNotRunningError, createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
+import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
+import { createRemoteDaemonClient } from 'flow-core';
 
+import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import type { ClientCommand, DaemonResponse } from '../../ipc/Protocol';
 
@@ -20,12 +21,12 @@ export function registerResumeCommand(program: Command): void {
 		)
 		.option('--json', 'Machine-readable output')
 		.action(async (executionId: string, options: { json?: boolean }) => {
-			const daemonDir = ConfigDir.get('flow');
+			const daemonDir = flowConfigDir();
 			const cmd: Extract<ClientCommand, { type: 'resume' }> = { type: 'resume', executionId };
 
 			let response: DaemonResponse;
 			try {
-				response = (await createDaemonClient<FlowCommands>({ configDir: daemonDir, commands: {} }).send(
+				response = (await createRemoteDaemonClient<FlowCommands>(daemonDir).send(
 					'resume',
 					cmd
 				)) as DaemonResponse;

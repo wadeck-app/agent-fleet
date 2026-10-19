@@ -10,6 +10,7 @@
 		"paths": {
 			"extension-points": ["../extension-points/src/index"],
 			"flow-core": ["../flow-core/src/index"],
+			"flow-core/testing": ["../flow-core/src/testing/index"],
 			"flow-engine": ["../flow-engine/src"],
 			"flow-engine/*": ["../flow-engine/src/*"],
 			"shared-common": ["../shared-common/src"],

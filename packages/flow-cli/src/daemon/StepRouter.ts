@@ -1,4 +1,3 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
 import { cacheFilePath, readCache } from '@wadeck-app/shared-updater';
 import type {
 	StepDistributionProvider,
@@ -9,6 +8,7 @@ import type {
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
+import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { workerSatisfiesLabels } from './LabelMatcher.js';
 import { workerSatisfiesShell } from './ShellMatcher.js';
 import type { RegisteredWorker } from './WorkerRegistry.js';
@@ -60,11 +60,11 @@ export class DefaultWorkerAcceptance implements WorkerAcceptanceProvider {
 export class DefaultStepDistribution implements StepDistributionProvider {
 	/**
 	 * @param configDir - where this daemon's updater cache lives. Defaults to the real
-	 *        `flow` config dir (`ConfigDir.get('flow')`) so production needs no wiring; a
+	 *        `flow` config dir (`flowConfigDir()`) so production needs no wiring; a
 	 *        test passes its own tmp dir to control what `readLatestVersion` sees without
 	 *        touching the developer's real cache file.
 	 */
-	constructor(private readonly configDir: string = ConfigDir.get('flow')) {}
+	constructor(private readonly configDir: string = flowConfigDir()) {}
 
 	order(candidates: WorkerCandidate[]): WorkerCandidate[] {
 		const registered = this.preferUpToDate(candidates.filter(candidate => !candidate.ephemeral));

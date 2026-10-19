@@ -1,14 +1,15 @@
-import { ConfigDir } from '@wadeck-app/shared-cli';
 import type { Command } from 'commander';
-import { FlowQueryService, InvalidQueryError } from 'flow-core';
+import { FlowQueryService, InvalidQueryError, describeSkippedExecutions } from 'flow-core';
 import type { ExecutionFilterOptions } from 'flow-core';
 
-/** Default flow config directory, resolved lazily so ConfigDir is read at run time. */
-function defaultConfigDir(): string {
-	return ConfigDir.get('flow');
+import { flowConfigDir } from '../../config/FlowConfigDir.js';
+
+// stderr, so a piped table or --json document stays clean; the history itself is still shown.
+function warnAboutSkippedFiles(warning: string | undefined): void {
+	if (warning !== undefined) console.error(`[flow] warning: ${warning}`);
 }
 
-export function registerHistoryCommand(program: Command, getConfigDir: () => string = defaultConfigDir): void {
+export function registerHistoryCommand(program: Command, getConfigDir: () => string = flowConfigDir): void {
 	program
 		.command('history')
 		.description(
@@ -29,11 +30,14 @@ export function registerHistoryCommand(program: Command, getConfigDir: () => str
 			const service = FlowQueryService.forConfigDir(getConfigDir());
 			try {
 				if (!opts.json) {
-					console.log(service.renderHistory(opts));
+					const { text, skippedWarning } = service.renderHistoryReport(opts);
+					console.log(text);
+					warnAboutSkippedFiles(skippedWarning);
 					return;
 				}
 				// Same selection as the table, but raw records
-				const { items } = service.listExecutions(opts);
+				const { items, skipped } = service.listExecutions(opts);
+				warnAboutSkippedFiles(describeSkippedExecutions(skipped));
 				const output = opts.id && items.length === 1 ? items[0] : items;
 				process.stdout.write(JSON.stringify(output) + '\n');
 			} catch (err) {

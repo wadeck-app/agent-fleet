@@ -1,4 +1,6 @@
+import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { DEFAULT_HISTORY_LIMIT } from 'flow-core';
+import { FlowConfigFixture, collectRoutes } from 'flow-core/testing';
 import { load } from 'js-yaml';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -6,8 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import backend from './index.js';
-import { FlowConfigFixture } from './testing/FlowConfigFixture.js';
-import { collectRoutes } from './testing/HttpDoubles.js';
 
 const configDirectory = vi.hoisted(() => ({ get: vi.fn<(appName: string) => string>() }));
 vi.mock('@wadeck-app/shared-cli/ConfigDir', () => ({ ConfigDir: configDirectory }));
@@ -25,7 +25,9 @@ interface ManifestPoint {
 }
 const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf8')) as {
 	extensionPoints: ManifestPoint[];
+	expose?: { slots?: Record<string, { accepts: string[] }> };
 };
+const SLOT_URL = /^GET \/api\/slots\/flow:([a-z][a-z0-9-]*)$/;
 
 interface ParsedView {
 	file: string;
@@ -107,6 +109,15 @@ describe('executions page', () => {
 	});
 });
 
+describe('executions page flow filter', () => {
+	it('links each flow row to ?flow=<flowId>, the URL parameter the executions source forwards', () => {
+		const view = parseView('executions-page.yaml');
+		expect(collectStrings(view.document, 'navigateTo')).toContain('/modules/flow/executions?flow={flowId}');
+		const executions = sourcesOf(view).find(source => source.name === 'executions');
+		expect(executions?.spec.params?.['flow']).toBe('$urlParam.flow');
+	});
+});
+
 describe('every $sources url is served by the backend', () => {
 	let registered: Set<string>;
 
@@ -114,7 +125,7 @@ describe('every $sources url is served by the backend', () => {
 		// The module is not loaded by app-core here: only the routes it would register matter.
 		const fixture = new FlowConfigFixture();
 		configDirectory.get.mockReturnValue(fixture.configDir);
-		const { routes, ctx } = collectRoutes();
+		const { routes, ctx } = collectRoutes<ModuleContext>();
 		backend(ctx);
 		registered = new Set(routes.keys());
 		fixture.dispose();
@@ -123,6 +134,8 @@ describe('every $sources url is served by the backend', () => {
 	it.each(viewFiles)('%s', file => {
 		const view = parseView(file);
 		for (const { name, spec } of sourcesOf(view)) {
+			// A slot source is served by app-core itself (GET /api/slots/flow:<slot>), checked in 'extension slots'.
+			if (SLOT_URL.test(spec.url)) continue;
 			const match = /^GET \/api\/modules\/flow(\/[^?\s]*)(\?.*)?$/.exec(spec.url);
 			expect(
 				match,
@@ -186,5 +199,68 @@ describe('every link and row navigation lands on a page of the manifest', () => 
 				).toContain(name);
 			}
 		}
+	});
+});
+
+describe('extension slots', () => {
+	const exposed = Object.keys(manifest.expose?.slots ?? {});
+
+	/** Slot names a view embeds: ExtensionSlot items point at a source that GETs /api/slots/flow:<name>. */
+	function embeddedSlots(file: string): string[] {
+		const view = parseView(file);
+		const sources = new Map(sourcesOf(view).map(source => [source.name, source.spec.url]));
+		return collectNodes(view.document, 'ExtensionSlot').map(node => {
+			const items = String(node['items']);
+			const url = sources.get(items.replace('$sources.', ''));
+			const match = url === undefined ? null : SLOT_URL.exec(url);
+			if (!items.startsWith('$sources.') || match === null) {
+				throw new Error(
+					`${file}: ExtensionSlot items '${items}' must be a $sources entry 'GET /api/slots/flow:<slot>', got '${String(url)}'`
+				);
+			}
+			return match[1]!;
+		});
+	}
+
+	it('embeds execution-actions in the execution detail page', () => {
+		expect(embeddedSlots('execution-detail-page.yaml')).toEqual(['execution-actions']);
+	});
+
+	it('embeds executions-actions in the executions page', () => {
+		expect(embeddedSlots('executions-page.yaml')).toEqual(['executions-actions']);
+	});
+
+	it('embeds only slots the manifest exposes, and every exposed slot is embedded somewhere', () => {
+		const embedded = viewFiles.flatMap(file => embeddedSlots(file));
+		for (const name of embedded) expect(exposed, `slot ${name} is not in expose.slots`).toContain(name);
+		for (const name of exposed) expect(embedded, `slot ${name} is exposed but no view embeds it`).toContain(name);
+	});
+
+	it('keeps the PageHeader subtitle: headerActions would drop it, so the slot sits in its own row', () => {
+		for (const file of ['execution-detail-page.yaml', 'executions-page.yaml']) {
+			for (const header of collectNodes(parseView(file).document, 'PageHeader')) {
+				expect(header, file).not.toHaveProperty('headerActions');
+			}
+		}
+	});
+});
+
+describe('dashboard widget', () => {
+	const widgetPoint = manifest.extensionPoints.find(point => point.kind === 'widget' && point.slot === 'dashboard');
+
+	it('reads the single precomputed widget route and links to the executions page and the detail page', () => {
+		expect(widgetPoint, 'manifest.json declares no dashboard widget').toBeDefined();
+		const view = parseView(widgetPoint!.view.value.replace('./src/dsl-views/', ''));
+		expect(sourcesOf(view).map(source => source.spec.url)).toEqual([`GET ${MODULE_API_PREFIX}/widgets/executions`]);
+		expect(collectStrings(view.document, 'href')).toEqual([`${MODULE_PAGE_PREFIX}/executions`]);
+		expect(collectStrings(view.document, 'navigateTo')).toEqual([`${MODULE_PAGE_PREFIX}/executions/{executionId}`]);
+	});
+
+	it('shows only columns the widget route sends (a typo would render empty cells)', () => {
+		const view = parseView(widgetPoint!.view.value.replace('./src/dsl-views/', ''));
+		const columns = collectNodes(view.document, 'DataTable').flatMap(
+			table => table['columns'] as { key: string }[]
+		);
+		expect(columns.map(column => column.key)).toEqual(['title', 'when']);
 	});
 });

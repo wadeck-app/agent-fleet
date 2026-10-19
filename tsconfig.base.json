@@ -21,6 +21,7 @@
 			"e2e-web/*": ["./packages/e2e-web/src/*"],
 			"flow-cli/*": ["./packages/flow-cli/src/*"],
 			"flow-core": ["./packages/flow-core/src/index"],
+			"flow-core/testing": ["./packages/flow-core/src/testing/index"],
 			"flow-engine": ["./packages/flow-engine/src/index"],
 			"flow-engine/*": ["./packages/flow-engine/src/*"],
 			"orchestrator/*": ["./packages/orchestrator/src/*"],

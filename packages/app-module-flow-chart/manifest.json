@@ -1,0 +1,62 @@
+{
+	"id": "flow-chart",
+	"requires": {
+		"flow": ">=0.0.0-0"
+	},
+	"dslLib": {
+		"shared": {
+			"react": "^19",
+			"react-router-dom": "^7",
+			"@wadeck-app/dsl-ui": ">=2026.10.3-0",
+			"@wadeck-app/dsl-renderer": ">=2026.10.14-0"
+		}
+	},
+	"extensionPoints": [
+		{
+			"kind": "widget",
+			"slot": "flow:execution-actions",
+			"label": "See flow chart",
+			"view": {
+				"type": "path",
+				"value": "./src/dsl-views/execution-action.yaml"
+			}
+		},
+		{
+			"kind": "widget",
+			"slot": "flow:executions-actions",
+			"label": "Flow charts",
+			"view": {
+				"type": "path",
+				"value": "./src/dsl-views/executions-action.yaml"
+			}
+		},
+		{
+			"kind": "page",
+			"slot": "nav",
+			"label": "Flow Charts",
+			"path": "/flows",
+			"view": {
+				"type": "path",
+				"value": "./src/dsl-views/flows-page.yaml"
+			}
+		},
+		{
+			"kind": "page",
+			"slot": "route",
+			"path": "/flows/:flowId",
+			"view": {
+				"type": "path",
+				"value": "./src/dsl-views/flow-chart-page.yaml"
+			}
+		},
+		{
+			"kind": "page",
+			"slot": "route",
+			"path": "/executions/:id",
+			"view": {
+				"type": "path",
+				"value": "./src/dsl-views/execution-chart-page.yaml"
+			}
+		}
+	]
+}

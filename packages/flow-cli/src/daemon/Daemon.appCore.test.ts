@@ -25,7 +25,7 @@ function readDaemonLog(): { level: string; msg: string }[] {
 		.map(line => JSON.parse(line) as { level: string; msg: string });
 }
 
-async function startDaemon(options: { appCoreModule?: { manifestPath: string } }) {
+async function startDaemon(options: { appCoreModules?: { id: string; manifestPath: string }[] }) {
 	const { Daemon } = await import('./Daemon.js');
 	const { FlowConfigLoader } = await import('../config/FlowConfig.js');
 	return Daemon.start(
@@ -48,12 +48,15 @@ describe('Daemon registration of the app-module with app-core', () => {
 			}
 		);
 
-		const handle = await startDaemon({ appCoreModule: { manifestPath: '/abs/dist-module/manifest.json' } });
+		const handle = await startDaemon({
+			appCoreModules: [{ id: 'flow', manifestPath: '/abs/dist-module/manifest.json' }],
+		});
 		try {
 			await vi.waitFor(() => expect(registration.registerWithAppCore).toHaveBeenCalledTimes(1), {
 				timeout: 2000,
 			});
 			expect(registration.registerWithAppCore.mock.calls[0]![0]).toBe('/abs/dist-module/manifest.json');
+			expect(registration.registerWithAppCore.mock.calls[0]![2]).toBe('flow');
 			await vi.waitFor(() =>
 				expect(readDaemonLog().map(e => e.msg)).toContain('[AppCoreRegistration] app-core refused: reason')
 			);
@@ -75,7 +78,7 @@ describe('Daemon registration of the app-module with app-core', () => {
 	it('starts normally when the registration function rejects (best-effort: a broken app-core must not stop the daemon)', async () => {
 		registration.registerWithAppCore.mockRejectedValue(new Error('unexpected'));
 
-		const handle = await startDaemon({ appCoreModule: { manifestPath: '/abs/manifest.json' } });
+		const handle = await startDaemon({ appCoreModules: [{ id: 'flow', manifestPath: '/abs/manifest.json' }] });
 		try {
 			await vi.waitFor(() => expect(registration.registerWithAppCore).toHaveBeenCalled(), { timeout: 2000 });
 			expect(readDaemonLog().map(e => e.msg)).toContain('Daemon started');
@@ -83,6 +86,62 @@ describe('Daemon registration of the app-module with app-core', () => {
 				expect(
 					readDaemonLog().some(
 						e => e.level === 'error' && e.msg.includes('app-core') && e.msg.includes('unexpected')
+					)
+				).toBe(true)
+			);
+		} finally {
+			await handle.stop('idle');
+		}
+	});
+
+	it('registers flow first then flow-chart, one after the other (flow-chart requires flow)', async () => {
+		const order: string[] = [];
+		// flow stays pending until released: a registration that does not wait for it would start flow-chart meanwhile.
+		let releaseFlow!: () => void;
+		const flowGate = new Promise<void>(resolve => {
+			releaseFlow = resolve;
+		});
+		registration.registerWithAppCore.mockImplementation(async (_path: string, _log: unknown, id: string) => {
+			order.push(`start ${id}`);
+			if (id === 'flow') await flowGate;
+			order.push(`end ${id}`);
+		});
+
+		const handle = await startDaemon({
+			appCoreModules: [
+				{ id: 'flow', manifestPath: '/abs/flow/manifest.json' },
+				{ id: 'flow-chart', manifestPath: '/abs/chart/manifest.json' },
+			],
+		});
+		try {
+			await vi.waitFor(() => expect(order).toEqual(['start flow']), { timeout: 2000 });
+			releaseFlow();
+			await vi.waitFor(() => expect(order).toHaveLength(4), { timeout: 2000 });
+			expect(order).toEqual(['start flow', 'end flow', 'start flow-chart', 'end flow-chart']);
+		} finally {
+			await handle.stop('idle');
+		}
+	});
+
+	it('still registers flow-chart when the flow registration rejects, and logs the failure naming the module', async () => {
+		registration.registerWithAppCore.mockImplementation(async (_path: string, _log: unknown, id: string) => {
+			if (id === 'flow') throw new Error('unexpected');
+		});
+
+		const handle = await startDaemon({
+			appCoreModules: [
+				{ id: 'flow', manifestPath: '/abs/flow/manifest.json' },
+				{ id: 'flow-chart', manifestPath: '/abs/chart/manifest.json' },
+			],
+		});
+		try {
+			await vi.waitFor(() => expect(registration.registerWithAppCore).toHaveBeenCalledTimes(2), {
+				timeout: 2000,
+			});
+			await vi.waitFor(() =>
+				expect(
+					readDaemonLog().some(
+						e => e.level === 'error' && e.msg.includes('"flow"') && e.msg.includes('unexpected')
 					)
 				).toBe(true)
 			);

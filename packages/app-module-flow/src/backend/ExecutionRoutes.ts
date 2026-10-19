@@ -6,10 +6,11 @@ import {
 	type FlowQueryService,
 	InvalidQueryError,
 	renderExecutionDetail,
+	toExecutionDetail,
+	toExecutionSummary,
 } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
-import { toExecutionDetail, toExecutionSummary } from './ExecutionView.js';
 import { type QueryParams, optionalBoolean, optionalInteger, optionalString } from './QueryParameters.js';
 
 export const MAX_EXECUTIONS_LIMIT = 500;
@@ -49,7 +50,10 @@ function readOffset(query: QueryParams, pageSize: number): number | undefined {
 	return fromPage;
 }
 
-/** `GET /executions` (history) and `GET /executions/:id` (detail): `flow history` and `flow show`. */
+/**
+ * `GET /executions` (history), `GET /executions/:id` (detail) and `GET /flows` (distinct flows, to filter the history by):
+ * `flow history` and `flow show`.
+ */
 export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQueryService): void {
 	ctx.registerRoute('GET', '/executions', (req, reply) => {
 		const query = (req as { query?: QueryParams }).query ?? {};
@@ -66,10 +70,20 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const body = {
 				items: page.items.map(toExecutionSummary),
 				total: page.total,
+				// Execution files that could not be read: the list is incomplete by this many, so a client can say so.
+				skipped: page.skipped.length,
 				limit: limit ?? DEFAULT_HISTORY_LIMIT,
 				offset: offset ?? 0,
 			};
 			return reply.code(200).send(body);
+		} catch (err) {
+			return replyWithError(reply, err);
+		}
+	});
+
+	ctx.registerRoute('GET', '/flows', (_req, reply) => {
+		try {
+			return reply.code(200).send({ flows: service.listFlows() });
 		} catch (err) {
 			return replyWithError(reply, err);
 		}

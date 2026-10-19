@@ -1,0 +1,99 @@
+import { FLOW_APP_MODULE_ID, FLOW_CHART_APP_MODULE_ID, FLOW_EXPOSED_SLOTS } from 'flow-core';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { satisfies, valid } from 'semver';
+import { describe, expect, it } from 'vitest';
+
+const packageDir = join(dirname(fileURLToPath(import.meta.url)), '../..');
+interface Manifest {
+	id?: string;
+	version?: unknown;
+	backendEntryPath?: unknown;
+	requires?: Record<string, string>;
+	expose?: { slots?: Record<string, { accepts: string[] }> };
+	dslLib?: { shared?: Record<string, string> };
+	extensionPoints: { kind: string; slot: string; path?: string; view: { type: string; value: string } }[];
+}
+
+const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf8')) as Manifest;
+// The slot prefix a contributor writes to fill a slot of the flow module.
+const flowSlotPrefix = `${FLOW_APP_MODULE_ID}:`;
+
+describe('manifest.json (source manifest of the app-core-cli layout)', () => {
+	it('declares the id the module is registered under', () => {
+		expect(manifest.id).toBe(FLOW_CHART_APP_MODULE_ID);
+	});
+
+	it('holds neither version nor backendEntryPath: `app-core-cli package` stamps the first and fixes the second', () => {
+		expect(manifest).not.toHaveProperty('version');
+		expect(manifest).not.toHaveProperty('backendEntryPath');
+	});
+
+	it('references every view as ./src/dsl-views/<file> and each of them exists', () => {
+		const paths = manifest.extensionPoints.map(point => point.view.value);
+		expect(paths.length).toBeGreaterThan(0);
+		for (const path of paths) {
+			expect(path).toMatch(/^\.\/src\/dsl-views\/[\w.-]+\.ya?ml$/);
+			expect(existsSync(join(packageDir, path))).toBe(true);
+		}
+	});
+
+	it('offers the flow charts index in the nav and the two chart pages as routes', () => {
+		const summary = manifest.extensionPoints.filter(p => p.kind === 'page').map(p => `${p.slot}:${p.path}`);
+		expect(summary.sort()).toEqual(['nav:/flows', 'route:/executions/:id', 'route:/flows/:flowId']);
+	});
+
+	it('declares a dslLib (the FlowGraph and FlowChartLink components) with the shared ranges it was built against', () => {
+		expect(Object.keys(manifest.dslLib?.shared ?? {}).sort()).toEqual([
+			'@wadeck-app/dsl-renderer',
+			'@wadeck-app/dsl-ui',
+			'react',
+			'react-router-dom',
+		]);
+	});
+});
+
+describe('requirement on the flow module', () => {
+	it('requires flow: without it the slots it fills do not exist', () => {
+		expect(Object.keys(manifest.requires ?? {})).toEqual([FLOW_APP_MODULE_ID]);
+	});
+
+	// app-core matches with includePrerelease: CI stamps 2026.10.19-663-3ea4c829, a local build 0.1.0.
+	it.each(['2026.10.19-663-3ea4c829', '0.1.0', '2026.10.19', '0.0.0-test-integration'])(
+		'accepts the flow version %s',
+		version => {
+			const range = manifest.requires?.[FLOW_APP_MODULE_ID] ?? '';
+			expect(valid(version)).not.toBeNull();
+			expect(satisfies(version, range, { includePrerelease: true })).toBe(true);
+		}
+	);
+});
+
+describe('contributions to the slots of flow', () => {
+	const contributions = manifest.extensionPoints.filter(p => p.slot.startsWith(flowSlotPrefix));
+
+	it('fills only slots flow exposes (flow-core FLOW_EXPOSED_SLOTS)', () => {
+		expect(contributions.length).toBeGreaterThan(0);
+		for (const point of contributions) {
+			expect(Object.keys(FLOW_EXPOSED_SLOTS)).toContain(point.slot.slice(flowSlotPrefix.length));
+		}
+	});
+
+	it('uses a root $type the slot accepts (app-core validates the root only)', () => {
+		for (const point of contributions) {
+			const view = readFileSync(join(packageDir, point.view.value), 'utf8');
+			const root = /^\$type:\s*(\S+)\s*$/m.exec(view)?.[1];
+			expect(root, `${point.view.value} has no root $type`).toBeDefined();
+			expect(FLOW_EXPOSED_SLOTS[point.slot.slice(flowSlotPrefix.length)]).toContain(root);
+		}
+	});
+
+	it('fills the execution detail page and the executions list', () => {
+		expect(contributions.map(p => p.slot).sort()).toEqual(
+			Object.keys(FLOW_EXPOSED_SLOTS)
+				.map(slot => `${flowSlotPrefix}${slot}`)
+				.sort()
+		);
+	});
+});

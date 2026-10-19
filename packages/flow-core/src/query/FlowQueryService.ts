@@ -1,8 +1,14 @@
-import * as path from 'node:path';
-
+import { executionsDirOf } from '../config/FlowConfigLayout.js';
 import { FlowCoreError, errorMessage } from '../errors.js';
+import type { FlowGraphResult, FlowGraphTarget } from '../graph/FlowGraph.js';
+import { queryFlowGraph } from '../graph/FlowGraphQuery.js';
 import { type ExecutionFilterOptions, type FilteredExecutions, filterExecutions } from '../history/ExecutionFilter.js';
-import { loadExecutions } from '../history/ExecutionLoader.js';
+import {
+	type SkippedExecutionFile,
+	describeSkippedExecutions,
+	loadExecutionReport,
+} from '../history/ExecutionLoader.js';
+import { type FlowSummary, summarizeFlows } from '../history/FlowSummaries.js';
 import { buildHistoryTable } from '../history/HistoryTable.js';
 import { type LogReadResult, type ReadLogsOptions, readLogs } from '../logs/LogReader.js';
 import {
@@ -39,6 +45,21 @@ export interface FlowQueryServiceOptions extends FlowQueryDirectories {
 	 * listPlugins/describePlugin, which refuse to answer without them rather than list nothing.
 	 */
 	pluginManifests?: Record<string, PluginCatalogSource>;
+	/** Clock used to date daemon-derived explanations (default: the system clock); injected by tests. */
+	now?: () => number;
+}
+
+/** A page of executions plus the execution files that could not be read, so no host has to hide them. */
+export interface QueriedExecutions extends FilteredExecutions {
+	skipped: SkippedExecutionFile[];
+}
+
+/** The text `flow history` prints and the execution files it had to skip. */
+export interface RenderedHistory {
+	text: string;
+	skipped: SkippedExecutionFile[];
+	/** One-line warning about the skipped files; undefined when none. */
+	skippedWarning: string | undefined;
 }
 
 export interface WorkerListResult {
@@ -71,41 +92,68 @@ export class FlowQueryService {
 	static forConfigDir(configDir: string, pluginManifests?: Record<string, PluginCatalogSource>): FlowQueryService {
 		assertDirectory('configDir', configDir);
 		return new FlowQueryService({
-			executionsDir: path.join(configDir, 'executions'),
+			executionsDir: executionsDirOf(configDir),
 			configDir,
 			daemonDir: configDir,
 			pluginManifests,
 		});
 	}
 
-	readonly directories: FlowQueryDirectories;
+	/** Frozen: the locations are fixed for the life of the service. */
+	readonly directories: Readonly<FlowQueryDirectories>;
 	private readonly pluginManifests: Record<string, PluginCatalogSource> | undefined;
+	private readonly now: () => number;
 
 	constructor(options: FlowQueryServiceOptions) {
 		assertDirectory('executionsDir', options.executionsDir);
 		assertDirectory('configDir', options.configDir);
 		assertDirectory('daemonDir', options.daemonDir);
-		this.directories = {
+		this.directories = Object.freeze({
 			executionsDir: options.executionsDir,
 			configDir: options.configDir,
 			daemonDir: options.daemonDir,
-		};
+		});
 		this.pluginManifests = options.pluginManifests;
+		this.now = options.now ?? Date.now;
 	}
 
 	/** Executions, newest first, filtered and paginated by {@link filterExecutions}. */
-	listExecutions(filter: ExecutionFilterOptions): FilteredExecutions {
-		return filterExecutions(loadExecutions(this.directories.executionsDir), filter);
+	listExecutions(filter: ExecutionFilterOptions): QueriedExecutions {
+		const { executions, skipped } = loadExecutionReport(this.directories.executionsDir);
+		return { ...filterExecutions(executions, filter), skipped };
+	}
+
+	/** Distinct flows that have run, with their counts: the values `listExecutions({ flow })` accepts. */
+	listFlows(): FlowSummary[] {
+		return summarizeFlows(loadExecutionReport(this.directories.executionsDir).executions);
 	}
 
 	/** The text `flow history` prints (table, or detail view when `filter.id` is set). */
 	renderHistory(filter: ExecutionFilterOptions): string {
-		return buildHistoryTable(loadExecutions(this.directories.executionsDir), filter);
+		return this.renderHistoryReport(filter).text;
+	}
+
+	/** Like {@link renderHistory}, with the execution files that were skipped and a ready-made warning for them. */
+	renderHistoryReport(filter: ExecutionFilterOptions): RenderedHistory {
+		const { executions, skipped } = loadExecutionReport(this.directories.executionsDir);
+		return {
+			text: buildHistoryTable(executions, filter),
+			skipped,
+			skippedWarning: describeSkippedExecutions(skipped),
+		};
 	}
 
 	/** One execution by id or unique prefix. Throws ExecutionLookupError. */
 	getExecution(idOrPrefix: string): ResolvedExecution {
 		return resolveExecution(this.directories.executionsDir, idOrPrefix);
+	}
+
+	/**
+	 * Graph of a flow: nodes = steps, edges = depends / when / onFailure.goto / parent. With `executionId` the
+	 * nodes carry that run's step states. Throws ExecutionLookupError, FlowDefinitionError or FlowCoreError.
+	 */
+	getFlowGraph(target: FlowGraphTarget): FlowGraphResult {
+		return queryFlowGraph(this.directories.executionsDir, target);
 	}
 
 	/** The text `flow show <executionId>` prints. Throws ExecutionLookupError. */
@@ -132,7 +180,7 @@ export class FlowQueryService {
 			daemon,
 			declaredSources,
 			...(declaredSourcesError !== undefined ? { declaredSourcesError } : {}),
-			emptyExplanation: describeNoLiveWorkers(declaredSources, daemon, Date.now()),
+			emptyExplanation: describeNoLiveWorkers(declaredSources, daemon, this.now()),
 		};
 	}
 

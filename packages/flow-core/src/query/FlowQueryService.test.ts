@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FlowCoreError } from '../errors.js';
-import type { ExecutionRecord } from '../execution/ExecutionRecord.js';
+import type { ExecutionState } from '../execution/ExecutionState.js';
 import { ExecutionLookupError } from '../show/ExecutionDetail.js';
 import { makeExec } from '../testing/makeExec.js';
 import { WORKER_SOURCE_REGISTRY_FILE } from '../worker/WorkerSources.js';
@@ -27,7 +27,7 @@ describe('FlowQueryService', () => {
 	let root: string;
 	let service: FlowQueryService;
 
-	const writeExec = (id: string, overrides: Partial<ExecutionRecord>) => {
+	const writeExec = (id: string, overrides: Partial<ExecutionState>) => {
 		fs.writeFileSync(
 			path.join(root, 'executions', `${id}.json`),
 			JSON.stringify(makeExec({ executionId: id, ...overrides }))
@@ -81,6 +81,13 @@ describe('FlowQueryService', () => {
 			const failed = service.listExecutions({ status: 'failed' });
 			expect(failed.items.map(e => e.executionId)).toEqual(['bbb22222']);
 			expect(service.listExecutions({ limit: 1 })).toMatchObject({ total: 2 });
+		});
+
+		it('lists the distinct flows that ran, with their counts', () => {
+			expect(service.listFlows().map(f => [f.flowId, f.executionCount, f.failedCount])).toEqual([
+				['f2', 1, 1],
+				['f1', 1, 0],
+			]);
 		});
 
 		it('renders the history table or the detail view from the same filter', () => {
@@ -149,6 +156,18 @@ describe('FlowQueryService', () => {
 			expect(JSON.stringify(result)).not.toContain('tokenHash');
 		});
 
+		it('dates the daemon uptime with the injected clock', async () => {
+			kit.send.mockResolvedValue([]);
+			kit.readPortFile.mockResolvedValue({ pid: 42, port: 4000, startedAt: '2026-10-18T10:00:00.000Z' });
+			const clocked = new FlowQueryService({
+				...service.directories,
+				now: () => Date.parse('2026-10-18T10:00:05.000Z'),
+			});
+			const result = await clocked.listWorkers();
+			expect(result.emptyExplanation).toContain('It started recently');
+			expect(result.emptyExplanation).toContain('pid=42');
+		});
+
 		it('reports an unreadable registry as a warning and still explains the empty list', async () => {
 			kit.send.mockRejectedValue(new kit.DaemonNotRunningError('Daemon is not running'));
 			fs.writeFileSync(path.join(root, WORKER_SOURCE_REGISTRY_FILE), '{ broken');
@@ -160,6 +179,41 @@ describe('FlowQueryService', () => {
 		it('propagates a typed error when the daemon cannot answer', async () => {
 			kit.send.mockRejectedValue(new Error('socket hang up'));
 			await expect(service.listWorkers()).rejects.toMatchObject({ kind: 'daemon-error' });
+		});
+	});
+
+	describe('directories', () => {
+		it('cannot be mutated by a caller: the locations are fixed for the life of the service', () => {
+			expect(Object.isFrozen(service.directories)).toBe(true);
+			expect(() => {
+				(service.directories as { executionsDir: string }).executionsDir = '/elsewhere';
+			}).toThrow(TypeError);
+		});
+	});
+
+	describe('skipped execution files', () => {
+		it('listExecutions reports the unreadable files alongside the page', () => {
+			writeExec('good0001', {});
+			fs.writeFileSync(path.join(root, 'executions', 'broken.json'), '{ nope');
+			const page = service.listExecutions({});
+			expect(page.items.map(e => e.executionId)).toEqual(['good0001']);
+			expect(page.skipped).toHaveLength(1);
+			expect(page.skipped[0]!.file).toBe(path.join(root, 'executions', 'broken.json'));
+		});
+
+		it('renderHistoryReport gives the table, the skipped files and a one-line warning', () => {
+			writeExec('good0001', {});
+			fs.writeFileSync(path.join(root, 'executions', 'broken.json'), '{ nope');
+			const report = service.renderHistoryReport({});
+			expect(report.text).toContain('good0001');
+			expect(report.skipped).toHaveLength(1);
+			expect(report.skippedWarning).toMatch(/^1 execution file skipped: .*broken\.json \(not valid JSON/);
+			expect(service.renderHistory({})).toBe(report.text);
+		});
+
+		it('has no warning when every file is readable', () => {
+			writeExec('good0001', {});
+			expect(service.renderHistoryReport({}).skippedWarning).toBeUndefined();
 		});
 	});
 

@@ -2,19 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { ExecutionStore, generateExecutionId } from './ExecutionStore';
-
-describe('generateExecutionId', () => {
-	it('generates 8-char alphanumeric IDs', () => {
-		const id = generateExecutionId();
-		expect(id).toMatch(/^[a-z0-9]{8}$/);
-	});
-
-	it('generates unique IDs across multiple calls', () => {
-		const ids = new Set(Array.from({ length: 20 }, () => generateExecutionId()));
-		expect(ids.size).toBe(20);
-	});
-});
+import { ExecutionStore } from './ExecutionStore';
 
 describe('ExecutionStore', () => {
 	let tmpDir: string;

@@ -2,16 +2,21 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import type { AppModuleDescriptor } from '../daemon/AppModules';
+
 export type AppModuleVersion = { version: string } | { absent: true } | { error: string };
 
 export interface RegisterAfterUpdateDeps {
+	/** Id of the app-module, as app-core knows it. */
+	moduleId: string;
 	/** manifest.json of the app-module inside the installed package. */
 	manifestPath: string;
 	/** What `readAppModuleVersion` returned BEFORE the updater ran. */
 	before: AppModuleVersion;
 	register: (
 		manifestPath: string,
-		log: (entry: { level: string; source: string; message: string }) => void
+		log: (entry: { level: string; source: string; message: string }) => void,
+		moduleId: string
 	) => Promise<void>;
 	log: (line: string) => void;
 }
@@ -40,25 +45,27 @@ export async function registerAfterUpdate(deps: RegisterAfterUpdateDeps): Promis
 	const after = readAppModuleVersion(deps.manifestPath);
 
 	if ('error' in after) {
-		deps.log(`app-core: not re-registering the app-module, ${after.error}`);
+		deps.log(`app-core: not re-registering the app-module "${deps.moduleId}", ${after.error}`);
 		return;
 	}
 	if ('absent' in after) {
 		if (!('absent' in deps.before)) {
 			deps.log(
-				`app-core: the installed package no longer ships an app-module (${deps.manifestPath}), nothing to register`
+				`app-core: the installed package no longer ships the app-module "${deps.moduleId}" (${deps.manifestPath}), nothing to register`
 			);
 		}
 		return;
 	}
 	if ('version' in deps.before && deps.before.version === after.version) return;
-	await deps.register(deps.manifestPath, entry => deps.log(entry.message));
+	await deps.register(deps.manifestPath, entry => deps.log(entry.message), deps.moduleId);
 }
 
 export interface TrackAppModuleUpdateDeps {
 	/** Output of `npm root -g`, undefined when that command failed. */
 	npmRoot: string | undefined;
 	pkgName: string;
+	/** The modules to follow, in registration order (flow before the modules that require it). */
+	modules: readonly AppModuleDescriptor[];
 	register: RegisterAfterUpdateDeps['register'];
 	/** Progress and diagnostics of the registration (stdout). */
 	log: (line: string) => void;
@@ -67,26 +74,32 @@ export interface TrackAppModuleUpdateDeps {
 }
 
 /**
- * Wiring of {@link registerAfterUpdate} for the updater entry: locates the app-module manifest in the global
+ * Wiring of {@link registerAfterUpdate} for the updater entry: locates each app-module manifest in the global
  * install and reads its version NOW, so call it before the install replaces the files. The returned function
  * is to run once the update is over; it never throws (a failed registration must not fail an update that
- * succeeded), every reason for not registering is reported through `warn`.
+ * succeeded), every reason for not registering is reported through `warn`. Modules are handled one after the
+ * other in the given order, and a failure on one does not skip the next.
  */
 export function trackAppModuleUpdate(deps: TrackAppModuleUpdateDeps): () => Promise<void> {
 	if (deps.npmRoot === undefined) {
 		return async () => {
-			deps.warn('app-core: not re-registering the app-module, "npm root -g" failed earlier');
+			deps.warn('app-core: not re-registering the app-modules, "npm root -g" failed earlier');
 		};
 	}
-	const manifestPath = join(deps.npmRoot, deps.pkgName, 'app-module', 'manifest.json');
-	const before = readAppModuleVersion(manifestPath);
+	const npmRoot = deps.npmRoot;
+	const tracked = deps.modules.map(module => {
+		const manifestPath = join(npmRoot, deps.pkgName, module.bundleDir, 'manifest.json');
+		return { moduleId: module.id, manifestPath, before: readAppModuleVersion(manifestPath) };
+	});
 	return async () => {
-		try {
-			await registerAfterUpdate({ manifestPath, before, register: deps.register, log: deps.log });
-		} catch (err) {
-			deps.warn(
-				`app-core: re-registering the app-module failed (${String(err)}). Run \`flow cli update\` again or restart the flow daemon to register it`
-			);
+		for (const { moduleId, manifestPath, before } of tracked) {
+			try {
+				await registerAfterUpdate({ moduleId, manifestPath, before, register: deps.register, log: deps.log });
+			} catch (err) {
+				deps.warn(
+					`app-core: re-registering the app-module "${moduleId}" failed (${String(err)}). Run "flow cli update" again or restart the flow daemon to register it`
+				);
+			}
 		}
 	};
 }

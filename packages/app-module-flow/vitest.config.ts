@@ -26,6 +26,10 @@ export default defineConfig({
 		testTimeout: 30_000,
 	},
 	resolve: {
-		alias: { 'flow-core': path.resolve(__dirname, '../flow-core/src/index.ts') },
+		alias: {
+			// Specific entry first: a plain 'flow-core' key would also capture 'flow-core/testing'.
+			'flow-core/testing': path.resolve(__dirname, '../flow-core/src/testing/index.ts'),
+			'flow-core': path.resolve(__dirname, '../flow-core/src/index.ts'),
+		},
 	},
 });

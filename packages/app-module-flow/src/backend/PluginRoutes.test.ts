@@ -1,13 +1,14 @@
+import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { BUILTIN_PLUGIN_CATALOG, FlowQueryService } from 'flow-core';
+import { callRoute, collectRoutes } from 'flow-core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { registerPluginRoutes } from './PluginRoutes.js';
-import { callRoute, collectRoutes } from './testing/HttpDoubles.js';
 
 let routes: ReturnType<typeof collectRoutes>['routes'];
 
 beforeEach(() => {
-	const collected = collectRoutes();
+	const collected = collectRoutes<ModuleContext>();
 	routes = collected.routes;
 	registerPluginRoutes(collected.ctx, FlowQueryService.forConfigDir('/unused', BUILTIN_PLUGIN_CATALOG));
 });
@@ -67,7 +68,7 @@ describe('GET /plugins/:id', () => {
 	});
 
 	it('answers 500 saying what is missing when the service has no manifests (configuration error, never an empty list)', async () => {
-		const collected = collectRoutes();
+		const collected = collectRoutes<ModuleContext>();
 		registerPluginRoutes(collected.ctx, FlowQueryService.forConfigDir('/unused'));
 		const { status, body } = await callRoute(collected.routes, 'GET /plugins');
 		expect(status).toBe(500);

@@ -1,4 +1,6 @@
-import { type ExecutionRecord, type ResolvedExecution, type StepStateRecord, formatDuration } from 'flow-core';
+import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
+import { formatDuration } from '../history/ExecutionFormat.js';
+import type { ResolvedExecution } from '../show/ExecutionDetail.js';
 
 /** What a row of the executions table needs. Steps are counted, not sent: the list can hold hundreds of runs. */
 export interface ExecutionSummary {
@@ -43,7 +45,7 @@ export interface ExecutionDetailView extends ExecutionSummary {
 	text: string;
 }
 
-export function toExecutionSummary(record: ExecutionRecord): ExecutionSummary {
+export function toExecutionSummary(record: ExecutionState): ExecutionSummary {
 	const steps = Object.values(record.steps);
 	return {
 		executionId: record.executionId,
@@ -61,7 +63,7 @@ export function toExecutionSummary(record: ExecutionRecord): ExecutionSummary {
 	};
 }
 
-function toStepView(stepId: string, step: StepStateRecord): StepView {
+function toStepView(stepId: string, step: StepState): StepView {
 	const meta = step.meta as { model?: string; cost?: { usd: number } } | undefined;
 	return {
 		stepId,

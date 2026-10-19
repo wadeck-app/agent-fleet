@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { InvalidQueryError } from '../errors.js';
-import { logFilePath, readAppendedLog, readLogs, todayLogDate } from './LogReader.js';
+import { isLogFileName, logFileName, logFilePath, readAppendedLog, readLogs, todayLogDate } from './LogReader.js';
 
 describe('LogReader', () => {
 	let configDir: string;
@@ -99,5 +99,21 @@ describe('LogReader', () => {
 			fs.appendFileSync(file, JSON.stringify({ ts: '2026-10-18T10:00:00.000Z', msg: 'late' }) + '\n');
 			expect(readAppendedLog(file, 0, { human: true })?.text).toMatch(/\[INFO \] late\n$/);
 		});
+	});
+});
+
+describe('logFileName', () => {
+	it('is what isLogFileName recognises', () => {
+		expect(logFileName('2026-10-18')).toBe('2026-10-18.ndjson');
+		expect(isLogFileName(logFileName('2026-10-18'))).toBe(true);
+	});
+});
+
+describe('isLogFileName', () => {
+	it('accepts daily log files only', () => {
+		expect(isLogFileName('2026-10-18.ndjson')).toBe(true);
+		expect(isLogFileName('2026-10-18.log')).toBe(false);
+		expect(isLogFileName('notes.ndjson')).toBe(false);
+		expect(isLogFileName('../2026-10-18.ndjson')).toBe(false);
 	});
 });
