@@ -1,5 +1,5 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
-import { FLOW_PAGE_PATHS } from 'flow-core';
+import { DEFAULT_HISTORY_LIMIT, FLOW_PAGE_PATHS } from 'flow-core';
 import { FlowConfigFixture, collectRoutes } from 'flow-core/testing';
 import { load } from 'js-yaml';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -171,6 +171,48 @@ describe('every link and row navigation lands on a page', () => {
 					`${view.file} reads $route.${name} but its manifest path is '${point.path}'`
 				).toContain(name);
 			}
+		}
+	});
+});
+
+/** Every node of `$type` at any depth. */
+function collectNodes(node: unknown, type: string, found: Record<string, unknown>[] = []): Record<string, unknown>[] {
+	if (Array.isArray(node)) {
+		for (const child of node) collectNodes(child, type, found);
+	} else if (node !== null && typeof node === 'object') {
+		if ((node as Record<string, unknown>)['$type'] === type) found.push(node as Record<string, unknown>);
+		for (const child of Object.values(node)) collectNodes(child, type, found);
+	}
+	return found;
+}
+
+describe('flows page', () => {
+	it('offers the backend default page size first: PageSizeSelect shows options[0] while ?size= is absent', () => {
+		const selects = collectNodes(parseView('flows-page.yaml').document, 'PageSizeSelect');
+		expect(selects).toHaveLength(1);
+		expect((selects[0]!['options'] as number[])[0]).toBe(DEFAULT_HISTORY_LIMIT);
+	});
+
+	it('forwards the page and the size of the URL to the flows source, and paginates by its total', () => {
+		const view = parseView('flows-page.yaml');
+		expect(sourcesOf(view)[0]!.spec.params).toEqual({ page: '$urlParam.page', limit: '$urlParam.size' });
+		expect(collectNodes(view.document, 'Pagination')[0]).toMatchObject({
+			total: '$sources.flows.total',
+			size: '$sources.flows.limit',
+		});
+	});
+
+	it('has four short columns and sets only key and label on them (the DataTable ignores anything else)', () => {
+		const table = collectNodes(parseView('flows-page.yaml').document, 'DataTable')[0]!;
+		const columns = table['columns'] as Record<string, unknown>[];
+		expect(columns.map(column => column['key'])).toEqual([
+			'flowId',
+			'executionCount',
+			'failedCount',
+			'lastStartedLabel',
+		]);
+		for (const column of columns) {
+			expect(Object.keys(column).sort()).toEqual(['key', 'label']);
 		}
 	});
 });

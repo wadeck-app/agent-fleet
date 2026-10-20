@@ -3,7 +3,7 @@
 # One precomputed source (GET /widgets/executions): the DSL cannot put a status mark in front of a name or print "5m".
 # The DataTable renders every cell of a YAML column as `break-all` with no width limit and ignores `width`, `truncate`
 # and `muted` (dsl-ui normalizeColumn keeps key and label only), so a long value is broken letter by letter. The only
-# lever is a short value: `title` is "tag name - age" cut to MAX_WIDGET_TITLE_LENGTH characters by the backend, in a
+# lever is a short value: `title` is "tag name age" cut to MAX_WIDGET_TITLE_LENGTH characters by the backend, in a
 # single column so no second column steals width from the name.
 $sources:
     recent:
@@ -13,11 +13,9 @@ $sources:
 $type: VerticalStack
 gap: gap-2
 items:
-    - $type: HorizontalStack
-      gap: gap-2
-      items:
-          - { $type: StatTile, label: Running, value: $sources.recent.running }
-          - { $type: StatTile, label: Failed, value: $sources.recent.failed }
+    # Stacked, not side by side: two tiles in a row do not fit a 160px card.
+    - { $type: StatTile, label: Running, value: $sources.recent.running }
+    - { $type: StatTile, label: Failed, value: $sources.recent.failed }
 
     - $type: DataTable
       rows: $sources.recent.items

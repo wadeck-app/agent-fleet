@@ -1,6 +1,6 @@
 # Contributed to the slot "flow:execution-actions" of the flow module (execution detail page). The view is rendered
 # with the host page's context, so $route.id is the execution id. A custom component builds the link because a
-# DSL string cannot be concatenated (/modules/flow-chart/executions/ + id).
+# DSL string cannot be concatenated (/modules/flow-chart/flows/runs/ + id).
 # The root must be one of the slot's `accepts`; only the root is validated, so the custom component can be a child.
 $type: HorizontalStack
 gap: gap-2

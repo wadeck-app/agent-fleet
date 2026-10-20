@@ -155,6 +155,39 @@ describe('FlowGraphView', () => {
 		expect(screen.queryByText(/Zoomed in on step/)).toBeNull();
 	});
 
+	it('takes no room for the details until a step is selected, so the chart keeps the full width', () => {
+		renderView(executionResult());
+		expect(screen.queryByRole('complementary', { name: 'Step details' })).toBeNull();
+		fireEvent.click(screen.getByTestId('step-test'));
+		expect(screen.getByRole('complementary', { name: 'Step details' })).toBeInTheDocument();
+	});
+
+	it('marks a step missing from the flow file with a discreet note, not a boxed REMOVED badge', () => {
+		const graph = { nodes: [node('a', { kind: 'removed' }), node('b')], edges: [] };
+		renderView(executionResult({ graph }));
+		expect(within(screen.getByTestId('step-a')).getByText('not in file')).toBeInTheDocument();
+		expect(within(screen.getByTestId('step-b')).queryByText('not in file')).toBeNull();
+		expect(screen.queryByText(/^removed$/i)).toBeNull();
+	});
+
+	it('does not repeat the status, the kind or raw flags in the details of a removed step', () => {
+		const graph = {
+			nodes: [node('a', { kind: 'removed', status: 'failed', meta: { type: 'removed', removed: true } })],
+			edges: [],
+		};
+		renderView(executionResult({ graph }));
+		fireEvent.click(screen.getByTestId('step-a'));
+		const panel = screen.getByRole('complementary', { name: 'Step details' });
+		expect(within(panel).getAllByText('failed')).toHaveLength(1);
+		expect(within(panel).queryByText('removed')).toBeNull();
+		expect(within(panel).queryByText('true')).toBeNull();
+	});
+
+	it('zooms in on a step for a 30 step chain and tells the reader how to see the rest', () => {
+		renderView(executionResult({ graph: chain(30), execution: undefined }));
+		expect(screen.getByText(/Zoomed in on step 'step-0'.*Fit to view/)).toBeInTheDocument();
+	});
+
 	it('says it zoomed in on a step, outside the canvas, when the flow is too big to be readable', () => {
 		renderView(executionResult({ graph: chain(80), execution: undefined }));
 		const hint = screen.getByText(/Zoomed in on step/);

@@ -2,19 +2,19 @@ import type { FlowGraph } from 'flow-core';
 
 import { type LayoutDirection, NODE_HEIGHT, NODE_WIDTH, layoutGraph } from './GraphLayout.js';
 
-// Below this zoom the step text is unreadable: the chart then opens on one step instead of on the whole flow.
-export const READABLE_ZOOM = 0.6;
+// Below this zoom the step text is unreadable: the chart then opens at this zoom on one step (the reader pans) instead of on the whole flow.
+export const READABLE_ZOOM = 0.7;
 /** Share of the canvas kept free on each side when fitting. */
 export const FIT_PADDING = 0.1;
 export const MAX_FIT_ZOOM = 1.2;
 /** Options of every "fit the whole chart" viewport computation (initial view and the Fit to view control). */
 export const FIT_OPTIONS = { padding: FIT_PADDING, minZoom: 0.1, maxZoom: MAX_FIT_ZOOM };
 const MIN_CANVAS_HEIGHT = 420;
+/** A wide window does not make a taller canvas: past this the chart would only gain empty space. */
+const MAX_BASE_CANVAS_HEIGHT = 760;
 const CANVAS_VIEWPORT_SHARE = 0.65;
 /** A taller canvas than this is a page of its own; beyond it the chart opens on one step. */
 export const MAX_CANVAS_HEIGHT = 2600;
-/** Up to this many steps the whole chart is always shown (fitted, however small); beyond it, a flow too big to be readable opens on one step. */
-export const MAX_FIT_NODES = 25;
 
 export interface ChartViewPlan {
 	direction: LayoutDirection;
@@ -24,7 +24,7 @@ export interface ChartViewPlan {
 	grown: boolean;
 	/** Zoom at which the whole chart fits the canvas. */
 	fittedZoom: number;
-	/** More than MAX_FIT_NODES steps that cannot be readable even on the tallest canvas: open on the step that matters instead. */
+	/** The whole chart cannot be readable (zoom >= READABLE_ZOOM) even on the tallest canvas: open at READABLE_ZOOM on the step that matters instead. */
 	focus: boolean;
 }
 
@@ -45,7 +45,7 @@ function planFor(graph: FlowGraph, direction: LayoutDirection, width: number, ba
 		canvasHeight = Math.min(MAX_CANVAS_HEIGHT, Math.max(baseHeight, needed));
 	}
 	const fittedZoom = fitZoom(graph, direction, width, canvasHeight);
-	const focus = graph.nodes.length > MAX_FIT_NODES && fittedZoom < READABLE_ZOOM;
+	const focus = fittedZoom < READABLE_ZOOM;
 	// Opening on one step centers it in the canvas: a grown canvas would only add empty space around it.
 	if (focus) {
 		return { direction, canvasHeight: baseHeight, grown: false, fittedZoom, focus };
@@ -70,7 +70,10 @@ export function planChartView(
 	if (!(canvasWidth > 0)) {
 		throw new Error(`Cannot plan the chart: the canvas width is ${canvasWidth}px, it must be measured first.`);
 	}
-	const baseHeight = Math.max(MIN_CANVAS_HEIGHT, Math.round(viewportHeight * CANVAS_VIEWPORT_SHARE));
+	const baseHeight = Math.min(
+		MAX_BASE_CANVAS_HEIGHT,
+		Math.max(MIN_CANVAS_HEIGHT, Math.round(viewportHeight * CANVAS_VIEWPORT_SHARE))
+	);
 	if (forcedDirection !== undefined) {
 		return planFor(graph, forcedDirection, canvasWidth, baseHeight);
 	}

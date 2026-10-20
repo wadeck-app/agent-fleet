@@ -13,12 +13,21 @@ interface Manifest {
 	requires?: Record<string, string>;
 	expose?: { slots?: Record<string, { accepts: string[] }> };
 	dslLib?: { shared?: Record<string, string> };
-	extensionPoints: { kind: string; slot: string; path?: string; view: { type: string; value: string } }[];
+	extensionPoints: {
+		kind: string;
+		slot: string;
+		label?: string;
+		order?: number;
+		path?: string;
+		view: { type: string; value: string };
+	}[];
 }
 
 const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf8')) as Manifest;
 // The slot prefix a contributor writes to fill a slot of the flow module.
 const flowSlotPrefix = `${FLOW_APP_MODULE_ID}:`;
+// The side menu of flow, not a slot flow exposes: any module a module requires has one (app-core `<provider>:nav`).
+const FLOW_MENU_SLOT = `${flowSlotPrefix}nav`;
 
 describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 	it('declares the id the module is registered under', () => {
@@ -39,9 +48,20 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 		}
 	});
 
-	it('offers the flow charts index in the nav and the two chart pages as routes', () => {
+	it('puts the flow charts index in the side menu of flow and the two chart pages as routes', () => {
 		const summary = manifest.extensionPoints.filter(p => p.kind === 'page').map(p => `${p.slot}:${p.path}`);
-		expect(summary.sort()).toEqual(['nav:/flows', 'route:/executions/:id', 'route:/flows/:flowId']);
+		expect(summary.sort()).toEqual(['flow:nav:/flows', 'route:/flows/:flowId', 'route:/flows/runs/:id']);
+	});
+
+	it('has no page in its own nav: that would give it a tab of the top bar next to Flow', () => {
+		expect(manifest.extensionPoints.filter(p => p.slot === 'nav')).toEqual([]);
+	});
+
+	it('orders and names its menu entry, and names its route pages for the breadcrumb', () => {
+		const menu = manifest.extensionPoints.find(p => p.slot === FLOW_MENU_SLOT);
+		expect(menu).toMatchObject({ label: 'Flow Charts', order: 10 });
+		const labels = manifest.extensionPoints.filter(p => p.slot === 'route').map(p => `${p.path}=${p.label}`);
+		expect(labels.sort()).toEqual(['/flows/:flowId=Flow', '/flows/runs/:id=Execution']);
 	});
 
 	it('declares a dslLib (the FlowGraph and FlowChartLink components) with the shared ranges it was built against', () => {
@@ -59,6 +79,11 @@ describe('requirement on the flow module', () => {
 		expect(Object.keys(manifest.requires ?? {})).toEqual([FLOW_APP_MODULE_ID]);
 	});
 
+	// "*" on purpose: app-core matches with includePrerelease, and CI stamps prereleases like 2026.10.19-663-3ea4c829.
+	it('accepts any flow version', () => {
+		expect(manifest.requires?.[FLOW_APP_MODULE_ID]).toBe('*');
+	});
+
 	// app-core matches with includePrerelease: CI stamps 2026.10.19-663-3ea4c829, a local build 0.1.0.
 	it.each(['2026.10.19-663-3ea4c829', '0.1.0', '2026.10.19', '0.0.0-test-integration'])(
 		'accepts the flow version %s',
@@ -71,7 +96,9 @@ describe('requirement on the flow module', () => {
 });
 
 describe('contributions to the slots of flow', () => {
-	const contributions = manifest.extensionPoints.filter(p => p.slot.startsWith(flowSlotPrefix));
+	const contributions = manifest.extensionPoints.filter(
+		p => p.slot.startsWith(flowSlotPrefix) && p.slot !== FLOW_MENU_SLOT
+	);
 
 	it('fills only slots flow exposes (flow-core FLOW_EXPOSED_SLOTS)', () => {
 		expect(contributions.length).toBeGreaterThan(0);

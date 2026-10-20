@@ -11,7 +11,13 @@ const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf
 	backendEntryPath?: unknown;
 	requires?: unknown;
 	expose?: { slots?: Record<string, { accepts: string[] }> };
-	extensionPoints: { kind: string; slot: string; path?: string; view: { type: string; value: string } }[];
+	extensionPoints: {
+		kind: string;
+		slot: string;
+		label?: string;
+		path?: string;
+		view: { type: string; value: string };
+	}[];
 };
 
 describe('manifest.json (source manifest of the app-core-cli layout)', () => {
@@ -46,6 +52,11 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 				'widget:dashboard:',
 			])
 		);
+	});
+
+	it('names its route pages, for the breadcrumb', () => {
+		const labels = manifest.extensionPoints.filter(p => p.slot === 'route').map(p => `${p.path}=${p.label}`);
+		expect(labels.sort()).toEqual(['/executions/:id=Execution', '/plugins/:id=Plugin']);
 	});
 
 	it('declares exactly the pages of flow-core FLOW_PAGE_PATHS, the contract the modules linking to them are tested against', () => {

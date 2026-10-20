@@ -134,9 +134,31 @@ describe('executions page layout', () => {
 	it('shows the raw status and a one-line error excerpt, columns the executions route sends', () => {
 		const table = collectNodes(parseView('executions-page.yaml').document, 'DataTable')[0]!;
 		const keys = (table['columns'] as { key: string }[]).map(column => column.key);
-		expect(keys).toContain('status');
-		expect(keys).toContain('errorExcerpt');
+		expect(keys).toContain('statusLabel');
 		expect(keys).not.toContain('lastError');
+	});
+
+	it('has at most 3 narrow columns of short precomputed text: a 510px content area breaks any longer cell mid-word', () => {
+		const table = collectNodes(parseView('executions-page.yaml').document, 'DataTable')[0]!;
+		expect((table['columns'] as { key: string }[]).map(column => column.key)).toEqual([
+			'startedLabel',
+			'runLabel',
+			'statusLabel',
+		]);
+	});
+
+	it('labels the status links from the route, which marks the active filter', () => {
+		const links = collectNodes(parseView('executions-page.yaml').document, 'Link');
+		const labels = links
+			.map(link => link['label'])
+			.filter(label => typeof label === 'string' && label.startsWith('$'));
+		expect(labels).toEqual([
+			'$sources.executions.statusFilters.all',
+			'$sources.executions.statusFilters.running',
+			'$sources.executions.statusFilters.queued',
+			'$sources.executions.statusFilters.completed',
+			'$sources.executions.statusFilters.failed',
+		]);
 	});
 });
 
@@ -145,16 +167,14 @@ describe('execution detail page', () => {
 		const document = parseView('execution-detail-page.yaml').document;
 		const badges = collectNodes(document, 'Badge');
 		expect(badges[0]).toMatchObject({
-			label: '$sources.execution.status',
+			label: '$sources.execution.statusText',
 			variant: '$sources.execution.statusVariant',
 		});
 		const steps = collectNodes(document, 'DataTable')[0]!;
 		expect((steps['columns'] as { key: string }[]).map(column => column.key)).toEqual([
 			'stepId',
-			'status',
+			'statusLabel',
 			'duration',
-			'attempts',
-			'errorExcerpt',
 		]);
 	});
 });

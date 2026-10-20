@@ -51,9 +51,9 @@ describe('FlowChartLink', () => {
 		);
 		expect(screen.getByRole('link', { name: 'See flow chart' })).toHaveAttribute(
 			'href',
-			'/modules/flow-chart/executions/abc%201'
+			'/modules/flow-chart/flows/runs/abc%201'
 		);
-		expect(chartPathOfExecution('abc')).toBe('/modules/flow-chart/executions/abc');
+		expect(chartPathOfExecution('abc')).toBe('/modules/flow-chart/flows/runs/abc');
 	});
 
 	it('says what is wrong when no id reaches it, instead of rendering nothing', () => {
@@ -75,7 +75,7 @@ describe('registry entries', () => {
 		renderEntry('FlowChartLink', { executionId: '$route.id' }, { $route: { id: 'exec9' } });
 		expect(screen.getByRole('link', { name: 'See flow chart' })).toHaveAttribute(
 			'href',
-			'/modules/flow-chart/executions/exec9'
+			'/modules/flow-chart/flows/runs/exec9'
 		);
 	});
 

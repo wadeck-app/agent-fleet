@@ -84,7 +84,25 @@ export type {
 
 export { classifyFlowError, httpAnswerOfFlowError, httpStatusOfFlowError } from './ErrorClassification.js';
 export type { FlowErrorCategory, HttpErrorAnswer } from './ErrorClassification.js';
-export { ellipsize, excerptOf, startedLabel, statusTag } from './view/CellText.js';
+export {
+	ellipsize,
+	excerptOf,
+	outcomeLabel,
+	runLabel,
+	shortStarted,
+	startedLabel,
+	statusTag,
+	stepStatusTag,
+} from './view/CellText.js';
+export type { OutcomeNotes } from './view/CellText.js';
+export {
+	type IntegerBounds,
+	type QueryParams,
+	optionalBoolean,
+	optionalInteger,
+	optionalString,
+	readPageOffset,
+} from './query/QueryParameters.js';
 export { toExecutionDetail, toExecutionSummary } from './view/ExecutionView.js';
 export type { ExecutionDetailView, ExecutionSummary, StepView } from './view/ExecutionView.js';
 

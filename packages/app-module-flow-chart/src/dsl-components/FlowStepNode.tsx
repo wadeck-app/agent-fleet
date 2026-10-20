@@ -65,9 +65,15 @@ export function FlowStepNode({ data, selected }: NodeProps<StepNode>) {
 				<span className="font-medium">
 					<span aria-hidden="true">{style.glyph}</span> {style.label}
 				</span>
-				<span className="rounded border border-border bg-surface px-1.5 text-[10px] uppercase text-muted">
-					{step.kind.replace('_', ' ')}
-				</span>
+				{step.kind === 'removed' ? (
+					<span className="text-[10px] italic text-muted" title="This step is not in the current flow file">
+						not in file
+					</span>
+				) : (
+					<span className="rounded border border-border bg-surface px-1.5 text-[10px] uppercase text-muted">
+						{step.kind.replace('_', ' ')}
+					</span>
+				)}
 			</div>
 			<div className="mt-1 truncate text-sm font-semibold" title={step.label}>
 				{step.label}

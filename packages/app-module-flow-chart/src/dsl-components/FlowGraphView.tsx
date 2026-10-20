@@ -18,6 +18,10 @@ import { toFlowElements } from './ToFlowElements.js';
 
 const NODE_TYPES = { step: FlowStepNode };
 
+// Written out in full: Tailwind finds classes by scanning source text.
+const DETAILS_OVERLAY_CLASS = 'mt-3 lg:pointer-events-none lg:absolute lg:inset-y-0 lg:right-2 lg:mt-0 lg:w-80 lg:py-2';
+const DETAILS_STICKY_CLASS = 'lg:pointer-events-auto lg:sticky lg:top-2 lg:max-h-[calc(100vh-1rem)] lg:overflow-auto';
+
 const WARNING_BANNER_CLASS = 'rounded-md border border-warning bg-warning-bg px-3 py-2 text-sm text-warning-text';
 
 type BadgeVariant = NonNullable<Parameters<typeof Badge>[0]['variant']>;
@@ -64,7 +68,7 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 	const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
 	const colorMode = useShellColorMode();
 	const [focusedOnStep, setFocusedOnStep] = useState(false);
-	const focusId = useMemo(() => (graph.nodes.length > 0 ? pickFocusStep(graph) : ''), [graph]);
+	const focusId = useMemo(() => (graph.nodes.length > 0 ? pickFocusStep(graph, direction) : ''), [graph, direction]);
 
 	const elements = useMemo(() => toFlowElements(graph, direction, selectedId), [graph, direction, selectedId]);
 	const focusLabel = graph.nodes.find(n => n.id === focusId)?.label;
@@ -126,7 +130,7 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 				</div>
 			)}
 
-			<div className="flex flex-col gap-3 lg:flex-row">
+			<div className="flex flex-col gap-3">
 				<div ref={columnRef} className="flex min-w-0 flex-1 flex-col gap-2">
 					<ReactFlowProvider>
 						<ChartToolbar
@@ -138,51 +142,64 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 							}}
 							hint={
 								focusedOnStep
-									? `Zoomed in on step '${focusLabel}'. The whole flow does not fit at a readable size: Fit to view shows all of it.`
-									: undefined
+									? `Zoomed in on step '${focusLabel}' (readable size). The whole flow does not fit at that size: drag to move along it, or use Fit to view to see all of it, smaller.`
+									: selected === undefined
+										? 'Click a step to see its status, duration, attempts and error.'
+										: undefined
 							}
 						/>
 						{plan && (
-							<div
-								className="relative min-h-[420px] overflow-hidden rounded-lg border border-border bg-bg"
-								style={{ height: plan.canvasHeight }}
-								data-testid="chart-canvas"
-							>
-								<ReactFlow
-									// A new layout direction is a new chart: remounting re-runs the initial fit.
-									key={direction}
-									nodes={elements.nodes}
-									edges={elements.edges}
-									nodeTypes={NODE_TYPES}
-									// Same as the shell: xyflow's class name re-scopes the shell's color tokens.
-									colorMode={colorMode}
-									minZoom={0.1}
-									maxZoom={2}
-									// On a canvas taller than the window the page scrolls over it: zooming needs ctrl/cmd + wheel.
-									zoomOnScroll={!plan.grown}
-									preventScrolling={!plan.grown}
-									nodesDraggable={false}
-									nodesConnectable={false}
-									edgesFocusable={false}
-									elementsSelectable
-									onNodeClick={(_event, node) => setSelectedId(node.id)}
-									onPaneClick={() => setSelectedId(undefined)}
-									proOptions={{ hideAttribution: true }}
+							<div className="relative">
+								<div
+									className="relative min-h-[420px] overflow-hidden rounded-lg border border-border bg-bg"
+									style={{ height: plan.canvasHeight }}
+									data-testid="chart-canvas"
 								>
-									<Background color="var(--color-border)" gap={20} />
-									<InitialViewport
-										focusId={focusId}
-										focus={plan.focus}
-										onFocused={setFocusedOnStep}
-									/>
-								</ReactFlow>
+									<ReactFlow
+										// A new layout direction is a new chart: remounting re-runs the initial fit.
+										key={direction}
+										nodes={elements.nodes}
+										edges={elements.edges}
+										nodeTypes={NODE_TYPES}
+										// Same as the shell: xyflow's class name re-scopes the shell's color tokens.
+										colorMode={colorMode}
+										minZoom={0.1}
+										maxZoom={2}
+										// On a canvas taller than the window the page scrolls over it: zooming needs ctrl/cmd + wheel.
+										zoomOnScroll={!plan.grown}
+										preventScrolling={!plan.grown}
+										nodesDraggable={false}
+										nodesConnectable={false}
+										edgesFocusable={false}
+										elementsSelectable
+										onNodeClick={(_event, node) => setSelectedId(node.id)}
+										onPaneClick={() => setSelectedId(undefined)}
+										proOptions={{ hideAttribution: true }}
+									>
+										<Background color="var(--color-border)" gap={20} />
+										<InitialViewport
+											focusId={focusId}
+											focus={plan.focus}
+											direction={direction}
+											onFocused={setFocusedOnStep}
+										/>
+									</ReactFlow>
+								</div>
+								{selected !== undefined && (
+									// Over the canvas on wide windows (the chart keeps the full width), below it on narrow ones; sticky so it stays in view on a tall canvas.
+									<div className={DETAILS_OVERLAY_CLASS}>
+										<div className={DETAILS_STICKY_CLASS}>
+											<StepDetailsPanel
+												step={selected}
+												onClose={() => setSelectedId(undefined)}
+											/>
+										</div>
+									</div>
+								)}
 							</div>
 						)}
 					</ReactFlowProvider>
 					<GraphLegend showStatuses={execution !== undefined} edgeKinds={edgeKinds} />
-				</div>
-				<div className="w-full shrink-0 lg:w-80">
-					<StepDetailsPanel step={selected} onClose={() => setSelectedId(undefined)} />
 				</div>
 			</div>
 		</div>

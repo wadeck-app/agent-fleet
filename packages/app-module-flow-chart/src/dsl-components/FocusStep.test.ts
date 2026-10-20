@@ -1,3 +1,4 @@
+import type { FlowGraph } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
 import { pickFocusStep } from './FocusStep.js';
@@ -13,17 +14,33 @@ describe('pickFocusStep', () => {
 			],
 			edges: [],
 		};
-		expect(pickFocusStep(graph)).toBe('b');
+		expect(pickFocusStep(graph, 'TB')).toBe('b');
 	});
 
 	it('falls back to the first running step, then to the first step', () => {
 		expect(
-			pickFocusStep({ nodes: [node('a', { status: 'completed' }), node('b', { status: 'running' })], edges: [] })
+			pickFocusStep(
+				{ nodes: [node('a', { status: 'completed' }), node('b', { status: 'running' })], edges: [] },
+				'TB'
+			)
 		).toBe('b');
-		expect(pickFocusStep(chain(3))).toBe(chain(3).nodes[0]!.id);
+		expect(pickFocusStep(chain(3), 'TB')).toBe(chain(3).nodes[0]!.id);
+	});
+
+	it('falls back to the entry step of the layout (first along the flow), not the first node of the list', () => {
+		// "leaf" is listed first but sits last in the flow: the entry is "root".
+		const graph: FlowGraph = {
+			nodes: [node('leaf'), node('mid'), node('root')],
+			edges: [
+				{ from: 'root', to: 'mid', kind: 'dependency' },
+				{ from: 'mid', to: 'leaf', kind: 'dependency' },
+			],
+		};
+		expect(pickFocusStep(graph, 'TB')).toBe('root');
+		expect(pickFocusStep(graph, 'LR')).toBe('root');
 	});
 
 	it('fails loudly on an empty graph', () => {
-		expect(() => pickFocusStep({ nodes: [], edges: [] })).toThrow(/no step/);
+		expect(() => pickFocusStep({ nodes: [], edges: [] }, 'TB')).toThrow(/no step/);
 	});
 });

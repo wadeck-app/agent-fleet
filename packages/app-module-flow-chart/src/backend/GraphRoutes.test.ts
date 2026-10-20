@@ -182,6 +182,60 @@ describe('GET /flows', () => {
 	});
 
 	it('answers an empty list, not an error, before any run', async () => {
-		expect(await callRoute(routes, 'GET /flows')).toEqual({ status: 200, body: { flows: [] } });
+		expect(await callRoute(routes, 'GET /flows')).toEqual({
+			status: 200,
+			body: { flows: [], total: 0, limit: 20, offset: 0 },
+		});
+	});
+
+	it('gives each flow a short ASCII "Oct 18 16:15" lastStartedLabel next to the raw lastStartedAt', async () => {
+		fixture.addExecution({
+			executionId: 'a1',
+			flowId: 'build_task',
+			flowFile,
+			startedAt: '2026-10-18T16:15:24.166Z',
+		});
+		const { body } = await callRoute(routes, 'GET /flows');
+		expect((body as { flows: unknown[] }).flows[0]).toMatchObject({
+			lastStartedAt: '2026-10-18T16:15:24.166Z',
+			lastStartedLabel: 'Oct 18 16:15',
+		});
+	});
+
+	describe('pagination (what the DSL Pagination and PageSizeSelect send)', () => {
+		beforeEach(() => {
+			for (let i = 0; i < 5; i++) {
+				fixture.addExecution({
+					executionId: `e${i}`,
+					flowId: `flow_${i}`,
+					flowFile,
+					startedAt: `2026-10-18T10:0${i}:00.000Z`,
+				});
+			}
+		});
+
+		it('returns the first page with the total, most recent flow first', async () => {
+			const { body } = await callRoute(routes, 'GET /flows', { query: { limit: '2' } });
+			expect(body).toMatchObject({ total: 5, limit: 2, offset: 0 });
+			expect((body as { flows: { flowId: string }[] }).flows.map(flow => flow.flowId)).toEqual([
+				'flow_4',
+				'flow_3',
+			]);
+		});
+
+		it('returns the page asked for (zero-based)', async () => {
+			const { body } = await callRoute(routes, 'GET /flows', { query: { limit: '2', page: '2' } });
+			expect(body).toMatchObject({ total: 5, limit: 2, offset: 4 });
+			expect((body as { flows: { flowId: string }[] }).flows.map(flow => flow.flowId)).toEqual(['flow_0']);
+		});
+
+		it('refuses a bad limit and a page combined with an offset, saying what is expected', async () => {
+			expect(await callRoute(routes, 'GET /flows', { query: { limit: '0' } })).toEqual({
+				status: 400,
+				body: { error: "'limit' must be an integer between 1 and 500, got '0'." },
+			});
+			const both = await callRoute(routes, 'GET /flows', { query: { page: '1', offset: '2' } });
+			expect(both.status).toBe(400);
+		});
 	});
 });

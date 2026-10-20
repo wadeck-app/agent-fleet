@@ -27,6 +27,7 @@
 		{
 			"kind": "page",
 			"slot": "route",
+			"label": "Execution",
 			"path": "/executions/:id",
 			"view": { "type": "path", "value": "./src/dsl-views/execution-detail-page.yaml" }
 		},
@@ -54,6 +55,7 @@
 		{
 			"kind": "page",
 			"slot": "route",
+			"label": "Plugin",
 			"path": "/plugins/:id",
 			"view": { "type": "path", "value": "./src/dsl-views/plugin-detail-page.yaml" }
 		}

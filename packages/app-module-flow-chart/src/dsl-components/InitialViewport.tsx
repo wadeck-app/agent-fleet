@@ -3,22 +3,23 @@ import { useEffect, useRef } from 'react';
 import { getNodesBounds, getViewportForBounds, useReactFlow, useStore } from '@xyflow/react';
 
 import { FIT_OPTIONS } from './ChartViewPlan.js';
-
-const FOCUS_ZOOM = 0.85;
-const FOCUS_TOP_SHARE = 0.15;
+import { focusViewport } from './FocusViewport.js';
+import type { LayoutDirection } from './GraphLayout.js';
 
 /**
  * Fits the whole chart once the nodes are measured. When the plan says the chart cannot be readable even fitted
- * on the tallest canvas (`focus`), it opens on the step that matters (first failed, running, or first) and says
- * so; "Fit to view" shows everything.
+ * on the tallest canvas (`focus`), it opens at the minimum readable zoom, anchored on the step that matters (first
+ * failed, running, or first) with the rest of the flow ahead of it, and says so; "Fit to view" shows everything.
  */
 export function InitialViewport({
 	focusId,
 	focus,
+	direction,
 	onFocused,
 }: {
 	focusId: string;
 	focus: boolean;
+	direction: LayoutDirection;
 	onFocused: (focusedOn: boolean) => void;
 }) {
 	const flow = useReactFlow();
@@ -45,15 +46,15 @@ export function InitialViewport({
 			void flow.setViewport(fitted);
 			return;
 		}
-		// The step is centered horizontally and sits in the upper part, so its successors are visible below it.
-		const centerX = target.position.x + (target.width ?? 0) / 2;
-		const topY = target.position.y;
-		void flow.setViewport({
-			x: width / 2 - centerX * FOCUS_ZOOM,
-			y: height * FOCUS_TOP_SHARE - topY * FOCUS_ZOOM,
-			zoom: FOCUS_ZOOM,
-		});
+		void flow.setViewport(
+			focusViewport(direction, { width, height }, getNodesBounds(nodes), {
+				x: target.position.x,
+				y: target.position.y,
+				width: target.width ?? 0,
+				height: target.height ?? 0,
+			})
+		);
 		onFocused(true);
-	}, [width, height, flow, focusId, focus, onFocused]);
+	}, [width, height, flow, focusId, focus, direction, onFocused]);
 	return null;
 }

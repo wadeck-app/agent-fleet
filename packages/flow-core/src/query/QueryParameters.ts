@@ -1,4 +1,4 @@
-import { InvalidQueryError } from 'flow-core';
+import { InvalidQueryError } from '../errors.js';
 
 export type QueryParams = Record<string, string | string[] | undefined>;
 
@@ -53,4 +53,23 @@ export function optionalInteger(query: QueryParams, name: string, bounds: Intege
 		throw new InvalidQueryError(`'${name}' must be ${expected}, got '${raw}'.`);
 	}
 	return parsed;
+}
+
+/** `offset`, or `page` (zero-based, what the DSL Pagination component sends) converted with the page size. */
+export function readPageOffset(query: QueryParams, pageSize: number): number | undefined {
+	const offset = optionalInteger(query, 'offset', { min: 0 });
+	const page = optionalInteger(query, 'page', { min: 0 });
+	if (page === undefined) {
+		return offset;
+	}
+	if (offset !== undefined) {
+		throw new InvalidQueryError(
+			"'page' and 'offset' cannot be combined: use page (with limit) or offset, not both."
+		);
+	}
+	const fromPage = page * pageSize;
+	if (!Number.isSafeInteger(fromPage)) {
+		throw new InvalidQueryError(`'page' is too large: page ${page} of ${pageSize} rows is not a valid offset.`);
+	}
+	return fromPage;
 }

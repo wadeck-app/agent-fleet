@@ -1,7 +1,7 @@
-import { InvalidQueryError } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
-import { optionalInteger, optionalString } from './QueryParameters.js';
+import { InvalidQueryError } from '../errors.js';
+import { optionalInteger, optionalString, readPageOffset } from './QueryParameters.js';
 
 describe('optionalString', () => {
 	it('returns undefined for an absent or empty value (the DSL sends empty strings for unset filters)', () => {
@@ -60,5 +60,22 @@ describe('optionalInteger', () => {
 		expect(() => optionalInteger({ offset: '99999999999999999999' }, 'offset', { min: 0 })).toThrow(
 			InvalidQueryError
 		);
+	});
+});
+
+describe('readPageOffset', () => {
+	it('is undefined without page or offset, and passes an offset through', () => {
+		expect(readPageOffset({}, 20)).toBeUndefined();
+		expect(readPageOffset({ offset: '7' }, 20)).toBe(7);
+	});
+
+	it('turns a zero-based page into an offset with the page size', () => {
+		expect(readPageOffset({ page: '0' }, 20)).toBe(0);
+		expect(readPageOffset({ page: '3' }, 20)).toBe(60);
+	});
+
+	it('refuses page together with offset, and a page that overflows', () => {
+		expect(() => readPageOffset({ page: '1', offset: '2' }, 20)).toThrow(/cannot be combined/);
+		expect(() => readPageOffset({ page: '9007199254740990' }, 20)).toThrow(/too large/);
 	});
 });

@@ -2,7 +2,7 @@ import { ButtonLink } from '@wadeck-app/dsl-ui';
 
 /** Where the chart of one run lives (page of the manifest: /executions/:id under /modules/flow-chart). */
 export function chartPathOfExecution(executionId: string): string {
-	return `/modules/flow-chart/executions/${encodeURIComponent(executionId)}`;
+	return `/modules/flow-chart/flows/runs/${encodeURIComponent(executionId)}`;
 }
 
 /**

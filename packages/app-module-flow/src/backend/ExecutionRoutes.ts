@@ -5,14 +5,18 @@ import {
 	type ExecutionStatus,
 	type FlowQueryService,
 	InvalidQueryError,
+	type QueryParams,
+	optionalBoolean,
+	optionalInteger,
+	optionalString,
+	readPageOffset,
 	renderExecutionDetail,
 	toExecutionDetail,
 	toExecutionSummary,
 } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
-import { toExecutionDetailRow, toExecutionRow, toFlowRow } from './ExecutionDisplay.js';
-import { type QueryParams, optionalBoolean, optionalInteger, optionalString } from './QueryParameters.js';
+import { toExecutionDetailRow, toExecutionRow, toFlowRow, toStatusFilters } from './ExecutionDisplay.js';
 
 export const MAX_EXECUTIONS_LIMIT = 500;
 export const MAX_TAIL_CHARS = 1_000_000;
@@ -32,25 +36,6 @@ function readStatus(query: QueryParams): string | undefined {
 		throw new InvalidQueryError(`'status' must be one of ${EXECUTION_STATUSES.join(', ')}, got '${status}'.`);
 	}
 	return status;
-}
-
-/** `offset`, or `page` (zero-based, what the DSL Pagination component sends) converted with the page size. */
-function readOffset(query: QueryParams, pageSize: number): number | undefined {
-	const offset = optionalInteger(query, 'offset', { min: 0 });
-	const page = optionalInteger(query, 'page', { min: 0 });
-	if (page === undefined) {
-		return offset;
-	}
-	if (offset !== undefined) {
-		throw new InvalidQueryError(
-			"'page' and 'offset' cannot be combined: use page (with limit) or offset, not both."
-		);
-	}
-	const fromPage = page * pageSize;
-	if (!Number.isSafeInteger(fromPage)) {
-		throw new InvalidQueryError(`'page' is too large: page ${page} of ${pageSize} rows is not a valid offset.`);
-	}
-	return fromPage;
 }
 
 /** What the flows table says about itself: it is the only place the DSL can show that the list was cut. */
@@ -73,11 +58,12 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 		const query = (req as { query?: QueryParams }).query ?? {};
 		try {
 			const limit = optionalInteger(query, 'limit', { min: 1, max: MAX_EXECUTIONS_LIMIT });
-			const offset = readOffset(query, limit ?? DEFAULT_HISTORY_LIMIT);
+			const offset = readPageOffset(query, limit ?? DEFAULT_HISTORY_LIMIT);
+			const status = readStatus(query);
 			const page = service.listExecutions({
 				limit,
 				offset,
-				status: readStatus(query),
+				status,
 				flow: optionalString(query, 'flow'),
 				id: optionalString(query, 'id'),
 			});
@@ -88,6 +74,8 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 				skipped: page.skipped.length,
 				limit: limit ?? DEFAULT_HISTORY_LIMIT,
 				offset: offset ?? 0,
+				// Labels of the status links, the active one marked: the DSL cannot style a link.
+				statusFilters: toStatusFilters(status),
 			};
 			return reply.code(200).send(body);
 		} catch (err) {

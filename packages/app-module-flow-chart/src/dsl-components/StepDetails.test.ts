@@ -4,17 +4,31 @@ import { describeStep } from './StepDetails.js';
 import { node } from './testing/GraphFixtures.js';
 
 describe('describeStep', () => {
-	it('lists status, kind, duration and attempts first, in that order', () => {
+	it('lists duration and attempts first, without repeating the status the badge already shows', () => {
 		const { rows } = describeStep(
 			node('build', { kind: 'script', status: 'completed', durationLabel: '12.3s', attempts: 2 })
 		);
-		expect(rows.map(r => r.label)).toEqual(['Status', 'Kind', 'Duration', 'Attempts']);
-		expect(rows.map(r => r.value)).toEqual(['completed', 'script', '12.3s', '2']);
+		expect(rows.map(r => `${r.label}=${r.value}`)).toEqual(['Kind=script', 'Duration=12.3s', 'Attempts=2']);
 	});
 
-	it('says "not run" for a node of a definition drawn without a run, and omits what is unknown', () => {
+	it('leaves out the attempts of a step that ran once', () => {
+		const { rows } = describeStep(node('build', { durationLabel: '1s', attempts: 1 }));
+		expect(rows.map(r => r.label)).not.toContain('Attempts');
+	});
+
+	it('shows only the kind for a node of a definition drawn without a run', () => {
 		const { rows } = describeStep(node('build'));
-		expect(rows.map(r => `${r.label}=${r.value}`)).toEqual(['Status=not run', 'Kind=script']);
+		expect(rows.map(r => `${r.label}=${r.value}`)).toEqual(['Kind=script']);
+	});
+
+	it('says once that a step is not in the current flow file, instead of printing the kind and raw flags', () => {
+		const { rows } = describeStep(node('old', { kind: 'removed', meta: { type: 'removed', removed: true } }));
+		expect(rows).toEqual([{ label: 'Flow file', value: 'step no longer declared' }]);
+	});
+
+	it('says once that a step was injected at run time', () => {
+		const { rows } = describeStep(node('extra', { kind: 'injected', meta: { type: 'injected', injected: true } }));
+		expect(rows).toEqual([{ label: 'Flow file', value: 'created at run time' }]);
 	});
 
 	it('labels the known meta keys in plain words', () => {
@@ -51,9 +65,9 @@ describe('describeStep', () => {
 		expect(byLabel['Completed']).toBe('soon');
 	});
 
-	it('shows a meta key it does not know under its own name instead of dropping it', () => {
+	it('does not dump a meta key it does not know: the panel lists curated facts only', () => {
 		const { rows } = describeStep(node('a', { meta: { futureField: 'x' } }));
-		expect(rows).toContainEqual({ label: 'futureField', value: 'x' });
+		expect(rows.map(r => r.label)).not.toContain('futureField');
 	});
 
 	it('does not repeat the error and the node type among the rows: the error has its own block', () => {

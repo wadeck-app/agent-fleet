@@ -1,7 +1,7 @@
 {
 	"id": "flow-chart",
 	"requires": {
-		"flow": ">=0.0.0-0"
+		"flow": "*"
 	},
 	"dslLib": {
 		"shared": {
@@ -32,8 +32,9 @@
 		},
 		{
 			"kind": "page",
-			"slot": "nav",
+			"slot": "flow:nav",
 			"label": "Flow Charts",
+			"order": 10,
 			"path": "/flows",
 			"view": {
 				"type": "path",
@@ -43,6 +44,7 @@
 		{
 			"kind": "page",
 			"slot": "route",
+			"label": "Flow",
 			"path": "/flows/:flowId",
 			"view": {
 				"type": "path",
@@ -52,7 +54,8 @@
 		{
 			"kind": "page",
 			"slot": "route",
-			"path": "/executions/:id",
+			"label": "Execution",
+			"path": "/flows/runs/:id",
 			"view": {
 				"type": "path",
 				"value": "./src/dsl-views/execution-chart-page.yaml"

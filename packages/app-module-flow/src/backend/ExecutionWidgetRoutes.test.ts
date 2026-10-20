@@ -78,17 +78,17 @@ describe('GET /widgets/executions', () => {
 			running: 1,
 			failed: 1,
 			items: [
-				{ executionId: 'run', flowId: 'deploy', status: 'running', title: 'run deploy - 2m', when: '2m' },
+				{ executionId: 'run', flowId: 'deploy', status: 'running', title: 'running deploy 2m', when: '2m' },
 				{
 					executionId: 'bad',
 					flowId: 'factory_retrospective',
 					status: 'failed',
-					title: 'FAIL factory_retrosp... - 5m',
+					title: 'FAILED factory... 5m',
 					when: '5m',
 				},
-				{ executionId: 'ok3', flowId: 'deploy', status: 'completed', title: 'ok deploy - 57m', when: '57m' },
-				{ executionId: 'ok2', flowId: 'deploy', status: 'completed', title: 'ok deploy - 58m', when: '58m' },
-				{ executionId: 'ok1', flowId: 'deploy', status: 'completed', title: 'ok deploy - 59m', when: '59m' },
+				{ executionId: 'ok3', flowId: 'deploy', status: 'completed', title: 'ok deploy 57m', when: '57m' },
+				{ executionId: 'ok2', flowId: 'deploy', status: 'completed', title: 'ok deploy 58m', when: '58m' },
+				{ executionId: 'ok1', flowId: 'deploy', status: 'completed', title: 'ok deploy 59m', when: '59m' },
 			],
 		});
 	});
@@ -102,12 +102,12 @@ describe('GET /widgets/executions', () => {
 
 describe('widgetTitle', () => {
 	it('puts the tag, the flow name and the age in one string, whole when it fits', () => {
-		expect(widgetTitle('completed', 'build_task', '1d')).toBe('ok build_task - 1d');
+		expect(widgetTitle('completed', 'build_task', '1d')).toBe('ok build_task 1d');
 	});
 
 	it('cuts the flow name, never the age, so the whole title stays within the width of a narrow card', () => {
 		const title = widgetTitle('failed', 'a_really_long_flow_name_that_will_not_fit', '12m');
-		expect(title).toBe('FAIL a_really_long_... - 12m');
+		expect(title).toBe('FAILED a_real... 12m');
 		expect(title.length).toBeLessThanOrEqual(MAX_WIDGET_TITLE_LENGTH);
 		expect(widgetTitle('completed', 'x'.repeat(50), '2026-08-01')).toHaveLength(MAX_WIDGET_TITLE_LENGTH);
 	});

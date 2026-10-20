@@ -5,7 +5,11 @@ import {
 	type FlowSummary,
 	type StepView,
 	excerptOf,
-	startedLabel,
+	outcomeLabel,
+	runLabel,
+	shortStarted,
+	statusTag,
+	stepStatusTag,
 } from 'flow-core';
 
 /**
@@ -27,20 +31,54 @@ const STATUS_VARIANTS: Record<ExecutionStatus, BadgeVariant> = {
 };
 // @formatter:on
 
-/** A history row plus the strings the table shows as they are. Raw fields stay for the other consumers. */
+const RECOVERED_PREFIX = 'recovered: ';
+
+/** One line of the error; the text of a run (or step) that went on to complete says it was recovered. */
+function errorExcerptOf(error: string | undefined, recovered: boolean): string {
+	if (error === undefined) {
+		return '';
+	}
+	return recovered
+		? `${RECOVERED_PREFIX}${excerptOf(error, MAX_ERROR_EXCERPT_LENGTH - RECOVERED_PREFIX.length)}`
+		: excerptOf(error, MAX_ERROR_EXCERPT_LENGTH);
+}
+
+/**
+ * A history row plus the short ASCII strings the table shows as they are ("Oct 18 16:15", "build_task rsvl5t",
+ * "ok, recovered"). Raw fields stay for the other consumers.
+ */
 export function toExecutionRow(summary: ExecutionSummary) {
 	return {
 		...summary,
-		startedLabel: startedLabel(summary.startedAt),
-		errorExcerpt: excerptOf(summary.lastError, MAX_ERROR_EXCERPT_LENGTH),
+		startedLabel: shortStarted(summary.startedAt),
+		runLabel: runLabel(summary.flowId, summary.executionId),
+		statusLabel: outcomeLabel(statusTag(summary.status), { recovered: summary.lastErrorRecovered }),
+		errorExcerpt: errorExcerptOf(summary.lastError, summary.lastErrorRecovered),
 	};
 }
 
 export function toStepRow(step: StepView) {
+	const recovered = step.status === 'completed' && step.error !== undefined;
 	return {
 		...step,
-		errorExcerpt: excerptOf(step.error, MAX_ERROR_EXCERPT_LENGTH),
+		statusLabel: outcomeLabel(stepStatusTag(step.status), { recovered, attempts: step.attempts }),
+		errorExcerpt: errorExcerptOf(step.error, recovered),
 	};
+}
+
+const STATUS_FILTERS = [
+	['all', 'All', undefined],
+	['running', 'Running', 'running'],
+	['queued', 'Queued', 'queued'],
+	['completed', 'Completed', 'completed'],
+	['failed', 'Failed', 'failed'],
+] as const;
+
+/** Labels of the status links; the DSL cannot style the active link, so its label carries it: "[Failed]". */
+export function toStatusFilters(activeStatus: string | undefined): Record<string, string> {
+	return Object.fromEntries(
+		STATUS_FILTERS.map(([key, label, status]) => [key, status === activeStatus ? `[${label}]` : label])
+	);
 }
 
 /** The detail plus a colour for its status badge (the only place the DSL can colour a status). */
@@ -53,11 +91,13 @@ export function toExecutionDetailRow(detail: ExecutionDetailView) {
 	}
 	return {
 		...detail,
-		statusVariant,
+		// A recovered error is not a success to read past: the badge says it and turns to warning.
+		statusText: detail.lastErrorRecovered ? 'completed, recovered an error' : detail.status,
+		statusVariant: detail.lastErrorRecovered ? 'warning' : statusVariant,
 		steps: detail.steps.map(toStepRow),
 	};
 }
 
 export function toFlowRow(flow: FlowSummary) {
-	return { ...flow, lastStartedLabel: startedLabel(flow.lastStartedAt) };
+	return { ...flow, lastStartedLabel: shortStarted(flow.lastStartedAt) };
 }

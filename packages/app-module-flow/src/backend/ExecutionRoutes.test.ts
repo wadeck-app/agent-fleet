@@ -26,7 +26,7 @@ describe('GET /executions', () => {
 	it('answers an empty page, not an error, when nothing ran yet', async () => {
 		expect(await callRoute(routes, 'GET /executions', { query: {} })).toEqual({
 			status: 200,
-			body: { items: [], total: 0, skipped: 0, limit: 20, offset: 0 },
+			body: { items: [], total: 0, skipped: 0, limit: 20, offset: 0, statusFilters: expect.any(Object) },
 		});
 	});
 
@@ -259,14 +259,14 @@ describe('GET /flows', () => {
 					executionCount: 1,
 					failedCount: 0,
 					lastStartedAt: '2026-08-17T10:00:00.000Z',
-					lastStartedLabel: '2026-08-17 10:00',
+					lastStartedLabel: 'Aug 17 10:00',
 				},
 				{
 					flowId: 'deploy',
 					executionCount: 2,
 					failedCount: 1,
 					lastStartedAt: '2026-08-16T10:00:00.000Z',
-					lastStartedLabel: '2026-08-16 10:00',
+					lastStartedLabel: 'Aug 16 10:00',
 				},
 			],
 			total: 2,
@@ -296,7 +296,7 @@ describe('GET /flows', () => {
 });
 
 describe('display fields (the DataTable shows a cell as is: it cannot style, truncate or format)', () => {
-	it('adds startedLabel and a one-line errorExcerpt to each execution row, keeping the raw fields', async () => {
+	it('adds short ASCII startedLabel, runLabel and statusLabel to each row, with a one-line errorExcerpt, keeping the raw fields', async () => {
 		fixture.addExecution({
 			executionId: 'bad1',
 			status: 'failed',
@@ -310,12 +310,72 @@ ${'word '.repeat(40)}`,
 		expect(bad).toMatchObject({
 			status: 'failed',
 			startedAt: '2026-08-16T10:05:09.000Z',
-			startedLabel: '2026-08-16 10:05',
+			startedLabel: 'Aug 16 10:05',
+			runLabel: 'deploy bad1',
+			statusLabel: 'FAILED',
 		});
 		expect(String(bad!['errorExcerpt'])).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
 		expect(String(bad!['errorExcerpt'])).toMatch(/^first line word word .*...$/);
 		expect(bad!['lastError']).toContain('\n');
-		expect(ok).toMatchObject({ status: 'completed', errorExcerpt: '' });
+		expect(ok).toMatchObject({ status: 'completed', statusLabel: 'ok', errorExcerpt: '' });
+	});
+
+	it('labels the error of a completed run as recovered, in the status and in the excerpt', async () => {
+		fixture.addExecution({ executionId: 'rec1', lastError: 'worker lost the connection and was retried' });
+		const { body } = await callRoute(routes, 'GET /executions', { query: {} });
+		const [row] = (body as { items: Record<string, unknown>[] }).items;
+		expect(row).toMatchObject({ status: 'completed', statusLabel: 'ok, recovered' });
+		expect(String(row!['errorExcerpt'])).toMatch(/^recovered: worker/);
+		expect(String(row!['errorExcerpt']).length).toBeLessThanOrEqual(MAX_ERROR_EXCERPT_LENGTH);
+	});
+
+	it.each([
+		[undefined, '[All]', 'Running', 'Queued', 'Completed', 'Failed'],
+		['failed', 'All', 'Running', 'Queued', 'Completed', '[Failed]'],
+		['running', 'All', '[Running]', 'Queued', 'Completed', 'Failed'],
+	])(
+		'marks the active status filter in its label (status=%s)',
+		async (status, all, running, queued, completed, failed) => {
+			const { body } = await callRoute(routes, 'GET /executions', {
+				query: status === undefined ? {} : { status },
+			});
+			expect((body as { statusFilters: unknown }).statusFilters).toEqual({
+				all,
+				running,
+				queued,
+				completed,
+				failed,
+			});
+		}
+	);
+
+	it('labels every step with a short status word, and notes retries and recovered errors', async () => {
+		fixture.addExecution({
+			executionId: 'abc124',
+			steps: {
+				build: { status: 'completed' },
+				flaky: { status: 'completed', error: 'boom', attempts: 3 },
+				test: { status: 'failed', error: 'e'.repeat(80) },
+				ship: { status: 'pending' },
+			},
+		});
+		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'abc124' }, query: {} });
+		const steps = (body as { steps: { statusLabel: string; errorExcerpt: string }[] }).steps;
+		expect(steps.map(step => step.statusLabel)).toEqual(['ok', 'ok, recovered, 3 tries', 'FAILED', 'pending']);
+		expect(steps[1]!.errorExcerpt).toBe('recovered: boom');
+		expect(steps[2]!.errorExcerpt).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
+	});
+
+	it('words the detail status badge so a recovered error is visible, in warning colour', async () => {
+		fixture.addExecution({ executionId: 'rec2', lastError: 'boom' });
+		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'rec2' }, query: {} });
+		expect(body).toMatchObject({ statusText: 'completed, recovered an error', statusVariant: 'warning' });
+	});
+
+	it('words the detail status badge with the plain status otherwise', async () => {
+		fixture.addExecution({ executionId: 'plain', status: 'failed', lastError: 'boom' });
+		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'plain' }, query: {} });
+		expect(body).toMatchObject({ statusText: 'failed', statusVariant: 'danger' });
 	});
 
 	it('adds statusVariant and per-step display fields to the detail', async () => {

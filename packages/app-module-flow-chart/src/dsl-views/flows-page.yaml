@@ -1,8 +1,14 @@
 # Flow charts index (nav): the flows that ran on this machine. A row opens the chart of the flow definition;
 # the chart of one run is reached from that execution's page ("See flow chart").
+# Short precomputed text and three columns: the DataTable keeps only key and label of a column (no format, no width) and
+# breaks a cell anywhere, so a raw ISO timestamp would wrap mid-number on a narrow page.
+# Pagination and page size live in the URL (?page=&size=), like the executions page of the flow module.
 $sources:
     flows:
         url: GET /api/modules/flow-chart/flows
+        params:
+            page: $urlParam.page
+            limit: $urlParam.size
 
 $type: PageContent
 sections:
@@ -16,6 +22,21 @@ sections:
       emptyMessage: No flow has run yet. Run a flow (flow run <file>) and it will be listed here.
       columns:
           - { key: 'flowId', label: 'Flow' }
-          - { key: 'executionCount', label: 'Executions' }
+          - { key: 'executionCount', label: 'Runs' }
           - { key: 'failedCount', label: 'Failed' }
-          - { key: 'lastStartedAt', label: 'Last started', format: 'datetime' }
+          - { key: 'lastStartedLabel', label: 'Last' }
+
+    - $type: HorizontalStack
+      justify: justify-between
+      align: items-center
+      gap: gap-3
+      items:
+          - $type: Pagination
+            urlParam: page
+            total: $sources.flows.total
+            size: $sources.flows.limit
+
+          # Shows options[0] while ?size= is absent: it must be the backend default page size (views.test.ts).
+          - $type: PageSizeSelect
+            urlParam: size
+            options: [20, 50, 100]

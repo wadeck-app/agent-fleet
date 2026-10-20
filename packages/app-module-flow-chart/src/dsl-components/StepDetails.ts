@@ -1,7 +1,5 @@
 import type { FlowGraphNode } from 'flow-core';
 
-import { statusStyle } from './StatusStyle.js';
-
 export interface DetailRow {
 	label: string;
 	value: string;
@@ -13,7 +11,7 @@ export interface StepDetail {
 	error: string | undefined;
 }
 
-// Order is the order of display. A key not listed here is still shown, under its own name, after these.
+// Order is the order of display. A key not listed here is not shown (no raw dump of the record's meta).
 const META_LABELS: Record<string, string> = {
 	provider: 'Provider',
 	model: 'Model',
@@ -33,8 +31,6 @@ const META_LABELS: Record<string, string> = {
 	costUsd: 'Cost (USD)',
 };
 const DATE_KEYS = new Set(['startedAt', 'completedAt']);
-// `type` repeats the kind; `error` has its own block.
-const HIDDEN_KEYS = new Set(['type', 'error']);
 
 function formatValue(key: string, value: string | number | boolean): string {
 	if (DATE_KEYS.has(key) && typeof value === 'string') {
@@ -47,14 +43,19 @@ function formatValue(key: string, value: string | number | boolean): string {
 
 /** The facts the details panel shows for one step, as label/value rows. */
 export function describeStep(step: FlowGraphNode): StepDetail {
-	const rows: DetailRow[] = [
-		{ label: 'Status', value: statusStyle(step.status).label },
-		{ label: 'Kind', value: step.kind },
-	];
+	// The status is the badge of the panel; a removed or injected node says so once, here, not through its kind and raw flags.
+	const rows: DetailRow[] = [];
+	if (step.kind === 'removed') {
+		rows.push({ label: 'Flow file', value: 'step no longer declared' });
+	} else if (step.kind === 'injected') {
+		rows.push({ label: 'Flow file', value: 'created at run time' });
+	} else {
+		rows.push({ label: 'Kind', value: step.kind });
+	}
 	if (step.durationLabel !== undefined) {
 		rows.push({ label: 'Duration', value: step.durationLabel });
 	}
-	if (step.attempts !== undefined) {
+	if (step.attempts !== undefined && step.attempts > 1) {
 		rows.push({ label: 'Attempts', value: String(step.attempts) });
 	}
 
@@ -63,11 +64,6 @@ export function describeStep(step: FlowGraphNode): StepDetail {
 		const value = meta[key];
 		if (value !== undefined) {
 			rows.push({ label: META_LABELS[key]!, value: formatValue(key, value) });
-		}
-	}
-	for (const [key, value] of Object.entries(meta)) {
-		if (!(key in META_LABELS) && !HIDDEN_KEYS.has(key)) {
-			rows.push({ label: key, value: formatValue(key, value) });
 		}
 	}
 	const error = meta['error'];

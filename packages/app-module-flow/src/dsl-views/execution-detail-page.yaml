@@ -2,6 +2,8 @@
 # ?tail=<chars> sets how much of a failed step's output is kept; ?full=true lifts the limit.
 # Slot "flow:execution-actions" (manifest expose.slots): other modules add buttons beside the badges. Their views are
 # rendered with this page's context, so they can read $route.id and $sources.execution.<field> (whole-string expressions only).
+# The steps table has three short columns (a narrow page breaks longer cells mid-word): the status word carries retries
+# and recovered errors ("ok, recovered, 3 tries"); the error text is in the output below.
 $sources:
     execution:
         # A placeholder is filled from params; the module id stays literal.
@@ -35,7 +37,7 @@ sections:
             items:
                 - {
                       $type: Badge,
-                      label: $sources.execution.status,
+                      label: $sources.execution.statusText,
                       variant: $sources.execution.statusVariant,
                       tone: subtle,
                   }
@@ -54,13 +56,11 @@ sections:
             emptyMessage: This execution has no step
             columns:
                 - { key: 'stepId', label: 'Step' }
-                - { key: 'status', label: 'Status' }
+                - { key: 'statusLabel', label: 'Status' }
                 - { key: 'duration', label: 'Duration' }
-                - { key: 'attempts', label: 'Attempts' }
-                - { key: 'errorExcerpt', label: 'Error' }
 
     - $type: Section
-      title: Output (same text as `flow show`, failed steps carry the tail of their output)
+      title: Output (same text as `flow show`, with the error and the tail of failed steps)
       items:
           - $type: JsonViewer
             row: $sources.execution

@@ -5,12 +5,12 @@ import { replyWithError } from './ErrorReply.js';
 
 export const WIDGET_ROW_COUNT = 5;
 /**
- * Longest row title: "tag name - age" must fit one line of the narrowest widget (a 240px card leaves about 190px,
- * 25-27 characters at 14px). The dsl-ui DataTable ignores a column's width/truncate and breaks a cell anywhere, so the
- * only way to keep one line per run is to send a title that is short enough.
+ * Longest row title: "tag name age". A 240px card leaves room for about 25 characters on one line, a 160px one for
+ * about 13, where it wraps in two. The dsl-ui DataTable ignores a column's width/truncate and breaks a cell anywhere, so
+ * the only lever is a short title.
  */
-export const MAX_WIDGET_TITLE_LENGTH = 28;
-const TITLE_SEPARATOR = ' - ';
+export const MAX_WIDGET_TITLE_LENGTH = 20;
+const TITLE_SEPARATOR = ' ';
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -77,7 +77,7 @@ export function registerExecutionWidgetRoutes(
 	});
 }
 
-/** "ok build_task - 1d": the flow name is cut (with "...") so the whole title fits; `flowId` keeps the full name. */
+/** "ok build_task 1d": the flow name is cut (with "...") so the whole title fits; `flowId` keeps the full name. */
 export function widgetTitle(status: string, flowId: string, age: string): string {
 	const prefix = `${statusTag(status)} `;
 	const suffix = `${TITLE_SEPARATOR}${age}`;

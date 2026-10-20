@@ -6,26 +6,16 @@ import { describeStep } from './StepDetails.js';
 
 const BADGE_BASE_CLASS = 'inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium';
 const ERROR_BLOCK_CLASS =
-	'max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md border border-danger bg-danger-bg p-2 font-mono text-xs text-danger-text';
+	'max-h-56 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-md border border-danger bg-danger-bg p-2 font-mono text-xs text-danger-text';
 const PANEL_CLASS = 'flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-sm text-content';
 
 interface StepDetailsPanelProps {
-	step: FlowGraphNode | undefined;
+	step: FlowGraphNode;
 	onClose: () => void;
 }
 
-/** The facts of the selected step; a hint while nothing is selected so the panel does not look broken. */
+/** The facts of the selected step. The caller renders it only while a step is selected, so it never takes room from the chart. */
 export function StepDetailsPanel({ step, onClose }: StepDetailsPanelProps) {
-	if (step === undefined) {
-		return (
-			<aside
-				aria-label="Step details"
-				className="rounded-lg border border-dashed border-border bg-surface p-4 text-sm text-muted"
-			>
-				Click a step to see its status, duration, attempts and error.
-			</aside>
-		);
-	}
 	const { rows, error } = describeStep(step);
 	const style = statusStyle(step.status);
 

@@ -1,18 +1,19 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
-import { type FlowGraphTarget, type FlowQueryService, InvalidQueryError } from 'flow-core';
+import {
+	DEFAULT_HISTORY_LIMIT,
+	type FlowGraphTarget,
+	type FlowQueryService,
+	InvalidQueryError,
+	type QueryParams,
+	optionalInteger,
+	optionalString,
+	readPageOffset,
+	shortStarted,
+} from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
 
-type QueryParams = Record<string, string | string[] | undefined>;
-
-/** A parameter given once. Empty means unset: the DSL sends `?flowId=` when its route value is missing. */
-function optionalString(query: QueryParams, name: string): string | undefined {
-	const raw = query[name];
-	if (Array.isArray(raw)) {
-		throw new InvalidQueryError(`'${name}' must be given once, got ${raw.length} values.`);
-	}
-	return raw === undefined || raw === '' ? undefined : raw;
-}
+export const MAX_FLOWS_LIMIT = 500;
 
 function readTarget(query: QueryParams): FlowGraphTarget {
 	const executionId = optionalString(query, 'executionId');
@@ -33,7 +34,7 @@ function readTarget(query: QueryParams): FlowGraphTarget {
 
 /**
  * `GET /graph?executionId=` or `?flowId=` (the graph flow-core builds from the flow file, with the step
- * states of the run when there is one) and `GET /flows` (the flows that ran, to pick one to draw).
+ * states of the run when there is one) and `GET /flows?page&limit` (a page of the flows that ran, to pick one to draw).
  * Read-only.
  */
 export function registerGraphRoutes(ctx: ModuleContext, service: FlowQueryService): void {
@@ -47,10 +48,16 @@ export function registerGraphRoutes(ctx: ModuleContext, service: FlowQueryServic
 		}
 	});
 
-	ctx.registerRoute('GET', '/flows', (_req, reply) => {
+	ctx.registerRoute('GET', '/flows', (req, reply) => {
+		const query = (req as { query?: QueryParams }).query ?? {};
 		try {
-			const flows = service.listFlows();
-			return reply.code(200).send({ flows });
+			const limit = optionalInteger(query, 'limit', { min: 1, max: MAX_FLOWS_LIMIT }) ?? DEFAULT_HISTORY_LIMIT;
+			const offset = readPageOffset(query, limit) ?? 0;
+			const all = service.listFlows();
+			const flows = all
+				.slice(offset, offset + limit)
+				.map(flow => ({ ...flow, lastStartedLabel: shortStarted(flow.lastStartedAt) }));
+			return reply.code(200).send({ flows, total: all.length, limit, offset });
 		} catch (err) {
 			return replyWithError(reply, err);
 		}
