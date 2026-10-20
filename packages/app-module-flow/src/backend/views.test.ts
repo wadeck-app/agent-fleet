@@ -1,5 +1,5 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
-import { DEFAULT_HISTORY_LIMIT } from 'flow-core';
+import { DEFAULT_HISTORY_LIMIT, statusTag } from 'flow-core';
 import { FlowConfigFixture, collectRoutes } from 'flow-core/testing';
 import { load } from 'js-yaml';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -110,14 +110,49 @@ describe('executions page', () => {
 });
 
 describe('DataTable columns', () => {
-	// dsl-ui normalizeColumn (2026.10.18-101 and the current source) copies only key and label from a YAML column:
-	// width, truncate, muted, mono and format are dropped without a warning, so a view that sets them lies.
-	it.each(viewFiles)('%s sets only key and label on a column (anything else is ignored by the renderer)', file => {
-		const columns = collectNodes(parseView(file).document, 'DataTable').flatMap(
+	// Keys dsl-ui 2026.10.19-122 (DATA_TABLE_COLUMN_KEYS) accepts on a data column. Any other key is a compile error
+	// there; a shell older than 122 ignores everything but key and label, so each option below must be cosmetic.
+	const COLUMN_KEYS = [
+		'field',
+		'key',
+		'label',
+		'width',
+		'truncate',
+		'nowrap',
+		'mono',
+		'muted',
+		'sortable',
+		'format',
+		'badge',
+	];
+	const BADGE_VARIANTS = ['default', 'primary', 'success', 'warning', 'danger', 'info'];
+
+	function columnsOf(file: string): Record<string, unknown>[] {
+		return collectNodes(parseView(file).document, 'DataTable').flatMap(
 			table => table['columns'] as Record<string, unknown>[]
 		);
-		for (const column of columns) {
-			expect(Object.keys(column).sort(), `${file}: column ${JSON.stringify(column)}`).toEqual(['key', 'label']);
+	}
+
+	it.each(viewFiles)('%s sets only keys the dsl-ui DataTable reads (any other is a compile error)', file => {
+		for (const column of columnsOf(file)) {
+			for (const name of Object.keys(column)) {
+				expect(COLUMN_KEYS, `${file}: column ${JSON.stringify(column)}`).toContain(name);
+			}
+		}
+	});
+
+	it.each(viewFiles)('%s names the row field with key (a shell older than 122 reads key only)', file => {
+		for (const column of columnsOf(file)) {
+			expect(column, `${file}: column ${JSON.stringify(column)}`).toHaveProperty('key');
+			expect(column).not.toHaveProperty('field');
+		}
+	});
+
+	it.each(viewFiles)('%s maps badges to known variants', file => {
+		for (const column of columnsOf(file)) {
+			for (const variant of Object.values((column['badge'] ?? {}) as Record<string, string>)) {
+				expect(BADGE_VARIANTS, `${file}: column ${JSON.stringify(column)}`).toContain(variant);
+			}
 		}
 	});
 });
@@ -145,6 +180,27 @@ describe('executions page layout', () => {
 			'runLabel',
 			'statusLabel',
 		]);
+	});
+
+	it('keeps When and Status on one line and badges every bare status word the route can send', () => {
+		const table = collectNodes(parseView('executions-page.yaml').document, 'DataTable')[0]!;
+		const columns = table['columns'] as Record<string, unknown>[];
+		const byKey = (key: string) => columns.find(column => column['key'] === key)!;
+		expect(byKey('startedLabel')).toMatchObject({ nowrap: true });
+		expect(byKey('statusLabel')).toMatchObject({ nowrap: true });
+		const badge = byKey('statusLabel')['badge'] as Record<string, string>;
+		// The cell text stays the status word (older shells show it as is); the badge only colours a cell whose text is exactly a key.
+		for (const status of ['queued', 'running', 'completed', 'failed', 're-queued']) {
+			expect(Object.keys(badge), status).toContain(statusTag(status));
+		}
+		expect(badge[statusTag('completed')]).toBe('success');
+		expect(badge[statusTag('failed')]).toBe('danger');
+	});
+
+	it('truncates the flow name of the flows summary', () => {
+		const table = collectNodes(parseView('executions-page.yaml').document, 'DataTable')[1]!;
+		const flow = (table['columns'] as Record<string, unknown>[]).find(column => column['key'] === 'flowId');
+		expect(flow).toMatchObject({ truncate: true });
 	});
 
 	it('labels the status links from the route, which marks the active filter', () => {

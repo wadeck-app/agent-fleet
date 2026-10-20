@@ -2,8 +2,9 @@
 # The status links reload the page with the filter applied. The flow filter is the `flow` URL parameter, set by clicking
 # a row of the "Flows" table (GET /flows?limit=N, the most recent flows: the executions come first, they are the page).
 # Three columns of short ASCII text the route precomputes (startedLabel "Oct 18 16:15", runLabel "flow_name abc123",
-# statusLabel "ok" / "FAILED" / "ok, recovered"): the DataTable renders every YAML-column cell as `break-all` and keeps
-# only key and label of a column, so on a narrow page (about 510px of content) anything longer breaks mid-word.
+# statusLabel "ok" / "FAILED" / "ok, recovered"): a plain YAML-column cell is `break-all`, so on a narrow page (about
+# 510px of content) anything longer breaks mid-word. dsl-ui 122 adds nowrap/truncate/badge; older shells ignore them
+# (they keep key and label only), hence the short precomputed text stays the base and the options only improve it.
 # The error of a run is on its detail page: a cell cannot hold a second line.
 # The status links get their label from the route (statusFilters), which puts the active one in brackets: a Link has no active style. A free-text/select control bound to ?flow= needs a dsl-ui change: today only
 # Pagination and PageSizeSelect take `urlParam`, and SearchBar/CompactSelect cannot read the URL back into `value`.
@@ -69,9 +70,22 @@ sections:
       navigateTo: '/modules/flow/executions/{executionId}'
       emptyMessage: No execution matches
       columns:
-          - { key: 'startedLabel', label: 'When' }
+          - { key: 'startedLabel', label: 'When', nowrap: true }
           - { key: 'runLabel', label: 'Run' }
-          - { key: 'statusLabel', label: 'Status' }
+          # The cell text stays the status word: a shell older than dsl-ui 122 ignores nowrap and badge and shows it as is.
+          # The badge colours a cell whose text is exactly a key; "ok, 3 tries" and the like stay plain text.
+          - key: statusLabel
+            label: Status
+            nowrap: true
+            badge:
+                {
+                    ok: success,
+                    FAILED: danger,
+                    running: info,
+                    waiting: default,
+                    retry: warning,
+                    'ok, recovered': warning,
+                }
 
     - $type: HorizontalStack
       justify: justify-between
@@ -97,7 +111,7 @@ sections:
             navigateTo: '/modules/flow/executions?flow={flowId}'
             emptyMessage: No flow has run yet
             columns:
-                - { key: 'flowId', label: 'Flow' }
+                - { key: 'flowId', label: 'Flow', truncate: true }
                 - { key: 'executionCount', label: 'Runs' }
                 - { key: 'failedCount', label: 'Failed' }
                 - { key: 'lastStartedLabel', label: 'Last' }
