@@ -26,7 +26,9 @@ type FlowCommands = { run?: (payload: unknown) => Promise<DaemonResponse> };
 
 function parseTimeout(value: string): number {
 	const match = /^(\d+)(ms|s|m|h)?$/.exec(value);
-	if (!match) throw new Error(`Invalid timeout: ${value}. Use e.g. 10m, 30s, 5000ms`);
+	if (!match) {
+		throw new Error(`Invalid timeout: ${value}. Use e.g. 10m, 30s, 5000ms`);
+	}
 	const n = parseInt(match[1]!, 10);
 	switch (match[2] ?? 's') {
 		case 'ms':
@@ -57,10 +59,14 @@ export function tailLogFile(
 	lastByte: number,
 	onLog: (stepId: string, message: string) => void
 ): number {
-	if (!fs.existsSync(logFile)) return lastByte;
+	if (!fs.existsSync(logFile)) {
+		return lastByte;
+	}
 
 	const stat = fs.statSync(logFile);
-	if (stat.size <= lastByte) return lastByte;
+	if (stat.size <= lastByte) {
+		return lastByte;
+	}
 
 	const buf = Buffer.alloc(stat.size - lastByte);
 	const fd = fs.openSync(logFile, 'r');
@@ -72,7 +78,9 @@ export function tailLogFile(
 
 	for (const raw of lines) {
 		const trimmed = raw.trim();
-		if (!trimmed) continue;
+		if (!trimmed) {
+			continue;
+		}
 		let line: LogLine;
 		try {
 			line = JSON.parse(trimmed) as LogLine;
@@ -80,9 +88,13 @@ export function tailLogFile(
 			continue;
 		}
 		const prefix = `[${executionId}|`;
-		if (typeof line.prefix !== 'string' || !line.prefix.startsWith(prefix)) continue;
+		if (typeof line.prefix !== 'string' || !line.prefix.startsWith(prefix)) {
+			continue;
+		}
 		const stepId = line.prefix.slice(prefix.length, -1);
-		if (stepId === '__execution') continue;
+		if (stepId === '__execution') {
+			continue;
+		}
 		onLog(stepId, line.message);
 	}
 
@@ -113,12 +125,16 @@ async function waitForCompletion(
 		if (store.exists(executionId)) {
 			const state = store.read(executionId);
 			if (state.status === 'completed' || state.status === 'failed') {
-				if (onLog) tailLogFile(logFile, executionId, lastByte, onLog);
+				if (onLog) {
+					tailLogFile(logFile, executionId, lastByte, onLog);
+				}
 				return state;
 			}
 		}
 		await new Promise(r => setTimeout(r, delay));
-		if (!options?.fastPoll) delay = Math.min(delay * 1.5, 2000);
+		if (!options?.fastPoll) {
+			delay = Math.min(delay * 1.5, 2000);
+		}
 	}
 	throw new ExecutionTimeoutError(`Execution ${executionId} did not complete within ${timeoutMs}ms`);
 }
@@ -162,14 +178,21 @@ function validateSecretInputs(flowFilePath: string, inputs: Record<string, strin
 		return null; // If we can't read the flow, let the daemon handle it
 	}
 
-	if (!flow?.inputs) return null;
+	if (!flow?.inputs) {
+		return null;
+	}
 
 	for (const [key, spec] of Object.entries(flow.inputs)) {
 		const inputType = typeof spec === 'string' ? spec : (spec as InputDefinition).type;
-		if (inputType !== 'password') continue;
+		if (inputType !== 'password') {
+			continue;
+		}
 
 		const value = inputs[key];
-		if (value === undefined) continue; // missing optional input -- daemon will handle
+		// missing optional input -- daemon will handle
+		if (value === undefined) {
+			continue;
+		}
 
 		// Validate that the value is a URI scheme, not a literal
 		const isUriScheme = value.startsWith('env://') || value.startsWith('file://') || value.startsWith('input://');
@@ -201,7 +224,8 @@ function loadMockConfig(mockConfigPath: string, flowFilePath: string): Record<st
 		const content = fs.readFileSync(resolvedPath, 'utf8');
 		parsed = yaml.load(content, { schema: yaml.JSON_SCHEMA });
 	} catch (err) {
-		console.error(`Error:Mock config file "${resolvedPath}" is not valid YAML/JSON. ${getErrorMessage(err)}`);
+		const detail = getErrorMessage(err);
+		console.error(`Error:Mock config file "${resolvedPath}" is not valid YAML/JSON. ${detail}`);
 		process.exit(2);
 	}
 
@@ -271,7 +295,9 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 	// A foreign override must not reach the daemon either: it would resolve its own updater path
 	// from another CLI's directory. Pass on the value we accepted, or nothing.
 	const daemonEnv: NodeJS.ProcessEnv = { ...process.env, FLOW_DAEMON_MODE: '1' };
-	if (daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'] !== resolvedBundle) delete daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'];
+	if (daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'] !== resolvedBundle) {
+		delete daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'];
+	}
 
 	// On Windows the daemon is spawned via VBScript, which loses the Git Bash PATH enrichment
 	// (MSYS2 paths like C:\Program Files\Git\usr\bin are absent in the system PATH). Resolve
@@ -279,7 +305,9 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 	// daemon and its forked workers never depend on PATH lookup for bash.
 	if (process.platform === 'win32') {
 		const resolved = resolveFlowBashPath(daemonEnv);
-		if (resolved) daemonEnv['FLOW_BASH_PATH'] = resolved;
+		if (resolved) {
+			daemonEnv['FLOW_BASH_PATH'] = resolved;
+		}
 	}
 
 	// Remove stale port file before spawning so the poll below only resolves on a fresh write
@@ -332,7 +360,9 @@ async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Pro
 	// Poll for port file written by the freshly-spawned daemon
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
-		if (fs.existsSync(portFile)) return;
+		if (fs.existsSync(portFile)) {
+			return;
+		}
 		await new Promise(r => setTimeout(r, 50));
 	}
 	throw new Error(`Daemon did not start within ${timeoutMs}ms (port file not found: ${portFile})`);
@@ -347,7 +377,9 @@ async function sendToDaemon(
 	try {
 		return (await makeClient().send('run', cmd)) as DaemonResponse;
 	} catch (err) {
-		if (!(err instanceof DaemonNotRunningError)) throw err;
+		if (!(err instanceof DaemonNotRunningError)) {
+			throw err;
+		}
 		try {
 			await spawnDaemonBackground(daemonDir);
 			// On Windows the daemon writes the port file before the TCP server is ready.
@@ -358,7 +390,9 @@ async function sendToDaemon(
 					return (await makeClient().send('run', cmd)) as DaemonResponse;
 				} catch (eRetry) {
 					const code = (eRetry as NodeJS.ErrnoException).code;
-					if (code !== 'ECONNRESET' && !(eRetry instanceof DaemonNotRunningError)) throw eRetry;
+					if (code !== 'ECONNRESET' && !(eRetry instanceof DaemonNotRunningError)) {
+						throw eRetry;
+					}
 					lastErr = eRetry;
 					await new Promise(r => setTimeout(r, 150 * (attempt + 1)));
 				}

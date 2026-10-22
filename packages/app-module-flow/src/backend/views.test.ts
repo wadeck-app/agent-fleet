@@ -204,6 +204,53 @@ describe('DataTable columns', () => {
 	});
 });
 
+describe('timestamps (same text as the rest of app-core: the shell DataTable formats an ISO value)', () => {
+	// dsl-ui DataTable `format: datetime` = Intl.DateTimeFormat(undefined, short date + short time), the format of the
+	// queue module tables. A view must not show a timestamp any other way: no server-side label, no raw ISO in a Badge.
+	const TIMESTAMP_ONLY_KEY = /At$/;
+
+	function everyColumn(): { file: string; variant: string | undefined; column: Record<string, unknown> }[] {
+		return viewFiles.flatMap(file =>
+			alternativesOf(file).flatMap(({ variant, document }) =>
+				collectNodes(document, 'DataTable').flatMap(table =>
+					(table['columns'] as Record<string, unknown>[]).map(column => ({ file, variant, column }))
+				)
+			)
+		);
+	}
+
+	it('formats every *At column as a datetime, in every A/B variant', () => {
+		const dated = everyColumn().filter(({ column }) => TIMESTAMP_ONLY_KEY.test(String(column['key'])));
+		// A rename of the keys would make the loop below vacuous.
+		expect(dated.length).toBeGreaterThanOrEqual(6);
+		for (const { file, variant, column } of dated) {
+			expect(column, `${file} (${String(variant)}): ${JSON.stringify(column)}`).toMatchObject({
+				format: 'datetime',
+			});
+		}
+	});
+
+	it('reads no precomputed date label (startedLabel, lastStartedLabel): the backend sends ISO 8601 only', () => {
+		for (const file of viewFiles) {
+			expect(JSON.stringify(parseView(file).document), file).not.toMatch(/(started|Started)Label/);
+		}
+		expect(
+			everyColumn().filter(({ column }) => /StartedLabel$|^startedLabel$/.test(String(column['key'])))
+		).toEqual([]);
+	});
+
+	it('never puts a timestamp in a Badge or a StatTile (they would show the raw ISO text)', () => {
+		for (const file of viewFiles) {
+			for (const { variant, document } of alternativesOf(file)) {
+				for (const node of [...collectNodes(document, 'Badge'), ...collectNodes(document, 'StatTile')]) {
+					const text = JSON.stringify([node['label'], node['value']]);
+					expect(text, `${file} (${String(variant)})`).not.toMatch(/At"/);
+				}
+			}
+		}
+	});
+});
+
 describe('executions page layout', () => {
 	it('shows the executions table before the flows summary, which asks for a short list', () => {
 		const view = { file: 'executions-page.yaml', document: initialView('executions-page.yaml') };
@@ -223,7 +270,7 @@ describe('executions page layout', () => {
 	it('has at most 3 narrow columns of short precomputed text: a 510px content area breaks any longer cell mid-word', () => {
 		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[0]!;
 		expect((table['columns'] as { key: string }[]).map(column => column.key)).toEqual([
-			'startedLabel',
+			'startedAt',
 			'runLabel',
 			'statusLabel',
 		]);
@@ -233,7 +280,7 @@ describe('executions page layout', () => {
 		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[0]!;
 		const columns = table['columns'] as Record<string, unknown>[];
 		const byKey = (key: string) => columns.find(column => column['key'] === key)!;
-		expect(byKey('startedLabel')).toMatchObject({ nowrap: true });
+		expect(byKey('startedAt')).toMatchObject({ nowrap: true, format: 'datetime' });
 		expect(byKey('statusLabel')).toMatchObject({ nowrap: true });
 		const badge = byKey('statusLabel')['badge'] as Record<string, string>;
 		// The cell text stays the status word (older shells show it as is); the badge only colours a cell whose text is exactly a key.
@@ -273,12 +320,41 @@ describe('execution detail page', () => {
 			label: '$sources.execution.statusText',
 			variant: '$sources.execution.statusVariant',
 		});
-		const steps = collectNodes(document, 'DataTable')[0]!;
+		const steps = collectNodes(document, 'DataTable').find(table => table['rows'] === '$sources.execution.steps')!;
 		expect((steps['columns'] as { key: string }[]).map(column => column.key)).toEqual([
 			'stepId',
 			'statusLabel',
 			'duration',
+			'startedAt',
 		]);
+	});
+
+	it('shows when the run started and ended in a one-row table the shell formats, in every variant', () => {
+		for (const { variant, document } of alternativesOf('execution-detail-page.yaml')) {
+			const timing = collectNodes(document, 'DataTable').filter(
+				table => table['rows'] === '$sources.execution.timing'
+			);
+			expect(timing, String(variant)).toHaveLength(1);
+			expect(timing[0]!['columns'], String(variant)).toEqual([
+				{ key: 'startedAt', label: 'Started', format: 'datetime', nowrap: true },
+				{ key: 'completedAt', label: 'Finished', format: 'datetime', nowrap: true },
+			]);
+		}
+	});
+
+	it('badges the step status words in every variant', () => {
+		for (const { variant, document } of alternativesOf('execution-detail-page.yaml')) {
+			const steps = collectNodes(document, 'DataTable').find(
+				table => table['rows'] === '$sources.execution.steps'
+			)!;
+			const status = (steps['columns'] as Record<string, unknown>[]).find(
+				column => column['key'] === 'statusLabel'
+			);
+			expect(status, String(variant)).toMatchObject({ nowrap: true });
+			expect(Object.keys(status!['badge'] as object), String(variant)).toEqual(
+				expect.arrayContaining(['ok', 'FAILED', 'running', 'waiting', 'retry', 'pending'])
+			);
+		}
 	});
 });
 
@@ -445,7 +521,7 @@ describe('dashboard widget', () => {
 	});
 
 	// Fields of one row of the widget route: `title` for the list variant, the rest for the dense table.
-	const ROW_FIELDS = ['title', 'statusLabel', 'flowId', 'when'];
+	const ROW_FIELDS = ['title', 'statusLabel', 'flowId', 'startedAt'];
 
 	it('shows only columns the widget route sends (a typo would render empty cells)', () => {
 		for (const { variant, document } of alternativesOf(widgetFile)) {
@@ -454,11 +530,23 @@ describe('dashboard widget', () => {
 		}
 	});
 
-	it('shows the current design first: one precomputed title column', () => {
+	it('shows the current design first: the precomputed title and the shell-formatted start time', () => {
 		const columns = collectNodes(initialView(widgetFile), 'DataTable').flatMap(
 			table => table['columns'] as { key: string }[]
 		);
-		expect(columns.map(column => column.key)).toEqual(['title']);
+		expect(columns.map(column => column.key)).toEqual(['title', 'startedAt']);
+	});
+
+	it('shows the start time of the last run as a datetime in the tiles variant, with an empty message when nothing ran', () => {
+		const tiles = alternativesOf(widgetFile).find(alternative => alternative.variant === 'tiles')!;
+		const lastRun = collectNodes(tiles.document, 'DataTable').filter(
+			table => table['rows'] === '$sources.recent.lastRun'
+		);
+		expect(lastRun).toHaveLength(1);
+		expect(lastRun[0]).toMatchObject({
+			columns: [{ key: 'startedAt', label: 'Last run', format: 'datetime', nowrap: true }],
+			emptyMessage: 'No execution yet',
+		});
 	});
 
 	it('reads only widget fields the route sends', () => {

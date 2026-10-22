@@ -28,23 +28,35 @@ export interface ChartViewPlan {
 	focus: boolean;
 }
 
-function fitZoom(graph: FlowGraph, direction: LayoutDirection, width: number, height: number): number {
-	const positions = [...layoutGraph(graph, direction).values()];
+function fitZoom(
+	graph: FlowGraph,
+	direction: LayoutDirection,
+	width: number,
+	height: number,
+	collapsed: ReadonlySet<string>
+): number {
+	const positions = [...layoutGraph(graph, direction, collapsed).values()];
 	const boundsWidth = Math.max(...positions.map(p => p.x)) - Math.min(...positions.map(p => p.x)) + NODE_WIDTH;
 	const boundsHeight = Math.max(...positions.map(p => p.y)) - Math.min(...positions.map(p => p.y)) + NODE_HEIGHT;
 	const usable = 1 - 2 * FIT_PADDING;
 	return Math.min(MAX_FIT_ZOOM, (width * usable) / boundsWidth, (height * usable) / boundsHeight);
 }
 
-function planFor(graph: FlowGraph, direction: LayoutDirection, width: number, baseHeight: number): ChartViewPlan {
+function planFor(
+	graph: FlowGraph,
+	direction: LayoutDirection,
+	width: number,
+	baseHeight: number,
+	collapsed: ReadonlySet<string>
+): ChartViewPlan {
 	let canvasHeight = baseHeight;
 	if (direction === 'TB') {
-		const positions = [...layoutGraph(graph, 'TB').values()];
+		const positions = [...layoutGraph(graph, 'TB', collapsed).values()];
 		const boundsHeight = Math.max(...positions.map(p => p.y)) - Math.min(...positions.map(p => p.y)) + NODE_HEIGHT;
 		const needed = Math.ceil((boundsHeight * READABLE_ZOOM) / (1 - 2 * FIT_PADDING));
 		canvasHeight = Math.min(MAX_CANVAS_HEIGHT, Math.max(baseHeight, needed));
 	}
-	const fittedZoom = fitZoom(graph, direction, width, canvasHeight);
+	const fittedZoom = fitZoom(graph, direction, width, canvasHeight, collapsed);
 	const focus = fittedZoom < READABLE_ZOOM;
 	// Opening on one step centers it in the canvas: a grown canvas would only add empty space around it.
 	if (focus) {
@@ -56,13 +68,15 @@ function planFor(graph: FlowGraph, direction: LayoutDirection, width: number, ba
 /**
  * Decides how the chart first appears: the layout direction (left to right when that is readable, else vertical),
  * the canvas height, and whether the whole flow fits at a readable zoom or the chart must open on one step.
- * `forcedDirection` is the reader's choice, which only changes the other outputs.
+ * `forcedDirection` is the reader's choice, which only changes the other outputs. `collapsed` are the parents whose
+ * sub-steps are folded (they take no room).
  */
 export function planChartView(
 	graph: FlowGraph,
 	canvasWidth: number,
 	viewportHeight: number,
-	forcedDirection?: LayoutDirection
+	forcedDirection?: LayoutDirection,
+	collapsed: ReadonlySet<string> = new Set()
 ): ChartViewPlan {
 	if (graph.nodes.length === 0) {
 		throw new Error('Cannot plan a chart with no step: the caller must handle the empty graph.');
@@ -75,13 +89,13 @@ export function planChartView(
 		Math.max(MIN_CANVAS_HEIGHT, Math.round(viewportHeight * CANVAS_VIEWPORT_SHARE))
 	);
 	if (forcedDirection !== undefined) {
-		return planFor(graph, forcedDirection, canvasWidth, baseHeight);
+		return planFor(graph, forcedDirection, canvasWidth, baseHeight, collapsed);
 	}
 
-	const horizontal = planFor(graph, 'LR', canvasWidth, baseHeight);
+	const horizontal = planFor(graph, 'LR', canvasWidth, baseHeight, collapsed);
 	if (horizontal.fittedZoom >= READABLE_ZOOM) {
 		return horizontal;
 	}
-	const vertical = planFor(graph, 'TB', canvasWidth, baseHeight);
+	const vertical = planFor(graph, 'TB', canvasWidth, baseHeight, collapsed);
 	return vertical.fittedZoom > horizontal.fittedZoom ? vertical : horizontal;
 }

@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// violations-suppress: ts/no-deep-relative build script outside src/ cannot use a path alias; the bundle script is not covered by tsconfig paths
 import { APP_MODULES } from '../../src/daemon/AppModules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

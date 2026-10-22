@@ -24,6 +24,7 @@ function resolveJsToTs(): Plugin {
 
 // Specific entry first: a plain 'flow-core' key would also capture 'flow-core/testing'.
 const alias = {
+	'flow-core/graph-tree': path.resolve(__dirname, '../flow-core/src/graph/GraphTree.ts'),
 	'flow-core/testing': path.resolve(__dirname, '../flow-core/src/testing/index.ts'),
 	'flow-core': path.resolve(__dirname, '../flow-core/src/index.ts'),
 };

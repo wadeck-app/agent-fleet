@@ -3,6 +3,7 @@ import type { Command } from 'commander';
 // "[fail] Error: ...", double-prefixing the CLI's own marker.
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
@@ -55,7 +56,9 @@ function buildCommandOptions(options: {
 }
 
 function parseLabels(raw: string | undefined): string[] {
-	if (raw === undefined || raw.trim() === '') return [];
+	if (raw === undefined || raw.trim() === '') {
+		return [];
+	}
 	// Comma-separated on the CLI, a list once stored -- matched as AND (D#7).
 	return raw.split(',').map(label => label.trim());
 }

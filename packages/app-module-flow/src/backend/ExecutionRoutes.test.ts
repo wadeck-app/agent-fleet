@@ -261,21 +261,21 @@ describe('GET /flows', () => {
 		fixture.addExecution({ executionId: 'b1', flowId: 'build', startedAt: '2026-08-17T10:00:00.000Z' });
 		const { status, body } = await callRoute(routes, 'GET /flows', { query: {} });
 		expect(status).toBe(200);
-		expect(body).toEqual({
+		// The shell formats lastStartedAt (DataTable format: datetime): no server-side label next to it.
+		expect(JSON.stringify(body)).not.toContain('lastStartedLabel');
+		expect(body).toMatchObject({
 			flows: [
 				{
 					flowId: 'build',
 					executionCount: 1,
 					failedCount: 0,
 					lastStartedAt: '2026-08-17T10:00:00.000Z',
-					lastStartedLabel: 'Aug 17 10:00',
 				},
 				{
 					flowId: 'deploy',
 					executionCount: 2,
 					failedCount: 1,
 					lastStartedAt: '2026-08-16T10:00:00.000Z',
-					lastStartedLabel: 'Aug 16 10:00',
 				},
 			],
 			total: 2,
@@ -305,7 +305,7 @@ describe('GET /flows', () => {
 });
 
 describe('display fields (the DataTable shows a cell as is: it cannot style, truncate or format)', () => {
-	it('adds short ASCII startedLabel, runLabel and statusLabel to each row, with a one-line errorExcerpt, keeping the raw fields', async () => {
+	it('adds short ASCII runLabel and statusLabel to each row, with a one-line errorExcerpt, keeping the raw fields', async () => {
 		fixture.addExecution({
 			executionId: 'bad1',
 			status: 'failed',
@@ -319,10 +319,11 @@ ${'word '.repeat(40)}`,
 		expect(bad).toMatchObject({
 			status: 'failed',
 			startedAt: '2026-08-16T10:05:09.000Z',
-			startedLabel: 'Aug 16 10:05',
 			runLabel: 'deploy bad1',
 			statusLabel: 'FAILED',
 		});
+		// The shell formats the ISO startedAt itself (DataTable format: datetime): no server-side label.
+		expect(bad).not.toHaveProperty('startedLabel');
 		expect(String(bad!['errorExcerpt'])).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
 		expect(String(bad!['errorExcerpt'])).toMatch(/^first line word word .*...$/);
 		expect(bad!['lastError']).toContain('\n');
@@ -425,6 +426,27 @@ ${'word '.repeat(40)}`,
 		expect(steps.map(step => step.statusLabel)).toEqual(['ok', 'ok, recovered, 3 tries', 'FAILED', 'pending']);
 		expect(steps[1]!.errorExcerpt).toBe('recovered: boom');
 		expect(steps[2]!.errorExcerpt).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
+	});
+
+	it('sends the start and end of the run as ISO timestamps in a one-row table, for the shell to format', async () => {
+		fixture.addExecution({
+			executionId: 'tm1',
+			startedAt: '2026-08-16T10:05:09.000Z',
+			completedAt: '2026-08-16T10:06:09.000Z',
+		});
+		fixture.addExecution({
+			executionId: 'tm2',
+			status: 'running',
+			startedAt: '2026-08-16T10:05:09.000Z',
+			completedAt: null,
+		});
+		const done = await callRoute(routes, 'GET /executions/:id', { params: { id: 'tm1' }, query: {} });
+		expect(done.body).toMatchObject({
+			timing: [{ startedAt: '2026-08-16T10:05:09.000Z', completedAt: '2026-08-16T10:06:09.000Z' }],
+		});
+		// A run in progress has no end: the cell stays empty, not "Invalid Date".
+		const running = await callRoute(routes, 'GET /executions/:id', { params: { id: 'tm2' }, query: {} });
+		expect(running.body).toMatchObject({ timing: [{ startedAt: '2026-08-16T10:05:09.000Z', completedAt: null }] });
 	});
 
 	it('words the detail status badge so a recovered error is visible, in warning colour', async () => {

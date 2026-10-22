@@ -12,9 +12,13 @@ app-core module `flow-chart`: draws a flow as a graph (steps, `depends`, `when`,
 | Route `/modules/flow-chart/flows/:flowId`                      | Definition chart                                             | `flow-chart-page.yaml`                 |
 | Route `/modules/flow-chart/flows/runs/:id`                     | Run chart, refreshed every 4 s while the run is live         | `execution-chart-page.yaml`            |
 
-Routes (`/api/modules/flow-chart/...`): `GET /graph?executionId=` or `?flowId=` (exactly one), `GET /flows`.
+Routes (`/api/modules/flow-chart/...`): `GET /graph?executionId=` or `?flowId=` (exactly one), `GET /flows?q=&health=&page=&limit=` (adds `runCount`, `lastStatus`, `lastRunId`, `lastRunAt` as ISO, `health`, `chartPath`, `lastRunChartPath`), `GET /flows/health?q=` (flows grouped failing / running / healthy, up to 500).
 
-Components (`src/dsl-components`, bundled with xyflow and dagre): `flow-chart:FlowGraph`, `flow-chart:FlowChartLink`. The link is a component because a contributed view cannot concatenate `$route.id` into a path.
+Components (`src/dsl-components`, bundled with xyflow and dagre): `flow-chart:FlowGraph`, `flow-chart:FlowChartLink`, `flow-chart:FlowIndexList` (`layout: cards | list`; the DSL cannot repeat a node per row). The link is a component because a contributed view cannot concatenate `$route.id` into a path.
+
+## Chart header, sub-step tree, flows index A/B
+
+See [.docs/chart-and-index.md](.docs/chart-and-index.md).
 
 ## `requires`
 

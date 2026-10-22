@@ -6,8 +6,12 @@
 # Slot "flow:execution-actions" (manifest expose.slots): other modules add buttons beside the badges, in every variant.
 # Their views are rendered with this page's context, so they can read $route.id and $sources.execution.<field>
 # (whole-string expressions only).
-# The steps table has three short columns (a narrow page breaks longer cells mid-word): the status word carries retries
-# and recovered errors ("ok, recovered, 3 tries"); the error text is in the output below.
+# Times are ISO 8601 and shown by table columns with `format: datetime`, the shell formatter of every app-core table:
+# the run start and end are a one-row table (`timing`: a Badge or a StatTile cannot format a timestamp), a step start is
+# a column. A shell older than dsl-ui 122 ignores `format` and shows the raw ISO text.
+# The steps table has short columns (a narrow page breaks longer cells mid-word): the status word carries retries
+# and recovered errors ("ok, recovered, 3 tries"), coloured by `badge` when it is a bare word; the error text is in the
+# output below.
 # `summary-first` also reads stepsSummary, retryCount and errorSummary, short texts the route precomputes for stat tiles.
 $sources:
     execution:
@@ -29,7 +33,7 @@ sections:
       variants:
           steps-table:
               label: Steps table
-              hint: 'Status, duration and start time as badges under the title, then the steps table and the output.'
+              hint: 'Status and duration as badges under the title, the start and end time, then the steps table and the output.'
               view:
                   $type: VerticalStack
                   gap: gap-4
@@ -60,12 +64,18 @@ sections:
                                         tone: subtle,
                                     }
                                   - { $type: Badge, label: $sources.execution.duration, variant: info }
-                                  - { $type: Badge, label: $sources.execution.startedAt, variant: default }
 
                             # Renders nothing while no module contributes.
                             - &actionsSlot
                               $type: ExtensionSlot
                               items: $sources.actions
+
+                      - &timingTable
+                        $type: DataTable
+                        rows: $sources.execution.timing
+                        columns:
+                            - { key: 'startedAt', label: 'Started', format: datetime, nowrap: true }
+                            - { key: 'completedAt', label: 'Finished', format: datetime, nowrap: true }
 
                       - $type: Section
                         title: Steps
@@ -74,9 +84,22 @@ sections:
                               rows: $sources.execution.steps
                               emptyMessage: This execution has no step
                               columns:
-                                  - { key: 'stepId', label: 'Step' }
-                                  - { key: 'statusLabel', label: 'Status' }
-                                  - { key: 'duration', label: 'Duration' }
+                                  - { key: 'stepId', label: 'Step', truncate: true, mono: true }
+                                  - key: statusLabel
+                                    label: Status
+                                    nowrap: true
+                                    badge:
+                                        &stepBadges {
+                                            ok: success,
+                                            FAILED: danger,
+                                            running: info,
+                                            waiting: default,
+                                            pending: default,
+                                            retry: warning,
+                                            'ok, recovered': warning,
+                                        }
+                                  - { key: 'duration', label: 'Duration', nowrap: true, muted: true }
+                                  - { key: 'startedAt', label: 'Started', format: datetime, nowrap: true }
 
                       - &outputSection
                         $type: Section
@@ -124,23 +147,17 @@ sections:
 
                       - { $type: StatTile, label: Error, value: $sources.execution.errorSummary }
 
+                      - *timingTable
+
                       - $type: DataTable
                         rows: $sources.execution.steps
                         emptyMessage: This execution has no step
                         columns:
-                            - { key: 'stepId', label: 'Step', truncate: true }
+                            - { key: 'stepId', label: 'Step', truncate: true, mono: true }
                             - key: statusLabel
                               label: Status
                               nowrap: true
-                              badge:
-                                  {
-                                      ok: success,
-                                      FAILED: danger,
-                                      running: info,
-                                      waiting: default,
-                                      retry: warning,
-                                      'ok, recovered': warning,
-                                  }
+                              badge: *stepBadges
                             - { key: 'duration', label: 'Duration', nowrap: true, muted: true }
 
                       - *outputSection

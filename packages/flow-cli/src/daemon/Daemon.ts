@@ -134,7 +134,9 @@ export function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
 		return {};
 	}
 	const configPath = path.join(projectRoot, '.flow', 'config.yml');
-	if (!fs.existsSync(configPath)) return {};
+	if (!fs.existsSync(configPath)) {
+		return {};
+	}
 	let raw: Record<string, unknown> | null;
 	try {
 		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
@@ -159,7 +161,9 @@ export function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
  * provider configured", since `resolveAll()` requires one by design (P-4).
  */
 export function declaresPlugins(configPath: string): boolean {
-	if (!fs.existsSync(configPath)) return false;
+	if (!fs.existsSync(configPath)) {
+		return false;
+	}
 	let raw: Record<string, unknown> | null;
 	try {
 		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
@@ -192,7 +196,9 @@ const UNRESOLVED_PLUGIN_POINTS: Record<string, string> = {
 
 /** Names the unresolved plugin sections a config file declares, if any. */
 function declaresUnresolvedPlugins(configPath: string): string[] {
-	if (!fs.existsSync(configPath)) return [];
+	if (!fs.existsSync(configPath)) {
+		return [];
+	}
 	let raw: Record<string, unknown> | null;
 	try {
 		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
@@ -204,7 +210,9 @@ function declaresUnresolvedPlugins(configPath: string): string[] {
 		return [];
 	}
 	const plugins = raw?.['plugins'];
-	if (typeof plugins !== 'object' || plugins === null) return [];
+	if (typeof plugins !== 'object' || plugins === null) {
+		return [];
+	}
 	// violations-suppress: ts/no-unsafe-type-cast parsed YAML has no static shape; the plugins key is checked before use
 	const declared = plugins as Record<string, unknown>;
 	return Object.keys(UNRESOLVED_PLUGIN_POINTS).filter(point => declared[point] !== undefined);
@@ -242,7 +250,9 @@ async function tryResolvePlugins(): Promise<{
 	}
 
 	for (const configPath of [globalConfigPath, projectConfigPath]) {
-		if (configPath === null) continue;
+		if (configPath === null) {
+			continue;
+		}
 		for (const point of declaresUnresolvedPlugins(configPath)) {
 			throw new Error(
 				`"${configPath}" configures plugins.${point}, but the daemon does not load a ${point} plugin yet -- it uses ${UNRESOLVED_PLUGIN_POINTS[point] ?? 'a built-in implementation'}. Remove that section, or track the work to make it pluggable, rather than assuming it is active.`
@@ -371,7 +381,9 @@ async function startDaemon(
 			// in-process (tests, or `flow daemon stop` reusing the same process) must not keep
 			// firing it against a torn-down daemon.
 			onShutdown: () => {
-				if (updateCheckTimer !== undefined) clearInterval(updateCheckTimer);
+				if (updateCheckTimer !== undefined) {
+					clearInterval(updateCheckTimer);
+				}
 			},
 			onStart: (port: number) => {
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
@@ -603,7 +615,9 @@ async function startDaemon(
 			case 'ready': {
 				// Refused registrations are already reported and the socket terminated;
 				// dispatching afterwards would target a worker that was rejected.
-				if (!workerProvisioner.registerWorker(ws, message)) break;
+				if (!workerProvisioner.registerWorker(ws, message)) {
+					break;
+				}
 				commandHandler.tryDispatch();
 				checkShutdown();
 				break;
@@ -611,7 +625,9 @@ async function startDaemon(
 			case 'step_completed': {
 				try {
 					const { assignmentId, executionId, stepId, output, meta } = message;
-					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
+					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
+						break;
+					}
 					// The outcome is accepted from here on, so the assignment is closed and
 					// the same result cannot be replayed.
 					commandHandler.settleAssignment(assignmentId);
@@ -651,7 +667,9 @@ async function startDaemon(
 			case 'step_failed': {
 				try {
 					const { assignmentId, executionId, stepId, error, output, stdout, stderr } = message;
-					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
+					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
+						break;
+					}
 					commandHandler.settleAssignment(assignmentId);
 					executionStore.markStepFailed(executionId, stepId, error, stdout, stderr);
 					commandHandler.onStepFailed(executionId, stepId, error, output);
@@ -668,7 +686,9 @@ async function startDaemon(
 				try {
 					const { assignmentId, executionId, stepId, entry } = message;
 					// Logs are bound too: they land in another execution's log file otherwise.
-					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
+					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
+						break;
+					}
 					// Output is the proof a step is still working: a wedged worker keeps its socket
 					// open and answers pings, so silence is the only signal there is.
 					commandHandler.noteAssignmentActivity(assignmentId);
@@ -688,13 +708,17 @@ async function startDaemon(
 				// Carries no content -- unlike 'log', this is never written to the execution log,
 				// only used to reset the silence clock (see Protocol.ts for why this exists).
 				const { assignmentId, executionId, stepId } = message;
-				if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) break;
+				if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
+					break;
+				}
 				commandHandler.noteAssignmentActivity(assignmentId);
 				break;
 			}
 			case 'inject_steps': {
 				const { assignmentId, executionId, steps } = message;
-				if (!commandHandler.verifyAssignmentScope(ws, assignmentId, executionId)) break;
+				if (!commandHandler.verifyAssignmentScope(ws, assignmentId, executionId)) {
+					break;
+				}
 				try {
 					commandHandler.injectSteps(executionId, steps);
 					// H1: also register injected step IDs in ExecutionStore so the allDone check is accurate
@@ -785,7 +809,9 @@ async function startDaemon(
 	 * recheck below see activity, at which point the schedule is dropped without acting.
 	 */
 	function checkShutdown(): void {
-		if (shuttingDown) return;
+		if (shuttingDown) {
+			return;
+		}
 		if (!isIdle()) {
 			if (pendingShutdown !== undefined) {
 				clearTimeout(pendingShutdown);
@@ -794,7 +820,10 @@ async function startDaemon(
 			}
 			return;
 		}
-		if (pendingShutdown !== undefined) return; // already scheduled
+		// already scheduled
+		if (pendingShutdown !== undefined) {
+			return;
+		}
 		writeDaemonLog(
 			logsDir,
 			'info',
@@ -802,7 +831,9 @@ async function startDaemon(
 		);
 		pendingShutdown = setTimeout(() => {
 			pendingShutdown = undefined;
-			if (shuttingDown) return;
+			if (shuttingDown) {
+				return;
+			}
 			if (!isIdle()) {
 				writeDaemonLog(logsDir, 'info', `Idle shutdown skipped on recheck (${diagnosticSnapshot()})`);
 				return;
@@ -821,7 +852,9 @@ async function startDaemon(
 			// re-check would run against a closed listener.
 			commandHandler.stopBackgroundWork();
 			// Nothing is executing at this point, so a sweep would only run against a torn-down handler.
-			if (stalledSweep !== undefined) clearInterval(stalledSweep);
+			if (stalledSweep !== undefined) {
+				clearInterval(stalledSweep);
+			}
 			// updateCheckTimer is cleared by the onShutdown hook, which fires for every stop()
 			// path -- including the daemonHandle.stop('idle') call just below.
 			wsServer.close();

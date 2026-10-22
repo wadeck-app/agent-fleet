@@ -75,6 +75,17 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const MAX_RUN_FLOW_LENGTH = 20;
 const RUN_ID_LENGTH = 6;
 
+/**
+ * The timestamp itself when it is a valid date. A host sends ISO 8601 and lets the shell format it
+ * (DataTable `format: datetime`); an unreadable one would show as "Invalid Date", so it fails here instead.
+ */
+export function requireTimestamp(iso: string): string {
+	if (Number.isNaN(new Date(iso).getTime())) {
+		throw new Error(`Cannot send the timestamp '${iso}': it is not a valid date (corrupt execution file?).`);
+	}
+	return iso;
+}
+
 /** "Oct 18 16:15" (UTC): short enough for a narrow column, no ISO noise. */
 export function shortStarted(iso: string): string {
 	const date = new Date(iso);

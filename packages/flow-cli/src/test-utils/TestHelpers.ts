@@ -90,7 +90,9 @@ export async function waitForExecution(
 	while (Date.now() < deadline) {
 		if (store.exists(executionId)) {
 			const state = store.read(executionId);
-			if (state.status === 'completed' || state.status === 'failed') return state;
+			if (state.status === 'completed' || state.status === 'failed') {
+				return state;
+			}
 		}
 		await new Promise(r => setTimeout(r, delay));
 		delay = Math.min(delay * 1.5, 2000);

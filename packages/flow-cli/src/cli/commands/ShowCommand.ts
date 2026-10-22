@@ -8,7 +8,9 @@ import {
 } from 'flow-core';
 import type { FlowDefinition } from 'flow-engine/types';
 import * as fs from 'node:fs';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { loadYaml } from '../../utils/loadYaml';
@@ -56,8 +58,10 @@ function showExecution(
 		}
 		console.log(service.renderExecution(target, { tail, full: opts.full === true }));
 	} catch (err) {
-		if (!(err instanceof ExecutionLookupError)) throw err;
-		console.error(err.message);
+		if (!(err instanceof ExecutionLookupError)) {
+			throw err;
+		}
+		console.error(normalizeError(err).message);
 		if (err.kind === 'not-found') {
 			console.error(
 				`'${target}' is also not an existing flow file (cwd: ${process.cwd()}).\n` +

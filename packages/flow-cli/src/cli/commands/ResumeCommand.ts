@@ -2,6 +2,7 @@ import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import { createRemoteDaemonClient } from 'flow-core';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import type { ClientCommand, DaemonResponse } from '../../ipc/Protocol';

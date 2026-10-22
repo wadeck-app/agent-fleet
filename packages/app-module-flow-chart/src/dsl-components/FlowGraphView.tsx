@@ -3,7 +3,9 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Badge, ButtonLink } from '@wadeck-app/dsl-ui';
 import { Background, ReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { FlowGraphResult } from 'flow-core';
+import { buildGraphTree, defaultCollapsedIds } from 'flow-core/graph-tree';
 
+import { describeChartMode } from './ChartMode.js';
 import { ChartToolbar } from './ChartToolbar.js';
 import { planChartView } from './ChartViewPlan.js';
 import { FlowStepNode } from './FlowStepNode.js';
@@ -59,18 +61,64 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 			setBaseline({ graph, width });
 		}
 	}, [baseline, graph]);
+	// Parents the reader folded (true) or unfolded (false); the others follow the default rule. Kept by step id, so a refresh of a running flow keeps them.
+	const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(new Map());
+	const collapsed = useMemo(() => {
+		const folded = defaultCollapsedIds(buildGraphTree(graph));
+		for (const [id, fold] of toggled) {
+			if (fold) {
+				folded.add(id);
+			} else {
+				folded.delete(id);
+			}
+		}
+		return folded;
+	}, [graph, toggled]);
+	const toggleCollapse = (stepId: string) =>
+		setToggled(previous => new Map(previous).set(stepId, !collapsed.has(stepId)));
+	// The direction the chart opens with (with the default folding): folding a parent later must not flip it.
+	const openingDirection = useMemo(
+		() =>
+			baseline
+				? planChartView(
+						baseline.graph,
+						baseline.width,
+						window.innerHeight,
+						undefined,
+						defaultCollapsedIds(buildGraphTree(baseline.graph))
+					).direction
+				: undefined,
+		[baseline]
+	);
 	const plan = useMemo(
 		() =>
-			baseline ? planChartView(baseline.graph, baseline.width, window.innerHeight, chosenDirection) : undefined,
-		[baseline, chosenDirection]
+			baseline
+				? planChartView(
+						baseline.graph,
+						baseline.width,
+						window.innerHeight,
+						chosenDirection ?? openingDirection,
+						collapsed
+					)
+				: undefined,
+		[baseline, chosenDirection, openingDirection, collapsed]
 	);
 	const direction: LayoutDirection = plan?.direction ?? 'LR';
 	const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
 	const colorMode = useShellColorMode();
 	const [focusedOnStep, setFocusedOnStep] = useState(false);
-	const focusId = useMemo(() => (graph.nodes.length > 0 ? pickFocusStep(graph, direction) : ''), [graph, direction]);
+	const focusId = useMemo(
+		() => (graph.nodes.length > 0 ? pickFocusStep(graph, direction, collapsed) : ''),
+		[graph, direction, collapsed]
+	);
 
-	const elements = useMemo(() => toFlowElements(graph, direction, selectedId), [graph, direction, selectedId]);
+	const elements = useMemo(
+		() => toFlowElements(graph, direction, selectedId, { collapsed, onToggle: toggleCollapse }),
+		// toggleCollapse is rebuilt every render and only reads `collapsed`, already a dependency.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[graph, direction, selectedId, collapsed]
+	);
+	const mode = describeChartMode(execution);
 	const focusLabel = graph.nodes.find(n => n.id === focusId)?.label;
 	const selected = graph.nodes.find(node => node.id === selectedId);
 	const edgeKinds = useMemo(() => new Set(graph.edges.map(edge => edge.kind)), [graph]);
@@ -100,17 +148,18 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 					</h2>
 					<p className="text-xs text-muted">
 						{result.flowName !== result.flowId && <span>{result.flowName}</span>}
-						{execution && <span className="font-mono"> - {execution.executionId}</span>}
 						{' - '}
 						{summarizeStatuses(graph)}
 					</p>
 				</div>
-				<div className="flex items-center gap-2">
-					{execution ? (
-						<Badge label={execution.status} variant={executionBadge(execution.status)} />
-					) : (
-						<Badge label="definition" variant="default" />
-					)}
+				<div className="flex flex-wrap items-center gap-2">
+					<div className="max-w-md">
+						<p className="flex items-center gap-2 text-sm font-semibold text-content">
+							<span>{mode.title}</span>
+							{execution && <Badge label={execution.status} variant={executionBadge(execution.status)} />}
+						</p>
+						<p className="text-xs text-muted">{mode.hint}</p>
+					</div>
 					<ButtonLink to={back.to} label={back.label} variant="secondary" size="sm" />
 				</div>
 			</header>
@@ -199,7 +248,7 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 							</div>
 						)}
 					</ReactFlowProvider>
-					<GraphLegend showStatuses={execution !== undefined} edgeKinds={edgeKinds} />
+					<GraphLegend modeHint={mode.hint} showStatuses={execution !== undefined} edgeKinds={edgeKinds} />
 				</div>
 			</div>
 		</div>

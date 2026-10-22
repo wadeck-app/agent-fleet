@@ -8,6 +8,16 @@ Pages: `src/dsl-views/*.yaml`, referenced by `manifest.json`. `views.test.ts` ch
 
 Known limit: the executions flow filter is set by clicking a row of the flows table (`?flow=`). A text/select bound to a URL parameter needs a dsl-ui change (only `Pagination` and `PageSizeSelect` take `urlParam`).
 
+## Times and table columns
+
+- Every timestamp is sent as ISO 8601 (`startedAt`, `completedAt`, `lastStartedAt`, `timing`, `lastRun`); the route checks it is a valid date (`requireTimestamp`, flow-core) and fails otherwise. No server-side label ("Oct 18 16:15"), no "5m" age.
+- The views show them with the dsl-ui DataTable column `format: datetime`, the formatter of the other modules (queue) and tables of app-core: `Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' })`, so the viewer's locale, no seconds (en-US: "10/18/26, 4:15 PM"). Source: dsl-ui `DataTable.tsx` `formatValue`.
+- A Badge, StatTile or composed string cannot format a timestamp: the detail page shows the run start and end as a one-row table (`timing`), the tiles widget shows the last run as a one-row table (`lastRun`).
+- Shells older than dsl-ui 122 ignore `format` and show the raw ISO text.
+- Durations stay readable text from the backend ("12.3s"): the DataTable `format: ms` only appends "ms" to a number.
+
+Column options used (dsl-ui >= 122, older shells keep `key` and `label` only): `format` for times, `badge` for status words (ok/FAILED/running/waiting/retry/pending, worker idle/busy), `nowrap` for short values (times, counts, status), `truncate` for names, `mono` for ids and versions, `muted` for secondary values. `views.test.ts` pins: every `*At` column is `format: datetime` in every A/B variant, no timestamp in a Badge or StatTile.
+
 ## Design variants (A/B)
 
 Three views declare design alternatives with the dsl-ui `AbTest` node, to compare them in the real pages:

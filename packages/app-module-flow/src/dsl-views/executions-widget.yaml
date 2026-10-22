@@ -1,9 +1,12 @@
 # Dashboard widget, built for a narrow cell (a 240px card). Three designs are declared as an A/B test (README: "Design
 # variants"); the dev shell's A/B dock picks one, `list` is what everybody else sees.
-# One precomputed source (GET /widgets/executions): the DSL cannot put a status mark in front of a name or print "5m".
-# `list` reads `title`, "tag name age" cut to MAX_WIDGET_TITLE_LENGTH characters by the backend, in a single column so no
-# second column steals width from the name. `compact` has real columns instead, and truncates the name itself (dsl-ui
-# 122 DataTable `truncate`/`nowrap`/`badge`; a shell older than 122 shows the plain text).
+# One precomputed source (GET /api/modules/flow/widgets/executions): the DSL cannot put a status mark in front of a name.
+# Times are ISO 8601 (startedAt) shown by a column with `format: datetime`, the shell formatter of every app-core table
+# (no relative "5m" text composed by the backend, no timestamp inside a StatTile or a Badge: neither can format it). A
+# shell older than dsl-ui 122 ignores `format` and shows the raw ISO text.
+# `list` reads `title`, "tag name" cut to MAX_WIDGET_TITLE_LENGTH characters by the backend, next to the start time.
+# `compact` has real columns instead, and truncates the name itself (dsl-ui 122 DataTable `truncate`/`nowrap`/`badge`;
+# a shell older than 122 shows the plain text).
 # `&viewAll` is defined once, in the first variant: keep that variant, or move the anchor, when removing variants.
 $sources:
     recent:
@@ -17,7 +20,7 @@ initial: list
 variants:
     list:
         label: List
-        hint: 'Two counters, the 5 latest runs as one line each (status word, name, age), then a link.'
+        hint: 'Two counters, the 5 latest runs as one line each (status word, name, start time), then a link.'
         view:
             $type: VerticalStack
             gap: gap-2
@@ -31,13 +34,14 @@ variants:
                   navigateTo: '/modules/flow/executions/{executionId}'
                   emptyMessage: No execution yet
                   columns:
-                      - { key: 'title', label: 'Recent runs' }
+                      - { key: 'title', label: 'Recent runs', nowrap: true }
+                      - { key: 'startedAt', label: 'Started', format: datetime, muted: true }
 
                 - &viewAll { $type: Link, label: $sources.recent.viewAllLabel, href: /modules/flow/executions }
 
     tiles:
         label: Tiles
-        hint: 'Four numbers only (running, failed, total, age of the last run) in a 2x2 block: no list, just the state.'
+        hint: 'Three numbers (running, failed, total) in tiles and the start of the last run: no list, just the state.'
         view:
             $type: VerticalStack
             gap: gap-2
@@ -48,17 +52,19 @@ variants:
                   items:
                       - { $type: StatTile, label: Running, value: $sources.recent.running }
                       - { $type: StatTile, label: Failed, value: $sources.recent.failed }
-                - $type: HorizontalStack
-                  gap: gap-2
-                  itemSizes: [flex, flex]
-                  items:
-                      - { $type: StatTile, label: Total, value: $sources.recent.total }
-                      - { $type: StatTile, label: Last run, value: $sources.recent.lastRun }
+                - { $type: StatTile, label: Total, value: $sources.recent.total }
+
+                # One row (none before the first run): a StatTile cannot format a timestamp, a table column can.
+                - $type: DataTable
+                  rows: $sources.recent.lastRun
+                  emptyMessage: No execution yet
+                  columns:
+                      - { key: 'startedAt', label: 'Last run', format: datetime, nowrap: true }
                 - *viewAll
 
     compact:
         label: Compact
-        hint: 'No counters: the 8 latest runs in one dense table (status badge, flow name, age) so failures show by colour.'
+        hint: 'No counters: the 8 latest runs in one dense table (status badge, flow name, start time) so failures show by colour.'
         view:
             $type: VerticalStack
             gap: gap-2
@@ -73,5 +79,5 @@ variants:
                         nowrap: true
                         badge: { ok: success, FAILED: danger, running: info, waiting: default, retry: warning }
                       - { key: 'flowId', label: 'Flow', truncate: true }
-                      - { key: 'when', label: 'Age', nowrap: true, muted: true }
+                      - { key: 'startedAt', label: 'Started', format: datetime, muted: true }
                 - *viewAll

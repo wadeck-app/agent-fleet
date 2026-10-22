@@ -1,42 +1,164 @@
-# Flow charts index (nav): the flows that ran on this machine. A row opens the chart of the flow definition;
-# the chart of one run is reached from that execution's page ("See flow chart").
-# Short precomputed text and three columns: the DataTable keeps only key and label of a column (no format, no width) and
-# breaks a cell anywhere, so a raw ISO timestamp would wrap mid-number on a narrow page.
-# Pagination and page size live in the URL (?page=&size=), like the executions page of the flow module.
+# Flow charts index (nav): the flows that ran on this machine. Every flow offers two targets: the chart of its
+# definition and the chart of its latest run (/modules/flow-chart/flows/runs/:id).
+# Four designs are declared as an A/B test (README: "Design variants"); the dev shell's A/B dock picks one, `table` is
+# what everybody else sees. The sections they share are YAML anchors defined in the first variant that uses them
+# (`&pager`, `&search`): keep that variant, or move the anchors, when removing variants.
+# `table`: short precomputed text and three columns: the DataTable keeps only key and label of a column in shells older
+# than dsl-ui 122, and breaks a cell anywhere, so a raw ISO timestamp would wrap mid-number on a narrow page.
+# The other variants render the flows with flow-chart:FlowIndexList (the DSL cannot repeat a node per row); the age of
+# the last run is an ISO text the shell formats (RelativeDate).
+# Pagination, page size, text filter and health filter live in the URL: ?page=&size=&q=&health=failing|running|healthy
+# (an empty value means no filter). The `health-board` variant has no pagination: it shows up to 500 flows, grouped.
 $sources:
     flows:
         url: GET /api/modules/flow-chart/flows
         params:
             page: $urlParam.page
             limit: $urlParam.size
+            q: $urlParam.q
+            health: $urlParam.health
+    board:
+        url: GET /api/modules/flow-chart/flows/health
+        params:
+            q: $urlParam.q
 
 $type: PageContent
 sections:
-    - $type: PageHeader
-      title: Flow charts
-      subtitle: Click a flow to see its steps and how they depend on each other
+    - $type: AbTest
+      id: flow-chart-index-design
+      label: Flow charts index
+      initial: table
+      variants:
+          table:
+              label: Table
+              hint: 'The flows in a table: click a row to open the chart of the flow. The chart of a run is reached from the execution page.'
+              view:
+                  $type: VerticalStack
+                  gap: gap-4
+                  items:
+                      - $type: PageHeader
+                        title: Flow charts
+                        subtitle: Click a flow to see its steps and how they depend on each other
 
-    - $type: DataTable
-      rows: $sources.flows.flows
-      navigateTo: '/modules/flow-chart/flows/{flowId}'
-      emptyMessage: No flow has run yet. Run a flow (flow run <file>) and it will be listed here.
-      columns:
-          - { key: 'flowId', label: 'Flow' }
-          - { key: 'executionCount', label: 'Runs' }
-          - { key: 'failedCount', label: 'Failed' }
-          - { key: 'lastStartedLabel', label: 'Last' }
+                      - $type: DataTable
+                        rows: $sources.flows.flows
+                        navigateTo: '/modules/flow-chart/flows/{flowId}'
+                        emptyMessage: No flow has run yet. Run a flow (flow run <file>) and it will be listed here.
+                        columns:
+                            - { key: 'flowId', label: 'Flow' }
+                            - { key: 'executionCount', label: 'Runs' }
+                            - { key: 'failedCount', label: 'Failed' }
+                            - { key: 'lastStartedLabel', label: 'Last' }
 
-    - $type: HorizontalStack
-      justify: justify-between
-      align: items-center
-      gap: gap-3
-      items:
-          - $type: Pagination
-            urlParam: page
-            total: $sources.flows.total
-            size: $sources.flows.limit
+                      - &pager
+                        $type: HorizontalStack
+                        justify: justify-between
+                        align: items-center
+                        gap: gap-3
+                        items:
+                            - $type: Pagination
+                              urlParam: page
+                              total: $sources.flows.total
+                              size: $sources.flows.limit
 
-          # Shows options[0] while ?size= is absent: it must be the backend default page size (views.test.ts).
-          - $type: PageSizeSelect
-            urlParam: size
-            options: [20, 50, 100]
+                            # Shows options[0] while ?size= is absent: it must be the backend default page size (views.test.ts).
+                            - $type: PageSizeSelect
+                              urlParam: size
+                              options: [20, 50, 100]
+
+          cards:
+              label: Cards
+              hint: 'One card per flow: name, last status, counts, and two buttons (Open chart, Latest run chart). Filter by text or health.'
+              view:
+                  $type: VerticalStack
+                  gap: gap-4
+                  items:
+                      - $type: PageHeader
+                        title: Flow charts
+                        subtitle: Open the chart of a flow, or of its latest run
+
+                      - $type: HorizontalStack
+                        gap: gap-3
+                        align: items-center
+                        items:
+                            - &search
+                              $type: SearchBar
+                              urlParam: q
+                              placeholder: Filter flows
+
+                            # An empty choice means "all": the backend treats ?health= as no filter.
+                            - $type: CompactSelect
+                              urlParam: health
+                              ariaLabel: Filter by health
+                              placeholder: All health
+                              options:
+                                  - { value: failing, label: Failing }
+                                  - { value: running, label: Running }
+                                  - { value: healthy, label: Healthy }
+
+                      - $type: flow-chart:FlowIndexList
+                        flows: $sources.flows.flows
+                        layout: cards
+                        emptyMessage: No flow matches. Clear the filter, or run a flow (flow run <file>) to list it here.
+
+                      - *pager
+
+          list:
+              label: Search list
+              hint: 'Search first: a dense list, status badge first, with the two chart buttons on every row.'
+              view:
+                  $type: VerticalStack
+                  gap: gap-3
+                  items:
+                      - $type: PageHeader
+                        title: Flow charts
+                        subtitle: Type to filter the flows by name
+
+                      - *search
+
+                      - $type: flow-chart:FlowIndexList
+                        flows: $sources.flows.flows
+                        layout: list
+                        emptyMessage: No flow matches. Clear the filter, or run a flow (flow run <file>) to list it here.
+
+                      - *pager
+
+          health-board:
+              label: Health board
+              hint: 'Flows grouped by the state of their last run: failing first, then running, then healthy (folded).'
+              view:
+                  $type: VerticalStack
+                  gap: gap-3
+                  items:
+                      - $type: PageHeader
+                        title: Flow charts
+                        subtitle: $sources.board.summary
+
+                      - *search
+
+                      - $type: Collapsible
+                        title: $sources.board.failing.title
+                        defaultOpen: true
+                        items:
+                            - $type: flow-chart:FlowIndexList
+                              flows: $sources.board.failing.flows
+                              layout: list
+                              emptyMessage: No failing flow.
+
+                      - $type: Collapsible
+                        title: $sources.board.running.title
+                        defaultOpen: true
+                        items:
+                            - $type: flow-chart:FlowIndexList
+                              flows: $sources.board.running.flows
+                              layout: list
+                              emptyMessage: No flow is running.
+
+                      - $type: Collapsible
+                        title: $sources.board.healthy.title
+                        defaultOpen: false
+                        items:
+                            - $type: flow-chart:FlowIndexList
+                              flows: $sources.board.healthy.flows
+                              layout: list
+                              emptyMessage: No healthy flow.

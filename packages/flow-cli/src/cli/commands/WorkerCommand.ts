@@ -67,7 +67,9 @@ interface WorkerOptions {
 }
 
 function parseLabels(raw: string | undefined): string[] {
-	if (raw === undefined || raw.trim() === '') return [];
+	if (raw === undefined || raw.trim() === '') {
+		return [];
+	}
 	return raw.split(',').map(label => label.trim());
 }
 
@@ -107,12 +109,20 @@ export function buildReExecArgs(params: {
 	interactive: boolean;
 }): string[] {
 	const args: string[] = [];
-	if (params.sourceId !== undefined) args.push('--source', params.sourceId);
+	if (params.sourceId !== undefined) {
+		args.push('--source', params.sourceId);
+	}
 	args.push('--token', params.token);
 	for (const project of params.extraProjects) args.push('--project', project);
-	if (params.labels.length > 0) args.push('--labels', params.labels.join(','));
-	if (params.verbose) args.push('--verbose');
-	if (params.interactive) args.push('--interactive');
+	if (params.labels.length > 0) {
+		args.push('--labels', params.labels.join(','));
+	}
+	if (params.verbose) {
+		args.push('--verbose');
+	}
+	if (params.interactive) {
+		args.push('--interactive');
+	}
 	return args;
 }
 
@@ -142,7 +152,9 @@ export function isNewerVersionAvailable(
 	latestVersion: string | null,
 	lastHandledVersion: string | undefined
 ): boolean {
-	if (latestVersion === null || latestVersion === lastHandledVersion) return false;
+	if (latestVersion === null || latestVersion === lastHandledVersion) {
+		return false;
+	}
 	return !semverLte(latestVersion, currentVersion);
 }
 
@@ -178,7 +190,9 @@ function ts(): string {
 }
 
 function formatDelay(ms: number): string {
-	if (ms < 1_000) return `${String(ms)}ms`;
+	if (ms < 1_000) {
+		return `${String(ms)}ms`;
+	}
 	return `${String(Math.round(ms / 1_000))}s`;
 }
 
@@ -247,8 +261,10 @@ async function runWorkerListOnce(service: FlowQueryService, json: boolean): Prom
 	try {
 		result = await service.listWorkers();
 	} catch (err) {
-		if (!(err instanceof WorkerListError)) throw err;
-		report('[fail]', err.message);
+		if (!(err instanceof WorkerListError)) {
+			throw err;
+		}
+		report('[fail]', normalizeError(err).message);
 		process.exit(1);
 	}
 	warnIfSourcesUnreadable(result);
@@ -265,7 +281,9 @@ async function runWorkerListOnce(service: FlowQueryService, json: boolean): Prom
 
 /** A damaged source registry does not fail the listing (the live workers are known); it is reported. */
 function warnIfSourcesUnreadable(result: WorkerListResult): void {
-	if (result.declaredSourcesError === undefined) return;
+	if (result.declaredSourcesError === undefined) {
+		return;
+	}
 	report('[warn]', `could not read the declared worker sources: ${result.declaredSourcesError}`);
 }
 
@@ -286,12 +304,17 @@ async function runWorkerListFollow(service: FlowQueryService, json: boolean): Pr
 		try {
 			result = await service.listWorkers();
 		} catch (err) {
-			if (!(err instanceof WorkerListError)) throw err;
+			if (!(err instanceof WorkerListError)) {
+				throw err;
+			}
 			// A condition that stays fatal (e.g. the daemon staying too old) must not spam
 			// the identical line every tick -- report it once per distinct failure only. The
 			// region itself is left showing the last known-good state rather than cleared.
-			if (err.message !== lastFailureMessage) report('[fail]', err.message);
-			lastFailureMessage = err.message;
+			const failureMessage = normalizeError(err).message;
+			if (failureMessage !== lastFailureMessage) {
+				report('[fail]', failureMessage);
+			}
+			lastFailureMessage = failureMessage;
 			return;
 		}
 		lastFailureMessage = undefined;
@@ -378,7 +401,9 @@ function registerUpdateCommand(worker: Command): void {
 
 			let shellCapabilities: ('bash' | 'cmd' | 'pwsh')[] | undefined;
 			try {
-				if (options.shells !== undefined) shellCapabilities = parseShells(options.shells);
+				if (options.shells !== undefined) {
+					shellCapabilities = parseShells(options.shells);
+				}
 			} catch (err) {
 				report('[fail]', normalizeError(err).message);
 				process.exit(1);
@@ -591,6 +616,7 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		// already: d032e7e, b2bca73, d9af4d67). It must inherit this process's console exactly
 		// like ForkWorkerSource.obtainWorker() does for daemon-forked workers.
 		report('[wait]', `newer version detected -- re-exec'ing to pick it up`);
+		// violations-suppress: cli/no-spawn-without-windows-hide windowsHide is deliberately omitted, see the comment above (CREATE_NO_WINDOW strips the console handle)
 		const child = spawn(process.execPath, [scriptPath, 'worker', ...args], { stdio: 'ignore' });
 
 		// Does not exit until the replacement has survived REEXEC_HEALTH_CHECK_MS without
@@ -600,7 +626,9 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		// this worker was running in had already exited.
 		let settled = false;
 		const onEarlyFailure = (detail: unknown): void => {
-			if (settled) return;
+			if (settled) {
+				return;
+			}
 			settled = true;
 			clearTimeout(healthTimer);
 			report(
@@ -611,7 +639,9 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		child.once('error', onEarlyFailure);
 		child.once('exit', (code, signal) => onEarlyFailure(`exit code=${String(code)} signal=${String(signal)}`));
 		const healthTimer = setTimeout(() => {
-			if (settled) return;
+			if (settled) {
+				return;
+			}
 			settled = true;
 			child.removeAllListeners('error');
 			child.removeAllListeners('exit');
@@ -623,7 +653,9 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	};
 
 	const maybeReExec = (): void => {
-		if (!pendingReExec || busyTracker.busy) return;
+		if (!pendingReExec || busyTracker.busy) {
+			return;
+		}
 		pendingReExec = false;
 		reExecAndExit();
 	};
@@ -631,7 +663,9 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	const checkForNewerVersion = (): void => {
 		const cache = readCache(cacheFilePath(daemonDir));
 		const latestVersion = cache?.latestVersion ?? null;
-		if (!isNewerVersionAvailable(VERSION, latestVersion, lastHandledVersion)) return;
+		if (!isNewerVersionAvailable(VERSION, latestVersion, lastHandledVersion)) {
+			return;
+		}
 		// Recorded before busy is even checked: a second tick seeing the same cached version
 		// while still busy must not re-arm a second pending re-exec (idempotency).
 		lastHandledVersion = latestVersion ?? undefined;
@@ -712,7 +746,9 @@ function releaseOnExit(cleanup: () => void): void {
  * missing plugin, and only one of those is fixed by editing config.
  */
 function explainInteractivity(interactive: boolean, hasApproval: boolean): string {
-	if (interactive) return '';
+	if (interactive) {
+		return '';
+	}
 	if (!hasApproval) {
 		return ' (no approval plugin configured, so no user_intervention step can run here)';
 	}
@@ -781,7 +817,9 @@ function connect(
 	);
 
 	const send = (message: WorkerToDaemon): void => {
-		if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
+		if (ws.readyState === ws.OPEN) {
+			ws.send(JSON.stringify(message));
+		}
 	};
 
 	ws.on('open', () => {
@@ -844,7 +882,9 @@ function scheduleReconnect(
 	//    costs only latency.
 	let fired = false;
 	const reconnect = (wsUrlFromNudge?: string): void => {
-		if (fired) return;
+		if (fired) {
+			return;
+		}
 		fired = true;
 		clearTimeout(timer);
 		// Disarm all notifiers so a late-arriving nudge does not trigger a second connect.
@@ -885,7 +925,9 @@ async function handleMessage(
 			// Also where this terminal sees the step's own output: the worker produces those
 			// lines, so showing them here costs nothing (D#31).
 			const sendForAssignment = (scoped: AssignmentScopedMessage): void => {
-				if (scoped.type === 'log') display.stepLog(stepId, scoped.entry);
+				if (scoped.type === 'log') {
+					display.stepLog(stepId, scoped.entry);
+				}
 				send({ ...scoped, assignmentId } as WorkerToDaemon);
 			};
 			display.stepStarted(stepId, {

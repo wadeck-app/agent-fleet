@@ -3,7 +3,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FlowChartLink, chartPathOfExecution } from './FlowChartLink.js';
+import { chartPathOfExecution } from '../commons/ChartPaths.js';
+import { FlowChartLink } from './FlowChartLink.js';
 import { FlowGraph } from './FlowGraph.js';
 import entries from './index.js';
 import { BUILD_GRAPH } from './testing/GraphFixtures.js';
@@ -68,7 +69,7 @@ describe('registry entries', () => {
 		render(<MemoryRouter>{byName(name).render({ node, registry: {}, ctx })}</MemoryRouter>);
 
 	it('registers FlowGraph and FlowChartLink (app-core prefixes them with flow-chart:)', () => {
-		expect(entries.map(e => e.name).sort()).toEqual(['FlowChartLink', 'FlowGraph']);
+		expect(entries.map(e => e.name).sort()).toEqual(['FlowChartLink', 'FlowGraph', 'FlowIndexList']);
 	});
 
 	it('FlowChartLink reads executionId from the host page context ($route.id)', () => {

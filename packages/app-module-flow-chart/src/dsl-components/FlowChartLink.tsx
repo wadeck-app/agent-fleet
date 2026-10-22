@@ -1,9 +1,6 @@
 import { ButtonLink } from '@wadeck-app/dsl-ui';
 
-/** Where the chart of one run lives (page of the manifest: /executions/:id under /modules/flow-chart). */
-export function chartPathOfExecution(executionId: string): string {
-	return `/modules/flow-chart/flows/runs/${encodeURIComponent(executionId)}`;
-}
+import { chartPathOfExecution } from '../commons/ChartPaths.js';
 
 /**
  * The "See flow chart" button contributed to the flow module's execution page. The DSL cannot concatenate the

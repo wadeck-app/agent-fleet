@@ -29,7 +29,9 @@ export class ExecutionStore {
 			return;
 		}
 		const files = rawFiles.filter(f => f.endsWith('.json'));
-		if (files.length === 0) return;
+		if (files.length === 0) {
+			return;
+		}
 		const cutoffMs = Date.now() - this.retainDays * 24 * 60 * 60 * 1000;
 		for (const file of files) {
 			const filePath = path.join(this.executionsDir, file);
@@ -45,7 +47,9 @@ export class ExecutionStore {
 				// fallback: delete if unreadable and old by mtime
 				try {
 					const stat = fs.statSync(filePath);
-					if (stat.mtimeMs < cutoffMs) fs.unlinkSync(filePath);
+					if (stat.mtimeMs < cutoffMs) {
+						fs.unlinkSync(filePath);
+					}
 				} catch {
 					/* ignore */
 				}
@@ -143,8 +147,12 @@ export class ExecutionStore {
 			...(provenance?.sourceId !== undefined ? { sourceId: provenance.sourceId } : {}),
 			...(provenance?.workerId !== undefined ? { workerId: provenance.workerId } : {}),
 		};
-		if (!state.currentSteps.includes(stepId)) state.currentSteps.push(stepId);
-		if (state.status === 'queued') state.status = 'running';
+		if (!state.currentSteps.includes(stepId)) {
+			state.currentSteps.push(stepId);
+		}
+		if (state.status === 'queued') {
+			state.status = 'running';
+		}
 		this.write(state);
 		return state;
 	}
@@ -155,7 +163,9 @@ export class ExecutionStore {
 		if (step) {
 			step.status = 'completed';
 			step.completedAt = new Date().toISOString();
-			if (meta !== undefined) step.meta = meta;
+			if (meta !== undefined) {
+				step.meta = meta;
+			}
 		}
 		state.currentSteps = state.currentSteps.filter(id => id !== stepId);
 		this.write(state);
@@ -174,12 +184,20 @@ export class ExecutionStore {
 		if (step) {
 			step.status = 'failed';
 			step.completedAt = new Date().toISOString();
-			if (error !== undefined) step.error = error;
-			if (stdout !== undefined) step.stdout = stdout;
-			if (stderr !== undefined) step.stderr = stderr;
+			if (error !== undefined) {
+				step.error = error;
+			}
+			if (stdout !== undefined) {
+				step.stdout = stdout;
+			}
+			if (stderr !== undefined) {
+				step.stderr = stderr;
+			}
 		}
 		state.currentSteps = state.currentSteps.filter(id => id !== stepId);
-		if (error !== undefined) state.lastError = error;
+		if (error !== undefined) {
+			state.lastError = error;
+		}
 		this.write(state);
 		return state;
 	}

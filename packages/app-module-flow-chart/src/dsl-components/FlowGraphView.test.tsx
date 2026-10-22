@@ -5,7 +5,7 @@ import type { FlowGraphResult } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
 import { FlowGraphView } from './FlowGraphView.js';
-import { BUILD_GRAPH, chain, node } from './testing/GraphFixtures.js';
+import { BUILD_GRAPH, SUBFLOW_GRAPH, chain, node } from './testing/GraphFixtures.js';
 
 function executionResult(overrides: Partial<FlowGraphResult> = {}): FlowGraphResult {
 	return {
@@ -46,9 +46,30 @@ describe('FlowGraphView', () => {
 		);
 	});
 
-	it('shows a definition without status colors, a "definition" badge and a link to the index', () => {
+	it('says a chart without a run shows the structure of the flow file, in the header and in the legend', () => {
 		renderView(executionResult({ execution: undefined, graph: chain(3) }));
-		expect(screen.getByText('definition')).toBeInTheDocument();
+		const header = screen.getByRole('banner');
+		expect(within(header).getByText('Flow structure (no run selected)')).toBeInTheDocument();
+		expect(within(header).getByText(/steps as written in the flow file/)).toBeInTheDocument();
+		expect(screen.queryByText('definition')).toBeNull();
+		expect(
+			within(screen.getByRole('list', { name: 'Legend' })).getByText(/steps as written in the flow file/)
+		).toBeInTheDocument();
+	});
+
+	it('names the run and its status when the chart shows a run, in the header and in the legend', () => {
+		renderView(executionResult());
+		const header = screen.getByRole('banner');
+		expect(within(header).getByText('Run exec1')).toBeInTheDocument();
+		expect(within(header).getByText('failed')).toBeInTheDocument();
+		expect(screen.queryByText('Flow structure (no run selected)')).toBeNull();
+		expect(
+			within(screen.getByRole('list', { name: 'Legend' })).getByText(/status of each step/)
+		).toBeInTheDocument();
+	});
+
+	it('shows a definition without status colors and a link to the index', () => {
+		renderView(executionResult({ execution: undefined, graph: chain(3) }));
 		expect(screen.getByTestId('step-step-0')).toHaveAttribute('data-status', 'none');
 		expect(screen.getByRole('link', { name: 'Back to flow charts' })).toHaveAttribute(
 			'href',
@@ -193,5 +214,60 @@ describe('FlowGraphView', () => {
 		const hint = screen.getByText(/Zoomed in on step/);
 		expect(hint).toBeInTheDocument();
 		expect(within(screen.getByTestId('chart-canvas')).queryByText(/Zoomed in on step/)).toBeNull();
+	});
+});
+
+describe('FlowGraphView sub-steps', () => {
+	it('draws the sub-steps of a step, nested, and says how many each step has', () => {
+		renderView(executionResult({ graph: SUBFLOW_GRAPH }));
+		for (const id of ['plan', 'build', 'b1', 'b2', 'b2a', 'b2b', 'ship']) {
+			expect(screen.getByTestId('step-' + id)).toBeInTheDocument();
+		}
+		expect(screen.getByRole('button', { name: 'Collapse 2 sub-steps of build' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Collapse 2 sub-steps of b2' })).toBeInTheDocument();
+		expect(within(screen.getByTestId('step-build')).getByText('2 sub-steps')).toBeInTheDocument();
+		expect(within(screen.getByTestId('step-plan')).queryByText(/sub-step/)).toBeNull();
+	});
+
+	it('folds and unfolds the sub-steps of one parent with its chevron, without selecting the step', () => {
+		renderView(executionResult({ graph: SUBFLOW_GRAPH }));
+		fireEvent.click(screen.getByRole('button', { name: 'Collapse 2 sub-steps of b2' }));
+		expect(screen.queryByTestId('step-b2a')).toBeNull();
+		expect(screen.getByTestId('step-b1')).toBeInTheDocument();
+		expect(screen.queryByRole('complementary', { name: 'Step details' })).toBeNull();
+		fireEvent.click(screen.getByRole('button', { name: 'Collapse 2 sub-steps of build' }));
+		expect(screen.queryByTestId('step-b1')).toBeNull();
+		fireEvent.click(screen.getByRole('button', { name: 'Expand 2 sub-steps of build' }));
+		expect(screen.getByTestId('step-b1')).toBeInTheDocument();
+		expect(screen.queryByTestId('step-b2a')).toBeNull();
+	});
+
+	it('keeps the layout direction the chart opened with when a parent is folded or unfolded', () => {
+		renderView(executionResult({ graph: SUBFLOW_GRAPH }));
+		const label = () => screen.getByRole('button', { name: /Switch to (vertical|horizontal) layout/ }).textContent;
+		const before = label();
+		fireEvent.click(screen.getByRole('button', { name: 'Collapse 2 sub-steps of build' }));
+		expect(label()).toBe(before);
+		fireEvent.click(screen.getByRole('button', { name: 'Expand 2 sub-steps of build' }));
+		expect(label()).toBe(before);
+	});
+
+	it('starts with a parent folded when it has more than 8 sub-steps', () => {
+		const children = Array.from({ length: 9 }, (_, i) => node('c' + i));
+		const graph = {
+			nodes: [node('p'), ...children],
+			edges: children.map(c => ({ from: c.id, to: 'p', kind: 'substep' as const })),
+		};
+		renderView(executionResult({ graph }));
+		expect(screen.queryByTestId('step-c0')).toBeNull();
+		fireEvent.click(screen.getByRole('button', { name: 'Expand 9 sub-steps of p' }));
+		expect(screen.getByTestId('step-c0')).toBeInTheDocument();
+	});
+
+	it('explains the indentation in the legend when sub-steps are drawn', () => {
+		renderView(executionResult({ graph: SUBFLOW_GRAPH }));
+		expect(
+			within(screen.getByRole('list', { name: 'Legend' })).getByText(/indented under its parent/)
+		).toBeInTheDocument();
 	});
 });

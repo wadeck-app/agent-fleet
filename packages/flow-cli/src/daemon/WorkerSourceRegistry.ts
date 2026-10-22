@@ -97,7 +97,9 @@ export class WorkerSourceRegistry {
 		// tells the user to apply, so an entry naming the old provider must still be removable.
 		const sources = this.parse();
 		const remaining = sources.filter(s => s.sourceId !== sourceId);
-		if (remaining.length === sources.length) return false;
+		if (remaining.length === sources.length) {
+			return false;
+		}
 		this.write(remaining);
 		return true;
 	}
@@ -114,11 +116,15 @@ export class WorkerSourceRegistry {
 		const sources = this.read();
 		const removed: string[] = [];
 		const remaining = sources.filter(source => {
-			if (source.pid === undefined || isProcessAlive(source.pid)) return true;
+			if (source.pid === undefined || isProcessAlive(source.pid)) {
+				return true;
+			}
 			removed.push(source.sourceId);
 			return false;
 		});
-		if (removed.length > 0) this.write(remaining);
+		if (removed.length > 0) {
+			this.write(remaining);
+		}
 		return removed;
 	}
 
@@ -130,7 +136,9 @@ export class WorkerSourceRegistry {
 	 * process on this host, so there is nothing local to check.
 	 */
 	livenessOf(entry: WorkerSourceEntry): 'alive' | 'dead' | 'unknown' {
-		if (entry.pid === undefined) return 'unknown';
+		if (entry.pid === undefined) {
+			return 'unknown';
+		}
 		return isProcessAlive(entry.pid) ? 'alive' : 'dead';
 	}
 
@@ -161,11 +169,15 @@ export class WorkerSourceRegistry {
 	 * simply cannot act as a source, which is the safe reading of missing data.
 	 */
 	private matches(storedHash: string | undefined, token: string): boolean {
-		if (storedHash === undefined) return false;
+		if (storedHash === undefined) {
+			return false;
+		}
 
 		const presented = Buffer.from(hashToken(token), 'hex');
 		const stored = Buffer.from(storedHash, 'hex');
-		if (presented.length !== stored.length) return false;
+		if (presented.length !== stored.length) {
+			return false;
+		}
 		return timingSafeEqual(presented, stored);
 	}
 
@@ -274,7 +286,9 @@ export class WorkerSourceRegistry {
 	 * Returns `undefined` when the file already parses fine (nothing to repair).
 	 */
 	repair(): { backupPath: string } | undefined {
-		if (!existsSync(this.filePath)) return undefined;
+		if (!existsSync(this.filePath)) {
+			return undefined;
+		}
 		try {
 			this.parse();
 			return undefined;

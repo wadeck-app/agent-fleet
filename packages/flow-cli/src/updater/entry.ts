@@ -29,11 +29,15 @@ const baseConfigDir = process.env['FLOW_CONFIG_DIR'] ?? ConfigDir.get(FLOW_CONFI
 // When UPDATER_MANUAL=1 (explicit `flow cli update`), bypass autoUpdate:false by
 // running the updater against a temp config copy with the flag removed.
 const configDir = (() => {
-	if (!process.env['UPDATER_MANUAL']) return baseConfigDir;
+	if (!process.env['UPDATER_MANUAL']) {
+		return baseConfigDir;
+	}
 	try {
 		const configFile = join(baseConfigDir, 'config.yml');
 		const content = readFileSync(configFile, 'utf8');
-		if (!/^autoUpdate:\s*false/m.test(content)) return baseConfigDir;
+		if (!/^autoUpdate:\s*false/m.test(content)) {
+			return baseConfigDir;
+		}
 		const tempDir = join(os.tmpdir(), `flow-update-manual-${Date.now()}`);
 		mkdirSync(tempDir, { recursive: true });
 		cpSync(baseConfigDir, tempDir, { recursive: true });
@@ -133,17 +137,25 @@ function echoUpdaterLog(startPath: string, startSize: number): LogEntry[] {
 	const endPath = updaterLogPath();
 	// A run straddling midnight rolls over to a new file, which must be read from the start.
 	const offset = endPath === startPath ? startSize : 0;
-	if (!existsSync(endPath)) return [];
+	if (!existsSync(endPath)) {
+		return [];
+	}
 	const appended = readFileSync(endPath, 'utf8').slice(offset);
 	const entries: LogEntry[] = [];
 	for (const line of appended.split('\n')) {
-		if (line.trim() === '') continue;
+		if (line.trim() === '') {
+			continue;
+		}
 		let level = 'info';
 		let msg = line;
 		try {
 			const entry = JSON.parse(line) as { level?: string; msg?: string };
-			if (typeof entry.msg === 'string') msg = entry.msg;
-			if (typeof entry.level === 'string') level = entry.level;
+			if (typeof entry.msg === 'string') {
+				msg = entry.msg;
+			}
+			if (typeof entry.level === 'string') {
+				level = entry.level;
+			}
 		} catch {
 			// Not valid NDJSON: still surface the raw line rather than hiding it.
 		}
@@ -249,14 +261,18 @@ runUpdater({
 	},
 })
 	.then(async () => {
-		if (force) reportOutcome(startedAt, echoUpdaterLog(logPathBeforeRun, logSizeBeforeRun));
+		if (force) {
+			reportOutcome(startedAt, echoUpdaterLog(logPathBeforeRun, logSizeBeforeRun));
+		}
 		// An update does not restart the daemon (it registers on its own start), so a running app-core would keep
 		// the previous app-module until the next daemon start: tell it now, from the new install.
 		await registerAppModuleAfterUpdate();
 	})
 	.catch(err => {
 		// Surface whatever the updater managed to log before failing, then the failure itself.
-		if (force) reportOutcome(startedAt, echoUpdaterLog(logPathBeforeRun, logSizeBeforeRun));
+		if (force) {
+			reportOutcome(startedAt, echoUpdaterLog(logPathBeforeRun, logSizeBeforeRun));
+		}
 		process.stderr.write(`[flow-updater] fatal: ${err}\n`);
 		process.exit(1);
 	});

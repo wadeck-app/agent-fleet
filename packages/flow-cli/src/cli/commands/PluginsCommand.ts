@@ -1,5 +1,6 @@
 import type { Command } from 'commander';
 import { FlowQueryService, UnknownPluginError } from 'flow-core';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { BUILTIN_PLUGIN_MANIFESTS } from '../../config/BuiltinPlugins.js';
@@ -39,8 +40,11 @@ export function registerPluginsCommand(program: Command): void {
 					(options.json ? JSON.stringify(description, null, 2) : description.snippet) + '\n'
 				);
 			} catch (err) {
-				if (!(err instanceof UnknownPluginError)) throw err;
-				console.error(`Error: ${err.message}`);
+				if (!(err instanceof UnknownPluginError)) {
+					throw err;
+				}
+				const message = normalizeError(err).message;
+				console.error(`Error: ${message}`);
 				process.exit(1);
 			}
 		});

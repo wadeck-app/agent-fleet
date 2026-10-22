@@ -16,12 +16,13 @@ sections:
             rows: $sources.workers.workers
             emptyMessage: No worker is connected
             columns:
-                - { key: 'workerId', label: 'Worker' }
-                - { key: 'state', label: 'State' }
-                - { key: 'pid', label: 'PID' }
-                - { key: 'version', label: 'Version' }
-                - { key: 'sourceId', label: 'Source' }
-                - { key: 'hasUserInterface', label: 'Interactive' }
+                - { key: 'workerId', label: 'Worker', truncate: true, mono: true }
+                # The state is idle or busy (WorkerSummary); a shell older than dsl-ui 122 shows the word as it is.
+                - { key: 'state', label: 'State', nowrap: true, badge: { idle: default, busy: info } }
+                - { key: 'pid', label: 'PID', nowrap: true, mono: true }
+                - { key: 'version', label: 'Version', nowrap: true, mono: true }
+                - { key: 'sourceId', label: 'Source', truncate: true }
+                - { key: 'hasUserInterface', label: 'Interactive', nowrap: true }
 
     - $type: Section
       title: Declared sources (capacity that can be started, not workers)
@@ -30,9 +31,9 @@ sections:
             rows: $sources.workers.declaredSources
             emptyMessage: No source declared
             columns:
-                - { key: 'sourceId', label: 'Source' }
-                - { key: 'provider', label: 'Provider' }
-                - { key: 'maxWorkers', label: 'Max workers' }
+                - { key: 'sourceId', label: 'Source', truncate: true }
+                - { key: 'provider', label: 'Provider', nowrap: true }
+                - { key: 'maxWorkers', label: 'Max workers', nowrap: true }
 
     - $type: Section
       title: Why the list may be empty

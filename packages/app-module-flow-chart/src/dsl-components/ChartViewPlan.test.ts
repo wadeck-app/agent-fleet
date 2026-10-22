@@ -1,3 +1,4 @@
+import type { FlowGraph } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
 import { MAX_CANVAS_HEIGHT, READABLE_ZOOM, planChartView } from './ChartViewPlan.js';
@@ -82,5 +83,17 @@ describe('planChartView', () => {
 	it('refuses an empty graph and an unmeasured canvas loudly', () => {
 		expect(() => planChartView({ nodes: [], edges: [] }, 880, VIEWPORT_HEIGHT)).toThrow(/no step/);
 		expect(() => planChartView(chain(2), 0, VIEWPORT_HEIGHT)).toThrow(/width/);
+	});
+});
+
+describe('planChartView with sub-steps', () => {
+	it('plans a taller vertical canvas for an expanded parent than for a collapsed one', () => {
+		const graph: FlowGraph = {
+			nodes: ['p', ...Array.from({ length: 12 }, (_, i) => `c${i}`)].map(id => node(id)),
+			edges: Array.from({ length: 12 }, (_, i) => ({ from: `c${i}`, to: 'p', kind: 'substep' as const })),
+		};
+		const open = planChartView(graph, 1200, 900, 'TB');
+		const folded = planChartView(graph, 1200, 900, 'TB', new Set(['p']));
+		expect(open.canvasHeight).toBeGreaterThan(folded.canvasHeight);
 	});
 });

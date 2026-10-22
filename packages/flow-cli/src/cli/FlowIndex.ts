@@ -79,7 +79,9 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 				const safeBundle = bundlePath.replace(/"/g, '""');
 				const daemonEnv: NodeJS.ProcessEnv = { ...process.env, FLOW_DAEMON_MODE: '1' };
 				const resolvedBashPath = resolveFlowBashPath(daemonEnv);
-				if (resolvedBashPath) daemonEnv['FLOW_BASH_PATH'] = resolvedBashPath;
+				if (resolvedBashPath) {
+					daemonEnv['FLOW_BASH_PATH'] = resolvedBashPath;
+				}
 				fs.writeFileSync(
 					vbsPath,
 					[
@@ -208,7 +210,9 @@ async function main(): Promise<void> {
 		const { config, legacyWarning } = FlowConfigLoader.loadForDaemon(DAEMON_DIR);
 		// Printed by the daemon itself, since this is the process whose behaviour the ignored
 		// file would have changed.
-		if (legacyWarning !== undefined) process.stderr.write(`[flow] ${legacyWarning}\n`);
+		if (legacyWarning !== undefined) {
+			process.stderr.write(`[flow] ${legacyWarning}\n`);
+		}
 		// Must run before any worker is forked: ForkWorkerSource/WindowsDaemonEnv forward these
 		// two vars from this process's own env, never overriding an operator's explicit export.
 		FlowConfigLoader.applyOpenCodeEnvDefaults(config);

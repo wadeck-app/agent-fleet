@@ -67,7 +67,10 @@ export class LogWriter {
 
 	private rotate(): void {
 		const today = this.todayDate();
-		if (this.lastRotationDate === today) return; // already rotated today
+		// already rotated today
+		if (this.lastRotationDate === today) {
+			return;
+		}
 
 		const limit = Math.min(this.retainDays, HARD_CAP);
 		let files: string[];

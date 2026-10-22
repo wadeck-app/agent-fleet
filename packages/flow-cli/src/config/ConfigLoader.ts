@@ -60,7 +60,9 @@ function loadYamlFile<T>(filePath: string): T | null {
 		content = readFileSync(filePath, 'utf8');
 	} catch (err: unknown) {
 		const code = (err as NodeJS.ErrnoException).code;
-		if (code === 'ENOENT' || code === 'ENOTDIR') return null;
+		if (code === 'ENOENT' || code === 'ENOTDIR') {
+			return null;
+		}
 		throw err;
 	}
 	try {
@@ -142,7 +144,9 @@ export class ConfigLoader {
 
 	private loadProjectConfig(): ProjectConfig {
 		const projectConfigPath = this.resolveProjectConfigPath();
-		if (projectConfigPath === null) return {};
+		if (projectConfigPath === null) {
+			return {};
+		}
 		return loadYamlFile<ProjectConfig>(projectConfigPath) ?? {};
 	}
 
@@ -151,7 +155,9 @@ export class ConfigLoader {
 		const projectPlugins = project.plugins ?? {};
 
 		for (const [feature, projectSection] of Object.entries(projectPlugins)) {
-			if (!projectSection) continue;
+			if (!projectSection) {
+				continue;
+			}
 			const resolved = this.resolveFeature(feature, projectSection as ProjectFeatureSection, global);
 			result[feature] = resolved;
 		}

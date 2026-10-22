@@ -32,6 +32,6 @@ export const EDGE_LEGEND: readonly { kind: FlowGraphEdgeKind; description: strin
 	{ kind: 'dependency', description: 'depends on' },
 	{ kind: 'conditional', description: 'runs only when the condition holds' },
 	{ kind: 'loop', description: 'on failure, goes back (retry loop)' },
-	{ kind: 'substep', description: 'sub-step of' },
+	{ kind: 'substep', description: 'sub-step (indented under its parent)' },
 	{ kind: 'sequence', description: 'ran after (dependencies not recorded)' },
 ];

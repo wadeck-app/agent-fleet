@@ -1,6 +1,7 @@
 import { Handle, type NodeProps, Position } from '@xyflow/react';
 
 import { statusStyle } from './StatusStyle.js';
+import { SubStepToggle } from './SubStepToggle.js';
 import type { StepNode } from './ToFlowElements.js';
 
 // Handles are the anchors of the edges, not controls: invisible, and not connectable (the chart is read-only).
@@ -11,7 +12,7 @@ const HANDLE_CLASS = '!h-1 !w-1 !min-h-0 !min-w-0 !border-0 !bg-transparent';
  * A retry loop leaves from and returns to the side opposite to the flow (bottom when the flow runs left to right).
  */
 export function FlowStepNode({ data, selected }: NodeProps<StepNode>) {
-	const { step, direction } = data;
+	const { step, direction, tree, onToggleCollapse } = data;
 	const style = statusStyle(step.status);
 	const horizontal = direction === 'LR';
 	const details = [
@@ -61,6 +62,53 @@ export function FlowStepNode({ data, selected }: NodeProps<StepNode>) {
 				style={horizontal ? { left: '70%' } : { top: '70%' }}
 			/>
 
+			{/* Anchors of the tree: the link to a sub-step leaves the lower left corner of its parent and enters the left side. */}
+			<Handle
+				id="tree-out"
+				type="source"
+				position={Position.Bottom}
+				isConnectable={false}
+				className={HANDLE_CLASS}
+				style={{ left: 20 }}
+			/>
+			<Handle
+				id="tree-in"
+				type="target"
+				position={Position.Left}
+				isConnectable={false}
+				className={HANDLE_CLASS}
+			/>
+			<Handle
+				id="side-out"
+				type="source"
+				position={Position.Left}
+				isConnectable={false}
+				className={HANDLE_CLASS}
+				style={{ top: '30%' }}
+			/>
+			<Handle
+				id="side-in"
+				type="target"
+				position={Position.Left}
+				isConnectable={false}
+				className={HANDLE_CLASS}
+				style={{ top: '70%' }}
+			/>
+			<Handle
+				id="stack-in"
+				type="target"
+				position={Position.Top}
+				isConnectable={false}
+				className={HANDLE_CLASS}
+			/>
+			<Handle
+				id="stack-out"
+				type="source"
+				position={Position.Bottom}
+				isConnectable={false}
+				className={HANDLE_CLASS}
+			/>
+
 			<div className="flex items-center justify-between gap-2 text-xs">
 				<span className="font-medium">
 					<span aria-hidden="true">{style.glyph}</span> {style.label}
@@ -78,7 +126,16 @@ export function FlowStepNode({ data, selected }: NodeProps<StepNode>) {
 			<div className="mt-1 truncate text-sm font-semibold" title={step.label}>
 				{step.label}
 			</div>
-			<div className="mt-0.5 h-4 truncate text-xs">{details}</div>
+			<div className="mt-0.5 flex h-4 items-center justify-between gap-2 text-xs">
+				<span className="truncate">{details}</span>
+				{tree.childCount > 0 && (
+					<SubStepToggle
+						label={step.label}
+						tree={tree}
+						onToggle={onToggleCollapse ? () => onToggleCollapse(step.id) : undefined}
+					/>
+				)}
+			</div>
 		</div>
 	);
 }

@@ -7,32 +7,9 @@ import {
 	MAX_WIDGET_TITLE_LENGTH,
 	WIDGET_COMPACT_ROW_COUNT,
 	WIDGET_ROW_COUNT,
-	formatRelativeTime,
 	registerExecutionWidgetRoutes,
 	widgetTitle,
 } from './ExecutionWidgetRoutes.js';
-
-const NOW = new Date('2026-10-19T12:00:00.000Z');
-
-describe('formatRelativeTime', () => {
-	it.each([
-		['2026-10-19T11:59:45.000Z', 'now'],
-		['2026-10-19T12:00:30.000Z', 'now'],
-		['2026-10-19T11:55:00.000Z', '5m'],
-		['2026-10-19T09:00:00.000Z', '3h'],
-		['2026-10-17T12:00:00.000Z', '2d'],
-	])('%s -> %s', (iso, expected) => {
-		expect(formatRelativeTime(iso, NOW)).toBe(expected);
-	});
-
-	it('falls back to a short calendar date after 30 days', () => {
-		expect(formatRelativeTime('2026-08-01T12:00:00.000Z', NOW)).toBe('2026-08-01');
-	});
-
-	it('fails loudly on an unparseable timestamp', () => {
-		expect(() => formatRelativeTime('yesterday', NOW)).toThrow(/yesterday/);
-	});
-});
 
 describe('GET /widgets/executions', () => {
 	let fixture: FlowConfigFixture;
@@ -42,7 +19,7 @@ describe('GET /widgets/executions', () => {
 		fixture = new FlowConfigFixture();
 		const collected = collectRoutes<ModuleContext>();
 		routes = collected.routes;
-		registerExecutionWidgetRoutes(collected.ctx, FlowQueryService.forConfigDir(fixture.configDir), () => NOW);
+		registerExecutionWidgetRoutes(collected.ctx, FlowQueryService.forConfigDir(fixture.configDir));
 	});
 
 	afterEach(() => fixture.dispose());
@@ -54,7 +31,7 @@ describe('GET /widgets/executions', () => {
 				total: 0,
 				running: 0,
 				failed: 0,
-				lastRun: 'none',
+				lastRun: [],
 				viewAllLabel: 'View all executions',
 				items: [],
 				compact: [],
@@ -62,7 +39,7 @@ describe('GET /widgets/executions', () => {
 		});
 	});
 
-	it('lists the eight newest runs for the dense variant, as status word, flow name and age', async () => {
+	it('lists the eight newest runs for the dense variant, as status word, flow name and ISO start time', async () => {
 		for (let i = 0; i < 10; i++) {
 			fixture.addExecution({
 				executionId: `r${i}`,
@@ -74,7 +51,7 @@ describe('GET /widgets/executions', () => {
 		const { compact, items, lastRun } = body as {
 			compact: Record<string, unknown>[];
 			items: unknown[];
-			lastRun: string;
+			lastRun: unknown[];
 		};
 		expect(compact).toHaveLength(WIDGET_COMPACT_ROW_COUNT);
 		expect(items).toHaveLength(WIDGET_ROW_COUNT);
@@ -82,12 +59,12 @@ describe('GET /widgets/executions', () => {
 			executionId: 'r9',
 			flowId: 'deploy',
 			statusLabel: 'FAILED',
-			when: '41m',
+			startedAt: '2026-10-19T11:19:00.000Z',
 		});
-		expect(lastRun).toBe('41m');
+		expect(lastRun).toEqual([{ startedAt: '2026-10-19T11:19:00.000Z' }]);
 	});
 
-	it('counts all, running and failed runs and lists the five newest with a status mark and a relative time', async () => {
+	it('counts all, running and failed runs and lists the five newest with a status mark and an ISO start time', async () => {
 		for (let i = 0; i < 4; i++) {
 			fixture.addExecution({ executionId: `ok${i}`, startedAt: `2026-10-19T11:0${i}:00.000Z` });
 		}
@@ -112,28 +89,57 @@ describe('GET /widgets/executions', () => {
 			viewAllLabel: 'View all 7 executions',
 			running: 1,
 			failed: 1,
-			lastRun: '2m',
+			lastRun: [{ startedAt: '2026-10-19T11:58:00.000Z' }],
 			items: [
-				{ executionId: 'run', flowId: 'deploy', status: 'running', title: 'running deploy 2m', when: '2m' },
+				{
+					executionId: 'run',
+					flowId: 'deploy',
+					status: 'running',
+					title: 'running deploy',
+					startedAt: '2026-10-19T11:58:00.000Z',
+				},
 				{
 					executionId: 'bad',
 					flowId: 'factory_retrospective',
 					status: 'failed',
-					title: 'FAILED factory... 5m',
-					when: '5m',
+					title: 'FAILED factor...',
+					startedAt: '2026-10-19T11:55:00.000Z',
 				},
-				{ executionId: 'ok3', flowId: 'deploy', status: 'completed', title: 'ok deploy 57m', when: '57m' },
-				{ executionId: 'ok2', flowId: 'deploy', status: 'completed', title: 'ok deploy 58m', when: '58m' },
-				{ executionId: 'ok1', flowId: 'deploy', status: 'completed', title: 'ok deploy 59m', when: '59m' },
+				{
+					executionId: 'ok3',
+					flowId: 'deploy',
+					status: 'completed',
+					title: 'ok deploy',
+					startedAt: '2026-10-19T11:03:00.000Z',
+				},
+				{
+					executionId: 'ok2',
+					flowId: 'deploy',
+					status: 'completed',
+					title: 'ok deploy',
+					startedAt: '2026-10-19T11:02:00.000Z',
+				},
+				{
+					executionId: 'ok1',
+					flowId: 'deploy',
+					status: 'completed',
+					title: 'ok deploy',
+					startedAt: '2026-10-19T11:01:00.000Z',
+				},
 			],
 			compact: [
-				{ executionId: 'run', flowId: 'deploy', statusLabel: 'running', when: '2m' },
-				{ executionId: 'bad', flowId: 'factory_retrospective', statusLabel: 'FAILED', when: '5m' },
-				{ executionId: 'ok3', flowId: 'deploy', statusLabel: 'ok', when: '57m' },
-				{ executionId: 'ok2', flowId: 'deploy', statusLabel: 'ok', when: '58m' },
-				{ executionId: 'ok1', flowId: 'deploy', statusLabel: 'ok', when: '59m' },
-				{ executionId: 'ok0', flowId: 'deploy', statusLabel: 'ok', when: '1h' },
-				{ executionId: 'oldest', flowId: 'deploy', statusLabel: 'ok', when: '18d' },
+				{ executionId: 'run', flowId: 'deploy', statusLabel: 'running', startedAt: '2026-10-19T11:58:00.000Z' },
+				{
+					executionId: 'bad',
+					flowId: 'factory_retrospective',
+					statusLabel: 'FAILED',
+					startedAt: '2026-10-19T11:55:00.000Z',
+				},
+				{ executionId: 'ok3', flowId: 'deploy', statusLabel: 'ok', startedAt: '2026-10-19T11:03:00.000Z' },
+				{ executionId: 'ok2', flowId: 'deploy', statusLabel: 'ok', startedAt: '2026-10-19T11:02:00.000Z' },
+				{ executionId: 'ok1', flowId: 'deploy', statusLabel: 'ok', startedAt: '2026-10-19T11:01:00.000Z' },
+				{ executionId: 'ok0', flowId: 'deploy', statusLabel: 'ok', startedAt: '2026-10-19T11:00:00.000Z' },
+				{ executionId: 'oldest', flowId: 'deploy', statusLabel: 'ok', startedAt: '2026-10-01T11:00:00.000Z' },
 			],
 		});
 	});
@@ -146,14 +152,14 @@ describe('GET /widgets/executions', () => {
 });
 
 describe('widgetTitle', () => {
-	it('puts the tag, the flow name and the age in one string, whole when it fits', () => {
-		expect(widgetTitle('completed', 'build_task', '1d')).toBe('ok build_task 1d');
+	it('puts the tag and the flow name in one string, whole when it fits', () => {
+		expect(widgetTitle('completed', 'build_task')).toBe('ok build_task');
 	});
 
-	it('cuts the flow name, never the age, so the whole title stays within the width of a narrow card', () => {
-		const title = widgetTitle('failed', 'a_really_long_flow_name_that_will_not_fit', '12m');
-		expect(title).toBe('FAILED a_real... 12m');
+	it('cuts the flow name so the title leaves room for the date column of a narrow card', () => {
+		const title = widgetTitle('failed', 'a_really_long_flow_name_that_will_not_fit');
+		expect(title).toBe('FAILED a_real...');
 		expect(title.length).toBeLessThanOrEqual(MAX_WIDGET_TITLE_LENGTH);
-		expect(widgetTitle('completed', 'x'.repeat(50), '2026-08-01')).toHaveLength(MAX_WIDGET_TITLE_LENGTH);
+		expect(widgetTitle('completed', 'x'.repeat(50))).toHaveLength(MAX_WIDGET_TITLE_LENGTH);
 	});
 });

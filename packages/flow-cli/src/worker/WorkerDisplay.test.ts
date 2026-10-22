@@ -114,7 +114,7 @@ describe('WorkerDisplay - default verbosity', () => {
 		display.stepCompleted('build', 10);
 
 		// At least two separator lines (opening + closing)
-		const separators = out.lines.filter(l => l.includes('──'));
+		const separators = out.lines.filter(l => l.includes('----'));
 		expect(separators.length).toBeGreaterThanOrEqual(2);
 	});
 });
@@ -183,7 +183,7 @@ describe('WorkerDisplay - timestamps', () => {
 		display.stepCompleted('build', 10);
 
 		// Every non-separator line should have [HH:MM:SS] prefix
-		const infoLines = out.lines.filter(l => !l.includes('──'));
+		const infoLines = out.lines.filter(l => !l.includes('----'));
 		for (const line of infoLines) {
 			expect(line).toMatch(/^\[\d{2}:\d{2}:\d{2}\]/);
 		}

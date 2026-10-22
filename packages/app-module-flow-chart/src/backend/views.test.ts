@@ -186,24 +186,71 @@ function collectNodes(node: unknown, type: string, found: Record<string, unknown
 	return found;
 }
 
+interface Variant {
+	label?: string;
+	hint?: string;
+	view: Record<string, unknown>;
+}
+
+function flowsPageExperiment(): { id: string; initial: string; variants: Record<string, Variant> } {
+	const tests = collectNodes(parseView('flows-page.yaml').document, 'AbTest');
+	expect(tests).toHaveLength(1);
+	return tests[0] as unknown as { id: string; initial: string; variants: Record<string, Variant> };
+}
+
+const PAGED_VARIANTS = ['table', 'cards', 'list'];
+
 describe('flows page', () => {
+	it('declares the design experiment with stable ids: renaming one drops the choice stored in browsers', () => {
+		const test = flowsPageExperiment();
+		expect(test.id).toBe('flow-chart-index-design');
+		expect(test.initial).toBe('table');
+		expect(Object.keys(test.variants)).toEqual(['table', 'cards', 'list', 'health-board']);
+	});
+
+	it('gives every variant a label and a hint (the dock refuses a variant without them)', () => {
+		for (const [key, variant] of Object.entries(flowsPageExperiment().variants)) {
+			expect(variant.label, key).toEqual(expect.any(String));
+			expect(variant.hint, key).toEqual(expect.any(String));
+		}
+	});
+
 	it('offers the backend default page size first: PageSizeSelect shows options[0] while ?size= is absent', () => {
-		const selects = collectNodes(parseView('flows-page.yaml').document, 'PageSizeSelect');
-		expect(selects).toHaveLength(1);
-		expect((selects[0]!['options'] as number[])[0]).toBe(DEFAULT_HISTORY_LIMIT);
+		const { variants } = flowsPageExperiment();
+		for (const key of PAGED_VARIANTS) {
+			const selects = collectNodes(variants[key]!.view, 'PageSizeSelect');
+			expect(selects, key).toHaveLength(1);
+			expect((selects[0]!['options'] as number[])[0], key).toBe(DEFAULT_HISTORY_LIMIT);
+		}
 	});
 
-	it('forwards the page and the size of the URL to the flows source, and paginates by its total', () => {
+	it('forwards the page, size, text and health of the URL to the flows source, and paginates by its total', () => {
 		const view = parseView('flows-page.yaml');
-		expect(sourcesOf(view)[0]!.spec.params).toEqual({ page: '$urlParam.page', limit: '$urlParam.size' });
-		expect(collectNodes(view.document, 'Pagination')[0]).toMatchObject({
-			total: '$sources.flows.total',
-			size: '$sources.flows.limit',
+		const flows = sourcesOf(view).find(source => source.name === 'flows')!;
+		expect(flows.spec.params).toEqual({
+			page: '$urlParam.page',
+			limit: '$urlParam.size',
+			q: '$urlParam.q',
+			health: '$urlParam.health',
 		});
+		for (const [key, variant] of Object.entries(flowsPageExperiment().variants)) {
+			if (!PAGED_VARIANTS.includes(key)) continue;
+			expect(collectNodes(variant.view, 'Pagination')[0], key).toMatchObject({
+				total: '$sources.flows.total',
+				size: '$sources.flows.limit',
+			});
+		}
 	});
 
-	it('has four short columns and sets only key and label on them (the DataTable ignores anything else)', () => {
-		const table = collectNodes(parseView('flows-page.yaml').document, 'DataTable')[0]!;
+	it('searches through the q URL parameter in every variant but the plain table', () => {
+		const { variants } = flowsPageExperiment();
+		for (const key of ['cards', 'list', 'health-board']) {
+			expect(collectNodes(variants[key]!.view, 'SearchBar')[0], key).toMatchObject({ urlParam: 'q' });
+		}
+	});
+
+	it('table (the initial variant) has four short columns and sets only key and label on them', () => {
+		const table = collectNodes(flowsPageExperiment().variants['table']!.view, 'DataTable')[0]!;
 		const columns = table['columns'] as Record<string, unknown>[];
 		expect(columns.map(column => column['key'])).toEqual([
 			'flowId',
@@ -213,6 +260,19 @@ describe('flows page', () => {
 		]);
 		for (const column of columns) {
 			expect(Object.keys(column).sort()).toEqual(['key', 'label']);
+		}
+	});
+
+	it('draws flows with FlowIndexList in the other variants, with a layout it accepts and rows from a source', () => {
+		const { variants } = flowsPageExperiment();
+		for (const [key, variant] of Object.entries(variants)) {
+			if (key === 'table') continue;
+			const lists = collectNodes(variant.view, 'flow-chart:FlowIndexList');
+			expect(lists.length, key).toBeGreaterThan(0);
+			for (const list of lists) {
+				expect(['cards', 'list'], key).toContain(list['layout']);
+				expect(list['flows'], key).toMatch(/^\$sources\.(flows|board)\./);
+			}
 		}
 	});
 });

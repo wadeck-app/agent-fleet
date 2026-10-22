@@ -4,6 +4,7 @@ import {
 	ellipsize,
 	excerptOf,
 	outcomeLabel,
+	requireTimestamp,
 	runLabel,
 	shortStarted,
 	startedLabel,
@@ -83,6 +84,17 @@ describe('shortStarted', () => {
 
 	it('refuses a timestamp it cannot read instead of printing NaN', () => {
 		expect(() => shortStarted('yesterday')).toThrow(/yesterday/);
+	});
+});
+
+describe('requireTimestamp', () => {
+	it('returns a valid timestamp untouched: the shell formats it, the server only vouches for it', () => {
+		expect(requireTimestamp('2026-10-18T16:15:24.166Z')).toBe('2026-10-18T16:15:24.166Z');
+	});
+
+	it('refuses a timestamp the shell would print as "Invalid Date"', () => {
+		expect(() => requireTimestamp('yesterday')).toThrow(/yesterday/);
+		expect(() => requireTimestamp('')).toThrow(/not a valid date/);
 	});
 });
 

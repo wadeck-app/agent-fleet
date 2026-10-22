@@ -5,10 +5,13 @@
 # removing variants.
 # The status links reload the page with the filter applied. The flow filter is the `flow` URL parameter, set by clicking
 # a row of a flows table (GET /flows?limit=N, the most recent flows: the executions come first, they are the page).
-# Three columns of short ASCII text the route precomputes (startedLabel "Oct 18 16:15", runLabel "flow_name abc123",
-# statusLabel "ok" / "FAILED" / "ok, recovered"): a plain YAML-column cell is `break-all`, so on a narrow page (about
-# 510px of content) anything longer breaks mid-word. dsl-ui 122 adds nowrap/truncate/badge; older shells ignore them
-# (they keep key and label only), hence the short precomputed text stays the base and the options only improve it.
+# Times are ISO 8601 (startedAt, lastStartedAt) and every column of them is `format: datetime`: the shell prints them
+# like every table of app-core (dsl-ui DataTable, e.g. "10/18/26, 4:15 PM" in en-US). A shell older than dsl-ui 122
+# ignores `format` and shows the raw ISO text.
+# The other two columns are short ASCII text the route precomputes (runLabel "flow_name abc123", statusLabel "ok" /
+# "FAILED" / "ok, recovered"): a plain YAML-column cell is `break-all`, so on a narrow page (about 510px of content)
+# anything longer breaks mid-word. dsl-ui 122 adds nowrap/truncate/mono/badge/format; older shells ignore them (they
+# keep key and label only), hence the short precomputed text stays the base and the options only improve it.
 # The error of a run is on its detail page: a cell cannot hold a second line.
 # The status links get their label from the route (statusFilters, or statusFiltersCounted with the number of runs),
 # which puts the active one in brackets: a Link has no active style. A free-text/select control bound to ?flow= needs a
@@ -97,8 +100,8 @@ sections:
                         navigateTo: '/modules/flow/executions/{executionId}'
                         emptyMessage: No execution matches
                         columns:
-                            - { key: 'startedLabel', label: 'When', nowrap: true }
-                            - { key: 'runLabel', label: 'Run' }
+                            - { key: 'startedAt', label: 'When', format: datetime, nowrap: true }
+                            - { key: 'runLabel', label: 'Run', mono: true }
                             # The cell text stays the status word: a shell older than dsl-ui 122 ignores nowrap and badge and shows it as is.
                             # The badge colours a cell whose text is exactly a key; "ok, 3 tries" and the like stay plain text.
                             - key: statusLabel
@@ -140,10 +143,10 @@ sections:
                               navigateTo: '/modules/flow/executions?flow={flowId}'
                               emptyMessage: No flow has run yet
                               columns:
-                                  - { key: 'flowId', label: 'Flow', truncate: true }
-                                  - { key: 'executionCount', label: 'Runs' }
-                                  - { key: 'failedCount', label: 'Failed' }
-                                  - { key: 'lastStartedLabel', label: 'Last' }
+                                  - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
+                                  - { key: 'executionCount', label: 'Runs', nowrap: true }
+                                  - { key: 'failedCount', label: 'Failed', nowrap: true }
+                                  - { key: 'lastStartedAt', label: 'Last', format: datetime, nowrap: true }
 
           filters-first:
               label: Filters first
@@ -231,10 +234,10 @@ sections:
                               navigateTo: '/modules/flow/executions?flow={flowId}'
                               emptyMessage: No flow has run yet
                               columns:
-                                  - { key: 'flowId', label: 'Flow', truncate: true }
+                                  - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
                                   - { key: 'executionCount', label: 'Runs', nowrap: true }
                                   - { key: 'failedCount', label: 'Failed', nowrap: true }
-                                  - { key: 'lastStartedLabel', label: 'Last', nowrap: true }
+                                  - { key: 'lastStartedAt', label: 'Last', format: datetime, nowrap: true }
 
                       - $type: HorizontalStack
                         gap: gap-3

@@ -48,8 +48,8 @@ function errorOf(body: unknown): string {
 }
 
 describe('routes', () => {
-	it('registers the graph and the flows index', () => {
-		expect([...routes.keys()].sort()).toEqual(['GET /flows', 'GET /graph']);
+	it('registers the graph, the flows index and the flows health board', () => {
+		expect([...routes.keys()].sort()).toEqual(['GET /flows', 'GET /flows/health', 'GET /graph']);
 	});
 });
 
@@ -237,5 +237,116 @@ describe('GET /flows', () => {
 			const both = await callRoute(routes, 'GET /flows', { query: { page: '1', offset: '2' } });
 			expect(both.status).toBe(400);
 		});
+	});
+});
+
+describe('GET /flows fields for the index variants', () => {
+	beforeEach(() => {
+		fixture.addExecution({
+			executionId: 'old',
+			flowId: 'build_task',
+			flowFile,
+			status: 'completed',
+			startedAt: '2026-10-18T10:00:00.000Z',
+		});
+		fixture.addExecution({
+			executionId: 'new run',
+			flowId: 'build_task',
+			flowFile,
+			status: 'failed',
+			startedAt: '2026-10-18T11:00:00.000Z',
+		});
+		fixture.addExecution({
+			executionId: 'r1',
+			flowId: 'deploy',
+			flowFile,
+			status: 'running',
+			startedAt: '2026-10-18T09:00:00.000Z',
+		});
+		fixture.addExecution({
+			executionId: 'h1',
+			flowId: 'lint',
+			flowFile,
+			status: 'completed',
+			startedAt: '2026-10-18T08:00:00.000Z',
+		});
+	});
+
+	type Row = Record<string, unknown> & { flowId: string };
+	const flowsOf = (body: unknown): Row[] => (body as { flows: Row[] }).flows;
+
+	it('gives each flow its last run, health, counts and the two chart paths, with the date as ISO text', async () => {
+		const { body } = await callRoute(routes, 'GET /flows');
+		expect(flowsOf(body)[0]).toEqual({
+			flowId: 'build_task',
+			executionCount: 2,
+			runCount: 2,
+			failedCount: 1,
+			runningCount: 0,
+			lastStatus: 'failed',
+			lastRunId: 'new run',
+			lastRunAt: '2026-10-18T11:00:00.000Z',
+			lastStartedAt: '2026-10-18T11:00:00.000Z',
+			lastStartedLabel: 'Oct 18 11:00',
+			health: 'failing',
+			chartPath: '/modules/flow-chart/flows/build_task',
+			lastRunChartPath: '/modules/flow-chart/flows/runs/new%20run',
+		});
+	});
+
+	it('filters by text before paginating, and says the total of the matches', async () => {
+		const { body } = await callRoute(routes, 'GET /flows', { query: { q: 'BUILD', limit: '1' } });
+		expect(flowsOf(body).map(f => f.flowId)).toEqual(['build_task']);
+		expect(body).toMatchObject({ total: 1 });
+	});
+
+	it('filters by health, and treats empty q and health as unset (the DSL sends ?health=)', async () => {
+		const running = await callRoute(routes, 'GET /flows', { query: { health: 'running' } });
+		expect(flowsOf(running.body).map(f => f.flowId)).toEqual(['deploy']);
+		const all = await callRoute(routes, 'GET /flows', { query: { q: '', health: '' } });
+		expect(flowsOf(all.body)).toHaveLength(3);
+	});
+
+	it('refuses an unknown health (400) and lists the accepted values', async () => {
+		const { status, body } = await callRoute(routes, 'GET /flows', { query: { health: 'sick' } });
+		expect(status).toBe(400);
+		expect(errorOf(body)).toMatch(/failing, running, healthy.*'sick'/);
+	});
+
+	it('GET /flows/health groups the flows worst first with a titled count and a summary', async () => {
+		const { status, body } = await callRoute(routes, 'GET /flows/health');
+		expect(status).toBe(200);
+		const board = body as Record<string, { title: string; flows: Row[] }> & { total: number; summary: string };
+		expect(board.total).toBe(3);
+		expect(board.summary).toBe('3 flows: 1 failing, 1 running, 1 healthy');
+		expect(board['failing']!.title).toBe('Failing (1)');
+		expect(board['failing']!.flows.map(f => f.flowId)).toEqual(['build_task']);
+		expect(board['running']!.flows.map(f => f.flowId)).toEqual(['deploy']);
+		expect(board['healthy']!.title).toBe('Healthy (1)');
+	});
+
+	it('GET /flows/health applies q, and its summary says when nothing matches', async () => {
+		const { body } = await callRoute(routes, 'GET /flows/health', { query: { q: 'zzz' } });
+		expect(body).toMatchObject({ total: 0, summary: 'No flow matches' });
+	});
+
+	it('GET /flows/health says when it shows only the first flows (no silent truncation)', async () => {
+		const many = Array.from({ length: 3 }, (_, i) => ({
+			flowId: 'f' + i,
+			executionCount: 1,
+			failedCount: 0,
+			runningCount: 0,
+			lastStartedAt: '2026-10-18T10:00:00.000Z',
+			lastExecutionId: 'e' + i,
+			lastStatus: 'completed',
+		}));
+		const collected = collectRoutes<ModuleContext>();
+		registerGraphRoutes(collected.ctx, { listFlows: () => many } as unknown as FlowQueryService, 2);
+		const { body } = await callRoute(collected.routes, 'GET /flows/health');
+		expect(body).toMatchObject({
+			total: 3,
+			summary: '2 flows: 0 failing, 0 running, 2 healthy (showing the first 2 of 3)',
+		});
+		expect((body as { healthy: { flows: unknown[] } }).healthy.flows).toHaveLength(2);
 	});
 });

@@ -90,6 +90,7 @@ export {
 	ellipsize,
 	excerptOf,
 	outcomeLabel,
+	requireTimestamp,
 	runLabel,
 	shortStarted,
 	startedLabel,
@@ -97,6 +98,14 @@ export {
 	stepStatusTag,
 } from './view/CellText.js';
 export type { OutcomeNotes } from './view/CellText.js';
+export {
+	FLOW_HEALTHS,
+	filterFlowSummaries,
+	flowHealth,
+	groupByHealth,
+	readFlowIndexFilter,
+} from './query/FlowIndex.js';
+export type { FlowHealth, FlowHealthGroup, FlowIndexFilter } from './query/FlowIndex.js';
 export {
 	type IntegerBounds,
 	type QueryParams,

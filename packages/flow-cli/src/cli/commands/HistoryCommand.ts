@@ -1,12 +1,16 @@
 import type { Command } from 'commander';
 import { FlowQueryService, InvalidQueryError, describeSkippedExecutions } from 'flow-core';
 import type { ExecutionFilterOptions } from 'flow-core';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 
 // stderr, so a piped table or --json document stays clean; the history itself is still shown.
 function warnAboutSkippedFiles(warning: string | undefined): void {
-	if (warning !== undefined) console.error(`[flow] warning: ${warning}`);
+	if (warning !== undefined) {
+		console.error(`[flow] warning: ${warning}`);
+	}
 }
 
 export function registerHistoryCommand(program: Command, getConfigDir: () => string = flowConfigDir): void {
@@ -41,8 +45,10 @@ export function registerHistoryCommand(program: Command, getConfigDir: () => str
 				const output = opts.id && items.length === 1 ? items[0] : items;
 				process.stdout.write(JSON.stringify(output) + '\n');
 			} catch (err) {
-				if (!(err instanceof InvalidQueryError)) throw err;
-				console.error(err.message);
+				if (!(err instanceof InvalidQueryError)) {
+					throw err;
+				}
+				console.error(normalizeError(err).message);
 				process.exit(1);
 			}
 		});

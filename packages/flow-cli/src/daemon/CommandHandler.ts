@@ -204,7 +204,9 @@ export class CommandHandler {
 		 */
 		private readonly stalledStepLimitMs: number = DEFAULT_STEP_SILENCE_LIMIT_MS
 	) {
-		if (interactivityPolicy !== undefined) this.interactivityPolicy = interactivityPolicy;
+		if (interactivityPolicy !== undefined) {
+			this.interactivityPolicy = interactivityPolicy;
+		}
 		this.stalledSteps = new StalledStepWatch(stalledStepLimitMs);
 		this.executionStore = executionStore ?? new ExecutionStore(executionsDirOf(daemonDir));
 		this.logWriter = logWriter ?? new LogWriter(logsDirOf(daemonDir));
@@ -490,7 +492,9 @@ export class CommandHandler {
 			}
 			// Also kept in memory: routing consults it per dispatch, and a worker the daemon
 			// did not create only serves the projects it declared (D#9).
-			if (projectRoot !== undefined) this.executionProjects.set(executionId, projectRoot);
+			if (projectRoot !== undefined) {
+				this.executionProjects.set(executionId, projectRoot);
+			}
 			this.executionStore.create({ executionId, flowFile, flowId, stepIds, projectRoot });
 		} catch (err) {
 			// Execution setup failed after workspace was allocated - release before propagating
@@ -566,7 +570,9 @@ export class CommandHandler {
 										},
 									}
 								: s;
-						if (flowLabels.length === 0) return withEnv;
+						if (flowLabels.length === 0) {
+							return withEnv;
+						}
 						const stepLabels = (withEnv as { labels?: string[] }).labels ?? [];
 						return { ...withEnv, labels: [...new Set([...flowLabels, ...stepLabels])] };
 					})
@@ -580,13 +586,17 @@ export class CommandHandler {
 		if (cmd.mockEnv) {
 			for (const step of assignable) {
 				const overlay = cmd.mockEnv[step.id];
-				if (!overlay) continue;
+				if (!overlay) {
+					continue;
+				}
 				// Step type (model/script) was already confirmed above, before any allocation.
-				if (step.type !== 'model' && step.type !== 'script') continue;
+				if (step.type !== 'model' && step.type !== 'script') {
+					continue;
+				}
 				step.env = { ...(step.env ?? {}), ...overlay };
 				const banner = `MOCK: step '${step.id}' output replaced by ${cmd.mockConfigPath ?? '--mock-config'}`;
-				writeDaemonLog(logsDirOf(this.daemonDir), 'info', `⚠ ${banner}`);
-				this.logWriter.writeExecution(executionId, `⚠ ${banner}`, 'info');
+				writeDaemonLog(logsDirOf(this.daemonDir), 'info', `[warn] ${banner}`);
+				this.logWriter.writeExecution(executionId, `[warn] ${banner}`, 'info');
 			}
 		}
 
@@ -599,7 +609,9 @@ export class CommandHandler {
 		this.stepCounts.set(executionId, assignable.length);
 		this.activeExecutionCount++;
 
-		if (hookDispatcher) this.executionHooks.set(executionId, hookDispatcher);
+		if (hookDispatcher) {
+			this.executionHooks.set(executionId, hookDispatcher);
+		}
 
 		this.enqueueReadyItems(executionId, readyItems, context);
 		this.logWriter.writeExecution(executionId, `Execution started for flow ${flowId}`);
@@ -660,7 +672,9 @@ export class CommandHandler {
 		for (const assignmentId of this.stalledSteps.stalled()) {
 			const step = this.dispatched.get(assignmentId);
 			const assignment = this.assignments.describe(assignmentId);
-			if (assignment === undefined) continue;
+			if (assignment === undefined) {
+				continue;
+			}
 			if (!assignment.started) {
 				// Nothing ran, so there is nothing to protect: drop the worker and let the normal
 				// disconnect path hand the step to another one, instead of failing it.
@@ -670,7 +684,9 @@ export class CommandHandler {
 					`Worker never confirmed starting step ${assignment.stepId} within ${String(Math.round(this.stalledStepLimitMs / 1000))}s; dropping its connection so the step is handed over again`,
 					'warning'
 				);
-				if (connection !== undefined) this.registry.disconnect(connection);
+				if (connection !== undefined) {
+					this.registry.disconnect(connection);
+				}
 				continue;
 			}
 			this.dispatched.delete(assignmentId);
@@ -678,7 +694,9 @@ export class CommandHandler {
 			this.assignments.settle(assignmentId);
 			// A wedged worker never sends the `ready` that would free it, so without this it would stay
 			// "busy" forever: the daemon could never hibernate and updates would wait on it for good.
-			if (connection !== undefined) this.registry.disconnect(connection);
+			if (connection !== undefined) {
+				this.registry.disconnect(connection);
+			}
 			this.failStep(
 				assignment.executionId,
 				step?.stepId ?? assignment.stepId,
@@ -786,7 +804,9 @@ export class CommandHandler {
 		// Sync output and meta to ExecutionContext (used by worker for template rendering in next step)
 		const context = this.executionContexts.get(executionId)!;
 		context.stepOutputs[stepId] = output;
-		if (meta) context.stepMeta[stepId] = meta;
+		if (meta) {
+			context.stepMeta[stepId] = meta;
+		}
 
 		// Parent-blocking and deferral logic is handled inside FlowScheduler.complete().
 		// It returns [] while children are pending; fires deferred completion when all children settle.
@@ -974,7 +994,9 @@ export class CommandHandler {
 
 		this.stepCounts.set(executionId, totalAfterInject);
 
-		if (stepsToInject.length === 0) return;
+		if (stepsToInject.length === 0) {
+			return;
+		}
 
 		const context = this.executionContexts.get(executionId)!;
 		// Pass `parent` through -- FlowScheduler.inject() registers parent-child relationships natively
@@ -1074,7 +1096,9 @@ export class CommandHandler {
 				// Watched from the hand-over, not only from step_started: a worker confirms with
 				// step_started before anything else, so an assignment it never confirms would
 				// otherwise be waited on forever.
-				if (sent) this.stalledSteps.started(assignment.assignmentId);
+				if (sent) {
+					this.stalledSteps.started(assignment.assignmentId);
+				}
 				if (!sent) {
 					// Never handed over, so the assignment must not stay outstanding.
 					this.assignments.settle(assignment.assignmentId);
@@ -1105,7 +1129,9 @@ export class CommandHandler {
 	 */
 	private warnIfWorkerCannotResume(step: ReadyStep, worker: WebSocket): void {
 		const registered = this.registry.describe(worker);
-		if (registered?.features.includes(WORKER_FEATURE_SUB_STEP_SESSION_RESUME) === true) return;
+		if (registered?.features.includes(WORKER_FEATURE_SUB_STEP_SESSION_RESUME) === true) {
+			return;
+		}
 		this.logWriter.writeExecution(
 			step.executionContext.executionId,
 			`Step '${step.stepId}' is re-run because a sub-step failed, but worker ${registered?.workerId ?? 'unknown'} (flow-cli ${registered?.version ?? 'unknown version'}) cannot resume its session: it will render the step's prompt again from scratch instead of receiving only the sub-step feedback. Update flow-cli on that worker (\`flow cli update\`) and restart it to get the session-resume behaviour.`,
@@ -1133,7 +1159,9 @@ export class CommandHandler {
 			waitingMs: Date.now() - since,
 			interactiveWorkers,
 		});
-		if (decision.action === 'wait') return false;
+		if (decision.action === 'wait') {
+			return false;
+		}
 
 		this.interactiveWaitSince.delete(key);
 		this.failStep(step.executionContext.executionId, step.stepId, decision.reason);
@@ -1166,7 +1194,9 @@ export class CommandHandler {
 		// they were contacted only at daemon startup, which made the S8 wait a wait for something
 		// nobody had been asked for -- and put remote capacity out of reach of any run that began
 		// later. Once per episode, not once per pass: the re-check fires several times a second.
-		if (isNewEpisode) this.requestFromDeclaredSources?.();
+		if (isNewEpisode) {
+			this.requestFromDeclaredSources?.();
+		}
 
 		const plan = this.provisioner.planProvisioning(unmetDemand, now - this.unmetDemandSince);
 
@@ -1207,7 +1237,9 @@ export class CommandHandler {
 
 	/** Re-runs dispatch once the S8 wait can have elapsed, since nothing else would. */
 	private scheduleDemandRecheck(): void {
-		if (this.demandRecheck !== undefined) return;
+		if (this.demandRecheck !== undefined) {
+			return;
+		}
 		this.demandRecheck = setTimeout(() => {
 			this.demandRecheck = undefined;
 			this.tryDispatch();
@@ -1217,7 +1249,9 @@ export class CommandHandler {
 	}
 
 	private clearDemandRecheck(): void {
-		if (this.demandRecheck === undefined) return;
+		if (this.demandRecheck === undefined) {
+			return;
+		}
 		clearTimeout(this.demandRecheck);
 		this.demandRecheck = undefined;
 	}
@@ -1273,7 +1307,9 @@ export class CommandHandler {
 	}
 
 	private markSkippedStepsCompleted(executionId: string): void {
-		if (!this.executionStore.exists(executionId)) return;
+		if (!this.executionStore.exists(executionId)) {
+			return;
+		}
 		const state = this.executionStore.read(executionId);
 		for (const [sid, stepState] of Object.entries(state.steps)) {
 			if (stepState.status === 'pending') {
@@ -1294,10 +1330,14 @@ export class CommandHandler {
 		// by execution and step, so nothing else would ever remove these entries and a
 		// long-lived daemon would accumulate one per step it has ever run.
 		for (const key of this.redispatchCounts.keys()) {
-			if (key.startsWith(`${executionId}:`)) this.redispatchCounts.delete(key);
+			if (key.startsWith(`${executionId}:`)) {
+				this.redispatchCounts.delete(key);
+			}
 		}
 		for (const key of this.interactiveWaitSince.keys()) {
-			if (key.startsWith(`${executionId}:`)) this.interactiveWaitSince.delete(key);
+			if (key.startsWith(`${executionId}:`)) {
+				this.interactiveWaitSince.delete(key);
+			}
 		}
 
 		const pluginWs = this.pluginWorkspaceHandles.get(executionId);

@@ -7,8 +7,8 @@ import {
 	type StepView,
 	excerptOf,
 	outcomeLabel,
+	requireTimestamp,
 	runLabel,
-	shortStarted,
 	statusTag,
 	stepStatusTag,
 } from 'flow-core';
@@ -45,13 +45,13 @@ function errorExcerptOf(error: string | undefined, recovered: boolean): string {
 }
 
 /**
- * A history row plus the short ASCII strings the table shows as they are ("Oct 18 16:15", "build_task rsvl5t",
- * "ok, recovered"). Raw fields stay for the other consumers.
+ * A history row plus the short ASCII strings the table shows as they are ("build_task rsvl5t", "ok, recovered").
+ * Timestamps stay ISO 8601 (startedAt): the shell formats them (DataTable `format: datetime`), like everywhere in app-core.
  */
 export function toExecutionRow(summary: ExecutionSummary) {
 	return {
 		...summary,
-		startedLabel: shortStarted(summary.startedAt),
+		startedAt: requireTimestamp(summary.startedAt),
 		runLabel: runLabel(summary.flowId, summary.executionId),
 		statusLabel: outcomeLabel(statusTag(summary.status), { recovered: summary.lastErrorRecovered }),
 		errorExcerpt: errorExcerptOf(summary.lastError, summary.lastErrorRecovered),
@@ -110,6 +110,8 @@ export function toExecutionDetailRow(detail: ExecutionDetailView) {
 	}
 	return {
 		...detail,
+		// One row, so a DataTable shows the run start and end in the shell datetime format; null while the run is in progress.
+		timing: [{ startedAt: requireTimestamp(detail.startedAt), completedAt: detail.completedAt }],
 		// A recovered error is not a success to read past: the badge says it and turns to warning.
 		statusText: detail.lastErrorRecovered ? 'completed, recovered an error' : detail.status,
 		statusVariant: detail.lastErrorRecovered ? 'warning' : statusVariant,
@@ -118,6 +120,7 @@ export function toExecutionDetailRow(detail: ExecutionDetailView) {
 	};
 }
 
+/** A flow row; its last start stays ISO 8601 for the shell to format, after a check that it is a date. */
 export function toFlowRow(flow: FlowSummary) {
-	return { ...flow, lastStartedLabel: shortStarted(flow.lastStartedAt) };
+	return { ...flow, lastStartedAt: requireTimestamp(flow.lastStartedAt) };
 }

@@ -9,7 +9,7 @@ import type { LiveLogEntry } from 'flow-engine/types';
  */
 export type WorkerVerbosity = 'summary' | 'verbose';
 
-const SEPARATOR = '──────────────────────────────────────────────────────────';
+const SEPARATOR = '-'.repeat(58);
 
 function ts(): string {
 	return new Date().toISOString().slice(11, 19);
@@ -62,7 +62,9 @@ export class WorkerDisplay {
 	 */
 	stepLog(stepId: string, entry: LiveLogEntry): void {
 		const important = entry.level === 'warning' || entry.level === 'error';
-		if (this.verbosity !== 'verbose' && !important) return;
+		if (this.verbosity !== 'verbose' && !important) {
+			return;
+		}
 		const marker = important ? entry.level.slice(0, 4) : 'out ';
 		this.write(`[${ts()}] [${marker}] ${stepId}: ${entry.message}`);
 	}
@@ -88,12 +90,18 @@ export class WorkerDisplay {
  * unified.
  */
 function formatDuration(elapsedMs: number): string {
-	if (elapsedMs < 1_000) return `${String(Math.round(elapsedMs))}ms`;
+	if (elapsedMs < 1_000) {
+		return `${String(Math.round(elapsedMs))}ms`;
+	}
 	// One decimal up to ten seconds: rounding 1.5s to "2s" overstates a short step by a
 	// third, which matters when the reader is comparing steps.
-	if (elapsedMs < 10_000) return `${(elapsedMs / 1_000).toFixed(1)}s`;
+	if (elapsedMs < 10_000) {
+		return `${(elapsedMs / 1_000).toFixed(1)}s`;
+	}
 	const totalSeconds = Math.round(elapsedMs / 1_000);
-	if (totalSeconds < 60) return `${String(totalSeconds)}s`;
+	if (totalSeconds < 60) {
+		return `${String(totalSeconds)}s`;
+	}
 	const minutes = Math.floor(totalSeconds / 60);
 	return `${String(minutes)}m${String(totalSeconds % 60)}s`;
 }

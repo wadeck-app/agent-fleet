@@ -32,20 +32,30 @@ export interface RoutingCandidate {
 export class DefaultWorkerAcceptance implements WorkerAcceptanceProvider {
 	accepts({ step, worker }: { step: StepPlacement; worker: WorkerCandidate }): boolean {
 		// Only a worker with a terminal can prompt a human (D#32).
-		if (step.requiresUserInterface && !worker.hasUserInterface) return false;
+		if (step.requiresUserInterface && !worker.hasUserInterface) {
+			return false;
+		}
 
-		if (!workerSatisfiesLabels(step.labels, worker.labels)) return false;
+		if (!workerSatisfiesLabels(step.labels, worker.labels)) {
+			return false;
+		}
 
-		if (!workerSatisfiesShell(step.shellKind, worker.shellCapabilities)) return false;
+		if (!workerSatisfiesShell(step.shellKind, worker.shellCapabilities)) {
+			return false;
+		}
 
 		// A daemon-created worker exists to serve this daemon's queue, so there is no
 		// declared project set to check it against.
-		if (worker.ephemeral) return true;
+		if (worker.ephemeral) {
+			return true;
+		}
 
 		// Serving a project is explicit for a worker the daemon did not create (D#9). With
 		// no project to check against there is nothing to match, so the answer is no rather
 		// than a guess -- a run from outside any project falls back to forked capacity.
-		if (step.projectRoot === undefined) return false;
+		if (step.projectRoot === undefined) {
+			return false;
+		}
 		return worker.attachedProjects.includes(step.projectRoot);
 	}
 }
@@ -86,11 +96,15 @@ export class DefaultStepDistribution implements StepDistributionProvider {
 	 */
 	private preferUpToDate(group: WorkerCandidate[]): WorkerCandidate[] {
 		const latestVersion = this.readLatestVersion();
-		if (latestVersion === undefined) return group;
+		if (latestVersion === undefined) {
+			return group;
+		}
 
 		const versioned = group as (WorkerCandidate & { version?: string })[];
 		const upToDate = versioned.filter(candidate => candidate.version === latestVersion);
-		if (upToDate.length === 0 || upToDate.length === versioned.length) return group;
+		if (upToDate.length === 0 || upToDate.length === versioned.length) {
+			return group;
+		}
 
 		const stale = versioned.filter(candidate => candidate.version !== latestVersion);
 		return [...upToDate, ...stale];
@@ -124,7 +138,9 @@ export class StepRouter {
 		const byWorkerId = new Map(candidates.map(candidate => [candidate.worker.workerId, candidate]));
 
 		const eligible = candidates.filter(candidate => this.acceptsSafely(step, candidate.worker));
-		if (eligible.length === 0) return undefined;
+		if (eligible.length === 0) {
+			return undefined;
+		}
 
 		const ordered = this.orderSafely(eligible.map(candidate => candidate.worker));
 		const first = ordered[0];

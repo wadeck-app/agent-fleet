@@ -171,7 +171,9 @@ export function buildCliCommand(): Command {
 				// Check 1: Bundle integrity -- verify FlowExecutor is accessible from flow-engine
 				async () => {
 					try {
-						if (typeof FlowExecutor !== 'function') throw new Error('FlowExecutor is not a constructor');
+						if (typeof FlowExecutor !== 'function') {
+							throw new Error('FlowExecutor is not a constructor');
+						}
 						return { name: 'Bundle integrity', ok: true };
 					} catch (err) {
 						return { name: 'Bundle integrity', ok: false, detail: String(err) };
@@ -183,8 +185,9 @@ export function buildCliCommand(): Command {
 						const config = FlowConfigLoader.load(
 							path.join(os.tmpdir(), '.flow-self-check-nonexistent-config.yaml')
 						);
-						if (config.workspace.retainDays === undefined)
+						if (config.workspace.retainDays === undefined) {
 							throw new Error('workspace.retainDays is undefined');
+						}
 						return { name: 'Config loading', ok: true };
 					} catch (err) {
 						return { name: 'Config loading', ok: false, detail: String(err) };
@@ -201,8 +204,9 @@ export function buildCliCommand(): Command {
 							'    script: echo ok',
 						].join('\n');
 						const parsed = yaml.load(input) as { id?: string; steps?: unknown[] };
-						if (parsed?.id !== 'self-check-test')
+						if (parsed?.id !== 'self-check-test') {
 							throw new Error(`Expected id 'self-check-test', got '${String(parsed?.id)}'`);
+						}
 						if (!Array.isArray(parsed?.steps) || parsed.steps.length !== 1) {
 							throw new Error(
 								`Expected 1 step, got ${Array.isArray(parsed?.steps) ? parsed.steps.length : 'non-array'}`
@@ -292,8 +296,11 @@ export function buildCliCommand(): Command {
 					lines: parseInt(opts.lines ?? '50', 10),
 				});
 			} catch (err) {
-				if (!(err instanceof InvalidQueryError)) throw err;
-				process.stderr.write(`${err.message}\n`);
+				if (!(err instanceof InvalidQueryError)) {
+					throw err;
+				}
+				const message = normalizeError(err).message;
+				process.stderr.write(`${message}\n`);
 				process.exit(1);
 			}
 		});

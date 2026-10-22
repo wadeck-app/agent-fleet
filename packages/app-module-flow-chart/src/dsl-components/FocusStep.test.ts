@@ -44,3 +44,14 @@ describe('pickFocusStep', () => {
 		expect(() => pickFocusStep({ nodes: [], edges: [] }, 'TB')).toThrow(/no step/);
 	});
 });
+
+describe('pickFocusStep with collapsed parents', () => {
+	it('never picks a step hidden in a collapsed parent', () => {
+		const graph: FlowGraph = {
+			nodes: [node('p', { status: 'running' }), node('c', { status: 'failed' })],
+			edges: [{ from: 'c', to: 'p', kind: 'substep' }],
+		};
+		expect(pickFocusStep(graph, 'TB')).toBe('c');
+		expect(pickFocusStep(graph, 'TB', new Set(['p']))).toBe('p');
+	});
+});

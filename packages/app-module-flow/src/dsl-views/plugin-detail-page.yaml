@@ -37,5 +37,5 @@ sections:
             rows: $sources.plugin.optionRows
             emptyMessage: This plugin has no option
             columns:
-                - { key: 'name', label: 'Option' }
+                - { key: 'name', label: 'Option', nowrap: true, mono: true }
                 - { key: 'description', label: 'Description' }
