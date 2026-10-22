@@ -1,10 +1,12 @@
 import { Handle, type NodeProps, Position } from '@xyflow/react';
 
-import { statusStyle } from './StatusStyle.js';
+import { nodeStyle } from './NodeAppearance.js';
 import { SubStepToggle } from './SubStepToggle.js';
 import type { StepNode } from './ToFlowElements.js';
 
 // Handles are the anchors of the edges, not controls: invisible, and not connectable (the chart is read-only).
+const ORDINAL_CLASS =
+	'inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-current px-1 text-[10px] font-semibold';
 const HANDLE_CLASS = '!h-1 !w-1 !min-h-0 !min-w-0 !border-0 !bg-transparent';
 
 /**
@@ -13,11 +15,14 @@ const HANDLE_CLASS = '!h-1 !w-1 !min-h-0 !min-w-0 !border-0 !bg-transparent';
  */
 export function FlowStepNode({ data, selected }: NodeProps<StepNode>) {
 	const { step, direction, tree, onToggleCollapse } = data;
-	const style = statusStyle(step.status);
+	const style = nodeStyle(step);
+	const ordinal = step.path?.ordinal;
 	const horizontal = direction === 'LR';
 	const details = [
 		step.durationLabel,
-		step.attempts !== undefined && step.attempts > 1 ? `${step.attempts} attempts` : undefined,
+		step.attempts !== undefined && step.attempts > 1
+			? `${step.attempts} attempts${step.path?.attemptKind ? ` (${step.path.attemptKind})` : ''}`
+			: undefined,
 	]
 		.filter(Boolean)
 		.join(' - ');
@@ -27,8 +32,9 @@ export function FlowStepNode({ data, selected }: NodeProps<StepNode>) {
 			className={`flex h-full w-full flex-col justify-center rounded-lg border-2 px-3 py-2 text-left shadow-sm ${style.nodeClass} ${
 				selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-bg' : ''
 			}`}
-			aria-label={`${step.label}, ${style.label}`}
+			aria-label={`${step.label}, ${style.label}${ordinal === undefined ? '' : `, run order ${ordinal}`}`}
 			data-status={step.status ?? 'none'}
+			data-outcome={step.path?.outcome ?? 'none'}
 			data-testid={`step-${step.id}`}
 		>
 			<Handle
@@ -110,8 +116,19 @@ export function FlowStepNode({ data, selected }: NodeProps<StepNode>) {
 			/>
 
 			<div className="flex items-center justify-between gap-2 text-xs">
-				<span className="font-medium">
-					<span aria-hidden="true">{style.glyph}</span> {style.label}
+				<span className="flex items-center gap-1.5 font-medium">
+					{ordinal !== undefined && (
+						<span
+							data-testid={`ordinal-${step.id}`}
+							title={`Run order ${ordinal}: by the start of the step's latest attempt`}
+							className={ORDINAL_CLASS}
+						>
+							{ordinal}
+						</span>
+					)}
+					<span>
+						<span aria-hidden="true">{style.glyph}</span> {style.label}
+					</span>
 				</span>
 				{step.kind === 'removed' ? (
 					<span className="text-[10px] italic text-muted" title="This step is not in the current flow file">

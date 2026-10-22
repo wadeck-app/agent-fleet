@@ -1,6 +1,5 @@
 import { ButtonLink } from '@wadeck-app/dsl-ui';
-
-import { chartPathOfExecution } from '../commons/ChartPaths.js';
+import { chartPathOfExecution } from 'flow-core/graph-tree';
 
 /**
  * The "See flow chart" button contributed to the flow module's execution page. The DSL cannot concatenate the

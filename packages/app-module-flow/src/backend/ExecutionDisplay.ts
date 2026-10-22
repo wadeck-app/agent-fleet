@@ -3,12 +3,11 @@ import {
 	type ExecutionStatus,
 	type ExecutionSummary,
 	type FlowSummary,
-	type StatusCounts,
 	type StepView,
 	excerptOf,
+	executionLogsPath,
 	outcomeLabel,
 	requireTimestamp,
-	runLabel,
 	statusTag,
 	stepStatusTag,
 } from 'flow-core';
@@ -45,16 +44,18 @@ function errorExcerptOf(error: string | undefined, recovered: boolean): string {
 }
 
 /**
- * A history row plus the short ASCII strings the table shows as they are ("build_task rsvl5t", "ok, recovered").
+ * A history row plus the short ASCII status the table shows as it is ("ok, recovered") and the links of the run
+ * (a DSL string cannot be concatenated, so the paths are built here from flow-core's contract). The flow name and the
+ * id are sent whole: the table column truncates with an ellipsis when the viewport needs it.
  * Timestamps stay ISO 8601 (startedAt): the shell formats them (DataTable `format: datetime`), like everywhere in app-core.
  */
 export function toExecutionRow(summary: ExecutionSummary) {
 	return {
 		...summary,
 		startedAt: requireTimestamp(summary.startedAt),
-		runLabel: runLabel(summary.flowId, summary.executionId),
 		statusLabel: outcomeLabel(statusTag(summary.status), { recovered: summary.lastErrorRecovered }),
 		errorExcerpt: errorExcerptOf(summary.lastError, summary.lastErrorRecovered),
+		logsHref: executionLogsPath(summary.executionId),
 	};
 }
 
@@ -65,28 +66,6 @@ export function toStepRow(step: StepView) {
 		statusLabel: outcomeLabel(stepStatusTag(step.status), { recovered, attempts: step.attempts }),
 		errorExcerpt: errorExcerptOf(step.error, recovered),
 	};
-}
-
-const STATUS_FILTERS = [
-	['all', 'All', undefined],
-	['running', 'Running', 'running'],
-	['queued', 'Queued', 'queued'],
-	['completed', 'Completed', 'completed'],
-	['failed', 'Failed', 'failed'],
-] as const;
-
-/**
- * Labels of the status links; the DSL cannot style the active link, so its label carries it: "[Failed]".
- * With `counts`, each label also says how many executions it would show: "Failed (3)".
- */
-export function toStatusFilters(activeStatus: string | undefined, counts?: StatusCounts): Record<string, string> {
-	return Object.fromEntries(
-		STATUS_FILTERS.map(([key, label, status]) => {
-			const text =
-				counts === undefined ? label : `${label} (${status === undefined ? counts.total : counts[status]})`;
-			return [key, status === activeStatus ? `[${text}]` : text];
-		})
-	);
 }
 
 /** Short texts for the stat tiles of the detail: how many steps, how many retries, what went wrong. */
@@ -115,6 +94,7 @@ export function toExecutionDetailRow(detail: ExecutionDetailView) {
 		// A recovered error is not a success to read past: the badge says it and turns to warning.
 		statusText: detail.lastErrorRecovered ? 'completed, recovered an error' : detail.status,
 		statusVariant: detail.lastErrorRecovered ? 'warning' : statusVariant,
+		logsHref: executionLogsPath(detail.executionId),
 		...summaryOf(detail),
 		steps: detail.steps.map(toStepRow),
 	};

@@ -12,6 +12,12 @@ import { type FlowSummary, summarizeFlows } from '../history/FlowSummaries.js';
 import { buildHistoryTable } from '../history/HistoryTable.js';
 import { type RunDigest, buildRunDigest } from '../history/RunDigest.js';
 import { type StatusCounts, countByStatus } from '../history/StatusCounts.js';
+import {
+	type ExecutionLogQuery,
+	type ExecutionLogs,
+	formatRecordedStepOutput,
+	readExecutionLogs,
+} from '../logs/ExecutionLogs.js';
 import { type LogReadResult, type ReadLogsOptions, readLogs } from '../logs/LogReader.js';
 import {
 	type PluginCatalogSource,
@@ -54,6 +60,15 @@ export interface FlowQueryServiceOptions extends FlowQueryDirectories {
 /** A page of executions plus the execution files that could not be read, so no host has to hide them. */
 export interface QueriedExecutions extends FilteredExecutions {
 	skipped: SkippedExecutionFile[];
+}
+
+/** The log lines of one execution, with the failure text its record kept. */
+export interface ExecutionLogsView extends ExecutionLogs {
+	/** Full id: the query may have been a prefix. */
+	executionId: string;
+	flowId: string;
+	/** Error, stdout and stderr the execution record kept for failed steps (the selected step only): what is left once the daily logs rotated away. */
+	recordedOutput: string;
 }
 
 /** The text `flow history` prints and the execution files it had to skip. */
@@ -201,6 +216,29 @@ export class FlowQueryService {
 	/** Tail of one day's daemon log (default: today). */
 	readLogs(options: ReadLogsOptions): LogReadResult {
 		return readLogs(this.directories.configDir, options);
+	}
+
+	/**
+	 * The daemon log lines of one execution (id or unique prefix), filtered by step, level and text, paged from the end.
+	 * `stepIds` lists the steps of the record followed by the other ids that logged (such as `__execution`).
+	 * Throws ExecutionLookupError and InvalidQueryError.
+	 */
+	readExecutionLogs(idOrPrefix: string, query: ExecutionLogQuery): ExecutionLogsView {
+		const { record } = this.getExecution(idOrPrefix);
+		const logs = readExecutionLogs(
+			this.directories.configDir,
+			{ executionId: record.executionId, startedAt: record.startedAt, completedAt: record.completedAt },
+			query,
+			new Date(this.now())
+		);
+		const recordedIds = Object.keys(record.steps);
+		return {
+			...logs,
+			stepIds: [...recordedIds, ...logs.stepIds.filter(id => !recordedIds.includes(id))],
+			executionId: record.executionId,
+			flowId: record.flowId,
+			recordedOutput: formatRecordedStepOutput(record.steps, query.stepId),
+		};
 	}
 
 	listPlugins(): PluginEntry[] {

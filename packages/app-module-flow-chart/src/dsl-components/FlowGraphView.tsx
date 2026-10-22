@@ -3,7 +3,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Badge, ButtonLink } from '@wadeck-app/dsl-ui';
 import { Background, ReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { FlowGraphResult } from 'flow-core';
-import { buildGraphTree, defaultCollapsedIds } from 'flow-core/graph-tree';
+import { buildGraphTree, defaultCollapsedIds, executionLogsPath, executionStepLogsPath } from 'flow-core/graph-tree';
 
 import { describeChartMode } from './ChartMode.js';
 import { ChartToolbar } from './ChartToolbar.js';
@@ -13,6 +13,7 @@ import { pickFocusStep } from './FocusStep.js';
 import type { LayoutDirection } from './GraphLayout.js';
 import { GraphLegend } from './GraphLegend.js';
 import { InitialViewport } from './InitialViewport.js';
+import { nodeStyle } from './NodeAppearance.js';
 import { useShellColorMode } from './ShellColorMode.js';
 import { summarizeStatuses } from './StatusSummary.js';
 import { StepDetailsPanel } from './StepDetailsPanel.js';
@@ -123,12 +124,8 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 	const selected = graph.nodes.find(node => node.id === selectedId);
 	const edgeKinds = useMemo(() => new Set(graph.edges.map(edge => edge.kind)), [graph]);
 
-	const back = execution
-		? {
-				to: `/modules/flow/executions/${encodeURIComponent(execution.executionId)}`,
-				label: 'Back to the execution',
-			}
-		: { to: '/modules/flow-chart/flows', label: 'Back to flow charts' };
+	const pathLabels = useMemo(() => new Set(graph.nodes.map(node => nodeStyle(node).label)), [graph]);
+	const labelOf = (stepId: string): string => graph.nodes.find(node => node.id === stepId)?.label ?? stepId;
 
 	if (graph.nodes.length === 0) {
 		return (
@@ -160,7 +157,14 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 						</p>
 						<p className="text-xs text-muted">{mode.hint}</p>
 					</div>
-					<ButtonLink to={back.to} label={back.label} variant="secondary" size="sm" />
+					{execution && (
+						<ButtonLink
+							to={executionLogsPath(execution.executionId)}
+							label="Logs"
+							variant="secondary"
+							size="sm"
+						/>
+					)}
 				</div>
 			</header>
 
@@ -193,7 +197,7 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 								focusedOnStep
 									? `Zoomed in on step '${focusLabel}' (readable size). The whole flow does not fit at that size: drag to move along it, or use Fit to view to see all of it, smaller.`
 									: selected === undefined
-										? 'Click a step to see its status, duration, attempts and error.'
+										? 'Click a step to see its status, path, inputs, outputs and error.'
 										: undefined
 							}
 						/>
@@ -240,6 +244,12 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 										<div className={DETAILS_STICKY_CLASS}>
 											<StepDetailsPanel
 												step={selected}
+												labelOf={labelOf}
+												onSelectStep={setSelectedId}
+												logsPath={
+													execution &&
+													executionStepLogsPath(execution.executionId, selected.id)
+												}
 												onClose={() => setSelectedId(undefined)}
 											/>
 										</div>
@@ -248,7 +258,13 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 							</div>
 						)}
 					</ReactFlowProvider>
-					<GraphLegend modeHint={mode.hint} showStatuses={execution !== undefined} edgeKinds={edgeKinds} />
+					<GraphLegend
+						modeHint={mode.hint}
+						showStatuses={execution !== undefined}
+						edgeKinds={edgeKinds}
+						pathLabels={pathLabels}
+						showPath={graph.nodes.some(node => node.path !== undefined)}
+					/>
 				</div>
 			</div>
 		</div>

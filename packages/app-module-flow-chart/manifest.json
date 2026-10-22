@@ -23,6 +23,15 @@
 		},
 		{
 			"kind": "widget",
+			"slot": "flow:execution-row-actions",
+			"label": "See flow chart",
+			"view": {
+				"type": "path",
+				"value": "./src/dsl-views/execution-row-action.yaml"
+			}
+		},
+		{
+			"kind": "widget",
 			"slot": "flow:executions-actions",
 			"label": "Flow charts",
 			"view": {

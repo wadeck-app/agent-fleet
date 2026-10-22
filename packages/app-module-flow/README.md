@@ -2,44 +2,13 @@
 
 app-core module exposing flow state (executions, workers, logs, plugins) as read-only HTTP routes and DSL pages. All logic comes from `flow-core`; this package only validates query parameters, maps errors to HTTP status and projects records (no step `meta`).
 
-Routes (`/api/modules/flow/...`): `GET /executions`, `/executions/:id`, `/flows`, `/workers`, `/logs`, `/plugins`, `/plugins/:id`. Registered in `src/backend/*Routes.ts`.
+Routes (`/api/modules/flow/...`): `GET /executions`, `/executions/:id`, `/executions/:id/logs`, `/flows`, `/widgets/executions`, `/widgets/daemon`, `/workers`, `/logs`, `/plugins`, `/plugins/:id`. Registered in `src/backend/*Routes.ts`.
 
 Pages: `src/dsl-views/*.yaml`, referenced by `manifest.json`. `views.test.ts` checks that every `$sources` url has a route and every link lands on a manifest page.
 
-Known limit: the executions flow filter is set by clicking a row of the flows table (`?flow=`). A text/select bound to a URL parameter needs a dsl-ui change (only `Pagination` and `PageSizeSelect` take `urlParam`).
+Slots other modules fill: `flow:execution-actions`, `flow:executions-actions`, `flow:execution-row-actions` (see `FlowModuleContract` in flow-core).
 
-## Times and table columns
-
-- Every timestamp is sent as ISO 8601 (`startedAt`, `completedAt`, `lastStartedAt`, `timing`, `lastRun`); the route checks it is a valid date (`requireTimestamp`, flow-core) and fails otherwise. No server-side label ("Oct 18 16:15"), no "5m" age.
-- The views show them with the dsl-ui DataTable column `format: datetime`, the formatter of the other modules (queue) and tables of app-core: `Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' })`, so the viewer's locale, no seconds (en-US: "10/18/26, 4:15 PM"). Source: dsl-ui `DataTable.tsx` `formatValue`.
-- A Badge, StatTile or composed string cannot format a timestamp: the detail page shows the run start and end as a one-row table (`timing`), the tiles widget shows the last run as a one-row table (`lastRun`).
-- Shells older than dsl-ui 122 ignore `format` and show the raw ISO text.
-- Durations stay readable text from the backend ("12.3s"): the DataTable `format: ms` only appends "ms" to a number.
-
-Column options used (dsl-ui >= 122, older shells keep `key` and `label` only): `format` for times, `badge` for status words (ok/FAILED/running/waiting/retry/pending, worker idle/busy), `nowrap` for short values (times, counts, status), `truncate` for names, `mono` for ids and versions, `muted` for secondary values. `views.test.ts` pins: every `*At` column is `format: datetime` in every A/B variant, no timestamp in a Badge or StatTile.
-
-## Design variants (A/B)
-
-Three views declare design alternatives with the dsl-ui `AbTest` node, to compare them in the real pages. The widget is four independent experiments (dimensions) stacked in one card; each has its own dock row, so any combination can be tried:
-
-| View                         | id                       | Variants (first = `initial`)                    |
-| ---------------------------- | ------------------------ | ----------------------------------------------- |
-| `executions-widget.yaml`     | `flow-widget-summary`    | `tiles`, `banner`, `rate`, `big`                |
-| `executions-widget.yaml`     | `flow-widget-trend`      | `none`, `bars`, `daily-rate`, `delta`           |
-| `executions-widget.yaml`     | `flow-widget-recent`     | `none`, `latest`, `failures`, `active`, `flows` |
-| `executions-widget.yaml`     | `flow-widget-actions`    | `link`, `buttons`, `status`, `latest-failure`   |
-| `executions-page.yaml`       | `flow-executions-design` | `table`, `filters-first`, `flows-aside`         |
-| `execution-detail-page.yaml` | `flow-execution-design`  | `steps-table`, `summary-first`                  |
-
-- Pick one in the A/B dock of a development shell, or force it for one page load with `?ab.<id>=<variant>`. The dock keeps the choice in `localStorage` key `ab.<id>`.
-- Production shells and shells with the dock disabled render `initial`.
-- Needs a shell with dsl-ui >= 2026.10.19-110. An older shell shows "Unknown component type: AbTest" for these three views. The manifest declares no `dslLib` range for it (that would require a `src/dsl-components` entry), so app-core does not refuse the module on an old shell.
-- Widget: force a combination with `?ab.flow-widget-summary=banner&ab.flow-widget-trend=bars`. Defaults are `tiles`, `none`, `none`, `link`.
-- Widget data: `recent` source (`GET /widgets/executions`, flow-core `RunDigest` flattened in `ExecutionWidgetBody.ts`) feeds every dimension; `daemon` source (`GET /widgets/daemon`) feeds only `actions=status`. `latest-failure` and `buttons` link to the flow-chart module pages, which exist only if that module is installed.
-- Keep ids and variant keys stable: renaming one drops the choice stored in browsers. `views.test.ts` pins them.
-- Backend fields only some variants read: every widget field except `viewAllLabel` (see `$sources.recent.*` in the view), `statusFiltersCounted` and `statusCounts` (executions route), `stepsSummary`, `retryCount` and `errorSummary` (detail route).
-
-To keep one variant of a widget dimension: replace that `AbTest` node by the `view` of the chosen variant (or by nothing for `none`); the other dimensions stay. To remove an experiment once a variant is chosen: replace the `AbTest` node by the `view` of the chosen variant (for the widget, make it the document root and keep `$sources`), delete the other variants, then resolve the YAML anchors (`&name` defined in one variant, `*name` used in others) by inlining them, and remove the backend fields no remaining view reads. Update `EXPECTED` in `views.test.ts`.
+Details: [.docs/pages-and-variants.md](.docs/pages-and-variants.md) covers the executions page, execution logs, times and columns, and the A/B design variants (`AbTest` ids, how to pick or retire one).
 
 ```
 npm test            # builds flow-core first

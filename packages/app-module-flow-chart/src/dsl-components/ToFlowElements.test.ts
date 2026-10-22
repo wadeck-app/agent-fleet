@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { INDENT, NODE_HEIGHT, NODE_WIDTH } from './GraphLayout.js';
 import { toFlowElements } from './ToFlowElements.js';
-import { BUILD_GRAPH, SUBFLOW_GRAPH, node } from './testing/GraphFixtures.js';
+import { BUILD_GRAPH, SUBFLOW_GRAPH, chain, node } from './testing/GraphFixtures.js';
 
 describe('toFlowElements', () => {
 	it('makes one fixed-size step node per step, selected only when asked', () => {
@@ -130,5 +130,21 @@ describe('toFlowElements with sub-steps', () => {
 		nodes.find(n => n.id === 'build')!.data.onToggleCollapse!('build');
 		expect(calls).toEqual(['build']);
 		expect(nodes.find(n => n.id === 'plan')!.data.tree.toggleable).toBe(false);
+	});
+
+	it('draws the edges the run followed heavy and the others faded, and leaves a graph without a run as before', () => {
+		const graph = {
+			nodes: [node('a'), node('b'), node('c')],
+			edges: [
+				{ from: 'a', to: 'b', kind: 'dependency' as const, traversed: true },
+				{ from: 'a', to: 'c', kind: 'conditional' as const, traversed: false },
+			],
+		};
+		const { edges } = toFlowElements(graph, 'LR', undefined);
+		expect(edges[0]!.style).toMatchObject({ strokeWidth: 2.5, opacity: 1 });
+		expect(edges[1]!.style).toMatchObject({ strokeWidth: 1.5, opacity: 0.3 });
+
+		const plain = toFlowElements(chain(2), 'LR', undefined).edges;
+		expect(plain[0]!.style).toMatchObject({ strokeWidth: 1.5, opacity: 1 });
 	});
 });

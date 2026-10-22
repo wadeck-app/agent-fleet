@@ -45,6 +45,7 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 			expect.arrayContaining([
 				'page:nav:/executions',
 				'page:route:/executions/:id',
+				'page:route:/executions/:id/logs',
 				'page:nav:/workers',
 				'page:nav:/logs',
 				'page:nav:/plugins',
@@ -56,7 +57,11 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 
 	it('names its route pages, for the breadcrumb', () => {
 		const labels = manifest.extensionPoints.filter(p => p.slot === 'route').map(p => `${p.path}=${p.label}`);
-		expect(labels.sort()).toEqual(['/executions/:id=Execution', '/plugins/:id=Plugin']);
+		expect(labels.sort()).toEqual([
+			'/executions/:id/logs=Logs',
+			'/executions/:id=Execution',
+			'/plugins/:id=Plugin',
+		]);
 	});
 
 	it('declares exactly the pages of flow-core FLOW_PAGE_PATHS, the contract the modules linking to them are tested against', () => {

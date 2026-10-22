@@ -33,5 +33,21 @@ export const EDGE_LEGEND: readonly { kind: FlowGraphEdgeKind; description: strin
 	{ kind: 'conditional', description: 'runs only when the condition holds' },
 	{ kind: 'loop', description: 'on failure, goes back (retry loop)' },
 	{ kind: 'substep', description: 'sub-step (indented under its parent)' },
-	{ kind: 'sequence', description: 'ran after (dependencies not recorded)' },
+	{ kind: 'sequence', description: 'recorded order (dependencies unknown: flow file changed or injected steps)' },
 ];
+
+export interface TraversalStyle {
+	opacity: number;
+	width: number;
+}
+
+/**
+ * How an edge looks once the run is known: followed edges are heavy, edges the run did not follow are faded.
+ * `undefined` is a graph without a run (nothing to tell apart).
+ */
+export function traversalStyle(traversed: boolean | undefined): TraversalStyle {
+	if (traversed === undefined) {
+		return { opacity: 1, width: 1.5 };
+	}
+	return traversed ? { opacity: 1, width: 2.5 } : { opacity: 0.3, width: 1.5 };
+}

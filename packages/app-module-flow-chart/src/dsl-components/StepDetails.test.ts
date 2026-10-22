@@ -80,4 +80,28 @@ describe('describeStep', () => {
 	it('has no error block when the step did not fail', () => {
 		expect(describeStep(node('a')).error).toBeUndefined();
 	});
+
+	it('adds the run order and explains why a step did not run, with how sure the chart is', () => {
+		const ran = describeStep(
+			node('a', {
+				attempts: 3,
+				path: {
+					outcome: 'ran',
+					basis: 'recorded',
+					reason: 'Ran.',
+					ordinal: 2,
+					attempts: 3,
+					attemptKind: 'loop',
+				},
+			})
+		);
+		expect(ran.rows).toContainEqual({ label: 'Run order', value: '2' });
+		expect(ran.rows).toContainEqual({ label: 'Attempts', value: '3 (loop passes, inferred)' });
+		expect(ran.outcome).toBeUndefined();
+
+		const skipped = describeStep(
+			node('b', { path: { outcome: 'skipped', basis: 'inferred', reason: 'Probably skipped: x.' } })
+		);
+		expect(skipped.outcome).toEqual({ text: 'Probably skipped: x.', basis: 'inferred' });
+	});
 });

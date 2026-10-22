@@ -1,4 +1,26 @@
-# Chart header, sub-step tree, flows index (A/B)
+# Run path, step I/O, chart header, sub-step tree, flows index (A/B)
+
+## Run path (flow-core `RunPath.ts`, `RunGraphAnnotation.ts`)
+
+The record keeps per step: status, start of the latest attempt, completion, attempt count, error. It does not keep which dependency released a step or the value of a `when`.
+
+| Shown                                          | Basis                                                                                                           |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Number on a node (1, 2, ...)                   | Recorded: order of each step's latest start (a step run twice is numbered by its last run)                      |
+| Step ran / running / waiting                   | Recorded                                                                                                        |
+| Skipped                                        | Recorded that the step completed without starting; the cause (`when`, branch) is inferred                       |
+| Not reached / probably skipped in a failed run | Inferred from the failed or missing dependency, or an unmet `when`                                              |
+| Attempts kind (retry, loop passes, relaunch)   | Inferred from the flow definition; only the start count is recorded                                             |
+| Heavy vs faded edge                            | Inferred: both ends started and the source finished before the target started (loop: target ran more than once) |
+| "recorded order" edge                          | Recorded start order, for steps the flow file no longer declares                                                |
+
+## Step panel: inputs and outputs (`StepIO.ts`)
+
+- Not recorded: resolved inputs and step outputs. Only failed steps keep stdout/stderr (last 2000 chars), plus error, meta (exit code, session id, tokens, cost) and relaunch feedback. The panel says so.
+- Inputs show the declaration: references (`${{ ... }}`) of prompts and scripts (never their text), values of env / sub-flow inputs (200 chars max).
+- Data-flow links ("Uses output of" / "Used by") come from `steps.<id>.outputs` references in prompt, script, env, inputs, `when`, `context.previousOutputs` and `session.continue`; names select the node.
+- Secrets: the record is NOT masked at write time (`LogMasker` is not wired into the daemon). `SecretRedaction.ts` hides secret-named values and `KEY=value` / bearer / token patterns in what this module adds; it is a safety net, not a guarantee.
+- "Logs of this step" opens `/modules/flow/executions/<id>/logs?step=<stepId>` (`executionStepLogsPath`).
 
 ## Chart header and sub-steps
 

@@ -6,6 +6,7 @@ import {
 	type FlowQueryService,
 	InvalidQueryError,
 	type QueryParams,
+	RECOVERED_STATUS,
 	optionalBoolean,
 	optionalInteger,
 	optionalString,
@@ -16,12 +17,13 @@ import {
 } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
-import { toExecutionDetailRow, toExecutionRow, toFlowRow, toStatusFilters } from './ExecutionDisplay.js';
+import { toExecutionDetailRow, toExecutionRow, toFlowRow } from './ExecutionDisplay.js';
 
 export const MAX_EXECUTIONS_LIMIT = 500;
 export const MAX_TAIL_CHARS = 1_000_000;
 
 // Typed against ExecutionStatus so a status added to flow-core fails the build here instead of being refused at runtime.
+// "recovered" is not a status: it filters the completed runs that saw an error (see filterExecutions).
 const EXECUTION_STATUSES = [
 	'queued',
 	'running',
@@ -29,13 +31,25 @@ const EXECUTION_STATUSES = [
 	'failed',
 	're-queued',
 ] as const satisfies readonly ExecutionStatus[];
+const ACCEPTED_STATUS_FILTERS: readonly string[] = [...EXECUTION_STATUSES, RECOVERED_STATUS];
 
 function readStatus(query: QueryParams): string | undefined {
 	const status = optionalString(query, 'status');
-	if (status !== undefined && !(EXECUTION_STATUSES as readonly string[]).includes(status)) {
-		throw new InvalidQueryError(`'status' must be one of ${EXECUTION_STATUSES.join(', ')}, got '${status}'.`);
+	if (status !== undefined && !ACCEPTED_STATUS_FILTERS.includes(status)) {
+		throw new InvalidQueryError(`'status' must be one of ${ACCEPTED_STATUS_FILTERS.join(', ')}, got '${status}'.`);
 	}
 	return status;
+}
+
+/**
+ * What the executions table says when it has no row. The three causes need three words: a page past the end (entries
+ * exist, `total` says so), a filter that matches nothing, and an install where nothing ever ran.
+ */
+function emptyMessageOf(total: number, filtered: boolean): string {
+	if (total > 0) {
+		return 'No executions on this page';
+	}
+	return filtered ? 'No execution matches the filters' : 'No execution yet: run a flow and it shows here';
 }
 
 /** What the flows table says about itself: it is the only place the DSL can show that the list was cut. */
@@ -61,14 +75,9 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const offset = readPageOffset(query, limit ?? DEFAULT_HISTORY_LIMIT);
 			const status = readStatus(query);
 			const flow = optionalString(query, 'flow');
-			const page = service.listExecutions({
-				limit,
-				offset,
-				status,
-				flow,
-				id: optionalString(query, 'id'),
-			});
-			const counts = service.countByStatus(flow);
+			const flowContains = optionalString(query, 'flowContains');
+			const id = optionalString(query, 'id');
+			const page = service.listExecutions({ limit, offset, status, flow, flowContains, id });
 			const body = {
 				items: page.items.map(record => toExecutionRow(toExecutionSummary(record))),
 				total: page.total,
@@ -76,11 +85,10 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 				skipped: page.skipped.length,
 				limit: limit ?? DEFAULT_HISTORY_LIMIT,
 				offset: offset ?? 0,
-				// Labels of the status links, the active one marked: the DSL cannot style a link.
-				statusFilters: toStatusFilters(status),
-				// Same links with the number of executions each shows (for the flow filter, if any).
-				statusFiltersCounted: toStatusFilters(status, counts),
-				statusCounts: counts,
+				emptyMessage: emptyMessageOf(
+					page.total,
+					[status, flow, flowContains, id].some(value => value !== undefined)
+				),
 			};
 			return reply.code(200).send(body);
 		} catch (err) {

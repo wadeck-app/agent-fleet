@@ -3,7 +3,7 @@ import { MarkerType } from '@xyflow/react';
 import type { FlowGraph, FlowGraphEdge, FlowGraphNode } from 'flow-core';
 import type { GraphTreeRow } from 'flow-core/graph-tree';
 
-import { edgeStyle } from './EdgeStyle.js';
+import { edgeStyle, traversalStyle } from './EdgeStyle.js';
 import { type LayoutDirection, NODE_HEIGHT, NODE_WIDTH, layoutTree } from './GraphLayout.js';
 
 /** Where a step sits in the tree of sub-steps, for its node to draw the indent cue and the chevron. */
@@ -104,6 +104,7 @@ export function toFlowElements(
 
 	const edges: Edge[] = layout.edges.map(edge => {
 		const style = edgeStyle(edge.kind);
+		const followed = traversalStyle(edge.traversed);
 		const isLoop = edge.kind === 'loop';
 		const isLink = edge.kind === 'substep';
 		const handles = isLoop ? LOOP : isLink ? TREE : orderingHandles(edge, direction, rowOf, collapsed);
@@ -118,9 +119,15 @@ export function toFlowElements(
 			type: style.type,
 			...(isLoop ? { pathOptions: { offset: 36, borderRadius: 14 } } : {}),
 			...(around ? { pathOptions: { offset: 26, borderRadius: 10 } } : {}),
-			animated: style.animated,
+			// An edge the run did not follow does not animate: it would look active.
+			animated: style.animated && edge.traversed !== false,
 			label: isLink ? undefined : edge.label,
-			style: { stroke: style.stroke, strokeDasharray: style.dash, strokeWidth: 1.5 },
+			style: {
+				stroke: style.stroke,
+				strokeDasharray: style.dash,
+				strokeWidth: followed.width,
+				opacity: followed.opacity,
+			},
 			...(isLink
 				? {}
 				: { markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke, width: 16, height: 16 } }),

@@ -1,0 +1,93 @@
+# Logs of one execution, mounted at /modules/flow/executions/:id/logs. ":id" of the manifest path is $route.id.
+# Same lines as `flow logs`, read from the daemon's daily files and narrowed to this run by the route
+# (GET /executions/:id/logs). Filters live in the URL: ?step=<stepId>&level=error&q=text&page=0&size=100.
+# The step select lists the steps of the run (stepOptions, from the execution record and from the log itself;
+# "Run events" are the lines about the run, not a step).
+# Pages count from the END: page 1 of the pager (?page=0 or none) is the latest lines, the next ones are older. Rows inside
+# a page are oldest first. A changed filter or page size goes back to page 1 (resetUrlParams, dsl-ui >= 2026.10.22-124).
+# Times are ISO 8601 and the column is `format: time`: the shell prints it like every table of app-core.
+# The notice (hasNotice/notice) explains an empty table or a damaged log; it is also the table's empty message.
+# The recorded failure text is what the execution record kept of failed steps (error, stdout, stderr): it outlives the
+# daily files, which rotate away.
+$sources:
+    logs:
+        url: GET /api/modules/flow/executions/{id}/logs
+        params:
+            id: $route.id
+            step: $urlParam.step
+            level: $urlParam.level
+            q: $urlParam.q
+            page: $urlParam.page
+            limit: $urlParam.size
+
+$type: PageContent
+sections:
+    - $type: PageHeader
+      title: $sources.logs.flowId
+      subtitle: $sources.logs.executionId
+
+    - $type: HorizontalStack
+      gap: gap-3
+      align: items-center
+      items:
+          - $type: SearchBar
+            urlParam: q
+            resetUrlParams: [page]
+            placeholder: Message text
+          # options is a source expression: it is undefined until the route answered, and CompactSelect throws on that (blank page), hence the $if.
+          - $type: CompactSelect
+            $if: $sources.logs.stepOptions
+            urlParam: step
+            resetUrlParams: [page]
+            ariaLabel: Step
+            placeholder: All steps
+            options: $sources.logs.stepOptions
+          - $type: CompactSelect
+            urlParam: level
+            resetUrlParams: [page]
+            ariaLabel: Level
+            placeholder: Any level
+            options:
+                - { value: debug, label: Debug }
+                - { value: info, label: Info }
+                - { value: warning, label: Warning }
+                - { value: error, label: Error }
+
+    - { $type: Badge, $if: $sources.logs.hasNotice, label: $sources.logs.notice, variant: warning, tone: subtle }
+
+    - $type: DataTable
+      rows: $sources.logs.entries
+      emptyMessage: $sources.logs.notice
+      columns:
+          - { key: 'timestamp', label: 'Time', format: time, nowrap: true }
+          - key: level
+            label: Level
+            nowrap: true
+            badge: { debug: default, info: info, warning: warning, error: danger }
+          - { key: 'stepId', label: 'Step', truncate: true, mono: true }
+          - { key: 'message', label: 'Message', mono: true }
+
+    - $type: HorizontalStack
+      justify: justify-between
+      align: items-center
+      gap: gap-3
+      items:
+          - $type: Pagination
+            urlParam: page
+            total: $sources.logs.total
+            size: $sources.logs.limit
+
+          # options[0] is the route's default page size (checked in views.test.ts).
+          - $type: PageSizeSelect
+            urlParam: size
+            resetUrlParams: [page]
+            options: [100, 200, 500]
+
+    - $type: Section
+      $if: $sources.logs.hasRecordedOutput
+      title: Recorded failure output (error, stdout and stderr kept in the execution record)
+      items:
+          - $type: JsonViewer
+            row: $sources.logs
+            field: recordedOutput
+            maxHeight: 30rem

@@ -5,7 +5,11 @@ import type { FlowGraph, FlowGraphEdge, FlowGraphNode } from './FlowGraph.js';
 import {
 	DEFAULT_MAX_EXPANDED_CHILDREN,
 	buildGraphTree,
+	chartPathOfExecution,
+	chartPathOfFlow,
 	defaultCollapsedIds,
+	executionLogsPath,
+	executionStepLogsPath,
 	liftEdges,
 	visibleTreeRows,
 } from './GraphTree.js';
@@ -149,6 +153,15 @@ describe('visibleTreeRows', () => {
 	});
 });
 
+describe('browser-safe page paths of the subpath', () => {
+	it('re-exports the paths a chart links to', () => {
+		expect(chartPathOfExecution('a')).toBe('/modules/flow-chart/flows/runs/a');
+		expect(chartPathOfFlow('a')).toBe('/modules/flow-chart/flows/a');
+		expect(executionLogsPath('a')).toBe('/modules/flow/executions/a/logs');
+		expect(executionStepLogsPath('a', 's')).toBe('/modules/flow/executions/a/logs?step=s');
+	});
+});
+
 describe('liftEdges', () => {
 	it('moves an edge end hidden in a collapsed parent to that parent, drops what becomes a self edge, and merges duplicates', () => {
 		const rows = buildGraphTree(NESTED);
@@ -169,5 +182,22 @@ describe('liftEdges', () => {
 		};
 		const rows = buildGraphTree(graph);
 		expect(liftEdges(graph.edges, rows, new Set(['p', 'after']))).toEqual([dep('p', 'after')]);
+	});
+
+	it('keeps an edge traversed when it merges with one that was not', () => {
+		const graph: FlowGraph = {
+			nodes: ['p', 'c1', 'c2', 'after'].map(node),
+			edges: [
+				sub('c1', 'p'),
+				sub('c2', 'p'),
+				{ ...dep('c1', 'after'), traversed: false },
+				{ ...dep('c2', 'after'), traversed: true },
+			],
+		};
+		const rows = buildGraphTree(graph);
+
+		expect(liftEdges(graph.edges, rows, new Set(['p', 'after']))).toEqual([
+			{ ...dep('p', 'after'), traversed: true },
+		]);
 	});
 });

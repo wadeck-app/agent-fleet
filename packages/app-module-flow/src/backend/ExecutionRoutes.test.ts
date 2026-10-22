@@ -32,9 +32,7 @@ describe('GET /executions', () => {
 				skipped: 0,
 				limit: 20,
 				offset: 0,
-				statusFilters: expect.any(Object),
-				statusFiltersCounted: expect.any(Object),
-				statusCounts: expect.any(Object),
+				emptyMessage: 'No execution yet: run a flow and it shows here',
 			},
 		});
 	});
@@ -121,6 +119,35 @@ describe('GET /executions', () => {
 		expect((body as { total: number }).total).toBe(1);
 	});
 
+	it('searches the flow name by substring with flowContains (the flow box of the page), and keeps flow as an exact match', async () => {
+		fixture.addExecution({ executionId: 'a1', flowId: 'deploy' });
+		fixture.addExecution({ executionId: 'a2', flowId: 'Deploy-Prod' });
+		fixture.addExecution({ executionId: 'a3', flowId: 'build' });
+		const ids = async (query: Record<string, string>) =>
+			((await callRoute(routes, 'GET /executions', { query })).body as { items: { executionId: string }[] }).items
+				.map(i => i.executionId)
+				.sort();
+		expect(await ids({ flowContains: 'deploy' })).toEqual(['a1', 'a2']);
+		expect(await ids({ flow: 'deploy' })).toEqual(['a1']);
+	});
+
+	it('filters the runs that recovered from an error with status=recovered', async () => {
+		fixture.addExecution({ executionId: 'r1', lastError: 'flaky' });
+		fixture.addExecution({ executionId: 'r2' });
+		const { body } = await callRoute(routes, 'GET /executions', { query: { status: 'recovered' } });
+		expect((body as { items: { executionId: string }[] }).items.map(i => i.executionId)).toEqual(['r1']);
+	});
+
+	it('words the empty table: a page past the end, a filter without match, and nothing ever ran', async () => {
+		const emptyMessage = async (query: Record<string, string>) =>
+			((await callRoute(routes, 'GET /executions', { query })).body as { emptyMessage: string }).emptyMessage;
+		expect(await emptyMessage({})).toBe('No execution yet: run a flow and it shows here');
+		fixture.addExecution({ executionId: 'a1', flowId: 'deploy' });
+		expect(await emptyMessage({ page: '5' })).toBe('No executions on this page');
+		expect(await emptyMessage({ flowContains: 'nothing' })).toBe('No execution matches the filters');
+		expect(await emptyMessage({ status: 'failed' })).toBe('No execution matches the filters');
+	});
+
 	it('looks an id prefix up (a lookup, not a page)', async () => {
 		fixture.addExecution({ executionId: 'abcd1' });
 		fixture.addExecution({ executionId: 'zzzz9' });
@@ -134,9 +161,10 @@ describe('GET /executions', () => {
 		[{ offset: '-1' }, "'offset' must be an integer >= 0, got '-1'."],
 		[
 			{ status: 'exploded' },
-			"'status' must be one of queued, running, completed, failed, re-queued, got 'exploded'.",
+			"'status' must be one of queued, running, completed, failed, re-queued, recovered, got 'exploded'.",
 		],
 		[{ flow: ['a', 'b'] }, "'flow' must be given once, got 2 values."],
+		[{ flowContains: ['a', 'b'] }, "'flowContains' must be given once, got 2 values."],
 	])('rejects the query %j with 400 and an actionable message', async (query, message) => {
 		expect(await callRoute(routes, 'GET /executions', { query })).toEqual({
 			status: 400,
@@ -305,7 +333,7 @@ describe('GET /flows', () => {
 });
 
 describe('display fields (the DataTable shows a cell as is: it cannot style, truncate or format)', () => {
-	it('adds short ASCII runLabel and statusLabel to each row, with a one-line errorExcerpt, keeping the raw fields', async () => {
+	it('sends the full flow name and execution id (the column truncates), a short statusLabel and the links of the run, keeping the raw fields', async () => {
 		fixture.addExecution({
 			executionId: 'bad1',
 			status: 'failed',
@@ -319,15 +347,25 @@ ${'word '.repeat(40)}`,
 		expect(bad).toMatchObject({
 			status: 'failed',
 			startedAt: '2026-08-16T10:05:09.000Z',
-			runLabel: 'deploy bad1',
+			flowId: 'deploy',
+			executionId: 'bad1',
 			statusLabel: 'FAILED',
+			logsHref: '/modules/flow/executions/bad1/logs',
 		});
+		expect(bad).not.toHaveProperty('runLabel');
 		// The shell formats the ISO startedAt itself (DataTable format: datetime): no server-side label.
 		expect(bad).not.toHaveProperty('startedLabel');
 		expect(String(bad!['errorExcerpt'])).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
 		expect(String(bad!['errorExcerpt'])).toMatch(/^first line word word .*...$/);
 		expect(bad!['lastError']).toContain('\n');
 		expect(ok).toMatchObject({ status: 'completed', statusLabel: 'ok', errorExcerpt: '' });
+	});
+
+	it('never cuts a long flow name: the column truncates it with an ellipsis when the viewport needs it', async () => {
+		const flowId = 'a_very_long_flow_name_'.repeat(5);
+		fixture.addExecution({ executionId: 'long1', flowId });
+		const { body } = await callRoute(routes, 'GET /executions', { query: {} });
+		expect((body as { items: { flowId: string }[] }).items[0]!.flowId).toBe(flowId);
 	});
 
 	it('labels the error of a completed run as recovered, in the status and in the excerpt', async () => {
@@ -339,52 +377,10 @@ ${'word '.repeat(40)}`,
 		expect(String(row!['errorExcerpt']).length).toBeLessThanOrEqual(MAX_ERROR_EXCERPT_LENGTH);
 	});
 
-	it.each([
-		[undefined, '[All]', 'Running', 'Queued', 'Completed', 'Failed'],
-		['failed', 'All', 'Running', 'Queued', 'Completed', '[Failed]'],
-		['running', 'All', '[Running]', 'Queued', 'Completed', 'Failed'],
-	])(
-		'marks the active status filter in its label (status=%s)',
-		async (status, all, running, queued, completed, failed) => {
-			const { body } = await callRoute(routes, 'GET /executions', {
-				query: status === undefined ? {} : { status },
-			});
-			expect((body as { statusFilters: unknown }).statusFilters).toEqual({
-				all,
-				running,
-				queued,
-				completed,
-				failed,
-			});
-		}
-	);
-
-	it('counts the executions per status and labels the status links with them, the active one in brackets', async () => {
-		fixture.addExecution({ executionId: 'c1', status: 'completed', startedAt: '2026-08-16T10:00:00.000Z' });
-		fixture.addExecution({ executionId: 'c2', status: 'completed', startedAt: '2026-08-16T11:00:00.000Z' });
-		fixture.addExecution({ executionId: 'f1', status: 'failed', startedAt: '2026-08-16T12:00:00.000Z' });
-		const { body } = await callRoute(routes, 'GET /executions', { query: { status: 'failed' } });
-		expect(body).toMatchObject({
-			statusCounts: { total: 3, queued: 0, running: 0, completed: 2, failed: 1 },
-			statusFiltersCounted: {
-				all: 'All (3)',
-				running: 'Running (0)',
-				queued: 'Queued (0)',
-				completed: 'Completed (2)',
-				failed: '[Failed (1)]',
-			},
-		});
-	});
-
-	it('counts only the executions of the flow filter, so the counts match what the table can show', async () => {
-		fixture.addExecution({ executionId: 'a1', flowId: 'alpha', status: 'failed' });
-		fixture.addExecution({ executionId: 'b1', flowId: 'beta', status: 'failed' });
-		fixture.addExecution({ executionId: 'b2', flowId: 'beta', status: 'completed' });
-		const { body } = await callRoute(routes, 'GET /executions', { query: { flow: 'beta' } });
-		expect(body).toMatchObject({
-			statusCounts: { total: 2, failed: 1, completed: 1 },
-			statusFiltersCounted: { all: '[All (2)]', failed: 'Failed (1)' },
-		});
+	it('sends the path of the logs page of the run with the detail', async () => {
+		fixture.addExecution({ executionId: 'det1' });
+		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'det1' } });
+		expect(body).toMatchObject({ logsHref: '/modules/flow/executions/det1/logs' });
 	});
 
 	it('summarises the detail for stat tiles: steps, retries and the error', async () => {

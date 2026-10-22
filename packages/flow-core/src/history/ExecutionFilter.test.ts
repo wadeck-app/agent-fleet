@@ -42,6 +42,36 @@ describe('filterExecutions', () => {
 		expect(result.total).toBe(3);
 	});
 
+	it('searches the flow name by case-insensitive substring with flowContains, combined with the other filters', () => {
+		const named = [
+			makeExec({ executionId: 'n1', flowId: 'build_task', status: 'completed' }),
+			makeExec({ executionId: 'n2', flowId: 'Deploy-Prod', status: 'failed' }),
+			makeExec({ executionId: 'n3', flowId: 'deploy_stage', status: 'failed' }),
+		];
+		expect(filterExecutions(named, { flowContains: 'deploy' }).items.map(e => e.executionId)).toEqual(['n2', 'n3']);
+		expect(filterExecutions(named, { flowContains: 'TASK' }).items.map(e => e.executionId)).toEqual(['n1']);
+		expect(filterExecutions(named, { flowContains: 'deploy', status: 'failed', limit: 1 }).total).toBe(2);
+		expect(filterExecutions(named, { flowContains: 'nothing' })).toEqual({ items: [], total: 0 });
+	});
+
+	it('keeps flow as an exact match when flowContains is not given', () => {
+		const named = [
+			makeExec({ executionId: 'n1', flowId: 'deploy' }),
+			makeExec({ executionId: 'n2', flowId: 'deploy_stage' }),
+		];
+		expect(filterExecutions(named, { flow: 'deploy' }).items.map(e => e.executionId)).toEqual(['n1']);
+	});
+
+	it('filters the pseudo status "recovered": completed runs that saw an error', () => {
+		const runs = [
+			makeExec({ executionId: 'r1', status: 'completed', lastError: 'flaky' }),
+			makeExec({ executionId: 'r2', status: 'completed' }),
+			makeExec({ executionId: 'r3', status: 'failed', lastError: 'boom' }),
+		];
+		expect(filterExecutions(runs, { status: 'recovered' }).items.map(e => e.executionId)).toEqual(['r1']);
+		expect(filterExecutions(runs, { status: 'completed' }).items.map(e => e.executionId)).toEqual(['r1', 'r2']);
+	});
+
 	it('rejects a non-integer or negative limit/offset with an actionable error', () => {
 		expect(() => filterExecutions(execs, { limit: Number.NaN })).toThrow(/limit/);
 		expect(() => filterExecutions(execs, { offset: -1 })).toThrow(/offset/);

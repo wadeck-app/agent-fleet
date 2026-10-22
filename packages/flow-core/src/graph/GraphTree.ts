@@ -1,6 +1,12 @@
 import { FlowCoreError } from '../errors.js';
 import type { FlowGraph, FlowGraphEdge } from './FlowGraph.js';
 
+// This file is the browser-safe subpath `flow-core/graph-tree` (the package index pulls in node:fs). The page paths
+// a chart links to are re-exported here until the package gets a subpath of their own.
+export { chartPathOfExecution, chartPathOfFlow } from '../appModule/FlowChartPaths.js';
+export { executionStepLogsPath } from '../appModule/FlowExecutionLogsLink.js';
+export { executionLogsPath } from '../appModule/FlowModuleContract.js';
+
 /** A parent with more sub-steps than this starts collapsed in a chart. */
 export const DEFAULT_MAX_EXPANDED_CHILDREN = 8;
 
@@ -164,7 +170,8 @@ export function visibleTreeRows(rows: readonly GraphTreeRow[], collapsed: Readon
 
 /**
  * Redraws edges on the steps that are shown: an end hidden in a collapsed parent moves to that parent. Edges that
- * become a loop on one step are dropped, identical ones merged; the order of the first occurrences is kept.
+ * become a loop on one step are dropped, identical ones merged (merged, an edge counts as traversed when any of them
+ * was); the order of the first occurrences is kept.
  */
 export function liftEdges(
 	edges: readonly FlowGraphEdge[],
@@ -180,16 +187,23 @@ export function liftEdges(
 		}
 		throw invalid(`step '${id}' and all its ancestors are hidden; the visible set must hold every top-level step.`);
 	};
-	const seen = new Set<string>();
+	const seen = new Map<string, number>();
 	const lifted: FlowGraphEdge[] = [];
 	for (const edge of edges) {
 		const from = lift(edge.from);
 		const to = lift(edge.to);
 		const key = `${edge.kind}\u0000${from}\u0000${to}\u0000${edge.label ?? ''}`;
-		if (from === to || seen.has(key)) {
+		if (from === to) {
 			continue;
 		}
-		seen.add(key);
+		const first = seen.get(key);
+		if (first !== undefined) {
+			if (edge.traversed === true && lifted[first]!.traversed !== true) {
+				lifted[first] = { ...lifted[first]!, traversed: true };
+			}
+			continue;
+		}
+		seen.set(key, lifted.length);
 		lifted.push(from === edge.from && to === edge.to ? edge : { ...edge, from, to });
 	}
 	return lifted;

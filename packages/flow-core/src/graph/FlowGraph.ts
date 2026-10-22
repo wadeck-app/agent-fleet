@@ -1,4 +1,6 @@
 import type { StepStatus } from '../execution/ExecutionState.js';
+import type { StepRunPath } from './RunPath.js';
+import type { StepIO } from './StepIO.js';
 
 /**
  * Step kinds of the flow DSL (`type:` of a step), plus `injected` for steps an execution created at
@@ -29,6 +31,10 @@ export interface FlowGraphNode {
 	attempts?: number;
 	/** Display details; values are plain scalars so a UI can list them without knowing the shape. */
 	meta?: Record<string, string | number | boolean>;
+	/** Where the run went at this step; only on graphs annotated with an execution (see annotateGraph). */
+	path?: StepRunPath;
+	/** Declared inputs/outputs, what the record holds, and data-flow links; only on annotated graphs. */
+	io?: StepIO;
 }
 
 export interface FlowGraphEdge {
@@ -36,6 +42,8 @@ export interface FlowGraphEdge {
 	to: string;
 	kind: FlowGraphEdgeKind;
 	label?: string;
+	/** Annotated graphs of a run: whether the run went along this edge. Inferred from times and dependencies, not recorded. */
+	traversed?: boolean;
 }
 
 export interface FlowGraph {

@@ -1,6 +1,7 @@
 # Chart of one run: the flow definition with each step colored by its status, mounted at
 # /modules/flow-chart/flows/runs/:id. The component loads GET /api/modules/flow-chart/graph itself and
-# links back to /modules/flow/executions/<id> (it needs the id, which a DSL string cannot be concatenated with).
+# links to the logs page of the run (it needs the id, which a DSL string cannot be concatenated with). The way back
+# is the breadcrumb of the shell.
 $type: PageContent
 sections:
     - $type: flow-chart:FlowGraph

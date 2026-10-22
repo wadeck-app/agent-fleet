@@ -2,7 +2,9 @@
 # ?tail=<chars> sets how much of a failed step's output is kept; ?full=true lifts the limit.
 # Two layouts are declared as an A/B test (README: "Design variants"); the dev shell's A/B dock picks one, `steps-table`
 # is what everybody else sees. The sections they share are YAML anchors defined in the first variant
-# (`&backLink`, `&actionsSlot`, `&outputSection`): keep that variant, or move the anchors, when removing variants.
+# (`&actionsGroup`, `&outputSection`): keep that variant, or move the anchors, when removing variants.
+# There is no "Back to executions" link: the shell shows a breadcrumb.
+# The Logs button opens the logs page of this run (logsHref, a path the route builds: a DSL string cannot be concatenated).
 # Slot "flow:execution-actions" (manifest expose.slots): other modules add buttons beside the badges, in every variant.
 # Their views are rendered with this page's context, so they can read $route.id and $sources.execution.<field>
 # (whole-string expressions only).
@@ -38,12 +40,6 @@ sections:
                   $type: VerticalStack
                   gap: gap-4
                   items:
-                      - &backLink
-                        $type: Link
-                        label: Back to executions
-                        href: /modules/flow/executions
-                        variant: muted
-
                       - $type: PageHeader
                         title: $sources.execution.flowId
                         subtitle: $sources.execution.executionId
@@ -65,10 +61,22 @@ sections:
                                     }
                                   - { $type: Badge, label: $sources.execution.duration, variant: info }
 
-                            # Renders nothing while no module contributes.
-                            - &actionsSlot
-                              $type: ExtensionSlot
-                              items: $sources.actions
+                            - &actionsGroup
+                              $type: HorizontalStack
+                              gap: gap-2
+                              align: items-center
+                              items:
+                                  - {
+                                        $type: ButtonLink,
+                                        size: sm,
+                                        variant: neutral,
+                                        label: Logs,
+                                        to: $sources.execution.logsHref,
+                                    }
+
+                                  # Renders nothing while no module contributes.
+                                  - $type: ExtensionSlot
+                                    items: $sources.actions
 
                       - &timingTable
                         $type: DataTable
@@ -117,8 +125,6 @@ sections:
                   $type: VerticalStack
                   gap: gap-4
                   items:
-                      - *backLink
-
                       - $type: PageHeader
                         title: $sources.execution.flowId
                         subtitle: $sources.execution.executionId
@@ -134,7 +140,7 @@ sections:
                                   variant: $sources.execution.statusVariant,
                                   tone: subtle,
                               }
-                            - *actionsSlot
+                            - *actionsGroup
 
                       - $type: HorizontalStack
                         gap: gap-3

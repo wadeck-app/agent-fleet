@@ -6,6 +6,8 @@ import {
 	type FlowSummary,
 	InvalidQueryError,
 	type QueryParams,
+	chartPathOfExecution,
+	chartPathOfFlow,
 	filterFlowSummaries,
 	flowHealth,
 	groupByHealth,
@@ -16,7 +18,6 @@ import {
 	shortStarted,
 } from 'flow-core';
 
-import { chartPathOfExecution, chartPathOfFlow } from '../commons/ChartPaths.js';
 import { replyWithError } from './ErrorReply.js';
 
 export const MAX_FLOWS_LIMIT = 500;

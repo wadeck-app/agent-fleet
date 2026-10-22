@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { EDGE_LEGEND, edgeStyle } from './EdgeStyle.js';
+import { EDGE_LEGEND, edgeStyle, traversalStyle } from './EdgeStyle.js';
 
 describe('edgeStyle', () => {
 	it('draws a dependency solid, a condition dashed, a retry loop animated and routed around the flow', () => {
@@ -32,5 +32,11 @@ describe('edgeStyle', () => {
 	it('lists every kind in the legend with a sentence', () => {
 		expect(EDGE_LEGEND.map(e => e.kind)).toEqual(['dependency', 'conditional', 'loop', 'substep', 'sequence']);
 		for (const entry of EDGE_LEGEND) expect(entry.description.length).toBeGreaterThan(5);
+	});
+
+	it('draws followed edges heavier and unfollowed ones faded, and leaves a definition untouched', () => {
+		expect(traversalStyle(undefined)).toEqual({ opacity: 1, width: 1.5 });
+		expect(traversalStyle(true).width).toBeGreaterThan(traversalStyle(undefined).width);
+		expect(traversalStyle(false).opacity).toBeLessThan(0.5);
 	});
 });

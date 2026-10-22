@@ -1,9 +1,9 @@
 import { MemoryRouter } from 'react-router-dom';
 
 import { render, screen, waitFor } from '@testing-library/react';
+import { chartPathOfExecution } from 'flow-core';
 import { describe, expect, it, vi } from 'vitest';
 
-import { chartPathOfExecution } from '../commons/ChartPaths.js';
 import { FlowChartLink } from './FlowChartLink.js';
 import { FlowGraph } from './FlowGraph.js';
 import entries from './index.js';

@@ -5,8 +5,15 @@
 export { FlowCoreError, InvalidQueryError, errorMessage } from './errors.js';
 
 export { FLOW_APP_MODULE_ID, FLOW_CHART_APP_MODULE_ID } from './appModule/AppModuleIds.js';
-export { FLOW_EXPOSED_SLOTS, FLOW_PAGE_PATHS } from './appModule/FlowModuleContract.js';
-export { FLOW_CHART_INDEX_PATH, chartPathOfExecution } from './appModule/FlowChartPaths.js';
+export {
+	FLOW_EXECUTION_ROW_CONTEXT_FIELDS,
+	FLOW_EXPOSED_SLOTS,
+	FLOW_PAGE_PATHS,
+	executionLogsPath,
+	executionPagePath,
+} from './appModule/FlowModuleContract.js';
+export { FLOW_LOGS_STEP_PARAM, executionStepLogsPath } from './appModule/FlowExecutionLogsLink.js';
+export { FLOW_CHART_INDEX_PATH, chartPathOfExecution, chartPathOfFlow } from './appModule/FlowChartPaths.js';
 export { FLOW_CONFIG_DIR_NAME, executionsDirOf, logsDirOf } from './config/FlowConfigLayout.js';
 export {
 	EXECUTION_ID_LENGTH,
@@ -18,7 +25,7 @@ export {
 export type { ExecutionState, ExecutionStatus, StepState, StepStatus } from './execution/ExecutionState.js';
 
 export { createRemoteDaemonClient, isUnknownCommandError, outdatedDaemonMessage } from './daemon/RemoteDaemonClient.js';
-export { DEFAULT_HISTORY_LIMIT, filterExecutions } from './history/ExecutionFilter.js';
+export { DEFAULT_HISTORY_LIMIT, RECOVERED_STATUS, filterExecutions } from './history/ExecutionFilter.js';
 export type { ExecutionFilterOptions, FilteredExecutions } from './history/ExecutionFilter.js';
 export { countByStatus } from './history/StatusCounts.js';
 export type { StatusCounts } from './history/StatusCounts.js';
@@ -71,6 +78,8 @@ export type { DeclaredWorkerSource, WorkerSourceEntry, WorkerSourceRegistryFile 
 export type { WorkerSummary } from './worker/WorkerSummary.js';
 
 export { formatLogContent, formatLogLine, tailLines } from './logs/LogFormat.js';
+export { LOG_LEVELS, formatRecordedStepOutput, readExecutionLogs } from './logs/ExecutionLogs.js';
+export type { ExecutionLogEntry, ExecutionLogQuery, ExecutionLogTarget, ExecutionLogs } from './logs/ExecutionLogs.js';
 export { isLogFileName, logFileName, logFilePath, readAppendedLog, readLogs, todayLogDate } from './logs/LogReader.js';
 export type { LogReadResult, ReadLogsOptions } from './logs/LogReader.js';
 
@@ -86,6 +95,7 @@ export { BUILTIN_PLUGIN_CATALOG } from './plugins/BuiltinPluginCatalog.js';
 
 export { FlowQueryService } from './query/FlowQueryService.js';
 export type {
+	ExecutionLogsView,
 	FlowQueryDirectories,
 	FlowQueryServiceOptions,
 	QueriedExecutions,
@@ -127,6 +137,19 @@ export { toExecutionDetail, toExecutionSummary } from './view/ExecutionView.js';
 export type { ExecutionDetailView, ExecutionSummary, StepView } from './view/ExecutionView.js';
 
 export { buildFlowGraph } from './graph/FlowGraphBuilder.js';
+export { annotateGraph } from './graph/RunGraphAnnotation.js';
+export { computeRunPath, isEdgeTraversed } from './graph/RunPath.js';
+export type { AttemptKind, RunOutcome, StepRunPath } from './graph/RunPath.js';
+export { REDACTED_TEXT, isSecretName, redactSecretValue, redactSecrets } from './graph/SecretRedaction.js';
+export { describeStepIO, findDataLinks } from './graph/StepIO.js';
+export type {
+	CappedText,
+	DeclaredInput,
+	DeclaredOutput,
+	RecordedStepIO,
+	StepDataLink,
+	StepIO,
+} from './graph/StepIO.js';
 export { FlowDefinitionError, loadFlowDefinition } from './graph/FlowDefinitionLoader.js';
 export type { FlowDefinitionErrorKind } from './graph/FlowDefinitionLoader.js';
 export type {

@@ -6,12 +6,14 @@ import { resolveExecution } from '../show/ExecutionDetail.js';
 import { FlowDefinitionError, loadFlowDefinition } from './FlowDefinitionLoader.js';
 import type { FlowGraphResult, FlowGraphTarget } from './FlowGraph.js';
 import { buildFlowGraph } from './FlowGraphBuilder.js';
+import { annotateGraph } from './RunGraphAnnotation.js';
 
 /**
  * Resolves a graph request against the executions directory:
  * - `executionId` (or unique prefix): the run's flow file + its step states;
  * - `flowId`: the definition, read from the most recent run of that flow whose file still exists;
  * - `flowFile`: the definition of that file.
+ * The graph is annotated (annotateGraph): inputs/outputs and data flow, plus the path of the run when there is one.
  * Throws ExecutionLookupError, FlowDefinitionError or FlowCoreError('invalid-flow-graph'), all with actionable messages.
  */
 export function queryFlowGraph(executionsDir: string, target: FlowGraphTarget): FlowGraphResult {
@@ -19,7 +21,7 @@ export function queryFlowGraph(executionsDir: string, target: FlowGraphTarget): 
 		const { record } = resolveExecution(executionsDir, target.executionId);
 		const flow = loadFlowDefinition(record.flowFile);
 		return {
-			graph: buildFlowGraph(flow, record),
+			graph: annotateGraph(buildFlowGraph(flow, record), flow, record),
 			flowId: flow.id,
 			flowName: flow.name || flow.id,
 			flowFile: record.flowFile,
@@ -33,7 +35,12 @@ export function queryFlowGraph(executionsDir: string, target: FlowGraphTarget): 
 	}
 	const flowFile = 'flowFile' in target ? target.flowFile : findFlowFile(executionsDir, target.flowId);
 	const flow = loadFlowDefinition(flowFile);
-	return { graph: buildFlowGraph(flow), flowId: flow.id, flowName: flow.name || flow.id, flowFile };
+	return {
+		graph: annotateGraph(buildFlowGraph(flow), flow),
+		flowId: flow.id,
+		flowName: flow.name || flow.id,
+		flowFile,
+	};
 }
 
 function findFlowFile(executionsDir: string, flowId: string): string {

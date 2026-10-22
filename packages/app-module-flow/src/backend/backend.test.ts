@@ -8,7 +8,14 @@ import backend from './index.js';
 const configDirectory = vi.hoisted(() => ({ get: vi.fn<(appName: string) => string>() }));
 vi.mock('@wadeck-app/shared-cli/ConfigDir', () => ({ ConfigDir: configDirectory }));
 
-type QueryMethod = 'listExecutions' | 'getExecution' | 'readLogs' | 'listWorkers' | 'listPlugins' | 'describePlugin';
+type QueryMethod =
+	| 'listExecutions'
+	| 'getExecution'
+	| 'readExecutionLogs'
+	| 'readLogs'
+	| 'listWorkers'
+	| 'listPlugins'
+	| 'describePlugin';
 
 let fixture: FlowConfigFixture;
 
@@ -27,6 +34,7 @@ describe('backend entry', () => {
 		expect([...routes.keys()].sort()).toEqual([
 			'GET /executions',
 			'GET /executions/:id',
+			'GET /executions/:id/logs',
 			'GET /flows',
 			'GET /logs',
 			'GET /plugins',
@@ -68,6 +76,7 @@ describe('backend entry', () => {
 	it.each<[string, QueryMethod, string, Record<string, unknown>]>([
 		['GET /executions', 'listExecutions', 'disk on fire', {}],
 		['GET /executions/:id', 'getExecution', 'disk on fire', { params: { id: 'abc' } }],
+		['GET /executions/:id/logs', 'readExecutionLogs', 'disk on fire', { params: { id: 'abc' } }],
 		['GET /logs', 'readLogs', 'disk on fire', {}],
 		['GET /workers', 'listWorkers', 'disk on fire', {}],
 		['GET /plugins', 'listPlugins', 'disk on fire', {}],

@@ -237,6 +237,47 @@ describe('FlowQueryService', () => {
 		});
 	});
 
+	describe('readExecutionLogs', () => {
+		it('resolves the execution (id prefix allowed) and reads its lines, offers the steps of the record and the log, and keeps the recorded failure text', () => {
+			writeExec('abc12345', {
+				flowId: 'build',
+				status: 'failed',
+				startedAt: '2026-10-18T10:00:00.000Z',
+				completedAt: '2026-10-18T10:05:00.000Z',
+				steps: {
+					compile: { status: 'failed', error: 'exit 2', stderr: 'oops' },
+					deploy: { status: 'pending' },
+				},
+			});
+			fs.writeFileSync(
+				path.join(root, 'logs', '2026-10-18.ndjson'),
+				[
+					JSON.stringify({
+						prefix: '[abc12345|compile]',
+						timestamp: '2026-10-18T10:01:00.000Z',
+						level: 'error',
+						message: 'boom',
+					}),
+					JSON.stringify({
+						prefix: '[abc12345|__execution]',
+						timestamp: '2026-10-18T10:05:00.000Z',
+						level: 'error',
+						message: 'Execution failed',
+					}),
+				].join('\n') + '\n'
+			);
+			const result = service.readExecutionLogs('abc1', { limit: 10, stepId: 'compile' });
+			expect(result).toMatchObject({ executionId: 'abc12345', flowId: 'build', total: 1 });
+			expect(result.entries.map(e => e.message)).toEqual(['boom']);
+			expect(result.stepIds).toEqual(['compile', 'deploy', '__execution']);
+			expect(result.recordedOutput).toBe('[compile] error: exit 2\n[compile] stderr:\noops\n');
+		});
+
+		it('throws the lookup error of an unknown execution', () => {
+			expect(() => service.readExecutionLogs('nope', { limit: 10 })).toThrow(ExecutionLookupError);
+		});
+	});
+
 	describe('plugins', () => {
 		const manifests = {
 			none: {

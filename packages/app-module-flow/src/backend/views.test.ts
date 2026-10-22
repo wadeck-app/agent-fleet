@@ -1,6 +1,14 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
-import { DEFAULT_HISTORY_LIMIT, FLOW_CHART_INDEX_PATH, buildRunDigest, statusTag, summarizeDaemon } from 'flow-core';
-import { FlowConfigFixture, collectRoutes, makeExec } from 'flow-core/testing';
+import {
+	DEFAULT_HISTORY_LIMIT,
+	FLOW_CHART_INDEX_PATH,
+	FLOW_EXECUTION_ROW_CONTEXT_FIELDS,
+	LOG_LEVELS,
+	buildRunDigest,
+	statusTag,
+	summarizeDaemon,
+} from 'flow-core';
+import { FlowConfigFixture, callRoute, collectRoutes, makeExec } from 'flow-core/testing';
 import { load } from 'js-yaml';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -8,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { DEFAULT_EXECUTION_LOG_LIMIT, MAX_EXECUTION_LOG_LIMIT } from './ExecutionLogRoutes.js';
 import { toWidgetBody } from './ExecutionWidgetBody.js';
 import backend from './index.js';
 
@@ -55,6 +64,15 @@ function collectStrings(node: unknown, key: string, found: string[] = []): strin
 		}
 	}
 	return found;
+}
+
+/** The table of the executions (flows-aside shows the flows table first). */
+function executionsTableOf(document: unknown): Record<string, unknown> {
+	const table = collectNodes(document, 'DataTable').find(
+		candidate => candidate['rows'] === '$sources.executions.items'
+	);
+	if (table === undefined) throw new Error('No DataTable reads $sources.executions.items.');
+	return table;
 }
 
 /** Every DSL node of the given $type, at any depth. */
@@ -159,6 +177,178 @@ describe('executions page', () => {
 			const selects = collectNodes(document, 'PageSizeSelect');
 			expect(selects, `executions-page.yaml (${String(variant)}) has no PageSizeSelect`).toHaveLength(1);
 			expect((selects[0]!['options'] as number[])[0]).toBe(DEFAULT_HISTORY_LIMIT);
+		}
+	});
+});
+
+describe('executions page filters (real controls bound to the URL, not links)', () => {
+	// The status values GET /executions accepts: the statuses plus "recovered" (completed after an error).
+	const ACCEPTED_STATUSES = ['queued', 'running', 'completed', 'failed', 're-queued', 'recovered'];
+
+	it('has a flow search box and a status select in every variant, each back to page 1 when changed', () => {
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			const [search] = collectNodes(document, 'SearchBar');
+			expect(search, String(variant)).toMatchObject({
+				urlParam: 'flow',
+				placeholder: 'Flow name',
+				resetUrlParams: ['page'],
+			});
+			const [select] = collectNodes(document, 'CompactSelect');
+			expect(select, String(variant)).toMatchObject({
+				urlParam: 'status',
+				ariaLabel: 'Status',
+				placeholder: 'Any status',
+				resetUrlParams: ['page'],
+			});
+			const values = (select!['options'] as { value: string }[]).map(option => option.value);
+			expect(values.length, String(variant)).toBeGreaterThanOrEqual(5);
+			for (const value of values) expect(ACCEPTED_STATUSES, String(variant)).toContain(value);
+			expect(collectNodes(document, 'SearchBar'), String(variant)).toHaveLength(1);
+			expect(collectNodes(document, 'CompactSelect'), String(variant)).toHaveLength(1);
+		}
+	});
+
+	it('keeps no status link or button: the filter is the select', () => {
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			const targets = [...collectNodes(document, 'Link'), ...collectNodes(document, 'ButtonLink')].map(node =>
+				JSON.stringify([node['href'], node['to']])
+			);
+			for (const target of targets) expect(target, String(variant)).not.toContain('status=');
+		}
+	});
+
+	it('forwards the search to the substring filter of the route, the status and the page size and number', () => {
+		const executions = sourcesOf(parseView('executions-page.yaml')).find(source => source.name === 'executions');
+		expect(executions?.spec.params).toEqual({
+			status: '$urlParam.status',
+			flowContains: '$urlParam.flow',
+			page: '$urlParam.page',
+			limit: '$urlParam.size',
+		});
+	});
+
+	it('lets the route word the empty table (nothing ran, no match, or a page past the end), in every variant', () => {
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			expect(executionsTableOf(document)['emptyMessage'], String(variant)).toBe(
+				'$sources.executions.emptyMessage'
+			);
+		}
+	});
+
+	it('resets the page when the page size changes, in every variant', () => {
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			expect(collectNodes(document, 'PageSizeSelect')[0], String(variant)).toMatchObject({
+				urlParam: 'size',
+				options: [20, 50, 100],
+				resetUrlParams: ['page'],
+			});
+			expect(collectNodes(document, 'Pagination')[0], String(variant)).toMatchObject({ urlParam: 'page' });
+		}
+	});
+});
+
+describe('executions table row panel (links of the run, and the per-row extension slot)', () => {
+	it('opens a panel per row with the logs and chart links of the run and the execution-row-actions slot, in every variant', () => {
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			const panel = executionsTableOf(document)['expansion'];
+			expect(panel, String(variant)).toBeDefined();
+			expect(
+				collectNodes(panel, 'Link').map(link => [link['label'], link['href']]),
+				String(variant)
+			).toEqual([['Logs', '$ctx.row.logsHref']]);
+			const [slot] = collectNodes(panel, 'ExtensionSlot');
+			expect(slot, String(variant)).toMatchObject({ items: '$sources.rowActions' });
+		}
+	});
+
+	it('declares the row fields a contribution can read', () => {
+		expect(FLOW_EXECUTION_ROW_CONTEXT_FIELDS).toEqual(['executionId', 'flowId']);
+	});
+});
+
+describe('execution logs page', () => {
+	const file = 'execution-logs-page.yaml';
+
+	it('reads the logs route of the run in the URL with the filters, the page and the page size', () => {
+		const logs = sourcesOf(parseView(file)).find(source => source.name === 'logs');
+		expect(logs?.spec.url).toBe('GET /api/modules/flow/executions/{id}/logs');
+		expect(logs?.spec.params).toEqual({
+			id: '$route.id',
+			step: '$urlParam.step',
+			level: '$urlParam.level',
+			q: '$urlParam.q',
+			page: '$urlParam.page',
+			limit: '$urlParam.size',
+		});
+	});
+
+	it('filters by step (the steps of the run), level (the levels the daemon writes) and text, each back to page 1', () => {
+		const document = parseView(file).document;
+		const [search] = collectNodes(document, 'SearchBar');
+		expect(search).toMatchObject({ urlParam: 'q', resetUrlParams: ['page'] });
+		const selects = collectNodes(document, 'CompactSelect');
+		const byParam = (name: string) => selects.find(select => select['urlParam'] === name)!;
+		expect(byParam('step')).toMatchObject({
+			ariaLabel: 'Step',
+			placeholder: 'All steps',
+			options: '$sources.logs.stepOptions',
+			resetUrlParams: ['page'],
+		});
+		expect(byParam('level')).toMatchObject({
+			ariaLabel: 'Level',
+			placeholder: 'Any level',
+			resetUrlParams: ['page'],
+		});
+		expect((byParam('level')['options'] as { value: string }[]).map(option => option.value)).toEqual([
+			...LOG_LEVELS,
+		]);
+		expect(selects).toHaveLength(2);
+	});
+
+	it('guards the select whose options come from the route: CompactSelect throws on undefined options while the route loads', () => {
+		const selects = collectNodes(parseView(file).document, 'CompactSelect');
+		const dynamic = selects.filter(select => typeof select['options'] === 'string');
+		expect(dynamic.length).toBeGreaterThan(0);
+		for (const select of dynamic) expect(select['$if'], JSON.stringify(select)).toBe(select['options']);
+	});
+
+	it('shows the lines in a table of time (formatted by the shell), level badge, step and message', () => {
+		const table = collectNodes(parseView(file).document, 'DataTable')[0]!;
+		expect(table['rows']).toBe('$sources.logs.entries');
+		const columns = table['columns'] as Record<string, unknown>[];
+		expect(columns.map(column => column['key'])).toEqual(['timestamp', 'level', 'stepId', 'message']);
+		expect(columns[0]).toMatchObject({ format: 'time', nowrap: true });
+		expect(Object.keys(columns[1]!['badge'] as object)).toEqual(expect.arrayContaining([...LOG_LEVELS]));
+		expect(table['emptyMessage']).toBe('$sources.logs.notice');
+	});
+
+	it('pages from the end with the backend default page size first and every size within the route maximum', () => {
+		const document = parseView(file).document;
+		const [size] = collectNodes(document, 'PageSizeSelect');
+		const options = size!['options'] as number[];
+		expect(options[0]).toBe(DEFAULT_EXECUTION_LOG_LIMIT);
+		for (const option of options) expect(option).toBeLessThanOrEqual(MAX_EXECUTION_LOG_LIMIT);
+		expect(size).toMatchObject({ urlParam: 'size', resetUrlParams: ['page'] });
+		expect(collectNodes(document, 'Pagination')[0]).toMatchObject({ urlParam: 'page' });
+	});
+
+	it('shows the recorded failure text and the notice only when the route has some', () => {
+		const document = parseView(file).document;
+		const viewers = collectNodes(document, 'JsonViewer');
+		expect(viewers).toHaveLength(1);
+		expect(viewers[0]).toMatchObject({ row: '$sources.logs', field: 'recordedOutput' });
+		const gated = JSON.stringify(document);
+		expect(gated).toContain('"$if":"$sources.logs.hasRecordedOutput"');
+		expect(gated).toContain('"$if":"$sources.logs.hasNotice"');
+	});
+});
+
+describe('no back link (the shell has a breadcrumb)', () => {
+	it.each(viewFiles)('%s has no Back to ... link', file => {
+		for (const { variant, document } of alternativesOf(file)) {
+			for (const node of [...collectNodes(document, 'Link'), ...collectNodes(document, 'ButtonLink')]) {
+				expect(String(node['label']), `${file} (${String(variant)})`).not.toMatch(/^back\b/i);
+			}
 		}
 	});
 });
@@ -274,13 +464,17 @@ describe('executions page layout', () => {
 		expect(keys).not.toContain('lastError');
 	});
 
-	it('has at most 3 narrow columns of short precomputed text: a 510px content area breaks any longer cell mid-word', () => {
-		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[0]!;
-		expect((table['columns'] as { key: string }[]).map(column => column.key)).toEqual([
-			'startedAt',
-			'runLabel',
-			'statusLabel',
-		]);
+	it('has four columns, the full flow name truncated by the column (ellipsis and tooltip) and the run id kept visible', () => {
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			const columns = executionsTableOf(document)['columns'] as Record<string, unknown>[];
+			expect(
+				columns.map(column => column['key']),
+				String(variant)
+			).toEqual(['startedAt', 'flowId', 'executionId', 'statusLabel']);
+			expect(columns[1], String(variant)).toMatchObject({ truncate: true, mono: true });
+			expect(columns[2], String(variant)).toMatchObject({ nowrap: true, mono: true });
+			expect(JSON.stringify(columns), String(variant)).not.toContain('runLabel');
+		}
 	});
 
 	it('keeps When and Status on one line and badges every bare status word the route can send', () => {
@@ -302,20 +496,6 @@ describe('executions page layout', () => {
 		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[1]!;
 		const flow = (table['columns'] as Record<string, unknown>[]).find(column => column['key'] === 'flowId');
 		expect(flow).toMatchObject({ truncate: true });
-	});
-
-	it('labels the status links from the route, which marks the active filter', () => {
-		const links = collectNodes(initialView('executions-page.yaml'), 'Link');
-		const labels = links
-			.map(link => link['label'])
-			.filter(label => typeof label === 'string' && label.startsWith('$'));
-		expect(labels).toEqual([
-			'$sources.executions.statusFilters.all',
-			'$sources.executions.statusFilters.running',
-			'$sources.executions.statusFilters.queued',
-			'$sources.executions.statusFilters.completed',
-			'$sources.executions.statusFilters.failed',
-		]);
 	});
 });
 
@@ -349,6 +529,14 @@ describe('execution detail page', () => {
 		}
 	});
 
+	it('links to the logs of the run in every variant', () => {
+		for (const { variant, document } of alternativesOf('execution-detail-page.yaml')) {
+			const logs = collectNodes(document, 'ButtonLink').filter(link => link['label'] === 'Logs');
+			expect(logs, String(variant)).toHaveLength(1);
+			expect(logs[0], String(variant)).toMatchObject({ to: '$sources.execution.logsHref' });
+		}
+	});
+
 	it('badges the step status words in every variant', () => {
 		for (const { variant, document } of alternativesOf('execution-detail-page.yaml')) {
 			const steps = collectNodes(document, 'DataTable').find(
@@ -370,7 +558,7 @@ describe('executions page flow filter', () => {
 		const view = parseView('executions-page.yaml');
 		expect(collectStrings(view.document, 'navigateTo')).toContain('/modules/flow/executions?flow={flowId}');
 		const executions = sourcesOf(view).find(source => source.name === 'executions');
-		expect(executions?.spec.params?.['flow']).toBe('$urlParam.flow');
+		expect(executions?.spec.params?.['flowContains']).toBe('$urlParam.flow');
 	});
 });
 
@@ -431,7 +619,7 @@ describe('every link and row navigation lands on a page of the manifest', () => 
 	it.each(viewFiles)('%s', file => {
 		const view = parseView(file);
 		const targets = [...collectStrings(view.document, 'href'), ...collectStrings(view.document, 'navigateTo')];
-		for (const target of targets) {
+		for (const target of targets.filter(candidate => !candidate.startsWith('$'))) {
 			expect(
 				pageMatching(target),
 				`${file}: '${target}' matches no page of manifest.json (${pagePaths.join(', ')}) under ${MODULE_PAGE_PREFIX}`
@@ -458,6 +646,58 @@ describe('every link and row navigation lands on a page of the manifest', () => 
 	});
 });
 
+describe('links read from a row or from the detail resolve to a page of the manifest', () => {
+	const pagePaths = manifest.extensionPoints.filter(point => point.kind === 'page').map(point => point.path!);
+
+	function isPage(target: string): boolean {
+		return pagePaths.some(
+			pagePath =>
+				new RegExp(`^${MODULE_PAGE_PREFIX}${pagePath.replace(/:\w+/g, '[^/]+')}$`).test(
+					target.split('?')[0]!
+				) ||
+				// The chart of a run is a page of the flow-chart module, not of this manifest.
+				/^\/modules\/flow-chart\/flows\/runs\/[^/]+$/.test(target)
+		);
+	}
+
+	it('sends, in the rows and in the detail, every field the views use as a link target, each a real page path', async () => {
+		const fixture = new FlowConfigFixture();
+		fixture.addExecution({ executionId: 'abc12345', steps: { a: { status: 'completed' } } });
+		configDirectory.get.mockReturnValue(fixture.configDir);
+		const { routes, ctx } = collectRoutes<ModuleContext>();
+		backend(ctx);
+		const list = (await callRoute(routes, 'GET /executions', { query: {} })).body as {
+			items: Record<string, unknown>[];
+		};
+		const detail = (await callRoute(routes, 'GET /executions/:id', { params: { id: 'abc12345' } })).body as Record<
+			string,
+			unknown
+		>;
+		fixture.dispose();
+
+		const resolved: string[] = [];
+		for (const file of viewFiles) {
+			for (const { document } of alternativesOf(file)) {
+				const targets = [...collectStrings(document, 'href'), ...collectStrings(document, 'to')].filter(
+					target =>
+						// The dashboard widget has its own test below.
+						/^\$(ctx\.row|sources\.execution)\./.test(target)
+				);
+				for (const target of targets) {
+					const row = target.startsWith('$ctx.row.') ? list.items[0]! : detail;
+					const field = target.replace(/^\$(ctx\.row|sources\.execution)\./, '');
+					expect(row[field], `${file}: '${target}' is not a field the route sends`).toEqual(
+						expect.any(String)
+					);
+					expect(isPage(String(row[field])), `${file}: '${target}' sends '${String(row[field])}'`).toBe(true);
+					resolved.push(target);
+				}
+			}
+		}
+		expect(new Set(resolved)).toEqual(new Set(['$ctx.row.logsHref', '$sources.execution.logsHref']));
+	});
+});
+
 describe('extension slots', () => {
 	const exposed = Object.keys(manifest.expose?.slots ?? {});
 
@@ -479,13 +719,14 @@ describe('extension slots', () => {
 	}
 
 	it.each([
-		['execution-detail-page.yaml', 'execution-actions'],
-		['executions-page.yaml', 'executions-actions'],
+		['execution-detail-page.yaml', ['execution-actions']],
+		['executions-page.yaml', ['execution-row-actions', 'executions-actions']],
+		['execution-logs-page.yaml', []],
 	])(
-		'%s embeds %s in every A/B variant: choosing a design must not drop the buttons other modules add',
-		(file, slot) => {
+		'%s embeds %j in every A/B variant: choosing a design must not drop the buttons other modules add',
+		(file, slots) => {
 			for (const { variant, document } of alternativesOf(file)) {
-				expect(embeddedSlots(file, document), `variant ${String(variant)}`).toEqual([slot]);
+				expect([...embeddedSlots(file, document)].sort(), `variant ${String(variant)}`).toEqual(slots);
 			}
 		}
 	);

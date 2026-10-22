@@ -45,6 +45,14 @@ function writeFlowConfig(flowConfigDir: string): void {
 	fixture.addLog('2026-01-01', [
 		JSON.stringify({ ts: '2026-01-01T10:00:00.000Z', level: 'info', msg: 'Daemon started' }),
 	]);
+	fixture.addLog('2026-01-02', [
+		JSON.stringify({
+			prefix: '[bbb222|build]',
+			timestamp: '2026-01-02T00:00:01.000Z',
+			level: 'error',
+			message: 'build exploded',
+		}),
+	]);
 	// A declared source with credential hashes that must never reach the API.
 	writeFileSync(
 		join(flowConfigDir, 'worker-sources.json'),
@@ -162,6 +170,14 @@ describe('the packaged module through a real app-core server', () => {
 		const missing = await get('/executions/zzz999');
 		expect(missing.status).toBe(404);
 		expect(String(missing.body['error'])).toContain('zzz999');
+	});
+
+	it('GET /executions/:id/logs reads the lines of that run from the daily log and filters them by step', async () => {
+		const all = await get('/executions/bbb222/logs');
+		expect(all.status).toBe(200);
+		expect((all.body['entries'] as { message: string }[]).map(e => e.message)).toEqual(['build exploded']);
+		expect(all.body['stepOptions']).toEqual([{ value: 'build', label: 'build' }]);
+		expect(((await get('/executions/bbb222/logs?step=other')).body['entries'] as unknown[]).length).toBe(0);
 	});
 
 	it('GET /executions rejects a bad query with 400', async () => {

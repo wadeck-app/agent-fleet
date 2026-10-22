@@ -6,8 +6,12 @@ export interface ExecutionFilterOptions {
 	limit?: number;
 	/** Rows skipped before the page (default 0). Ignored when `id` is set. */
 	offset?: number;
+	/** An execution status, or "recovered" (a completed run that saw an error: its status is "completed" and it has a lastError). */
 	status?: string;
+	/** Exact flow id. */
 	flow?: string;
+	/** Case-insensitive substring of the flow id: the flow search box of a UI. Combines with `flow`. */
+	flowContains?: string;
 	/** Execution id prefix. A lookup, not a page: pagination is not applied. */
 	id?: string;
 }
@@ -19,6 +23,9 @@ export interface FilteredExecutions {
 }
 
 export const DEFAULT_HISTORY_LIMIT = 20;
+
+/** The status filter value for runs that completed after an error (same rule as ExecutionSummary.lastErrorRecovered). */
+export const RECOVERED_STATUS = 'recovered';
 
 function assertNonNegativeInteger(name: string, value: number): void {
 	if (!Number.isInteger(value) || value < 0) {
@@ -37,11 +44,17 @@ export function filterExecutions(execs: ExecutionState[], opts: ExecutionFilterO
 	assertNonNegativeInteger('offset', offset);
 
 	let filtered = execs;
-	if (opts.status) {
+	if (opts.status === RECOVERED_STATUS) {
+		filtered = filtered.filter(e => e.status === 'completed' && e.lastError !== undefined);
+	} else if (opts.status) {
 		filtered = filtered.filter(e => e.status === opts.status);
 	}
 	if (opts.flow) {
 		filtered = filtered.filter(e => e.flowId === opts.flow);
+	}
+	if (opts.flowContains) {
+		const needle = opts.flowContains.toLowerCase();
+		filtered = filtered.filter(e => e.flowId.toLowerCase().includes(needle));
 	}
 	if (opts.id) {
 		// Prefix matching: "6u84" matches "6u84r8gf" -- lenient like task ID resolution

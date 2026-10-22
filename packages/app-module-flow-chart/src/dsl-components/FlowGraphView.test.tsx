@@ -1,11 +1,11 @@
 import { MemoryRouter } from 'react-router-dom';
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { FlowGraphResult } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
 import { FlowGraphView } from './FlowGraphView.js';
-import { BUILD_GRAPH, SUBFLOW_GRAPH, chain, node } from './testing/GraphFixtures.js';
+import { ANNOTATED_RUN_GRAPH, BUILD_GRAPH, SUBFLOW_GRAPH, chain, node } from './testing/GraphFixtures.js';
 
 function executionResult(overrides: Partial<FlowGraphResult> = {}): FlowGraphResult {
 	return {
@@ -38,12 +38,25 @@ describe('FlowGraphView', () => {
 		expect(screen.getByText(/4 steps: 2 pending, 1 completed, 1 failed/)).toBeInTheDocument();
 	});
 
-	it('links back to the execution page of flow', () => {
+	it('has no "Back to" link: the shell breadcrumb is the way back', () => {
 		renderView(executionResult());
-		expect(screen.getByRole('link', { name: 'Back to the execution' })).toHaveAttribute(
+		expect(screen.queryByRole('link', { name: /^Back to/ })).toBeNull();
+		cleanup();
+		renderView(executionResult({ execution: undefined, graph: chain(3) }));
+		expect(screen.queryByRole('link', { name: /^Back to/ })).toBeNull();
+	});
+
+	it('links the header of a run to its logs page', () => {
+		renderView(executionResult());
+		expect(screen.getByRole('link', { name: 'Logs' })).toHaveAttribute(
 			'href',
-			'/modules/flow/executions/exec1'
+			'/modules/flow/executions/exec1/logs'
 		);
+	});
+
+	it('has no logs link for a definition without a run', () => {
+		renderView(executionResult({ execution: undefined, graph: chain(3) }));
+		expect(screen.queryByRole('link', { name: 'Logs' })).toBeNull();
 	});
 
 	it('says a chart without a run shows the structure of the flow file, in the header and in the legend', () => {
@@ -68,13 +81,9 @@ describe('FlowGraphView', () => {
 		).toBeInTheDocument();
 	});
 
-	it('shows a definition without status colors and a link to the index', () => {
+	it('shows a definition without status colors', () => {
 		renderView(executionResult({ execution: undefined, graph: chain(3) }));
 		expect(screen.getByTestId('step-step-0')).toHaveAttribute('data-status', 'none');
-		expect(screen.getByRole('link', { name: 'Back to flow charts' })).toHaveAttribute(
-			'href',
-			'/modules/flow-chart/flows'
-		);
 		expect(within(screen.getByRole('list', { name: 'Legend' })).queryByText(/completed/)).toBeNull();
 	});
 
@@ -155,13 +164,15 @@ describe('FlowGraphView', () => {
 		expect(screen.getByRole('status', { name: 'Chart warnings' })).toHaveTextContent('changed since this run');
 	});
 
-	it('explains the inferred "ran after" edges in the legend', () => {
+	it('explains the recorded-order edges in the legend, and says their dependencies are unknown', () => {
 		const graph = {
 			nodes: [node('a', { kind: 'removed' }), node('b', { kind: 'removed' })],
 			edges: [{ from: 'a', to: 'b', kind: 'sequence' as const, label: 'recorded order' }],
 		};
 		renderView(executionResult({ graph }));
-		expect(within(screen.getByRole('list', { name: 'Legend' })).getByText(/ran after/)).toBeInTheDocument();
+		expect(
+			within(screen.getByRole('list', { name: 'Legend' })).getByText(/recorded order.*dependencies unknown/)
+		).toBeInTheDocument();
 	});
 
 	it('keeps the controls out of the canvas, where they would cover the steps', () => {
@@ -269,5 +280,87 @@ describe('FlowGraphView sub-steps', () => {
 		expect(
 			within(screen.getByRole('list', { name: 'Legend' })).getByText(/indented under its parent/)
 		).toBeInTheDocument();
+	});
+
+	describe('path and inputs/outputs of a run', () => {
+		const annotated = () => executionResult({ graph: ANNOTATED_RUN_GRAPH });
+
+		it('numbers the steps that ran and shows the others as skipped or not reached', () => {
+			renderView(annotated());
+			expect(screen.getByTestId('ordinal-plan')).toHaveTextContent('1');
+			expect(screen.getByTestId('ordinal-test')).toHaveTextContent('2');
+			expect(screen.queryByTestId('ordinal-ship')).toBeNull();
+			expect(screen.getByTestId('step-ship')).toHaveAttribute('data-outcome', 'not-reached');
+			expect(screen.getByTestId('step-ship')).toHaveAccessibleName(/not reached/);
+			expect(screen.getByTestId('step-notify')).toHaveAccessibleName(/skipped/);
+			expect(screen.getByText(/3 attempts/)).toBeInTheDocument();
+		});
+
+		it('says in the legend what is recorded and what is inferred', () => {
+			renderView(annotated());
+			const legend = screen.getByRole('list', { name: 'Legend' });
+			expect(within(legend).getByText(/run order \(recorded/)).toBeInTheDocument();
+			expect(within(legend).getByText(/followed by the run.*inferred/)).toBeInTheDocument();
+			expect(within(legend).getByText(/skipped/)).toBeInTheDocument();
+			expect(within(legend).getByText(/not reached/)).toBeInTheDocument();
+		});
+
+		it('shows the inputs as declared with the note that resolved values are not recorded', () => {
+			renderView(annotated());
+			fireEvent.click(screen.getByTestId('step-test'));
+			const panel = screen.getByRole('complementary', { name: 'Step details' });
+			const inputs = within(panel).getByRole('region', { name: 'Inputs' });
+			expect(within(inputs).getByText('env.REGION')).toBeInTheDocument();
+			expect(within(inputs).getByText('eu')).toBeInTheDocument();
+			expect(within(inputs).getByText(/uses steps.plan.outputs.files/)).toBeInTheDocument();
+			expect(within(inputs).getByText(/Resolved values not recorded/)).toBeInTheDocument();
+		});
+
+		it('selects the linked step when its name is clicked', () => {
+			renderView(annotated());
+			fireEvent.click(screen.getByTestId('step-test'));
+			const flow = within(screen.getByRole('complementary', { name: 'Step details' })).getByRole('region', {
+				name: 'Data flow',
+			});
+			expect(within(flow).getByText('Uses output of')).toBeInTheDocument();
+			// Plan is used by Test and Notify; following the link to Plan shows who uses it.
+			fireEvent.click(within(flow).getByRole('button', { name: 'Plan' }));
+			const planFlow = within(screen.getByRole('complementary', { name: 'Step details' })).getByRole('region', {
+				name: 'Data flow',
+			});
+			expect(within(planFlow).getByText('Used by')).toBeInTheDocument();
+			expect(within(planFlow).getByRole('button', { name: 'Test' })).toBeInTheDocument();
+			expect(within(planFlow).getByRole('button', { name: 'Notify' })).toBeInTheDocument();
+		});
+
+		it('shows the captured output of a failed step shortened, with Show more', () => {
+			renderView(annotated());
+			fireEvent.click(screen.getByTestId('step-test'));
+			const block = screen.getByRole('region', { name: 'Outputs' });
+			const before = within(block).getByLabelText(/^stdout/).textContent!.length;
+			fireEvent.click(within(block).getByRole('button', { name: /Show more/ }));
+			expect(within(block).getByLabelText(/^stdout/).textContent!.length).toBeGreaterThan(before);
+			expect(within(block).getByLabelText(/^stdout/)).toHaveTextContent('FAIL a.test.ts');
+			fireEvent.click(within(block).getByRole('button', { name: 'Show less' }));
+			expect(within(block).getByLabelText(/^stdout/).textContent!.length).toBe(before);
+		});
+
+		it('explains why a step did not run and links its logs preselected on the step', () => {
+			renderView(annotated());
+			fireEvent.click(screen.getByTestId('step-ship'));
+			const panel = screen.getByRole('complementary', { name: 'Step details' });
+			expect(within(panel).getByText(/Not reached: 'test' failed/)).toBeInTheDocument();
+			expect(within(panel).getByText('(inferred)')).toBeInTheDocument();
+			expect(within(panel).getByRole('link', { name: 'Logs of this step' })).toHaveAttribute(
+				'href',
+				'/modules/flow/executions/exec1/logs?step=ship'
+			);
+		});
+
+		it('offers no logs link in the panel of a definition without a run', () => {
+			renderView(executionResult({ execution: undefined, graph: chain(3) }));
+			fireEvent.click(screen.getByTestId('step-step-0'));
+			expect(screen.queryByRole('link', { name: 'Logs of this step' })).toBeNull();
+		});
 	});
 });

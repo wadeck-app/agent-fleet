@@ -16,4 +16,16 @@ describe('summarizeStatuses', () => {
 		expect(summarizeStatuses({ nodes: [node('a')], edges: [] })).toBe('1 step');
 		expect(summarizeStatuses({ nodes: [node('a', { status: 'running' })], edges: [] })).toBe('1 step: 1 running');
 	});
+
+	it('counts skipped and never reached steps as such, not as completed or pending', () => {
+		const graph = {
+			nodes: [
+				node('a', { status: 'completed', path: { outcome: 'ran', basis: 'recorded', reason: 'Ran.' } }),
+				node('b', { status: 'completed', path: { outcome: 'skipped', basis: 'recorded', reason: 'x' } }),
+				node('c', { status: 'pending', path: { outcome: 'not-reached', basis: 'inferred', reason: 'x' } }),
+			],
+			edges: [],
+		};
+		expect(summarizeStatuses(graph)).toBe('3 steps: 1 completed, 1 skipped, 1 not reached');
+	});
 });

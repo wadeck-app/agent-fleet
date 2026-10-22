@@ -1,27 +1,34 @@
 # Executions history (`flow history`). Filters and pagination live in the URL: ?status=failed&flow=deploy&page=1&size=50
 # Three page structures are declared as an A/B test (README: "Design variants"); the dev shell's A/B dock picks one,
 # `table` is what everybody else sees. The sections they share are YAML anchors defined in the first variant that uses
-# them (`&executionsTable`, `&pager`, `&actionsSlot`, `&statusLinks`, `&flowsTable`): keep that variant, or move the anchors, when
+# them (`&filterRow`, `&executionsTable`, `&pager`, `&flowsTable`): keep that variant, or move the anchors, when
 # removing variants.
-# The status links reload the page with the filter applied. The flow filter is the `flow` URL parameter, set by clicking
-# a row of a flows table (GET /flows?limit=N, the most recent flows: the executions come first, they are the page).
+# Filters: a search box on the flow name (?flow=, a case-insensitive substring: the source forwards it to the route as
+# flowContains) and a select on the status (?status=). Both are real controls bound to the URL (SearchBar/CompactSelect
+# `urlParam`, dsl-ui >= 2026.10.19-117); `resetUrlParams: [page]` (>= 2026.10.22-124) sends a changed filter back to
+# page 1. A shell older than 124 keeps the stale ?page= and may show an empty page: the table then says so.
+# Clicking a row of the flows table sets ?flow=<flowId>, which the search box shows.
 # Times are ISO 8601 (startedAt, lastStartedAt) and every column of them is `format: datetime`: the shell prints them
 # like every table of app-core (dsl-ui DataTable, e.g. "10/18/26, 4:15 PM" in en-US). A shell older than dsl-ui 122
 # ignores `format` and shows the raw ISO text.
-# The other two columns are short ASCII text the route precomputes (runLabel "flow_name abc123", statusLabel "ok" /
-# "FAILED" / "ok, recovered"): a plain YAML-column cell is `break-all`, so on a narrow page (about 510px of content)
-# anything longer breaks mid-word. dsl-ui 122 adds nowrap/truncate/mono/badge/format; older shells ignore them (they
-# keep key and label only), hence the short precomputed text stays the base and the options only improve it.
-# The error of a run is on its detail page: a cell cannot hold a second line.
-# The status links get their label from the route (statusFilters, or statusFiltersCounted with the number of runs),
-# which puts the active one in brackets: a Link has no active style. A free-text/select control bound to ?flow= needs a
-# dsl-ui change: today only Pagination and PageSizeSelect take `urlParam`, and SearchBar/CompactSelect cannot read the
-# URL back into `value`.
-# Slot "flow:executions-actions" (manifest expose.slots): other modules add page-level buttons next to the status links,
-# in every variant. DataTable has no per-row slot (its row actions are static), so nothing is contributed per row.
+# Run columns: the route sends the full flow name and the full execution id. The flow column is `truncate`: the
+# DataTable cuts it with an ellipsis (full text as tooltip) only when the viewport needs it; the id column is nowrap and
+# mono, so the run id stays visible. statusLabel is a short ASCII word ("ok", "FAILED", "ok, recovered"), badged when it
+# is a bare word. The error of a run is on its detail page: a cell cannot hold a second line.
+# The empty message comes from the route (emptyMessage): a page past the end, a filter without match and an install
+# where nothing ran need different words.
+# Row click opens the detail page. The chevron of a row opens a panel (DataTable `expansion`) with the links of the
+# run, because a DataTable cell cannot hold a link and a row action can only call an $actions handler, not navigate:
+# Logs (this module) and the slot "flow:execution-row-actions" (manifest expose.slots): other modules add their own links
+# per run (flow-chart adds its chart button). The panel
+# gets the row as $ctx.row (whole-string expressions only, so a contribution reads $ctx.row.executionId and the like).
+# Slot "flow:executions-actions" (manifest expose.slots): other modules add page-level buttons next to the filters, in
+# every variant.
 $sources:
     actions:
         url: GET /api/slots/flow:executions-actions
+    rowActions:
+        url: GET /api/slots/flow:execution-row-actions
     flows:
         url: GET /api/modules/flow/flows?limit=8
     flowsTop:
@@ -30,7 +37,7 @@ $sources:
         url: GET /api/modules/flow/executions
         params:
             status: $urlParam.status
-            flow: $urlParam.flow
+            flowContains: $urlParam.flow
             page: $urlParam.page
             limit: $urlParam.size
 
@@ -43,51 +50,41 @@ sections:
       variants:
           table:
               label: Table
-              hint: 'Status links, the executions table, then the flows table below: everything on one page.'
+              hint: 'Filters, the executions table, then the flows table below: everything on one page.'
               view:
                   $type: VerticalStack
                   gap: gap-4
                   items:
                       - $type: PageHeader
                         title: Flow executions
-                        subtitle: 'Filter by status, or click a flow below to see only its executions (?flow=<flowId>)'
+                        subtitle: 'Search a flow or pick a status; click a flow below to see only its executions, open a row for its chart and logs'
 
-                      - $type: HorizontalStack
+                      - &filterRow
+                        $type: HorizontalStack
                         gap: gap-3
                         align: items-center
                         justify: justify-between
                         items:
-                            - &statusLinks
-                              $type: HorizontalStack
+                            - $type: HorizontalStack
                               gap: gap-3
                               align: items-center
                               items:
-                                  - {
-                                        $type: Link,
-                                        label: $sources.executions.statusFilters.all,
-                                        href: /modules/flow/executions,
-                                    }
-                                  - {
-                                        $type: Link,
-                                        label: $sources.executions.statusFilters.running,
-                                        href: '/modules/flow/executions?status=running',
-                                    }
-                                  - {
-                                        $type: Link,
-                                        label: $sources.executions.statusFilters.queued,
-                                        href: '/modules/flow/executions?status=queued',
-                                    }
-                                  - {
-                                        $type: Link,
-                                        label: $sources.executions.statusFilters.completed,
-                                        href: '/modules/flow/executions?status=completed',
-                                    }
-                                  - {
-                                        $type: Link,
-                                        label: $sources.executions.statusFilters.failed,
-                                        href: '/modules/flow/executions?status=failed',
-                                        variant: danger,
-                                    }
+                                  - $type: SearchBar
+                                    urlParam: flow
+                                    resetUrlParams: [page]
+                                    placeholder: Flow name
+                                  # The placeholder is the empty choice: no ?status=, every status.
+                                  - $type: CompactSelect
+                                    urlParam: status
+                                    resetUrlParams: [page]
+                                    ariaLabel: Status
+                                    placeholder: Any status
+                                    options:
+                                        - { value: completed, label: OK }
+                                        - { value: failed, label: Failed }
+                                        - { value: running, label: Running }
+                                        - { value: queued, label: Waiting }
+                                        - { value: recovered, label: Recovered }
 
                             # Renders nothing while no module contributes.
                             - &actionsSlot
@@ -98,10 +95,20 @@ sections:
                         $type: DataTable
                         rows: $sources.executions.items
                         navigateTo: '/modules/flow/executions/{executionId}'
-                        emptyMessage: No execution matches
+                        emptyMessage: $sources.executions.emptyMessage
+                        expansion:
+                            $type: HorizontalStack
+                            gap: gap-3
+                            align: items-center
+                            items:
+                                - { $type: Link, label: Logs, href: $ctx.row.logsHref }
+                                # Renders nothing while no module contributes.
+                                - $type: ExtensionSlot
+                                  items: $sources.rowActions
                         columns:
                             - { key: 'startedAt', label: 'When', format: datetime, nowrap: true }
-                            - { key: 'runLabel', label: 'Run', mono: true }
+                            - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
+                            - { key: 'executionId', label: 'Run', nowrap: true, mono: true }
                             # The cell text stays the status word: a shell older than dsl-ui 122 ignores nowrap and badge and shows it as is.
                             # The badge colours a cell whose text is exactly a key; "ok, 3 tries" and the like stay plain text.
                             - key: statusLabel
@@ -132,6 +139,7 @@ sections:
                             # the parameter is absent: that must be the backend's default page size (checked in views.test.ts).
                             - $type: PageSizeSelect
                               urlParam: size
+                              resetUrlParams: [page]
                               options: [20, 50, 100]
 
                       - $type: Section
@@ -150,62 +158,16 @@ sections:
 
           filters-first:
               label: Filters first
-              hint: 'A row of status buttons with the number of runs each shows, the table, and the flows folded behind a Flows header.'
+              hint: 'Filters, the table, and the flows folded behind a Flows header.'
               view:
                   $type: VerticalStack
                   gap: gap-4
                   items:
                       - $type: PageHeader
                         title: Flow executions
-                        subtitle: Pick a status, the number is how many runs it shows
+                        subtitle: Search a flow or pick a status, open a row for its chart and logs
 
-                      - $type: HorizontalStack
-                        gap: gap-3
-                        align: items-center
-                        justify: justify-between
-                        items:
-                            - $type: HorizontalStack
-                              gap: gap-2
-                              align: items-center
-                              items:
-                                  - {
-                                        $type: ButtonLink,
-                                        size: sm,
-                                        variant: neutral,
-                                        label: $sources.executions.statusFiltersCounted.all,
-                                        to: /modules/flow/executions,
-                                    }
-                                  - {
-                                        $type: ButtonLink,
-                                        size: sm,
-                                        variant: neutral,
-                                        label: $sources.executions.statusFiltersCounted.running,
-                                        to: '/modules/flow/executions?status=running',
-                                    }
-                                  - {
-                                        $type: ButtonLink,
-                                        size: sm,
-                                        variant: neutral,
-                                        label: $sources.executions.statusFiltersCounted.queued,
-                                        to: '/modules/flow/executions?status=queued',
-                                    }
-                                  - {
-                                        $type: ButtonLink,
-                                        size: sm,
-                                        variant: neutral,
-                                        label: $sources.executions.statusFiltersCounted.completed,
-                                        to: '/modules/flow/executions?status=completed',
-                                    }
-                                  - {
-                                        $type: ButtonLink,
-                                        size: sm,
-                                        variant: danger-outline,
-                                        label: $sources.executions.statusFiltersCounted.failed,
-                                        to: '/modules/flow/executions?status=failed',
-                                    }
-
-                            - *actionsSlot
-
+                      - *filterRow
                       - *executionsTable
                       - *pager
 
@@ -224,7 +186,7 @@ sections:
                   items:
                       - $type: PageHeader
                         title: Flow executions
-                        subtitle: 'Filter by status, or click one of the latest flows (?flow=<flowId>)'
+                        subtitle: 'Search a flow or pick a status, or click one of the latest flows (?flow=<flowId>)'
 
                       - $type: Section
                         title: Latest flows
@@ -239,14 +201,6 @@ sections:
                                   - { key: 'failedCount', label: 'Failed', nowrap: true }
                                   - { key: 'lastStartedAt', label: 'Last', format: datetime, nowrap: true }
 
-                      - $type: HorizontalStack
-                        gap: gap-3
-                        align: items-center
-                        justify: justify-between
-                        items:
-                            - *statusLinks
-
-                            - *actionsSlot
-
+                      - *filterRow
                       - *executionsTable
                       - *pager

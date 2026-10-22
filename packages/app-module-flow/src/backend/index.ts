@@ -4,6 +4,7 @@ import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
 import { BUILTIN_PLUGIN_CATALOG, FLOW_CONFIG_DIR_NAME, FlowQueryService } from 'flow-core';
 
 import { registerDaemonWidgetRoutes } from './DaemonWidgetRoutes.js';
+import { registerExecutionLogRoutes } from './ExecutionLogRoutes.js';
 import { registerExecutionRoutes } from './ExecutionRoutes.js';
 import { registerExecutionWidgetRoutes } from './ExecutionWidgetRoutes.js';
 import { registerLogRoutes } from './LogRoutes.js';
@@ -20,6 +21,7 @@ export default function (ctx: ModuleContext): void {
 	const service = FlowQueryService.forConfigDir(ConfigDir.get(FLOW_CONFIG_DIR_NAME), BUILTIN_PLUGIN_CATALOG);
 
 	registerExecutionRoutes(ctx, service);
+	registerExecutionLogRoutes(ctx, service);
 	registerExecutionWidgetRoutes(ctx, service);
 	registerDaemonWidgetRoutes(ctx, service);
 	registerWorkerRoutes(ctx, service);

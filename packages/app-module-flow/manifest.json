@@ -7,6 +7,9 @@
 			},
 			"executions-actions": {
 				"accepts": ["ActionBar", "HorizontalStack", "ButtonLink", "ButtonAction", "IconButton", "Link"]
+			},
+			"execution-row-actions": {
+				"accepts": ["ActionBar", "HorizontalStack", "ButtonLink", "ButtonAction", "IconButton", "Link"]
 			}
 		}
 	},
@@ -30,6 +33,13 @@
 			"label": "Execution",
 			"path": "/executions/:id",
 			"view": { "type": "path", "value": "./src/dsl-views/execution-detail-page.yaml" }
+		},
+		{
+			"kind": "page",
+			"slot": "route",
+			"label": "Logs",
+			"path": "/executions/:id/logs",
+			"view": { "type": "path", "value": "./src/dsl-views/execution-logs-page.yaml" }
 		},
 		{
 			"kind": "page",

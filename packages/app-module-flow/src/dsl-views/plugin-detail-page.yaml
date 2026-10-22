@@ -8,11 +8,6 @@ $sources:
 
 $type: PageContent
 sections:
-    - $type: Link
-      label: Back to plugins
-      href: /modules/flow/plugins
-      variant: muted
-
     - $type: PageHeader
       title: $sources.plugin.id
       subtitle: $sources.plugin.typeString
