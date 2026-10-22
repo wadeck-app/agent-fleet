@@ -26,7 +26,16 @@ describe('GET /executions', () => {
 	it('answers an empty page, not an error, when nothing ran yet', async () => {
 		expect(await callRoute(routes, 'GET /executions', { query: {} })).toEqual({
 			status: 200,
-			body: { items: [], total: 0, skipped: 0, limit: 20, offset: 0, statusFilters: expect.any(Object) },
+			body: {
+				items: [],
+				total: 0,
+				skipped: 0,
+				limit: 20,
+				offset: 0,
+				statusFilters: expect.any(Object),
+				statusFiltersCounted: expect.any(Object),
+				statusCounts: expect.any(Object),
+			},
 		});
 	});
 
@@ -348,6 +357,58 @@ ${'word '.repeat(40)}`,
 			});
 		}
 	);
+
+	it('counts the executions per status and labels the status links with them, the active one in brackets', async () => {
+		fixture.addExecution({ executionId: 'c1', status: 'completed', startedAt: '2026-08-16T10:00:00.000Z' });
+		fixture.addExecution({ executionId: 'c2', status: 'completed', startedAt: '2026-08-16T11:00:00.000Z' });
+		fixture.addExecution({ executionId: 'f1', status: 'failed', startedAt: '2026-08-16T12:00:00.000Z' });
+		const { body } = await callRoute(routes, 'GET /executions', { query: { status: 'failed' } });
+		expect(body).toMatchObject({
+			statusCounts: { total: 3, queued: 0, running: 0, completed: 2, failed: 1 },
+			statusFiltersCounted: {
+				all: 'All (3)',
+				running: 'Running (0)',
+				queued: 'Queued (0)',
+				completed: 'Completed (2)',
+				failed: '[Failed (1)]',
+			},
+		});
+	});
+
+	it('counts only the executions of the flow filter, so the counts match what the table can show', async () => {
+		fixture.addExecution({ executionId: 'a1', flowId: 'alpha', status: 'failed' });
+		fixture.addExecution({ executionId: 'b1', flowId: 'beta', status: 'failed' });
+		fixture.addExecution({ executionId: 'b2', flowId: 'beta', status: 'completed' });
+		const { body } = await callRoute(routes, 'GET /executions', { query: { flow: 'beta' } });
+		expect(body).toMatchObject({
+			statusCounts: { total: 2, failed: 1, completed: 1 },
+			statusFiltersCounted: { all: '[All (2)]', failed: 'Failed (1)' },
+		});
+	});
+
+	it('summarises the detail for stat tiles: steps, retries and the error', async () => {
+		fixture.addExecution({
+			executionId: 'sum1',
+			status: 'failed',
+			lastError: 'e'.repeat(80),
+			steps: {
+				build: { status: 'completed' },
+				flaky: { status: 'completed', error: 'boom', attempts: 3 },
+				test: { status: 'failed', error: 'e'.repeat(80), attempts: 2 },
+				ship: { status: 'pending' },
+			},
+		});
+		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'sum1' }, query: {} });
+		const detail = body as { stepsSummary: string; retryCount: number; errorSummary: string };
+		expect(detail).toMatchObject({ stepsSummary: '4 steps, 1 failed', retryCount: 3 });
+		expect(detail.errorSummary).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
+	});
+
+	it('says there is no error, and counts a single step as a step, when the run is clean', async () => {
+		fixture.addExecution({ executionId: 'sum2', steps: { build: { status: 'completed' } } });
+		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'sum2' }, query: {} });
+		expect(body).toMatchObject({ stepsSummary: '1 step, 0 failed', retryCount: 0, errorSummary: 'none' });
+	});
 
 	it('labels every step with a short status word, and notes retries and recovered errors', async () => {
 		fixture.addExecution({

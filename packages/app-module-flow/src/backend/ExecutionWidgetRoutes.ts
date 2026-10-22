@@ -4,6 +4,8 @@ import { type FlowQueryService, ellipsize, statusTag } from 'flow-core';
 import { replyWithError } from './ErrorReply.js';
 
 export const WIDGET_ROW_COUNT = 5;
+/** Rows of the dense variant of the widget (`compact`); the first {@link WIDGET_ROW_COUNT} are also `items`. */
+export const WIDGET_COMPACT_ROW_COUNT = 8;
 /**
  * Longest row title: "tag name age". A 240px card leaves room for about 25 characters on one line, a 160px one for
  * about 13, where it wraps in two. The dsl-ui DataTable ignores a column's width/truncate and breaks a cell anywhere, so
@@ -52,23 +54,31 @@ export function registerExecutionWidgetRoutes(
 ): void {
 	ctx.registerRoute('GET', '/widgets/executions', (_req, reply) => {
 		try {
-			const recent = service.listExecutions({ limit: WIDGET_ROW_COUNT });
+			const recent = service.listExecutions({ limit: WIDGET_COMPACT_ROW_COUNT });
+			const counts = service.countByStatus();
 			const reference = now();
+			const aged = recent.items.map(record => ({ record, age: formatRelativeTime(record.startedAt, reference) }));
 			const body = {
 				total: recent.total,
 				viewAllLabel: recent.total === 0 ? 'View all executions' : `View all ${recent.total} executions`,
-				running: service.listExecutions({ status: 'running', limit: 1 }).total,
-				failed: service.listExecutions({ status: 'failed', limit: 1 }).total,
-				items: recent.items.map(record => {
-					const age = formatRelativeTime(record.startedAt, reference);
-					return {
-						executionId: record.executionId,
-						flowId: record.flowId,
-						status: record.status,
-						title: widgetTitle(record.status, record.flowId, age),
-						when: age,
-					};
-				}),
+				running: counts.running,
+				failed: counts.failed,
+				// Age of the newest run, for a tile; "none" rather than an empty tile when nothing ran.
+				lastRun: aged[0]?.age ?? 'none',
+				items: aged.slice(0, WIDGET_ROW_COUNT).map(({ record, age }) => ({
+					executionId: record.executionId,
+					flowId: record.flowId,
+					status: record.status,
+					title: widgetTitle(record.status, record.flowId, age),
+					when: age,
+				})),
+				// Columns instead of one precomputed title: for the dense table variant, which truncates the name itself.
+				compact: aged.map(({ record, age }) => ({
+					executionId: record.executionId,
+					flowId: record.flowId,
+					statusLabel: statusTag(record.status),
+					when: age,
+				})),
 			};
 			return reply.code(200).send(body);
 		} catch (err) {

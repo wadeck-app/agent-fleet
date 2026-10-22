@@ -3,8 +3,9 @@ import { DEFAULT_HISTORY_LIMIT, statusTag } from 'flow-core';
 import { FlowConfigFixture, collectRoutes } from 'flow-core/testing';
 import { load } from 'js-yaml';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import backend from './index.js';
@@ -81,6 +82,50 @@ function sourcesOf(view: ParsedView): { name: string; spec: SourceSpec }[] {
 	}));
 }
 
+interface Alternative {
+	/** Key of the AbTest variant this document shows; undefined for a view without A/B test. */
+	variant: string | undefined;
+	document: Record<string, unknown>;
+}
+
+/**
+ * Copy of `node` where each AbTest is replaced by the view of the variant `choose` names. The page-level `$sources`
+ * of a root AbTest stay on the replacing view, like the renderer keeps them for the page.
+ */
+function resolveVariants(node: unknown, choose: (abTest: Record<string, unknown>) => string, isRoot = true): unknown {
+	if (Array.isArray(node)) return node.map(child => resolveVariants(child, choose, false));
+	if (node === null || typeof node !== 'object') return node;
+	const record = node as Record<string, unknown>;
+	if (record['$type'] === 'AbTest') {
+		const key = choose(record);
+		const variants = record['variants'] as Record<string, { view: Record<string, unknown> }>;
+		if (variants[key] === undefined) throw new Error(`AbTest '${String(record['id'])}' has no variant '${key}'.`);
+		const view = resolveVariants(variants[key].view, choose, false) as Record<string, unknown>;
+		return isRoot && record['$sources'] !== undefined ? { ...view, $sources: record['$sources'] } : view;
+	}
+	return Object.fromEntries(
+		Object.entries(record).map(([name, child]) => [name, resolveVariants(child, choose, false)])
+	);
+}
+
+/** The view as the user sees it before choosing anything: every AbTest shows its `initial` variant. */
+function initialView(file: string): Record<string, unknown> {
+	return resolveVariants(parseView(file).document, abTest => String(abTest['initial'])) as Record<string, unknown>;
+}
+
+/** One document per variant of the file's AbTest (the module declares at most one per view), or the view itself. */
+function alternativesOf(file: string): Alternative[] {
+	const { document } = parseView(file);
+	const abTests = collectNodes(document, 'AbTest');
+	if (abTests.length === 0) return [{ variant: undefined, document }];
+	if (abTests.length > 1)
+		throw new Error(`${file} declares ${abTests.length} AbTest nodes: alternativesOf handles one.`);
+	return Object.keys(abTests[0]!['variants'] as object).map(variant => ({
+		variant,
+		document: resolveVariants(document, () => variant) as Record<string, unknown>,
+	}));
+}
+
 const viewFiles = readdirSync(viewsDir).filter(file => /\.ya?ml$/.test(file));
 
 describe('dsl-views', () => {
@@ -103,9 +148,11 @@ describe('dsl-views', () => {
 
 describe('executions page', () => {
 	it('offers the backend default page size first: PageSizeSelect shows options[0] while ?size= is absent', () => {
-		const selects = collectNodes(parseView('executions-page.yaml').document, 'PageSizeSelect');
-		expect(selects, 'executions-page.yaml has no PageSizeSelect').toHaveLength(1);
-		expect((selects[0]!['options'] as number[])[0]).toBe(DEFAULT_HISTORY_LIMIT);
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			const selects = collectNodes(document, 'PageSizeSelect');
+			expect(selects, `executions-page.yaml (${String(variant)}) has no PageSizeSelect`).toHaveLength(1);
+			expect((selects[0]!['options'] as number[])[0]).toBe(DEFAULT_HISTORY_LIMIT);
+		}
 	});
 });
 
@@ -159,7 +206,7 @@ describe('DataTable columns', () => {
 
 describe('executions page layout', () => {
 	it('shows the executions table before the flows summary, which asks for a short list', () => {
-		const view = parseView('executions-page.yaml');
+		const view = { file: 'executions-page.yaml', document: initialView('executions-page.yaml') };
 		const tables = collectNodes(view.document, 'DataTable');
 		expect(tables.map(table => table['rows'])).toEqual(['$sources.executions.items', '$sources.flows.flows']);
 		const flows = sourcesOf(view).find(source => source.name === 'flows');
@@ -167,14 +214,14 @@ describe('executions page layout', () => {
 	});
 
 	it('shows the raw status and a one-line error excerpt, columns the executions route sends', () => {
-		const table = collectNodes(parseView('executions-page.yaml').document, 'DataTable')[0]!;
+		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[0]!;
 		const keys = (table['columns'] as { key: string }[]).map(column => column.key);
 		expect(keys).toContain('statusLabel');
 		expect(keys).not.toContain('lastError');
 	});
 
 	it('has at most 3 narrow columns of short precomputed text: a 510px content area breaks any longer cell mid-word', () => {
-		const table = collectNodes(parseView('executions-page.yaml').document, 'DataTable')[0]!;
+		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[0]!;
 		expect((table['columns'] as { key: string }[]).map(column => column.key)).toEqual([
 			'startedLabel',
 			'runLabel',
@@ -183,7 +230,7 @@ describe('executions page layout', () => {
 	});
 
 	it('keeps When and Status on one line and badges every bare status word the route can send', () => {
-		const table = collectNodes(parseView('executions-page.yaml').document, 'DataTable')[0]!;
+		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[0]!;
 		const columns = table['columns'] as Record<string, unknown>[];
 		const byKey = (key: string) => columns.find(column => column['key'] === key)!;
 		expect(byKey('startedLabel')).toMatchObject({ nowrap: true });
@@ -198,13 +245,13 @@ describe('executions page layout', () => {
 	});
 
 	it('truncates the flow name of the flows summary', () => {
-		const table = collectNodes(parseView('executions-page.yaml').document, 'DataTable')[1]!;
+		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[1]!;
 		const flow = (table['columns'] as Record<string, unknown>[]).find(column => column['key'] === 'flowId');
 		expect(flow).toMatchObject({ truncate: true });
 	});
 
 	it('labels the status links from the route, which marks the active filter', () => {
-		const links = collectNodes(parseView('executions-page.yaml').document, 'Link');
+		const links = collectNodes(initialView('executions-page.yaml'), 'Link');
 		const labels = links
 			.map(link => link['label'])
 			.filter(label => typeof label === 'string' && label.startsWith('$'));
@@ -220,7 +267,7 @@ describe('executions page layout', () => {
 
 describe('execution detail page', () => {
 	it('colours the status badge from the variant the route sends and lists display-ready step columns', () => {
-		const document = parseView('execution-detail-page.yaml').document;
+		const document = initialView('execution-detail-page.yaml');
 		const badges = collectNodes(document, 'Badge');
 		expect(badges[0]).toMatchObject({
 			label: '$sources.execution.statusText',
@@ -331,9 +378,9 @@ describe('every link and row navigation lands on a page of the manifest', () => 
 describe('extension slots', () => {
 	const exposed = Object.keys(manifest.expose?.slots ?? {});
 
-	/** Slot names a view embeds: ExtensionSlot items point at a source that GETs /api/slots/flow:<name>. */
-	function embeddedSlots(file: string): string[] {
-		const view = parseView(file);
+	/** Slot names a document embeds: ExtensionSlot items point at a source that GETs /api/slots/flow:<name>. */
+	function embeddedSlots(file: string, document: Record<string, unknown>): string[] {
+		const view = { file, document };
 		const sources = new Map(sourcesOf(view).map(source => [source.name, source.spec.url]));
 		return collectNodes(view.document, 'ExtensionSlot').map(node => {
 			const items = String(node['items']);
@@ -348,16 +395,22 @@ describe('extension slots', () => {
 		});
 	}
 
-	it('embeds execution-actions in the execution detail page', () => {
-		expect(embeddedSlots('execution-detail-page.yaml')).toEqual(['execution-actions']);
-	});
-
-	it('embeds executions-actions in the executions page', () => {
-		expect(embeddedSlots('executions-page.yaml')).toEqual(['executions-actions']);
-	});
+	it.each([
+		['execution-detail-page.yaml', 'execution-actions'],
+		['executions-page.yaml', 'executions-actions'],
+	])(
+		'%s embeds %s in every A/B variant: choosing a design must not drop the buttons other modules add',
+		(file, slot) => {
+			for (const { variant, document } of alternativesOf(file)) {
+				expect(embeddedSlots(file, document), `variant ${String(variant)}`).toEqual([slot]);
+			}
+		}
+	);
 
 	it('embeds only slots the manifest exposes, and every exposed slot is embedded somewhere', () => {
-		const embedded = viewFiles.flatMap(file => embeddedSlots(file));
+		const embedded = viewFiles.flatMap(file =>
+			alternativesOf(file).flatMap(({ document }) => embeddedSlots(file, document))
+		);
 		for (const name of embedded) expect(exposed, `slot ${name} is not in expose.slots`).toContain(name);
 		for (const name of exposed) expect(embedded, `slot ${name} is exposed but no view embeds it`).toContain(name);
 	});
@@ -373,20 +426,151 @@ describe('extension slots', () => {
 
 describe('dashboard widget', () => {
 	const widgetPoint = manifest.extensionPoints.find(point => point.kind === 'widget' && point.slot === 'dashboard');
+	const widgetFile = widgetPoint!.view.value.replace('./src/dsl-views/', '');
 
-	it('reads the single precomputed widget route and links to the executions page and the detail page', () => {
+	it('reads the single precomputed widget route', () => {
 		expect(widgetPoint, 'manifest.json declares no dashboard widget').toBeDefined();
-		const view = parseView(widgetPoint!.view.value.replace('./src/dsl-views/', ''));
-		expect(sourcesOf(view).map(source => source.spec.url)).toEqual([`GET ${MODULE_API_PREFIX}/widgets/executions`]);
-		expect(collectStrings(view.document, 'href')).toEqual([`${MODULE_PAGE_PREFIX}/executions`]);
-		expect(collectStrings(view.document, 'navigateTo')).toEqual([`${MODULE_PAGE_PREFIX}/executions/{executionId}`]);
+		expect(sourcesOf(parseView(widgetFile)).map(source => source.spec.url)).toEqual([
+			`GET ${MODULE_API_PREFIX}/widgets/executions`,
+		]);
 	});
 
+	it('links every variant to the executions page, and rows to the detail page', () => {
+		for (const { variant, document } of alternativesOf(widgetFile)) {
+			expect(collectStrings(document, 'href'), String(variant)).toEqual([`${MODULE_PAGE_PREFIX}/executions`]);
+			for (const target of collectStrings(document, 'navigateTo')) {
+				expect(target, String(variant)).toBe(`${MODULE_PAGE_PREFIX}/executions/{executionId}`);
+			}
+		}
+	});
+
+	// Fields of one row of the widget route: `title` for the list variant, the rest for the dense table.
+	const ROW_FIELDS = ['title', 'statusLabel', 'flowId', 'when'];
+
 	it('shows only columns the widget route sends (a typo would render empty cells)', () => {
-		const view = parseView(widgetPoint!.view.value.replace('./src/dsl-views/', ''));
-		const columns = collectNodes(view.document, 'DataTable').flatMap(
+		for (const { variant, document } of alternativesOf(widgetFile)) {
+			const columns = collectNodes(document, 'DataTable').flatMap(table => table['columns'] as { key: string }[]);
+			for (const column of columns) expect(ROW_FIELDS, `${String(variant)}: ${column.key}`).toContain(column.key);
+		}
+	});
+
+	it('shows the current design first: one precomputed title column', () => {
+		const columns = collectNodes(initialView(widgetFile), 'DataTable').flatMap(
 			table => table['columns'] as { key: string }[]
 		);
 		expect(columns.map(column => column.key)).toEqual(['title']);
 	});
+
+	it('reads only widget fields the route sends', () => {
+		const sent = ['total', 'running', 'failed', 'lastRun', 'viewAllLabel', 'items', 'compact'];
+		for (const { variant, document } of alternativesOf(widgetFile)) {
+			const used = JSON.stringify(document).match(/\$sources\.recent\.\w+/g) ?? [];
+			for (const reference of used) {
+				expect(sent, `${String(variant)}: ${reference}`).toContain(reference.split('.')[2]);
+			}
+		}
+	});
 });
+
+describe('A/B variants (AbTest)', () => {
+	// The views declare their design alternatives; the shell's dock picks one. Ids and variant keys are the contract
+	// of the README: renaming one drops the choice a user stored in the browser.
+	const EXPECTED: Record<string, { id: string; initial: string; variants: string[] }> = {
+		'executions-widget.yaml': {
+			id: 'flow-widget-design',
+			initial: 'list',
+			variants: ['list', 'tiles', 'compact'],
+		},
+		'executions-page.yaml': {
+			id: 'flow-executions-design',
+			initial: 'table',
+			variants: ['table', 'filters-first', 'flows-aside'],
+		},
+		'execution-detail-page.yaml': {
+			id: 'flow-execution-design',
+			initial: 'steps-table',
+			variants: ['steps-table', 'summary-first'],
+		},
+	};
+	const ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+	const tests = viewFiles.flatMap(file =>
+		collectNodes(parseView(file).document, 'AbTest').map(test => ({ file, test }))
+	);
+
+	it('declares exactly the experiments of the README, one per view', () => {
+		const found: Record<string, unknown[]> = {};
+		for (const { file, test } of tests) {
+			found[file] = [
+				...(found[file] ?? []),
+				{ id: test['id'], initial: test['initial'], variants: Object.keys(test['variants'] as object) },
+			];
+		}
+		expect(found).toEqual(Object.fromEntries(Object.entries(EXPECTED).map(([file, test]) => [file, [test]])));
+	});
+
+	it('has a valid id (letters, digits, _ and -), unique across the module', () => {
+		const ids = tests.map(({ test }) => String(test['id']));
+		expect(tests.length).toBeGreaterThan(0);
+		for (const id of ids) expect(id, `id '${id}'`).toMatch(ID_PATTERN);
+		expect(new Set(ids).size, `duplicate id in ${ids.join(', ')}`).toBe(ids.length);
+	});
+
+	it.each(tests.map(({ file, test }) => [file, String(test['id']), test] as const))(
+		'%s: %s has a label, an initial variant that exists, and variants with a label, a hint and a view',
+		(file, id, test) => {
+			expect(test['label'], `${file} ${id}`).toEqual(expect.stringMatching(/\S/));
+			const variants = test['variants'] as Record<string, Record<string, unknown>>;
+			expect(Object.keys(variants).length, `${file} ${id} needs two variants or more`).toBeGreaterThanOrEqual(2);
+			expect(Object.keys(variants), `${file} ${id}: initial`).toContain(test['initial']);
+			for (const [key, variant] of Object.entries(variants)) {
+				expect(Object.keys(variant).sort(), `${file} ${id} variant ${key}`).toEqual(['hint', 'label', 'view']);
+				expect(variant['label'], `${id}/${key} label`).toEqual(expect.stringMatching(/\S/));
+				expect(variant['hint'], `${id}/${key} hint`).toEqual(expect.stringMatching(/\S/));
+				expect(variant['view'], `${id}/${key} view`).toHaveProperty('$type');
+			}
+		}
+	);
+
+	it.each(viewFiles)("%s holds no key the shell's dsl-ui does not know, in any variant", async file => {
+		const { findUnknownKeys, knownKeys } = await loadKeyCheck();
+		expect(
+			knownKeys,
+			'the installed dsl-ui predates AbTest (release 2026.10.19-110): update @wadeck-app/dsl-ui, or set DSL_PACKAGES_DIR'
+		).toHaveProperty('AbTest');
+		const errors = findUnknownKeys(parseView(file).document, knownKeys).filter(d => d.severity === 'error');
+		expect(errors, `${file}: ${errors.map(d => `${d.nodePath} ${d.message}`).join('\n')}`).toEqual([]);
+	});
+});
+
+interface Diagnostic {
+	severity: string;
+	nodePath: string;
+	message: string;
+}
+
+interface UnknownKeysModule {
+	findUnknownKeys: (document: Record<string, unknown>, manifest: Record<string, unknown>) => Diagnostic[];
+}
+
+/**
+ * The dsl-renderer walker and the dsl-ui key list the dev shell validates the views with. DSL_PACKAGES_DIR points at
+ * another node_modules/@wadeck-app (for example app-core's) when the repository still has an older release installed.
+ */
+async function loadKeyCheck() {
+	const override = process.env['DSL_PACKAGES_DIR'];
+	const walker =
+		override === undefined
+			? ((await import('@wadeck-app/dsl-renderer/build/unknownKeys')) as UnknownKeysModule)
+			: ((await import(
+					pathToFileURL(join(override, 'dsl-renderer/dist/build/unknownKeys.js')).href
+				)) as UnknownKeysModule);
+	const keysFile =
+		override === undefined
+			? createRequire(import.meta.url).resolve('@wadeck-app/dsl-ui/known-keys.json')
+			: join(override, 'dsl-ui/src/known-keys.json');
+	return {
+		findUnknownKeys: walker.findUnknownKeys,
+		knownKeys: JSON.parse(readFileSync(keysFile, 'utf8')) as Record<string, unknown>,
+	};
+}

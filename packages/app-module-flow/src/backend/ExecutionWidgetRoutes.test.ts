@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
 	MAX_WIDGET_TITLE_LENGTH,
+	WIDGET_COMPACT_ROW_COUNT,
+	WIDGET_ROW_COUNT,
 	formatRelativeTime,
 	registerExecutionWidgetRoutes,
 	widgetTitle,
@@ -48,8 +50,41 @@ describe('GET /widgets/executions', () => {
 	it('answers zeros and no row when nothing ran yet', async () => {
 		expect(await callRoute(routes, 'GET /widgets/executions', { query: {} })).toEqual({
 			status: 200,
-			body: { total: 0, running: 0, failed: 0, viewAllLabel: 'View all executions', items: [] },
+			body: {
+				total: 0,
+				running: 0,
+				failed: 0,
+				lastRun: 'none',
+				viewAllLabel: 'View all executions',
+				items: [],
+				compact: [],
+			},
 		});
+	});
+
+	it('lists the eight newest runs for the dense variant, as status word, flow name and age', async () => {
+		for (let i = 0; i < 10; i++) {
+			fixture.addExecution({
+				executionId: `r${i}`,
+				status: i === 9 ? 'failed' : 'completed',
+				startedAt: `2026-10-19T11:${String(10 + i)}:00.000Z`,
+			});
+		}
+		const { body } = await callRoute(routes, 'GET /widgets/executions', { query: {} });
+		const { compact, items, lastRun } = body as {
+			compact: Record<string, unknown>[];
+			items: unknown[];
+			lastRun: string;
+		};
+		expect(compact).toHaveLength(WIDGET_COMPACT_ROW_COUNT);
+		expect(items).toHaveLength(WIDGET_ROW_COUNT);
+		expect(compact[0]).toEqual({
+			executionId: 'r9',
+			flowId: 'deploy',
+			statusLabel: 'FAILED',
+			when: '41m',
+		});
+		expect(lastRun).toBe('41m');
 	});
 
 	it('counts all, running and failed runs and lists the five newest with a status mark and a relative time', async () => {
@@ -77,6 +112,7 @@ describe('GET /widgets/executions', () => {
 			viewAllLabel: 'View all 7 executions',
 			running: 1,
 			failed: 1,
+			lastRun: '2m',
 			items: [
 				{ executionId: 'run', flowId: 'deploy', status: 'running', title: 'running deploy 2m', when: '2m' },
 				{
@@ -89,6 +125,15 @@ describe('GET /widgets/executions', () => {
 				{ executionId: 'ok3', flowId: 'deploy', status: 'completed', title: 'ok deploy 57m', when: '57m' },
 				{ executionId: 'ok2', flowId: 'deploy', status: 'completed', title: 'ok deploy 58m', when: '58m' },
 				{ executionId: 'ok1', flowId: 'deploy', status: 'completed', title: 'ok deploy 59m', when: '59m' },
+			],
+			compact: [
+				{ executionId: 'run', flowId: 'deploy', statusLabel: 'running', when: '2m' },
+				{ executionId: 'bad', flowId: 'factory_retrospective', statusLabel: 'FAILED', when: '5m' },
+				{ executionId: 'ok3', flowId: 'deploy', statusLabel: 'ok', when: '57m' },
+				{ executionId: 'ok2', flowId: 'deploy', statusLabel: 'ok', when: '58m' },
+				{ executionId: 'ok1', flowId: 'deploy', statusLabel: 'ok', when: '59m' },
+				{ executionId: 'ok0', flowId: 'deploy', statusLabel: 'ok', when: '1h' },
+				{ executionId: 'oldest', flowId: 'deploy', statusLabel: 'ok', when: '18d' },
 			],
 		});
 	});

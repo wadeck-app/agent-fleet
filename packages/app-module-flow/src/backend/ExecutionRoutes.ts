@@ -60,13 +60,15 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const limit = optionalInteger(query, 'limit', { min: 1, max: MAX_EXECUTIONS_LIMIT });
 			const offset = readPageOffset(query, limit ?? DEFAULT_HISTORY_LIMIT);
 			const status = readStatus(query);
+			const flow = optionalString(query, 'flow');
 			const page = service.listExecutions({
 				limit,
 				offset,
 				status,
-				flow: optionalString(query, 'flow'),
+				flow,
 				id: optionalString(query, 'id'),
 			});
+			const counts = service.countByStatus(flow);
 			const body = {
 				items: page.items.map(record => toExecutionRow(toExecutionSummary(record))),
 				total: page.total,
@@ -76,6 +78,9 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 				offset: offset ?? 0,
 				// Labels of the status links, the active one marked: the DSL cannot style a link.
 				statusFilters: toStatusFilters(status),
+				// Same links with the number of executions each shows (for the flow filter, if any).
+				statusFiltersCounted: toStatusFilters(status, counts),
+				statusCounts: counts,
 			};
 			return reply.code(200).send(body);
 		} catch (err) {

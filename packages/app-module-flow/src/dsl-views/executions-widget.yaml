@@ -1,27 +1,77 @@
-# Dashboard widget, built for a narrow cell (a 240px card): two counters, then the five most recent runs as one line
-# each, then a link to the full list.
+# Dashboard widget, built for a narrow cell (a 240px card). Three designs are declared as an A/B test (README: "Design
+# variants"); the dev shell's A/B dock picks one, `list` is what everybody else sees.
 # One precomputed source (GET /widgets/executions): the DSL cannot put a status mark in front of a name or print "5m".
-# The DataTable renders every cell of a YAML column as `break-all` with no width limit and ignores `width`, `truncate`
-# and `muted` (dsl-ui normalizeColumn keeps key and label only), so a long value is broken letter by letter. The only
-# lever is a short value: `title` is "tag name age" cut to MAX_WIDGET_TITLE_LENGTH characters by the backend, in a
-# single column so no second column steals width from the name.
+# `list` reads `title`, "tag name age" cut to MAX_WIDGET_TITLE_LENGTH characters by the backend, in a single column so no
+# second column steals width from the name. `compact` has real columns instead, and truncates the name itself (dsl-ui
+# 122 DataTable `truncate`/`nowrap`/`badge`; a shell older than 122 shows the plain text).
+# `&viewAll` is defined once, in the first variant: keep that variant, or move the anchor, when removing variants.
 $sources:
     recent:
         url: GET /api/modules/flow/widgets/executions
         poll: 30s
 
-$type: VerticalStack
-gap: gap-2
-items:
-    # Stacked, not side by side: two tiles in a row do not fit a 160px card.
-    - { $type: StatTile, label: Running, value: $sources.recent.running }
-    - { $type: StatTile, label: Failed, value: $sources.recent.failed }
+$type: AbTest
+id: flow-widget-design
+label: Flow widget
+initial: list
+variants:
+    list:
+        label: List
+        hint: 'Two counters, the 5 latest runs as one line each (status word, name, age), then a link.'
+        view:
+            $type: VerticalStack
+            gap: gap-2
+            items:
+                # Stacked, not side by side: two tiles in a row do not fit a 160px card.
+                - { $type: StatTile, label: Running, value: $sources.recent.running }
+                - { $type: StatTile, label: Failed, value: $sources.recent.failed }
 
-    - $type: DataTable
-      rows: $sources.recent.items
-      navigateTo: '/modules/flow/executions/{executionId}'
-      emptyMessage: No execution yet
-      columns:
-          - { key: 'title', label: 'Recent runs' }
+                - $type: DataTable
+                  rows: $sources.recent.items
+                  navigateTo: '/modules/flow/executions/{executionId}'
+                  emptyMessage: No execution yet
+                  columns:
+                      - { key: 'title', label: 'Recent runs' }
 
-    - { $type: Link, label: $sources.recent.viewAllLabel, href: /modules/flow/executions }
+                - &viewAll { $type: Link, label: $sources.recent.viewAllLabel, href: /modules/flow/executions }
+
+    tiles:
+        label: Tiles
+        hint: 'Four numbers only (running, failed, total, age of the last run) in a 2x2 block: no list, just the state.'
+        view:
+            $type: VerticalStack
+            gap: gap-2
+            items:
+                - $type: HorizontalStack
+                  gap: gap-2
+                  itemSizes: [flex, flex]
+                  items:
+                      - { $type: StatTile, label: Running, value: $sources.recent.running }
+                      - { $type: StatTile, label: Failed, value: $sources.recent.failed }
+                - $type: HorizontalStack
+                  gap: gap-2
+                  itemSizes: [flex, flex]
+                  items:
+                      - { $type: StatTile, label: Total, value: $sources.recent.total }
+                      - { $type: StatTile, label: Last run, value: $sources.recent.lastRun }
+                - *viewAll
+
+    compact:
+        label: Compact
+        hint: 'No counters: the 8 latest runs in one dense table (status badge, flow name, age) so failures show by colour.'
+        view:
+            $type: VerticalStack
+            gap: gap-2
+            items:
+                - $type: DataTable
+                  rows: $sources.recent.compact
+                  navigateTo: '/modules/flow/executions/{executionId}'
+                  emptyMessage: No execution yet
+                  columns:
+                      - key: statusLabel
+                        label: Status
+                        nowrap: true
+                        badge: { ok: success, FAILED: danger, running: info, waiting: default, retry: warning }
+                      - { key: 'flowId', label: 'Flow', truncate: true }
+                      - { key: 'when', label: 'Age', nowrap: true, muted: true }
+                - *viewAll

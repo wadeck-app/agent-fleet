@@ -1,9 +1,14 @@
 # Execution detail (`flow show <id>`), mounted at /modules/flow/executions/:id. ":id" of the manifest path is $route.id.
 # ?tail=<chars> sets how much of a failed step's output is kept; ?full=true lifts the limit.
-# Slot "flow:execution-actions" (manifest expose.slots): other modules add buttons beside the badges. Their views are
-# rendered with this page's context, so they can read $route.id and $sources.execution.<field> (whole-string expressions only).
+# Two layouts are declared as an A/B test (README: "Design variants"); the dev shell's A/B dock picks one, `steps-table`
+# is what everybody else sees. The sections they share are YAML anchors defined in the first variant
+# (`&backLink`, `&actionsSlot`, `&outputSection`): keep that variant, or move the anchors, when removing variants.
+# Slot "flow:execution-actions" (manifest expose.slots): other modules add buttons beside the badges, in every variant.
+# Their views are rendered with this page's context, so they can read $route.id and $sources.execution.<field>
+# (whole-string expressions only).
 # The steps table has three short columns (a narrow page breaks longer cells mid-word): the status word carries retries
 # and recovered errors ("ok, recovered, 3 tries"); the error text is in the output below.
+# `summary-first` also reads stepsSummary, retryCount and errorSummary, short texts the route precomputes for stat tiles.
 $sources:
     execution:
         # A placeholder is filled from params; the module id stays literal.
@@ -17,52 +22,125 @@ $sources:
 
 $type: PageContent
 sections:
-    - $type: Link
-      label: Back to executions
-      href: /modules/flow/executions
-      variant: muted
+    - $type: AbTest
+      id: flow-execution-design
+      label: Execution page
+      initial: steps-table
+      variants:
+          steps-table:
+              label: Steps table
+              hint: 'Status, duration and start time as badges under the title, then the steps table and the output.'
+              view:
+                  $type: VerticalStack
+                  gap: gap-4
+                  items:
+                      - &backLink
+                        $type: Link
+                        label: Back to executions
+                        href: /modules/flow/executions
+                        variant: muted
 
-    - $type: PageHeader
-      title: $sources.execution.flowId
-      subtitle: $sources.execution.executionId
+                      - $type: PageHeader
+                        title: $sources.execution.flowId
+                        subtitle: $sources.execution.executionId
 
-    - $type: HorizontalStack
-      gap: gap-3
-      align: items-center
-      justify: justify-between
-      items:
-          - $type: HorizontalStack
-            gap: gap-3
-            align: items-center
-            items:
-                - {
-                      $type: Badge,
-                      label: $sources.execution.statusText,
-                      variant: $sources.execution.statusVariant,
-                      tone: subtle,
-                  }
-                - { $type: Badge, label: $sources.execution.duration, variant: info }
-                - { $type: Badge, label: $sources.execution.startedAt, variant: default }
+                      - $type: HorizontalStack
+                        gap: gap-3
+                        align: items-center
+                        justify: justify-between
+                        items:
+                            - $type: HorizontalStack
+                              gap: gap-3
+                              align: items-center
+                              items:
+                                  - {
+                                        $type: Badge,
+                                        label: $sources.execution.statusText,
+                                        variant: $sources.execution.statusVariant,
+                                        tone: subtle,
+                                    }
+                                  - { $type: Badge, label: $sources.execution.duration, variant: info }
+                                  - { $type: Badge, label: $sources.execution.startedAt, variant: default }
 
-          # Renders nothing while no module contributes.
-          - $type: ExtensionSlot
-            items: $sources.actions
+                            # Renders nothing while no module contributes.
+                            - &actionsSlot
+                              $type: ExtensionSlot
+                              items: $sources.actions
 
-    - $type: Section
-      title: Steps
-      items:
-          - $type: DataTable
-            rows: $sources.execution.steps
-            emptyMessage: This execution has no step
-            columns:
-                - { key: 'stepId', label: 'Step' }
-                - { key: 'statusLabel', label: 'Status' }
-                - { key: 'duration', label: 'Duration' }
+                      - $type: Section
+                        title: Steps
+                        items:
+                            - $type: DataTable
+                              rows: $sources.execution.steps
+                              emptyMessage: This execution has no step
+                              columns:
+                                  - { key: 'stepId', label: 'Step' }
+                                  - { key: 'statusLabel', label: 'Status' }
+                                  - { key: 'duration', label: 'Duration' }
 
-    - $type: Section
-      title: Output (same text as `flow show`, with the error and the tail of failed steps)
-      items:
-          - $type: JsonViewer
-            row: $sources.execution
-            field: text
-            maxHeight: 40rem
+                      - &outputSection
+                        $type: Section
+                        title: Output (same text as `flow show`, with the error and the tail of failed steps)
+                        items:
+                            - $type: JsonViewer
+                              row: $sources.execution
+                              field: text
+                              maxHeight: 40rem
+
+          summary-first:
+              label: Summary first
+              hint: 'Status badge and buttons, then tiles (duration, steps, retries, error) above a slim steps table.'
+              view:
+                  $type: VerticalStack
+                  gap: gap-4
+                  items:
+                      - *backLink
+
+                      - $type: PageHeader
+                        title: $sources.execution.flowId
+                        subtitle: $sources.execution.executionId
+
+                      - $type: HorizontalStack
+                        gap: gap-3
+                        align: items-center
+                        justify: justify-between
+                        items:
+                            - {
+                                  $type: Badge,
+                                  label: $sources.execution.statusText,
+                                  variant: $sources.execution.statusVariant,
+                                  tone: subtle,
+                              }
+                            - *actionsSlot
+
+                      - $type: HorizontalStack
+                        gap: gap-3
+                        align: items-stretch
+                        itemSizes: [flex, flex, flex]
+                        items:
+                            - { $type: StatTile, label: Duration, value: $sources.execution.duration }
+                            - { $type: StatTile, label: Steps, value: $sources.execution.stepsSummary }
+                            - { $type: StatTile, label: Retries, value: $sources.execution.retryCount }
+
+                      - { $type: StatTile, label: Error, value: $sources.execution.errorSummary }
+
+                      - $type: DataTable
+                        rows: $sources.execution.steps
+                        emptyMessage: This execution has no step
+                        columns:
+                            - { key: 'stepId', label: 'Step', truncate: true }
+                            - key: statusLabel
+                              label: Status
+                              nowrap: true
+                              badge:
+                                  {
+                                      ok: success,
+                                      FAILED: danger,
+                                      running: info,
+                                      waiting: default,
+                                      retry: warning,
+                                      'ok, recovered': warning,
+                                  }
+                            - { key: 'duration', label: 'Duration', nowrap: true, muted: true }
+
+                      - *outputSection

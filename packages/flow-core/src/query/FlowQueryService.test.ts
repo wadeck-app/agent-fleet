@@ -90,6 +90,11 @@ describe('FlowQueryService', () => {
 			]);
 		});
 
+		it('counts the executions per status, optionally for one flow', () => {
+			expect(service.countByStatus()).toMatchObject({ total: 2, completed: 1, failed: 1, running: 0 });
+			expect(service.countByStatus('f1')).toMatchObject({ total: 1, completed: 1, failed: 0 });
+		});
+
 		it('renders the history table or the detail view from the same filter', () => {
 			expect(service.renderHistory({})).toContain('bbb22222');
 			expect(service.renderHistory({ id: 'aaa' })).toContain('Execution: aaa11111');

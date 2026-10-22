@@ -3,6 +3,7 @@ import {
 	type ExecutionStatus,
 	type ExecutionSummary,
 	type FlowSummary,
+	type StatusCounts,
 	type StepView,
 	excerptOf,
 	outcomeLabel,
@@ -74,11 +75,29 @@ const STATUS_FILTERS = [
 	['failed', 'Failed', 'failed'],
 ] as const;
 
-/** Labels of the status links; the DSL cannot style the active link, so its label carries it: "[Failed]". */
-export function toStatusFilters(activeStatus: string | undefined): Record<string, string> {
+/**
+ * Labels of the status links; the DSL cannot style the active link, so its label carries it: "[Failed]".
+ * With `counts`, each label also says how many executions it would show: "Failed (3)".
+ */
+export function toStatusFilters(activeStatus: string | undefined, counts?: StatusCounts): Record<string, string> {
 	return Object.fromEntries(
-		STATUS_FILTERS.map(([key, label, status]) => [key, status === activeStatus ? `[${label}]` : label])
+		STATUS_FILTERS.map(([key, label, status]) => {
+			const text =
+				counts === undefined ? label : `${label} (${status === undefined ? counts.total : counts[status]})`;
+			return [key, status === activeStatus ? `[${text}]` : text];
+		})
 	);
+}
+
+/** Short texts for the stat tiles of the detail: how many steps, how many retries, what went wrong. */
+function summaryOf(detail: ExecutionDetailView) {
+	return {
+		stepsSummary: `${detail.stepCount} ${detail.stepCount === 1 ? 'step' : 'steps'}, ${detail.failedStepCount} failed`,
+		// A step that ran 3 times was retried twice.
+		retryCount: detail.steps.reduce((sum, step) => sum + Math.max(0, (step.attempts ?? 1) - 1), 0),
+		errorSummary:
+			detail.lastError === undefined ? 'none' : errorExcerptOf(detail.lastError, detail.lastErrorRecovered),
+	};
 }
 
 /** The detail plus a colour for its status badge (the only place the DSL can colour a status). */
@@ -94,6 +113,7 @@ export function toExecutionDetailRow(detail: ExecutionDetailView) {
 		// A recovered error is not a success to read past: the badge says it and turns to warning.
 		statusText: detail.lastErrorRecovered ? 'completed, recovered an error' : detail.status,
 		statusVariant: detail.lastErrorRecovered ? 'warning' : statusVariant,
+		...summaryOf(detail),
 		steps: detail.steps.map(toStepRow),
 	};
 }

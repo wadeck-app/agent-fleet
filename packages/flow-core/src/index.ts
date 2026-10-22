@@ -19,6 +19,8 @@ export type { ExecutionState, ExecutionStatus, StepState, StepStatus } from './e
 export { createRemoteDaemonClient, isUnknownCommandError, outdatedDaemonMessage } from './daemon/RemoteDaemonClient.js';
 export { DEFAULT_HISTORY_LIMIT, filterExecutions } from './history/ExecutionFilter.js';
 export type { ExecutionFilterOptions, FilteredExecutions } from './history/ExecutionFilter.js';
+export { countByStatus } from './history/StatusCounts.js';
+export type { StatusCounts } from './history/StatusCounts.js';
 export { summarizeFlows } from './history/FlowSummaries.js';
 export type { FlowSummary } from './history/FlowSummaries.js';
 export { formatDuration, formatModelCost, formatStarted } from './history/ExecutionFormat.js';
