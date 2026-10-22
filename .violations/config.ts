@@ -28,6 +28,8 @@ export default {
 		'./.violations/rules/plugin-rules.ts': true,
 		// Non-ASCII characters (check marks, ellipsis, em dashes, accents) are forbidden in app-module packages and flow-core, tests included
 		'./.violations/rules/app-module-ascii-only.ts': true,
+		// The app-modules' manifest.json, validated with the schemas app-core applies (rule shipped by app-core-sdk)
+		'./.violations/rules/app-core-manifest.js': true,
 		// Downgrade to warning: 338 pre-existing unsafe casts across 91 files require broader refactoring
 		'ts/no-unsafe-type-cast': { $severity: 'warning' },
 		// ReviewThreadItem uses icon-only ghost buttons requiring muted/destructive tokens without matching variant
