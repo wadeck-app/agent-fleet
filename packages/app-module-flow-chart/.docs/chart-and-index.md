@@ -10,7 +10,7 @@
 
 ## Flows index (A/B)
 
-`flows-page.yaml` declares the AbTest `flow-chart-index-design` (needs dsl-ui >= 2026.10.19-110, set in `manifest.json`). Dock and `?ab.<id>=<variant>` work only in a development shell; a production shell, including the `app-core-cli dev` bundle, shows `initial`.
+`flows-page.yaml` declares the AbTest `flow-chart-index-design` (the viewing shell needs dsl-ui >= 2026.10.19-110; `manifest.json` keeps `>=2026.10.3-0` on purpose: app-core checks the range against the server's build-info.json, which can be older than the shell, and refuses the whole module then). Dock and `?ab.<id>=<variant>` work only in a development shell; a production shell, including the `app-core-cli dev` bundle, shows `initial`.
 
 | Variant key       | What                                                                 |
 | ----------------- | -------------------------------------------------------------------- |

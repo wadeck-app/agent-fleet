@@ -72,6 +72,13 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 			'react-router-dom',
 		]);
 	});
+
+	// app-core checks this range against the build-info.json of its SERVER, which was 2026.10.18-101 when the
+	// range was raised to >=2026.10.19-110 and the whole module was refused ("built for ... but the shell provides").
+	it('accepts the dsl-ui of the app-core server build the user runs (raise the range only once that build is newer)', () => {
+		const range = manifest.dslLib?.shared?.['@wadeck-app/dsl-ui'] ?? '';
+		expect(satisfies('2026.10.18-101-b2ef217e', range, { includePrerelease: true })).toBe(true);
+	});
 });
 
 describe('requirement on the flow module', () => {
