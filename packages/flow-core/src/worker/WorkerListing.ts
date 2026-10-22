@@ -27,6 +27,9 @@ function formatUptime(ms: number): string {
 	return `${String(Math.floor(minutes / 60))}h${String(minutes % 60)}m`;
 }
 
+/** The step that brings a stopped daemon back; shared by the worker listing text and the dashboard digest. */
+export const START_DAEMON_ADVICE = 'run "flow start" or a flow';
+
 /**
  * Why the list can be empty while workers are alive: a daemon idle-stops by design (D#51) and
  * disconnects them, and they only come back once a daemon is up again. `flow worker list` never
@@ -37,7 +40,7 @@ function describeDaemon(daemon: DaemonStatus, now: number): string[] {
 		return [
 			`The daemon is not reachable, so no daemon is running to hold connections (${daemon.reason}).`,
 			'A daemon stops itself when idle (nothing queued or running), which disconnects external workers; they reconnect on their own (retry delay up to 30s) once a daemon is up again.',
-			'"flow worker list" does not start one: run "flow start" or a flow, then list again. To launch a worker yourself, see "flow worker --help".',
+			`"flow worker list" does not start one: ${START_DAEMON_ADVICE}, then list again. To launch a worker yourself, see "flow worker --help".`,
 		];
 	}
 	if (daemon.pid === undefined || daemon.port === undefined || daemon.startedAt === undefined) {

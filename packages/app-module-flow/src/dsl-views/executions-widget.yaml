@@ -1,76 +1,169 @@
-# Dashboard widget, built for a narrow cell (a 240px card). Three designs are declared as an A/B test (README: "Design
-# variants"); the dev shell's A/B dock picks one, `list` is what everybody else sees.
-# One precomputed source (GET /api/modules/flow/widgets/executions): the DSL cannot put a status mark in front of a name.
-# Times are ISO 8601 (startedAt) shown by a column with `format: datetime`, the shell formatter of every app-core table
-# (no relative "5m" text composed by the backend, no timestamp inside a StatTile or a Badge: neither can format it). A
-# shell older than dsl-ui 122 ignores `format` and shows the raw ISO text.
-# `list` reads `title`, "tag name" cut to MAX_WIDGET_TITLE_LENGTH characters by the backend, next to the start time.
-# `compact` has real columns instead, and truncates the name itself (dsl-ui 122 DataTable `truncate`/`nowrap`/`badge`;
-# a shell older than 122 shows the plain text).
-# `&viewAll` is defined once, in the first variant: keep that variant, or move the anchor, when removing variants.
+# Dashboard widget for a narrow card (240-360px). It is a stack of four INDEPENDENT A/B experiments ("dimensions"): the
+# dock of a development shell has one row per id, so every combination can be tried; README "Design variants" explains
+# how to combine them and keep one. Production shells render each `initial`: the tiles summary, nothing else but the link.
+# Two sources feed all of them (every source is fetched whatever the variants shown):
+#   recent: GET /widgets/executions, the digest of the runs (flow-core RunDigest, flattened by ExecutionWidgetBody.ts)
+#   daemon: GET /widgets/daemon, daemon state and worker count (only the `status` actions variant reads it)
+# Times are ISO 8601 shown by a DataTable column with `format: datetime` or by a RelativeDate node, both formatted by the
+# shell (a Badge, a StatTile or a composed string would show the raw text). A shell older than dsl-ui 122 ignores
+# `format`. `$if` hides a node on a falsy value, so the route sends booleans for "is there a failure".
+# When a source cannot be read the renderer only logs it: lists fall back to their emptyMessage, text and numbers stay
+# blank, nothing throws.
+# `&viewAll` is defined once, in the first actions variant: keep that variant, or move the anchor, when removing variants.
 $sources:
     recent:
         url: GET /api/modules/flow/widgets/executions
         poll: 30s
+    daemon:
+        url: GET /api/modules/flow/widgets/daemon
+        poll: 30s
 
-$type: AbTest
-id: flow-widget-design
-label: Flow widget
-initial: list
-variants:
-    list:
-        label: List
-        hint: 'Two counters, the 5 latest runs as one line each (status word, name, start time), then a link.'
-        view:
-            $type: VerticalStack
-            gap: gap-2
-            items:
-                # Stacked, not side by side: two tiles in a row do not fit a 160px card.
-                - { $type: StatTile, label: Running, value: $sources.recent.running }
-                - { $type: StatTile, label: Failed, value: $sources.recent.failed }
-
-                - $type: DataTable
-                  rows: $sources.recent.items
-                  navigateTo: '/modules/flow/executions/{executionId}'
-                  emptyMessage: No execution yet
-                  columns:
-                      - { key: 'title', label: 'Recent runs', nowrap: true }
-                      - { key: 'startedAt', label: 'Started', format: datetime, muted: true }
-
-                - &viewAll { $type: Link, label: $sources.recent.viewAllLabel, href: /modules/flow/executions }
-
-    tiles:
-        label: Tiles
-        hint: 'Three numbers (running, failed, total) in tiles and the start of the last run: no list, just the state.'
-        view:
-            $type: VerticalStack
-            gap: gap-2
-            items:
-                - $type: HorizontalStack
+$type: VerticalStack
+gap: gap-3
+items:
+    # Dimension 1: the headline.
+    - $type: AbTest
+      id: flow-widget-summary
+      label: Summary
+      initial: tiles
+      variants:
+          tiles:
+              label: Tiles
+              hint: 'Baseline. Running, Failed and Total counters in tiles, then the start time of the last run.'
+              view:
+                  $type: VerticalStack
                   gap: gap-2
-                  itemSizes: [flex, flex]
                   items:
-                      - { $type: StatTile, label: Running, value: $sources.recent.running }
-                      - { $type: StatTile, label: Failed, value: $sources.recent.failed }
-                - { $type: StatTile, label: Total, value: $sources.recent.total }
+                      - $type: HorizontalStack
+                        gap: gap-2
+                        itemSizes: [flex, flex]
+                        items:
+                            - { $type: StatTile, label: Running, value: $sources.recent.running }
+                            - { $type: StatTile, label: Failed, value: $sources.recent.failed }
+                      - { $type: StatTile, label: Total, value: $sources.recent.total }
 
-                # One row (none before the first run): a StatTile cannot format a timestamp, a table column can.
-                - $type: DataTable
-                  rows: $sources.recent.lastRun
-                  emptyMessage: No execution yet
-                  columns:
-                      - { key: 'startedAt', label: 'Last run', format: datetime, nowrap: true }
-                - *viewAll
+                      # One row (none before the first run): a StatTile cannot format a timestamp, a table column can.
+                      - $type: DataTable
+                        rows: $sources.recent.lastRun
+                        emptyMessage: No execution yet
+                        columns:
+                            - { key: 'startedAt', label: 'Last run', format: datetime, nowrap: true }
 
-    compact:
-        label: Compact
-        hint: 'No counters: the 8 latest runs in one dense table (status badge, flow name, start time) so failures show by colour.'
-        view:
-            $type: VerticalStack
-            gap: gap-2
-            items:
-                - $type: DataTable
-                  rows: $sources.recent.compact
+          banner:
+              label: Banner
+              hint: 'One sentence coloured by the worst state (for example 2 flows failing, 1 running), then when the last run started.'
+              view:
+                  $type: VerticalStack
+                  gap: gap-1.5
+                  items:
+                      - {
+                            $type: Badge,
+                            label: $sources.recent.healthText,
+                            variant: $sources.recent.healthVariant,
+                            tone: subtle,
+                            size: md,
+                        }
+                      - $type: HorizontalStack
+                        $if: $sources.recent.lastRunAt
+                        gap: gap-2
+                        items:
+                            - { $type: Tag, label: Last run }
+                            - { $type: RelativeDate, date: $sources.recent.lastRunAt }
+
+          rate:
+              label: Success bar
+              hint: 'One bar: share of completed runs among the last 20 finished ones (green from 90 percent, red under 60), with the exact count.'
+              view:
+                  $type: Progress
+                  label: Last 20 runs
+                  value: $sources.recent.rateValue
+                  max: $sources.recent.rateMax
+                  variant: $sources.recent.rateVariant
+                  valueLabel: $sources.recent.rateLabel
+                  showValue: true
+
+          big:
+              label: Big number
+              hint: 'A single big number: the runs that failed in the last 24 hours, with how many runs started in that time.'
+              view:
+                  $type: VerticalStack
+                  gap: gap-1.5
+                  items:
+                      - { $type: StatTile, label: Failed in the last 24h, value: $sources.recent.failures24h }
+                      # In a row so the pill keeps the width of its text instead of stretching to the card.
+                      - $type: HorizontalStack
+                        items:
+                            - { $type: Badge, label: $sources.recent.runs24hLabel, variant: default, tone: subtle }
+
+    # Dimension 2: history at a glance.
+    - $type: AbTest
+      id: flow-widget-trend
+      label: Trend
+      initial: none
+      variants:
+          none:
+              label: None
+              hint: 'No history, the card stays short.'
+              view: { $type: VerticalStack, items: [] }
+
+          bars:
+              label: Daily bars
+              hint: 'Runs of the last 7 days, one green (completed) and one red (failed) bar per day. Hover a bar for the date.'
+              view:
+                  $type: Chart
+                  data: $sources.recent.daily
+                  xAxisKey: dayStart
+                  xAxisType: time
+                  xFormat: date
+                  yFormat: number
+                  variant: sparkline
+                  height: 90
+                  series:
+                      - { key: completed, name: completed, color: 'var(--color-success)', type: bar, yAxisId: left }
+                      - { key: failed, name: failed, color: 'var(--color-danger)', type: bar, yAxisId: left }
+
+          daily-rate:
+              label: Daily rate
+              hint: 'One green bar per day for the last 7 days: its height is the success rate of that day (a day without finished run has no bar).'
+              view:
+                  $type: Chart
+                  data: $sources.recent.daily
+                  xAxisKey: dayStart
+                  xAxisType: time
+                  xFormat: date
+                  yFormat: number
+                  yUnit: '%'
+                  variant: sparkline
+                  height: 80
+                  series:
+                      - { key: successRate, name: success, color: 'var(--color-success)', type: bar, yAxisId: left }
+
+          delta:
+              label: Week delta
+              hint: 'Success rate of the last 7 days with an arrow against the 7 days before (no arrow when there is nothing to compare).'
+              view:
+                  $type: StatTile
+                  label: Success rate, 7 days
+                  value: $sources.recent.weekRateValue
+                  trend: $sources.recent.weekTrend
+
+    # Dimension 3: what to list.
+    - $type: AbTest
+      id: flow-widget-recent
+      label: Recent
+      initial: none
+      variants:
+          none:
+              label: None
+              hint: 'No list, the card stays short.'
+              view: { $type: VerticalStack, items: [] }
+
+          latest:
+              label: Latest runs
+              hint: 'The 5 newest runs, one per row: status badge and flow name (cut to 12 characters; the start time does not fit 240px). A row opens the run.'
+              view:
+                  $type: DataTable
+                  rows: $sources.recent.latest
                   navigateTo: '/modules/flow/executions/{executionId}'
                   emptyMessage: No execution yet
                   columns:
@@ -78,6 +171,122 @@ variants:
                         label: Status
                         nowrap: true
                         badge: { ok: success, FAILED: danger, running: info, waiting: default, retry: warning }
-                      - { key: 'flowId', label: 'Flow', truncate: true }
-                      - { key: 'startedAt', label: 'Started', format: datetime, muted: true }
-                - *viewAll
+                      - { key: 'flowLabel', label: 'Flow', truncate: true }
+
+          failures:
+              label: Failures
+              hint: 'Only the 5 newest failed runs, one column: flow name and the start of the first error line. A row opens the run.'
+              view:
+                  $type: DataTable
+                  rows: $sources.recent.failures
+                  navigateTo: '/modules/flow/executions/{executionId}'
+                  emptyMessage: No failure yet
+                  columns:
+                      - { key: 'summary', label: 'Failure', truncate: true }
+
+          active:
+              label: Running now
+              hint: 'Runs in progress or waiting (no status column, it does not fit 240px), with the time elapsed since they started. A row opens the run.'
+              view:
+                  $type: DataTable
+                  rows: $sources.recent.active
+                  navigateTo: '/modules/flow/executions/{executionId}'
+                  emptyMessage: Nothing running
+                  columns:
+                      - { key: 'flowLabel', label: 'Flow', truncate: true }
+                      - { key: 'elapsed', label: 'Elapsed', nowrap: true, muted: true }
+
+          flows:
+              label: Per flow
+              hint: 'The 5 flows that ran last, with their number of runs and failures. A row lists the runs of the flow.'
+              view:
+                  $type: DataTable
+                  rows: $sources.recent.flows
+                  navigateTo: '/modules/flow/executions?flow={flowId}'
+                  emptyMessage: No execution yet
+                  columns:
+                      - { key: 'flowLabel', label: 'Flow', truncate: true }
+                      - { key: 'runs', label: 'Runs', nowrap: true }
+                      - { key: 'failed', label: 'Failed', nowrap: true }
+
+    # Dimension 4: footer and navigation.
+    - $type: AbTest
+      id: flow-widget-actions
+      label: Actions
+      initial: link
+      variants:
+          link:
+              label: One link
+              hint: 'Baseline. A single View all N executions link.'
+              view: &viewAll { $type: Link, label: $sources.recent.viewAllLabel, href: /modules/flow/executions }
+
+          buttons:
+              label: Buttons row
+              hint: 'Three small buttons: the runs, the workers and the flow charts (the charts need the flow-chart module).'
+              view:
+                  $type: HorizontalStack
+                  gap: gap-1.5
+                  items:
+                      - { $type: ButtonLink, to: /modules/flow/executions, label: Runs, variant: secondary, size: sm }
+                      - { $type: ButtonLink, to: /modules/flow/workers, label: Workers, variant: secondary, size: sm }
+                      - {
+                            $type: ButtonLink,
+                            to: /modules/flow-chart/flows,
+                            label: Charts,
+                            variant: secondary,
+                            size: sm,
+                        }
+
+          status:
+              label: Daemon status
+              hint: 'Is the daemon running and how many workers are connected, with the hint to act on (a link to Workers), then the all-executions link.'
+              view:
+                  $type: VerticalStack
+                  gap: gap-1.5
+                  items:
+                      - $type: HorizontalStack
+                        gap: gap-1.5
+                        items:
+                            - {
+                                  $type: Badge,
+                                  label: $sources.daemon.daemonLabel,
+                                  variant: $sources.daemon.daemonVariant,
+                                  tone: subtle,
+                              }
+                            - {
+                                  $type: Badge,
+                                  label: $sources.daemon.workersLabel,
+                                  variant: $sources.daemon.workersVariant,
+                                  tone: subtle,
+                              }
+                      - { $type: Link, label: $sources.daemon.hint, href: /modules/flow/workers, variant: muted }
+                      - *viewAll
+
+          latest-failure:
+              label: Latest failure
+              hint: 'A button to the chart of the newest failed run (flow-chart module) and when it started; a reassuring badge when nothing failed.'
+              view:
+                  $type: VerticalStack
+                  gap: gap-1.5
+                  items:
+                      - {
+                            $type: ButtonLink,
+                            $if: $sources.recent.hasLatestFailure,
+                            to: $sources.recent.latestFailureChartPath,
+                            label: Latest failure chart,
+                            variant: danger-outline,
+                            size: sm,
+                        }
+                      - {
+                            $type: RelativeDate,
+                            $if: $sources.recent.hasLatestFailure,
+                            date: $sources.recent.latestFailureAt,
+                        }
+                      - {
+                            $type: Badge,
+                            $if: $sources.recent.hasNoLatestFailure,
+                            label: No failure yet,
+                            variant: success,
+                            tone: subtle,
+                        }
+                      - *viewAll

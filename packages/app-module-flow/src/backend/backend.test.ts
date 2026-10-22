@@ -31,6 +31,7 @@ describe('backend entry', () => {
 			'GET /logs',
 			'GET /plugins',
 			'GET /plugins/:id',
+			'GET /widgets/daemon',
 			'GET /widgets/executions',
 			'GET /workers',
 		]);

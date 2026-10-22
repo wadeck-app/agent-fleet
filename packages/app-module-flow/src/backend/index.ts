@@ -3,6 +3,7 @@ import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
 import { BUILTIN_PLUGIN_CATALOG, FLOW_CONFIG_DIR_NAME, FlowQueryService } from 'flow-core';
 
+import { registerDaemonWidgetRoutes } from './DaemonWidgetRoutes.js';
 import { registerExecutionRoutes } from './ExecutionRoutes.js';
 import { registerExecutionWidgetRoutes } from './ExecutionWidgetRoutes.js';
 import { registerLogRoutes } from './LogRoutes.js';
@@ -20,6 +21,7 @@ export default function (ctx: ModuleContext): void {
 
 	registerExecutionRoutes(ctx, service);
 	registerExecutionWidgetRoutes(ctx, service);
+	registerDaemonWidgetRoutes(ctx, service);
 	registerWorkerRoutes(ctx, service);
 	registerLogRoutes(ctx, service);
 	registerPluginRoutes(ctx, service);

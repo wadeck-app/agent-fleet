@@ -20,21 +20,26 @@ Column options used (dsl-ui >= 122, older shells keep `key` and `label` only): `
 
 ## Design variants (A/B)
 
-Three views declare design alternatives with the dsl-ui `AbTest` node, to compare them in the real pages:
+Three views declare design alternatives with the dsl-ui `AbTest` node, to compare them in the real pages. The widget is four independent experiments (dimensions) stacked in one card; each has its own dock row, so any combination can be tried:
 
-| View                         | id                       | Variants (first = `initial`)            |
-| ---------------------------- | ------------------------ | --------------------------------------- |
-| `executions-widget.yaml`     | `flow-widget-design`     | `list`, `tiles`, `compact`              |
-| `executions-page.yaml`       | `flow-executions-design` | `table`, `filters-first`, `flows-aside` |
-| `execution-detail-page.yaml` | `flow-execution-design`  | `steps-table`, `summary-first`          |
+| View                         | id                       | Variants (first = `initial`)                    |
+| ---------------------------- | ------------------------ | ----------------------------------------------- |
+| `executions-widget.yaml`     | `flow-widget-summary`    | `tiles`, `banner`, `rate`, `big`                |
+| `executions-widget.yaml`     | `flow-widget-trend`      | `none`, `bars`, `daily-rate`, `delta`           |
+| `executions-widget.yaml`     | `flow-widget-recent`     | `none`, `latest`, `failures`, `active`, `flows` |
+| `executions-widget.yaml`     | `flow-widget-actions`    | `link`, `buttons`, `status`, `latest-failure`   |
+| `executions-page.yaml`       | `flow-executions-design` | `table`, `filters-first`, `flows-aside`         |
+| `execution-detail-page.yaml` | `flow-execution-design`  | `steps-table`, `summary-first`                  |
 
 - Pick one in the A/B dock of a development shell, or force it for one page load with `?ab.<id>=<variant>`. The dock keeps the choice in `localStorage` key `ab.<id>`.
 - Production shells and shells with the dock disabled render `initial`.
 - Needs a shell with dsl-ui >= 2026.10.19-110. An older shell shows "Unknown component type: AbTest" for these three views. The manifest declares no `dslLib` range for it (that would require a `src/dsl-components` entry), so app-core does not refuse the module on an old shell.
+- Widget: force a combination with `?ab.flow-widget-summary=banner&ab.flow-widget-trend=bars`. Defaults are `tiles`, `none`, `none`, `link`.
+- Widget data: `recent` source (`GET /widgets/executions`, flow-core `RunDigest` flattened in `ExecutionWidgetBody.ts`) feeds every dimension; `daemon` source (`GET /widgets/daemon`) feeds only `actions=status`. `latest-failure` and `buttons` link to the flow-chart module pages, which exist only if that module is installed.
 - Keep ids and variant keys stable: renaming one drops the choice stored in browsers. `views.test.ts` pins them.
-- Backend fields only some variants read: `lastRun` and `compact` (widget route), `statusFiltersCounted` and `statusCounts` (executions route), `stepsSummary`, `retryCount` and `errorSummary` (detail route).
+- Backend fields only some variants read: every widget field except `viewAllLabel` (see `$sources.recent.*` in the view), `statusFiltersCounted` and `statusCounts` (executions route), `stepsSummary`, `retryCount` and `errorSummary` (detail route).
 
-To remove the experiment once a variant is chosen: replace the `AbTest` node by the `view` of the chosen variant (for the widget, make it the document root and keep `$sources`), delete the other variants, then resolve the YAML anchors (`&name` defined in one variant, `*name` used in others) by inlining them, and remove the backend fields no remaining view reads. Update `EXPECTED` in `views.test.ts`.
+To keep one variant of a widget dimension: replace that `AbTest` node by the `view` of the chosen variant (or by nothing for `none`); the other dimensions stay. To remove an experiment once a variant is chosen: replace the `AbTest` node by the `view` of the chosen variant (for the widget, make it the document root and keep `$sources`), delete the other variants, then resolve the YAML anchors (`&name` defined in one variant, `*name` used in others) by inlining them, and remove the backend fields no remaining view reads. Update `EXPECTED` in `views.test.ts`.
 
 ```
 npm test            # builds flow-core first

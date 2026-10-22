@@ -10,6 +10,7 @@ import {
 } from '../history/ExecutionLoader.js';
 import { type FlowSummary, summarizeFlows } from '../history/FlowSummaries.js';
 import { buildHistoryTable } from '../history/HistoryTable.js';
+import { type RunDigest, buildRunDigest } from '../history/RunDigest.js';
 import { type StatusCounts, countByStatus } from '../history/StatusCounts.js';
 import { type LogReadResult, type ReadLogsOptions, readLogs } from '../logs/LogReader.js';
 import {
@@ -132,6 +133,11 @@ export class FlowQueryService {
 	/** Executions per status and in total (one read of the executions), for one flow when `flow` is given. */
 	countByStatus(flow?: string): StatusCounts {
 		return countByStatus(loadExecutionReport(this.directories.executionsDir).executions, flow);
+	}
+
+	/** Counts, health, trends and short lists of the runs for a dashboard card (one read of the executions, at the service clock). */
+	digestRuns(): RunDigest {
+		return buildRunDigest(loadExecutionReport(this.directories.executionsDir).executions, this.now());
 	}
 
 	/** The text `flow history` prints (table, or detail view when `filter.id` is set). */

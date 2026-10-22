@@ -1,6 +1,6 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
-import { DEFAULT_HISTORY_LIMIT, statusTag } from 'flow-core';
-import { FlowConfigFixture, collectRoutes } from 'flow-core/testing';
+import { DEFAULT_HISTORY_LIMIT, FLOW_CHART_INDEX_PATH, buildRunDigest, statusTag, summarizeDaemon } from 'flow-core';
+import { FlowConfigFixture, collectRoutes, makeExec } from 'flow-core/testing';
 import { load } from 'js-yaml';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { toWidgetBody } from './ExecutionWidgetBody.js';
 import backend from './index.js';
 
 const configDirectory = vi.hoisted(() => ({ get: vi.fn<(appName: string) => string>() }));
@@ -113,17 +114,23 @@ function initialView(file: string): Record<string, unknown> {
 	return resolveVariants(parseView(file).document, abTest => String(abTest['initial'])) as Record<string, unknown>;
 }
 
-/** One document per variant of the file's AbTest (the module declares at most one per view), or the view itself. */
+/**
+ * One document per variant of each AbTest of the file, the other AbTests staying on their `initial` variant (the
+ * combinations a dock lets you pick one dimension at a time), or the view itself without AbTest. With several AbTests
+ * the variant is named '<id>=<key>'.
+ */
 function alternativesOf(file: string): Alternative[] {
 	const { document } = parseView(file);
 	const abTests = collectNodes(document, 'AbTest');
 	if (abTests.length === 0) return [{ variant: undefined, document }];
-	if (abTests.length > 1)
-		throw new Error(`${file} declares ${abTests.length} AbTest nodes: alternativesOf handles one.`);
-	return Object.keys(abTests[0]!['variants'] as object).map(variant => ({
-		variant,
-		document: resolveVariants(document, () => variant) as Record<string, unknown>,
-	}));
+	return abTests.flatMap(abTest =>
+		Object.keys(abTest['variants'] as object).map(variant => ({
+			variant: abTests.length === 1 ? variant : `${String(abTest['id'])}=${variant}`,
+			document: resolveVariants(document, candidate =>
+				candidate === abTest ? variant : String(candidate['initial'])
+			) as Record<string, unknown>,
+		}))
+	);
 }
 
 const viewFiles = readdirSync(viewsDir).filter(file => /\.ya?ml$/.test(file));
@@ -503,42 +510,170 @@ describe('extension slots', () => {
 describe('dashboard widget', () => {
 	const widgetPoint = manifest.extensionPoints.find(point => point.kind === 'widget' && point.slot === 'dashboard');
 	const widgetFile = widgetPoint!.view.value.replace('./src/dsl-views/', '');
+	const DAEMON_SOURCE = `GET ${MODULE_API_PREFIX}/widgets/daemon`;
 
-	it('reads the single precomputed widget route', () => {
+	// What the two widget routes send for a state where every list has rows (a failed, a running and a finished run).
+	const NOW = Date.parse('2026-10-22T12:00:00.000Z');
+	const runs = [
+		makeExec({
+			executionId: 'live',
+			flowId: 'lint',
+			status: 'running',
+			completedAt: null,
+			startedAt: '2026-10-22T11:50:00.000Z',
+		}),
+		makeExec({ executionId: 'bad', status: 'failed', lastError: 'boom', startedAt: '2026-10-22T11:00:00.000Z' }),
+		makeExec({ executionId: 'good', startedAt: '2026-10-22T10:00:00.000Z' }),
+	];
+	const recentBody = toWidgetBody(buildRunDigest(runs, NOW)) as Record<string, unknown>;
+	const daemonBody = summarizeDaemon({
+		workers: [],
+		daemon: { running: false, reason: 'Daemon is not running' },
+	}) as unknown as Record<string, unknown>;
+	const bodies: Record<string, Record<string, unknown>> = { recent: recentBody, daemon: daemonBody };
+
+	const widgetAlternatives = alternativesOf(widgetFile);
+
+	/** Value at `a.b.c` of the body of a source; `found: false` when a key on the way is missing (null values do exist). */
+	function readSource(reference: string): { found: boolean; value: unknown } {
+		const [source, ...path] = reference.replace('$sources.', '').split('.');
+		let current: unknown = bodies[source!];
+		for (const key of path) {
+			if (current === null || typeof current !== 'object' || !(key in current))
+				return { found: false, value: undefined };
+			current = (current as Record<string, unknown>)[key];
+		}
+		return { found: current !== undefined, value: current };
+	}
+
+	it('reads the executions digest and the daemon summary, nothing else', () => {
 		expect(widgetPoint, 'manifest.json declares no dashboard widget').toBeDefined();
 		expect(sourcesOf(parseView(widgetFile)).map(source => source.spec.url)).toEqual([
 			`GET ${MODULE_API_PREFIX}/widgets/executions`,
+			DAEMON_SOURCE,
 		]);
 	});
 
-	it('links every variant to the executions page, and rows to the detail page', () => {
-		for (const { variant, document } of alternativesOf(widgetFile)) {
-			expect(collectStrings(document, 'href'), String(variant)).toEqual([`${MODULE_PAGE_PREFIX}/executions`]);
+	it('offers every variant of every dimension on its own, the other dimensions staying on their initial one', () => {
+		expect(widgetAlternatives.map(alternative => alternative.variant)).toEqual([
+			'flow-widget-summary=tiles',
+			'flow-widget-summary=banner',
+			'flow-widget-summary=rate',
+			'flow-widget-summary=big',
+			'flow-widget-trend=none',
+			'flow-widget-trend=bars',
+			'flow-widget-trend=daily-rate',
+			'flow-widget-trend=delta',
+			'flow-widget-recent=none',
+			'flow-widget-recent=latest',
+			'flow-widget-recent=failures',
+			'flow-widget-recent=active',
+			'flow-widget-recent=flows',
+			'flow-widget-actions=link',
+			'flow-widget-actions=buttons',
+			'flow-widget-actions=status',
+			'flow-widget-actions=latest-failure',
+		]);
+	});
+
+	it('links only to pages that exist: the executions list, a run, the runs of a flow, the workers, the flow charts', () => {
+		const targets = new Set([
+			`${MODULE_PAGE_PREFIX}/executions`,
+			`${MODULE_PAGE_PREFIX}/workers`,
+			FLOW_CHART_INDEX_PATH,
+			'$sources.recent.latestFailureChartPath',
+		]);
+		for (const { variant, document } of widgetAlternatives) {
+			for (const target of [...collectStrings(document, 'href'), ...collectStrings(document, 'to')]) {
+				expect(targets, `${String(variant)}: ${target}`).toContain(target);
+			}
 			for (const target of collectStrings(document, 'navigateTo')) {
-				expect(target, String(variant)).toBe(`${MODULE_PAGE_PREFIX}/executions/{executionId}`);
+				expect(
+					[
+						`${MODULE_PAGE_PREFIX}/executions/{executionId}`,
+						`${MODULE_PAGE_PREFIX}/executions?flow={flowId}`,
+					],
+					String(variant)
+				).toContain(target);
 			}
 		}
 	});
 
-	// Fields of one row of the widget route: `title` for the list variant, the rest for the dense table.
-	const ROW_FIELDS = ['title', 'statusLabel', 'flowId', 'startedAt'];
-
-	it('shows only columns the widget route sends (a typo would render empty cells)', () => {
-		for (const { variant, document } of alternativesOf(widgetFile)) {
-			const columns = collectNodes(document, 'DataTable').flatMap(table => table['columns'] as { key: string }[]);
-			for (const column of columns) expect(ROW_FIELDS, `${String(variant)}: ${column.key}`).toContain(column.key);
+	it('reads only fields the routes send, with the data a busy install produces (a typo would render empty)', () => {
+		for (const { variant, document } of widgetAlternatives) {
+			const references = JSON.stringify(document).match(/\$sources\.\w+\.\w+/g) ?? [];
+			for (const reference of references) {
+				expect(readSource(reference).found, `${String(variant)}: ${reference}`).toBe(true);
+			}
 		}
 	});
 
-	it('shows the current design first: the precomputed title and the shell-formatted start time', () => {
-		const columns = collectNodes(initialView(widgetFile), 'DataTable').flatMap(
-			table => table['columns'] as { key: string }[]
-		);
-		expect(columns.map(column => column.key)).toEqual(['title', 'startedAt']);
+	it('shows columns every row of the table has', () => {
+		for (const { variant, document } of widgetAlternatives) {
+			for (const table of collectNodes(document, 'DataTable')) {
+				const rows = readSource(String(table['rows'])).value as Record<string, unknown>[];
+				expect(rows.length, `${String(variant)}: ${String(table['rows'])} has no row to check`).toBeGreaterThan(
+					0
+				);
+				for (const column of table['columns'] as { key: string }[]) {
+					expect(Object.keys(rows[0]!), `${String(variant)}: ${column.key}`).toContain(column.key);
+				}
+			}
+		}
+	});
+
+	it('hides nodes with `$if` on a boolean or a nullable field the routes send', () => {
+		for (const { variant, document } of widgetAlternatives) {
+			const guards: string[] = [];
+			(function walk(node: unknown): void {
+				if (Array.isArray(node)) return node.forEach(walk);
+				if (node === null || typeof node !== 'object') return;
+				const record = node as Record<string, unknown>;
+				if (typeof record['$if'] === 'string') guards.push(record['$if']);
+				Object.values(record).forEach(walk);
+			})(document);
+			for (const guard of guards) {
+				expect(readSource(guard).found, `${String(variant)}: $if ${guard}`).toBe(true);
+			}
+		}
+	});
+
+	it('gives every table an empty message and a column that cannot break mid-word (nowrap or truncate)', () => {
+		for (const { variant, document } of widgetAlternatives) {
+			for (const table of collectNodes(document, 'DataTable')) {
+				expect(table['emptyMessage'], `${String(variant)}: ${String(table['rows'])}`).toEqual(
+					expect.any(String)
+				);
+				for (const column of table['columns'] as Record<string, unknown>[]) {
+					expect(
+						column['nowrap'] === true || column['truncate'] === true,
+						`${String(variant)}: column ${String(column['key'])} wraps`
+					).toBe(true);
+				}
+			}
+		}
+	});
+
+	it('draws charts as sparklines with a height, so they stay small in a narrow card', () => {
+		const charts = widgetAlternatives.flatMap(({ document }) => collectNodes(document, 'Chart'));
+		expect(charts.length).toBeGreaterThanOrEqual(2);
+		for (const chart of charts) {
+			expect(chart).toMatchObject({ variant: 'sparkline', xAxisType: 'time', xFormat: 'date' });
+			expect(chart['height'], 'chart height').toBeLessThanOrEqual(120);
+			expect(readSource(String(chart['data'])).value).toBeInstanceOf(Array);
+		}
+	});
+
+	it('shows the current design by default: the tiles, the link, no trend and no list', () => {
+		const initial = initialView(widgetFile);
+		expect(collectNodes(initial, 'StatTile').map(tile => tile['label'])).toEqual(['Running', 'Failed', 'Total']);
+		expect(collectNodes(initial, 'Link').map(link => link['label'])).toEqual(['$sources.recent.viewAllLabel']);
+		expect(collectNodes(initial, 'Chart')).toEqual([]);
+		expect(collectNodes(initial, 'DataTable').map(table => table['rows'])).toEqual(['$sources.recent.lastRun']);
 	});
 
 	it('shows the start time of the last run as a datetime in the tiles variant, with an empty message when nothing ran', () => {
-		const tiles = alternativesOf(widgetFile).find(alternative => alternative.variant === 'tiles')!;
+		const tiles = widgetAlternatives.find(alternative => alternative.variant === 'flow-widget-summary=tiles')!;
 		const lastRun = collectNodes(tiles.document, 'DataTable').filter(
 			table => table['rows'] === '$sources.recent.lastRun'
 		);
@@ -549,36 +684,40 @@ describe('dashboard widget', () => {
 		});
 	});
 
-	it('reads only widget fields the route sends', () => {
-		const sent = ['total', 'running', 'failed', 'lastRun', 'viewAllLabel', 'items', 'compact'];
-		for (const { variant, document } of alternativesOf(widgetFile)) {
-			const used = JSON.stringify(document).match(/\$sources\.recent\.\w+/g) ?? [];
-			for (const reference of used) {
-				expect(sent, `${String(variant)}: ${reference}`).toContain(reference.split('.')[2]);
+	it('shows times with the shell (a datetime column or a RelativeDate node), never as text', () => {
+		for (const { variant, document } of widgetAlternatives) {
+			for (const date of collectNodes(document, 'RelativeDate')) {
+				expect(date['date'], String(variant)).toMatch(/^\$sources\.recent\.\w+At$/);
 			}
 		}
+	});
+
+	it('sends booleans, not lists, to `$if` (an empty list is truthy)', () => {
+		expect(recentBody['hasLatestFailure']).toBe(true);
+		expect(recentBody['hasNoLatestFailure']).toBe(false);
 	});
 });
 
 describe('A/B variants (AbTest)', () => {
 	// The views declare their design alternatives; the shell's dock picks one. Ids and variant keys are the contract
 	// of the README: renaming one drops the choice a user stored in the browser.
-	const EXPECTED: Record<string, { id: string; initial: string; variants: string[] }> = {
-		'executions-widget.yaml': {
-			id: 'flow-widget-design',
-			initial: 'list',
-			variants: ['list', 'tiles', 'compact'],
-		},
-		'executions-page.yaml': {
-			id: 'flow-executions-design',
-			initial: 'table',
-			variants: ['table', 'filters-first', 'flows-aside'],
-		},
-		'execution-detail-page.yaml': {
-			id: 'flow-execution-design',
-			initial: 'steps-table',
-			variants: ['steps-table', 'summary-first'],
-		},
+	const EXPECTED: Record<string, { id: string; initial: string; variants: string[] }[]> = {
+		'executions-widget.yaml': [
+			{ id: 'flow-widget-summary', initial: 'tiles', variants: ['tiles', 'banner', 'rate', 'big'] },
+			{ id: 'flow-widget-trend', initial: 'none', variants: ['none', 'bars', 'daily-rate', 'delta'] },
+			{
+				id: 'flow-widget-recent',
+				initial: 'none',
+				variants: ['none', 'latest', 'failures', 'active', 'flows'],
+			},
+			{ id: 'flow-widget-actions', initial: 'link', variants: ['link', 'buttons', 'status', 'latest-failure'] },
+		],
+		'executions-page.yaml': [
+			{ id: 'flow-executions-design', initial: 'table', variants: ['table', 'filters-first', 'flows-aside'] },
+		],
+		'execution-detail-page.yaml': [
+			{ id: 'flow-execution-design', initial: 'steps-table', variants: ['steps-table', 'summary-first'] },
+		],
 	};
 	const ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
@@ -586,7 +725,7 @@ describe('A/B variants (AbTest)', () => {
 		collectNodes(parseView(file).document, 'AbTest').map(test => ({ file, test }))
 	);
 
-	it('declares exactly the experiments of the README, one per view', () => {
+	it('declares exactly the experiments of the README', () => {
 		const found: Record<string, unknown[]> = {};
 		for (const { file, test } of tests) {
 			found[file] = [
@@ -594,7 +733,7 @@ describe('A/B variants (AbTest)', () => {
 				{ id: test['id'], initial: test['initial'], variants: Object.keys(test['variants'] as object) },
 			];
 		}
-		expect(found).toEqual(Object.fromEntries(Object.entries(EXPECTED).map(([file, test]) => [file, [test]])));
+		expect(found).toEqual(EXPECTED);
 	});
 
 	it('has a valid id (letters, digits, _ and -), unique across the module', () => {

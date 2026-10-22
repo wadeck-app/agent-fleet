@@ -6,6 +6,7 @@ export { FlowCoreError, InvalidQueryError, errorMessage } from './errors.js';
 
 export { FLOW_APP_MODULE_ID, FLOW_CHART_APP_MODULE_ID } from './appModule/AppModuleIds.js';
 export { FLOW_EXPOSED_SLOTS, FLOW_PAGE_PATHS } from './appModule/FlowModuleContract.js';
+export { FLOW_CHART_INDEX_PATH, chartPathOfExecution } from './appModule/FlowChartPaths.js';
 export { FLOW_CONFIG_DIR_NAME, executionsDirOf, logsDirOf } from './config/FlowConfigLayout.js';
 export {
 	EXECUTION_ID_LENGTH,
@@ -22,6 +23,12 @@ export type { ExecutionFilterOptions, FilteredExecutions } from './history/Execu
 export { countByStatus } from './history/StatusCounts.js';
 export type { StatusCounts } from './history/StatusCounts.js';
 export { summarizeFlows } from './history/FlowSummaries.js';
+export { describeFlowHealth } from './history/HealthBanner.js';
+export type { HealthBanner, HealthBannerVariant } from './history/HealthBanner.js';
+export { DIGEST_DAYS, DIGEST_ROWS, DIGEST_WINDOW, buildRunDigest } from './history/RunDigest.js';
+export type { RunDigest } from './history/RunDigest.js';
+export type { ActiveRunRow, FailureRow, FlowRow, LatestRunRow } from './history/RunRows.js';
+export type { DailyRunCount, SuccessTrend, SuccessWindow } from './history/RunTrend.js';
 export type { FlowSummary } from './history/FlowSummaries.js';
 export { formatDuration, formatModelCost, formatStarted } from './history/ExecutionFormat.js';
 export { describeSkippedExecutions, loadExecutionReport, loadExecutions } from './history/ExecutionLoader.js';
@@ -47,7 +54,9 @@ export {
 
 export { WorkerListError, describeRunningDaemon, formatWorkerLine, readWorkerList } from './worker/WorkerList.js';
 export type { WorkerListErrorKind, WorkerListSnapshot } from './worker/WorkerList.js';
-export { describeNoLiveWorkers } from './worker/WorkerListing.js';
+export { summarizeDaemon } from './worker/DaemonDigest.js';
+export type { DaemonDigest, DaemonDigestVariant } from './worker/DaemonDigest.js';
+export { START_DAEMON_ADVICE, describeNoLiveWorkers } from './worker/WorkerListing.js';
 export type { DaemonStatus } from './worker/WorkerListing.js';
 export {
 	RELAY_PROVIDER,
