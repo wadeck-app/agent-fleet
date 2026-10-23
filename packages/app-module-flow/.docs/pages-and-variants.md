@@ -17,7 +17,7 @@
 - `stepOptions` (record steps, then ids such as `__execution`) feeds the step select, which needs an `$if` on it (CompactSelect throws on undefined options while the route loads).
 - `recordedOutput`: error, stdout and stderr kept in the record for failed steps; it outlives the daily files.
 - The time column is `format: time` (no seconds: a dsl-ui limit).
-- Masking: the daemon writes secrets unmasked (`LogMasker` is not wired), so these lines, like `GET /logs`, are served as written.
+- Masking: these lines, like `GET /logs`, are served as stored (ANSI-stripped only). The daemon masks declared secrets at write time; older lines may hold secrets (see served-text.md).
 
 ## Times and table columns
 

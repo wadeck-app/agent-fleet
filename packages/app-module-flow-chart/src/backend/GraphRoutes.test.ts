@@ -86,6 +86,36 @@ describe('GET /graph', () => {
 		expect(result.graph.edges.map(e => e.kind)).toContain('loop');
 	});
 
+	it('serves the step texts without ANSI and as stored otherwise, with no redaction field', async () => {
+		const ESC = String.fromCharCode(27);
+		fixture.addExecution({
+			executionId: 'exec1',
+			flowId: 'build_task',
+			flowFile,
+			status: 'failed',
+			steps: {
+				test: {
+					status: 'failed',
+					error: `${ESC}[31mpush failed${ESC}[0m`,
+					stdout: `${ESC}[36mrunning${ESC}[0m\nPASSWORD=left-as-stored`,
+				},
+			},
+		});
+		const { body } = await callRoute(routes, 'GET /graph', { query: { executionId: 'exec1' } });
+		const result = body as {
+			graph: {
+				nodes: { id: string; meta?: { error?: string }; io?: { recorded: { stdout?: { text: string } } } }[];
+			};
+		};
+		const test = result.graph.nodes.find(n => n.id === 'test')!;
+
+		expect(JSON.stringify(body).includes(ESC)).toBe(false);
+		expect(test.meta?.error).toBe('push failed');
+		expect(test.io?.recorded.stdout?.text).toBe('running\nPASSWORD=left-as-stored');
+		expect(body).not.toHaveProperty('redactions');
+		expect(test.io?.recorded).not.toHaveProperty('redactions');
+	});
+
 	it('answers the definition alone for a flowId (no step state)', async () => {
 		fixture.addExecution({ executionId: 'exec1', flowId: 'build_task', flowFile });
 		const { status, body } = await callRoute(routes, 'GET /graph', { query: { flowId: 'build_task' } });

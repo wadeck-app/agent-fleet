@@ -1,4 +1,7 @@
 import { Command } from 'commander';
+import { SECRET_EXAMPLE_FLOW_YAML } from 'flow-engine/secrets/SecretFlowExample';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { registerShowCommand } from './ShowCommand';
@@ -129,5 +132,27 @@ describe('ShowCommand', () => {
 
 		const allOutput = consoleSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
 		expect(allOutput).toContain('haiku');
+	});
+});
+
+describe('ShowCommand: declared secrets', () => {
+	it('lists the secrets of a flow file with their users and never a value', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'show-secrets-'));
+		const file = path.join(dir, 'flow.yml');
+		fs.writeFileSync(file, SECRET_EXAMPLE_FLOW_YAML);
+		const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+		try {
+			const program = new Command();
+			program.exitOverride();
+			registerShowCommand(program, () => dir);
+			program.parse(['node', 'test', 'show', file]);
+			const out = log.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+			expect(out).toContain('secrets:');
+			expect(out).toContain('API_TOKEN');
+			expect(out).toContain('call-api');
+		} finally {
+			log.mockRestore();
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
 	});
 });

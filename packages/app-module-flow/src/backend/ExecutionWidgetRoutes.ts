@@ -1,5 +1,5 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
-import type { FlowQueryService } from 'flow-core';
+import { type FlowQueryService, stripErrorsForServing } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
 import { toWidgetBody } from './ExecutionWidgetBody.js';
@@ -13,7 +13,8 @@ export function registerExecutionWidgetRoutes(ctx: ModuleContext, service: FlowQ
 	ctx.registerRoute('GET', '/widgets/executions', (_req, reply) => {
 		try {
 			// Computed before reply.code(): a failure must not leave a 200 status set on the error answer.
-			const body = toWidgetBody(service.digestRuns());
+			// The error texts are served before the digest cuts them to one short line (ANSI stripped).
+			const body = toWidgetBody(service.digestRuns(stripErrorsForServing));
 			return reply.code(200).send(body);
 		} catch (err) {
 			return replyWithError(reply, err);

@@ -370,6 +370,10 @@ describe('execution logs page', () => {
 		expect(gated).toContain('"$if":"$sources.logs.hasRecordedOutput"');
 		expect(gated).toContain('"$if":"$sources.logs.hasNotice"');
 	});
+
+	it('shows no "values hidden" badge: the route serves what is stored', () => {
+		expect(JSON.stringify(parseView(file).document)).not.toMatch(/edactions/);
+	});
 });
 
 describe('no back link (the shell has a breadcrumb)', () => {
@@ -529,6 +533,13 @@ describe('executions page layout', () => {
 });
 
 describe('execution detail page', () => {
+	it.each(['steps-table', 'summary-first'])('shows no "values hidden" badge in the %s design', variant => {
+		const document = alternativesOf('execution-detail-page.yaml').find(
+			alternative => alternative.variant === variant
+		)!.document;
+		expect(JSON.stringify(document)).not.toMatch(/edactions/);
+	});
+
 	it('colours the status badge from the variant the route sends and lists display-ready step columns', () => {
 		const document = initialView('execution-detail-page.yaml');
 		const badges = collectNodes(document, 'Badge');

@@ -2,93 +2,107 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { SecretProvider, SecretResolutionError } from './SecretProvider';
+import { SecretSourceError, SecretTooShortError, SecretUnresolvedError } from './SecretErrors';
+import { SecretProvider } from './SecretProvider';
+
+// Built at runtime from parts: a literal would trip secret scanners on the source file.
+const GOOD = ['s3cr3t', '-valu', 'e-42'].join('');
 
 describe('SecretProvider', () => {
-	let tmpDir: string;
+	let workDir: string;
 
 	beforeEach(() => {
-		vi.restoreAllMocks();
+		workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'secret-provider-'));
 	});
 
-	afterAll(() => {
-		if (tmpDir) {
-			fs.rmSync(tmpDir, { recursive: true, force: true });
-		}
+	afterEach(() => {
+		fs.rmSync(workDir, { recursive: true, force: true });
 	});
 
 	describe('env:// scheme', () => {
-		it('returns a Secret with the env var value when the variable is set', () => {
-			process.env['TEST_SECRET_XYZ'] = 'myvalue';
-			try {
-				const provider = new SecretProvider('/tmp', {});
-				const secret = provider.resolve('env://TEST_SECRET_XYZ');
-				expect(secret.use()).toBe('myvalue');
-			} finally {
-				delete process.env['TEST_SECRET_XYZ'];
-			}
+		it('returns the value of the variable from the injected environment', () => {
+			const provider = new SecretProvider(workDir, { MY_VAR: GOOD });
+			expect(provider.resolve('TOKEN', 'env://MY_VAR').use()).toBe(GOOD);
 		});
 
-		it('throws SecretResolutionError containing the env var name when variable is not set', () => {
-			delete process.env['TEST_SECRET_MISSING_XYZ'];
-			const provider = new SecretProvider('/tmp', {});
-			expect(() => provider.resolve('env://TEST_SECRET_MISSING_XYZ')).toThrow(SecretResolutionError);
-			expect(() => provider.resolve('env://TEST_SECRET_MISSING_XYZ')).toThrow('TEST_SECRET_MISSING_XYZ');
+		it('fails with an actionable SecretUnresolvedError naming the secret, the variable and the daemon environment', () => {
+			const provider = new SecretProvider(workDir, {});
+			const attempt = (): unknown => provider.resolve('TOKEN', 'env://MY_VAR');
+			expect(attempt).toThrow(SecretUnresolvedError);
+			expect(attempt).toThrow(/'TOKEN'/);
+			expect(attempt).toThrow(/MY_VAR/);
+			expect(attempt).toThrow(/daemon/);
+			expect(attempt).toThrow(/file:\/\//);
+		});
+
+		it('treats an empty variable as unresolved: an empty secret is never injected', () => {
+			const provider = new SecretProvider(workDir, { MY_VAR: '' });
+			expect(() => provider.resolve('TOKEN', 'env://MY_VAR')).toThrow(SecretUnresolvedError);
+		});
+
+		it('refuses a value shorter than the minimum with SecretTooShortError, without echoing it', () => {
+			const provider = new SecretProvider(workDir, { MY_VAR: 'abc' });
+			const attempt = (): unknown => provider.resolve('TOKEN', 'env://MY_VAR');
+			expect(attempt).toThrow(SecretTooShortError);
+			expect(attempt).toThrow(/at least 8/);
+			expect(attempt).not.toThrow(/abc/);
 		});
 	});
 
 	describe('file:// scheme', () => {
-		it('reads file content from a relative path within the workspace', () => {
-			tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'secret-provider-'));
-			const secretFile = path.join(tmpDir, 'secret.txt');
-			fs.writeFileSync(secretFile, 's3cr3t-value', 'utf8');
-
-			const provider = new SecretProvider(tmpDir, {});
-			const secret = provider.resolve('file://./secret.txt');
-			expect(secret.use()).toBe('s3cr3t-value');
+		it('reads a relative file and trims exactly one trailing newline', () => {
+			fs.writeFileSync(path.join(workDir, 'secret.txt'), `${GOOD}\r\n`, 'utf8');
+			const provider = new SecretProvider(workDir, {});
+			expect(provider.resolve('TOKEN', 'file://./secret.txt').use()).toBe(GOOD);
 		});
 
-		it('throws SecretResolutionError for absolute file paths', () => {
-			const provider = new SecretProvider('/tmp', {});
-			expect(() => provider.resolve('file:///absolute-path/secret.txt')).toThrow(SecretResolutionError);
-			expect(() => provider.resolve('file:///absolute-path/secret.txt')).toThrow(/[Aa]bsolute/);
+		it('fails with SecretUnresolvedError naming the file when it does not exist', () => {
+			const provider = new SecretProvider(workDir, {});
+			const attempt = (): unknown => provider.resolve('TOKEN', 'file://./missing.txt');
+			expect(attempt).toThrow(SecretUnresolvedError);
+			expect(attempt).toThrow(/missing\.txt/);
 		});
 
-		it('throws SecretResolutionError on path traversal attempts', () => {
-			tmpDir = tmpDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'secret-provider-'));
-			const provider = new SecretProvider(tmpDir, {});
-			expect(() => provider.resolve('file://./traversal/../../etc/passwd')).toThrow(SecretResolutionError);
-			expect(() => provider.resolve('file://./traversal/../../etc/passwd')).toThrow(/[Tt]raversal/);
-		});
-	});
-
-	describe('input:// scheme', () => {
-		it('returns a Secret with the input value when the input is provided', () => {
-			const provider = new SecretProvider('/tmp', { myToken: 'abc123' });
-			const secret = provider.resolve('input://myToken');
-			expect(secret.use()).toBe('abc123');
+		it('fails with SecretUnresolvedError when the file is empty', () => {
+			fs.writeFileSync(path.join(workDir, 'empty.txt'), '\n', 'utf8');
+			const provider = new SecretProvider(workDir, {});
+			expect(() => provider.resolve('TOKEN', 'file://./empty.txt')).toThrow(SecretUnresolvedError);
 		});
 
-		it('throws SecretResolutionError when the input name is not provided', () => {
-			const provider = new SecretProvider('/tmp', {});
-			expect(() => provider.resolve('input://missingInput')).toThrow(SecretResolutionError);
-			expect(() => provider.resolve('input://missingInput')).toThrow('missingInput');
+		it('refuses absolute paths with SecretSourceError', () => {
+			const provider = new SecretProvider(workDir, {});
+			const attempt = (): unknown => provider.resolve('TOKEN', 'file:///absolute-path/secret.txt');
+			expect(attempt).toThrow(SecretSourceError);
+			expect(attempt).toThrow(/[Aa]bsolute/);
+		});
+
+		it('refuses path traversal with SecretSourceError', () => {
+			const provider = new SecretProvider(workDir, {});
+			const attempt = (): unknown => provider.resolve('TOKEN', 'file://./a/../../outside.txt');
+			expect(attempt).toThrow(SecretSourceError);
+			expect(attempt).toThrow(/[Tt]raversal/);
 		});
 	});
 
-	describe('value:// scheme', () => {
-		it('throws SecretResolutionError because value:// is forbidden in secrets', () => {
-			const provider = new SecretProvider('/tmp', {});
-			expect(() => provider.resolve('value://literal')).toThrow(SecretResolutionError);
-			expect(() => provider.resolve('value://literal')).toThrow(/value:\/\//);
+	describe('refused references', () => {
+		it.each([
+			['input://other', /input:\/\//],
+			['value://literal', /value:\/\//],
+			['ftp://foo', /[Uu]nsupported|[Uu]nknown/],
+			['literal-text', /env:\/\//],
+		])('%s is refused with a SecretSourceError that tells which references are accepted', (reference, expected) => {
+			const provider = new SecretProvider(workDir, {});
+			const attempt = (): unknown => provider.resolve('TOKEN', reference);
+			expect(attempt).toThrow(SecretSourceError);
+			expect(attempt).toThrow(expected);
+			expect(attempt).toThrow(/env:\/\/.*file:\/\//s);
 		});
-	});
 
-	describe('unknown schemes', () => {
-		it('throws SecretResolutionError for unrecognised URI schemes', () => {
-			const provider = new SecretProvider('/tmp', {});
-			expect(() => provider.resolve('ftp://foo')).toThrow(SecretResolutionError);
-			expect(() => provider.resolve('ftp://foo')).toThrow(/[Uu]nknown/);
+		it('never echoes a literal that was passed instead of a reference', () => {
+			const provider = new SecretProvider(workDir, {});
+			const attempt = (): unknown => provider.resolve('TOKEN', GOOD);
+			expect(attempt).toThrow(SecretSourceError);
+			expect(attempt).not.toThrow(new RegExp(GOOD));
 		});
 	});
 });

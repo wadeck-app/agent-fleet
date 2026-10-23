@@ -793,6 +793,12 @@ export interface ScriptFlowStep extends BaseFlowStep {
 	 * last command). Rejected by the validator on `shell: cmd|pwsh`.
 	 */
 	strict?: boolean;
+
+	/**
+	 * Names of `type: password` inputs this step receives as environment variables (env var NAME = secret value).
+	 * Only script steps may use secrets. Values are supplied by the executing worker and never logged.
+	 */
+	secrets?: string[];
 }
 
 /**

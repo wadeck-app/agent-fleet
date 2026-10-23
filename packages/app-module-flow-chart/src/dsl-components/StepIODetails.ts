@@ -35,6 +35,8 @@ function linkView(link: StepDataLink, labelOf: (stepId: string) => string): IOLi
 	};
 }
 
+// The label counts the CLEANED text (terminal control stripped, secrets hidden), as the route cuts after cleaning:
+// "last 2000 of 30880 characters" is 2000 of the 30880 characters the panel could show, not of the raw capture.
 function capturedTitle(stream: string, capped: CappedText): string {
 	return capped.truncated ? `${stream} (last ${capped.text.length} of ${capped.totalChars} characters)` : stream;
 }

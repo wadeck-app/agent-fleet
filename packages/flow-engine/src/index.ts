@@ -27,6 +27,8 @@ export type {
 } from './orchestration/FlowScheduler';
 export { RestartOnFirstFailure, WaitAll } from './orchestration/FlowScheduler.subStepStrategies';
 export { TemplateRenderer } from './processing/TemplateRenderer';
+export { SecretUsageAnalyzer } from './secrets/SecretUsageAnalyzer';
+export type { SecretDeclaration, SecretSourceKind } from './secrets/SecretUsageAnalyzer';
 export type { FlowDefinition, FlowPluginOverrides, FlowStep } from './types';
 export type { McpServer } from './processing/ModelProvider';
 export type { ModelProviderName } from './types';

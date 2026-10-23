@@ -157,7 +157,7 @@ export const FAILED_AT_TEST: ExecutionState = {
 			startedAt: '2026-08-16T12:03:10.000Z',
 			completedAt: '2026-08-16T12:04:00.000Z',
 			error: 'exit 1: 3 tests failed',
-			stdout: 'running tests\nGITHUB_TOKEN=ghp_abcdefghijklmnop1234\nFAIL a.test.ts',
+			stdout: 'running tests\nFAIL a.test.ts',
 			stderr: 'Error: 3 tests failed',
 			meta: { duration_ms: 50000, exit_code: 1 },
 		},

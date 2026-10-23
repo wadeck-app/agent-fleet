@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { VERSION } from '../cli/version';
-import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
+import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { WorkerReady } from '../ipc/Protocol';
 
 /** Longest gap between reconnection attempts, so a restarted daemon is found promptly. */
@@ -110,7 +110,9 @@ export function resolveWorkerToken(options: { token?: string; sourceId?: string 
  * environment, so the declared command can be plain `flow worker` with no ids to keep in sync.
  */
 export function resolveSourceId(fromFlag: string | undefined): string | undefined {
-	if (fromFlag !== undefined && fromFlag !== '') return fromFlag;
+	if (fromFlag !== undefined && fromFlag !== '') {
+		return fromFlag;
+	}
 	const fromEnv = process.env['FLOW_WORKER_SOURCE_ID'];
 	return fromEnv !== undefined && fromEnv !== '' ? fromEnv : undefined;
 }
@@ -122,9 +124,13 @@ export function resolveSourceId(fromFlag: string | undefined): string | undefine
  * to a project that does not exist.
  */
 export function resolveExtraProjects(fromFlags: string[] | undefined): string[] {
-	if (fromFlags !== undefined && fromFlags.length > 0) return fromFlags;
+	if (fromFlags !== undefined && fromFlags.length > 0) {
+		return fromFlags;
+	}
 	const fromEnv = process.env['FLOW_WORKER_PROJECTS'];
-	if (fromEnv === undefined || fromEnv.trim() === '') return [];
+	if (fromEnv === undefined || fromEnv.trim() === '') {
+		return [];
+	}
 	return fromEnv
 		.split(',')
 		.map(project => project.trim())
@@ -191,7 +197,9 @@ export function buildRegistration(params: {
 	// The launch project is always served; extras are additive and de-duplicated (D#9).
 	const attachedProjects = [params.projectRoot];
 	for (const project of params.extraProjects ?? []) {
-		if (!attachedProjects.includes(project)) attachedProjects.push(project);
+		if (!attachedProjects.includes(project)) {
+			attachedProjects.push(project);
+		}
 	}
 
 	return {
@@ -204,7 +212,7 @@ export function buildRegistration(params: {
 		labels: params.labels ?? [],
 		shellCapabilities: params.shellCapabilities ?? [],
 		// What this build implements beyond the base protocol; an older worker simply omits it
-		features: [WORKER_FEATURE_SUB_STEP_SESSION_RESUME],
+		features: [WORKER_FEATURE_SUB_STEP_SESSION_RESUME, WORKER_FEATURE_SECRETS],
 		attachedProjects,
 		// Only this process can see whether anybody can be reached from here (D#33, D#36) -- and a
 		// TTY alone is not the capability. Without an approval provider the worker would attract an

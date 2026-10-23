@@ -52,6 +52,15 @@ export interface ExecutionContext {
 	 */
 	subStepRelaunch?: { feedback: string };
 
+	/**
+	 * Values of the secrets THIS step uses (declared with `secrets:` or referenced as
+	 * `${{ inputs.NAME }}`), by input name. Set per assignment by the daemon, never on the shared
+	 * execution context, and absent for every other step. The worker must mask these exact values
+	 * in everything it sends back or prints (see `WORKER_FEATURE_SECRETS`); a worker that predates
+	 * the field is never given a step that needs it.
+	 */
+	secrets?: Record<string, string>;
+
 	/** Default working directory from the flow definition (FlowDefinition.workingDir). */
 	flowWorkingDir?: string;
 
@@ -68,6 +77,13 @@ export interface ExecutionContext {
  * parent's whole prompt, so the daemon names that in the execution log instead of staying silent.
  */
 export const WORKER_FEATURE_SUB_STEP_SESSION_RESUME = 'sub-step-session-resume';
+
+/**
+ * The worker receives `ExecutionContext.secrets`, injects them into the step and masks their exact
+ * values in what it reports. The daemon fails a step that needs secrets rather than dispatch it to
+ * a worker not declaring this: that worker would run the step with the variable missing.
+ */
+export const WORKER_FEATURE_SECRETS = 'secrets';
 
 export type ClientCommand =
 	| {

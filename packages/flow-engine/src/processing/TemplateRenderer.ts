@@ -33,6 +33,12 @@ export interface TemplateContext {
 	/** Input variables from the flow */
 	inputs: Record<string, any>;
 
+	/**
+	 * Values for the step's declared secrets (keyed by secret name), supplied by the executing worker.
+	 * Never logged.
+	 */
+	secrets?: Record<string, string>;
+
 	/** Outputs from completed steps (keyed by step ID) */
 	stepOutputs: Map<string, Record<string, any>>;
 

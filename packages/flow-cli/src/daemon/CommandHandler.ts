@@ -21,12 +21,15 @@ import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMes
 import type { WebSocket } from 'ws';
 
 import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
-import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
+import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
+import type { ExecutionSecrets } from '../secrets/ExecutionSecrets';
+import { SecretsResolutionFailedError } from '../secrets/SecretErrors';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { AssignmentLedger } from './AssignmentLedger.js';
 import { writeDaemonLog } from './DaemonLog.js';
+import { DaemonSecrets } from './DaemonSecrets.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
 import { assertStepLabels } from './LabelMatcher.js';
 import { StalledStepWatch } from './StalledStepWatch.js';
@@ -202,14 +205,21 @@ export class CommandHandler {
 		 * Generous by default: a model step can think for a long time without printing, and failing
 		 * honest work is worse than noticing a wedged one late.
 		 */
-		private readonly stalledStepLimitMs: number = DEFAULT_STEP_SILENCE_LIMIT_MS
+		private readonly stalledStepLimitMs: number = DEFAULT_STEP_SILENCE_LIMIT_MS,
+		/**
+		 * Resolves, hands out and masks the secrets the flows declare. The execution store and log
+		 * writer built here share its masks; ones injected by the caller must be built with the same
+		 * `ExecutionMasks` (the daemon does), or their output is not masked.
+		 */
+		private readonly daemonSecrets: DaemonSecrets = new DaemonSecrets()
 	) {
 		if (interactivityPolicy !== undefined) {
 			this.interactivityPolicy = interactivityPolicy;
 		}
 		this.stalledSteps = new StalledStepWatch(stalledStepLimitMs);
-		this.executionStore = executionStore ?? new ExecutionStore(executionsDirOf(daemonDir));
-		this.logWriter = logWriter ?? new LogWriter(logsDirOf(daemonDir));
+		this.executionStore =
+			executionStore ?? new ExecutionStore(executionsDirOf(daemonDir), undefined, daemonSecrets.masks);
+		this.logWriter = logWriter ?? new LogWriter(logsDirOf(daemonDir), undefined, daemonSecrets.masks);
 	}
 
 	dispatchHook(
@@ -399,8 +409,28 @@ export class CommandHandler {
 			}
 		}
 
+		// Declared secrets are resolved before an execution id, a workspace or a record exists:
+		// a secret that cannot be resolved must leave nothing behind and start no step.
+		let secrets: ExecutionSecrets;
+		try {
+			secrets = this.daemonSecrets.prepare(flow, cmd.inputs ?? {}, cmd.cwd);
+		} catch (err) {
+			if (!(err instanceof SecretsResolutionFailedError)) {
+				throw err;
+			}
+			// Messages name the input and the reference, never a value.
+			this.logWriter.writeExecution(
+				'__secrets',
+				`SECRET_RESOLUTION_FAILED: ${normalizeError(err).message}`,
+				'error'
+			);
+			return { type: 'error', code: 'SECRET_RESOLUTION_FAILED', message: normalizeError(err).message };
+		}
+
 		const flowId = cmd.flowId ?? flow.id;
 		const executionId = generateExecutionId();
+		// From here on every line written for this execution is masked.
+		this.daemonSecrets.activate(executionId, flow, secrets, cmd.cwd);
 
 		let workspaceDir: string;
 		let workspaceMetaDir: string;
@@ -511,7 +541,8 @@ export class CommandHandler {
 
 		const context: ExecutionContext = {
 			executionId,
-			inputs: cmd.inputs ?? {},
+			// Secret inputs (references) never travel with the ordinary inputs of every step.
+			inputs: secrets.publicInputs(cmd.inputs ?? {}),
 			stepOutputs: {},
 			stepMeta: {},
 			workspaceDir,
@@ -790,9 +821,12 @@ export class CommandHandler {
 	onStepCompleted(
 		executionId: string,
 		stepId: string,
-		output: Record<string, unknown>,
-		meta?: import('flow-engine/types').StepMeta
+		rawOutput: Record<string, unknown>,
+		rawMeta?: import('flow-engine/types').StepMeta
 	): void {
+		// What later steps, hooks and the scheduler see has the execution's secrets masked.
+		const output = this.daemonSecrets.masks.maskDeep(executionId, rawOutput);
+		const meta = this.daemonSecrets.masks.maskDeep(executionId, rawMeta);
 		const scheduler = this.schedulers.get(executionId);
 		if (!scheduler) {
 			process.stderr.write(
@@ -824,7 +858,9 @@ export class CommandHandler {
 	}
 
 	/** Called by Daemon when a worker reports step_failed. */
-	onStepFailed(executionId: string, stepId: string, error: string, outputs?: Record<string, unknown>): void {
+	onStepFailed(executionId: string, stepId: string, rawError: string, rawOutputs?: Record<string, unknown>): void {
+		const error = this.daemonSecrets.masks.mask(executionId, rawError);
+		const outputs = this.daemonSecrets.masks.maskDeep(executionId, rawOutputs);
 		const scheduler = this.schedulers.get(executionId);
 		if (!scheduler) {
 			process.stderr.write(
@@ -915,6 +951,17 @@ export class CommandHandler {
 			};
 		}
 
+		// Secrets are never persisted: the references are resolved again, so a rotated value is used.
+		// A reference that no longer resolves leaves the execution resumable, with the reason.
+		try {
+			this.daemonSecrets.resume(executionId);
+		} catch (err) {
+			if (!(err instanceof SecretsResolutionFailedError)) {
+				throw err;
+			}
+			return { type: 'error', code: 'SECRET_RESOLUTION_FAILED', message: normalizeError(err).message };
+		}
+
 		this.resumableInterventions.delete(executionId);
 		const readyItem = scheduler.resumeFailedStep(resumable.stepId);
 		this.executionStore.markExecutionResumed(executionId, resumable.stepId);
@@ -970,6 +1017,9 @@ export class CommandHandler {
 				// Non-in-flight existing step: treat as no-op (idempotent re-injection after loop reset)
 				continue;
 			}
+			// A step added while the flow runs was not scanned for secrets at start: refuse it
+			// rather than run it with an empty value.
+			this.daemonSecrets.assertInjectable(executionId, injected as unknown as FlowStep);
 			if (injected.parent !== undefined && !allKnownIds.has(injected.parent)) {
 				throw new Error(`Parent step '${injected.parent}' does not exist in execution ${executionId}`);
 			}
@@ -1058,10 +1108,22 @@ export class CommandHandler {
 				// the feedback. Decided per assignment from the scheduler: `subSteps` above is
 				// execution-wide and reaches unrelated steps, so it cannot tell which one this is.
 				const relaunchFeedback = scheduler?.getSubStepRelaunchFeedback(step.stepId);
-				const executionContext =
+				const stepSecrets = this.daemonSecrets.valuesForStep(step.executionContext.executionId, step.stepId);
+				if (stepSecrets !== undefined && !this.workerSupportsSecrets(idleWorker)) {
+					this.failStep(
+						step.executionContext.executionId,
+						step.stepId,
+						this.describeWorkerWithoutSecrets(step.stepId, Object.keys(stepSecrets), idleWorker)
+					);
+					continue;
+				}
+				const sessionContext =
 					relaunchFeedback === undefined
 						? step.executionContext
 						: { ...step.executionContext, subStepRelaunch: { feedback: relaunchFeedback } };
+				// Per assignment, never on the shared context: only the step that uses a secret gets it.
+				const executionContext =
+					stepSecrets === undefined ? sessionContext : { ...sessionContext, secrets: stepSecrets };
 				if (relaunchFeedback !== undefined) {
 					this.warnIfWorkerCannotResume(step, idleWorker);
 				}
@@ -1117,6 +1179,19 @@ export class CommandHandler {
 
 		this.readyQueue.unshift(...unplaced);
 		this.coverUnmetDemand(unplaced.length);
+	}
+
+	private workerSupportsSecrets(worker: WebSocket): boolean {
+		return this.registry.describe(worker)?.features.includes(WORKER_FEATURE_SECRETS) === true;
+	}
+
+	private describeWorkerWithoutSecrets(stepId: string, secretNames: string[], worker: WebSocket): string {
+		const registered = this.registry.describe(worker);
+		return (
+			`Step '${stepId}' uses secret(s) ${secretNames.join(', ')} but worker ${registered?.workerId ?? 'unknown'} ` +
+			`(flow-cli ${registered?.version ?? 'unknown version'}) does not support secrets and would run it with the ` +
+			`variable missing. Update flow-cli on that worker (\`flow cli update\`) and restart it.`
+		);
 	}
 
 	/**

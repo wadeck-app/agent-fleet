@@ -5,6 +5,7 @@ import {
 	type QueryParams,
 	optionalInteger,
 	optionalString,
+	stripForServing,
 } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
@@ -43,8 +44,9 @@ function noticeOf(logs: ExecutionLogsView, filtered: boolean): string {
  * `GET /executions/:id/logs?step&level&q&page&limit`: the daemon log lines of one execution (id or unique prefix), the
  * same lines `flow logs` shows for the day but narrowed to the run. `page` is zero-based from the END (page 0 = tail).
  *
- * The lines are served as the daemon wrote them. Nothing masks secrets before they reach the file (LogMasker is not
- * wired to the daemon's LogWriter), so this route exposes whatever a step printed, like `GET /logs` does.
+ * Each message and the recorded output are served with ANSI stripped and nothing else: no secret guessing. Secrets are
+ * masked by exact value when the daemon writes (declared secrets only); older lines may still hold some. The `q`
+ * filter matches the stored message.
  */
 export function registerExecutionLogRoutes(ctx: ModuleContext, service: FlowQueryService): void {
 	ctx.registerRoute('GET', '/executions/:id/logs', (req, reply) => {
@@ -60,13 +62,17 @@ export function registerExecutionLogRoutes(ctx: ModuleContext, service: FlowQuer
 			const search = optionalString(query, 'q');
 			const logs = service.readExecutionLogs(id, { limit, page, stepId, level, search });
 			const notice = noticeOf(logs, stepId !== undefined || level !== undefined || search !== undefined);
+			const entries = logs.entries.map(entry => ({ ...entry, message: stripForServing(entry.message) }));
+			const recordedOutput = stripForServing(logs.recordedOutput);
 			return reply.code(200).send({
 				...logs,
+				entries,
+				recordedOutput,
 				limit,
 				offset: page * limit,
 				stepOptions: logs.stepIds.map(value => ({ value, label: stepLabel(value) })),
 				// Booleans for `$if`: an empty string or list is not falsy in every shell version.
-				hasRecordedOutput: logs.recordedOutput !== '',
+				hasRecordedOutput: recordedOutput !== '',
 				notice,
 				hasNotice: notice !== '',
 			});

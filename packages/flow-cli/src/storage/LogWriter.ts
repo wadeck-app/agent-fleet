@@ -3,6 +3,8 @@ import type { LiveLogEntry } from 'flow-engine/types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { ExecutionMasks } from '../secrets/ExecutionMasks';
+
 const HARD_CAP = 120;
 
 interface LogLine {
@@ -20,7 +22,9 @@ export class LogWriter {
 
 	constructor(
 		private readonly logsDir: string,
-		private readonly retainDays: number = 30
+		private readonly retainDays: number = 30,
+		// Hides the exact values of the execution's declared secrets in every line written.
+		private readonly masks: ExecutionMasks = new ExecutionMasks()
 	) {}
 
 	write(executionId: string, stepId: string, entry: LiveLogEntry): void {
@@ -34,7 +38,7 @@ export class LogWriter {
 			prefix: `[${executionId}|${stepId}]`,
 			timestamp,
 			level: entry.level,
-			message: entry.message,
+			message: this.masks.mask(executionId, entry.message),
 		};
 		const filePath = path.join(this.logsDir, logFileName(this.todayDate()));
 		try {
@@ -50,7 +54,7 @@ export class LogWriter {
 			prefix: `[${executionId}|__execution]`,
 			timestamp: new Date().toISOString(),
 			level,
-			message,
+			message: this.masks.mask(executionId, message),
 		};
 		const filePath = path.join(this.logsDir, logFileName(this.todayDate()));
 		try {

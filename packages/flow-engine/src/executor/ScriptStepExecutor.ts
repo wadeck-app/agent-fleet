@@ -13,11 +13,17 @@ export function writeOutputFiles(
 	outputConfig: StepOutput | undefined,
 	context: TemplateContext
 ): void {
-	if (!outputConfig) return;
+	if (!outputConfig) {
+		return;
+	}
 	const outputsDir = context.context?.outputsDir;
-	if (!outputsDir) return;
+	if (!outputsDir) {
+		return;
+	}
 	for (const [varName, config] of Object.entries(outputConfig)) {
-		if (!config.writeOutput) continue;
+		if (!config.writeOutput) {
+			continue;
+		}
 		const relPath = config.writeOutput;
 		const normalized = path.normalize(relPath);
 		if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
@@ -28,6 +34,32 @@ export function writeOutputFiles(
 		fs.mkdirSync(path.dirname(filePath), { recursive: true });
 		fs.writeFileSync(filePath, value != null ? String(value) : '', 'utf8');
 	}
+}
+
+/**
+ * Adds the step's declared secrets to its environment AFTER the rendered step env (explicit secrets win).
+ * Fails fast when the executing worker did not supply one. Values are never logged or put in messages.
+ */
+function withSecrets(
+	step: ScriptFlowStep,
+	renderedEnv: Record<string, string> | undefined,
+	context: TemplateContext
+): Record<string, string> | undefined {
+	if (!step.secrets || step.secrets.length === 0) {
+		return renderedEnv;
+	}
+	const env = { ...renderedEnv };
+	for (const name of step.secrets) {
+		const value = context.secrets?.[name];
+		if (value === undefined) {
+			throw new Error(
+				`Step '${step.id}' declares secret '${name}' but the executing worker did not receive it. ` +
+					`Update flow-cli on that worker (it may predate secret inputs) and check that '${name}' was supplied for this run.`
+			);
+		}
+		env[name] = value;
+	}
+	return env;
 }
 
 export async function executeScriptStep(
@@ -47,9 +79,15 @@ export async function executeScriptStep(
 	const renderedScript = templateRenderer.render(step.script, context, true);
 	stepTrace.script = renderedScript;
 
-	const renderedEnv = step.env
-		? Object.fromEntries(Object.entries(step.env).map(([k, v]) => [k, templateRenderer.render(v, context, true)]))
-		: undefined;
+	const renderedEnv = withSecrets(
+		step,
+		step.env
+			? Object.fromEntries(
+					Object.entries(step.env).map(([k, v]) => [k, templateRenderer.render(v, context, true)])
+				)
+			: undefined,
+		context
+	);
 
 	const workingDir = step.workingDir ?? context.context?.['workingDir'] ?? workspacePath;
 	const result = await scriptExecutor.execute({

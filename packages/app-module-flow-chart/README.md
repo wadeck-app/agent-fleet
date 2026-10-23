@@ -19,7 +19,7 @@ Components (`src/dsl-components`, bundled with xyflow and dagre): `flow-chart:Fl
 
 ## Run path, step inputs/outputs, header, sub-steps, flows index
 
-A run chart numbers the steps in run order, marks skipped / not reached steps, and fades the edges the run did not follow; the step panel lists inputs, outputs, data-flow links and a Logs link (`?step=`). Pages carry no "Back to" link (the shell has a breadcrumb). The execution record holds no step input or output values and is not secret-masked: details in [.docs/chart-and-index.md](.docs/chart-and-index.md).
+A run chart numbers the steps in run order, marks skipped / not reached steps, and fades the edges the run did not follow; the step panel lists inputs, outputs, data-flow links and a Logs link (`?step=`). Pages carry no "Back to" link (the shell has a breadcrumb). The execution record holds no step input or output values and is served as stored (ANSI-stripped only; old records may hold secrets): details in [.docs/chart-and-index.md](.docs/chart-and-index.md).
 
 Step panel A/B tests: `flow-chart-step-panel` (`overlay`, `drawer`, `tabs`, `accordion`) and `flow-chart-step-panel-density` (see the doc). Flows index A/B tests (dev shell dock): `flow-chart-index-design` (`table`, `cards`, `list`, `health-board`) and, nested in `table`, `flow-chart-index-filters` (`bar`, `inline`, `chips`). Compose and keep one: see the doc.
 

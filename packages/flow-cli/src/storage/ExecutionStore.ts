@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { ExecutionState, StepStatus } from '../ipc/Protocol';
+import { ExecutionMasks } from '../secrets/ExecutionMasks';
 
 function assertExecutionIdSafe(executionId: string): void {
 	if (!isExecutionId(executionId)) {
@@ -17,7 +18,9 @@ const MAX_RELAUNCH_FEEDBACK_CHARS = 2000;
 export class ExecutionStore {
 	constructor(
 		private readonly executionsDir: string,
-		private readonly retainDays: number = 30
+		private readonly retainDays: number = 30,
+		// Hides the exact values of the execution's declared secrets in every record written.
+		private readonly masks: ExecutionMasks = new ExecutionMasks()
 	) {}
 
 	pruneOldExecutions(): void {
@@ -237,6 +240,10 @@ export class ExecutionStore {
 	}
 
 	private write(state: ExecutionState): void {
-		fs.writeFileSync(this.filePath(state.executionId), JSON.stringify(state, null, 2), 'utf8');
+		fs.writeFileSync(
+			this.filePath(state.executionId),
+			JSON.stringify(this.masks.maskDeep(state.executionId, state), null, 2),
+			'utf8'
+		);
 	}
 }

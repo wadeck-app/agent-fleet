@@ -414,7 +414,9 @@ export class SchemaValidator {
 					// Warn if default value type doesn't match declared type
 					if (def.default !== undefined) {
 						const defaultType = typeof def.default;
-						const expectedType = def.type === 'object' ? 'object' : def.type;
+						// A password default is a reference string (env:// or file://); SecretValidator checks its form
+						const expectedType =
+							def.type === 'object' ? 'object' : def.type === 'password' ? 'string' : def.type;
 
 						if (defaultType !== expectedType) {
 							this.issueCollector.addIssue({
@@ -506,7 +508,9 @@ export class SchemaValidator {
 			// Validate writeOutput paths (must be relative, no path traversal)
 			if (step.output) {
 				for (const [outputName, outputConfig] of Object.entries(step.output)) {
-					if (typeof outputConfig === 'string' || !outputConfig.writeOutput) continue;
+					if (typeof outputConfig === 'string' || !outputConfig.writeOutput) {
+						continue;
+					}
 					{
 						const normalized = outputConfig.writeOutput.replace(/\\/g, '/');
 						if (normalized.includes('..') || normalized.startsWith('/')) {
@@ -550,7 +554,9 @@ export class SchemaValidator {
 	 */
 	private validateExecutionConfig(flow: FlowDefinition): void {
 		const execution = flow.execution as { skipPermissions?: unknown } | undefined;
-		if (execution?.skipPermissions === undefined) return;
+		if (execution?.skipPermissions === undefined) {
+			return;
+		}
 
 		this.issueCollector.addIssue({
 			severity: 'error',
@@ -563,7 +569,9 @@ export class SchemaValidator {
 
 	private validateFlowLabels(flow: FlowDefinition): void {
 		const labels = flow.labels;
-		if (labels === undefined) return;
+		if (labels === undefined) {
+			return;
+		}
 
 		if (!Array.isArray(labels)) {
 			this.issueCollector.addIssue({
@@ -609,7 +617,9 @@ export class SchemaValidator {
 	 */
 	private validateStepLabels(step: FlowStep): void {
 		const labels = (step as { labels?: unknown }).labels;
-		if (labels === undefined) return;
+		if (labels === undefined) {
+			return;
+		}
 
 		if (!Array.isArray(labels)) {
 			this.issueCollector.addIssue({
@@ -822,7 +832,9 @@ export class SchemaValidator {
 	 * `strict` is bash-only (`bash -e -u`): boolean, and never silently ignored on other shells.
 	 */
 	private validateScriptStrict(step: ScriptFlowStep): void {
-		if (step.strict === undefined) return;
+		if (step.strict === undefined) {
+			return;
+		}
 		if (typeof step.strict !== 'boolean') {
 			this.issueCollector.addIssue({
 				severity: 'error',

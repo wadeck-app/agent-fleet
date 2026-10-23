@@ -2,7 +2,7 @@ import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePat
 import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import { createRemoteDaemonClient, executionsDirOf, logFilePath, todayLogDate } from 'flow-core';
-import type { FlowDefinition, InputDefinition } from 'flow-engine/types';
+import type { FlowDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -19,6 +19,7 @@ import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/Wi
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
+import { checkSecretInputs } from './SecretInputCheck';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -165,45 +166,6 @@ function resolveFlowFile(flowRef: string, cwd: string): FlowResolution {
 		};
 	}
 	return { found: true, flowFile: flowsFile, inferredFlowId: flowRef };
-}
-
-// D27: Validate secret/password inputs at CLI time -- literal values are rejected with exit code 2
-function validateSecretInputs(flowFilePath: string, inputs: Record<string, string>): string | null {
-	// Only validate if the flow file exists and is readable
-	let flow: FlowDefinition;
-	try {
-		const content = fs.readFileSync(flowFilePath, 'utf8');
-		flow = yaml.load(content, { schema: yaml.JSON_SCHEMA }) as FlowDefinition;
-	} catch {
-		return null; // If we can't read the flow, let the daemon handle it
-	}
-
-	if (!flow?.inputs) {
-		return null;
-	}
-
-	for (const [key, spec] of Object.entries(flow.inputs)) {
-		const inputType = typeof spec === 'string' ? spec : (spec as InputDefinition).type;
-		if (inputType !== 'password') {
-			continue;
-		}
-
-		const value = inputs[key];
-		// missing optional input -- daemon will handle
-		if (value === undefined) {
-			continue;
-		}
-
-		// Validate that the value is a URI scheme, not a literal
-		const isUriScheme = value.startsWith('env://') || value.startsWith('file://') || value.startsWith('input://');
-		if (!isUriScheme) {
-			return (
-				`Input '${key}' is of type '${inputType}' but received a literal value. ` +
-				`Use a URI scheme instead: env://VAR_NAME, file://./path, or input://name.`
-			);
-		}
-	}
-	return null;
 }
 
 /**
@@ -474,7 +436,7 @@ export function registerRunCommand(program: Command): void {
 				// D27: Validate secret inputs before sending to daemon
 				// Only check if we resolved a specific file (not a registry ID)
 				if (fs.existsSync(flowFile)) {
-					const secretError = validateSecretInputs(flowFile, inputs);
+					const secretError = checkSecretInputs(flowFile, inputs);
 					if (secretError) {
 						console.error(`Error:${secretError}`);
 						process.exit(2);

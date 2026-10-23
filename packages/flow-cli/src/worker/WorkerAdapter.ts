@@ -2,8 +2,10 @@ import type { StepRunner } from 'flow-engine';
 import type { TemplateContext } from 'flow-engine/processing/TemplateRenderer';
 import type { LiveLogEntry, ModelFlowStep, ScriptFlowStep, Workspace } from 'flow-engine/types';
 import { randomUUID } from 'node:crypto';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { AssignableStep, AssignmentScopedMessage, ExecutionContext, InjectedStep } from '../ipc/Protocol';
+import { SecretMasker } from '../secrets/SecretMasker';
 import type { McpServerConfig } from './McpServer';
 import { McpServer } from './McpServer';
 
@@ -17,15 +19,22 @@ export type SendMessageFn = (msg: AssignmentScopedMessage) => void;
 // Pass an empty array when no MCP server is needed (script steps).
 export type StepRunnerFactory = (mcpServers: McpServerConfig[]) => StepRunner;
 
+// Kept as a code point so the source stays ASCII; the displayed text is unchanged.
+const ELLIPSIS = String.fromCharCode(0x2026);
+
 function sendStdoutAsLogs(
 	stdout: string | undefined,
 	executionId: string,
 	stepId: string,
 	sendMessage: SendMessageFn
 ): void {
-	if (!stdout?.trim()) return;
+	if (!stdout?.trim()) {
+		return;
+	}
 	for (const line of stdout.split('\n')) {
-		if (!line.trim()) continue;
+		if (!line.trim()) {
+			continue;
+		}
 		const entry: LiveLogEntry = {
 			id: randomUUID(),
 			timestamp: Date.now(),
@@ -37,6 +46,24 @@ function sendStdoutAsLogs(
 	}
 }
 
+function maskOptional(masker: SecretMasker, text: string | undefined): string | undefined {
+	return text === undefined ? undefined : masker.mask(text);
+}
+
+// The error is rethrown with the same extra fields (stdout, stderr, stepOutputs) the caller
+// forwards to the daemon, all masked.
+function maskError(error: unknown, masker: SecretMasker): unknown {
+	if (!(error instanceof Error)) {
+		return error;
+	}
+	const carried = error as Error & { stdout?: string; stderr?: string; stepOutputs?: Record<string, unknown> };
+	return Object.assign(new Error(masker.mask(normalizeError(error).message)), {
+		stdout: maskOptional(masker, carried.stdout),
+		stderr: maskOptional(masker, carried.stderr),
+		stepOutputs: masker.maskDeep(carried.stepOutputs),
+	});
+}
+
 export class WorkerAdapter {
 	private readonly stepRunnerFactory: StepRunnerFactory;
 
@@ -44,10 +71,29 @@ export class WorkerAdapter {
 		this.stepRunnerFactory = stepRunnerFactory;
 	}
 
+	/**
+	 * Runs one step. Everything that leaves this method (messages, result, error) has had the
+	 * exact values of the step's secrets replaced; the unmasked text never leaves the worker.
+	 */
 	async execute(
 		step: AssignableStep,
 		context: ExecutionContext,
 		sendMessage: SendMessageFn
+	): Promise<{ output: Record<string, unknown>; meta?: import('flow-engine/types').StepMeta }> {
+		const masker = new SecretMasker(new Map(Object.entries(context.secrets ?? {})));
+		try {
+			const result = await this.run(step, context, message => sendMessage(masker.maskDeep(message)), masker);
+			return masker.maskDeep(result);
+		} catch (error) {
+			throw maskError(error, masker);
+		}
+	}
+
+	private async run(
+		step: AssignableStep,
+		context: ExecutionContext,
+		sendMessage: SendMessageFn,
+		masker: SecretMasker
 	): Promise<{ output: Record<string, unknown>; meta?: import('flow-engine/types').StepMeta }> {
 		if ((step as { type: string }).type === 'subflow') {
 			throw new Error(`Step type 'subflow' is not supported in v1`);
@@ -74,7 +120,10 @@ export class WorkerAdapter {
 			// approval request: without it every request was published as "unknown_<stepId>", so two
 			// concurrent flows shared one filename and an answer could satisfy the wrong step.
 			taskId: context.executionId,
-			inputs: context.inputs,
+			// The secrets this step uses are plain inputs for ${{ inputs.NAME }}; the separate map is
+			// what the engine injects as environment variables for `secrets:`.
+			inputs: { ...context.inputs, ...context.secrets },
+			...(context.secrets ? { secrets: context.secrets } : {}),
 			stepOutputs: new Map(Object.entries(context.stepOutputs)),
 			stepMeta: new Map(Object.entries(context.stepMeta)) as unknown as Map<string, Record<string, unknown>>,
 			taskMetadata: {},
@@ -133,7 +182,7 @@ export class WorkerAdapter {
 						id: randomUUID(),
 						timestamp: Date.now(),
 						level: 'info',
-						message: `Launching ${(step as unknown as { model?: string }).model ?? 'model'}…`,
+						message: `Launching ${(step as unknown as { model?: string }).model ?? 'model'}${ELLIPSIS}`,
 						eventType: 'system',
 					},
 				});
@@ -160,7 +209,7 @@ export class WorkerAdapter {
 										...entry,
 										message:
 											toolLog === 'name'
-												? base.slice(0, 120) + (base.length > 120 ? '…' : '')
+												? base.slice(0, 120) + (base.length > 120 ? ELLIPSIS : '')
 												: base,
 									};
 									sendMessage({
@@ -189,7 +238,9 @@ export class WorkerAdapter {
 				let lastProgressSentAt = 0;
 				const onActivity = (): void => {
 					const now = Date.now();
-					if (now - lastProgressSentAt < PROGRESS_THROTTLE_MS) return;
+					if (now - lastProgressSentAt < PROGRESS_THROTTLE_MS) {
+						return;
+					}
 					lastProgressSentAt = now;
 					sendMessage({ type: 'step_progress', executionId: context.executionId, stepId: step.id });
 				};
@@ -205,7 +256,7 @@ export class WorkerAdapter {
 				// For log:end/none -- send response as logs after completion (existing behavior)
 				if (logMode === 'end') {
 					sendStdoutAsLogs(
-						(trace as unknown as { response?: string }).response,
+						maskOptional(masker, (trace as unknown as { response?: string }).response),
 						context.executionId,
 						step.id,
 						sendMessage
@@ -229,7 +280,8 @@ export class WorkerAdapter {
 
 		const runner = this.stepRunnerFactory([]);
 		const trace = await runner.executeStep(step as unknown as ScriptFlowStep, workspace, templateContext);
-		sendStdoutAsLogs(trace.stdout, context.executionId, step.id, sendMessage);
+		// Masked as a whole BEFORE being split into lines: a multi-line secret is intact here.
+		sendStdoutAsLogs(maskOptional(masker, trace.stdout), context.executionId, step.id, sendMessage);
 		if (trace.error) {
 			// Include captured outputs (stdout/stderr) in the error so the daemon can forward them
 			// to the scheduler for ${{ subSteps.xxx.outputs.stderr }} in parent prompts.

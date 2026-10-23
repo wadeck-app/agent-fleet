@@ -20,8 +20,9 @@ export function queryFlowGraph(executionsDir: string, target: FlowGraphTarget): 
 	if ('executionId' in target) {
 		const { record } = resolveExecution(executionsDir, target.executionId);
 		const flow = loadFlowDefinition(record.flowFile);
+		const graph = annotateGraph(buildFlowGraph(flow, record), flow, record);
 		return {
-			graph: annotateGraph(buildFlowGraph(flow, record), flow, record),
+			graph,
 			flowId: flow.id,
 			flowName: flow.name || flow.id,
 			flowFile: record.flowFile,

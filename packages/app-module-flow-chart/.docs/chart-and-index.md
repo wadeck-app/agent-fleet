@@ -19,7 +19,7 @@ The record keeps per step: status, start of the latest attempt, completion, atte
 - Not recorded: resolved inputs and step outputs. Only failed steps keep stdout/stderr (last 2000 chars), plus error, meta (exit code, session id, tokens, cost) and relaunch feedback. The panel says so.
 - Inputs show the declaration: references (`${{ ... }}`) of prompts and scripts (never their text), values of env / sub-flow inputs (200 chars max).
 - Data-flow links ("Uses output of" / "Used by") come from `steps.<id>.outputs` references in prompt, script, env, inputs, `when`, `context.previousOutputs` and `session.continue`; names select the node.
-- Secrets: the record is NOT masked at write time (`LogMasker` is not wired into the daemon). `SecretRedaction.ts` hides secret-named values and `KEY=value` / bearer / token patterns in what this module adds; it is a safety net, not a guarantee.
+- Served text: stdout, stderr, errors and relaunch feedback are ANSI-stripped before the 2000-char cut, so "last 2000 of N characters" counts the stripped text. Nothing else is hidden: secrets are masked by the daemon at write time (declared ones only), older records may contain some. Details and grep recipe: [app-module-flow `.docs/served-text.md`](../../app-module-flow/.docs/served-text.md).
 - "Logs of this step" opens `/modules/flow/executions/<id>/logs?step=<stepId>` (`executionStepLogsPath`).
 
 ## Chart header and sub-steps

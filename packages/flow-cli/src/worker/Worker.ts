@@ -4,7 +4,7 @@ import type { StepRunnerConfig } from 'flow-engine';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
 
-import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
+import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { AssignmentScopedMessage, DaemonToWorker, WorkerToDaemon } from '../ipc/Protocol';
 import type { McpServerConfig } from './McpServer';
 import { WorkerAdapter } from './WorkerAdapter';
@@ -23,7 +23,7 @@ function send(message: WorkerToDaemon): void {
 	}
 }
 
-const WORKER_FEATURES = [WORKER_FEATURE_SUB_STEP_SESSION_RESUME];
+const WORKER_FEATURES = [WORKER_FEATURE_SUB_STEP_SESSION_RESUME, WORKER_FEATURE_SECRETS];
 
 const baseConfig: StepRunnerConfig = { interactive: false };
 

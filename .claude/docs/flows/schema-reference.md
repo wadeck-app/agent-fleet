@@ -520,6 +520,25 @@ Executes a shell script or command in the workspace.
           echo done
     ```
 
+#### `secrets`
+
+- **Type**: `string[]` (optional, script steps only)
+- **Description**: Names of `type: password` inputs exposed to this step as environment variables (`secrets: [API_TOKEN]` then `$API_TOKEN`). Only steps listing a secret, or referencing `${{ inputs.NAME }}`, receive it.
+- **Validation**: `SECRET_UNKNOWN` (not a declared password input), `SECRET_FORBIDDEN_STEP` (on a non-script step, or secret referenced by model/user_intervention/subflow steps or flow `env:`), `SECRET_INVALID_NAME`, `SECRET_BAD_REFERENCE` (password `default:` not `env://NAME` or `file://relative`), warning `SECRET_IN_SCRIPT_TEXT` (secret templated into script text).
+- **Inputs**: `type: password` input values are references passed with `-i NAME=env://VAR` or `-i NAME=file://./path`; see [INPUT_TYPES_GUIDE](../INPUT_TYPES_GUIDE.md).
+- **Example**:
+    ```yaml
+    inputs:
+      API_TOKEN: { type: password, required: true }
+    steps:
+      - type: script
+        id: call-api
+        name: 'Call API'
+        shell: bash
+        secrets: [API_TOKEN]
+        script: curl -s -H "Authorization: Bearer $API_TOKEN" https://example.invalid/
+    ```
+
 #### Other Properties
 
 See [Common Step Properties](#common-step-properties) for `context`, `output`, `depends`, `when`, `skipOnLoop`, `retry`, `onFailure`, `contract`.

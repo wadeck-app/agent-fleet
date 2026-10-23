@@ -145,7 +145,8 @@ export { buildFlowGraph } from './graph/FlowGraphBuilder.js';
 export { annotateGraph } from './graph/RunGraphAnnotation.js';
 export { computeRunPath, isEdgeTraversed } from './graph/RunPath.js';
 export type { AttemptKind, RunOutcome, StepRunPath } from './graph/RunPath.js';
-export { REDACTED_TEXT, isSecretName, redactSecretValue, redactSecrets } from './graph/SecretRedaction.js';
+export { stripAnsi } from './logs/AnsiStrip.js';
+export { stripErrorsForServing, stripForServing, stripRecordForServing } from './logs/ServingText.js';
 export { describeStepIO, findDataLinks } from './graph/StepIO.js';
 export type {
 	CappedText,

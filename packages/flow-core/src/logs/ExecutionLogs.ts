@@ -136,8 +136,8 @@ function parseLine(raw: string, executionId: string): ParsedLine | null | undefi
  * The files are the daemon's own: a day without a file is a normal answer (`daysRead` says what was read), and lines
  * that cannot be parsed are counted, not hidden. Throws InvalidQueryError for a bad level, limit, page or start date.
  *
- * The lines are served as the daemon wrote them. Nothing in the daemon masks secrets before writing (LogMasker is
- * not wired to LogWriter), so callers must not assume the text is safe to expose beyond the local user.
+ * The lines are served as the daemon wrote them. Masking is the writer's job (exact value, declared secrets only) and
+ * lines written before it existed may hold secrets, so callers must not assume the text is safe beyond the local user.
  */
 export function readExecutionLogs(
 	configDir: string,

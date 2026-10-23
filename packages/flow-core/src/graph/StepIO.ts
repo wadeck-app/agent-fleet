@@ -1,14 +1,18 @@
 import type { FlowDefinition, FlowStep } from 'flow-engine/types';
 
 import type { StepState } from '../execution/ExecutionState.js';
-import { REDACTED_TEXT, isSecretName, redactSecretValue, redactSecrets } from './SecretRedaction.js';
+import { stripForServing } from '../logs/ServingText.js';
 
 // What a step received and produced, as far as the flow file and the execution record tell. The record does NOT
 // hold resolved inputs or step outputs (flow-cli's ExecutionStore keeps status, times, attempts, error, meta and,
 // for failed steps only, stdout/stderr); the daemon keeps outputs in memory while the run lasts. So this shows
 // the declaration (references, not whole prompts or scripts, which may embed secrets) plus what was recorded.
 
-/** Longest text of a captured stdout/stderr kept; same size as the default tail of `flow show`. */
+/**
+ * Longest text of a captured stdout/stderr kept; same size as the default tail of `flow show`. The cut is made AFTER
+ * the terminal control is stripped and the terminal control stripped, so `totalChars` and the "last N of M characters" label count
+ * the cleaned text the panel shows, not the raw capture.
+ */
 export const MAX_CAPPED_CHARS = 2000;
 const MAX_VALUE_CHARS = 200;
 const MAX_FEEDBACK_CHARS = 300;
@@ -17,14 +21,14 @@ export interface CappedText {
 	text: string;
 	/** True when `text` is only the end of the original. */
 	truncated: boolean;
-	/** Length of the original. */
+	/** Length of the original, once terminal control is stripped. */
 	totalChars: number;
 }
 
 export interface DeclaredInput {
 	/** `prompt`, `script`, `env.NAME`, `inputs.NAME`, `when`... */
 	name: string;
-	/** The value, only for short fields (env, sub-flow inputs); hidden when the name looks secret. Never set for prompts and scripts. */
+	/** The value, only for short fields (env, sub-flow inputs), as written in the flow file. Never set for prompts and scripts. */
 	value?: string;
 	/** The `${{ ... }}` expressions found in the field, without the braces. */
 	references: string[];
@@ -144,8 +148,7 @@ function declaredInputsOf(step: FlowStep): DeclaredInput[] {
 				...(field.name === 'prompt' || field.name === 'script' ? { length: field.text.length } : {}),
 			};
 		}
-		const value = isSecretName(field.name) ? REDACTED_TEXT : redactSecrets(cap(field.text, MAX_VALUE_CHARS));
-		return { name: field.name, value, references };
+		return { name: field.name, value: cap(field.text, MAX_VALUE_CHARS), references };
 	});
 }
 
@@ -166,7 +169,7 @@ function declaredOutputsOf(step: FlowStep): DeclaredOutput[] {
 			outputs.push({
 				name,
 				type: 'string',
-				source: redactSecretValue(name, redactSecrets(cap(config, MAX_VALUE_CHARS))),
+				source: cap(config, MAX_VALUE_CHARS),
 			});
 			continue;
 		}
@@ -189,10 +192,10 @@ function recordedOf(state: StepState | undefined): RecordedStepIO {
 		return recorded;
 	}
 	if (state.stdout !== undefined) {
-		recorded.stdout = capText(redactSecrets(state.stdout));
+		recorded.stdout = capText(stripForServing(state.stdout));
 	}
 	if (state.stderr !== undefined) {
-		recorded.stderr = capText(redactSecrets(state.stderr));
+		recorded.stderr = capText(stripForServing(state.stderr));
 	}
 	const meta = state.meta as
 		| {
@@ -232,7 +235,7 @@ function recordedOf(state: StepState | undefined): RecordedStepIO {
 	}
 	recorded.relaunches = (state.relaunches ?? []).map(relaunch => ({
 		at: relaunch.at,
-		feedback: cap(redactSecrets(relaunch.feedback), MAX_FEEDBACK_CHARS),
+		feedback: cap(stripForServing(relaunch.feedback), MAX_FEEDBACK_CHARS),
 	}));
 	return recorded;
 }

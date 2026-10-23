@@ -14,6 +14,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { loadYaml } from '../../utils/loadYaml';
+import { renderSecretsSummary } from './SecretsSummary';
 
 function isExistingFile(target: string): boolean {
 	try {
@@ -38,6 +39,10 @@ function showFlowFile(file: string, opts: { json?: boolean }): void {
 	}
 
 	console.log(renderFlowSummary(flow));
+	const secrets = renderSecretsSummary(flow);
+	if (secrets !== '') {
+		console.log(secrets + '\n');
+	}
 }
 
 function showExecution(

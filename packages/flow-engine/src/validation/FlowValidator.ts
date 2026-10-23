@@ -5,7 +5,7 @@
  * Designed to collect ALL errors (not just the first) and provide rich metadata
  * for UI integration (workflow builder).
  *
- * This validator orchestrates eight specialized validators:
+ * This validator orchestrates nine specialized validators (SecretValidator runs right after Phase 1):
  * 1. SchemaValidator - Structure, required fields, types
  * 2. GraphValidator - Cycles, reachability, DAG structure
  * 3. SemanticValidator - References, subflows, dependencies
@@ -33,6 +33,7 @@ import { GraphValidator } from './GraphValidator';
 import { LogicalValidator } from './LogicalValidator';
 // Import specialized validators
 import { SchemaValidator } from './SchemaValidator';
+import { SecretValidator } from './SecretValidator';
 import { SemanticValidator } from './SemanticValidator';
 import { SimulationValidator } from './SimulationValidator';
 import { TemplateValidator } from './TemplateValidator';
@@ -61,6 +62,7 @@ export class FlowValidator implements IssueCollector {
 
 	// Specialized validators
 	private schemaValidator: SchemaValidator;
+	private secretValidator: SecretValidator;
 	private graphValidator: GraphValidator;
 	private semanticValidator: SemanticValidator;
 	private templateValidator: TemplateValidator;
@@ -79,6 +81,7 @@ export class FlowValidator implements IssueCollector {
 
 		// Initialize specialized validators with this as IssueCollector
 		this.schemaValidator = new SchemaValidator(this, validTaskStatuses);
+		this.secretValidator = new SecretValidator(this);
 		this.graphValidator = new GraphValidator(this, flowRegistry);
 		this.semanticValidator = new SemanticValidator(this, this.graphValidator, flowRegistry);
 		this.templateValidator = new TemplateValidator(this);
@@ -97,6 +100,9 @@ export class FlowValidator implements IssueCollector {
 
 		// Phase 1: Schema validation (structural) and input normalization
 		const { stepIds, normalizedInputs } = this.schemaValidator.validateSchema(flow);
+
+		// Secrets: validated before any early exit so their errors are always reported
+		this.secretValidator.validateSecrets(flow);
 
 		// Early exit if critical errors prevent semantic validation
 		if (!this.canProceedToSemantics()) {

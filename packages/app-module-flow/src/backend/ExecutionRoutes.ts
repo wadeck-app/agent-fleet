@@ -12,6 +12,8 @@ import {
 	optionalString,
 	readPageOffset,
 	renderExecutionDetail,
+	stripErrorsForServing,
+	stripRecordForServing,
 	toExecutionDetail,
 	toExecutionSummary,
 } from 'flow-core';
@@ -65,7 +67,8 @@ function flowsCaption(shown: number, total: number): string {
 
 /**
  * `GET /executions` (history), `GET /executions/:id` (detail) and `GET /flows` (distinct flows, to filter the history by):
- * `flow history` and `flow show`.
+ * `flow history` and `flow show`. The free text of a run (errors, step output, relaunch feedback) is served through
+ * `stripForServing` (ANSI stripped, nothing else: no secret guessing; masking happens when the daemon writes).
  */
 export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQueryService): void {
 	ctx.registerRoute('GET', '/executions', (req, reply) => {
@@ -79,7 +82,7 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const id = optionalString(query, 'id');
 			const page = service.listExecutions({ limit, offset, status, flow, flowContains, id });
 			const body = {
-				items: page.items.map(record => toExecutionRow(toExecutionSummary(record))),
+				items: page.items.map(record => toExecutionRow(toExecutionSummary(stripErrorsForServing(record)))),
 				total: page.total,
 				// Execution files that could not be read: the list is incomplete by this many, so a client can say so.
 				skipped: page.skipped.length,
@@ -119,7 +122,9 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const tail = optionalInteger(query, 'tail', { min: 1, max: MAX_TAIL_CHARS }) ?? DEFAULT_TAIL_CHARS;
 			const full = optionalBoolean(query, 'full', false);
 			const resolved = service.getExecution(id);
-			const detail = toExecutionDetail(resolved, renderExecutionDetail(resolved, { tail, full }));
+			// Served before it is rendered: the tail of a step output is cut from the served text, never from the raw one.
+			const served = { ...resolved, record: stripRecordForServing(resolved.record) };
+			const detail = toExecutionDetail(served, renderExecutionDetail(served, { tail, full }));
 			return reply.code(200).send(toExecutionDetailRow(detail));
 		} catch (err) {
 			return replyWithError(reply, err);

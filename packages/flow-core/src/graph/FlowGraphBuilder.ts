@@ -3,6 +3,7 @@ import type { FlowDefinition, FlowStep } from 'flow-engine/types';
 import { FlowCoreError } from '../errors.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
 import { formatDuration } from '../history/ExecutionFormat.js';
+import { stripForServing } from '../logs/ServingText.js';
 import type { FlowGraph, FlowGraphEdge, FlowGraphNode } from './FlowGraph.js';
 
 const MAX_LABEL = 40;
@@ -31,7 +32,8 @@ function addStateMeta(meta: MetaValues, state: StepState): void {
 		meta.completedAt = state.completedAt;
 	}
 	if (state.error) {
-		meta.error = state.error;
+		// Served like the rest of a run's free text: ANSI stripped, nothing else.
+		meta.error = stripForServing(state.error);
 	}
 	if (state.workerId) {
 		meta.workerId = state.workerId;

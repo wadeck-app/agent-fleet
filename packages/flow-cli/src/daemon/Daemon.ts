@@ -21,12 +21,14 @@ import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { PluginResolver } from '../config/PluginResolver.js';
 import type { ClientCommand, SourceReady, UpdateWorkerRequest, WorkerToDaemon } from '../ipc/Protocol';
+import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { registerWithAppCore } from './AppCoreRegistration.js';
 import { CommandHandler } from './CommandHandler';
 import { buildDaemonHealth } from './DaemonHealth';
 import { writeDaemonLog } from './DaemonLog.js';
+import { DaemonSecrets } from './DaemonSecrets.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { injectedStepState } from './InjectedStepState.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
@@ -316,6 +318,7 @@ async function startDaemon(
 	let commandHandler: CommandHandler;
 	let executionStore: ExecutionStore;
 	let logWriter: LogWriter;
+	let daemonSecrets: DaemonSecrets;
 	/** checkShutdown() can be re-entered (e.g. a worker's own close event fires while
 	 * its socket is also being torn down by this same shutdown): without this guard
 	 * the idle-stop log line and daemonHandle.stop('idle') would both run twice. */
@@ -417,8 +420,20 @@ async function startDaemon(
 				}
 
 				const wsPort = config.worker.wsPort ?? port + 1;
-				executionStore = new ExecutionStore(executionsDir, config.logs.retainDays);
-				logWriter = new LogWriter(logsDir, config.logs.retainDays);
+				// One set of masks for everything that writes execution data: the stores below, the
+				// command handler and the ingress of worker messages.
+				daemonSecrets = new DaemonSecrets(
+					new ExecutionMasks((executionId, error) => {
+						// Neither the text nor a secret is in the message: only the execution and the cause.
+						writeDaemonLog(
+							logsDir,
+							'error',
+							`[warn] secret masking failed for execution ${executionId}, text replaced by a placeholder: ${getErrorMessage(error)}`
+						);
+					})
+				);
+				executionStore = new ExecutionStore(executionsDir, config.logs.retainDays, daemonSecrets.masks);
+				logWriter = new LogWriter(logsDir, config.logs.retainDays, daemonSecrets.masks);
 				executionStore.pruneOldExecutions();
 				// Workspace pruning is per-project and so runs per request, not here:
 				// this daemon is shared across projects and its launch directory says
@@ -516,7 +531,8 @@ async function startDaemon(
 						contactSources(workerListenerPort);
 					},
 					undefined,
-					config.queue.stepSilenceLimitSeconds * 1000
+					config.queue.stepSilenceLimitSeconds * 1000,
+					daemonSecrets
 				);
 
 				// Nothing else would notice a wedged worker: it keeps its socket open and answers
@@ -666,7 +682,9 @@ async function startDaemon(
 			}
 			case 'step_failed': {
 				try {
-					const { assignmentId, executionId, stepId, error, output, stdout, stderr } = message;
+					const { assignmentId, executionId, stepId, error: reportedError, output, stdout, stderr } = message;
+					// The worker already masked it; this is the daemon's own pass, before hooks and logs see it.
+					const error = daemonSecrets.masks.mask(executionId, reportedError);
 					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
 						break;
 					}

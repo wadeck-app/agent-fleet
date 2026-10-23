@@ -226,6 +226,7 @@ describe('the packaged module through a real app-core server', () => {
 	it('packaged backend bundle stays free of the plugin implementations', () => {
 		const backendBundle = join(workDir, 'module', 'api-backend', 'backend.cjs');
 		expect(readFileSync(backendBundle, 'utf8')).not.toContain('execa');
-		expect(statSync(backendBundle).size).toBeLessThan(250_000);
+		// execa and its tree were ~60% of the bundle (a regression doubles it); 300 KB leaves room for the served-text code in flow-core.
+		expect(statSync(backendBundle).size).toBeLessThan(300_000);
 	});
 });

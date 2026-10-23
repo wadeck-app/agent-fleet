@@ -479,21 +479,21 @@ inputs:
 
 #### `password`
 
-Secure password input.
+A secret. The flow never contains the value: it is passed at run time as a reference.
 
 ```yaml
 inputs:
-    api_key:
+    API_TOKEN:
         type: password
         required: true
         description: 'API key'
 ```
 
-**Use case**: Passwords, API keys, secrets
-
-**UI**: Password input (masked) with toggle visibility button
-
-**Security Note**: Use secure vault storage in production
+- **Name**: becomes an environment variable name, so it must match `[A-Za-z_][A-Za-z0-9_]*`.
+- **Run time**: `flow run f.yml -i API_TOKEN=env://VAR` (read from the daemon environment) or `-i API_TOKEN=file://./path` (relative to the run directory, preferred). Literals, `input://` and `value://` are refused. Minimum 8 characters.
+- **`default:`**: only an `env://` or `file://` reference.
+- **Use**: script steps only, `secrets: [API_TOKEN]` then `$API_TOKEN`. Referencing it in `model`, `user_intervention`, `subflow` steps or flow `env:` is a validation error.
+- **Masking**: the exact value (raw, JSON, URL, base64, hex) is replaced by `[secret:API_TOKEN]` in outputs, logs and records. Transformed or partial values are not covered. See `flow docs`, Section 8.
 
 ---
 

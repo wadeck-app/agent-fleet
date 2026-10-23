@@ -10,6 +10,8 @@ Slots other modules fill: `flow:execution-actions`, `flow:executions-actions`, `
 
 Details: [.docs/pages-and-variants.md](.docs/pages-and-variants.md) covers the executions page, execution logs, times and columns, and the A/B design variants (`AbTest` ids, how to pick or retire one).
 
+Served text (run output, errors, log lines) is ANSI-stripped only: no secret detection, what is stored is what is served. Declared secrets (`type: password` inputs) are masked by the daemon at write time; records written before that, and undeclared secrets, may contain secrets. Grep recipe: [.docs/served-text.md](.docs/served-text.md).
+
 ```
 npm test            # builds flow-core first
 npm run bundle      # dist-module/, what flow-cli registers with app-core

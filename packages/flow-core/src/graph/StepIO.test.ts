@@ -2,7 +2,6 @@ import type { FlowStep } from 'flow-engine/types';
 import { describe, expect, it } from 'vitest';
 
 import { BUILD_FLOW, COMPLETED_WITH_LOOP, FAILED_AT_TEST } from './RunFixtures.js';
-import { REDACTED_TEXT } from './SecretRedaction.js';
 import { MAX_CAPPED_CHARS, capText, describeStepIO, findDataLinks } from './StepIO.js';
 
 const step = (id: string): FlowStep => BUILD_FLOW.steps.find(s => s.id === id)!;
@@ -30,12 +29,12 @@ describe('describeStepIO: declared', () => {
 		expect(JSON.stringify(io)).not.toContain('Implement ${{');
 	});
 
-	it('shows env values, hides the secret-named ones and keeps the reference names', () => {
+	it('shows env values as written in the flow file, secret-named ones included, and keeps the reference names', () => {
 		const io = describeStepIO(step('test'), undefined);
 
 		expect(io.declaredInputs).toContainEqual({
 			name: 'env.GITHUB_TOKEN',
-			value: REDACTED_TEXT,
+			value: '${{ secrets.GH }}',
 			references: ['secrets.GH'],
 		});
 		expect(io.declaredInputs).toContainEqual({ name: 'env.REGION', value: 'eu', references: [] });
@@ -46,7 +45,7 @@ describe('describeStepIO: declared', () => {
 		});
 	});
 
-	it('shows the inputs of a sub-flow and hides secret-named ones', () => {
+	it('shows the inputs of a sub-flow as written, secret-named ones included', () => {
 		const io = describeStepIO(step('deploy'), undefined);
 
 		expect(io.declaredInputs).toContainEqual({
@@ -54,7 +53,7 @@ describe('describeStepIO: declared', () => {
 			value: '${{ steps.ship.outputs.version }}',
 			references: ['steps.ship.outputs.version'],
 		});
-		expect(io.declaredInputs).toContainEqual({ name: 'inputs.api_key', value: REDACTED_TEXT, references: [] });
+		expect(io.declaredInputs).toContainEqual({ name: 'inputs.api_key', value: 'abc123', references: [] });
 	});
 
 	it('lists the declared outputs, including the captured stdout', () => {
@@ -71,6 +70,8 @@ describe('describeStepIO: declared', () => {
 		expect(notes.outputs).toMatch(/outputs are not recorded/i);
 	});
 });
+
+const ESC = '\u001b';
 
 describe('describeStepIO: recorded', () => {
 	it('exposes the metadata a model step reported, without the session file path', () => {
@@ -90,22 +91,52 @@ describe('describeStepIO: recorded', () => {
 		expect(describeStepIO(step('test'), COMPLETED_WITH_LOOP.steps['test']).recorded.exitCode).toBe(0);
 	});
 
-	it('exposes stdout and stderr of a failed step, with secret assignments hidden', () => {
+	it('exposes stdout and stderr of a failed step as stored (masking is done at write time, not here)', () => {
 		const { recorded } = describeStepIO(step('test'), FAILED_AT_TEST.steps['test']);
 
-		expect(recorded.stdout?.text).toContain('FAIL a.test.ts');
-		expect(recorded.stdout?.text).not.toContain('ghp_abcdefghijklmnop1234');
+		expect(recorded.stdout?.text).toBe('running tests\nFAIL a.test.ts');
 		expect(recorded.stderr?.text).toBe('Error: 3 tests failed');
+		expect(recorded).not.toHaveProperty('redactions');
+		expect(recorded).not.toHaveProperty('redactionsLabel');
+	});
+
+	describe('terminal control and truncation order', () => {
+		const failed = (stdout: string, error?: string) =>
+			describeStepIO(undefined, { status: 'failed', stdout, ...(error !== undefined ? { error } : {}) }).recorded;
+
+		it('strips colour codes and progress overwrites from stdout', () => {
+			const { stdout } = failed(`${ESC}[36mcyan${ESC}[0m\n10%\r100%\n`);
+
+			expect(stdout?.text).toBe('cyan\n100%\n');
+		});
+
+		it('counts the characters of the cleaned text, not of the raw capture', () => {
+			const coloured = `${ESC}[36mline${ESC}[0m\n`.repeat(1000);
+			const { stdout } = failed(coloured);
+
+			// 1000 lines of 5 characters once cleaned; the raw capture is much longer than that.
+			expect(stdout?.totalChars).toBe(5000);
+			expect(coloured.length).toBeGreaterThan(10_000);
+			expect(stdout?.truncated).toBe(true);
+			expect(stdout?.text).toHaveLength(MAX_CAPPED_CHARS);
+			expect(stdout?.text).not.toContain(ESC);
+		});
+
+		it('does not guess secrets: an assignment that looks like a token is served as stored', () => {
+			const { stdout } = failed('API_KEY=abc123def');
+
+			expect(stdout?.text).toBe('API_KEY=abc123def');
+		});
 	});
 
 	it('caps and truncates long relaunch feedback', () => {
 		const io = describeStepIO(undefined, {
 			status: 'completed',
-			relaunches: [{ at: '2026-08-16T12:00:30.000Z', feedback: `password=hunter2 ${'y'.repeat(1000)}` }],
+			relaunches: [{ at: '2026-08-16T12:00:30.000Z', feedback: `retry ${ESC}[31m${'y'.repeat(1000)}` }],
 		});
 
 		expect(io.recorded.relaunches[0]!.feedback.length).toBeLessThanOrEqual(300);
-		expect(io.recorded.relaunches[0]!.feedback).not.toContain('hunter2');
+		expect(io.recorded.relaunches[0]!.feedback).not.toContain(ESC);
 	});
 
 	it('has an empty record for a step that never started and no declaration for an unknown step', () => {

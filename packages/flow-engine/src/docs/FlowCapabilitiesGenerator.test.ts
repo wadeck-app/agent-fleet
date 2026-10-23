@@ -1,5 +1,10 @@
+import * as yaml from 'js-yaml';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { SECRET_EXAMPLE_FLOW_YAML } from '../secrets/SecretFlowExample';
+import { SecretUsageAnalyzer } from '../secrets/SecretUsageAnalyzer';
+import type { FlowDefinition } from '../types';
+import { FlowValidator } from '../validation/FlowValidator';
 import { FlowCapabilitiesGenerator } from './FlowCapabilitiesGenerator';
 
 describe('FlowCapabilitiesGenerator', () => {
@@ -104,5 +109,54 @@ describe('FlowCapabilitiesGenerator', () => {
 	it('is deterministic — generate() returns the same string on repeated calls', () => {
 		const second = generator.generate();
 		expect(second).toBe(result);
+	});
+});
+
+describe('FlowCapabilitiesGenerator - secrets', () => {
+	const result = new FlowCapabilitiesGenerator().generate();
+
+	it('no longer describes password as UI-only masking', () => {
+		expect(result).not.toContain('Sensitive value, masked in UI');
+		expect(result).toContain('| `password` |');
+		expect(result).toContain('secret');
+	});
+
+	it('has a Secrets section covering declaration, run time, usage, limits and masking', () => {
+		expect(result).toContain('## Section 8: Secrets');
+		expect(result).toContain('type: password');
+		expect(result).toContain('-i API_TOKEN=env://');
+		expect(result).toContain('file://./');
+		expect(result).toContain('daemon environment');
+		expect(result).toContain('secrets: [API_TOKEN]');
+		expect(result).toContain('model');
+		expect(result).toContain('user_intervention');
+		expect(result).toContain('subflow');
+		expect(result).toContain('at least 8 characters');
+		expect(result).toContain('[secret:NAME]');
+		for (const encoding of ['raw', 'JSON-escaped', 'URL-encoded', 'base64', 'hex']) {
+			expect(result).toContain(encoding);
+		}
+		expect(result).toContain('NOT covered');
+	});
+
+	it('embeds the shared example flow', () => {
+		expect(result).toContain(SECRET_EXAMPLE_FLOW_YAML.trim());
+	});
+});
+
+describe('SECRET_EXAMPLE_FLOW_YAML', () => {
+	it('is a valid flow without validation errors', () => {
+		const flow = yaml.load(SECRET_EXAMPLE_FLOW_YAML) as FlowDefinition;
+		const result = new FlowValidator().validate(flow);
+		expect(result.issues.filter(issue => issue.severity === 'error')).toEqual([]);
+		expect(new SecretUsageAnalyzer().describe(flow)).toEqual([
+			{
+				name: 'API_TOKEN',
+				required: true,
+				sourceKind: 'run-time',
+				usedBy: ['call-api'],
+				description: expect.any(String),
+			},
+		]);
 	});
 });

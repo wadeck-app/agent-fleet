@@ -17,6 +17,7 @@ import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { appCoreModuleOptions } from '../daemon/AppModuleLocator.js';
 import { Daemon, writeDaemonLog } from '../daemon/Daemon.js';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
+import { describeCommandLine } from './CommandLineLog';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { buildCliCommand } from './commands/CliCommand.js';
 import { registerDocsCommand } from './commands/DocsCommand';
@@ -235,7 +236,8 @@ async function main(): Promise<void> {
 	try {
 		const logsDir = logsDirOf(flowConfigDir());
 		const args = process.argv.slice(2);
-		writeDaemonLog(logsDir, 'info', `cmd: flow ${args.join(' ')}`);
+		// Input values are omitted: any input may be a secret and the log is a plain file.
+		writeDaemonLog(logsDir, 'info', describeCommandLine(args));
 	} catch {
 		// never block the CLI on logging failure
 	}

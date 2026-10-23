@@ -1,3 +1,5 @@
+import { SecretsDocumentation } from '../secrets/SecretsDocumentation';
+
 /**
  * Flow Capabilities Generator
  *
@@ -8,6 +10,8 @@
  * No runtime reflection -- structure is hardcoded mirroring types.ts.
  */
 export class FlowCapabilitiesGenerator {
+	private readonly secretsDocumentation = new SecretsDocumentation();
+
 	/**
 	 * Generate a structured Markdown document describing all flow engine capabilities.
 	 *
@@ -23,6 +27,7 @@ export class FlowCapabilitiesGenerator {
 			this.generateStatusTransitions(),
 			this.generateInterventionTypes(),
 			this.generateFeedbackAndRetrospectiveAPIs(),
+			this.secretsDocumentation.generate(),
 		].join('\n\n');
 	}
 
@@ -197,7 +202,7 @@ All 20 supported \`VariableType\` values:
 ### Security types
 | Type | Description |
 |------|-------------|
-| \`password\` | Sensitive value, masked in UI |
+${SecretsDocumentation.PASSWORD_TYPE_ROW}
 
 ### Business types
 | Type | Description |
