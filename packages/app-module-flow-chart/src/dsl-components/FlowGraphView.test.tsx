@@ -1,7 +1,8 @@
 import { MemoryRouter } from 'react-router-dom';
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import type { FlowGraphResult } from 'flow-core';
+import { ButtonLink } from '@wadeck-app/dsl-ui';
+import { FLOW_ACTION_BUTTON_STYLE, type FlowGraphResult } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
 import { FlowGraphView } from './FlowGraphView.js';
@@ -52,6 +53,18 @@ describe('FlowGraphView', () => {
 			'href',
 			'/modules/flow/executions/exec1/logs'
 		);
+	});
+
+	it('draws that logs link with the contract style of every action next to an execution', () => {
+		renderView(executionResult());
+		const logs = screen.getByRole('link', { name: 'Logs' });
+		cleanup();
+		render(
+			<MemoryRouter>
+				<ButtonLink to="/x" label="Reference" {...FLOW_ACTION_BUTTON_STYLE} />
+			</MemoryRouter>
+		);
+		expect(logs.className).toBe(screen.getByRole('link', { name: 'Reference' }).className);
 	});
 
 	it('has no logs link for a definition without a run', () => {

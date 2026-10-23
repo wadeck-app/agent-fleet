@@ -45,6 +45,14 @@ describe.each(['cards', 'list'])('FlowIndexList %s', layout => {
 		expect(within(screen.getByTestId('flow-lint')).queryByText(/failed/)).toBeNull();
 	});
 
+	it('gives both chart links the one action style of the flow module (no primary next to a secondary)', () => {
+		show([row('build', 'failed')], layout);
+		const build = within(screen.getByTestId('flow-build'));
+		expect(build.getByRole('link', { name: 'Open chart' }).className).toBe(
+			build.getByRole('link', { name: 'Latest run chart' }).className
+		);
+	});
+
 	it('says so when there is no flow (custom message first)', () => {
 		show([], layout, 'No flow matches your filter.');
 		expect(screen.getByRole('status').textContent).toBe('No flow matches your filter.');

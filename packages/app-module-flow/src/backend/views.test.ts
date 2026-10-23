@@ -1,6 +1,7 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import {
 	DEFAULT_HISTORY_LIMIT,
+	FLOW_ACTION_BUTTON_STYLE,
 	FLOW_CHART_INDEX_PATH,
 	FLOW_EXECUTION_ROW_CONTEXT_FIELDS,
 	LOG_LEVELS,
@@ -171,6 +172,34 @@ describe('dsl-views', () => {
 	});
 });
 
+describe('action buttons next to an execution', () => {
+	// The look is one for every action (own or contributed): the flow-core style, on a ButtonLink (a navigation that reads as a button).
+	it('uses the contract style on the Logs button of the detail header, in every variant', () => {
+		for (const { variant, document } of alternativesOf('execution-detail-page.yaml')) {
+			const logs = collectNodes(document, 'ButtonLink').filter(link => link['label'] === 'Logs');
+			expect(logs, String(variant)).toHaveLength(1);
+			expect(logs[0], String(variant)).toMatchObject(FLOW_ACTION_BUTTON_STYLE);
+		}
+	});
+
+	it('uses the contract style on the Logs button of the expanded row panel, as a ButtonLink and not a text Link, in every variant', () => {
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			const tables = collectNodes(document, 'DataTable').filter(table => table['expansion'] !== undefined);
+			expect(tables.length, String(variant)).toBeGreaterThan(0);
+			for (const table of tables) {
+				expect(collectNodes(table['expansion'], 'Link'), String(variant)).toEqual([]);
+				const logs = collectNodes(table['expansion'], 'ButtonLink');
+				expect(logs, String(variant)).toHaveLength(1);
+				expect(logs[0], String(variant)).toMatchObject({
+					label: 'Logs',
+					to: '$ctx.row.logsHref',
+					...FLOW_ACTION_BUTTON_STYLE,
+				});
+			}
+		}
+	});
+});
+
 describe('executions page', () => {
 	it('offers the backend default page size first: PageSizeSelect shows options[0] while ?size= is absent', () => {
 		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
@@ -253,7 +282,7 @@ describe('executions table row panel (links of the run, and the per-row extensio
 			const panel = executionsTableOf(document)['expansion'];
 			expect(panel, String(variant)).toBeDefined();
 			expect(
-				collectNodes(panel, 'Link').map(link => [link['label'], link['href']]),
+				collectNodes(panel, 'ButtonLink').map(link => [link['label'], link['to']]),
 				String(variant)
 			).toEqual([['Logs', '$ctx.row.logsHref']]);
 			const [slot] = collectNodes(panel, 'ExtensionSlot');

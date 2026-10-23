@@ -6,6 +6,9 @@ import { type QueryParams, optionalString } from './QueryParameters.js';
 export const FLOW_HEALTHS = ['failing', 'running', 'healthy'] as const;
 export type FlowHealth = (typeof FLOW_HEALTHS)[number];
 
+/** The explicit "no health filter" of a request (an empty value means the same). */
+export const FLOW_HEALTH_ANY = 'any';
+
 export interface FlowIndexFilter {
 	/** Case-insensitive text looked for in the flow id. */
 	q?: string;
@@ -47,15 +50,26 @@ export function groupByHealth(flows: readonly FlowSummary[]): FlowHealthGroup[] 
 	return FLOW_HEALTHS.map(health => ({ health, flows: flows.filter(flow => flowHealth(flow) === health) }));
 }
 
-/** `q` and `health` of a request; an unknown health is refused with the accepted values. */
+/** How many flows are in each health, every health present (zero included), in FLOW_HEALTHS order. */
+export function countByHealth(flows: readonly FlowSummary[]): Record<FlowHealth, number> {
+	const counts = { failing: 0, running: 0, healthy: 0 };
+	for (const flow of flows) {
+		counts[flowHealth(flow)] += 1;
+	}
+	return counts;
+}
+
+/** `q` and `health` of a request (health "any" or empty = no filter); an unknown health is refused with the accepted values. */
 export function readFlowIndexFilter(query: QueryParams): FlowIndexFilter {
 	const q = optionalString(query, 'q');
 	const health = optionalString(query, 'health');
-	if (health !== undefined && !(FLOW_HEALTHS as readonly string[]).includes(health)) {
-		throw new InvalidQueryError(`'health' must be one of ${FLOW_HEALTHS.join(', ')}, got '${health}'.`);
+	if (health !== undefined && health !== FLOW_HEALTH_ANY && !(FLOW_HEALTHS as readonly string[]).includes(health)) {
+		throw new InvalidQueryError(
+			`'health' must be one of ${[FLOW_HEALTH_ANY, ...FLOW_HEALTHS].join(', ')}, got '${health}'.`
+		);
 	}
 	return {
 		...(q !== undefined ? { q } : {}),
-		...(health !== undefined ? { health: health as FlowHealth } : {}),
+		...(health !== undefined && health !== FLOW_HEALTH_ANY ? { health: health as FlowHealth } : {}),
 	};
 }

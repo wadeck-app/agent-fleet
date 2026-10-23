@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { InvalidQueryError } from '../errors.js';
 import type { FlowSummary } from '../history/FlowSummaries.js';
-import { filterFlowSummaries, flowHealth, groupByHealth, readFlowIndexFilter } from './FlowIndex.js';
+import { countByHealth, filterFlowSummaries, flowHealth, groupByHealth, readFlowIndexFilter } from './FlowIndex.js';
 
 function flow(flowId: string, lastStatus: FlowSummary['lastStatus']): FlowSummary {
 	return {
@@ -69,5 +69,28 @@ describe('readFlowIndexFilter', () => {
 	it('refuses an unknown health and lists the accepted ones', () => {
 		expect(() => readFlowIndexFilter({ health: 'sick' })).toThrow(InvalidQueryError);
 		expect(() => readFlowIndexFilter({ health: 'sick' })).toThrow(/failing, running, healthy/);
+	});
+});
+
+describe('readFlowIndexFilter with the explicit "any"', () => {
+	it('reads any as no health filter (the value of the "all" chip and of a shared link)', () => {
+		expect(readFlowIndexFilter({ health: 'any' })).toEqual({});
+		expect(readFlowIndexFilter({ q: 'x', health: 'any' })).toEqual({ q: 'x' });
+	});
+
+	it('lists any among the accepted values of a refused health', () => {
+		expect(() => readFlowIndexFilter({ health: 'sick' })).toThrow(/any, failing, running, healthy.*'sick'/);
+	});
+});
+
+describe('countByHealth', () => {
+	it('counts every health, zero included, in FLOW_HEALTHS order', () => {
+		const counts = countByHealth([flow('a', 'completed'), flow('b', 'failed'), flow('c', 'failed')]);
+		expect(counts).toEqual({ failing: 2, running: 0, healthy: 1 });
+		expect(Object.keys(counts)).toEqual(['failing', 'running', 'healthy']);
+	});
+
+	it('is all zeros without a flow', () => {
+		expect(countByHealth([])).toEqual({ failing: 0, running: 0, healthy: 0 });
 	});
 });

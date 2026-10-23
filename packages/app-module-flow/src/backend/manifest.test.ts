@@ -1,4 +1,4 @@
-import { FLOW_APP_MODULE_ID, FLOW_EXPOSED_SLOTS, FLOW_PAGE_PATHS } from 'flow-core';
+import { FLOW_ACTION_SLOT_ACCEPTS, FLOW_APP_MODULE_ID, FLOW_EXPOSED_SLOTS, FLOW_PAGE_PATHS } from 'flow-core';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -79,10 +79,9 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 			}
 		});
 
-		it('accepts button-like root $types only, never a page-sized component', () => {
+		it('accepts only the action-slot contract roots (the one component whose style is fixed), never a free-form component', () => {
 			for (const [name, slot] of Object.entries(slots)) {
-				expect(slot.accepts, `slot ${name}`).toEqual(expect.arrayContaining(['ActionBar', 'ButtonLink']));
-				expect(slot.accepts, `slot ${name}`).not.toContain('PageContent');
+				expect(slot.accepts, `slot ${name}`).toEqual([...FLOW_ACTION_SLOT_ACCEPTS]);
 			}
 		});
 

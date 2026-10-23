@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { type ComponentRegistryEntry, resolveExpressionValue } from '@wadeck-app/dsl-renderer';
 
 import { FlowChartLink } from './FlowChartLink.js';
+import { FLOW_CHART_LINK_KEYS, readFlowChartLinkProps } from './FlowChartLinkProps.js';
 import { FlowGraph } from './FlowGraph.js';
 import type { GraphTarget } from './FlowGraphLoader.js';
 import { FlowIndexList } from './FlowIndexList.js';
@@ -47,9 +48,8 @@ const entries: ComponentRegistryEntry[] = [
 		name: 'FlowChartLink',
 		category: 'atomic',
 		tags: ['flow', 'chart', 'link'],
-		knownKeys: ['executionId'],
-		render: ({ node, ctx }) =>
-			createElement(FlowChartLink, { executionId: resolveExpressionValue(node['executionId'], ctx) }),
+		knownKeys: [...FLOW_CHART_LINK_KEYS],
+		render: ({ node, ctx }) => createElement(FlowChartLink, readFlowChartLinkProps(node, ctx)),
 	},
 	{
 		name: 'FlowIndexList',

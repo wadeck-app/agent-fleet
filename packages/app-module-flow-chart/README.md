@@ -13,13 +13,15 @@ app-core module `flow-chart`: draws a flow as a graph (steps, `depends`, `when`,
 | Route `/modules/flow-chart/flows/:flowId`                      | Definition chart                                        | `flow-chart-page.yaml`                    |
 | Route `/modules/flow-chart/flows/runs/:id`                     | Run chart, refreshed every 4 s while the run is live    | `execution-chart-page.yaml`               |
 
-Routes (`/api/modules/flow-chart/...`): `GET /graph?executionId=` or `?flowId=` (exactly one), `GET /flows?q=&health=&page=&limit=` (adds `runCount`, `lastStatus`, `lastRunId`, `lastRunAt` as ISO, `health`, `chartPath`, `lastRunChartPath`), `GET /flows/health?q=` (flows grouped failing / running / healthy, up to 500).
+Routes (`/api/modules/flow-chart/...`): `GET /graph?executionId=` or `?flowId=` (exactly one), `GET /flows?q=&health=&page=&limit=` (adds `runCount`, `lastStatus`, `lastRunId`, `lastRunAt` as ISO, `health`, `chartPath`, `lastRunChartPath`, `emptyMessage`, `chips`; `health=any` = no filter), `GET /flows/health?q=` (flows grouped failing / running / healthy, up to 500).
 
 Components (`src/dsl-components`, bundled with xyflow and dagre): `flow-chart:FlowGraph`, `flow-chart:FlowChartLink`, `flow-chart:FlowIndexList` (`layout: cards | list`; the DSL cannot repeat a node per row). The link is a component because a contributed view cannot concatenate `$route.id` into a path.
 
 ## Run path, step inputs/outputs, header, sub-steps, flows index
 
 A run chart numbers the steps in run order, marks skipped / not reached steps, and fades the edges the run did not follow; the step panel lists inputs, outputs, data-flow links and a Logs link (`?step=`). Pages carry no "Back to" link (the shell has a breadcrumb). The execution record holds no step input or output values and is not secret-masked: details in [.docs/chart-and-index.md](.docs/chart-and-index.md).
+
+Step panel A/B tests: `flow-chart-step-panel` (`overlay`, `drawer`, `tabs`, `accordion`) and `flow-chart-step-panel-density` (see the doc). Flows index A/B tests (dev shell dock): `flow-chart-index-design` (`table`, `cards`, `list`, `health-board`) and, nested in `table`, `flow-chart-index-filters` (`bar`, `inline`, `chips`). Compose and keep one: see the doc.
 
 ## `requires`
 

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+	FLOW_ACTION_BUTTON_STYLE,
+	FLOW_ACTION_SLOT_ACCEPTS,
 	FLOW_EXECUTION_ROW_CONTEXT_FIELDS,
 	FLOW_EXPOSED_SLOTS,
 	FLOW_PAGE_PATHS,
+	FLOW_REQUIRED_RANGE,
 	executionLogsPath,
 	executionPagePath,
 } from './FlowModuleContract.js';
@@ -17,11 +20,29 @@ describe('FLOW_EXPOSED_SLOTS', () => {
 		]);
 	});
 
-	it('accepts button-like root types only, never a page-sized component', () => {
+	it('gives every slot the same accepted roots, the action-slot contract', () => {
 		for (const [slot, accepts] of Object.entries(FLOW_EXPOSED_SLOTS)) {
-			expect(accepts, slot).toEqual(expect.arrayContaining(['ActionBar', 'ButtonLink']));
-			expect(accepts, slot).not.toContain('PageContent');
+			expect(accepts, slot).toEqual(FLOW_ACTION_SLOT_ACCEPTS);
 		}
+	});
+});
+
+describe('FLOW_ACTION_SLOT_ACCEPTS', () => {
+	it('is the single flow-chart component whose style is fixed, never a component with free style props', () => {
+		expect([...FLOW_ACTION_SLOT_ACCEPTS]).toEqual(['flow-chart:FlowChartLink']);
+		expect(FLOW_ACTION_SLOT_ACCEPTS).not.toContain('ButtonLink');
+	});
+});
+
+describe('FLOW_REQUIRED_RANGE', () => {
+	it('accepts any flow version, prereleases included', () => {
+		expect(FLOW_REQUIRED_RANGE).toBe('*');
+	});
+});
+
+describe('FLOW_ACTION_BUTTON_STYLE', () => {
+	it('is the secondary small button, the look of every action next to an execution', () => {
+		expect(FLOW_ACTION_BUTTON_STYLE).toEqual({ variant: 'secondary', size: 'sm' });
 	});
 });
 

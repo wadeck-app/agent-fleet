@@ -1,10 +1,8 @@
 import { MemoryRouter } from 'react-router-dom';
 
 import { render, screen, waitFor } from '@testing-library/react';
-import { chartPathOfExecution } from 'flow-core';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FlowChartLink } from './FlowChartLink.js';
 import { FlowGraph } from './FlowGraph.js';
 import entries from './index.js';
 import { BUILD_GRAPH } from './testing/GraphFixtures.js';
@@ -43,41 +41,13 @@ describe('FlowGraph', () => {
 	});
 });
 
-describe('FlowChartLink', () => {
-	it('links to the chart page of the execution', () => {
-		render(
-			<MemoryRouter>
-				<FlowChartLink executionId="abc 1" />
-			</MemoryRouter>
-		);
-		expect(screen.getByRole('link', { name: 'See flow chart' })).toHaveAttribute(
-			'href',
-			'/modules/flow-chart/flows/runs/abc%201'
-		);
-		expect(chartPathOfExecution('abc')).toBe('/modules/flow-chart/flows/runs/abc');
-	});
-
-	it('says what is wrong when no id reaches it, instead of rendering nothing', () => {
-		render(<FlowChartLink executionId={undefined} />);
-		expect(screen.getByRole('alert')).toHaveTextContent('executionId: $route.id');
-	});
-});
-
 describe('registry entries', () => {
 	const byName = (name: string) => entries.find(e => e.name === name)!;
 	const renderEntry = (name: string, node: Record<string, unknown>, ctx: Record<string, unknown>) =>
 		render(<MemoryRouter>{byName(name).render({ node, registry: {}, ctx })}</MemoryRouter>);
 
-	it('registers FlowGraph and FlowChartLink (app-core prefixes them with flow-chart:)', () => {
+	it('registers FlowGraph and FlowChartLink (app-core prefixes them with flow-chart:; FlowChartLink has its own test file)', () => {
 		expect(entries.map(e => e.name).sort()).toEqual(['FlowChartLink', 'FlowGraph', 'FlowIndexList']);
-	});
-
-	it('FlowChartLink reads executionId from the host page context ($route.id)', () => {
-		renderEntry('FlowChartLink', { executionId: '$route.id' }, { $route: { id: 'exec9' } });
-		expect(screen.getByRole('link', { name: 'See flow chart' })).toHaveAttribute(
-			'href',
-			'/modules/flow-chart/flows/runs/exec9'
-		);
 	});
 
 	it('FlowGraph without any id says what to set', () => {

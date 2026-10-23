@@ -1,4 +1,4 @@
-import { FLOW_APP_MODULE_ID, FLOW_CHART_APP_MODULE_ID, FLOW_EXPOSED_SLOTS } from 'flow-core';
+import { FLOW_APP_MODULE_ID, FLOW_CHART_APP_MODULE_ID, FLOW_EXPOSED_SLOTS, FLOW_REQUIRED_RANGE } from 'flow-core';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -88,7 +88,7 @@ describe('requirement on the flow module', () => {
 
 	// "*" on purpose: app-core matches with includePrerelease, and CI stamps prereleases like 2026.10.19-663-3ea4c829.
 	it('accepts any flow version', () => {
-		expect(manifest.requires?.[FLOW_APP_MODULE_ID]).toBe('*');
+		expect(manifest.requires?.[FLOW_APP_MODULE_ID]).toBe(FLOW_REQUIRED_RANGE);
 	});
 
 	// app-core matches with includePrerelease: CI stamps 2026.10.19-663-3ea4c829, a local build 0.1.0.

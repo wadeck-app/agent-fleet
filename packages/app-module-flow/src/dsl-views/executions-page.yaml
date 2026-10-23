@@ -101,7 +101,13 @@ sections:
                             gap: gap-3
                             align: items-center
                             items:
-                                - { $type: Link, label: Logs, href: $ctx.row.logsHref }
+                                - {
+                                      $type: ButtonLink,
+                                      label: Logs,
+                                      to: $ctx.row.logsHref,
+                                      variant: secondary,
+                                      size: sm,
+                                  }
                                 # Renders nothing while no module contributes.
                                 - $type: ExtensionSlot
                                   items: $sources.rowActions

@@ -32,13 +32,49 @@ The record keeps per step: status, start of the latest attempt, completion, atte
 
 ## Flows index (A/B)
 
-`flows-page.yaml` declares the AbTest `flow-chart-index-design` (the viewing shell needs dsl-ui >= 2026.10.19-110; `manifest.json` keeps `>=2026.10.3-0` on purpose: app-core checks the range against the server's build-info.json, which can be older than the shell, and refuses the whole module then). Dock and `?ab.<id>=<variant>` work only in a development shell; a production shell, including the `app-core-cli dev` bundle, shows `initial`.
+`flows-page.yaml` declares two independent experiments. The viewing shell needs dsl-ui >= 2026.10.19-110 (`manifest.json` keeps `>=2026.10.3-0` on purpose: app-core checks the range against the server's build-info.json, which can be older than the shell, and refuses the whole module then). Dock and `?ab.<id>=<variant>` work only in a development shell; production and the `app-core-cli dev` bundle show `initial`.
 
-| Variant key       | What                                                                 |
-| ----------------- | -------------------------------------------------------------------- |
-| `table` (initial) | The table; a row opens the definition chart                          |
-| `cards`           | Cards with name, status badge, counts, age; search and health filter |
-| `list`            | Search first, dense rows; both chart buttons on every row            |
-| `health-board`    | Failing, running, healthy groups with counts; healthy folded         |
+| Test id                    | Variants (first = initial)               | Where                                         |
+| -------------------------- | ---------------------------------------- | --------------------------------------------- |
+| `flow-chart-index-design`  | `table`, `cards`, `list`, `health-board` | page level (layout)                           |
+| `flow-chart-index-filters` | `bar`, `inline`, `chips`                 | the whole view of the `table` layout (nested) |
 
-Keep one: replace the AbTest by the chosen `view`, resolve the YAML anchors, drop the unused source, update `views.test.ts`. Keep ids and keys stable meanwhile (browsers store the choice).
+Composition: the filters test is nested in the `table` layout, so its dock row appears only while `table` is chosen (`?ab.flow-chart-index-design=table&ab.flow-chart-index-filters=chips`). `cards` and `list` reuse the `bar` filter bar and bottom row through YAML anchors (`&filterBar`, `&pager`); `health-board` keeps only a search box (it groups by health). No density test: dsl-ui has no row height or padding prop (`DataTable` and the stacks read `gap` only).
+
+Filter variants (look of the queue History page: filter bar, table, bottom row with `Pagination` and `PageSizeSelect`; every control has `resetUrlParams: [page]`, dsl-ui >= 2026.10.22-124):
+
+| Variant         | What                                                                               |
+| --------------- | ---------------------------------------------------------------------------------- |
+| `bar` (initial) | `SearchBar ?q=` + `CompactSelect ?health=` above the table                         |
+| `inline`        | The same controls in the header row of the table (`DataTable filtersTop`)          |
+| `chips`         | `SearchBar` + four `ButtonLink` chips (Any, Failing, Running, Healthy) with counts |
+
+Click targets (a cell cannot hold a link, a row action cannot navigate): a row click opens the flow chart; the chevron opens a row panel (`expansion`) with `ButtonLink` "Open chart" and "Latest run chart". Their paths are row fields built by the route from flow-core `chartPathOfFlow` / `chartPathOfExecution`.
+
+`GET /flows` also sends `emptyMessage` ("No flows on this page" / "No flow matches the filters" / "No flow has run yet: ...") and `chips`. Chips are four named objects (`any`, `failing`, `running`, `healthy`) with `label` ("Failing (12)", counts follow `q` only), `to` (index page keeping `q` and the page size, no page) and `variant` (`primary` when active): the DSL has no URL-bound toggle, no conditional and cannot repeat a node. `health=any` or empty means no filter.
+
+Limits: at 800 px the table scrolls sideways (same as the executions page) and chip labels wrap; a chip click reloads the page (`ButtonLink` is a router link, the page size is kept only because the route echoes it).
+
+Keep one: replace each AbTest by the chosen `view`, resolve the YAML anchors, update `views.test.ts` (ids are pinned). Keep ids and keys stable meanwhile (browsers store the choice).
+
+## Step panel (A/B)
+
+Cause of the old overflow (measured: 1132 px panel in a 781 px frame at 1280x800, header scrolled away): the cap was `100vh`, not the frame (`DETAILS_STICKY_CLASS`), and the header was inside the scrolling box. Now every layout caps the panel at the frame (`min(100%, 100vh - 1rem)` beside the chart, 70vh when stacked under it below 1024 px), keeps the header (name, status, Close) fixed and scrolls the body. Opening it moves the focus to the panel (scrolled into view when stacked below the fold); Escape inside closes it; stdout/stderr/error have a Copy button (a refused copy shows why).
+
+Two independent tests, declared in code (`StepPanelExperiment.ts`, dsl-ui `useAbTest` + `useRegisterAbTests`; the DSL cannot express a React layout). They apply only when the shell dock is on (dev shell); otherwise, or with a stored choice but no dock, the hook returns `initial`. Force one with `?ab.<id>=<variant>`.
+
+| Test id                         | Variants (first = initial)                 |
+| ------------------------------- | ------------------------------------------ |
+| `flow-chart-step-panel`         | `overlay`, `drawer`, `tabs`, `accordion`   |
+| `flow-chart-step-panel-density` | `comfortable`, `compact` (text, block cap) |
+
+| Variant     | Idea                                                                                               |
+| ----------- | -------------------------------------------------------------------------------------------------- |
+| `overlay`   | Floating panel over the right of the chart, header fixed, body scrolls                             |
+| `drawer`    | Docked right over the full chart height, resizable (drag or arrow keys, 280-640 px); chart narrows |
+| `tabs`      | Summary / Error / Inputs / Links / Outputs, one at a time; opens on Error for a failed step        |
+| `accordion` | Collapsible sections, only Error open (Summary when none)                                          |
+
+Not built: a bottom dock (steals height from a 420 px chart; the drawer covers the resizable case). Needs a shell dsl-ui that exports `useAbTest`, `useRegisterAbTests` and `useAbExperiments`; `manifest.json` still declares `>=2026.10.3-0` (see the index section for why it is not raised).
+
+Keep one: fix `layout` / `density` in `useStepPanelExperiment`, delete `StepPanelExperiment.ts`, the unused layouts (`StepPanelTabs`, `StepPanelAccordion`, `DrawerResizeHandle`, the drawer branch of `StepPanelDock`) and their tests.

@@ -1,10 +1,8 @@
 # Contributed to the slot "flow:execution-actions" of the flow module (execution detail page). The view is rendered
 # with the host page's context, so $route.id is the execution id. A custom component builds the link because a
 # DSL string cannot be concatenated (/modules/flow-chart/flows/runs/ + id).
-# The root must be one of the slot's `accepts`; only the root is validated, so the custom component can be a child.
-$type: HorizontalStack
-gap: gap-2
-align: items-center
-items:
-    - $type: flow-chart:FlowChartLink
-      executionId: $route.id
+# The root must be the one component the slot accepts (flow-core FLOW_ACTION_SLOT_ACCEPTS): its style is fixed by the
+# flow module's contract and any other key than target and executionId is refused by the component.
+$type: flow-chart:FlowChartLink
+target: execution
+executionId: $route.id

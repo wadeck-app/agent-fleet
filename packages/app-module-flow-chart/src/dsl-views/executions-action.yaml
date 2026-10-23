@@ -1,8 +1,6 @@
 # Contributed to the slot "flow:executions-actions" of the flow module (executions list page). The list has no
 # per-row slot (a DataTable row cannot host a contributed view), so the entry point is one page-level link to the
 # flows index, where a flow is picked; from an execution's own page, the "See flow chart" button draws that run.
-$type: ButtonLink
-label: Flow charts
-to: /modules/flow-chart/flows
-variant: secondary
-size: sm
+# Same component and same fixed style as the other two contributions (the slot accepts nothing else).
+$type: flow-chart:FlowChartLink
+target: index

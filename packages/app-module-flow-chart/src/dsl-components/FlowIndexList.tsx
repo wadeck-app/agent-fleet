@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 
 import { Badge, ButtonLink, RelativeDate } from '@wadeck-app/dsl-ui';
+import { FLOW_ACTION_BUTTON_STYLE } from 'flow-core/graph-tree';
 
 export type FlowIndexLayout = 'cards' | 'list';
 
@@ -64,8 +65,8 @@ function renderCounts(flow: FlowIndexRow) {
 function renderActions(flow: FlowIndexRow) {
 	return (
 		<div className="flex flex-wrap items-center gap-2">
-			<ButtonLink to={flow.chartPath} label="Open chart" variant="primary" size="sm" />
-			<ButtonLink to={flow.lastRunChartPath} label="Latest run chart" variant="secondary" size="sm" />
+			<ButtonLink to={flow.chartPath} label="Open chart" {...FLOW_ACTION_BUTTON_STYLE} />
+			<ButtonLink to={flow.lastRunChartPath} label="Latest run chart" {...FLOW_ACTION_BUTTON_STYLE} />
 		</div>
 	);
 }

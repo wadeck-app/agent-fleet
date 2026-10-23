@@ -1,8 +1,5 @@
 # Contributed to the slot "flow:execution-row-actions" of the flow module (expanded row of the executions table).
 # The row is the context: $ctx.row.executionId (whole-string expressions only). Same component as the detail page button.
-$type: HorizontalStack
-gap: gap-2
-align: items-center
-items:
-    - $type: flow-chart:FlowChartLink
-      executionId: $ctx.row.executionId
+$type: flow-chart:FlowChartLink
+target: execution
+executionId: $ctx.row.executionId

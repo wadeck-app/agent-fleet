@@ -3,7 +3,13 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Badge, ButtonLink } from '@wadeck-app/dsl-ui';
 import { Background, ReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { FlowGraphResult } from 'flow-core';
-import { buildGraphTree, defaultCollapsedIds, executionLogsPath, executionStepLogsPath } from 'flow-core/graph-tree';
+import {
+	FLOW_ACTION_BUTTON_STYLE,
+	buildGraphTree,
+	defaultCollapsedIds,
+	executionLogsPath,
+	executionStepLogsPath,
+} from 'flow-core/graph-tree';
 
 import { describeChartMode } from './ChartMode.js';
 import { ChartToolbar } from './ChartToolbar.js';
@@ -17,13 +23,11 @@ import { nodeStyle } from './NodeAppearance.js';
 import { useShellColorMode } from './ShellColorMode.js';
 import { summarizeStatuses } from './StatusSummary.js';
 import { StepDetailsPanel } from './StepDetailsPanel.js';
+import { StepPanelDock } from './StepPanelDock.js';
+import { useStepPanelExperiment } from './StepPanelExperiment.js';
 import { toFlowElements } from './ToFlowElements.js';
 
 const NODE_TYPES = { step: FlowStepNode };
-
-// Written out in full: Tailwind finds classes by scanning source text.
-const DETAILS_OVERLAY_CLASS = 'mt-3 lg:pointer-events-none lg:absolute lg:inset-y-0 lg:right-2 lg:mt-0 lg:w-80 lg:py-2';
-const DETAILS_STICKY_CLASS = 'lg:pointer-events-auto lg:sticky lg:top-2 lg:max-h-[calc(100vh-1rem)] lg:overflow-auto';
 
 const WARNING_BANNER_CLASS = 'rounded-md border border-warning bg-warning-bg px-3 py-2 text-sm text-warning-text';
 
@@ -107,6 +111,7 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 	const direction: LayoutDirection = plan?.direction ?? 'LR';
 	const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
 	const colorMode = useShellColorMode();
+	const { layout: panelLayout, density: panelDensity } = useStepPanelExperiment();
 	const [focusedOnStep, setFocusedOnStep] = useState(false);
 	const focusId = useMemo(
 		() => (graph.nodes.length > 0 ? pickFocusStep(graph, direction, collapsed) : ''),
@@ -161,8 +166,7 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 						<ButtonLink
 							to={executionLogsPath(execution.executionId)}
 							label="Logs"
-							variant="secondary"
-							size="sm"
+							{...FLOW_ACTION_BUTTON_STYLE}
 						/>
 					)}
 				</div>
@@ -202,60 +206,61 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 							}
 						/>
 						{plan && (
-							<div className="relative">
-								<div
-									className="relative min-h-[420px] overflow-hidden rounded-lg border border-border bg-bg"
-									style={{ height: plan.canvasHeight }}
-									data-testid="chart-canvas"
-								>
-									<ReactFlow
-										// A new layout direction is a new chart: remounting re-runs the initial fit.
-										key={direction}
-										nodes={elements.nodes}
-										edges={elements.edges}
-										nodeTypes={NODE_TYPES}
-										// Same as the shell: xyflow's class name re-scopes the shell's color tokens.
-										colorMode={colorMode}
-										minZoom={0.1}
-										maxZoom={2}
-										// On a canvas taller than the window the page scrolls over it: zooming needs ctrl/cmd + wheel.
-										zoomOnScroll={!plan.grown}
-										preventScrolling={!plan.grown}
-										nodesDraggable={false}
-										nodesConnectable={false}
-										edgesFocusable={false}
-										elementsSelectable
-										onNodeClick={(_event, node) => setSelectedId(node.id)}
-										onPaneClick={() => setSelectedId(undefined)}
-										proOptions={{ hideAttribution: true }}
+							<StepPanelDock
+								layout={panelLayout}
+								canvas={
+									<div
+										className="relative min-h-[420px] overflow-hidden rounded-lg border border-border bg-bg"
+										style={{ height: plan.canvasHeight }}
+										data-testid="chart-canvas"
 									>
-										<Background color="var(--color-border)" gap={20} />
-										<InitialViewport
-											focusId={focusId}
-											focus={plan.focus}
-											direction={direction}
-											onFocused={setFocusedOnStep}
-										/>
-									</ReactFlow>
-								</div>
-								{selected !== undefined && (
-									// Over the canvas on wide windows (the chart keeps the full width), below it on narrow ones; sticky so it stays in view on a tall canvas.
-									<div className={DETAILS_OVERLAY_CLASS}>
-										<div className={DETAILS_STICKY_CLASS}>
-											<StepDetailsPanel
-												step={selected}
-												labelOf={labelOf}
-												onSelectStep={setSelectedId}
-												logsPath={
-													execution &&
-													executionStepLogsPath(execution.executionId, selected.id)
-												}
-												onClose={() => setSelectedId(undefined)}
+										<ReactFlow
+											// A new layout direction is a new chart: remounting re-runs the initial fit.
+											key={direction}
+											nodes={elements.nodes}
+											edges={elements.edges}
+											nodeTypes={NODE_TYPES}
+											// Same as the shell: xyflow's class name re-scopes the shell's color tokens.
+											colorMode={colorMode}
+											minZoom={0.1}
+											maxZoom={2}
+											// On a canvas taller than the window the page scrolls over it: zooming needs ctrl/cmd + wheel.
+											zoomOnScroll={!plan.grown}
+											preventScrolling={!plan.grown}
+											nodesDraggable={false}
+											nodesConnectable={false}
+											edgesFocusable={false}
+											elementsSelectable
+											onNodeClick={(_event, node) => setSelectedId(node.id)}
+											onPaneClick={() => setSelectedId(undefined)}
+											proOptions={{ hideAttribution: true }}
+										>
+											<Background color="var(--color-border)" gap={20} />
+											<InitialViewport
+												focusId={focusId}
+												focus={plan.focus}
+												direction={direction}
+												onFocused={setFocusedOnStep}
 											/>
-										</div>
+										</ReactFlow>
 									</div>
-								)}
-							</div>
+								}
+								panel={
+									selected === undefined ? undefined : (
+										<StepDetailsPanel
+											step={selected}
+											labelOf={labelOf}
+											onSelectStep={setSelectedId}
+											logsPath={
+												execution && executionStepLogsPath(execution.executionId, selected.id)
+											}
+											onClose={() => setSelectedId(undefined)}
+											layout={panelLayout}
+											density={panelDensity}
+										/>
+									)
+								}
+							/>
 						)}
 					</ReactFlowProvider>
 					<GraphLegend

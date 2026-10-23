@@ -3,21 +3,35 @@ import { useState } from 'react';
 import { ButtonAction } from '@wadeck-app/dsl-ui';
 import type { CappedText } from 'flow-core';
 
+import { CopyButton } from './CopyButton.js';
 import { PREVIEW_CHARS, previewOf } from './StepIODetails.js';
 
-// Written out in full: Tailwind finds classes by scanning source text.
+// The height cap (`max-h-*`) comes from the density, whose classes are written out in full in PanelDensity.ts.
 const BLOCK_CLASS =
-	'max-h-56 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-md border border-border bg-muted-bg p-2 font-mono text-xs text-content';
+	'overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-md border border-border bg-muted-bg p-2 font-mono text-xs text-content';
 
 /** A captured output in a scrollable monospace block; a long one starts shortened, with a button to show the rest. */
-export function CappedBlock({ title, capped }: { title: string; capped: CappedText }) {
+export function CappedBlock({
+	title,
+	capped,
+	heightClass,
+}: {
+	title: string;
+	capped: CappedText;
+	heightClass: string;
+}) {
 	const [expanded, setExpanded] = useState(false);
 	const { text, hiddenChars } = previewOf(capped, expanded);
 	const longer = capped.text.length > PREVIEW_CHARS;
+	// The title reads "stdout" or "stdout (last 2000 of 30880 characters)": the copy button names the stream only.
+	const stream = title.split(' (')[0] ?? title;
 	return (
 		<div>
-			<div className="mb-1 text-xs font-semibold text-muted">{title}</div>
-			<pre className={BLOCK_CLASS} aria-label={title}>
+			<div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+				<div className="text-xs font-semibold text-muted">{title}</div>
+				<CopyButton text={capped.text} what={stream} />
+			</div>
+			<pre className={`${heightClass} ${BLOCK_CLASS}`} aria-label={title}>
 				{text}
 			</pre>
 			{longer && (

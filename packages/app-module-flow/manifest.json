@@ -3,13 +3,13 @@
 	"expose": {
 		"slots": {
 			"execution-actions": {
-				"accepts": ["ActionBar", "HorizontalStack", "ButtonLink", "ButtonAction", "IconButton", "Link"]
+				"accepts": ["flow-chart:FlowChartLink"]
 			},
 			"executions-actions": {
-				"accepts": ["ActionBar", "HorizontalStack", "ButtonLink", "ButtonAction", "IconButton", "Link"]
+				"accepts": ["flow-chart:FlowChartLink"]
 			},
 			"execution-row-actions": {
-				"accepts": ["ActionBar", "HorizontalStack", "ButtonLink", "ButtonAction", "IconButton", "Link"]
+				"accepts": ["flow-chart:FlowChartLink"]
 			}
 		}
 	},

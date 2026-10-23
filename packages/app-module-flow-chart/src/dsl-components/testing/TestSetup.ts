@@ -21,3 +21,15 @@ Object.defineProperties(HTMLElement.prototype, {
 	offsetWidth: { configurable: true, get: () => 1000 },
 	offsetHeight: { configurable: true, get: () => 600 },
 });
+
+// jsdom has no PointerEvent: without it a fired pointer event loses clientX / pointerId, which the drawer resize reads.
+if (typeof globalThis.PointerEvent === 'undefined') {
+	class PointerEventStub extends MouseEvent {
+		pointerId: number;
+		constructor(type: string, init: PointerEventInit = {}) {
+			super(type, init);
+			this.pointerId = init.pointerId ?? 0;
+		}
+	}
+	globalThis.PointerEvent = PointerEventStub as unknown as typeof PointerEvent;
+}

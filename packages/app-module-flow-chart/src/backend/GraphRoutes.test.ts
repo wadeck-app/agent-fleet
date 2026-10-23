@@ -182,9 +182,14 @@ describe('GET /flows', () => {
 	});
 
 	it('answers an empty list, not an error, before any run', async () => {
-		expect(await callRoute(routes, 'GET /flows')).toEqual({
-			status: 200,
-			body: { flows: [], total: 0, limit: 20, offset: 0 },
+		const { status, body } = await callRoute(routes, 'GET /flows');
+		expect(status).toBe(200);
+		expect(body).toMatchObject({
+			flows: [],
+			total: 0,
+			limit: 20,
+			offset: 0,
+			emptyMessage: 'No flow has run yet: run a flow (flow run <file>) and it shows here',
 		});
 	});
 
@@ -305,6 +310,89 @@ describe('GET /flows fields for the index variants', () => {
 		expect(flowsOf(running.body).map(f => f.flowId)).toEqual(['deploy']);
 		const all = await callRoute(routes, 'GET /flows', { query: { q: '', health: '' } });
 		expect(flowsOf(all.body)).toHaveLength(3);
+	});
+
+	it('treats health=any as no health filter', async () => {
+		const { body } = await callRoute(routes, 'GET /flows', { query: { health: 'any' } });
+		expect(flowsOf(body)).toHaveLength(3);
+	});
+
+	describe('emptyMessage (about the page, like the executions table)', () => {
+		it('says the page is empty when flows exist but not on this page', async () => {
+			const { body } = await callRoute(routes, 'GET /flows', { query: { limit: '2', page: '5' } });
+			expect(body).toMatchObject({ total: 3, emptyMessage: 'No flows on this page' });
+		});
+
+		it('says no flow matches when a filter removed them all, naming how to clear it', async () => {
+			const { body } = await callRoute(routes, 'GET /flows', { query: { q: 'zzz' } });
+			expect(body).toMatchObject({ total: 0, emptyMessage: 'No flow matches the filters' });
+			const byHealth = await callRoute(routes, 'GET /flows', { query: { q: 'lint', health: 'failing' } });
+			expect(byHealth.body).toMatchObject({ emptyMessage: 'No flow matches the filters' });
+		});
+
+		it('does not treat health=any or empty values as a filter', async () => {
+			fixture.dispose();
+			fixture = new FlowConfigFixture();
+			const collected = collectRoutes<ModuleContext>();
+			registerGraphRoutes(collected.ctx, FlowQueryService.forConfigDir(fixture.configDir));
+			const { body } = await callRoute(collected.routes, 'GET /flows', { query: { q: '', health: 'any' } });
+			expect(body).toMatchObject({
+				total: 0,
+				emptyMessage: 'No flow has run yet: run a flow (flow run <file>) and it shows here',
+			});
+		});
+	});
+
+	describe('chips (health toggles with counts; the DSL cannot repeat a node, so each one is a named object)', () => {
+		type Chip = { label: string; to: string; variant: string };
+		const chipsOf = (body: unknown) => (body as { chips: Record<string, Chip> }).chips;
+
+		it('counts the flows of each health after the text filter, whatever the health filter and the page', async () => {
+			const { body } = await callRoute(routes, 'GET /flows', { query: { health: 'failing', limit: '1' } });
+			expect(Object.keys(chipsOf(body))).toEqual(['any', 'failing', 'running', 'healthy']);
+			expect(Object.values(chipsOf(body)).map(chip => chip.label)).toEqual([
+				'Any (3)',
+				'Failing (1)',
+				'Running (1)',
+				'Healthy (1)',
+			]);
+			const narrowed = await callRoute(routes, 'GET /flows', { query: { q: 'build' } });
+			expect(Object.values(chipsOf(narrowed.body)).map(chip => chip.label)).toEqual([
+				'Any (1)',
+				'Failing (1)',
+				'Running (0)',
+				'Healthy (0)',
+			]);
+		});
+
+		it('marks the chip of the active health primary and the others secondary (any when no filter)', async () => {
+			const none = await callRoute(routes, 'GET /flows');
+			expect(Object.values(chipsOf(none.body)).map(chip => chip.variant)).toEqual([
+				'primary',
+				'secondary',
+				'secondary',
+				'secondary',
+			]);
+			const running = await callRoute(routes, 'GET /flows', { query: { health: 'running' } });
+			expect(Object.values(chipsOf(running.body)).map(chip => chip.variant)).toEqual([
+				'secondary',
+				'secondary',
+				'primary',
+				'secondary',
+			]);
+		});
+
+		it('links to the index page with the health, keeping the text and the page size, and dropping the page', async () => {
+			const { body } = await callRoute(routes, 'GET /flows', {
+				query: { q: 'a b', health: 'running', limit: '50', page: '3' },
+			});
+			const chips = chipsOf(body);
+			expect(chips['any']!.to).toBe('/modules/flow-chart/flows?q=a+b&size=50');
+			expect(chips['failing']!.to).toBe('/modules/flow-chart/flows?q=a+b&health=failing&size=50');
+			const plain = await callRoute(routes, 'GET /flows');
+			expect(chipsOf(plain.body)['any']!.to).toBe('/modules/flow-chart/flows');
+			expect(chipsOf(plain.body)['healthy']!.to).toBe('/modules/flow-chart/flows?health=healthy');
+		});
 	});
 
 	it('refuses an unknown health (400) and lists the accepted values', async () => {

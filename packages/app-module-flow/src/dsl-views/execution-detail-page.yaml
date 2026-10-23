@@ -69,7 +69,7 @@ sections:
                                   - {
                                         $type: ButtonLink,
                                         size: sm,
-                                        variant: neutral,
+                                        variant: secondary,
                                         label: Logs,
                                         to: $sources.execution.logsHref,
                                     }

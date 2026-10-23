@@ -3,9 +3,9 @@ import type { FlowGraph, FlowGraphEdge } from './FlowGraph.js';
 
 // This file is the browser-safe subpath `flow-core/graph-tree` (the package index pulls in node:fs). The page paths
 // a chart links to are re-exported here until the package gets a subpath of their own.
-export { chartPathOfExecution, chartPathOfFlow } from '../appModule/FlowChartPaths.js';
+export { FLOW_CHART_INDEX_PATH, chartPathOfExecution, chartPathOfFlow } from '../appModule/FlowChartPaths.js';
 export { executionStepLogsPath } from '../appModule/FlowExecutionLogsLink.js';
-export { executionLogsPath } from '../appModule/FlowModuleContract.js';
+export { FLOW_ACTION_BUTTON_STYLE, executionLogsPath } from '../appModule/FlowModuleContract.js';
 
 /** A parent with more sub-steps than this starts collapsed in a chart. */
 export const DEFAULT_MAX_EXPANDED_CHILDREN = 8;

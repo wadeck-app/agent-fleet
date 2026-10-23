@@ -6,9 +6,12 @@ export { FlowCoreError, InvalidQueryError, errorMessage } from './errors.js';
 
 export { FLOW_APP_MODULE_ID, FLOW_CHART_APP_MODULE_ID } from './appModule/AppModuleIds.js';
 export {
+	FLOW_ACTION_BUTTON_STYLE,
+	FLOW_ACTION_SLOT_ACCEPTS,
 	FLOW_EXECUTION_ROW_CONTEXT_FIELDS,
 	FLOW_EXPOSED_SLOTS,
 	FLOW_PAGE_PATHS,
+	FLOW_REQUIRED_RANGE,
 	executionLogsPath,
 	executionPagePath,
 } from './appModule/FlowModuleContract.js';
@@ -119,6 +122,8 @@ export {
 export type { OutcomeNotes } from './view/CellText.js';
 export {
 	FLOW_HEALTHS,
+	FLOW_HEALTH_ANY,
+	countByHealth,
 	filterFlowSummaries,
 	flowHealth,
 	groupByHealth,

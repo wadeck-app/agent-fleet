@@ -1,14 +1,29 @@
 # Flow charts index (nav): the flows that ran on this machine. Every flow offers two targets: the chart of its
 # definition and the chart of its latest run (/modules/flow-chart/flows/runs/:id).
-# Four designs are declared as an A/B test (README: "Design variants"); the dev shell's A/B dock picks one, `table` is
-# what everybody else sees. The sections they share are YAML anchors defined in the first variant that uses them
-# (`&pager`, `&search`): keep that variant, or move the anchors, when removing variants.
-# `table`: short precomputed text and three columns: the DataTable keeps only key and label of a column in shells older
-# than dsl-ui 122, and breaks a cell anywhere, so a raw ISO timestamp would wrap mid-number on a narrow page.
-# The other variants render the flows with flow-chart:FlowIndexList (the DSL cannot repeat a node per row); the age of
-# the last run is an ISO text the shell formats (RelativeDate).
+# Two independent A/B tests (README: "Design variants"); the dev shell's A/B dock has one row per test, `table` and `bar`
+# are what everybody else sees:
+#   flow-chart-index-design   LAYOUT: table | cards | list | health-board
+#   flow-chart-index-filters  FILTERS, nested in the `table` layout: bar | inline | chips
+# They compose: the filters test is the whole view of the table layout, so its row shows in the dock only while the table
+# layout is chosen. Cards and list share the `bar` filter bar and bottom row (YAML anchors); the health board groups by
+# health already, so it only keeps the search box. There is no density test: dsl-ui has no row height or padding prop
+# (DataTable and the stacks only read `gap`), so there is nothing real to vary.
+# The sections they share are YAML anchors defined in the first variant that uses them (`&filterBar`, `&flowColumns`,
+# `&flowPanel`, `&pager`): keep that variant, or move the anchors, when removing variants.
+# The look is the one of the queue module's History page and of the flow executions page: a filter bar (SearchBar +
+# CompactSelect), the table, then a bottom row (Pagination + PageSizeSelect). `urlParam` on SearchBar/CompactSelect needs
+# dsl-ui >= 2026.10.19-117 and `resetUrlParams: [page]` >= 2026.10.22-124 (an older shell keeps a stale ?page= and the
+# table then says "No flows on this page"). ButtonLink was checked against 2026.10.22-127.
+# Click targets: a DataTable cell cannot hold a link and a row action cannot navigate. A row click opens the chart of the
+# flow (navigateTo); the chevron of a row opens a panel (DataTable `expansion`) with two ButtonLinks, "Open chart" and
+# "Latest run chart", whose paths come from the route (flow-core chartPathOfFlow / chartPathOfExecution) through
+# $ctx.row (whole-string expressions only).
+# Times are ISO 8601 and the column is `format: datetime` (dsl-ui >= 122; older shells show the raw ISO text).
 # Pagination, page size, text filter and health filter live in the URL: ?page=&size=&q=&health=failing|running|healthy
-# (an empty value means no filter). The `health-board` variant has no pagination: it shows up to 500 flows, grouped.
+# (empty or `any` means no filter). The `health-board` layout has no pagination: it shows up to 500 flows, grouped.
+# The health chips are ButtonLinks: the DSL has no toggle bound to the URL and cannot repeat a node, so the route sends
+# four named objects (chips.any / failing / running / healthy) with label (name and count), link and variant (primary
+# when active). A chip keeps the text and the page size, and drops the page.
 $sources:
     flows:
         url: GET /api/modules/flow-chart/flows
@@ -26,49 +41,195 @@ $type: PageContent
 sections:
     - $type: AbTest
       id: flow-chart-index-design
-      label: Flow charts index
+      label: Layout
       initial: table
       variants:
           table:
               label: Table
-              hint: 'The flows in a table: click a row to open the chart of the flow. The chart of a run is reached from the execution page.'
+              hint: 'The flows in a table: filters, a row click opens the chart, the row panel has Open chart and Latest run chart.'
               view:
-                  $type: VerticalStack
-                  gap: gap-4
-                  items:
-                      - $type: PageHeader
-                        title: Flow charts
-                        subtitle: Click a flow to see its steps and how they depend on each other
+                  $type: AbTest
+                  id: flow-chart-index-filters
+                  label: Filters
+                  initial: bar
+                  variants:
+                      bar:
+                          label: Filter bar
+                          hint: 'Search box and health select above the table, page size under it: the pattern of the queue History page.'
+                          view:
+                              $type: VerticalStack
+                              gap: gap-4
+                              items:
+                                  - $type: PageHeader
+                                    title: Flow charts
+                                    subtitle: 'Search a flow or pick a health; open a row for the chart of the flow or of its latest run'
 
-                      - $type: DataTable
-                        rows: $sources.flows.flows
-                        navigateTo: '/modules/flow-chart/flows/{flowId}'
-                        emptyMessage: No flow has run yet. Run a flow (flow run <file>) and it will be listed here.
-                        columns:
-                            - { key: 'flowId', label: 'Flow' }
-                            - { key: 'executionCount', label: 'Runs' }
-                            - { key: 'failedCount', label: 'Failed' }
-                            - { key: 'lastStartedLabel', label: 'Last' }
+                                  - &filterBar
+                                    $type: HorizontalStack
+                                    gap: gap-3
+                                    align: items-center
+                                    items:
+                                        - $type: SearchBar
+                                          urlParam: q
+                                          resetUrlParams: [page]
+                                          placeholder: Flow name
+                                        # The placeholder is the empty choice: no ?health=, every health.
+                                        - $type: CompactSelect
+                                          urlParam: health
+                                          resetUrlParams: [page]
+                                          ariaLabel: Health
+                                          placeholder: Any health
+                                          options:
+                                              - { value: failing, label: Failing }
+                                              - { value: running, label: Running }
+                                              - { value: healthy, label: Healthy }
 
-                      - &pager
-                        $type: HorizontalStack
-                        justify: justify-between
-                        align: items-center
-                        gap: gap-3
-                        items:
-                            - $type: Pagination
-                              urlParam: page
-                              total: $sources.flows.total
-                              size: $sources.flows.limit
+                                  - $type: DataTable
+                                    rows: $sources.flows.flows
+                                    navigateTo: '/modules/flow-chart/flows/{flowId}'
+                                    emptyMessage: $sources.flows.emptyMessage
+                                    expansion: &flowPanel
+                                        $type: HorizontalStack
+                                        gap: gap-3
+                                        align: items-center
+                                        items:
+                                            - {
+                                                  $type: ButtonLink,
+                                                  to: $ctx.row.chartPath,
+                                                  label: Open chart,
+                                                  variant: secondary,
+                                                  size: sm,
+                                              }
+                                            - {
+                                                  $type: ButtonLink,
+                                                  to: $ctx.row.lastRunChartPath,
+                                                  label: Latest run chart,
+                                                  variant: secondary,
+                                                  size: sm,
+                                              }
+                                    columns: &flowColumns
+                                        - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
+                                        # The cell text stays the health word: a shell older than dsl-ui 122 ignores badge and shows it as is.
+                                        - key: health
+                                          label: Health
+                                          nowrap: true
+                                          badge: { failing: danger, running: info, healthy: success }
+                                        - { key: 'executionCount', label: 'Runs', nowrap: true }
+                                        - { key: 'failedCount', label: 'Failed', nowrap: true }
+                                        - { key: 'lastStartedAt', label: 'Last run', format: datetime, nowrap: true }
 
-                            # Shows options[0] while ?size= is absent: it must be the backend default page size (views.test.ts).
-                            - $type: PageSizeSelect
-                              urlParam: size
-                              options: [20, 50, 100]
+                                  - &pager
+                                    $type: HorizontalStack
+                                    justify: justify-between
+                                    align: items-center
+                                    gap: gap-3
+                                    items:
+                                        - $type: Pagination
+                                          urlParam: page
+                                          total: $sources.flows.total
+                                          size: $sources.flows.limit
+
+                                        # With urlParam the component reads and writes ?size= itself, and shows options[0] while the
+                                        # parameter is absent: that must be the backend's default page size (checked in views.test.ts).
+                                        - $type: PageSizeSelect
+                                          urlParam: size
+                                          resetUrlParams: [page]
+                                          options: [20, 50, 100]
+
+                      inline:
+                          label: Inline filters
+                          hint: 'The same two controls inside the header row of the table card: one line less above the table.'
+                          view:
+                              $type: VerticalStack
+                              gap: gap-4
+                              items:
+                                  - $type: PageHeader
+                                    title: Flow charts
+                                    subtitle: 'Search a flow or pick a health; open a row for the chart of the flow or of its latest run'
+
+                                  - $type: DataTable
+                                    rows: $sources.flows.flows
+                                    navigateTo: '/modules/flow-chart/flows/{flowId}'
+                                    emptyMessage: $sources.flows.emptyMessage
+                                    filtersTop:
+                                        - $type: SearchBar
+                                          urlParam: q
+                                          resetUrlParams: [page]
+                                          placeholder: Flow name
+                                        - $type: CompactSelect
+                                          urlParam: health
+                                          resetUrlParams: [page]
+                                          ariaLabel: Health
+                                          placeholder: Any health
+                                          options:
+                                              - { value: failing, label: Failing }
+                                              - { value: running, label: Running }
+                                              - { value: healthy, label: Healthy }
+                                    expansion: *flowPanel
+                                    columns: *flowColumns
+
+                                  - *pager
+
+                      chips:
+                          label: Health chips
+                          hint: 'One search box and four chips (Any, Failing, Running, Healthy) with the number of flows each shows.'
+                          view:
+                              $type: VerticalStack
+                              gap: gap-4
+                              items:
+                                  - $type: PageHeader
+                                    title: Flow charts
+                                    subtitle: 'Search a flow or click a health; open a row for the chart of the flow or of its latest run'
+
+                                  - $type: HorizontalStack
+                                    gap: gap-3
+                                    align: items-center
+                                    items:
+                                        - $type: SearchBar
+                                          urlParam: q
+                                          resetUrlParams: [page]
+                                          placeholder: Flow name
+                                        - {
+                                              $type: ButtonLink,
+                                              to: $sources.flows.chips.any.to,
+                                              label: $sources.flows.chips.any.label,
+                                              variant: $sources.flows.chips.any.variant,
+                                              size: sm,
+                                          }
+                                        - {
+                                              $type: ButtonLink,
+                                              to: $sources.flows.chips.failing.to,
+                                              label: $sources.flows.chips.failing.label,
+                                              variant: $sources.flows.chips.failing.variant,
+                                              size: sm,
+                                          }
+                                        - {
+                                              $type: ButtonLink,
+                                              to: $sources.flows.chips.running.to,
+                                              label: $sources.flows.chips.running.label,
+                                              variant: $sources.flows.chips.running.variant,
+                                              size: sm,
+                                          }
+                                        - {
+                                              $type: ButtonLink,
+                                              to: $sources.flows.chips.healthy.to,
+                                              label: $sources.flows.chips.healthy.label,
+                                              variant: $sources.flows.chips.healthy.variant,
+                                              size: sm,
+                                          }
+
+                                  - $type: DataTable
+                                    rows: $sources.flows.flows
+                                    navigateTo: '/modules/flow-chart/flows/{flowId}'
+                                    emptyMessage: $sources.flows.emptyMessage
+                                    expansion: *flowPanel
+                                    columns: *flowColumns
+
+                                  - *pager
 
           cards:
               label: Cards
-              hint: 'One card per flow: name, last status, counts, and two buttons (Open chart, Latest run chart). Filter by text or health.'
+              hint: 'One card per flow: name, last status, counts, and two buttons (Open chart, Latest run chart). Same filter bar as the table.'
               view:
                   $type: VerticalStack
                   gap: gap-4
@@ -77,35 +238,18 @@ sections:
                         title: Flow charts
                         subtitle: Open the chart of a flow, or of its latest run
 
-                      - $type: HorizontalStack
-                        gap: gap-3
-                        align: items-center
-                        items:
-                            - &search
-                              $type: SearchBar
-                              urlParam: q
-                              placeholder: Filter flows
-
-                            # An empty choice means "all": the backend treats ?health= as no filter.
-                            - $type: CompactSelect
-                              urlParam: health
-                              ariaLabel: Filter by health
-                              placeholder: All health
-                              options:
-                                  - { value: failing, label: Failing }
-                                  - { value: running, label: Running }
-                                  - { value: healthy, label: Healthy }
+                      - *filterBar
 
                       - $type: flow-chart:FlowIndexList
                         flows: $sources.flows.flows
                         layout: cards
-                        emptyMessage: No flow matches. Clear the filter, or run a flow (flow run <file>) to list it here.
+                        emptyMessage: $sources.flows.emptyMessage
 
                       - *pager
 
           list:
               label: Search list
-              hint: 'Search first: a dense list, status badge first, with the two chart buttons on every row.'
+              hint: 'A dense list, status badge first, with the two chart buttons on every row. Same filter bar as the table.'
               view:
                   $type: VerticalStack
                   gap: gap-3
@@ -114,12 +258,12 @@ sections:
                         title: Flow charts
                         subtitle: Type to filter the flows by name
 
-                      - *search
+                      - *filterBar
 
                       - $type: flow-chart:FlowIndexList
                         flows: $sources.flows.flows
                         layout: list
-                        emptyMessage: No flow matches. Clear the filter, or run a flow (flow run <file>) to list it here.
+                        emptyMessage: $sources.flows.emptyMessage
 
                       - *pager
 
@@ -134,7 +278,9 @@ sections:
                         title: Flow charts
                         subtitle: $sources.board.summary
 
-                      - *search
+                      - $type: SearchBar
+                        urlParam: q
+                        placeholder: Flow name
 
                       - $type: Collapsible
                         title: $sources.board.failing.title

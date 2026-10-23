@@ -3,15 +3,29 @@
 // assert their manifests and views against it, so neither reads the other's files.
 import { FLOW_APP_MODULE_ID } from './AppModuleIds.js';
 
-/** Root `$type`s accepted by both slots: button-like components, never a page-sized one. */
-const ACTION_ROOT_TYPES = ['ActionBar', 'HorizontalStack', 'ButtonLink', 'ButtonAction', 'IconButton', 'Link'] as const;
+// One look for every action next to an execution (detail header, executions page, expanded row, chart header): a
+// small secondary navigating button. The platform (app-core check and load) validates only the ROOT $type of a
+// contribution, never its props, and a ButtonLink takes variant and size, so a slot that accepted ButtonLink could not
+// stop a contributor from restyling it. The slots therefore accept one component whose style is not a prop:
+// flow-chart:FlowChartLink renders FLOW_ACTION_BUTTON_STYLE and refuses any key it does not declare. The flow module's
+// own buttons are plain ButtonLinks, and its tests assert this same constant. To let another module contribute, add
+// its component here once it renders FLOW_ACTION_BUTTON_STYLE and rejects unknown keys.
+// "*" on purpose: app-core matches with includePrerelease, and CI stamps prereleases like 2026.10.19-663-3ea4c829.
+/** The `requires` range of a module that fills the slots of the flow module (its manifest `requires.flow`). */
+export const FLOW_REQUIRED_RANGE = '*';
+
+/** Props of every action button (dsl-ui ButtonLink) shown next to an execution. */
+export const FLOW_ACTION_BUTTON_STYLE = { variant: 'secondary', size: 'sm' } as const;
+
+/** Root `$type`s a contribution to any action slot may have; a namespaced $type is accepted only as this exact string. */
+export const FLOW_ACTION_SLOT_ACCEPTS: readonly string[] = ['flow-chart:FlowChartLink'];
 
 /** Extension slots the flow module exposes (manifest `expose.slots`): slot name, without the `flow:` prefix a contributor writes -> root `$type`s it accepts. */
 export const FLOW_EXPOSED_SLOTS: Readonly<Record<string, readonly string[]>> = {
-	'execution-actions': ACTION_ROOT_TYPES,
-	'executions-actions': ACTION_ROOT_TYPES,
+	'execution-actions': FLOW_ACTION_SLOT_ACCEPTS,
+	'executions-actions': FLOW_ACTION_SLOT_ACCEPTS,
 	// Rendered inside the expanded panel of a row of the executions table: the contribution reads the row as $ctx.row.<field>.
-	'execution-row-actions': ACTION_ROOT_TYPES,
+	'execution-row-actions': FLOW_ACTION_SLOT_ACCEPTS,
 };
 
 /** Fields of an executions-table row a contribution to `execution-row-actions` can read as `$ctx.row.<field>` (whole-string expressions only). */
