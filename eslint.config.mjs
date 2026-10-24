@@ -149,6 +149,27 @@ export const e2eRules = {
 	// No barrel export restriction for e2e tests
 };
 
+/**
+ * Type-aware correctness rules for production sources (test files are not part of the packages' tsconfig, so they
+ * cannot be type-checked by the linter). typescript-eslint loads TypeScript 6 side by side with the root
+ * TypeScript 7, see .claude/docs/linting.md.
+ * @param {string} tsconfigRootDir directory anchoring the project service (the package directory)
+ */
+export function typeAwareConfig(tsconfigRootDir) {
+	return {
+		files: ['src/**/*.ts', 'src/**/*.tsx'],
+		ignores: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/__mocks__/**'],
+		languageOptions: {
+			parserOptions: { projectService: true, tsconfigRootDir },
+		},
+		rules: {
+			'@typescript-eslint/no-floating-promises': 'error',
+			'@typescript-eslint/no-misused-promises': 'error',
+			'@typescript-eslint/await-thenable': 'error',
+		},
+	};
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // ROOT CONFIG (for running eslint from monorepo root)
 // ═══════════════════════════════════════════════════════════════════
@@ -205,6 +226,9 @@ export default [
 			// Package dependencies are enforced by package.json and TypeScript resolution
 		},
 	},
+
+	// Packages without their own eslint.config.mjs (linted from their directory)
+	{ ...typeAwareConfig(process.cwd()), files: ['packages/*/src/**/*.ts'] },
 
 	// flow-cli MCP stdio server: a hand-written CommonJS script that is shipped and spawned as-is
 	// (`node mcp-server.cjs`), never bundled, so `require` and Node globals are its module system,

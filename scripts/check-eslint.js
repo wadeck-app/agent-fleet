@@ -7,9 +7,9 @@
  * - Minimal console output on success
  * - Errors logged to file (eslint-errors.log) on failure
  * - Clean summary format for agent parsing
- * - Checks all packages in monorepo: shared, backend, frontend
+ * - Checks every package of the monorepo that declares a "lint" script
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -30,19 +30,44 @@ try {
 }
 
 const ERROR_LOG = 'eslint-errors.log';
-const PACKAGES = [
-	'shared-frontend-backend',
-	'shared-orch-worker',
-	'shared-common',
-	'web-backend',
-	'web-frontend',
-	'flow-core',
-	'app-module-flow',
-	'app-module-flow-chart',
-	'flow-engine',
-	'orchestrator',
-	'worker',
-];
+// Maximum number of packages linted at the same time (type-aware linting is memory hungry)
+const CONCURRENCY = 2;
+
+/**
+ * Every workspace package declaring a "lint" script. Discovered rather than listed so that a new package
+ * cannot silently escape the linter.
+ */
+function discoverPackages() {
+	const packagesDir = path.join(process.cwd(), 'packages');
+	return fs
+		.readdirSync(packagesDir, { withFileTypes: true })
+		.filter(entry => entry.isDirectory())
+		.filter(entry => {
+			const manifest = path.join(packagesDir, entry.name, 'package.json');
+			return fs.existsSync(manifest) && JSON.parse(fs.readFileSync(manifest, 'utf8')).scripts?.lint !== undefined;
+		})
+		.map(entry => entry.name)
+		.sort();
+}
+
+/**
+ * typescript-eslint cannot load TypeScript 7 (peer range <6.1.0): link TypeScript 6 into its dependency tree.
+ * Idempotent and cheap. See .claude/docs/linting.md.
+ */
+function ensureTypescriptSixSideBySide() {
+	const setup = spawnSync(process.execPath, [path.join(import.meta.dirname, 'setup-eslint-ts6.cjs'), '--quiet'], {
+		windowsHide: true,
+		encoding: 'utf8',
+	});
+	if (setup.status !== 0) {
+		console.error(chalk.red('ESLint prerequisite failed: could not link TypeScript 6 for typescript-eslint.'));
+		console.error(setup.stdout + setup.stderr);
+		console.error(
+			chalk.yellow('Run "npm install" at the repository root, then retry (see .claude/docs/linting.md).')
+		);
+		process.exit(1);
+	}
+}
 
 /**
  * Run ESLint check for a package
@@ -116,18 +141,22 @@ async function main() {
 		fs.unlinkSync(ERROR_LOG);
 	}
 
-	// Check all packages in parallel
-	console.log(chalk.gray(`Checking ${PACKAGES.join(', ')}...`));
-	const results = await Promise.all(
-		PACKAGES.map(async pkg => {
+	ensureTypescriptSixSideBySide();
+	const packages = discoverPackages();
+	console.log(chalk.gray(`Checking ${packages.join(', ')}...`));
+	const results = [];
+	const queue = [...packages];
+	const workers = Array.from({ length: CONCURRENCY }, async () => {
+		for (let pkg = queue.shift(); pkg !== undefined; pkg = queue.shift()) {
 			try {
-				return await checkPackage(pkg);
+				results.push(await checkPackage(pkg));
 			} catch (err) {
 				console.error(chalk.red(`Error checking ${pkg}: ${err.message}`));
-				return { package: pkg, skipped: false, errors: [err.message] };
+				results.push({ package: pkg, skipped: false, errors: [err.message] });
 			}
-		})
-	);
+		}
+	});
+	await Promise.all(workers);
 
 	// Analyze results
 	const packagesWithErrors = results.filter(r => !r.skipped && r.errors.length > 0);

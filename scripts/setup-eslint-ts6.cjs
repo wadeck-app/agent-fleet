@@ -1,41 +1,48 @@
 /**
- * postinstall: symlink typescript@6 into each @typescript-eslint/* nested node_modules
- * so they pick up TS6 instead of the TS7 installed at the root.
- * Required until typescript-eslint releases TS7 support:
- * https://github.com/typescript-eslint/typescript-eslint/issues/10940
+ * postinstall (and run again by scripts/check-eslint.js): link TypeScript 6 (installed as the "typescript-6" alias)
+ * into the dependency tree of typescript-eslint, so that it resolves TypeScript 6 while everything else (tsc, vitest,
+ * the build) keeps the TypeScript 7 installed at the root.
+ * Required until typescript-eslint supports TypeScript 7 (its peer range is "typescript <6.1.0"). See .claude/docs/linting.md.
+ *
+ * Idempotent: a link already pointing at TypeScript 6 is left untouched. Pass --quiet to only print failures.
  */
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
+const quiet = process.argv.includes('--quiet');
 const root = path.resolve(__dirname, '..');
-const ts6Path = path.join(root, 'node_modules', 'typescript-6');
+const modules = path.join(root, 'node_modules');
+const ts6Path = path.join(modules, 'typescript-6');
 
 if (!fs.existsSync(ts6Path)) {
-	console.error('✗ setup-eslint-ts6: node_modules/typescript-6 not found — run npm install first');
+	console.error('setup-eslint-ts6: node_modules/typescript-6 not found. Run "npm install" at the repository root.');
 	process.exit(1);
 }
 
-const targets = [
-	'node_modules/typescript-eslint/node_modules',
-	'node_modules/@typescript-eslint/parser/node_modules',
-	'node_modules/@typescript-eslint/typescript-estree/node_modules',
-	'node_modules/@typescript-eslint/eslint-plugin/node_modules',
-	'node_modules/@typescript-eslint/utils/node_modules',
-	'node_modules/ts-api-utils/node_modules',
+// Every package of typescript-eslint's tree that loads the compiler API (parser, type-aware rules, project service...)
+const consumers = [
+	'typescript-eslint',
+	'ts-api-utils',
+	...fs
+		.readdirSync(path.join(modules, '@typescript-eslint'), { withFileTypes: true })
+		.filter(entry => entry.isDirectory())
+		.map(entry => path.join('@typescript-eslint', entry.name)),
 ];
 
-for (const target of targets) {
-	const fullTarget = path.join(root, target);
-	const tsLink = path.join(fullTarget, 'typescript');
+for (const consumer of consumers) {
+	const nodeModules = path.join(modules, consumer, 'node_modules');
+	const link = path.join(nodeModules, 'typescript');
 
-	fs.mkdirSync(fullTarget, { recursive: true });
+	if (fs.existsSync(link) && fs.realpathSync(link) === fs.realpathSync(ts6Path)) {
+		continue;
+	}
 
-	try {
-		fs.rmSync(tsLink, { recursive: true, force: true });
-	} catch (_) {}
-
-	// Use 'junction' on Windows for directory symlinks (no elevated privileges needed)
-	fs.symlinkSync(ts6Path, tsLink, 'junction');
-	console.log(`✓ Linked typescript@6 → ${tsLink}`);
+	fs.mkdirSync(nodeModules, { recursive: true });
+	fs.rmSync(link, { recursive: true, force: true });
+	// 'junction' needs no elevated privileges on Windows
+	fs.symlinkSync(ts6Path, link, 'junction');
+	if (!quiet) {
+		console.log(`Linked typescript@6 -> ${link}`);
+	}
 }
