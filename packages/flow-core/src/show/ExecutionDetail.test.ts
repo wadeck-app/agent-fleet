@@ -187,6 +187,14 @@ describe('ExecutionDetail', () => {
 			expect(out).not.toContain('more detail');
 		});
 
+		it('shows why a step was not run', () => {
+			const record = minimal('skipped');
+			Object.assign(record.steps.a, { skippedReason: "not run: sub-step 'x' it depends on did not succeed" });
+			writeExec('skipped', record);
+			const out = renderExecutionDetail(resolveExecution(tmpDir, 'skipped'), { tail: 10, full: false });
+			expect(out).toContain("skipped: not run: sub-step 'x' it depends on did not succeed");
+		});
+
 		it('shows status, duration, error, model and cost per step', () => {
 			const out = renderExecutionDetail(fixture(), { tail: 2000, full: false });
 			expect(out).toContain('Execution: f41lc0de');

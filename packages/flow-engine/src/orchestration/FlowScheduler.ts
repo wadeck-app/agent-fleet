@@ -7,22 +7,30 @@ import type { SubStepAction, SubStepStrategy, SubStepStrategyContext } from './F
 
 export type { SubStepAction, SubStepStrategy, SubStepStrategyContext };
 
+/** What is known of a sub-step for the parent: its outputs, status, and the failure error when there is one. */
+export interface SubStepRecord {
+	outputs: Record<string, unknown>;
+	status: string;
+	error?: string;
+}
+
 /**
  * Aggregates every failed sub-step's own feedback into one string for the parent's retry
  * prompt, exposed as `${{ subStepFeedback }}` -- a flow author adding a new sub-step to a
  * retry chain does not also have to remember to wire its feedback into the prompt by hand.
  * Prefers stderr, falls back to rawOutput/stdout, then the raw outputs object -- whatever a
- * sub-step actually produced that explains the failure.
+ * sub-step actually produced that explains the failure. A sub-step the engine itself failed
+ * (stalled or lost worker) produced nothing: its recorded `error` is the only explanation, so it is
+ * used instead of an empty `{}`.
  */
-export function buildSubStepFeedback(
-	subSteps: Map<string, { outputs: Record<string, unknown>; status: string }>
-): string {
+export function buildSubStepFeedback(subSteps: Map<string, SubStepRecord>): string {
 	const parts: string[] = [];
-	for (const [stepId, { outputs }] of subSteps) {
+	for (const [stepId, { outputs, error }] of subSteps) {
 		const text =
 			(outputs['stderr'] as string | undefined) ||
 			(outputs['rawOutput'] as string | undefined) ||
 			(outputs['stdout'] as string | undefined) ||
+			(Object.keys(outputs).length === 0 ? error : undefined) ||
 			JSON.stringify(outputs);
 		parts.push(`[${stepId}]\n${text}`);
 	}
@@ -75,7 +83,7 @@ export interface SchedulerContext {
 	 * Populated when a parent is re-queued due to child failure.
 	 * Consumed by TemplateRenderer via ${{ subSteps.stepId.outputs.* }} and ${{ subSteps.stepId.status.failed }}.
 	 */
-	subSteps?: Map<string, { outputs: Record<string, unknown>; status: string }>;
+	subSteps?: Map<string, SubStepRecord>;
 }
 
 export interface ReadyItem {
@@ -144,6 +152,8 @@ export class FlowScheduler {
 	 * session with this text instead of re-rendering the original prompt.
 	 */
 	private readonly subStepRelaunchFeedback = new Map<string, string>();
+	/** Sub-steps settled without running (their dependency failed), awaiting {@link takeSkippedSteps}. */
+	private readonly skippedReasons = new Map<string, string>();
 	/** Registered sub-step strategies, keyed by strategy name. */
 	private readonly strategies: Map<string, SubStepStrategy>;
 
@@ -328,7 +338,10 @@ export class FlowScheduler {
 			if (action.type === 'wait') {
 				// Strategy wants to wait for remaining children before acting
 				this.supersededSteps.add(stepId);
-				return [];
+				// Siblings that depend on this child can never start: settle them now, otherwise
+				// they stay pending forever and the deferred parent never fires.
+				this.settleDependentsOfUnsuccessfulChild(stepId, parentId);
+				return this.tryFireDeferredParent(parentId);
 			}
 
 			if (action.type === 'fail-parent') {
@@ -374,11 +387,12 @@ export class FlowScheduler {
 			this.subStepFailedOutputs.delete(parentId);
 
 			// Populate context.subSteps so the parent prompt can reference sub-step data
-			const subStepsMap = new Map<string, { outputs: Record<string, unknown>; status: string }>();
-			for (const [childId] of failedChildrenSnapshot) {
+			const subStepsMap = new Map<string, SubStepRecord>();
+			for (const [childId, childError] of failedChildrenSnapshot) {
 				subStepsMap.set(childId, {
 					outputs: failedOutputsSnapshot.get(childId) ?? {},
 					status: 'failed',
+					error: childError,
 				});
 			}
 			this.context.subSteps = subStepsMap;
@@ -438,7 +452,7 @@ export class FlowScheduler {
 	 * Returns the current subSteps map, populated when a parent step is re-queued after child failure.
 	 * Used by FlowOrchestrator to sync into TemplateContext before rendering the next parent execution.
 	 */
-	getSubSteps(): Map<string, { outputs: Record<string, unknown>; status: string }> | undefined {
+	getSubSteps(): Map<string, SubStepRecord> | undefined {
 		return this.context.subSteps;
 	}
 
@@ -543,6 +557,45 @@ export class FlowScheduler {
 	/** Current step outputs map (read-only snapshot). Used by CommandHandler to sync ExecutionContext. */
 	getOutputs(): Map<string, Record<string, unknown>> {
 		return new Map(this.outputs);
+	}
+
+	/**
+	 * Steps settled without ever running because a sibling sub-step they depend on failed, each with
+	 * the reason. Returned once and forgotten, so the consumer can record them where the user looks
+	 * (`flow show`).
+	 */
+	takeSkippedSteps(): { stepId: string; reason: string }[] {
+		const taken = [...this.skippedReasons].map(([stepId, reason]) => ({ stepId, reason }));
+		this.skippedReasons.clear();
+		return taken;
+	}
+
+	/**
+	 * Settles, as superseded, every not-yet-started sibling sub-step that (transitively) depends on a
+	 * child that will not succeed in this run. Only siblings under the same parent are touched.
+	 */
+	private settleDependentsOfUnsuccessfulChild(childId: string, parentId: string): void {
+		const siblings = this.parentToChildren.get(parentId) ?? new Set<string>();
+		const queue = [childId];
+		while (queue.length > 0) {
+			const current = queue.shift()!;
+			for (const dependent of this.reverseDeps.get(current) ?? new Set<string>()) {
+				if (
+					!siblings.has(dependent) ||
+					!this.pendingDeps.has(dependent) ||
+					this.supersededSteps.has(dependent)
+				) {
+					continue;
+				}
+				this.pendingDeps.delete(dependent);
+				this.supersededSteps.add(dependent);
+				this.skippedReasons.set(
+					dependent,
+					`not run: sub-step '${current}' it depends on did not succeed, so '${dependent}' could not start`
+				);
+				queue.push(dependent);
+			}
+		}
 	}
 
 	private ensureSubStepErrors(): Map<string, string[]> {
@@ -752,11 +805,12 @@ export class FlowScheduler {
 		this.subStepFailedOutputs.delete(parentId);
 
 		// Populate context.subSteps so the parent prompt can reference sub-step data
-		const subStepsMap = new Map<string, { outputs: Record<string, unknown>; status: string }>();
-		for (const [childId] of failedChildrenSnapshot) {
+		const subStepsMap = new Map<string, SubStepRecord>();
+		for (const [childId, childError] of failedChildrenSnapshot) {
 			subStepsMap.set(childId, {
 				outputs: failedOutputsSnapshot.get(childId) ?? {},
 				status: 'failed',
+				error: childError,
 			});
 		}
 		this.context.subSteps = subStepsMap;

@@ -14,6 +14,16 @@ function assertExecutionIdSafe(executionId: string): void {
 	}
 }
 
+/** Marks a file as an unfinished write of a record; must never end in `.json`. */
+const TEMP_FILE_INFIX = '.json.tmp-';
+/** A leftover temporary file older than this belongs to a writer that died. */
+const STALE_TEMP_FILE_MS = 60 * 60 * 1000;
+/** Rename errors that mean "locked right now" rather than "cannot work". */
+const TRANSIENT_RENAME_CODES = ['EPERM', 'EBUSY', 'EACCES'];
+const RENAME_ATTEMPTS = 6;
+const RENAME_RETRY_DELAY_MS = 20;
+let temporaryFileCounter = 0;
+
 /** Feedback kept per relaunch in the execution record (truncated). */
 const MAX_RELAUNCH_FEEDBACK_CHARS = 2000;
 
@@ -48,6 +58,7 @@ export class ExecutionStore {
 			process.stderr.write(`[ExecutionStore] failed to read executions dir for pruning: ${String(err)}\n`);
 			return;
 		}
+		this.removeStaleTemporaryFiles(rawFiles);
 		const files = rawFiles.filter(f => f.endsWith('.json'));
 		if (files.length === 0) {
 			return;
@@ -73,6 +84,20 @@ export class ExecutionStore {
 				} catch {
 					/* ignore */
 				}
+			}
+		}
+	}
+
+	/** Deletes unfinished-write files left by a writer that died; a recent one may still be in use. */
+	private removeStaleTemporaryFiles(names: string[]): void {
+		for (const name of names.filter(n => n.includes(TEMP_FILE_INFIX))) {
+			const filePath = path.join(this.executionsDir, name);
+			try {
+				if (Date.now() - fs.statSync(filePath).mtimeMs > STALE_TEMP_FILE_MS) {
+					fs.unlinkSync(filePath);
+				}
+			} catch (err) {
+				process.stderr.write(`[ExecutionStore] could not clean leftover ${filePath}: ${String(err)}\n`);
 			}
 		}
 	}
@@ -207,6 +232,19 @@ export class ExecutionStore {
 		return state;
 	}
 
+	/** Settles a step that will never run (a sub-step it depends on failed); `reason` shows in `flow show`. */
+	markStepSkipped(executionId: string, stepId: string, reason: string): ExecutionState {
+		const state = this.read(executionId);
+		const step = state.steps[stepId];
+		if (step) {
+			step.status = 'completed';
+			step.completedAt = new Date().toISOString();
+			step.skippedReason = reason;
+		}
+		this.write(state);
+		return state;
+	}
+
 	markStepFailed(
 		executionId: string,
 		stepId: string,
@@ -308,8 +346,56 @@ export class ExecutionStore {
 	/** Persists the record with declared secrets masked, and returns what was written. */
 	private write(state: ExecutionState): ExecutionState {
 		const masked = this.masks.maskDeep(state.executionId, state);
-		fs.writeFileSync(this.filePath(state.executionId), JSON.stringify(masked, null, 2), 'utf8');
+		this.replaceFile(this.filePath(state.executionId), JSON.stringify(masked, null, 2));
 		return masked;
+	}
+
+	/**
+	 * Writes `content` to a sibling temporary file and renames it over `target`, so a concurrent
+	 * reader (`flow show`, `flow history`, the daemon) sees the old record or the new one, never half.
+	 * The temporary name does not end in `.json`, so no `*.json` listing mistakes it for an execution.
+	 */
+	private replaceFile(target: string, content: string): void {
+		const temporary = `${target}${TEMP_FILE_INFIX}${String(process.pid)}-${String(temporaryFileCounter++)}`;
+		try {
+			fs.writeFileSync(temporary, content, 'utf8');
+			this.renameWithRetry(temporary, target);
+		} catch (err) {
+			try {
+				fs.rmSync(temporary, { force: true });
+			} catch {
+				// Best effort: pruneOldExecutions removes leftovers later
+			}
+			throw err;
+		}
+	}
+
+	/**
+	 * Windows refuses to rename over a file another process has open (EPERM/EBUSY/EACCES), usually for
+	 * a few milliseconds only (a reader, an antivirus scan). Retried a bounded number of times, then
+	 * failed with what to do about it. Any other error is not transient and is thrown at once.
+	 */
+	private renameWithRetry(from: string, to: string): void {
+		for (let attempt = 1; ; attempt++) {
+			try {
+				fs.renameSync(from, to);
+				return;
+			} catch (err) {
+				const code = (err as NodeJS.ErrnoException).code;
+				if (code === undefined || !TRANSIENT_RENAME_CODES.includes(code)) {
+					throw err;
+				}
+				if (attempt >= RENAME_ATTEMPTS) {
+					throw new Error(
+						`Cannot save execution ${path.basename(to, '.json')}: ${to} stayed locked (${code}) for ${String(RENAME_ATTEMPTS)} attempts. ` +
+							'Another program (editor, antivirus, backup, a second flow process) is holding it open: close it, then re-run. ' +
+							'The previous record is untouched.',
+						{ cause: err }
+					);
+				}
+				Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, RENAME_RETRY_DELAY_MS * attempt);
+			}
+		}
 	}
 
 	private notify(transition: ExecutionTransition): void {

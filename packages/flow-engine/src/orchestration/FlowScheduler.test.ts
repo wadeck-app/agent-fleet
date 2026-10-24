@@ -67,6 +67,55 @@ describe('buildSubStepFeedback', () => {
 	it('returns an empty string for no failed sub-steps', () => {
 		expect(buildSubStepFeedback(new Map())).toBe('');
 	});
+
+	it('uses the recorded error when the sub-step produced no outputs (engine-side failure)', () => {
+		const feedback = buildSubStepFeedback(
+			new Map([['e2e', { outputs: {}, status: 'failed', error: 'the worker reported nothing for 1800s' }]])
+		);
+		expect(feedback).toBe('[e2e]\nthe worker reported nothing for 1800s');
+	});
+
+	it('still prefers the sub-step outputs over the error when it produced some', () => {
+		const feedback = buildSubStepFeedback(
+			new Map([['a', { outputs: { stderr: 'real stderr' }, status: 'failed', error: 'exit 1' }]])
+		);
+		expect(feedback).toBe('[a]\nreal stderr');
+	});
+});
+
+describe('FlowScheduler -- sub-step failure without outputs', () => {
+	it('feeds the failure error to the relaunched parent instead of an empty object', () => {
+		const scheduler = new FlowScheduler({ inputs: {}, stepOutputs: new Map() });
+		scheduler.start([{ id: 'parent' }], new Map([['parent', []]]));
+		scheduler.acknowledge('parent');
+		scheduler.inject([{ id: 'e2e', parent: 'parent' }]);
+		scheduler.complete('parent', { type: 'completed', outputs: {} });
+		scheduler.acknowledge('e2e');
+
+		// What StepOutcomes.failStep reports for a stalled or disconnected worker: no outputs
+		fail(scheduler, 'e2e', 'the worker running this step reported nothing for 1800s');
+
+		const feedback = scheduler.getSubStepRelaunchFeedback('parent');
+		expect(feedback).toBe('[e2e]\nthe worker running this step reported nothing for 1800s');
+		expect(feedback).not.toContain('{}');
+	});
+
+	it('does the same on the wait-all path', () => {
+		const scheduler = new FlowScheduler({ inputs: {}, stepOutputs: new Map() });
+		scheduler.start([{ id: 'parent', subStepStrategy: 'wait-all' }], new Map([['parent', []]]));
+		scheduler.acknowledge('parent');
+		scheduler.inject([
+			{ id: 'a', parent: 'parent' },
+			{ id: 'b', parent: 'parent' },
+		]);
+		scheduler.complete('parent', { type: 'completed', outputs: {} });
+		scheduler.acknowledge('a');
+		scheduler.acknowledge('b');
+		fail(scheduler, 'a', 'stalled-a');
+		scheduler.complete('b', { type: 'completed', outputs: {} });
+
+		expect(scheduler.getSubStepRelaunchFeedback('parent')).toBe('[a]\nstalled-a');
+	});
 });
 
 describe('FlowScheduler', () => {

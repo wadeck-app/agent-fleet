@@ -69,6 +69,7 @@ const mockExecStore = {
 	markStepRunning: vi.fn(),
 	markStepCompleted: vi.fn(),
 	markStepFailed: vi.fn(),
+	markStepSkipped: vi.fn(),
 	markExecutionCompleted: vi.fn(),
 	markExecutionFailed: vi.fn(),
 	pruneOldExecutions: vi.fn(),
@@ -288,5 +289,49 @@ steps:
 			// Execution still active
 			expect(handler.hasActiveExecutions()).toBe(true);
 		});
+	});
+});
+
+describe('CommandHandler — engine-side sub-step failures (stall watchdog, lost worker)', () => {
+	const WAIT_ALL_FLOW_YAML = PARENT_FLOW_YAML.replace('id: parent-flow', 'id: wait-all-flow').replace(
+		'    script: echo parent\n',
+		'    script: echo parent\n    subStepStrategy: wait-all\n'
+	);
+
+	async function startWaitAllFlow(handler: CommandHandler): Promise<string> {
+		const flowFile = path.join(tmpDir, 'wait-all-flow.yml');
+		fs.writeFileSync(flowFile, WAIT_ALL_FLOW_YAML);
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		expect(result.type).toBe('execution_started');
+		return (result as { executionId: string }).executionId;
+	}
+
+	const child = (id: string, depends?: string[]) =>
+		({
+			id,
+			name: id,
+			type: 'script',
+			script: 'echo x',
+			parent: 'parent',
+			...(depends ? { depends } : {}),
+		}) as never;
+
+	it('records a sibling that depended on the failed sub-step as not run, with the reason, and keeps the execution going', async () => {
+		const handler = makeHandler();
+		const executionId = await startWaitAllFlow(handler);
+		handler.injectSteps(executionId, [child('a'), child('b', ['a'])]);
+		handler.onStepCompleted(executionId, 'parent', {});
+
+		// What failStep reports for a stalled worker: an error and no outputs
+		handler.onStepFailed(executionId, 'a', 'the worker running this step reported nothing for 1800s');
+
+		expect(mockExecStore.markStepSkipped).toHaveBeenCalledTimes(1);
+		expect(mockExecStore.markStepSkipped).toHaveBeenCalledWith(
+			executionId,
+			'b',
+			expect.stringContaining("sub-step 'a' it depends on did not succeed")
+		);
+		expect(mockExecStore.markExecutionFailed).not.toHaveBeenCalled();
+		expect(handler.hasActiveExecutions()).toBe(true);
 	});
 });

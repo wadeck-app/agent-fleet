@@ -63,6 +63,7 @@ export class StepOutcomes {
 		// Parent-blocking and deferral logic is handled inside FlowScheduler.complete().
 		// It returns [] while children are pending; fires deferred completion when all children settle.
 		const newReady = scheduler.complete(stepId, { type: 'completed', outputs: output });
+		this.recordSkippedSteps(executionId, scheduler);
 
 		if (scheduler.isTerminal()) {
 			// Mark any steps skipped by the scheduler (still 'pending' in store) as completed
@@ -94,6 +95,7 @@ export class StepOutcomes {
 		//   (with error recorded in subStepErrors) up to maxSubStepIterations times.
 		// - After max iterations the parent is failed terminally, hasFailed() returns true.
 		const newReady = scheduler.complete(stepId, { type: 'failed', error, outputs });
+		this.recordSkippedSteps(executionId, scheduler);
 
 		if (scheduler.hasFailed()) {
 			// Terminal failure - purge queued steps for this execution and cleanup
@@ -200,6 +202,17 @@ export class StepOutcomes {
 		this.tryDispatch();
 
 		return { type: 'execution_resumed', executionId, stepId: resumable.stepId };
+	}
+
+	/** Records, with the reason, the sub-steps the scheduler settled without running (their dependency failed). */
+	private recordSkippedSteps(
+		executionId: string,
+		scheduler: { takeSkippedSteps(): { stepId: string; reason: string }[] }
+	): void {
+		for (const { stepId, reason } of scheduler.takeSkippedSteps()) {
+			this.executionStore.markStepSkipped(executionId, stepId, reason);
+			this.logWriter.writeExecution(executionId, `Step ${stepId} ${reason}`, 'warning');
+		}
 	}
 
 	private markSkippedStepsCompleted(executionId: string): void {

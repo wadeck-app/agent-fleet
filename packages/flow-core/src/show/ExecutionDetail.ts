@@ -169,6 +169,9 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 				`      relaunch ${i + 1} (sub-step failed) ${formatStarted(relaunch.at)}: ${firstLine.slice(0, 160)}`
 			);
 		}
+		if (step.skippedReason) {
+			lines.push(`      skipped: ${step.skippedReason}`);
+		}
 		if (step.error) {
 			lines.push(`      error: ${step.error}`);
 		}

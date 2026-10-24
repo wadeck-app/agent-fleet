@@ -47,6 +47,8 @@ export interface StepState {
 	parent?: string;
 	/** Error message if the step failed. */
 	error?: string;
+	/** Why the step never ran (it is settled as `completed` without an attempt), e.g. a sub-step it depends on failed. */
+	skippedReason?: string;
 	/** Full stdout captured during the step's execution, when the step failed. */
 	stdout?: string;
 	/** Full stderr captured during the step's execution, when the step failed. */

@@ -292,3 +292,100 @@ describe('FlowScheduler — custom strategy via extraStrategies', () => {
 		expect(overrideLog).toContain('child-y');
 	});
 });
+
+// --- dependents of a failed sibling ---------------------------------------------
+
+describe('FlowScheduler -- sub-step depending on a failed sibling', () => {
+	function setup(strategy: string | undefined): FlowScheduler {
+		const scheduler = new FlowScheduler(makeContext());
+		scheduler.start(
+			[makeStep('parent', [], strategy === undefined ? {} : { subStepStrategy: strategy })],
+			new Map([['parent', []]])
+		);
+		scheduler.acknowledge('parent');
+		scheduler.inject([makeStep('A', [], { parent: 'parent' }), makeStep('B', ['A'], { parent: 'parent' })]);
+		succeed(scheduler, 'parent');
+		scheduler.acknowledge('A');
+		return scheduler;
+	}
+
+	it('wait-all: settles the dependent as not run and re-queues the parent with the failed error', () => {
+		const scheduler = setup('wait-all');
+
+		const ready = fail(scheduler, 'A', 'error-a');
+
+		expect(ready.some(r => r.stepId === 'parent')).toBe(true);
+		expect(scheduler.hasFailed()).toBe(false);
+		expect(scheduler.getSubStepErrors('parent')).toEqual(['error-a']);
+		expect(scheduler.takeSkippedSteps()).toEqual([
+			{ stepId: 'B', reason: expect.stringContaining("sub-step 'A' it depends on did not succeed") },
+		]);
+		// reported once only
+		expect(scheduler.takeSkippedSteps()).toEqual([]);
+	});
+
+	it('wait-all: settles the whole chain of dependents', () => {
+		const scheduler = new FlowScheduler(makeContext());
+		scheduler.start([makeStep('parent', [], { subStepStrategy: 'wait-all' })], new Map([['parent', []]]));
+		scheduler.acknowledge('parent');
+		scheduler.inject([
+			makeStep('A', [], { parent: 'parent' }),
+			makeStep('B', ['A'], { parent: 'parent' }),
+			makeStep('C', ['B'], { parent: 'parent' }),
+		]);
+		succeed(scheduler, 'parent');
+		scheduler.acknowledge('A');
+
+		const ready = fail(scheduler, 'A', 'error-a');
+
+		expect(ready.some(r => r.stepId === 'parent')).toBe(true);
+		expect(
+			scheduler
+				.takeSkippedSteps()
+				.map(s => s.stepId)
+				.sort()
+		).toEqual(['B', 'C']);
+	});
+
+	it('wait-all: still waits for an unrelated running sibling, then fires the parent', () => {
+		const scheduler = new FlowScheduler(makeContext());
+		scheduler.start([makeStep('parent', [], { subStepStrategy: 'wait-all' })], new Map([['parent', []]]));
+		scheduler.acknowledge('parent');
+		scheduler.inject([
+			makeStep('A', [], { parent: 'parent' }),
+			makeStep('B', ['A'], { parent: 'parent' }),
+			makeStep('C', [], { parent: 'parent' }),
+		]);
+		succeed(scheduler, 'parent');
+		scheduler.acknowledge('A');
+		scheduler.acknowledge('C');
+
+		expect(fail(scheduler, 'A', 'error-a').some(r => r.stepId === 'parent')).toBe(false);
+		expect(succeed(scheduler, 'C').some(r => r.stepId === 'parent')).toBe(true);
+	});
+
+	it('wait-all: a superseded dependent does not block a parent that ends up failing on its budget', () => {
+		const scheduler = new FlowScheduler(makeContext());
+		scheduler.start(
+			[makeStep('parent', [], { subStepStrategy: 'wait-all', maxSubStepIterations: 0 })],
+			new Map([['parent', []]])
+		);
+		scheduler.acknowledge('parent');
+		scheduler.inject([makeStep('A', [], { parent: 'parent' }), makeStep('B', ['A'], { parent: 'parent' })]);
+		succeed(scheduler, 'parent');
+		scheduler.acknowledge('A');
+
+		fail(scheduler, 'A', 'error-a');
+
+		expect(scheduler.hasFailed()).toBe(true);
+	});
+
+	it('restart-on-first-failure: unchanged, the parent restarts at once and nothing is reported skipped', () => {
+		const scheduler = setup(undefined);
+
+		const ready = fail(scheduler, 'A', 'error-a');
+
+		expect(ready.some(r => r.stepId === 'parent')).toBe(true);
+		expect(scheduler.takeSkippedSteps()).toEqual([]);
+	});
+});
