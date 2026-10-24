@@ -1,6 +1,7 @@
 import * as yaml from 'js-yaml';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { DEFAULT_STEP_RECORD_LIMITS } from '../record/StepRecordLimits';
 import { SECRET_EXAMPLE_FLOW_YAML } from '../secrets/SecretFlowExample';
 import { SecretUsageAnalyzer } from '../secrets/SecretUsageAnalyzer';
 import type { FlowDefinition } from '../types';
@@ -144,6 +145,20 @@ describe('FlowCapabilitiesGenerator - secrets', () => {
 		);
 		expect(result).toContain('FLOW_QUEUE_EVENTS=0');
 		expect(result).toContain('exact event names');
+	});
+
+	it('has a Section 10 telling that inputs and outputs are recorded, with the caps, and that undeclared secrets are not masked', () => {
+		expect(result).toContain('## Section 10: What an execution records');
+		expect(result).toContain('execution record');
+		expect(result).toContain('history');
+		expect(result).toContain('flow show <execution-id> --io');
+		expect(result).toContain(String(DEFAULT_STEP_RECORD_LIMITS.perValue));
+		expect(result).toContain(String(DEFAULT_STEP_RECORD_LIMITS.perStep));
+		expect(result).toContain(String(DEFAULT_STEP_RECORD_LIMITS.perExecution));
+		expect(result).toContain('truncated');
+		expect(result).toMatch(/not masked/i);
+		expect(result).toMatch(/declare .* as a secret/i);
+		expect(result).toContain('type: password');
 	});
 
 	it('has a Secrets section covering declaration, run time, usage, limits and masking', () => {

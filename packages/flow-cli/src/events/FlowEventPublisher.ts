@@ -35,6 +35,13 @@ export type FlowEventsStatus =
 	| { state: 'unavailable'; reason: string }
 	| { state: 'disabled'; reason: string };
 
+/** Outcome of declaring the events to the queue (mirrors the SDK's `RegisterResult.status`, plus `not-declared`). */
+export type FlowEventsDeclaration =
+	| { state: 'registered'; count: number }
+	| { state: 'rejected'; reason: string; problems: { path: string; message: string }[] }
+	| { state: 'unsupported' | 'dropped' | 'unknown'; reason: string }
+	| { state: 'not-declared'; reason: string };
+
 /**
  * Where the daemon announces its lifecycle events. A small seam over the queue SDK, so the
  * daemon and its tests never depend on a running queue.
@@ -46,4 +53,9 @@ export interface FlowEventPublisher {
 	flush(): Promise<void>;
 	/** How events would be delivered; sends nothing. */
 	status(): Promise<FlowEventsStatus>;
+	/**
+	 * Declares the events to the queue so it documents them (`queue events list`). Called once, at
+	 * daemon start; idempotent and replaces the previous declaration. Never rejects.
+	 */
+	declareEvents(): Promise<FlowEventsDeclaration>;
 }

@@ -4,6 +4,8 @@ export interface PublishFailure {
 	message: string;
 	event: string;
 	outcome: 'dropped' | 'unknown';
+	/** `register-events` for an event declaration; absent or `publish` for a push. */
+	operation?: string;
 }
 
 /**

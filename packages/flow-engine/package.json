@@ -21,6 +21,7 @@
 		"uuid": "^9.0.1"
 	},
 	"devDependencies": {
+		"ajv": "^6.12.6",
 		"test-utils": "*",
 		"@types/js-yaml": "^4.0.9",
 		"@types/uuid": "^9.0.8",

@@ -29,6 +29,7 @@ import { ProjectResolverFactory } from '../../config/ProjectResolverFactory';
 import type {
 	AssignmentScopedMessage,
 	DaemonToWorker,
+	StepIoCapture,
 	UpdateWorkerRequest,
 	WorkerSummary,
 	WorkerToDaemon,
@@ -945,24 +946,31 @@ async function handleMessage(
 			// true for the whole execute() call, false again no matter how it ends.
 			busyTracker.busy = true;
 			try {
-				const { output, meta } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
+				const { output, meta, io } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
 				sendForAssignment({
 					type: 'step_completed',
 					executionId: executionContext.executionId,
 					stepId,
 					output,
 					meta,
+					io,
 				});
 				display.stepCompleted(stepId, Date.now() - startedAt);
 			} catch (err) {
 				const error = normalizeError(err).message;
 				const output = (err as { stepOutputs?: Record<string, unknown> }).stepOutputs;
+				const stdout = (err as { stdout?: string }).stdout;
+				const stderr = (err as { stderr?: string }).stderr;
+				const io = (err as { io?: StepIoCapture }).io;
 				sendForAssignment({
 					type: 'step_failed',
 					executionId: executionContext.executionId,
 					stepId,
 					error,
 					output,
+					stdout,
+					stderr,
+					io,
 				});
 				display.stepFailed(stepId, error, Date.now() - startedAt);
 			} finally {

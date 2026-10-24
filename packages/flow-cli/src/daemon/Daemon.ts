@@ -428,11 +428,14 @@ async function startDaemon(
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
 				fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
 				writeDaemonLog(logsDir, 'info', 'Daemon started');
-				// One line, once: whether events will reach the queue, and how to fix it if not.
-				void eventPublisher.status().then(status => {
-					const line = flowEventsStatusLine(status);
+				// One line, once: whether events will reach the queue, whether the queue documents them, and how to
+				// fix it if not. The events are declared only when the queue is reachable.
+				void (async () => {
+					const status = await eventPublisher.status();
+					const declaration = status.state === 'enabled' ? await eventPublisher.declareEvents() : undefined;
+					const line = flowEventsStatusLine(status, declaration);
 					writeDaemonLog(logsDir, line.level, line.message);
-				});
+				})();
 
 				// Fire-and-forget: app-core being absent or slow (the SDK waits up to 3 s) must not delay or break the
 				// daemon start. Whatever app-core answers lands in the daemon log, `flow logs` shows it.
@@ -688,14 +691,14 @@ async function startDaemon(
 			}
 			case 'step_completed': {
 				try {
-					const { assignmentId, executionId, stepId, output, meta } = message;
+					const { assignmentId, executionId, stepId, output, meta, io } = message;
 					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
 						break;
 					}
 					// The outcome is accepted from here on, so the assignment is closed and
 					// the same result cannot be replayed.
 					commandHandler.settleAssignment(assignmentId);
-					executionStore.markStepCompleted(executionId, stepId, meta);
+					executionStore.markStepCompleted(executionId, stepId, meta, { capture: io, outputs: output });
 					commandHandler.onStepCompleted(executionId, stepId, output, meta);
 					logWriter.writeExecution(executionId, `Step ${stepId} completed`);
 					commandHandler.dispatchHook(executionId, 'onStepEnd', { executionId, stepId });
@@ -730,14 +733,26 @@ async function startDaemon(
 			}
 			case 'step_failed': {
 				try {
-					const { assignmentId, executionId, stepId, error: reportedError, output, stdout, stderr } = message;
+					const {
+						assignmentId,
+						executionId,
+						stepId,
+						error: reportedError,
+						output,
+						stdout,
+						stderr,
+						io,
+					} = message;
 					// The worker already masked it; this is the daemon's own pass, before hooks and logs see it.
 					const error = daemonSecrets.masks.mask(executionId, reportedError);
 					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
 						break;
 					}
 					commandHandler.settleAssignment(assignmentId);
-					executionStore.markStepFailed(executionId, stepId, error, stdout, stderr);
+					executionStore.markStepFailed(executionId, stepId, error, stdout, stderr, {
+						capture: io,
+						outputs: output ?? {},
+					});
 					commandHandler.onStepFailed(executionId, stepId, error, output);
 					// markExecutionFailed is now called inside onStepFailed only when the failure is terminal
 					logWriter.writeExecution(executionId, `Step ${stepId} failed: ${error}`, 'error');

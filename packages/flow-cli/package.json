@@ -23,7 +23,7 @@
 	},
 	"dependencies": {
 		"@wadeck-app/app-core-sdk": "latest",
-		"@wadeck-app/queue-sdk": "latest",
+		"@wadeck-app/queue-sdk": ">=2026.10.24-190-aa15e847",
 		"@wadeck-app/shared-cli": "latest",
 		"@wadeck-app/shared-updater": "latest",
 		"@wadeck-app/singleton-daemon-kit": "latest",
@@ -40,6 +40,7 @@
 		"ws": "^8.0.0"
 	},
 	"devDependencies": {
+		"ajv": "^6.12.6",
 		"@types/js-yaml": "^4.0.9",
 		"@types/ws": "^8.0.0",
 		"esbuild": "^0.27.2",

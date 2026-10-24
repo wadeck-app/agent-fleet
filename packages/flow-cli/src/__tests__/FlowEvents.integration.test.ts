@@ -135,6 +135,8 @@ describe('flow lifecycle events (end to end)', () => {
 			{ timeout: 5000, interval: 25 }
 		);
 		expect(logText.match(/Queue events: /g)).toHaveLength(1);
+		expect(logText).toContain('declared to the queue (6 events');
+		expect(publisher.declareCount).toBe(1);
 
 		await ctx[Symbol.asyncDispose]();
 		expect(publisher.flushCount).toBe(1);

@@ -79,15 +79,12 @@ export async function executeScriptStep(
 	const renderedScript = templateRenderer.render(step.script, context, true);
 	stepTrace.script = renderedScript;
 
-	const renderedEnv = withSecrets(
-		step,
-		step.env
-			? Object.fromEntries(
-					Object.entries(step.env).map(([k, v]) => [k, templateRenderer.render(v, context, true)])
-				)
-			: undefined,
-		context
-	);
+	const stepEnv = step.env
+		? Object.fromEntries(Object.entries(step.env).map(([k, v]) => [k, templateRenderer.render(v, context, true)]))
+		: undefined;
+	// Kept before the declared secrets are added: the trace is reported and recorded, secrets must not be in it.
+	stepTrace.env = stepEnv;
+	const renderedEnv = withSecrets(step, stepEnv, context);
 
 	const workingDir = step.workingDir ?? context.context?.['workingDir'] ?? workspacePath;
 	const result = await scriptExecutor.execute({

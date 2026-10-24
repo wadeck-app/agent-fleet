@@ -13,14 +13,14 @@
  * are used: `--help` alone imports the whole command graph, which is where a resolution or
  * module-level error surfaces.
  */
+import { OWN_PROCESS_GROUP, killProcessTree, removeTempDirectory } from 'flow-core/testing';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { OWN_PROCESS_GROUP, killProcessTree } from '../test-utils/ProcessTree';
 import { pollUntil } from '../test-utils/WaitHelpers';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -241,11 +241,11 @@ describe('the standalone bundle in daemon mode', () => {
 			).toBe(true);
 		} finally {
 			// The daemon runs with projectDir as working directory: on Windows that locks the directory, and so does any
-			// process the daemon started. Kill the whole tree and wait for it, then remove. rmSync's own bounded retry
-			// (5 x 100 ms) only covers the OS releasing the handle a moment after the process is gone; it still throws.
+			// process the daemon started. Kill the whole tree and wait for it, then remove (removeTempDirectory states what it tolerates, loudly,
+			// when something outside the tree still holds a handle).
 			await killProcessTree(daemon.child);
 			for (const dir of [installDir, projectDir, configHome]) {
-				rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+				removeTempDirectory(dir);
 			}
 		}
 	}, 90_000);

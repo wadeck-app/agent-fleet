@@ -46,6 +46,16 @@ describe('executeScriptStep - secrets', () => {
 		expect(execute.mock.calls[0][0].env.API_TOKEN).toBe(SECRET_VALUE);
 	});
 
+	it('keeps the rendered env in the trace, without the declared secrets', async () => {
+		const { run } = setup();
+		const trace = await run(
+			{ secrets: ['API_TOKEN'], env: { REGION: '${{ inputs.region }}' } },
+			{ inputs: { region: 'eu' }, secrets: { API_TOKEN: SECRET_VALUE } }
+		);
+		expect(trace.env).toEqual({ REGION: 'eu' });
+		expect(JSON.stringify(trace)).not.toContain(SECRET_VALUE);
+	});
+
 	it('fails fast naming the step and the secret when the worker did not receive it', async () => {
 		const { execute, run } = setup();
 		const failure = await run({ secrets: ['API_TOKEN'] }, { secrets: { OTHER_SECRET: SECRET_VALUE } }).catch(

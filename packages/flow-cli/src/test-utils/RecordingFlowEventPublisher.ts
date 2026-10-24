@@ -2,6 +2,7 @@ import type {
 	FlowEventName,
 	FlowEventPayload,
 	FlowEventPublisher,
+	FlowEventsDeclaration,
 	FlowEventsStatus,
 } from '../events/FlowEventPublisher';
 
@@ -14,6 +15,7 @@ export interface RecordedFlowEvent {
 export class RecordingFlowEventPublisher implements FlowEventPublisher {
 	readonly events: RecordedFlowEvent[] = [];
 	flushCount = 0;
+	declareCount = 0;
 	/** When set, publish() throws it and records nothing. */
 	publishError: Error | undefined;
 	/** When set, flush() rejects with it. */
@@ -33,6 +35,11 @@ export class RecordingFlowEventPublisher implements FlowEventPublisher {
 
 	status(): Promise<FlowEventsStatus> {
 		return Promise.resolve({ state: 'enabled', via: 'daemon' });
+	}
+
+	declareEvents(): Promise<FlowEventsDeclaration> {
+		this.declareCount += 1;
+		return Promise.resolve({ state: 'registered', count: 6 });
 	}
 
 	names(): FlowEventName[] {

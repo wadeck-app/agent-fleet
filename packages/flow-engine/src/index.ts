@@ -1,5 +1,7 @@
 // violations-suppress: ts/no-barrel-index public API entry point for workspace package -- 26 import sites
 export { FlowCapabilitiesGenerator } from './docs/FlowCapabilitiesGenerator';
+export { FLOW_EVENT_CATALOG, FLOW_EVENT_SOURCE } from './events/FlowEventCatalog';
+export type { FlowEventDefinition } from './events/FlowEventCatalog';
 export { FlowRegistry } from './registry/FlowRegistry';
 export { FlowExecutor } from './executor/FlowExecutor';
 export type { FlowExecutionOptions } from './executor/FlowExecutor';
@@ -27,6 +29,8 @@ export type {
 } from './orchestration/FlowScheduler';
 export { RestartOnFirstFailure, WaitAll } from './orchestration/FlowScheduler.subStepStrategies';
 export { TemplateRenderer } from './processing/TemplateRenderer';
+export { DEFAULT_STEP_RECORD_LIMITS } from './record/StepRecordLimits';
+export type { StepRecordLimits } from './record/StepRecordLimits';
 export { SecretUsageAnalyzer } from './secrets/SecretUsageAnalyzer';
 export type { SecretDeclaration, SecretSourceKind } from './secrets/SecretUsageAnalyzer';
 export type { FlowDefinition, FlowPluginOverrides, FlowStep } from './types';

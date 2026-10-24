@@ -4,7 +4,7 @@ import type { StepRunnerConfig } from 'flow-engine';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
 
-import type { AssignmentScopedMessage, DaemonToWorker, WorkerToDaemon } from '../ipc/Protocol';
+import type { AssignmentScopedMessage, DaemonToWorker, StepIoCapture, WorkerToDaemon } from '../ipc/Protocol';
 import type { McpServerConfig } from './McpServer';
 import { WorkerAdapter } from './WorkerAdapter';
 import { buildForkedWorkerReady } from './WorkerLaunch';
@@ -70,19 +70,21 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 			// disconnect as a failure rather than replaying the step (D#65).
 			sendForAssignment({ type: 'step_started', executionId: executionContext.executionId, stepId });
 			try {
-				const { output, meta } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
+				const { output, meta, io } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
 				sendForAssignment({
 					type: 'step_completed',
 					executionId: executionContext.executionId,
 					stepId,
 					output,
 					meta,
+					io,
 				});
 			} catch (err) {
 				const error = normalizeError(err).message;
 				const output = (err as { stepOutputs?: Record<string, unknown> }).stepOutputs;
 				const stdout = (err as { stdout?: string }).stdout;
 				const stderr = (err as { stderr?: string }).stderr;
+				const io = (err as { io?: StepIoCapture }).io;
 				sendForAssignment({
 					type: 'step_failed',
 					executionId: executionContext.executionId,
@@ -91,6 +93,7 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 					output,
 					stdout,
 					stderr,
+					io,
 				});
 			}
 			send({ type: 'ready', ...READY });

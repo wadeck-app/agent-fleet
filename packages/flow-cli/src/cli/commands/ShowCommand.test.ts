@@ -156,3 +156,73 @@ describe('ShowCommand: declared secrets', () => {
 		}
 	});
 });
+
+describe('ShowCommand: --io', () => {
+	let configDir: string;
+	let consoleSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'show-io-'));
+		fs.mkdirSync(path.join(configDir, 'executions'));
+		const record = {
+			executionId: 'i0c0ffee',
+			flowFile: 'f.yml',
+			flowId: 'f',
+			status: 'completed',
+			currentSteps: [],
+			startedAt: '2026-10-24T10:00:00.000Z',
+			completedAt: '2026-10-24T10:00:05.000Z',
+			steps: {
+				recorded: {
+					status: 'completed',
+					startedAt: '2026-10-24T10:00:00.000Z',
+					completedAt: '2026-10-24T10:00:01.000Z',
+					io: {
+						inputs: { 'env.REGION': { text: 'eu', truncated: false, chars: 2 } },
+						outputs: { plan: { text: 'abcd', truncated: true, chars: 9000 } },
+						stdout: { text: 'hello', truncated: false, chars: 5 },
+						truncated: true,
+						storedChars: 11,
+					},
+				},
+				old: {
+					status: 'completed',
+					startedAt: '2026-10-24T10:00:01.000Z',
+					completedAt: '2026-10-24T10:00:02.000Z',
+				},
+			},
+		};
+		fs.writeFileSync(path.join(configDir, 'executions', 'i0c0ffee.json'), JSON.stringify(record));
+		consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		fs.rmSync(configDir, { recursive: true, force: true });
+	});
+
+	const show = (...extra: string[]): string => {
+		const program = new Command();
+		program.exitOverride();
+		registerShowCommand(program, () => configDir);
+		program.parse(['node', 'test', 'show', 'i0c0ffee', ...extra]);
+		return consoleSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+	};
+
+	it('prints no recorded value by default, to keep the output small', () => {
+		const out = show();
+
+		expect(out).toContain('recorded  [completed]');
+		expect(out).not.toContain('env.REGION');
+		expect(out).not.toContain('not recorded for this run');
+	});
+
+	it('prints what each step received and produced with --io, truncation included', () => {
+		const out = show('--io');
+
+		expect(out).toContain('env.REGION: eu');
+		expect(out).toContain('plan (truncated, 4 of 9000 chars kept):');
+		expect(out).toContain('stdout:');
+		expect(out).toContain('inputs/outputs: not recorded for this run');
+	});
+});

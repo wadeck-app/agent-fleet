@@ -1224,6 +1224,9 @@ export interface StepTrace {
 	/** Script executed (for type='script') */
 	script?: string;
 
+	/** Rendered `env` of the step, without the declared secrets (for type='script') */
+	env?: Record<string, string>;
+
 	/** Exit code (for type='script') */
 	exitCode?: number;
 

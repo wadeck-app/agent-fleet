@@ -205,6 +205,18 @@ export type SourceToDaemon =
  * Open-ended ([key: string]: unknown) to accept arbitrary step fields before schema validation.
  * Contrast with AssignableStep, which is the daemon-side typed form after casting.
  */
+/**
+ * What a step received and what it printed, reported by the worker with the step's outcome so the daemon can
+ * record it (`StepState.io`). Already masked by the worker; the daemon masks and caps again before storing.
+ * `inputs` keys: `inputs.NAME`, `env.NAME`, `secrets.NAME` (placeholder only), `prompt`. A model step's
+ * `stdout` is its final response.
+ */
+export interface StepIoCapture {
+	inputs: Record<string, string>;
+	stdout?: string;
+	stderr?: string;
+}
+
 export interface InjectedStep {
 	id: string;
 	type: 'model' | 'script' | 'subflow';
@@ -294,6 +306,8 @@ export type WorkerToDaemon =
 			stepId: string;
 			output: Record<string, unknown>;
 			meta?: StepMeta;
+			/** Absent from a worker older than step recording: the daemon then records the outputs only. */
+			io?: StepIoCapture;
 	  }
 	| {
 			type: 'step_failed';
@@ -304,6 +318,7 @@ export type WorkerToDaemon =
 			output?: Record<string, unknown>;
 			stdout?: string;
 			stderr?: string;
+			io?: StepIoCapture;
 	  }
 	| { type: 'inject_steps'; assignmentId: string; executionId: string; steps: InjectedStep[] };
 

@@ -3,9 +3,10 @@ import type { StepMeta } from 'flow-engine/types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type { ExecutionState, StepStatus } from '../ipc/Protocol';
+import type { ExecutionState, StepIoCapture, StepStatus } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import type { ExecutionTransition, ExecutionTransitionListener } from './ExecutionTransition';
+import { StepIoRecorder } from './StepIoRecorder';
 
 function assertExecutionIdSafe(executionId: string): void {
 	if (!isExecutionId(executionId)) {
@@ -16,15 +17,28 @@ function assertExecutionIdSafe(executionId: string): void {
 /** Feedback kept per relaunch in the execution record (truncated). */
 const MAX_RELAUNCH_FEEDBACK_CHARS = 2000;
 
+/** What a step received and produced, as reported with its outcome; recorded capped and masked. */
+export interface StepResultIo {
+	/** Absent when the worker predates step recording: the outputs are then recorded alone. */
+	capture: StepIoCapture | undefined;
+	outputs: Record<string, unknown>;
+}
+
 export class ExecutionStore {
+	private readonly recorder: StepIoRecorder;
+
 	constructor(
 		private readonly executionsDir: string,
 		private readonly retainDays: number = 30,
 		// Hides the exact values of the execution's declared secrets in every record written.
 		private readonly masks: ExecutionMasks = new ExecutionMasks(),
 		// Told once per real transition, with the record as written (masked). The only source of lifecycle events.
-		private readonly listener?: ExecutionTransitionListener
-	) {}
+		private readonly listener?: ExecutionTransitionListener,
+		// Caps and masks what steps received and produced before it is persisted.
+		recorder?: StepIoRecorder
+	) {
+		this.recorder = recorder ?? new StepIoRecorder((executionId, text) => masks.mask(executionId, text));
+	}
 
 	pruneOldExecutions(): void {
 		let rawFiles: string[];
@@ -149,6 +163,7 @@ export class ExecutionStore {
 			error: undefined,
 			stdout: undefined,
 			stderr: undefined,
+			io: undefined,
 			completedAt: undefined,
 			...(provenance?.sourceId !== undefined ? { sourceId: provenance.sourceId } : {}),
 			...(provenance?.workerId !== undefined ? { workerId: provenance.workerId } : {}),
@@ -168,7 +183,7 @@ export class ExecutionStore {
 		return state;
 	}
 
-	markStepCompleted(executionId: string, stepId: string, meta?: StepMeta): ExecutionState {
+	markStepCompleted(executionId: string, stepId: string, meta?: StepMeta, result?: StepResultIo): ExecutionState {
 		const state = this.read(executionId);
 		const step = state.steps[stepId];
 		// A step that never ran (skipped) is settled quietly: there was no attempt to announce.
@@ -179,6 +194,7 @@ export class ExecutionStore {
 			if (meta !== undefined) {
 				step.meta = meta;
 			}
+			this.recordIo(state, stepId, result);
 		}
 		state.currentSteps = state.currentSteps.filter(id => id !== stepId);
 		const written = this.write(state);
@@ -193,7 +209,8 @@ export class ExecutionStore {
 		stepId: string,
 		error?: string,
 		stdout?: string,
-		stderr?: string
+		stderr?: string,
+		result?: StepResultIo
 	): ExecutionState {
 		const state = this.read(executionId);
 		const step = state.steps[stepId];
@@ -210,6 +227,7 @@ export class ExecutionStore {
 			if (stderr !== undefined) {
 				step.stderr = stderr;
 			}
+			this.recordIo(state, stepId, result);
 		}
 		state.currentSteps = state.currentSteps.filter(id => id !== stepId);
 		if (error !== undefined) {
@@ -261,6 +279,23 @@ export class ExecutionStore {
 		}
 		this.write(state);
 		return state;
+	}
+
+	// The execution budget is what the OTHER steps already hold: this step's previous io is being replaced.
+	private recordIo(state: ExecutionState, stepId: string, result: StepResultIo | undefined): void {
+		const step = state.steps[stepId];
+		if (step === undefined || result === undefined) {
+			return;
+		}
+		const usedByOthers = Object.entries(state.steps)
+			.filter(([id]) => id !== stepId)
+			.reduce((sum, [, other]) => sum + (other.io?.storedChars ?? 0), 0);
+		step.io = this.recorder.record({
+			executionId: state.executionId,
+			capture: result.capture,
+			outputs: result.outputs,
+			usedByOthers,
+		});
 	}
 
 	private filePath(executionId: string): string {

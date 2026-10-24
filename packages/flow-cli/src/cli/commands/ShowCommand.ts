@@ -48,7 +48,7 @@ function showFlowFile(file: string, opts: { json?: boolean }): void {
 function showExecution(
 	target: string,
 	service: FlowQueryService,
-	opts: { json?: boolean; tail?: number; full?: boolean }
+	opts: { json?: boolean; tail?: number; full?: boolean; io?: boolean }
 ): void {
 	const tail = opts.tail ?? DEFAULT_TAIL_CHARS;
 	if (!Number.isInteger(tail) || tail < 0) {
@@ -61,7 +61,7 @@ function showExecution(
 			process.stdout.write(JSON.stringify(service.getExecution(target).record) + '\n');
 			return;
 		}
-		console.log(service.renderExecution(target, { tail, full: opts.full === true }));
+		console.log(service.renderExecution(target, { tail, full: opts.full === true, io: opts.io === true }));
 	} catch (err) {
 		if (!(err instanceof ExecutionLookupError)) {
 			throw err;
@@ -86,14 +86,16 @@ export function registerShowCommand(program: Command, getConfigDir: () => string
 				'                 An existing file always wins; otherwise <target> is treated as an execution id\n' +
 				'  --json         Machine-readable output (execution: raw record, untruncated)\n' +
 				`  --tail <n>     Execution only: trailing chars of stdout/stderr of failed steps (default: ${DEFAULT_TAIL_CHARS})\n` +
-				'  --full         Execution only: print stdout/stderr of failed steps untruncated'
+				'  --full         Execution only: print stdout/stderr of failed steps untruncated\n' +
+				'  --io           Execution only: print what each step received and produced (inputs, outputs, stdout/stderr tails; capped, secrets masked)'
 		)
 		.option('--json', 'Machine-readable JSON output')
 		.option('--tail <n>', 'Execution only: trailing characters of stdout/stderr shown for failed steps', v =>
 			Number(v)
 		)
 		.option('--full', 'Execution only: do not truncate stdout/stderr of failed steps')
-		.action((target: string, opts: { json?: boolean; tail?: number; full?: boolean }) => {
+		.option('--io', 'Execution only: print the recorded inputs, outputs and stdout/stderr tails of each step')
+		.action((target: string, opts: { json?: boolean; tail?: number; full?: boolean; io?: boolean }) => {
 			if (isExistingFile(target)) {
 				showFlowFile(target, opts);
 				return;

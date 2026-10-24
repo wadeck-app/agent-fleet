@@ -4,10 +4,17 @@ import type { LiveLogEntry, ModelFlowStep, ScriptFlowStep, Workspace } from 'flo
 import { randomUUID } from 'node:crypto';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
-import type { AssignableStep, AssignmentScopedMessage, ExecutionContext, InjectedStep } from '../ipc/Protocol';
+import type {
+	AssignableStep,
+	AssignmentScopedMessage,
+	ExecutionContext,
+	InjectedStep,
+	StepIoCapture,
+} from '../ipc/Protocol';
 import { SecretMasker } from '../secrets/SecretMasker';
 import type { McpServerConfig } from './McpServer';
 import { McpServer } from './McpServer';
+import { buildStepIoCapture } from './StepIoCaptureBuilder';
 
 /**
  * Sends a message about the step being executed. Already bound to the current
@@ -50,18 +57,31 @@ function maskOptional(masker: SecretMasker, text: string | undefined): string | 
 	return text === undefined ? undefined : masker.mask(text);
 }
 
-// The error is rethrown with the same extra fields (stdout, stderr, stepOutputs) the caller
+// The error is rethrown with the same extra fields (stdout, stderr, stepOutputs, io) the caller
 // forwards to the daemon, all masked.
 function maskError(error: unknown, masker: SecretMasker): unknown {
 	if (!(error instanceof Error)) {
 		return error;
 	}
-	const carried = error as Error & { stdout?: string; stderr?: string; stepOutputs?: Record<string, unknown> };
+	const carried = error as Error & {
+		stdout?: string;
+		stderr?: string;
+		stepOutputs?: Record<string, unknown>;
+		io?: StepIoCapture;
+	};
 	return Object.assign(new Error(masker.mask(normalizeError(error).message)), {
 		stdout: maskOptional(masker, carried.stdout),
 		stderr: maskOptional(masker, carried.stderr),
 		stepOutputs: masker.maskDeep(carried.stepOutputs),
+		io: masker.maskDeep(carried.io),
 	});
+}
+
+export interface StepResult {
+	output: Record<string, unknown>;
+	meta?: import('flow-engine/types').StepMeta;
+	/** What the step received and printed, for the daemon to record. */
+	io: StepIoCapture;
 }
 
 export class WorkerAdapter {
@@ -75,11 +95,7 @@ export class WorkerAdapter {
 	 * Runs one step. Everything that leaves this method (messages, result, error) has had the
 	 * exact values of the step's secrets replaced; the unmasked text never leaves the worker.
 	 */
-	async execute(
-		step: AssignableStep,
-		context: ExecutionContext,
-		sendMessage: SendMessageFn
-	): Promise<{ output: Record<string, unknown>; meta?: import('flow-engine/types').StepMeta }> {
+	async execute(step: AssignableStep, context: ExecutionContext, sendMessage: SendMessageFn): Promise<StepResult> {
 		const masker = new SecretMasker(new Map(Object.entries(context.secrets ?? {})));
 		try {
 			const result = await this.run(step, context, message => sendMessage(masker.maskDeep(message)), masker);
@@ -94,7 +110,7 @@ export class WorkerAdapter {
 		context: ExecutionContext,
 		sendMessage: SendMessageFn,
 		masker: SecretMasker
-	): Promise<{ output: Record<string, unknown>; meta?: import('flow-engine/types').StepMeta }> {
+	): Promise<StepResult> {
 		if ((step as { type: string }).type === 'subflow') {
 			throw new Error(`Step type 'subflow' is not supported in v1`);
 		}
@@ -262,12 +278,13 @@ export class WorkerAdapter {
 						sendMessage
 					);
 				}
+				const io = buildStepIoCapture(step, trace, context);
 				if (trace.error) {
-					throw new Error(trace.error);
+					throw Object.assign(new Error(trace.error), { io });
 				}
 				// trace.outputs is undefined for model steps that produce no structured output --
 				// an empty map is the correct representation (no outputs to propagate to dependents).
-				return { output: trace.outputs ?? {}, meta: trace.meta };
+				return { output: trace.outputs ?? {}, meta: trace.meta, io };
 			} finally {
 				// Suppress stop errors so they do not shadow the original executeStep error.
 				try {
@@ -282,6 +299,7 @@ export class WorkerAdapter {
 		const trace = await runner.executeStep(step as unknown as ScriptFlowStep, workspace, templateContext);
 		// Masked as a whole BEFORE being split into lines: a multi-line secret is intact here.
 		sendStdoutAsLogs(maskOptional(masker, trace.stdout), context.executionId, step.id, sendMessage);
+		const io = buildStepIoCapture(step, trace, context);
 		if (trace.error) {
 			// Include captured outputs (stdout/stderr) in the error so the daemon can forward them
 			// to the scheduler for ${{ subSteps.xxx.outputs.stderr }} in parent prompts.
@@ -289,10 +307,11 @@ export class WorkerAdapter {
 				stepOutputs: trace.outputs ?? {},
 				stdout: trace.stdout,
 				stderr: trace.stderr,
+				io,
 			});
 			throw err;
 		}
 		// trace.outputs is undefined for script steps without captureOutput -- empty map is correct.
-		return { output: trace.outputs ?? {}, meta: trace.meta };
+		return { output: trace.outputs ?? {}, meta: trace.meta, io };
 	}
 }

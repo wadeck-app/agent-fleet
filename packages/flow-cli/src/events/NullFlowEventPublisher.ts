@@ -1,4 +1,10 @@
-import type { FlowEventName, FlowEventPayload, FlowEventPublisher, FlowEventsStatus } from './FlowEventPublisher';
+import type {
+	FlowEventName,
+	FlowEventPayload,
+	FlowEventPublisher,
+	FlowEventsDeclaration,
+	FlowEventsStatus,
+} from './FlowEventPublisher';
 
 /** Publishes nothing, and says why when asked. Used when events are switched off. */
 export class NullFlowEventPublisher implements FlowEventPublisher {
@@ -14,5 +20,9 @@ export class NullFlowEventPublisher implements FlowEventPublisher {
 
 	status(): Promise<FlowEventsStatus> {
 		return Promise.resolve({ state: 'disabled', reason: this.reason });
+	}
+
+	declareEvents(): Promise<FlowEventsDeclaration> {
+		return Promise.resolve({ state: 'not-declared', reason: this.reason });
 	}
 }

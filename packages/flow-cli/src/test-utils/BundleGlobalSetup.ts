@@ -24,14 +24,25 @@ export default function setup(): void {
 	// `bundle` runs esbuild over dist/, so src must be compiled first or the bundle under test is whatever stale
 	// dist/ happens to be on disk. shell: true so npm resolves (npm.cmd) on Windows.
 	for (const script of ['build', 'bundle']) {
-		execFileSync('npm', ['run', script, '--workspace', 'packages/flow-cli'], {
-			windowsHide: true,
-			cwd: agentFleetRoot,
-			encoding: 'utf-8',
-			timeout: 300_000,
-			env: { ...process.env, BUNDLE_VERSION: TEST_BUNDLE_VERSION },
-			shell: true,
-		});
+		try {
+			execFileSync('npm', ['run', script, '--workspace', 'packages/flow-cli'], {
+				windowsHide: true,
+				cwd: agentFleetRoot,
+				encoding: 'utf-8',
+				timeout: 300_000,
+				env: { ...process.env, BUNDLE_VERSION: TEST_BUNDLE_VERSION },
+				shell: true,
+			});
+		} catch (error) {
+			// execFileSync's message is only "Command failed"; the compiler or bundler output is what names the cause.
+			const { stdout, stderr } = error as { stdout?: string; stderr?: string };
+			throw new Error(
+				`Bundling global setup: "npm run ${script}" failed.
+${stdout ?? ''}
+${stderr ?? ''}`,
+				{ cause: error }
+			);
+		}
 	}
 	for (const bundle of TEST_BUNDLES) {
 		if (!existsSync(bundle)) {
