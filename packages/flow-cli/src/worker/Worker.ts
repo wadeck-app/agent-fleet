@@ -4,10 +4,10 @@ import type { StepRunnerConfig } from 'flow-engine';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
 
-import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { AssignmentScopedMessage, DaemonToWorker, WorkerToDaemon } from '../ipc/Protocol';
 import type { McpServerConfig } from './McpServer';
 import { WorkerAdapter } from './WorkerAdapter';
+import { buildForkedWorkerReady } from './WorkerLaunch';
 
 const wsPort = process.env['FLOW_WS_PORT'];
 if (!wsPort) {
@@ -23,7 +23,8 @@ function send(message: WorkerToDaemon): void {
 	}
 }
 
-const WORKER_FEATURES = [WORKER_FEATURE_SUB_STEP_SESSION_RESUME, WORKER_FEATURE_SECRETS];
+// Probed once at launch, then repeated verbatim in every `ready` (connect and after each step).
+const READY = buildForkedWorkerReady(process.env, process.pid);
 
 const baseConfig: StepRunnerConfig = { interactive: false };
 
@@ -35,7 +36,7 @@ const adapter = new WorkerAdapter((mcpServers: McpServerConfig[]) => {
 });
 
 ws.on('open', () => {
-	send({ type: 'ready', pid: process.pid, features: WORKER_FEATURES });
+	send({ type: 'ready', ...READY });
 });
 
 ws.on('message', (data: Buffer) => {
@@ -92,7 +93,7 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 					stderr,
 				});
 			}
-			send({ type: 'ready', pid: process.pid, features: WORKER_FEATURES });
+			send({ type: 'ready', ...READY });
 			break;
 		}
 		case 'idle':

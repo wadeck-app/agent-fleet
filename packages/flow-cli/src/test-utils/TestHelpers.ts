@@ -9,6 +9,7 @@ import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { Daemon } from '../daemon/Daemon';
 import type { DaemonResponse, ExecutionState } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
+import { probeShellCapabilities } from '../worker/WorkerLaunch';
 
 type FlowTestCommands = {
 	run: (payload: unknown) => Promise<DaemonResponse>;
@@ -98,4 +99,26 @@ export async function waitForExecution(
 		delay = Math.min(delay * 1.5, 2000);
 	}
 	throw new Error(`Execution ${executionId} did not complete within ${timeoutMs}ms`);
+}
+
+/**
+ * Whether the test may use bash. Rule: bash is required wherever it is expected to exist, so a
+ * missing bash is a failure on Linux/macOS and on any CI runner (`CI` set). Only a local Windows
+ * machine without Git for Windows skips, and says so on stderr.
+ *
+ * @returns true when bash is available; false when the caller must skip (already reported).
+ * @throws when bash is missing where it must exist.
+ */
+export function requireBashOrSkip(testName: string): boolean {
+	if (probeShellCapabilities(process.env).includes('bash')) {
+		return true;
+	}
+	if (process.platform !== 'win32' || process.env['CI'] !== undefined) {
+		throw new Error(
+			`bash was not found on ${process.platform} (CI=${String(process.env['CI'])}) for ${testName}; it must be on PATH here. ` +
+				'Install bash or fix PATH -- the test is only skipped on a local Windows machine without Git Bash.'
+		);
+	}
+	process.stderr.write(`SKIPPED ${testName}: no bash on this Windows machine (install Git for Windows).\n`);
+	return false;
 }

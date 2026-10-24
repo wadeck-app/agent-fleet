@@ -164,6 +164,23 @@ export function probeShellCapabilities(env: NodeJS.ProcessEnv): ('bash' | 'cmd' 
 	return available;
 }
 
+/** Protocol features this build implements beyond the base protocol (declared by every kind of worker). */
+export const WORKER_FEATURES = [WORKER_FEATURE_SUB_STEP_SESSION_RESUME, WORKER_FEATURE_SECRETS];
+
+/**
+ * The `ready` a daemon-forked worker sends (on connect and after every step).
+ *
+ * It must declare the shells it can run: the daemon routes a `shell:` script step only to a
+ * worker that declared that shell, so a forked worker that declared none would leave every such
+ * step queued forever.
+ */
+export function buildForkedWorkerReady(
+	env: NodeJS.ProcessEnv,
+	pid: number
+): Pick<WorkerReady, 'pid' | 'features' | 'shellCapabilities'> {
+	return { pid, features: WORKER_FEATURES, shellCapabilities: probeShellCapabilities(env) };
+}
+
 /** Everything the worker declares about itself on registration. */
 export function buildRegistration(params: {
 	projectRoot: string;
@@ -212,7 +229,7 @@ export function buildRegistration(params: {
 		labels: params.labels ?? [],
 		shellCapabilities: params.shellCapabilities ?? [],
 		// What this build implements beyond the base protocol; an older worker simply omits it
-		features: [WORKER_FEATURE_SUB_STEP_SESSION_RESUME, WORKER_FEATURE_SECRETS],
+		features: WORKER_FEATURES,
 		attachedProjects,
 		// Only this process can see whether anybody can be reached from here (D#33, D#36) -- and a
 		// TTY alone is not the capability. Without an approval provider the worker would attract an

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { logsCommand } from '../cli/commands/LogsCommand';
 import { tailLogFile } from '../cli/commands/RunCommand';
-import { startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
+import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
 
@@ -43,6 +43,7 @@ steps:
   - id: leak
     name: Leak on purpose
     type: script
+    shell: bash
     secrets: [API_TOKEN, PEM_KEY]
     script: |
       echo "plain: $API_TOKEN"
@@ -92,6 +93,7 @@ describe('secret masking (end to end)', () => {
 	});
 
 	it('writes the placeholder, never the value, to the record, the daily log, the follow output and flow show', async () => {
+		if (!requireBashOrSkip('SecretMasking')) return;
 		await using ctx = await startTestDaemon();
 
 		const response = await ctx.client.send('run', {
