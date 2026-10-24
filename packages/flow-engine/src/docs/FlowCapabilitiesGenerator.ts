@@ -82,6 +82,7 @@ Key fields:
 - \`prompt\` (string, required) -- prompt template with \`${TMPL} }}\` variable interpolation
 - \`contextLimit\` (integer >= 30000, optional, claude only) -- tokens at which Claude auto-compacts the context; approximate upper bound. Rejected with \`session.mode: compact\` or an explicit \`CLAUDE_CODE_AUTO_COMPACT_WINDOW\`
 - \`subStepFeedbackPrompt\` (string, optional) -- wrapper for the message delivering failed sub-step feedback into this step's resumed session when it is re-run because a \`parent:\` sub-step failed (the \`prompt\` is not re-sent then). Must reference the sub-step feedback template variable; defaults to a built-in wrapper
+- \`subStepStrategy\` (\`restart-on-first-failure\` (default) | \`wait-all\`, optional) -- how this step reacts to failing \`parent:\` sub-steps. \`flow validate\` warns (exit 0) when a \`wait-all\` parent has a sub-step that \`depends\` on a sibling sub-step: if the sibling fails, the dependent is settled as not run
 - \`onCompact\` (\`{ command, timeout? }\`, optional, claude only) -- shell command run on each compaction (success, failed, thrashing). Gets the event as JSON on stdin and \`FLOW_COMPACT_*\` env vars. Observer only: a non-zero exit or a timeout (seconds, default 30) warns and never fails the step
 
 ### script

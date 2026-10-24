@@ -22,6 +22,8 @@ export type ValidateResult =
 	// The file is a flow registry (flows.yml format), not a single flow. The CLI maps it to process exit code 1.
 	| { exit: 4; message: string; flowIds: string[]; includes: string[] };
 
+const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([ValidationCode.SUB_STEP_SIBLING_DEPENDENCY]);
+
 // Same reserved key as FlowRegistry.loadProjectFlows
 const REGISTRY_INCLUDES_KEY = 'includes';
 
@@ -133,7 +135,15 @@ export function validateFlowFile(filePath: string, versions: DefinitionSnapshotS
 			errors: assessment.errors.map(message => ({ type: 'version', message, path: 'version' })),
 		};
 	}
-	return { exit: 0, version: assessment.version, warnings: assessment.warnings };
+	// Only the warning codes in SURFACED_WARNING_CODES are reported: the other engine warnings (missing step name, no inputs...) stay out of the CLI output
+	const flowWarnings = result.issues
+		.filter((i: ValidationIssue) => i.severity === 'warning' && SURFACED_WARNING_CODES.has(i.code))
+		.map(issueToWarning);
+	return { exit: 0, version: assessment.version, warnings: [...assessment.warnings, ...flowWarnings] };
+}
+
+function issueToWarning(issue: ValidationIssue): string {
+	return issue.suggestion ? `${issue.message}. Fix: ${issue.suggestion}` : issue.message;
 }
 
 function issueToCliError(issue: ValidationIssue): CliValidationError {

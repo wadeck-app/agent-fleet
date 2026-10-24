@@ -155,3 +155,44 @@ describe('validateFlowFile on a flow registry file', () => {
 		expect(validateFlowFile(SIMPLE_FLOW, store).exit).toBe(0);
 	});
 });
+
+describe('validateFlowFile sub-step dependency warning', () => {
+	const flowWith = (strategy: string | undefined): string =>
+		yaml.dump({
+			id: 'sub_dep',
+			version: '1.0.0',
+			name: 'sub dep',
+			description: 'd',
+			workspace: { mode: 'shared', gitStrategy: 'none', reusePolicy: 'if-available' },
+			steps: [
+				{
+					id: 'impl',
+					type: 'script',
+					script: 'true',
+					...(strategy === undefined ? {} : { subStepStrategy: strategy }),
+				},
+				{ id: 'l1', type: 'script', parent: 'impl', script: 'true' },
+				{ id: 'l2', type: 'script', parent: 'impl', depends: ['l1'], script: 'true' },
+			],
+		});
+
+	it('exits 0 with an actionable warning for a wait-all parent with dependent sub-steps', () => {
+		const file = path.join(tmpDir, 'wait-all.yml');
+		fs.writeFileSync(file, flowWith('wait-all'));
+		const result = validateFlowFile(file, store);
+		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings[0]).toContain("'impl'");
+		expect(result.warnings[0]).toContain("'l2'");
+		expect(result.warnings[0]).toContain("'l1'");
+		expect(result.warnings[0]).toContain('restart-on-first-failure');
+	});
+
+	it('has no such warning with the default strategy', () => {
+		const file = path.join(tmpDir, 'default.yml');
+		fs.writeFileSync(file, flowWith(undefined));
+		const result = validateFlowFile(file, store);
+		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
+		expect(result.warnings.filter(w => w.includes("'l2'"))).toEqual([]);
+	});
+});
