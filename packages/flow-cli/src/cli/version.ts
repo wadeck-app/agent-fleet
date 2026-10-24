@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 
-export function readBaseVersion(): string {
+/** `cwd` is where git is asked (the process working directory by default); tests pass a directory outside any repository. */
+export function readBaseVersion(cwd?: string): string {
 	const now = new Date();
 	const pad2 = (n: number) => String(n).padStart(2, '0');
 	const date = `${now.getFullYear()}.${pad2(now.getMonth() + 1)}.${pad2(now.getDate())}`;
@@ -13,6 +14,7 @@ export function readBaseVersion(): string {
 			encoding: 'utf8',
 			stdio: ['pipe', 'pipe', 'pipe'],
 			windowsHide: true,
+			...(cwd !== undefined ? { cwd } : {}),
 		}).trim();
 	} catch {
 		/* not a git repo */
@@ -23,6 +25,7 @@ export function readBaseVersion(): string {
 			encoding: 'utf8',
 			stdio: ['pipe', 'pipe', 'pipe'],
 			windowsHide: true,
+			...(cwd !== undefined ? { cwd } : {}),
 		}).trim();
 	} catch {
 		/* not a git repo */

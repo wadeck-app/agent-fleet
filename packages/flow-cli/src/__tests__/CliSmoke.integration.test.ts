@@ -71,7 +71,9 @@ function expectStarted(output: string): void {
 	}
 }
 
-describe('flow CLI starts', () => {
+// Each case spawns the CLI through tsx (cold start, slower under load): the test timeout is the spawn timeout of
+// runFlow, not vitest's 5 s default, which sat below the bound the spawn itself was given.
+describe('flow CLI starts', { timeout: 60_000 }, () => {
 	it('prints its top-level help', () => {
 		const { output, status } = runFlow(['--help']);
 
@@ -85,6 +87,8 @@ describe('flow CLI starts', () => {
 
 		expectStarted(output);
 		expect(output.trim()).not.toBe('');
+		// Run from outside any git repository (see runFlow): git must not leak its own error into the output.
+		expect(output).not.toContain('fatal:');
 		expect(status).toBe(0);
 	});
 

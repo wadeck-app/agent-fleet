@@ -1,58 +1,48 @@
-import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { VERSION } from './version.js';
+import { VERSION, readBaseVersion } from './version.js';
+
+const CALVER = /^\d{4}\.\d{2}\.\d{2}-\d{6}-\d+-[0-9a-zA-Z]+/;
 
 describe('VERSION', () => {
 	it('matches CalVer format YYYY.MM.DD-HHmmss-count-hash', () => {
-		expect(VERSION).toMatch(/^\d{4}\.\d{2}\.\d{2}-\d{6}-\d+-[0-9a-zA-Z]+/);
+		expect(VERSION).toMatch(CALVER);
 	});
 });
 
-describe('version -- non-git directory', () => {
-	it('flow --version produces no "fatal:" lines on stderr when run from a non-git directory', () => {
-		const __dirname = path.dirname(fileURLToPath(import.meta.url));
-		const packageDir = path.resolve(__dirname, '../../..');
-		const flowIndexPath = path.join(__dirname, 'FlowIndex.ts');
+// In-process: what mattered was git's behaviour outside a repository, not launching the whole CLI through tsx (a cold
+// start that could exceed the 5 s test timeout). `flow --version` through the real entry is covered by
+// CliSmoke.integration.test.ts, which also asserts that no "fatal:" line reaches the output.
+describe('readBaseVersion -- non-git directory', () => {
+	let nonGitDir: string;
 
-		// Resolve tsx the same way bin/flow.js does
-		const require = createRequire(path.join(packageDir, 'package.json'));
-		let tsxPath: string | undefined;
+	beforeEach(() => {
+		nonGitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-version-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(nonGitDir, { recursive: true, force: true });
+	});
+
+	it('falls back to count 0 and hash DEV, and git writes nothing to this process stderr', () => {
+		const writes: string[] = [];
+		const originalWrite = process.stderr.write;
+		process.stderr.write = ((chunk: string | Uint8Array): boolean => {
+			writes.push(String(chunk));
+			return true;
+		}) as typeof process.stderr.write;
+		let version: string;
 		try {
-			tsxPath = require.resolve('tsx/dist/cli.mjs');
-		} catch {
-			// Fallback: scan upward
-			let dir = packageDir;
-			for (let i = 0; i < 4; i++) {
-				const candidate = path.resolve(dir, 'node_modules', 'tsx', 'dist', 'cli.mjs');
-				if (fs.existsSync(candidate)) {
-					tsxPath = candidate;
-					break;
-				}
-				dir = path.resolve(dir, '..');
-			}
-		}
-
-		// Fails rather than returning: a test that quietly does nothing reports success for
-		// a CLI it never ran, which is how a startup failure stayed green for a whole day.
-		if (!tsxPath) throw new Error('tsx not found, so the CLI could not be launched. Run npm install.');
-
-		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-version-test-'));
-		try {
-			const result = spawnSync(process.execPath, [tsxPath, flowIndexPath, '--version'], {
-				cwd: tmpDir,
-				encoding: 'utf8',
-				timeout: 30000,
-				env: { ...process.env },
-			});
-			expect(result.stderr ?? '').not.toContain('fatal:');
+			version = readBaseVersion(nonGitDir);
 		} finally {
-			fs.rmSync(tmpDir, { recursive: true, force: true });
+			process.stderr.write = originalWrite;
 		}
+
+		expect(version).toMatch(CALVER);
+		expect(version).toMatch(/-0-DEV$/);
+		expect(writes.join('')).not.toContain('fatal:');
 	});
 });

@@ -222,3 +222,13 @@ describe('flow logs -- alias for cli logs', () => {
 		expect(combined).toContain('Unknown command');
 	});
 });
+
+describe('flow --pid', () => {
+	it('does not crash with "unknown option --pid"', () => {
+		const result = runFlow(['--pid']);
+		const combined = String(result.stdout ?? '') + String(result.stderr ?? '');
+		expect(combined).not.toContain('unknown option');
+		// exit code 2 means the daemon is not running: acceptable, not an error for this test
+		expect(result.status).not.toBe(1);
+	});
+});
