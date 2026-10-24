@@ -28,6 +28,26 @@ All hooks are **fire-and-forget**: if a hook fails (non-zero exit, connection re
 
 ---
 
+## Queue events (not hooks)
+
+Separately from hooks, the flow daemon publishes lifecycle events to the queue, so agents can `queue wait` instead of polling `flow status`. Nothing to configure; `flow docs` (Section 9: Events) is the reference for names, payload and commands.
+
+| Event                      | Fires when                                               |
+| -------------------------- | -------------------------------------------------------- |
+| `flow.execution.started`   | First step of an execution is dispatched                 |
+| `flow.execution.completed` | Every step completed                                     |
+| `flow.execution.failed`    | Execution failed for good                                |
+| `flow.step.started`        | A step attempt starts (retry: again, with `attempt` + 1) |
+| `flow.step.completed`      | A step attempt completed                                 |
+| `flow.step.failed`         | A step attempt failed                                    |
+
+- The daemon needs the `queue` CLI on its PATH; the SDK starts the queue daemon when it is stopped.
+- `FLOW_QUEUE_EVENTS=0` in the daemon environment switches events off. The daemon log states at start whether events are enabled, unavailable (with the fix) or disabled.
+- Publishing is best effort and never affects a run. Payloads hold ids, status, timings and the first line of the masked error; never inputs, env values or outputs.
+- Source of the mapping: `src/events/FlowEventMapper.ts`, fed by `ExecutionStore` transitions (one place, so no event is published twice).
+
+---
+
 ## Hook types
 
 ### CLI hook

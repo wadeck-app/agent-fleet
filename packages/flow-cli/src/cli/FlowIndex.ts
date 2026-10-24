@@ -17,6 +17,7 @@ import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { appCoreModuleOptions } from '../daemon/AppModuleLocator.js';
 import { Daemon, writeDaemonLog } from '../daemon/Daemon.js';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
+import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
 import { describeCommandLine } from './CommandLineLog';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { buildCliCommand } from './commands/CliCommand.js';
@@ -221,7 +222,10 @@ async function main(): Promise<void> {
 		const appCoreModules = appCoreModuleOptions(import.meta.url, message =>
 			writeDaemonLog(logsDirOf(DAEMON_DIR), 'error', `[AppCoreRegistration] ${message}`)
 		);
-		await Daemon.start(config, DAEMON_DIR, { appCoreModules });
+		const eventPublisher = createFlowEventPublisher(process.env, (level, message) =>
+			writeDaemonLog(logsDirOf(DAEMON_DIR), level, message)
+		);
+		await Daemon.start(config, DAEMON_DIR, { appCoreModules, eventPublisher });
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).
 		return;
 	}

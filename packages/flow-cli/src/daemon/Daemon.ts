@@ -21,6 +21,10 @@ import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { PluginResolver } from '../config/PluginResolver.js';
 import { ProjectResolverFactory } from '../config/ProjectResolverFactory.js';
+import { FlowEventMapper } from '../events/FlowEventMapper.js';
+import type { FlowEventPublisher } from '../events/FlowEventPublisher.js';
+import { flowEventsStatusLine } from '../events/FlowEventsStatusLine.js';
+import { NullFlowEventPublisher } from '../events/NullFlowEventPublisher.js';
 import type { ClientCommand, SourceReady, UpdateWorkerRequest, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { ExecutionStore } from '../storage/ExecutionStore';
@@ -288,6 +292,11 @@ export interface StartDaemonOptions {
 	 * talk to app-core at all (tests and embedders); the CLI entry always passes it.
 	 */
 	appCoreModules?: { id: string; manifestPath: string }[];
+	/**
+	 * Where the lifecycle events (flow.execution.*, flow.step.*) go. Omitted means none are published,
+	 * which is what tests and embedders want; the CLI entry passes the queue-backed one.
+	 */
+	eventPublisher?: FlowEventPublisher;
 }
 
 async function startDaemon(
@@ -298,6 +307,11 @@ async function startDaemon(
 	const resolvedDaemonDir = daemonDir ?? flowConfigDir();
 	const executionsDir = executionsDirOf(resolvedDaemonDir);
 	const logsDir = logsDirOf(resolvedDaemonDir);
+	const eventPublisher =
+		options.eventPublisher ??
+		new NullFlowEventPublisher('this daemon was started without an event publisher (embedded or test run)');
+	/** The flush started at shutdown, kept so the handle's stop() can wait for it. */
+	let shutdownFlush: Promise<void> = Promise.resolve();
 
 	// Resolve plugins before createDaemon - onStart is synchronous so async must happen here
 	const pluginProviders = await tryResolvePlugins();
@@ -404,11 +418,21 @@ async function startDaemon(
 				if (updateCheckTimer !== undefined) {
 					clearInterval(updateCheckTimer);
 				}
+				// The hook is synchronous: the flush runs on, and stop() below waits for it. Pushes in flight
+				// also keep the process alive until they settle.
+				shutdownFlush = eventPublisher.flush().catch((err: unknown) => {
+					writeDaemonLog(logsDir, 'error', `Queue events: flush at shutdown failed: ${getErrorMessage(err)}`);
+				});
 			},
 			onStart: (port: number) => {
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
 				fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
 				writeDaemonLog(logsDir, 'info', 'Daemon started');
+				// One line, once: whether events will reach the queue, and how to fix it if not.
+				void eventPublisher.status().then(status => {
+					const line = flowEventsStatusLine(status);
+					writeDaemonLog(logsDir, line.level, line.message);
+				});
 
 				// Fire-and-forget: app-core being absent or slow (the SDK waits up to 3 s) must not delay or break the
 				// daemon start. Whatever app-core answers lands in the daemon log, `flow logs` shows it.
@@ -449,7 +473,14 @@ async function startDaemon(
 						);
 					})
 				);
-				executionStore = new ExecutionStore(executionsDir, config.logs.retainDays, daemonSecrets.masks);
+				executionStore = new ExecutionStore(
+					executionsDir,
+					config.logs.retainDays,
+					daemonSecrets.masks,
+					new FlowEventMapper(eventPublisher, err =>
+						writeDaemonLog(logsDir, 'error', `Queue events: publishing failed: ${getErrorMessage(err)}`)
+					)
+				);
 				logWriter = new LogWriter(logsDir, config.logs.retainDays, daemonSecrets.masks);
 				executionStore.pruneOldExecutions();
 				// Workspace pruning is per-project and so runs per request, not here:
@@ -898,7 +929,15 @@ async function startDaemon(
 		}, SHUTDOWN_GRACE_MS);
 	}
 
-	return daemonHandle;
+	return {
+		get port(): number {
+			return daemonHandle.port;
+		},
+		stop: async reason => {
+			await daemonHandle.stop(reason);
+			await shutdownFlush;
+		},
+	};
 }
 
 export class Daemon {

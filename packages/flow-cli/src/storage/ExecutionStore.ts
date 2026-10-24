@@ -5,6 +5,7 @@ import * as path from 'node:path';
 
 import type { ExecutionState, StepStatus } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
+import type { ExecutionTransition, ExecutionTransitionListener } from './ExecutionTransition';
 
 function assertExecutionIdSafe(executionId: string): void {
 	if (!isExecutionId(executionId)) {
@@ -20,7 +21,9 @@ export class ExecutionStore {
 		private readonly executionsDir: string,
 		private readonly retainDays: number = 30,
 		// Hides the exact values of the execution's declared secrets in every record written.
-		private readonly masks: ExecutionMasks = new ExecutionMasks()
+		private readonly masks: ExecutionMasks = new ExecutionMasks(),
+		// Told once per real transition, with the record as written (masked). The only source of lifecycle events.
+		private readonly listener?: ExecutionTransitionListener
 	) {}
 
 	pruneOldExecutions(): void {
@@ -153,16 +156,23 @@ export class ExecutionStore {
 		if (!state.currentSteps.includes(stepId)) {
 			state.currentSteps.push(stepId);
 		}
-		if (state.status === 'queued') {
+		const executionStarted = state.status === 'queued';
+		if (executionStarted) {
 			state.status = 'running';
 		}
-		this.write(state);
+		const written = this.write(state);
+		if (executionStarted) {
+			this.notify({ kind: 'execution-started', state: written });
+		}
+		this.notify({ kind: 'step-started', state: written, stepId });
 		return state;
 	}
 
 	markStepCompleted(executionId: string, stepId: string, meta?: StepMeta): ExecutionState {
 		const state = this.read(executionId);
 		const step = state.steps[stepId];
+		// A step that never ran (skipped) is settled quietly: there was no attempt to announce.
+		const wasRunning = step?.status === 'running';
 		if (step) {
 			step.status = 'completed';
 			step.completedAt = new Date().toISOString();
@@ -171,7 +181,10 @@ export class ExecutionStore {
 			}
 		}
 		state.currentSteps = state.currentSteps.filter(id => id !== stepId);
-		this.write(state);
+		const written = this.write(state);
+		if (wasRunning) {
+			this.notify({ kind: 'step-completed', state: written, stepId });
+		}
 		return state;
 	}
 
@@ -184,6 +197,7 @@ export class ExecutionStore {
 	): ExecutionState {
 		const state = this.read(executionId);
 		const step = state.steps[stepId];
+		const alreadyFailed = step?.status === 'failed';
 		if (step) {
 			step.status = 'failed';
 			step.completedAt = new Date().toISOString();
@@ -201,20 +215,34 @@ export class ExecutionStore {
 		if (error !== undefined) {
 			state.lastError = error;
 		}
-		this.write(state);
+		const written = this.write(state);
+		if (step && !alreadyFailed) {
+			this.notify({ kind: 'step-failed', state: written, stepId });
+		}
 		return state;
 	}
 
 	markExecutionCompleted(executionId: string): ExecutionState {
-		return this.update(executionId, {
-			status: 'completed',
-			completedAt: new Date().toISOString(),
-			currentSteps: [],
-		});
+		return this.finishExecution(executionId, 'completed');
 	}
 
 	markExecutionFailed(executionId: string): ExecutionState {
-		return this.update(executionId, { status: 'failed', completedAt: new Date().toISOString(), currentSteps: [] });
+		return this.finishExecution(executionId, 'failed');
+	}
+
+	private finishExecution(executionId: string, status: 'completed' | 'failed'): ExecutionState {
+		const current = this.read(executionId);
+		const finished: ExecutionState = {
+			...current,
+			status,
+			completedAt: new Date().toISOString(),
+			currentSteps: [],
+		};
+		const written = this.write(finished);
+		if (current.status !== status) {
+			this.notify({ kind: status === 'completed' ? 'execution-completed' : 'execution-failed', state: written });
+		}
+		return finished;
 	}
 
 	/**
@@ -239,11 +267,14 @@ export class ExecutionStore {
 		return path.join(this.executionsDir, `${executionId}.json`);
 	}
 
-	private write(state: ExecutionState): void {
-		fs.writeFileSync(
-			this.filePath(state.executionId),
-			JSON.stringify(this.masks.maskDeep(state.executionId, state), null, 2),
-			'utf8'
-		);
+	/** Persists the record with declared secrets masked, and returns what was written. */
+	private write(state: ExecutionState): ExecutionState {
+		const masked = this.masks.maskDeep(state.executionId, state);
+		fs.writeFileSync(this.filePath(state.executionId), JSON.stringify(masked, null, 2), 'utf8');
+		return masked;
+	}
+
+	private notify(transition: ExecutionTransition): void {
+		this.listener?.onTransition(transition);
 	}
 }

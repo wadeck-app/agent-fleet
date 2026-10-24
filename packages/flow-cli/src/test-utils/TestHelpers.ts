@@ -7,6 +7,7 @@ import * as path from 'node:path';
 
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { Daemon } from '../daemon/Daemon';
+import type { FlowEventPublisher } from '../events/FlowEventPublisher';
 import type { DaemonResponse, ExecutionState } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { probeShellCapabilities } from '../worker/WorkerLaunch';
@@ -35,6 +36,8 @@ export interface TestDaemonOptions {
 	 * many workers the daemon creates, not who may connect.
 	 */
 	concurrency?: number;
+	/** Receives the daemon's lifecycle events; omitted means none are published. */
+	eventPublisher?: FlowEventPublisher;
 }
 
 export async function startTestDaemon(options: TestDaemonOptions = {}): Promise<TestDaemonContext> {
@@ -55,7 +58,10 @@ export async function startTestDaemon(options: TestDaemonOptions = {}): Promise<
 		// Port 0 for the command server too: the standard port is a fixed number shared with
 		// the user's own daemon and with every other test daemon, so whoever loses the race
 		// publishes a port file nothing is listening on and every client gets ECONNREFUSED.
-		handle = await Daemon.start(config, daemonDir, { port: 0 });
+		handle = await Daemon.start(config, daemonDir, {
+			port: 0,
+			...(options.eventPublisher === undefined ? {} : { eventPublisher: options.eventPublisher }),
+		});
 	} catch (err) {
 		fs.rmSync(daemonDir, { recursive: true, force: true });
 		throw err;

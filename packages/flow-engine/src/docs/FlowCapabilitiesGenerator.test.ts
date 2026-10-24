@@ -121,6 +121,31 @@ describe('FlowCapabilitiesGenerator - secrets', () => {
 		expect(result).toContain('secret');
 	});
 
+	it('has an Events section listing the six queue events, the payload and ready-to-use waits', () => {
+		expect(result).toContain('## Section 9: Events');
+		for (const name of [
+			'flow.execution.started',
+			'flow.execution.completed',
+			'flow.execution.failed',
+			'flow.step.started',
+			'flow.step.completed',
+			'flow.step.failed',
+		]) {
+			expect(result).toContain('`' + name + '`');
+		}
+		for (const field of ['executionId', 'flowId', 'stepId', 'attempt', 'durationMs', 'projectRoot', 'error']) {
+			expect(result).toContain('`' + field + '`');
+		}
+		expect(result).toContain(
+			'queue wait flow.execution.completed --when "payload.executionId=<id>" --since 5m --json'
+		);
+		expect(result).toContain(
+			'queue wait flow.step.failed --when "payload.executionId=<id>" --when "payload.stepId=<step>" --json'
+		);
+		expect(result).toContain('FLOW_QUEUE_EVENTS=0');
+		expect(result).toContain('exact event names');
+	});
+
 	it('has a Secrets section covering declaration, run time, usage, limits and masking', () => {
 		expect(result).toContain('## Section 8: Secrets');
 		expect(result).toContain('type: password');
