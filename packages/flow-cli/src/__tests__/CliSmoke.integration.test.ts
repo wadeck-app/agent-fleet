@@ -13,6 +13,7 @@
  * are used: `--help` alone imports the whole command graph, which is where a resolution or
  * module-level error surfaces.
  */
+import { readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { OWN_PROCESS_GROUP, killProcessTree, removeTempDirectory } from 'flow-core/testing';
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
@@ -186,6 +187,9 @@ function spawnBundledDaemon(installedFlow: string, projectDir: string, configHom
 	// ConfigDir.get honours this on every platform, so the daemon dir is XDG_CONFIG_HOME/flow.
 	// Without it the test would adopt (and then kill) the developer's own running daemon.
 	env['XDG_CONFIG_HOME'] = configHome;
+	// The standard port range belongs to the developer's own daemons: with all of it taken the daemon exits with
+	// DaemonPortExhaustedError and this test fails for a reason that has nothing to do with the bundle.
+	env['FLOW_DAEMON_PORT'] = '0';
 
 	const child = spawn(process.execPath, [installedFlow], {
 		cwd: projectDir,
@@ -239,6 +243,14 @@ describe('the standalone bundle in daemon mode', () => {
 				existsSync(portFile),
 				`the daemon never wrote "${portFile}", so no client could reach it.\nIts output:\n${daemon.output() || '(nothing at all)'}`
 			).toBe(true);
+			// Proves the isolation above worked, rather than the standard range merely having a free port today.
+			const published = await readPortFile(join(configHome, 'flow'));
+			expect(published, `"${portFile}" could not be read back.`).not.toBeNull();
+			const insideStandardRange = published!.port >= 47823 && published!.port <= 47833;
+			expect(
+				insideStandardRange,
+				`the daemon bound port ${String(published!.port)}, inside the standard range 47823-47833 that a developer's own daemons occupy`
+			).toBe(false);
 		} finally {
 			// The daemon runs with projectDir as working directory: on Windows that locks the directory, and so does any
 			// process the daemon started. Kill the whole tree and wait for it, then remove (removeTempDirectory states what it tolerates, loudly,

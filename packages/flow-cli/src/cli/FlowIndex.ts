@@ -18,6 +18,7 @@ import { appCoreModuleOptions } from '../daemon/AppModuleLocator.js';
 import { Daemon } from '../daemon/Daemon.js';
 import { writeDaemonLog } from '../daemon/DaemonLog.js';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
+import { resolveDaemonPort } from '../daemon/resolveDaemonPort.js';
 import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
 import { describeCommandLine } from './CommandLineLog';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
@@ -56,6 +57,7 @@ Status --json fields (flow status --json):
 Environment variables:
   XDG_CONFIG_HOME   Override base config directory (default: ~/.config)
   FLOW_DAEMON_MODE  Internal - set to "1" by "flow start" to launch daemon mode
+  FLOW_DAEMON_PORT  Daemon command port, 0 to let the OS pick one (default: standard range 47823-47833)
 
 Daemon-required commands: run, start, stop, status
 Standalone commands:      show, validate, history, versions, docs, logs, cli`;
@@ -228,7 +230,12 @@ async function main(): Promise<void> {
 		const eventPublisher = createFlowEventPublisher(process.env, (level, message) =>
 			writeDaemonLog(logsDirOf(DAEMON_DIR), level, message)
 		);
-		await Daemon.start(config, DAEMON_DIR, { appCoreModules, eventPublisher });
+		const port = resolveDaemonPort(process.env);
+		await Daemon.start(config, DAEMON_DIR, {
+			appCoreModules,
+			eventPublisher,
+			...(port === undefined ? {} : { port }),
+		});
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).
 		return;
 	}

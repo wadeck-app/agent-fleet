@@ -49,8 +49,7 @@ describe('flow versions (end to end)', () => {
 		if (!requireBashOrSkip('FlowVersions')) return;
 		await using ctx = await startTestDaemon();
 
-		// The daemon stops one second after its last execution ends, and the test client then answers with an echo of the
-		// command: every request is sent while a run is still in flight (see the refused one below).
+		// Starts a run and returns its id. The refused request below is also sent while a run is still in flight.
 		const start = async (flowVersion?: string): Promise<string> => {
 			const response = await ctx.client.send('run', {
 				type: 'run',

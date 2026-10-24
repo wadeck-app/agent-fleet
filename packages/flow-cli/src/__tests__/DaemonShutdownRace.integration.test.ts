@@ -47,7 +47,7 @@ beforeEach(async () => {
 
 	// Concurrency 0: nothing this daemon forks can mask the race -- only the registered
 	// worker connected below can ever run the step.
-	ctx = await startTestDaemon({ concurrency: 0 });
+	ctx = await startTestDaemon({ concurrency: 0, stopWhenIdle: true });
 	await waitForFile(join(ctx.daemonDir, 'config.port'));
 });
 

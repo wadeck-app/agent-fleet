@@ -51,6 +51,12 @@ export interface StartDaemonOptions {
 	 */
 	port?: number;
 	/**
+	 * Whether the daemon stops itself once it has nothing left to do. Omitted means yes, which is what a user's
+	 * daemon does: the next `flow run` starts a new one. Tests pass false, because their client never restarts a
+	 * daemon, so a second run sent after the first ended raced the idle timer and met a dead server.
+	 */
+	stopWhenIdle?: boolean;
+	/**
 	 * The packaged app-module to register with app-core on start. Omitted means the daemon does not
 	 * talk to app-core at all (tests and embedders); the CLI entry always passes it.
 	 */
@@ -108,8 +114,11 @@ async function startDaemon(
 		},
 		() => daemonHandle.stop('idle')
 	);
+	const stopWhenIdle = options.stopWhenIdle ?? true;
 	const workerMessages = new DaemonWorkerMessageHandler(logsDir, getRuntime, () => {
-		idleShutdown.checkShutdown();
+		if (stopWhenIdle) {
+			idleShutdown.checkShutdown();
+		}
 	});
 
 	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });

@@ -36,6 +36,12 @@ export interface TestDaemonOptions {
 	 * many workers the daemon creates, not who may connect.
 	 */
 	concurrency?: number;
+	/**
+	 * Whether the daemon stops itself once idle. Omitted means no: the test client never restarts a daemon, so a run
+	 * sent after the previous one ended (under load, polling lags past the one-second grace) met a stopped server and
+	 * failed with ECONNREFUSED. Only a test of the idle stop itself asks for true.
+	 */
+	stopWhenIdle?: boolean;
 	/** Receives the daemon's lifecycle events; omitted means none are published. */
 	eventPublisher?: FlowEventPublisher;
 }
@@ -60,6 +66,7 @@ export async function startTestDaemon(options: TestDaemonOptions = {}): Promise<
 		// publishes a port file nothing is listening on and every client gets ECONNREFUSED.
 		handle = await Daemon.start(config, daemonDir, {
 			port: 0,
+			stopWhenIdle: options.stopWhenIdle ?? false,
 			...(options.eventPublisher === undefined ? {} : { eventPublisher: options.eventPublisher }),
 		});
 	} catch (err) {
