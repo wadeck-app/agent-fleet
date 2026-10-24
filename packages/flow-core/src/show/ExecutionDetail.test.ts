@@ -272,3 +272,35 @@ describe('renderExecutionDetail version line', () => {
 		expect(text).toContain('Version:   not recorded');
 	});
 });
+
+describe('renderExecutionDetail waves', () => {
+	const record = {
+		executionId: 'abcd1234',
+		flowFile: 'f.yml',
+		flowId: 'f',
+		status: 'completed' as const,
+		currentSteps: [],
+		startedAt: '2026-10-04T14:00:00.000Z',
+		completedAt: '2026-10-04T14:00:05.000Z',
+		steps: {
+			impl: { status: 'completed' as const },
+			check: { status: 'completed' as const, wave: 1 },
+			late: {
+				status: 'completed' as const,
+				wave: 2,
+				skippedReason: 'not run: wave 1 failed, wave 2 was not started',
+			},
+		},
+	};
+
+	it('prints the wave of each sub-step next to its status, with the skip reason of a later wave', () => {
+		const lines = renderExecutionDetail(
+			{ record, filePath: '/e/abcd1234.json' },
+			{ tail: DEFAULT_TAIL_CHARS, full: false }
+		).split('\n');
+		expect(lines.find(l => l.startsWith('  impl '))).not.toContain('wave');
+		expect(lines.find(l => l.startsWith('  check '))).toContain('wave: 1');
+		expect(lines.find(l => l.startsWith('  late '))).toContain('wave: 2');
+		expect(lines).toContain('      skipped: not run: wave 1 failed, wave 2 was not started');
+	});
+});

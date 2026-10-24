@@ -22,7 +22,11 @@ export type ValidateResult =
 	// The file is a flow registry (flows.yml format), not a single flow. The CLI maps it to process exit code 1.
 	| { exit: 4; message: string; flowIds: string[]; includes: string[] };
 
-const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([ValidationCode.SUB_STEP_SIBLING_DEPENDENCY]);
+const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([
+	ValidationCode.SUB_STEP_SIBLING_DEPENDENCY,
+	ValidationCode.SUB_STEP_WAVES_SINGLE_WAVE,
+	ValidationCode.WAVE_REDUNDANT_DEPENDS,
+]);
 
 // Same reserved key as FlowRegistry.loadProjectFlows
 const REGISTRY_INCLUDES_KEY = 'includes';
@@ -163,6 +167,13 @@ function validationCodeToType(code: ValidationCode): string {
 		case ValidationCode.EMPTY_COLLECTION:
 		case ValidationCode.TYPE_MISMATCH:
 		case ValidationCode.INCOMPATIBLE_PROVIDER_MODEL:
+		case ValidationCode.SUB_STEP_STRATEGY_UNKNOWN:
+		case ValidationCode.SUB_STEP_WAVE_MISSING:
+		case ValidationCode.SUB_STEP_WAVE_WITHOUT_PARENT:
+		case ValidationCode.SUB_STEP_WAVE_STRATEGY_MISMATCH:
+		case ValidationCode.SUB_STEP_WAVE_NESTED:
+		case ValidationCode.SUB_STEP_WAVE_INVALID:
+		case ValidationCode.WAVE_LATER_DEPENDS:
 			return 'schema';
 		case ValidationCode.UNDEFINED_INPUT:
 		case ValidationCode.UNDEFINED_OUTPUT:

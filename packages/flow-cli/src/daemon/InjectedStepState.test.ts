@@ -16,3 +16,14 @@ describe('injectedStepState', () => {
 		expect(injectedStepState({ id: 'a', type: 'model' })).toEqual({ status: 'pending', injected: true });
 	});
 });
+
+describe('injectedStepState wave', () => {
+	it('records the wave of an injected sub-step, wave 0 included', () => {
+		expect(injectedStepState({ id: 'a', type: 'script', parent: 'p', wave: 2 })).toMatchObject({ wave: 2 });
+		expect(injectedStepState({ id: 'a', type: 'script', parent: 'p', wave: 0 })).toMatchObject({ wave: 0 });
+	});
+
+	it('leaves wave out when the step declares none', () => {
+		expect(injectedStepState({ id: 'a', type: 'script' })).not.toHaveProperty('wave');
+	});
+});

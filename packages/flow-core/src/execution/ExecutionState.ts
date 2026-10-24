@@ -45,6 +45,8 @@ export interface StepState {
 	dependsOn?: string[];
 	/** Injected steps only: the step it was declared a sub-step of (`parent`). */
 	parent?: string;
+	/** Wave of a direct sub-step of a `waves` parent (`wave:`), recorded at start; absent on other steps and on older records. */
+	wave?: number;
 	/** Error message if the step failed. */
 	error?: string;
 	/** Why the step never ran (it is settled as `completed` without an attempt), e.g. a sub-step it depends on failed. */

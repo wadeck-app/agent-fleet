@@ -87,6 +87,7 @@ const mockExecStore = {
 	markStepRunning: vi.fn(),
 	markStepCompleted: vi.fn(),
 	markStepFailed: vi.fn(),
+	markStepsPending: vi.fn(),
 	markExecutionCompleted: vi.fn(),
 	markExecutionFailed: vi.fn(),
 	markExecutionResumed: vi.fn(),

@@ -12,5 +12,6 @@ export function injectedStepState(step: InjectedStep): StepState {
 		injected: true,
 		...(step.depends && step.depends.length > 0 ? { dependsOn: [...step.depends] } : {}),
 		...(step.parent !== undefined ? { parent: step.parent } : {}),
+		...(typeof step.wave === 'number' ? { wave: step.wave } : {}),
 	};
 }

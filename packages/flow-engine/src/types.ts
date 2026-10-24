@@ -598,8 +598,15 @@ export interface BaseFlowStep {
 	/** Max times the parent is re-queued when this sub-step fails (default: 3). */
 	maxSubStepIterations?: number;
 
-	/** Sub-step failure strategy name ('restart-on-first-failure' or 'wait-all'). */
+	/** Sub-step failure strategy name ('restart-on-first-failure', 'wait-all' or 'waves'; see SUB_STEP_STRATEGY_NAMES). */
 	subStepStrategy?: string;
+
+	/**
+	 * Wave of a direct sub-step of a parent using subStepStrategy 'waves': a non-negative integer used only
+	 * as an ordering key (gaps allowed). Same wave runs in parallel, wave n+1 starts when wave n fully passed.
+	 * Nested sub-steps inherit the wave of their closest ancestor and must not declare one.
+	 */
+	wave?: number;
 }
 
 /**

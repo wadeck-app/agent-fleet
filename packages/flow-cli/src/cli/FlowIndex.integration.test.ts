@@ -4,6 +4,7 @@
 //   1. `flow cli self-check` does NOT produce duplicate lines in combined stdout+stderr
 //   2. `flow cli update` produces at least one line of output (not silent)
 //   3. `flow logs` (unknown command) exits with code 1 and reports "Unknown command"
+import { removeTempDirectory } from 'flow-core/testing';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -208,7 +209,14 @@ describe('flow logs -- alias for cli logs', () => {
 	it('exits 0 and reports log file status on stdout (no longer unknown command)', () => {
 		// 'flow logs' is now a registered top-level alias for 'flow cli logs'.
 		// It exits 0 regardless of whether a log file exists.
-		const result = runFlow(['logs']);
+		// A private config home: the machine's real log of the day can exceed spawnSync's 1 MiB output limit, which kills the child (status null).
+		const configHome = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-logs-test-'));
+		let result: ReturnType<typeof runFlow>;
+		try {
+			result = runFlow(['logs'], { XDG_CONFIG_HOME: configHome });
+		} finally {
+			removeTempDirectory(configHome);
+		}
 		expect(result.status).toBe(0);
 		const stdoutOutput = String(result.stdout ?? '');
 		// Either shows log content or "No log file for today" message

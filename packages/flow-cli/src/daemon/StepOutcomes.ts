@@ -65,6 +65,7 @@ export class StepOutcomes {
 		// It returns [] while children are pending; fires deferred completion when all children settle.
 		const newReady = scheduler.complete(stepId, { type: 'completed', outputs: output });
 		this.recordSkippedSteps(executionId, scheduler);
+		this.recordRequeuedSteps(executionId, scheduler);
 
 		if (scheduler.isTerminal()) {
 			// Mark any steps skipped by the scheduler (still 'pending' in store) as completed
@@ -107,6 +108,7 @@ export class StepOutcomes {
 		// - After max iterations the parent is failed terminally, hasFailed() returns true.
 		const newReady = scheduler.complete(stepId, { type: 'failed', error, outputs, origin });
 		this.recordSkippedSteps(executionId, scheduler);
+		this.recordRequeuedSteps(executionId, scheduler);
 		this.recordParentFailures(executionId, scheduler);
 
 		if (scheduler.hasFailed()) {
@@ -238,6 +240,24 @@ export class StepOutcomes {
 			this.executionStore.markStepSkipped(executionId, stepId, reason);
 			this.logWriter.writeExecution(executionId, `Step ${stepId} ${reason}`, 'warning');
 		}
+	}
+
+	/**
+	 * Resets in the store the sub-steps a parent restart sent back to the scheduler's start. Runs AFTER
+	 * {@link recordSkippedSteps}: a restart can settle later sub-steps as not run and requeue them in the
+	 * same call, so the reset wins and the reason only remains in the execution log line.
+	 */
+	private recordRequeuedSteps(executionId: string, scheduler: { takeRequeuedSteps(): string[] }): void {
+		const requeued = scheduler.takeRequeuedSteps();
+		if (requeued.length === 0) {
+			return;
+		}
+		this.executionStore.markStepsPending(executionId, requeued);
+		this.logWriter.writeExecution(
+			executionId,
+			`Sub-steps reset for the next round: ${requeued.join(', ')}`,
+			'info'
+		);
 	}
 
 	private markSkippedStepsCompleted(executionId: string): void {

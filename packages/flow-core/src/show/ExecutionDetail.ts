@@ -161,7 +161,7 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 		const name = step.injected ? `${stepId}*` : stepId;
 		const model = modelOf(step);
 		lines.push(
-			`  ${name}  [${step.status}]  ${stepDuration(step)}${model ? `  model: ${model}` : ''}${attemptsLabel(step)}`
+			`  ${name}  [${step.status}]  ${stepDuration(step)}${model ? `  model: ${model}` : ''}${step.wave === undefined ? '' : `  wave: ${step.wave}`}${attemptsLabel(step)}`
 		);
 		for (const [i, relaunch] of (step.relaunches ?? []).entries()) {
 			const firstLine = relaunch.feedback.split('\n').find(l => l.trim() !== '') ?? '';

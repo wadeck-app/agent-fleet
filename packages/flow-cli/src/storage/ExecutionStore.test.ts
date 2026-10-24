@@ -41,6 +41,35 @@ describe('ExecutionStore', () => {
 		});
 	});
 
+	describe('create() with stepWaves', () => {
+		it('records the wave of the sub-steps that have one (wave 0 included) and of no other step', () => {
+			const state = store.create({
+				executionId: EXEC_ID,
+				flowFile: 'f.yml',
+				flowId: 'my-flow',
+				stepIds: ['impl', 'zero', 'late'],
+				stepWaves: { zero: 0, late: 2 },
+			});
+
+			expect(state.steps['impl']).toEqual({ status: 'pending' });
+			expect(state.steps['zero']).toEqual({ status: 'pending', wave: 0 });
+			expect(state.steps['late']).toEqual({ status: 'pending', wave: 2 });
+			expect(store.read(EXEC_ID).steps['late']).toMatchObject({ wave: 2 });
+		});
+
+		it('fails loudly on a wave for a step that is not in the execution', () => {
+			expect(() =>
+				store.create({
+					executionId: EXEC_ID,
+					flowFile: 'f.yml',
+					flowId: 'my-flow',
+					stepIds: ['a'],
+					stepWaves: { ghost: 1 },
+				})
+			).toThrow("stepWaves names 'ghost'");
+		});
+	});
+
 	describe('create() with a definition', () => {
 		it('records version, hash, snapshot and choice, which survive later updates', () => {
 			const definition = {
@@ -149,6 +178,85 @@ describe('ExecutionStore', () => {
 
 			const done = store.markStepCompleted(EXEC_ID, 'step-a');
 			expect(done.steps['step-a'].error).toBeUndefined();
+		});
+
+		// A step settled as "not run" that now runs is no longer skipped.
+		it('clears the skipped reason of a step that was settled as not run and now runs', () => {
+			store.create({ executionId: EXEC_ID, flowFile: 'flow.yaml', flowId: 'my-flow', stepIds: ['step-a'] });
+			store.markStepSkipped(EXEC_ID, 'step-a', "not run: sub-step 'x' it depends on did not succeed");
+
+			const rerun = store.markStepRunning(EXEC_ID, 'step-a');
+
+			expect(rerun.steps['step-a'].status).toBe('running');
+			expect(rerun.steps['step-a'].skippedReason).toBeUndefined();
+		});
+	});
+
+	describe('markStepsPending()', () => {
+		const create = (stepIds: string[]): void => {
+			store.create({ executionId: EXEC_ID, flowFile: 'flow.yaml', flowId: 'my-flow', stepIds });
+		};
+
+		it('puts a failed, a completed and a skipped step back to a clean pending state', () => {
+			create(['failed', 'done', 'skipped']);
+			store.markStepRunning(EXEC_ID, 'failed', { sourceId: 'src', workerId: 'wk' });
+			store.markStepFailed(EXEC_ID, 'failed', 'boom', 'out', 'err');
+			store.markStepRunning(EXEC_ID, 'done');
+			store.markStepCompleted(EXEC_ID, 'done');
+			store.markStepSkipped(EXEC_ID, 'skipped', 'not run: because');
+
+			const state = store.markStepsPending(EXEC_ID, ['failed', 'done', 'skipped']);
+
+			for (const id of ['failed', 'done', 'skipped']) {
+				const step = state.steps[id]!;
+				expect(step.status, id).toBe('pending');
+				expect(step.skippedReason, id).toBeUndefined();
+				expect(step.completedAt, id).toBeUndefined();
+				expect(step.startedAt, id).toBeUndefined();
+				expect(step.error, id).toBeUndefined();
+				expect(step.stdout, id).toBeUndefined();
+				expect(step.stderr, id).toBeUndefined();
+				expect(step.io, id).toBeUndefined();
+			}
+			expect(store.read(EXEC_ID).steps['skipped']!.status).toBe('pending');
+		});
+
+		it('keeps the attempt history and the provenance, and drops the step from currentSteps', () => {
+			create(['a']);
+			store.markStepRunning(EXEC_ID, 'a', { sourceId: 'src', workerId: 'wk' }, 'feedback');
+			store.markStepFailed(EXEC_ID, 'a', 'boom');
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markStepCompleted(EXEC_ID, 'a');
+
+			const step = store.markStepsPending(EXEC_ID, ['a']).steps['a']!;
+
+			expect(step.attempts).toBe(2);
+			expect(step.relaunches).toHaveLength(1);
+			expect(step.sourceId).toBe('src');
+			expect(step.workerId).toBe('wk');
+			expect(store.read(EXEC_ID).currentSteps).not.toContain('a');
+		});
+
+		it('leaves a running step alone: it is in flight and reports itself', () => {
+			create(['a', 'b']);
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markStepSkipped(EXEC_ID, 'b', 'not run');
+
+			const state = store.markStepsPending(EXEC_ID, ['a', 'b']);
+
+			expect(state.steps['a']!.status).toBe('running');
+			expect(state.currentSteps).toContain('a');
+			expect(state.steps['b']!.status).toBe('pending');
+		});
+
+		it('fails loudly, naming the unknown step and the execution, and changes nothing', () => {
+			create(['a']);
+			store.markStepSkipped(EXEC_ID, 'a', 'not run');
+
+			expect(() => store.markStepsPending(EXEC_ID, ['a', 'ghost'])).toThrow(
+				new RegExp(`ghost.*${EXEC_ID}|${EXEC_ID}.*ghost`)
+			);
+			expect(store.read(EXEC_ID).steps['a']!.status).toBe('completed');
 		});
 	});
 

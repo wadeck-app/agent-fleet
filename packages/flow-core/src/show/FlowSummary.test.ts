@@ -145,3 +145,31 @@ describe('formatTrigger', () => {
 		);
 	});
 });
+
+describe('renderFlowSummary waves', () => {
+	const waves = {
+		...flow,
+		steps: [
+			{ id: 'impl', type: 'script', script: 'x', subStepStrategy: 'waves' },
+			{ id: 'check', type: 'script', script: 'x', parent: 'impl', wave: 1 },
+			{ id: 'review', type: 'model', model: 'haiku', prompt: 'p', parent: 'impl', wave: 2 },
+		],
+	} as unknown as FlowDefinition;
+
+	it('shows the wave of each sub-step on its row and nothing on other steps', () => {
+		const rows = renderFlowSummary(waves)
+			.split('\n')
+			.filter(l => /^ \d/.test(l));
+		expect(rows[0]).not.toContain('wave');
+		expect(rows[1]).toContain('wave:1');
+		expect(rows[2]).toContain('wave:2');
+	});
+
+	it('shows wave 0', () => {
+		const zero = {
+			...waves,
+			steps: [{ id: 'z', type: 'script', script: 'x', parent: 'p', wave: 0 }],
+		} as unknown as FlowDefinition;
+		expect(renderFlowSummary(zero)).toContain('wave:0');
+	});
+});

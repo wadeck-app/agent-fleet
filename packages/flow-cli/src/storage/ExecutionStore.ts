@@ -107,12 +107,22 @@ export class ExecutionStore {
 		flowFile: string;
 		flowId: string;
 		stepIds: string[];
+		/** Wave (`wave:`) of the sub-steps of a `waves` parent, by step id; every id must be in `stepIds`. */
+		stepWaves?: Record<string, number>;
 		/** Project this run belongs to, so active projects can be listed (D#10). */
 		projectRoot?: string;
 		/** Which definition ran: version, content hash, snapshot and how the version was chosen. Written once, never changed. */
 		definition?: Pick<ExecutionState, 'flowVersion' | 'definitionHash' | 'definitionSnapshot' | 'versionChoice'>;
 	}): ExecutionState {
 		assertExecutionIdSafe(params.executionId);
+		const stepWaves = params.stepWaves ?? {};
+		for (const waveStepId of Object.keys(stepWaves)) {
+			if (!params.stepIds.includes(waveStepId)) {
+				throw new Error(
+					`Cannot create execution ${params.executionId}: stepWaves names '${waveStepId}', which is not one of its steps (${params.stepIds.join(', ')})`
+				);
+			}
+		}
 		const state: ExecutionState = {
 			executionId: params.executionId,
 			flowFile: params.flowFile,
@@ -123,7 +133,15 @@ export class ExecutionStore {
 			currentSteps: [],
 			startedAt: new Date().toISOString(),
 			completedAt: null,
-			steps: Object.fromEntries(params.stepIds.map(id => [id, { status: 'pending' as StepStatus }])),
+			steps: Object.fromEntries(
+				params.stepIds.map(id => [
+					id,
+					{
+						status: 'pending' as StepStatus,
+						...(stepWaves[id] !== undefined ? { wave: stepWaves[id] } : {}),
+					},
+				])
+			),
 		};
 		this.write(state);
 		return state;
@@ -193,6 +211,8 @@ export class ExecutionStore {
 			stderr: undefined,
 			io: undefined,
 			completedAt: undefined,
+			// A step that now runs is no longer "not run"
+			skippedReason: undefined,
 			...(provenance?.sourceId !== undefined ? { sourceId: provenance.sourceId } : {}),
 			...(provenance?.workerId !== undefined ? { workerId: provenance.workerId } : {}),
 		};
@@ -240,6 +260,41 @@ export class ExecutionStore {
 			step.status = 'completed';
 			step.completedAt = new Date().toISOString();
 			step.skippedReason = reason;
+		}
+		this.write(state);
+		return state;
+	}
+
+	/**
+	 * Resets steps to a clean `pending` state because the scheduler will run them again (a parent
+	 * restart resets every sub-step below it). A running step is in flight and reports itself, so it
+	 * is left alone. The attempt history (`attempts`, `priorAttemptsMs`, `relaunches`), `injected` and
+	 * the provenance are kept.
+	 *
+	 * @throws Error naming the step when one is not part of the execution (nothing is changed)
+	 */
+	markStepsPending(executionId: string, stepIds: string[]): ExecutionState {
+		const state = this.read(executionId);
+		const unknown = stepIds.filter(id => state.steps[id] === undefined);
+		if (unknown.length > 0) {
+			throw new Error(
+				`Cannot reset step(s) ${unknown.map(id => `"${id}"`).join(', ')} to pending: not part of execution ${executionId}.`
+			);
+		}
+		for (const stepId of stepIds) {
+			const step = state.steps[stepId]!;
+			if (step.status === 'running') {
+				continue;
+			}
+			step.status = 'pending';
+			delete step.skippedReason;
+			delete step.completedAt;
+			delete step.startedAt;
+			delete step.error;
+			delete step.stdout;
+			delete step.stderr;
+			delete step.io;
+			state.currentSteps = state.currentSteps.filter(id => id !== stepId);
 		}
 		this.write(state);
 		return state;

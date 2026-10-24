@@ -37,6 +37,7 @@ import { SecretValidator } from './SecretValidator';
 import { SemanticValidator } from './SemanticValidator';
 import { SimulationValidator } from './SimulationValidator';
 import { SubStepDependencyValidator } from './SubStepDependencyValidator';
+import { SubStepWaveValidator } from './SubStepWaveValidator';
 import { TemplateValidator } from './TemplateValidator';
 // Import for internal use
 import type { IssueCollector, ValidationIssue, ValidationResult } from './ValidationTypes';
@@ -72,6 +73,7 @@ export class FlowValidator implements IssueCollector {
 	private contractValidator: ContractValidator;
 	private simulationValidator: SimulationValidator;
 	private subStepDependencyValidator: SubStepDependencyValidator;
+	private subStepWaveValidator: SubStepWaveValidator;
 
 	/**
 	 * Create a new FlowValidator
@@ -92,6 +94,7 @@ export class FlowValidator implements IssueCollector {
 		this.contractValidator = new ContractValidator(this);
 		this.simulationValidator = new SimulationValidator(this);
 		this.subStepDependencyValidator = new SubStepDependencyValidator(this);
+		this.subStepWaveValidator = new SubStepWaveValidator(this);
 	}
 
 	/**
@@ -147,6 +150,9 @@ export class FlowValidator implements IssueCollector {
 
 		// Sub-step dependency warnings (wait-all parents)
 		this.subStepDependencyValidator.validate(flow);
+
+		// Sub-step strategy names and waves
+		this.subStepWaveValidator.validate(flow);
 
 		// Phase 8: Simulation validation (execution paths) - only if no critical errors
 		if (this.canProceedToSimulation()) {

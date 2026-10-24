@@ -5,6 +5,7 @@
  * a terminal state. Two built-in strategies are provided; custom strategies can be
  * injected via FlowSchedulerOptions.extraStrategies.
  */
+import { WAVES_SUB_STEP_STRATEGY } from './SubStepStrategyNames';
 
 export interface SubStepStrategyContext {
 	parentId: string;
@@ -15,10 +16,24 @@ export interface SubStepStrategyContext {
 	/** All children that have failed in this parent run, including the current one. */
 	failedChildren: Map<string, string>;
 	completedChildren: Set<string>;
+	/**
+	 * Wave state, set only for a parent whose strategy is `waves`. For such a parent `pendingChildren`,
+	 * `failedChildren` and `completedChildren` are already limited to the current wave: later waves are
+	 * held, not pending.
+	 */
+	waves?: {
+		currentWave: number;
+		/** The next wave to start, `undefined` when the current wave is the last one. */
+		nextWave: number | undefined;
+	};
 }
 
 export type SubStepAction =
-	{ type: 'restart-parent'; errors: string[] } | { type: 'wait' } | { type: 'fail-parent'; error: string };
+	| { type: 'restart-parent'; errors: string[] }
+	| { type: 'wait' }
+	| { type: 'fail-parent'; error: string }
+	/** Start the given wave of a `waves` parent; the scheduler releases its held children. */
+	| { type: 'release-wave'; wave: number };
 
 export interface SubStepStrategy {
 	name: string;
@@ -70,3 +85,39 @@ export const WaitAll: SubStepStrategy = {
 		return { type: 'wait' };
 	},
 };
+
+/**
+ * Runs sub-steps in ordered waves (`wave:` on each direct sub-step). The scheduler limits the context to
+ * the current wave, so this strategy only decides what the end of a wave means:
+ * - any failure -> re-run the parent with the failures of that wave (later waves never started);
+ * - all passed and a later wave exists -> start the next wave;
+ * - all passed in the last wave -> fire normal deferred parent completion.
+ */
+export const Waves: SubStepStrategy = {
+	name: WAVES_SUB_STEP_STRATEGY,
+	onChildFailure(ctx): SubStepAction {
+		requireWaveState(ctx.waves, ctx.parentId);
+		if (ctx.pendingChildren.size > 0) {
+			// Siblings of the same wave are still running -- accumulate and wait.
+			return { type: 'wait' };
+		}
+		return { type: 'restart-parent', errors: [...ctx.failedChildren.values()] };
+	},
+	onAllChildrenTerminal(ctx): SubStepAction {
+		const waves = requireWaveState(ctx.waves, ctx.parentId);
+		if (ctx.failedChildren.size > 0) {
+			return { type: 'restart-parent', errors: [...ctx.failedChildren.values()] };
+		}
+		if (waves.nextWave !== undefined) {
+			return { type: 'release-wave', wave: waves.nextWave };
+		}
+		return { type: 'wait' };
+	},
+};
+
+function requireWaveState<T>(waves: T | undefined, parentId: string): T {
+	if (waves === undefined) {
+		throw new Error(`Waves strategy on step "${parentId}" was called without wave state: scheduler bug`);
+	}
+	return waves;
+}

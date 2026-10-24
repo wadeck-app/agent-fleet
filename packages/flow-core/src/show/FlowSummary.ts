@@ -76,6 +76,11 @@ function stepRetry(step: FlowStep): string {
 	return `  retry:${step.retry.maxAttempts}x`;
 }
 
+/** `  wave:2` for a sub-step of a `waves` parent; sub-steps of the same wave run in parallel. */
+function stepWave(step: FlowStep): string {
+	return step.wave === undefined ? '' : `  wave:${step.wave}`;
+}
+
 function isBlocking(step: FlowStep): boolean {
 	return step.type === 'user_intervention' && (step as UserInterventionStep).blocking !== false;
 }
@@ -189,7 +194,8 @@ export function renderFlowSummary(flow: FlowDefinition): string {
 				pad(stepDepends(step, steps), COL_DEPENDS) +
 				stepOutputs(step) +
 				stepLoop(step, steps) +
-				stepRetry(step)
+				stepRetry(step) +
+				stepWave(step)
 		);
 	}
 

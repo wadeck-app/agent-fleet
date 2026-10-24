@@ -7,6 +7,7 @@ import { SecretUsageAnalyzer } from '../secrets/SecretUsageAnalyzer';
 import type { FlowDefinition } from '../types';
 import { FlowValidator } from '../validation/FlowValidator';
 import { FlowCapabilitiesGenerator } from './FlowCapabilitiesGenerator';
+import { WAVES_EXAMPLE_FLOW_YAML } from './SubStepWavesDocumentation';
 
 describe('FlowCapabilitiesGenerator', () => {
 	const generator = new FlowCapabilitiesGenerator();
@@ -219,5 +220,35 @@ describe('SECRET_EXAMPLE_FLOW_YAML', () => {
 				description: expect.any(String),
 			},
 		]);
+	});
+});
+
+describe('sub-step waves documentation', () => {
+	const generated = new FlowCapabilitiesGenerator().generate();
+
+	it('lists waves among the subStepStrategy values and documents the wave field', () => {
+		expect(generated).toContain('`restart-on-first-failure` (default) | `wait-all` | `waves`');
+		expect(generated).toContain('### Sub-step waves');
+		expect(generated).toContain('`wave`');
+	});
+
+	it('states the semantics an author must know: parallel inside a wave, restart from wave 1, shared budget, nesting', () => {
+		for (const fact of [
+			'same `wave` run in parallel',
+			'restarts from wave 1',
+			'maxSubStepIterations',
+			'nested sub-step',
+			'unknown `subStepStrategy`',
+		]) {
+			expect(generated).toContain(fact);
+		}
+	});
+
+	it('embeds the shared example flow, which is valid and has no warning about waves', () => {
+		expect(generated).toContain(WAVES_EXAMPLE_FLOW_YAML.trim());
+		const result = new FlowValidator().validate(yaml.load(WAVES_EXAMPLE_FLOW_YAML) as FlowDefinition);
+		expect(result.issues.filter(issue => issue.severity === 'error')).toEqual([]);
+		expect(result.issues.map(issue => issue.code)).not.toContain('SUB_STEP_WAVES_SINGLE_WAVE');
+		expect(result.issues.map(issue => issue.code)).not.toContain('WAVE_REDUNDANT_DEPENDS');
 	});
 });

@@ -61,6 +61,8 @@ export class StepInjection {
 					}
 				}
 			}
+			// A sub-step of a waves parent needs a valid wave: refuse it here, before the step count is touched
+			scheduler.assertInjectable(injected as SchedulerStep);
 			stepsToInject.push(injected);
 		}
 

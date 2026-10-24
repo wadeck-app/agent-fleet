@@ -113,6 +113,9 @@ export class RunRequestHandler {
 		const { workspaceDir, workspaceMetaDir } = allocated;
 
 		const stepIds = flow.steps.map((s: FlowStep) => s.id);
+		const stepWaves = Object.fromEntries(
+			flow.steps.filter((s: FlowStep) => s.wave !== undefined).map((s: FlowStep) => [s.id, s.wave as number])
+		);
 		try {
 			// Each run records its project (resolved above) so the projects with active runs
 			// can be listed (D#10).
@@ -131,6 +134,7 @@ export class RunRequestHandler {
 				flowFile,
 				flowId,
 				stepIds,
+				stepWaves,
 				projectRoot,
 				definition: {
 					flowVersion: resolved.version,

@@ -70,6 +70,7 @@ const mockExecStore = {
 	markStepCompleted: vi.fn(),
 	markStepFailed: vi.fn(),
 	markStepSkipped: vi.fn(),
+	markStepsPending: vi.fn(),
 	markExecutionCompleted: vi.fn(),
 	markExecutionFailed: vi.fn(),
 	pruneOldExecutions: vi.fn(),
@@ -448,5 +449,50 @@ describe('CommandHandler — engine-side sub-step failures (stall watchdog, lost
 
 		expect(mockExecStore.markExecutionFailed).not.toHaveBeenCalled();
 		expect(handler.hasActiveExecutions()).toBe(true);
+	});
+});
+
+describe('CommandHandler -- waves sub-steps', () => {
+	const WAVES_FLOW_YAML = `\
+id: waves-flow
+version: "1.0.0"
+name: Waves Flow
+description: Flow with waves
+workspace:
+  mode: manual
+  gitStrategy: any
+  reusePolicy: if-available
+inputs: {}
+steps:
+  - id: impl
+    name: Impl
+    type: script
+    script: echo impl
+    subStepStrategy: waves
+  - id: check
+    name: Check
+    type: script
+    script: echo check
+    parent: impl
+    wave: 1
+  - id: review
+    name: Review
+    type: script
+    script: echo review
+    parent: impl
+    wave: 2
+`;
+
+	it('records the wave of each sub-step in the execution record when the run starts', async () => {
+		const handler = makeHandler();
+		const flowFile = path.join(tmpDir, 'waves-flow.yml');
+		fs.writeFileSync(flowFile, WAVES_FLOW_YAML);
+
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(result.type).toBe('execution_started');
+		expect(mockExecStore.create).toHaveBeenCalledWith(
+			expect.objectContaining({ stepIds: ['impl', 'check', 'review'], stepWaves: { check: 1, review: 2 } })
+		);
 	});
 });

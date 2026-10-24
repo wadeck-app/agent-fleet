@@ -196,3 +196,68 @@ describe('validateFlowFile sub-step dependency warning', () => {
 		expect(result.warnings.filter(w => w.includes("'l2'"))).toEqual([]);
 	});
 });
+
+describe('validateFlowFile subStepStrategy and waves', () => {
+	const flowYaml = (steps: Record<string, unknown>[]): string =>
+		yaml.dump({
+			id: 'waves_flow',
+			version: '1.0.0',
+			name: 'waves flow',
+			description: 'd',
+			workspace: { mode: 'shared', gitStrategy: 'none', reusePolicy: 'if-available' },
+			steps,
+		});
+	const impl = (strategy: string): Record<string, unknown> => ({
+		id: 'impl',
+		type: 'script',
+		script: 'true',
+		subStepStrategy: strategy,
+	});
+	const sub = (id: string, extra: Record<string, unknown>): Record<string, unknown> => ({
+		id,
+		type: 'script',
+		parent: 'impl',
+		script: 'true',
+		...extra,
+	});
+	const validate = (content: string): ReturnType<typeof validateFlowFile> => {
+		const file = path.join(tmpDir, 'flow.yml');
+		fs.writeFileSync(file, content);
+		return validateFlowFile(file, store);
+	};
+
+	it('exits 0 without warning for a valid 2-wave flow', () => {
+		const result = validate(flowYaml([impl('waves'), sub('a', { wave: 1 }), sub('b', { wave: 2 })]));
+		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
+		expect(result.warnings).toEqual([]);
+	});
+
+	it('exits 1 for an unknown subStepStrategy, listing the valid values', () => {
+		const result = validate(flowYaml([impl('wave'), sub('a', {})]));
+		if (result.exit !== 1) throw new Error(`Expected exit 1, got ${JSON.stringify(result)}`);
+		const message = result.errors.map(e => e.message).join('\n');
+		expect(message).toContain('"wave"');
+		expect(JSON.stringify(result.errors)).toContain('restart-on-first-failure, wait-all, waves');
+	});
+
+	it('exits 1 for a sub-step of a waves parent without wave', () => {
+		const result = validate(flowYaml([impl('waves'), sub('a', { wave: 1 }), sub('b', { wave: 2 }), sub('c', {})]));
+		if (result.exit !== 1) throw new Error(`Expected exit 1, got ${JSON.stringify(result)}`);
+		expect(result.errors.map(e => e.message).join('\n')).toContain("Sub-step 'c' has no wave");
+	});
+
+	it('exits 0 with the warning for a depends on an earlier wave', () => {
+		const result = validate(
+			flowYaml([impl('waves'), sub('a', { wave: 1 }), sub('b', { wave: 2, depends: ['a'] })])
+		);
+		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings[0]).toContain("Remove 'a'");
+	});
+
+	it('exits 0 with the warning for a single wave', () => {
+		const result = validate(flowYaml([impl('waves'), sub('a', { wave: 1 }), sub('b', { wave: 1 })]));
+		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
+		expect(result.warnings.join('\n')).toContain('wait-all');
+	});
+});
