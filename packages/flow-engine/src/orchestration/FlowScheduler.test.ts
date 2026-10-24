@@ -83,8 +83,10 @@ describe('buildSubStepFeedback', () => {
 	});
 });
 
-describe('FlowScheduler -- sub-step failure without outputs', () => {
-	it('feeds the failure error to the relaunched parent instead of an empty object', () => {
+// A stalled or lost worker is an engine-origin failure and never reaches this path (see
+// FlowScheduler.engineFailure.test.ts). These tests model a step's OWN failure that left no outputs.
+describe('FlowScheduler -- sub-step own failure without outputs', () => {
+	it('feeds the own failure error to the relaunched parent instead of an empty object', () => {
 		const scheduler = new FlowScheduler({ inputs: {}, stepOutputs: new Map() });
 		scheduler.start([{ id: 'parent' }], new Map([['parent', []]]));
 		scheduler.acknowledge('parent');
@@ -92,15 +94,15 @@ describe('FlowScheduler -- sub-step failure without outputs', () => {
 		scheduler.complete('parent', { type: 'completed', outputs: {} });
 		scheduler.acknowledge('e2e');
 
-		// What StepOutcomes.failStep reports for a stalled or disconnected worker: no outputs
-		fail(scheduler, 'e2e', 'the worker running this step reported nothing for 1800s');
+		// A step's own failure that produced no outputs (an engine failure is terminal instead)
+		fail(scheduler, 'e2e', 'the step crashed before writing any output');
 
 		const feedback = scheduler.getSubStepRelaunchFeedback('parent');
-		expect(feedback).toBe('[e2e]\nthe worker running this step reported nothing for 1800s');
+		expect(feedback).toBe('[e2e]\nthe step crashed before writing any output');
 		expect(feedback).not.toContain('{}');
 	});
 
-	it('does the same on the wait-all path', () => {
+	it('does the same on the wait-all path for an own failure', () => {
 		const scheduler = new FlowScheduler({ inputs: {}, stepOutputs: new Map() });
 		scheduler.start([{ id: 'parent', subStepStrategy: 'wait-all' }], new Map([['parent', []]]));
 		scheduler.acknowledge('parent');

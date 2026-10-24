@@ -14,6 +14,7 @@ import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import type { OutputExtractor } from '../processing/OutputExtractor';
 import { StreamEventMapper } from '../processing/StreamEventMapper';
 import type { TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
+import { ToolCallTracker, type ToolProgress } from '../processing/ToolCallTracker';
 import type { ExecutionConfig, LiveLogEntry, ModelFlowStep, ModelStepMeta, StepTrace } from '../types';
 import { writeOutputFiles } from './ScriptStepExecutor';
 import { buildSubStepRelaunch } from './SubStepRelaunch';
@@ -94,8 +95,10 @@ export async function executeModelStep(
 	 * activity from even in `log: 'streaming'` -- so a healthy tool-call-only, no-narration turn
 	 * can go fully silent and get killed as stuck. This exists so "is the provider doing anything"
 	 * stays independent of "what should be displayed".
+	 *
+	 * Also says which tool call is in flight ({@link ToolCallTracker}), so a stall can name it.
 	 */
-	onActivity?: () => void
+	onActivity?: (progress: ToolProgress) => void
 ): Promise<StepTrace> {
 	const { templateRenderer, outputExtractor } = services;
 	const provider = config.provider;
@@ -246,6 +249,7 @@ export async function executeModelStep(
 		}
 	}
 
+	const toolCalls = new ToolCallTracker();
 	const launchOptions = {
 		workingDir: workspacePath,
 		prompt: renderedPrompt,
@@ -272,7 +276,10 @@ export async function executeModelStep(
 		onStreamEvent:
 			streamJson && !config.interactive
 				? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
-						onActivity?.();
+						if (onActivity !== undefined) {
+							const changed = toolCalls.observe(event);
+							onActivity({ ...toolCalls.state(), changed });
+						}
 						const onCompact = step.onCompact;
 						if (onCompact !== undefined) {
 							const compactEvent = extractCompactEvent(event);

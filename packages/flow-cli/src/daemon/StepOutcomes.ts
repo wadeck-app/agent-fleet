@@ -1,3 +1,4 @@
+import type { FailureOrigin } from 'flow-engine';
 import type { StepMeta } from 'flow-engine/types';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
@@ -78,6 +79,16 @@ export class StepOutcomes {
 
 	/** Called by Daemon when a worker reports step_failed. */
 	onStepFailed(executionId: string, stepId: string, rawError: string, rawOutputs?: Record<string, unknown>): void {
+		this.settleFailure(executionId, stepId, rawError, 'step', rawOutputs);
+	}
+
+	private settleFailure(
+		executionId: string,
+		stepId: string,
+		rawError: string,
+		origin: FailureOrigin,
+		rawOutputs?: Record<string, unknown>
+	): void {
 		const error = this.daemonSecrets.masks.mask(executionId, rawError);
 		const outputs = this.daemonSecrets.masks.maskDeep(executionId, rawOutputs);
 		const scheduler = this.executions.scheduler(executionId);
@@ -94,8 +105,9 @@ export class StepOutcomes {
 		// - If the failed step is a child and the parent is deferred, the parent is re-queued
 		//   (with error recorded in subStepErrors) up to maxSubStepIterations times.
 		// - After max iterations the parent is failed terminally, hasFailed() returns true.
-		const newReady = scheduler.complete(stepId, { type: 'failed', error, outputs });
+		const newReady = scheduler.complete(stepId, { type: 'failed', error, outputs, origin });
 		this.recordSkippedSteps(executionId, scheduler);
+		this.recordParentFailures(executionId, scheduler);
 
 		if (scheduler.hasFailed()) {
 			// Terminal failure - purge queued steps for this execution and cleanup
@@ -125,7 +137,9 @@ export class StepOutcomes {
 
 	/**
 	 * Fails a step the daemon itself decided cannot proceed, with the same treatment a
-	 * failure reported by a worker gets.
+	 * failure reported by a worker gets, except that it is an engine-origin failure: the step's
+	 * `retry`, its `onFailure.goto` and the relaunch of its parent do not apply (see
+	 * {@link FailureOrigin}), because the step may already have had an effect.
 	 *
 	 * The store write and the hook are not optional extras: a step left `running` in the
 	 * execution store shows up in `flow history` as still running forever, and a hook that
@@ -134,7 +148,7 @@ export class StepOutcomes {
 	failStep(executionId: string, stepId: string, reason: string): void {
 		this.executionStore.markStepFailed(executionId, stepId, reason);
 		this.logWriter.writeExecution(executionId, `Step ${stepId} failed: ${reason}`, 'error');
-		this.onStepFailed(executionId, stepId, reason);
+		this.settleFailure(executionId, stepId, reason, 'engine');
 		this.hooks.dispatch(executionId, 'onStepFailed', { executionId, stepId, error: reason });
 	}
 
@@ -202,6 +216,17 @@ export class StepOutcomes {
 		this.tryDispatch();
 
 		return { type: 'execution_resumed', executionId, stepId: resumable.stepId };
+	}
+
+	/** Records on the parent, with the reason, that it was failed because the engine failed one of its sub-steps. */
+	private recordParentFailures(
+		executionId: string,
+		scheduler: { takeParentFailures(): { stepId: string; message: string }[] }
+	): void {
+		for (const { stepId, message } of scheduler.takeParentFailures()) {
+			this.executionStore.markStepFailed(executionId, stepId, message);
+			this.logWriter.writeExecution(executionId, `Step ${stepId} failed: ${message}`, 'error');
+		}
 	}
 
 	/** Records, with the reason, the sub-steps the scheduler settled without running (their dependency failed). */

@@ -1,5 +1,6 @@
 import type { WebSocket } from 'ws';
 
+import type { StepProgressDetail, StepToolActivity } from '../ipc/Protocol';
 import type { LogWriter } from '../storage/LogWriter';
 import { AssignmentLedger } from './AssignmentLedger.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
@@ -23,6 +24,12 @@ export const MAX_REDISPATCHES = 3;
  */
 export const DEFAULT_STEP_SILENCE_LIMIT_MS = 30 * 60 * 1000;
 
+/** What a worker has said about the tool call its step is in. */
+interface ToolActivityKnowledge {
+	activity: StepToolActivity | null;
+	lastCompletedTool: string | undefined;
+}
+
 /**
  * Keeps track of the work handed to workers: binds reports to assignments (T-05), notices a worker
  * gone quiet, and decides what happens to the steps a disconnected worker was holding.
@@ -39,6 +46,8 @@ export class WorkerAssignmentSupervisor {
 	private readonly dispatched = new Map<string, ReadyStep>();
 	/** Re-dispatches spent per step, so a step nobody ever starts cannot loop forever (D#62) */
 	private readonly redispatchCounts = new Map<string, number>();
+	/** The tool call each executing step was last reported to be in, so a stall can name it */
+	private readonly toolActivity = new Map<string, ToolActivityKnowledge>();
 	/** Notices an executing step whose worker went quiet; the only detector of a wedged worker */
 	private readonly stalledSteps: StalledStepWatch;
 
@@ -51,7 +60,9 @@ export class WorkerAssignmentSupervisor {
 		private readonly queue: ReadyStepQueue,
 		private readonly executions: ExecutionRegistry,
 		private readonly failStep: (executionId: string, stepId: string, reason: string) => void,
-		private readonly stalledStepLimitMs: number
+		private readonly stalledStepLimitMs: number,
+		/** Injectable clock, so how long a call ran is testable */
+		private readonly now: () => number = Date.now
 	) {
 		this.stalledSteps = new StalledStepWatch(stalledStepLimitMs);
 	}
@@ -76,6 +87,7 @@ export class WorkerAssignmentSupervisor {
 	discardUnsent(assignmentId: string): void {
 		this.assignments.settle(assignmentId);
 		this.dispatched.delete(assignmentId);
+		this.toolActivity.delete(assignmentId);
 	}
 
 	/**
@@ -108,13 +120,44 @@ export class WorkerAssignmentSupervisor {
 	settleAssignment(assignmentId: string): void {
 		this.assignments.settle(assignmentId);
 		this.stalledSteps.settled(assignmentId);
+		this.toolActivity.delete(assignmentId);
 		// The payload was only kept for a possible re-dispatch, which can no longer happen.
 		this.dispatched.delete(assignmentId);
 	}
 
 	/** Records that a worker is still saying something about an assignment it holds. */
-	noteAssignmentActivity(assignmentId: string): void {
+	noteAssignmentActivity(assignmentId: string, detail?: StepProgressDetail): void {
 		this.stalledSteps.progressed(assignmentId);
+		if (detail === undefined) {
+			return;
+		}
+		const known = this.toolActivity.get(assignmentId) ?? { activity: null, lastCompletedTool: undefined };
+		// `undefined` means "this report says nothing about it", unlike `null` which means "none".
+		const next: ToolActivityKnowledge = {
+			activity: detail.activity === undefined ? known.activity : detail.activity,
+			lastCompletedTool: detail.lastCompletedTool ?? known.lastCompletedTool,
+		};
+		this.toolActivity.set(assignmentId, next);
+	}
+
+	/**
+	 * Says what the step was doing when it went quiet, as far as the worker could tell.
+	 *
+	 * Only model steps have tool calls. A provider that announces a call only once it is over (opencode,
+	 * codex) never lets a call be seen in flight, and that is stated as such rather than guessed at.
+	 */
+	private describeToolActivity(assignmentId: string, step: ReadyStep | undefined): string {
+		const known = this.toolActivity.get(assignmentId);
+		if (known?.activity) {
+			const { tool, summary, startedAt } = known.activity;
+			const seconds = Math.max(0, Math.round((this.now() - startedAt) / 1000));
+			return `Last tool call: ${tool} "${summary}" running for ${String(seconds)}s. `;
+		}
+		if (known === undefined && step?.stepConfig.type !== 'model') {
+			return '';
+		}
+		const last = known?.lastCompletedTool;
+		return `No tool call in progress was observed${last === undefined ? '' : ` (last completed tool call: ${last})`}. `;
 	}
 
 	/** Forgets the re-dispatch budget of an execution that is over. */
@@ -157,6 +200,8 @@ export class WorkerAssignmentSupervisor {
 				continue;
 			}
 			this.dispatched.delete(assignmentId);
+			const toolActivity = this.describeToolActivity(assignmentId, step);
+			this.toolActivity.delete(assignmentId);
 			const connection = this.assignments.connectionOf(assignmentId);
 			this.assignments.settle(assignmentId);
 			// A wedged worker never sends the `ready` that would free it, so without this it would stay
@@ -168,6 +213,7 @@ export class WorkerAssignmentSupervisor {
 				assignment.executionId,
 				step?.stepId ?? assignment.stepId,
 				`the worker running this step reported nothing for ${String(Math.round(this.stalledStepLimitMs / 1000))}s, so it is treated as stuck. ` +
+					toolActivity +
 					'It was not retried automatically because it may have already had an effect. ' +
 					'A step that is legitimately quiet for that long needs a higher queue.stepSilenceLimitSeconds.'
 			);
@@ -208,14 +254,15 @@ export class WorkerAssignmentSupervisor {
 			const { executionId, stepId, assignmentId, started } = assignment;
 			const step = this.dispatched.get(assignmentId);
 			this.dispatched.delete(assignmentId);
+			this.toolActivity.delete(assignmentId);
 
 			if (started) {
-				// It may already have changed something, so the author's retry/onFailure
-				// decides rather than us silently replaying a half-run step.
+				// It may already have changed something: an engine failure, so neither we nor the
+				// step's retry/onFailure silently replay a half-run step.
 				this.failStep(
 					executionId,
 					stepId,
-					`the worker running this step disconnected while it was executing. It was not retried automatically because it may have already had an effect; re-run the flow, or declare "retry" on the step if it is safe to repeat.`
+					`the worker running this step disconnected while it was executing. It was not retried because it may have already had an effect (the step's retry and onFailure do not apply to an engine failure); re-run the flow if it is safe to repeat.`
 				);
 				continue;
 			}

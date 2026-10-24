@@ -1,5 +1,6 @@
 import type { StepRunner } from 'flow-engine';
 import type { TemplateContext } from 'flow-engine/processing/TemplateRenderer';
+import type { ToolCallInFlight, ToolProgress } from 'flow-engine/processing/ToolCallTracker';
 import type { LiveLogEntry, ModelFlowStep, ScriptFlowStep, Workspace } from 'flow-engine/types';
 import { randomUUID } from 'node:crypto';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
@@ -10,7 +11,9 @@ import type {
 	ExecutionContext,
 	InjectedStep,
 	StepIoCapture,
+	StepToolActivity,
 } from '../ipc/Protocol';
+import { TOOL_ACTIVITY_SUMMARY_MAX_LENGTH } from '../ipc/Protocol';
 import { SecretMasker } from '../secrets/SecretMasker';
 import type { McpServerConfig } from './McpServer';
 import { McpServer } from './McpServer';
@@ -28,6 +31,27 @@ export type StepRunnerFactory = (mcpServers: McpServerConfig[]) => StepRunner;
 
 // Kept as a code point so the source stays ASCII; the displayed text is unchanged.
 const ELLIPSIS = String.fromCharCode(0x2026);
+
+/**
+ * What the daemon is told about a tool call in flight.
+ *
+ * Masked BEFORE being cut to length: cutting first could split a secret so the masker no longer
+ * recognises it and its leading characters would be sent.
+ */
+function toStepToolActivity(activity: ToolCallInFlight | null, masker: SecretMasker): StepToolActivity | null {
+	if (activity === null) {
+		return null;
+	}
+	const summary = masker.mask(activity.summary);
+	return {
+		tool: masker.mask(activity.tool),
+		summary:
+			summary.length <= TOOL_ACTIVITY_SUMMARY_MAX_LENGTH
+				? summary
+				: summary.slice(0, TOOL_ACTIVITY_SUMMARY_MAX_LENGTH - 1) + ELLIPSIS,
+		startedAt: activity.startedAt,
+	};
+}
 
 function sendStdoutAsLogs(
 	stdout: string | undefined,
@@ -252,13 +276,24 @@ export class WorkerAdapter {
 				// one message per stream chunk.
 				const PROGRESS_THROTTLE_MS = 5000;
 				let lastProgressSentAt = 0;
-				const onActivity = (): void => {
+				const onActivity = (progress: ToolProgress): void => {
 					const now = Date.now();
-					if (now - lastProgressSentAt < PROGRESS_THROTTLE_MS) {
+					// A tool call starting or returning is rare and is what a stall report later
+					// names, so unlike a plain heartbeat it is never held back by the throttle.
+					if (!progress.changed && now - lastProgressSentAt < PROGRESS_THROTTLE_MS) {
 						return;
 					}
 					lastProgressSentAt = now;
-					sendMessage({ type: 'step_progress', executionId: context.executionId, stepId: step.id });
+					sendMessage({
+						type: 'step_progress',
+						executionId: context.executionId,
+						stepId: step.id,
+						// A heartbeat leaves out `activity`, which tells the daemon to keep what it knows.
+						...(progress.changed && { activity: toStepToolActivity(progress.activity, masker) }),
+						...(progress.lastCompletedTool !== undefined && {
+							lastCompletedTool: progress.lastCompletedTool,
+						}),
+					});
 				};
 
 				const trace = await runner.executeStep(

@@ -287,6 +287,32 @@ export interface WorkerReady {
 	features?: string[];
 }
 
+/** A tool call a worker saw start and has not seen return. */
+export interface StepToolActivity {
+	tool: string;
+	/** Main argument of the call, masked and at most {@link TOOL_ACTIVITY_SUMMARY_MAX_LENGTH} characters. */
+	summary: string;
+	/** Epoch milliseconds, on the worker's clock, at which the call was seen to start. */
+	startedAt: number;
+}
+
+/** Longest `StepToolActivity.summary` a worker sends. */
+export const TOOL_ACTIVITY_SUMMARY_MAX_LENGTH = 120;
+
+/**
+ * What a `step_progress` says about the tool call in flight. Every field is optional because most
+ * progress messages are plain heartbeats.
+ */
+export interface StepProgressDetail {
+	/**
+	 * `undefined` = this message says nothing about it (the daemon keeps what it knew);
+	 * an object = that call is running; `null` = no call is running any more.
+	 */
+	activity?: StepToolActivity | null;
+	/** Name of the last tool call seen to return. Only ever a name, never its arguments. */
+	lastCompletedTool?: string;
+}
+
 export type WorkerToDaemon =
 	| WorkerReady
 	| { type: 'log'; assignmentId: string; executionId: string; stepId: string; entry: LiveLogEntry }
@@ -306,9 +332,10 @@ export type WorkerToDaemon =
 	 * (the default) strips tool activity even from `log: 'streaming'` -- so a healthy, narration-free,
 	 * tool-call-only step could go fully silent and get killed as stuck even though the provider was
 	 * actively working the whole time. This message carries no content to display; it only resets
-	 * the silence clock.
+	 * the silence clock -- and, when the provider lets it be known, which tool call the step is
+	 * waiting on, so that a stall can say what it was stuck in (see {@link StepProgressDetail}).
 	 */
-	| { type: 'step_progress'; assignmentId: string; executionId: string; stepId: string }
+	| ({ type: 'step_progress'; assignmentId: string; executionId: string; stepId: string } & StepProgressDetail)
 	| {
 			type: 'step_completed';
 			assignmentId: string;

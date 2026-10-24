@@ -62,6 +62,7 @@ Each step has a \`type\` discriminator and inherits base fields from \`BaseFlowS
 - \`skipOnLoop\` -- skip this step when a feedback loop is triggered (useful for one-time setup)
 - \`retry\` -- \`{ maxAttempts, backoff: 'linear' | 'exponential' }\`
 - \`onFailure\` -- feedback loop config: \`{ goto, maxIterations, resetOnSuccess, addComment }\`
+- \`retry\`, \`onFailure\` and the re-run of a \`parent:\` step only apply to the step's own failures (script exit code, model validation). An engine failure (silent worker past \`queue.stepSilenceLimitSeconds\`, lost worker) is not retried because the step may already have had an effect: it fails the execution, and its parent, with the real error.
 - \`contract\` -- \`{ preProcess: { validateInputs, required }, postProcess: { validateOutputs, required } }\`
 
 ### model

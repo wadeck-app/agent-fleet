@@ -45,6 +45,12 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).toContain('set -o pipefail');
 	});
 
+	it('documents that an engine failure bypasses retry, onFailure and the sub-step relaunch', () => {
+		expect(result).toContain('engine failure');
+		expect(result).toContain('stepSilenceLimitSeconds');
+		expect(result).toMatch(/not retried/i);
+	});
+
 	it('contains all major variable types', () => {
 		expect(result).toContain('string');
 		expect(result).toContain('boolean');

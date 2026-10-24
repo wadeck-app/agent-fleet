@@ -316,14 +316,15 @@ describe('CommandHandler — engine-side sub-step failures (stall watchdog, lost
 			...(depends ? { depends } : {}),
 		}) as never;
 
-	it('records a sibling that depended on the failed sub-step as not run, with the reason, and keeps the execution going', async () => {
+	// A step's OWN failure reported by its worker (as opposed to the engine giving up on it, below):
+	// the wait-all strategy settles the dependents and keeps going. Modelled through onStepFailed.
+	it('records a sibling that depended on a sub-step that failed on its own as not run, with the reason, and keeps the execution going', async () => {
 		const handler = makeHandler();
 		const executionId = await startWaitAllFlow(handler);
 		handler.injectSteps(executionId, [child('a'), child('b', ['a'])]);
 		handler.onStepCompleted(executionId, 'parent', {});
 
-		// What failStep reports for a stalled worker: an error and no outputs
-		handler.onStepFailed(executionId, 'a', 'the worker running this step reported nothing for 1800s');
+		handler.onStepFailed(executionId, 'a', 'Script exited with code 1');
 
 		expect(mockExecStore.markStepSkipped).toHaveBeenCalledTimes(1);
 		expect(mockExecStore.markStepSkipped).toHaveBeenCalledWith(
@@ -331,6 +332,96 @@ describe('CommandHandler — engine-side sub-step failures (stall watchdog, lost
 			'b',
 			expect.stringContaining("sub-step 'a' it depends on did not succeed")
 		);
+		expect(mockExecStore.markExecutionFailed).not.toHaveBeenCalled();
+		expect(handler.hasActiveExecutions()).toBe(true);
+	});
+
+	// What the stall watchdog and the lost-worker path call. Reached through the private outcomes
+	// collaborator because driving a real stall needs a full worker/assignment harness.
+	const failStepByEngine = (handler: CommandHandler, executionId: string, stepId: string, reason: string): void =>
+		(handler as unknown as { outcomes: { failStep(e: string, s: string, r: string): void } }).outcomes.failStep(
+			executionId,
+			stepId,
+			reason
+		);
+
+	const STALL = 'the worker running this step reported nothing for 1800s, so it is treated as stuck.';
+
+	it('fails the execution terminally when the engine fails a sub-step (restart-on-first-failure): no parent relaunch', async () => {
+		const handler = makeHandler();
+		const executionId = await startParentFlow(handler);
+		handler.injectSteps(executionId, [child('a')]);
+		handler.onStepCompleted(executionId, 'parent', {});
+
+		failStepByEngine(handler, executionId, 'a', STALL);
+
+		expect(mockExecStore.markExecutionFailed).toHaveBeenCalledWith(executionId);
+		expect(handler.hasActiveExecutions()).toBe(false);
+	});
+
+	it('fails the execution terminally at once when the engine fails a wait-all sub-step, without waiting for its siblings', async () => {
+		const handler = makeHandler();
+		const executionId = await startWaitAllFlow(handler);
+		handler.injectSteps(executionId, [child('a'), child('b')]);
+		handler.onStepCompleted(executionId, 'parent', {});
+
+		failStepByEngine(handler, executionId, 'a', STALL);
+
+		expect(mockExecStore.markExecutionFailed).toHaveBeenCalledWith(executionId);
+		expect(handler.hasActiveExecutions()).toBe(false);
+	});
+
+	it('records the parent as failed with an actionable engine-failure message that keeps the real error', async () => {
+		const handler = makeHandler();
+		const executionId = await startParentFlow(handler);
+		handler.injectSteps(executionId, [child('a')]);
+		handler.onStepCompleted(executionId, 'parent', {});
+
+		failStepByEngine(handler, executionId, 'a', STALL);
+
+		const parentCall = mockExecStore.markStepFailed.mock.calls.find(call => call[1] === 'parent');
+		expect(parentCall).toBeDefined();
+		const message = String(parentCall![2]);
+		expect(message).toContain("Sub-step 'a'");
+		expect(message).toContain('engine failure');
+		expect(message).toContain(STALL);
+		expect(message).toContain('not retried');
+		expect(mockLogWriter.writeExecution).toHaveBeenCalledWith(
+			executionId,
+			expect.stringContaining(message),
+			'error'
+		);
+	});
+
+	async function startRetryFlow(handler: CommandHandler): Promise<string> {
+		const flowFile = path.join(tmpDir, 'retry-flow.yml');
+		fs.writeFileSync(
+			flowFile,
+			PARENT_FLOW_YAML.replace('id: parent-flow', 'id: retry-flow').replace(
+				'    script: echo parent\n',
+				'    script: echo parent\n    retry:\n      maxAttempts: 2\n      backoff: linear\n'
+			)
+		);
+		const started = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		return (started as { executionId: string }).executionId;
+	}
+
+	it('does not retry a top-level step with retry when the engine fails it', async () => {
+		const handler = makeHandler();
+		const executionId = await startRetryFlow(handler);
+
+		failStepByEngine(handler, executionId, 'parent', STALL);
+
+		expect(mockExecStore.markExecutionFailed).toHaveBeenCalledWith(executionId);
+		expect(handler.hasActiveExecutions()).toBe(false);
+	});
+
+	it('still retries a top-level step with retry when it fails on its own', async () => {
+		const handler = makeHandler();
+		const executionId = await startRetryFlow(handler);
+
+		handler.onStepFailed(executionId, 'parent', 'Script exited with code 1');
+
 		expect(mockExecStore.markExecutionFailed).not.toHaveBeenCalled();
 		expect(handler.hasActiveExecutions()).toBe(true);
 	});

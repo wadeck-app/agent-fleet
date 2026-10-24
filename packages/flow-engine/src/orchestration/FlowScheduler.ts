@@ -91,9 +91,17 @@ export interface ReadyItem {
 	step: SchedulerStep;
 }
 
+/**
+ * Who decided a step failed. `step`: the step's own result (script exit code, model validation),
+ * so the author's `retry`, `onFailure.goto` and the sub-step relaunch of the parent apply.
+ * `engine`: the engine gave up on the step (stall watchdog, lost worker) without a result from it;
+ * the step may already have had an effect, so none of those apply and the failure is terminal.
+ */
+export type FailureOrigin = 'step' | 'engine';
+
 export type StepOutcome =
 	| { type: 'completed'; outputs: Record<string, unknown> }
-	| { type: 'failed'; error: string; outputs?: Record<string, unknown> };
+	| { type: 'failed'; error: string; outputs?: Record<string, unknown>; origin?: FailureOrigin };
 
 export class FlowScheduler {
 	private readonly steps = new Map<string, SchedulerStep>();
@@ -154,6 +162,8 @@ export class FlowScheduler {
 	private readonly subStepRelaunchFeedback = new Map<string, string>();
 	/** Sub-steps settled without running (their dependency failed), awaiting {@link takeSkippedSteps}. */
 	private readonly skippedReasons = new Map<string, string>();
+	/** Why a parent was failed because of an engine-origin failure of one of its sub-steps. */
+	private readonly parentFailureMessages = new Map<string, string>();
 	/** Registered sub-step strategies, keyed by strategy name. */
 	private readonly strategies: Map<string, SubStepStrategy>;
 
@@ -272,6 +282,9 @@ export class FlowScheduler {
 		// Failed -- check retry first
 		const step = this.steps.get(stepId);
 		if (!step) throw new Error(`FlowScheduler: unknown stepId "${stepId}" in complete()`);
+		if (outcome.origin === 'engine') {
+			return this.failEngineOrigin(stepId, outcome.error);
+		}
 		const retry = step.retry as RetryConfig | undefined;
 		if (retry) {
 			const attempts = (this.retryCount.get(stepId) ?? 0) + 1;
@@ -415,6 +428,35 @@ export class FlowScheduler {
 		// No parent re-run -- mark step as failed terminally
 		this.failedSteps.add(stepId);
 		return [];
+	}
+
+	/**
+	 * Parents failed because the engine failed one of their sub-steps, each with the reason. Returned
+	 * once and forgotten, so the consumer can record them where the user looks: the sub-step's own
+	 * error does not say that the parent was given up on too.
+	 */
+	takeParentFailures(): { stepId: string; message: string }[] {
+		const taken = [...this.parentFailureMessages].map(([stepId, message]) => ({ stepId, message }));
+		this.parentFailureMessages.clear();
+		return taken;
+	}
+
+	/**
+	 * Terminal failure of a step the engine gave up on: no retry, no `onFailure.goto`, no sub-step
+	 * relaunch. A deferred parent is failed with it (recursively), with the real error in the message.
+	 */
+	private failEngineOrigin(stepId: string, error: string): ReadyItem[] {
+		this.failedSteps.add(stepId);
+		const parentId = this.childToParent.get(stepId);
+		if (parentId === undefined || !this.deferredOutcomes.has(parentId)) {
+			return [];
+		}
+		this.deferredOutcomes.delete(parentId);
+		const message =
+			`Sub-step '${stepId}' of '${parentId}' failed on an engine failure, not on its own result: ${error} ` +
+			`The sub-step was not retried and '${parentId}' was not relaunched, because the sub-step may already have had an effect.`;
+		this.parentFailureMessages.set(parentId, message);
+		return this.complete(parentId, { type: 'failed', error: message, origin: 'engine' });
 	}
 
 	/**

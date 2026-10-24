@@ -346,6 +346,47 @@ describe('ModelStepExecutor -- onActivity', () => {
 		expect(onActivity).toHaveBeenCalledTimes(3);
 	});
 
+	// Claude announces a tool call before running it: that is the only moment the daemon can learn
+	// which call a later stall is waiting on.
+	it('tells onActivity which tool call is in flight, flagging the events that changed it', async () => {
+		const seen: Array<{ changed: boolean; tool: string | null }> = [];
+		const step = makeStep();
+		const provider = streamingProvider([
+			{
+				type: 'assistant',
+				subtype: 'tool_use',
+				data: {
+					message: {
+						content: [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'npm test' } }],
+					},
+				},
+			},
+			{ type: 'system', subtype: 'noise', data: {} },
+			{
+				type: 'user',
+				subtype: 'tool_result',
+				data: { message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }] } },
+			},
+		]);
+
+		await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as any,
+			makeTrace(step),
+			{ interactive: false, provider, providerName: 'claude', resolvedModel: 'sonnet' },
+			{ templateRenderer: templateRenderer as any, outputExtractor: outputExtractor as any },
+			undefined,
+			progress => seen.push({ changed: progress?.changed ?? false, tool: progress?.activity?.tool ?? null })
+		);
+
+		expect(seen).toEqual([
+			{ changed: true, tool: 'Bash' },
+			{ changed: false, tool: 'Bash' },
+			{ changed: true, tool: null },
+		]);
+	});
+
 	it('does not throw when onActivity is omitted', async () => {
 		const step = makeStep();
 		const provider = streamingProvider([{ type: 'result', subtype: 'result', data: { result: 'done' } }]);

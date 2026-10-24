@@ -299,7 +299,7 @@ describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
 	});
 
 	// A step that had begun may have changed something. Replaying it silently is worse
-	// than failing it, so the author's declared retry/onFailure decides (D#65).
+	// than failing it, and it is an engine failure: neither its retry nor its onFailure applies (D#65).
 	it('fails a step that had begun executing instead of replaying it', async () => {
 		const { handler, worker, sent, executionId } = await dispatchOneStep();
 		handler.onStepStarted(worker, sent[0]!.assignmentId, executionId, 's1');
@@ -309,6 +309,21 @@ describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
 
 		expect(sent).toHaveLength(1);
 		expect(mockExecStore.markStepFailed).toHaveBeenCalled();
+	});
+
+	// The message used to suggest declaring "retry" on the step, which an engine failure now ignores:
+	// advice that cannot work is worse than none.
+	it('does not suggest declaring retry for a step lost mid-execution, since retry no longer applies to it', async () => {
+		const { handler, worker, sent, executionId } = await dispatchOneStep();
+		handler.onStepStarted(worker, sent[0]!.assignmentId, executionId, 's1');
+
+		handler.handleWorkerDisconnect(worker);
+
+		const reason = String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
+		expect(reason).toMatch(/disconnected while it was executing/i);
+		expect(reason).toMatch(/not retried/i);
+		expect(reason).not.toMatch(/declare "retry"/i);
+		expect(reason).toMatch(/re-run the flow/i);
 	});
 
 	it('ignores a step_started that names an assignment issued to another worker', async () => {
@@ -382,9 +397,9 @@ describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
 
 describe('CommandHandler — a step whose worker went quiet', () => {
 	/** Runs the one-step flow to the point where s1 is executing, with a short silence limit. */
-	async function startOneStep(limitMs: number, started = true) {
+	async function startOneStep(limitMs: number, started = true, flowYaml = VALID_FLOW_YAML) {
 		const flowFile = path.join(tmpDir, 'quiet.yml');
-		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
+		fs.writeFileSync(flowFile, flowYaml);
 
 		const workerPool = createMockWorkerPool();
 		const worker = {} as never;
@@ -505,6 +520,80 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+
+	describe('naming the tool call it was waiting on', () => {
+		const MODEL_FLOW_YAML = VALID_FLOW_YAML.replace(
+			'type: script\n    script: echo hello',
+			'type: model\n    provider: claude\n    prompt: go'
+		);
+
+		async function stallReason(
+			notes: (handler: CommandHandler, assignmentId: string) => void,
+			flowYaml = MODEL_FLOW_YAML
+		): Promise<string> {
+			vi.useFakeTimers();
+			try {
+				const { handler, assignmentId } = await startOneStep(60_000, true, flowYaml);
+				notes(handler, assignmentId);
+				vi.advanceTimersByTime(61_000);
+				handler.failStalledSteps();
+				return String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
+			} finally {
+				vi.useRealTimers();
+			}
+		}
+
+		it('says which call was in flight and for how long', async () => {
+			const reason = await stallReason((handler, assignmentId) =>
+				handler.noteAssignmentActivity(assignmentId, {
+					activity: { tool: 'bash', summary: 'npm test', startedAt: Date.now() },
+				})
+			);
+
+			expect(reason).toContain('Last tool call: bash "npm test" running for 61s');
+			// The existing explanation and remedy must survive.
+			expect(reason).toContain('queue.stepSilenceLimitSeconds');
+		});
+
+		it('keeps the call across a progress report that says nothing about it', async () => {
+			const reason = await stallReason((handler, assignmentId) => {
+				handler.noteAssignmentActivity(assignmentId, {
+					activity: { tool: 'bash', summary: 'npm test', startedAt: Date.now() },
+				});
+				handler.noteAssignmentActivity(assignmentId, {});
+				handler.noteAssignmentActivity(assignmentId);
+			});
+
+			expect(reason).toContain('Last tool call: bash "npm test"');
+		});
+
+		it('says no call was in progress, naming the last finished one, once the call returned', async () => {
+			const reason = await stallReason((handler, assignmentId) => {
+				handler.noteAssignmentActivity(assignmentId, {
+					activity: { tool: 'bash', summary: 'npm test', startedAt: Date.now() },
+				});
+				handler.noteAssignmentActivity(assignmentId, { activity: null, lastCompletedTool: 'bash' });
+			});
+
+			expect(reason).toMatch(/no tool call in progress was observed/i);
+			expect(reason).toContain('last completed tool call: bash');
+			expect(reason).not.toContain('Last tool call:');
+		});
+
+		// opencode only announces a call once it is over: claiming one was running would be invented.
+		it('says no call was in progress for a model step that never reported one', async () => {
+			const reason = await stallReason(() => {});
+
+			expect(reason).toMatch(/no tool call in progress was observed/i);
+			expect(reason).not.toContain('last completed');
+		});
+
+		it('does not talk about tool calls for a script step', async () => {
+			const reason = await stallReason(() => {}, VALID_FLOW_YAML);
+
+			expect(reason).not.toMatch(/tool call/i);
+		});
 	});
 
 	it('says nothing about a step that settled normally', async () => {

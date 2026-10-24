@@ -18,6 +18,7 @@ export type { IdeaRequirements } from './analysis/FlowRecommendationEngine';
 export { WorkspaceManager } from './workspace/WorkspaceManager';
 export { buildSubStepFeedback, FlowScheduler } from './orchestration/FlowScheduler';
 export type {
+	FailureOrigin,
 	FlowSchedulerOptions,
 	ReadyItem,
 	SchedulerContext,

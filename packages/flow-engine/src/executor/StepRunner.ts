@@ -16,6 +16,7 @@ import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import { OpenCodeModelProvider } from '../processing/OpenCodeModelProvider';
 import { OutputExtractor } from '../processing/OutputExtractor';
 import { type TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
+import type { ToolProgress } from '../processing/ToolCallTracker';
 import type { FlowRegistry } from '../registry/FlowRegistry';
 import type {
 	ExecutionConfig,
@@ -137,7 +138,7 @@ export class StepRunner {
 		context: TemplateContext,
 		onStepTraceCreated?: (stepTrace: StepTrace) => void,
 		onLogEntry?: (entry: LiveLogEntry) => void,
-		onActivity?: () => void
+		onActivity?: (progress: ToolProgress) => void
 	): Promise<StepTrace> {
 		const stepTrace: StepTrace = {
 			stepId: step.id,

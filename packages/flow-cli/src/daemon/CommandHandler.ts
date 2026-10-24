@@ -11,7 +11,7 @@ import type { FlowPluginOverrides } from 'flow-engine';
 import type { StepMeta } from 'flow-engine/types';
 import type { WebSocket } from 'ws';
 
-import type { ClientCommand, DaemonResponse, InjectedStep } from '../ipc/Protocol';
+import type { ClientCommand, DaemonResponse, InjectedStep, StepProgressDetail } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { DaemonSecrets } from './DaemonSecrets.js';
@@ -291,8 +291,8 @@ export class CommandHandler {
 	}
 
 	/** Records that a worker is still saying something about an assignment it holds. */
-	noteAssignmentActivity(assignmentId: string): void {
-		this.supervisor.noteAssignmentActivity(assignmentId);
+	noteAssignmentActivity(assignmentId: string, detail?: StepProgressDetail): void {
+		this.supervisor.noteAssignmentActivity(assignmentId, detail);
 	}
 
 	/** Called on a timer by `Daemon`; see {@link WorkerAssignmentSupervisor.failStalledSteps}. */

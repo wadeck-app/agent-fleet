@@ -11,6 +11,8 @@
 export interface StreamContentBlock {
 	type?: string;
 	text?: string;
+	/** Id of a `tool_use` block, echoed as `tool_use_id` by the matching `tool_result`. */
+	id?: string;
 	name?: string;
 	input?: unknown;
 	tool_use_id?: string;

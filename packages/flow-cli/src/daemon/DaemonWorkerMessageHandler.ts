@@ -54,13 +54,18 @@ export class DaemonWorkerMessageHandler {
 			}
 			case 'step_progress': {
 				// Carries no content -- unlike 'log', this is never written to the execution log,
-				// only used to reset the silence clock (see Protocol.ts for why this exists).
-				const { assignmentId, executionId, stepId } = message;
+				// only used to reset the silence clock and to remember which tool call the step is in
+				// (see Protocol.ts for why this exists).
+				const { assignmentId, executionId, stepId, activity, lastCompletedTool } = message;
 				const { commandHandler } = this.runtime();
 				if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
 					break;
 				}
-				commandHandler.noteAssignmentActivity(assignmentId);
+				// Only the fields the worker actually sent: `undefined` and `null` mean different things.
+				commandHandler.noteAssignmentActivity(assignmentId, {
+					...(activity !== undefined && { activity }),
+					...(lastCompletedTool !== undefined && { lastCompletedTool }),
+				});
 				break;
 			}
 			case 'inject_steps': {
