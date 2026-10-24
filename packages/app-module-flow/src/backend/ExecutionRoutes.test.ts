@@ -420,6 +420,48 @@ ${'word '.repeat(40)}`,
 		expect(running.body).toMatchObject({ timing: [{ startedAt: '2026-08-16T10:05:09.000Z', completedAt: null }] });
 	});
 
+	it('sends the flow version in the list rows, a dash for a record written before versions existed', async () => {
+		fixture.addExecution({
+			executionId: 'ver1',
+			startedAt: '2026-08-16T10:00:01.000Z',
+			flowVersion: '1.4.0',
+			definitionHash: 'd'.repeat(64),
+			definitionSnapshot: 'deploy/1.4.0-dddddddddddd.yml',
+			versionChoice: 'latest',
+		});
+		fixture.addExecution({ executionId: 'ver0', startedAt: '2026-08-16T10:00:00.000Z' });
+
+		const { body } = await callRoute(routes, 'GET /executions', { query: {} });
+
+		const items = (body as { items: { executionId: string; flowVersion?: string; versionLabel: string }[] }).items;
+		expect(items.map(item => [item.executionId, item.flowVersion, item.versionLabel])).toEqual([
+			['ver1', '1.4.0', '1.4.0'],
+			['ver0', undefined, '-'],
+		]);
+	});
+
+	it('sends the version of the run in the header row of the detail, with how it was chosen', async () => {
+		fixture.addExecution({
+			executionId: 'ver2',
+			flowVersion: '1.4.0',
+			definitionHash: 'd'.repeat(64),
+			definitionSnapshot: 'deploy/1.4.0-dddddddddddd.yml',
+			versionChoice: 'pinned',
+		});
+		fixture.addExecution({ executionId: 'ver3' });
+
+		const recorded = await callRoute(routes, 'GET /executions/:id', { params: { id: 'ver2' }, query: {} });
+		const legacy = await callRoute(routes, 'GET /executions/:id', { params: { id: 'ver3' }, query: {} });
+
+		expect(recorded.body).toMatchObject({
+			flowVersion: '1.4.0',
+			timing: [{ version: '1.4.0', definition: 'pinned by the request, definition dddddddddddd' }],
+		});
+		expect(legacy.body).toMatchObject({
+			timing: [{ version: 'not recorded', definition: 'run started before flow versions existed' }],
+		});
+	});
+
 	it('words the detail status badge so a recovered error is visible, in warning colour', async () => {
 		fixture.addExecution({ executionId: 'rec2', lastError: 'boom' });
 		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'rec2' }, query: {} });

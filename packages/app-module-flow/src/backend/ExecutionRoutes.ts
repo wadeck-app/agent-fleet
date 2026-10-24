@@ -7,11 +7,12 @@ import {
 	InvalidQueryError,
 	type QueryParams,
 	RECOVERED_STATUS,
+	definitionsDirOf,
 	optionalBoolean,
 	optionalInteger,
 	optionalString,
 	readPageOffset,
-	readRetryPolicies,
+	readRecordedRetryPolicies,
 	renderExecutionDetail,
 	stripErrorsForServing,
 	stripRecordForServing,
@@ -129,7 +130,10 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const detail = toExecutionDetail(served, renderExecutionDetail(served, { tail, full }));
 			// The recorded inputs and outputs come from the served record, in their own field: the step rows stay light.
 			return reply.code(200).send({
-				...toExecutionDetailRow(detail, readRetryPolicies(served.record.flowFile)),
+				...toExecutionDetailRow(
+					detail,
+					readRecordedRetryPolicies(served.record, definitionsDirOf(service.directories.configDir))
+				),
 				ioText: renderStepsIoText(served.record),
 			});
 		} catch (err) {

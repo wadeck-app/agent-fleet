@@ -1,6 +1,7 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
-import { FlowQueryService } from 'flow-core';
+import { DefinitionSnapshotStore, FlowQueryService, definitionsDirOf, hashDefinition } from 'flow-core';
 import { FlowConfigFixture, callRoute, collectRoutes } from 'flow-core/testing';
+import * as yaml from 'js-yaml';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -50,6 +51,47 @@ function errorOf(body: unknown): string {
 describe('routes', () => {
 	it('registers the graph, the flows index and the flows health board', () => {
 		expect([...routes.keys()].sort()).toEqual(['GET /flows', 'GET /flows/health', 'GET /graph']);
+	});
+});
+
+describe('GET /graph of a run that recorded its definition', () => {
+	it('draws the recorded definition after the flow file was edited, with real edges and no "changed" warning', async () => {
+		const recorded = yaml.load(FLOW_YAML);
+		const hash = hashDefinition(recorded);
+		const ref = new DefinitionSnapshotStore(definitionsDirOf(fixture.configDir)).save({
+			flowId: 'build_task',
+			version: '1.0.0',
+			hash,
+			text: FLOW_YAML,
+		}).ref;
+		fixture.addExecution({
+			executionId: 'rec1',
+			flowId: 'build_task',
+			flowFile,
+			flowVersion: '1.0.0',
+			definitionHash: hash,
+			definitionSnapshot: ref,
+			versionChoice: 'file',
+			steps: { plan: { status: 'completed' }, test: { status: 'failed' }, ship: { status: 'pending' } },
+		});
+		writeFileSync(
+			flowFile,
+			'id: build_task\nname: Edited\nsteps:\n  - id: only\n    type: script\n    script: x\n'
+		);
+
+		const { status, body } = await callRoute(routes, 'GET /graph', { query: { executionId: 'rec1' } });
+
+		const result = body as {
+			graph: { nodes: { id: string }[]; edges: { kind: string }[]; warnings?: string[] };
+			flowName: string;
+			definition: unknown;
+		};
+		expect(status).toBe(200);
+		expect(result.graph.nodes.map(node => node.id)).toEqual(['plan', 'test', 'ship']);
+		expect(result.graph.edges.some(edge => edge.kind === 'sequence')).toBe(false);
+		expect(result.graph.warnings ?? []).toEqual([]);
+		expect(result.flowName).toBe('Build a task');
+		expect(result.definition).toEqual({ source: 'recorded', version: '1.0.0', snapshot: ref });
 	});
 });
 

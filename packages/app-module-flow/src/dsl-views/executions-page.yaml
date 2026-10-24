@@ -94,6 +94,7 @@ sections:
             columns:
                 - { key: 'startedAt', label: 'When', format: datetime, nowrap: true }
                 - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
+                - { key: 'versionLabel', label: 'Version', nowrap: true, mono: true }
                 - { key: 'executionId', label: 'Run', nowrap: true, mono: true }
                 # The cell text stays the status word: a shell older than dsl-ui 122 ignores nowrap and badge and shows it as is.
                 # The badge colours a cell whose text is exactly a key; "ok, 3 tries" and the like stay plain text.

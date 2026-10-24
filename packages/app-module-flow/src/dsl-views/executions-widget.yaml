@@ -1,8 +1,7 @@
 # Dashboard widget for a narrow card (240-360px): three counters on one row, the daily bars of the last 7 days, the 5
 # latest runs and a row of buttons. One source feeds all of it:
 #   recent: GET /api/modules/flow/widgets/executions, the digest of the runs (flow-core RunDigest, served as is)
-# Times are ISO 8601 shown by a DataTable column with `format: datetime`, formatted by the shell (a StatTile or a composed
-# string would show the raw text). A shell older than dsl-ui 122 ignores `format`.
+# Times are ISO 8601, formatted by flow:RunList (a StatTile or a composed string would show the raw text).
 # When the source cannot be read the renderer only logs it: the list falls back to its emptyMessage, numbers stay blank,
 # nothing throws.
 $sources:
@@ -35,18 +34,13 @@ items:
           - { key: completed, name: completed, color: 'var(--color-success)', type: bar, yAxisId: left }
           - { key: failed, name: failed, color: 'var(--color-danger)', type: bar, yAxisId: left }
 
-    # The 5 newest runs, a row opens the run. The flow name is sent whole: its column takes the room the narrow columns leave.
-    - $type: DataTable
-      rows: $sources.recent.latest
-      navigateTo: '/modules/flow/executions/{executionId}'
+    # The 5 newest runs, one line each (status, flow name, start time), a line opens the run. A DataTable cannot shrink under
+    # its content, so in a narrow card it scrolled sideways and hid the time: flow:RunList (this module) gives the flow name
+    # the room the badge and the time leave and shows an ellipsis only when the name does not fit.
+    - $type: flow:RunList
+      runs: $sources.recent.latest
+      to: '/modules/flow/executions/{executionId}'
       emptyMessage: No execution yet
-      columns:
-          - key: statusLabel
-            label: Status
-            nowrap: true
-            badge: { ok: success, FAILED: danger, running: info, waiting: default, retry: warning }
-          - { key: 'flowId', label: 'Flow', truncate: true }
-          - { key: 'startedAt', label: 'Started', format: datetime, nowrap: true }
 
     # The charts need the flow-chart module: without it the last button leads to a missing page.
     - $type: HorizontalStack

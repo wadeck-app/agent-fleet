@@ -465,7 +465,7 @@ describe('timestamps (same text as the rest of app-core: the shell DataTable for
 	it('formats every *At column as a datetime, in every A/B variant', () => {
 		const dated = everyColumn().filter(({ column }) => TIMESTAMP_ONLY_KEY.test(String(column['key'])));
 		// A rename of the keys would make the loop below vacuous.
-		expect(dated.length).toBeGreaterThanOrEqual(6);
+		expect(dated.length).toBeGreaterThanOrEqual(5);
 		for (const { file, variant, column } of dated) {
 			expect(column, `${file} (${String(variant)}): ${JSON.stringify(column)}`).toMatchObject({
 				format: 'datetime',
@@ -510,15 +510,16 @@ describe('executions page layout', () => {
 		expect(keys).not.toContain('lastError');
 	});
 
-	it('has four columns, the full flow name truncated by the column (ellipsis and tooltip) and the run id kept visible', () => {
+	it('has five columns, the full flow name truncated by the column (ellipsis and tooltip), the version on one line and the run id kept visible', () => {
 		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
 			const columns = executionsTableOf(document)['columns'] as Record<string, unknown>[];
 			expect(
 				columns.map(column => column['key']),
 				String(variant)
-			).toEqual(['startedAt', 'flowId', 'executionId', 'statusLabel']);
+			).toEqual(['startedAt', 'flowId', 'versionLabel', 'executionId', 'statusLabel']);
 			expect(columns[1], String(variant)).toMatchObject({ truncate: true, mono: true });
-			expect(columns[2], String(variant)).toMatchObject({ nowrap: true, mono: true });
+			expect(columns[2], String(variant)).toMatchObject({ label: 'Version', nowrap: true, mono: true });
+			expect(columns[3], String(variant)).toMatchObject({ nowrap: true, mono: true });
 			expect(JSON.stringify(columns), String(variant)).not.toContain('runLabel');
 		}
 	});
@@ -602,6 +603,8 @@ describe('execution detail page', () => {
 			expect(timing[0]!['columns'], String(variant)).toEqual([
 				{ key: 'startedAt', label: 'Started', format: 'datetime', nowrap: true },
 				{ key: 'completedAt', label: 'Finished', format: 'datetime', nowrap: true },
+				{ key: 'version', label: 'Version', nowrap: true, mono: true },
+				{ key: 'definition', label: 'Definition', muted: true },
 			]);
 		}
 	});
@@ -885,17 +888,21 @@ describe('dashboard widget', () => {
 		expect(rows).toHaveLength(1);
 		expect(rows[0]!['items']).toHaveLength(3);
 		expect(collectNodes(widget.document, 'Chart')).toHaveLength(1);
-		expect(collectNodes(widget.document, 'DataTable').map(table => table['rows'])).toEqual([
+		expect(collectNodes(widget.document, 'flow:RunList').map(list => list['runs'])).toEqual([
 			'$sources.recent.latest',
 		]);
+		// A table cannot shrink under its content: in a narrow card it scrolled sideways and hid the time.
+		expect(collectNodes(widget.document, 'DataTable')).toEqual([]);
 	});
 
 	it('links only to pages that exist: the executions list, a run, the workers, the flow charts', () => {
-		const targets = [`${MODULE_PAGE_PREFIX}/executions`, `${MODULE_PAGE_PREFIX}/workers`, FLOW_CHART_INDEX_PATH];
-		expect([...collectStrings(widget.document, 'href'), ...collectStrings(widget.document, 'to')]).toEqual(targets);
-		expect(collectStrings(widget.document, 'navigateTo')).toEqual([
+		const targets = [
 			`${MODULE_PAGE_PREFIX}/executions/{executionId}`,
-		]);
+			`${MODULE_PAGE_PREFIX}/executions`,
+			`${MODULE_PAGE_PREFIX}/workers`,
+			FLOW_CHART_INDEX_PATH,
+		];
+		expect([...collectStrings(widget.document, 'href'), ...collectStrings(widget.document, 'to')]).toEqual(targets);
 	});
 
 	it('offers the three buttons in the style of the other action buttons of the module', () => {
@@ -912,27 +919,15 @@ describe('dashboard widget', () => {
 		}
 	});
 
-	it('shows columns every row of the table has', () => {
-		for (const table of collectNodes(widget.document, 'DataTable')) {
-			const rows = readSource(String(table['rows'])).value as Record<string, unknown>[];
-			expect(rows.length, `${String(table['rows'])} has no row to check`).toBeGreaterThan(0);
-			for (const column of table['columns'] as { key: string }[]) {
-				expect(Object.keys(rows[0]!), column.key).toContain(column.key);
-			}
+	it('gives the latest runs every field the list reads, an empty message and no style key', () => {
+		const [list] = collectNodes(widget.document, 'flow:RunList');
+		expect(list!['emptyMessage']).toEqual(expect.any(String));
+		expect(Object.keys(list!).filter(key => !key.startsWith('$'))).toEqual(['runs', 'to', 'emptyMessage']);
+		const rows = readSource(String(list!['runs'])).value as Record<string, unknown>[];
+		expect(rows.length, 'the latest runs have no row to check').toBeGreaterThan(0);
+		for (const field of ['executionId', 'flowId', 'statusLabel', 'startedAt']) {
+			expect(Object.keys(rows[0]!), field).toContain(field);
 		}
-	});
-
-	it('gives the table an empty message, narrow nowrap columns and a flow name column that takes the rest and truncates', () => {
-		const [table] = collectNodes(widget.document, 'DataTable');
-		expect(table!['emptyMessage']).toEqual(expect.any(String));
-		const columns = table!['columns'] as Record<string, unknown>[];
-		expect(columns.map(column => column['key'])).toEqual(['statusLabel', 'flowId', 'startedAt']);
-		const [status, name, started] = columns;
-		expect(status).toMatchObject({ nowrap: true });
-		// A fixed width would keep the room the name needs from the other columns: the name takes what they leave.
-		expect(name).toMatchObject({ truncate: true });
-		expect(name).not.toHaveProperty('width');
-		expect(started).toMatchObject({ format: 'datetime', nowrap: true });
 	});
 
 	it('draws the chart as a sparkline with a height, so it stays small in a narrow card', () => {
@@ -943,7 +938,7 @@ describe('dashboard widget', () => {
 		expect((chart!['series'] as { key: string }[]).map(series => series.key)).toEqual(['completed', 'failed']);
 	});
 
-	it('sends a time only to a datetime column: the shell formats it, never text', () => {
+	it('draws the time and the status itself in flow:RunList, not with a stray RelativeDate or Badge', () => {
 		expect(collectNodes(widget.document, 'RelativeDate')).toEqual([]);
 		expect(collectNodes(widget.document, 'Badge')).toEqual([]);
 	});
@@ -952,7 +947,10 @@ describe('dashboard widget', () => {
 describe('views keys', () => {
 	it.each(viewFiles)("%s holds no key the shell's dsl-ui does not know", async file => {
 		const { findUnknownKeys, knownKeys } = await loadKeyCheck();
-		const errors = findUnknownKeys(parseView(file).document, knownKeys).filter(d => d.severity === 'error');
+		// The dsl-lib components of this module (`flow:` prefix) are not in dsl-ui's list: RegisteredComponents.test.ts pins their keys.
+		const errors = findUnknownKeys(parseView(file).document, knownKeys, {
+			skipType: type => type.startsWith('flow:'),
+		}).filter(d => d.severity === 'error');
 		expect(errors, `${file}: ${errors.map(d => `${d.nodePath} ${d.message}`).join('\n')}`).toEqual([]);
 	});
 });
@@ -964,7 +962,11 @@ interface Diagnostic {
 }
 
 interface UnknownKeysModule {
-	findUnknownKeys: (document: Record<string, unknown>, manifest: Record<string, unknown>) => Diagnostic[];
+	findUnknownKeys: (
+		document: Record<string, unknown>,
+		manifest: Record<string, unknown>,
+		options?: { skipType?: (type: string) => boolean }
+	) => Diagnostic[];
 }
 
 /**

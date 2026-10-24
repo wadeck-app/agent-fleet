@@ -5,8 +5,10 @@ import type { ComponentRegistryEntry } from '@wadeck-app/dsl-renderer';
 
 import { MarkdownText } from './MarkdownText.js';
 import { MARKDOWN_TEXT_KEYS, readMarkdownTextProps } from './MarkdownTextProps.js';
+import { RunList } from './RunList.js';
+import { RUN_LIST_KEYS, readRunListProps } from './RunListProps.js';
 
-// Registered by app-core as `flow:MarkdownText`.
+// Registered by app-core as `flow:MarkdownText` and `flow:RunList`.
 const entries: ComponentRegistryEntry[] = [
 	{
 		name: 'MarkdownText',
@@ -14,6 +16,13 @@ const entries: ComponentRegistryEntry[] = [
 		tags: ['flow', 'markdown', 'text'],
 		knownKeys: [...MARKDOWN_TEXT_KEYS],
 		render: ({ node, ctx }) => createElement(MarkdownText, readMarkdownTextProps(node, ctx)),
+	},
+	{
+		name: 'RunList',
+		category: 'composite',
+		tags: ['flow', 'runs', 'list'],
+		knownKeys: [...RUN_LIST_KEYS],
+		render: ({ node, ctx }) => createElement(RunList, readRunListProps(node, ctx)),
 	},
 ];
 

@@ -11,6 +11,7 @@ function result(status: string): FlowGraphResult {
 		flowId: 'build',
 		flowName: 'Build',
 		flowFile: '/f.yml',
+		definition: { source: 'flow-file' },
 		execution: { executionId: 'e1', status, startedAt: '2026-08-16T12:00:00.000Z', completedAt: null },
 	};
 }

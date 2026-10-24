@@ -14,6 +14,7 @@ const RESULT: FlowGraphResult = {
 	flowId: 'build_task',
 	flowName: 'Build a task',
 	flowFile: '/flows/build.yml',
+	definition: { source: 'flow-file' },
 	execution: { executionId: 'exec1', status: 'failed', startedAt: '2026-08-16T12:00:00.000Z', completedAt: null },
 };
 

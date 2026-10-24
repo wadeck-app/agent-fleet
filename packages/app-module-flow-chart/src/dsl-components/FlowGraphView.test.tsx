@@ -14,6 +14,7 @@ function executionResult(overrides: Partial<FlowGraphResult> = {}): FlowGraphRes
 		flowId: 'build_task',
 		flowName: 'Build a task',
 		flowFile: '/flows/build.yml',
+		definition: { source: 'recorded', version: '1.2.0', snapshot: 'build_task/1.2.0-abcdef012345.yml' },
 		execution: { executionId: 'exec1', status: 'failed', startedAt: '2026-08-16T12:00:00.000Z', completedAt: null },
 		...overrides,
 	};
@@ -28,6 +29,14 @@ function renderView(result: FlowGraphResult, refreshError?: string) {
 }
 
 describe('FlowGraphView', () => {
+	it('says in the header which definition a run is drawn from', () => {
+		renderView(executionResult());
+		expect(screen.getByText(/definition v1\.2\.0 as it ran/)).toBeInTheDocument();
+		cleanup();
+		renderView(executionResult({ definition: { source: 'flow-file' } }));
+		expect(screen.getByText(/read from the flow file as it is now/)).toBeInTheDocument();
+	});
+
 	it('draws every step with its status, and names the flow and the run in the header', () => {
 		renderView(executionResult());
 		expect(screen.getByRole('heading', { name: 'build_task' })).toBeInTheDocument();

@@ -73,7 +73,15 @@ export function toExecutionDetailRow(
 	return {
 		...detail,
 		// One row, so a DataTable shows the run start and end in the shell datetime format; null while the run is in progress.
-		timing: [{ startedAt: requireTimestamp(detail.startedAt), completedAt: detail.completedAt }],
+		// The version of the definition that ran sits in the same row (version, then how it was chosen), so one table is the header.
+		timing: [
+			{
+				startedAt: requireTimestamp(detail.startedAt),
+				completedAt: detail.completedAt,
+				version: detail.flowVersion ?? 'not recorded',
+				definition: detail.versionNote,
+			},
+		],
 		// A recovered error is not a success to read past: the badge says it and turns to warning.
 		statusText: detail.lastErrorRecovered ? 'completed, recovered an error' : detail.status,
 		statusVariant: detail.lastErrorRecovered ? 'warning' : statusVariant,

@@ -14,6 +14,7 @@ import {
 import { describeChartMode } from './ChartMode.js';
 import { ChartToolbar } from './ChartToolbar.js';
 import { planChartView } from './ChartViewPlan.js';
+import { definitionNoteOf } from './DefinitionNote.js';
 import { FlowStepNode } from './FlowStepNode.js';
 import { pickFocusStep } from './FocusStep.js';
 import type { LayoutDirection } from './GraphLayout.js';
@@ -129,6 +130,7 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 	const selected = graph.nodes.find(node => node.id === selectedId);
 	const edgeKinds = useMemo(() => new Set(graph.edges.map(edge => edge.kind)), [graph]);
 
+	const definitionNote = definitionNoteOf(result);
 	const pathLabels = useMemo(() => new Set(graph.nodes.map(node => nodeStyle(node).label)), [graph]);
 	const labelOf = (stepId: string): string => graph.nodes.find(node => node.id === stepId)?.label ?? stepId;
 
@@ -152,6 +154,7 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 						{result.flowName !== result.flowId && <span>{result.flowName}</span>}
 						{' - '}
 						{summarizeStatuses(graph)}
+						{definitionNote !== undefined && ` - ${definitionNote}`}
 					</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">

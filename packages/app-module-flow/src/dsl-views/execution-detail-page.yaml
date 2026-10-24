@@ -74,6 +74,8 @@ sections:
             columns:
                 - { key: 'startedAt', label: 'Started', format: datetime, nowrap: true }
                 - { key: 'completedAt', label: 'Finished', format: datetime, nowrap: true }
+                - { key: 'version', label: 'Version', nowrap: true, mono: true }
+                - { key: 'definition', label: 'Definition', muted: true }
 
           - $type: Section
             title: Steps
