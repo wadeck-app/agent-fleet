@@ -67,7 +67,9 @@ export class StreamEventMapper {
 			// OpenCode emits 'text' events for streamed assistant text chunks
 			case 'text': {
 				const text = event.data.text as string | undefined;
-				if (!text) return [];
+				if (!text) {
+					return [];
+				}
 				return [
 					{
 						id: this.nextId(),
@@ -155,7 +157,7 @@ export class StreamEventMapper {
 		// flow author can see context was trimmed, and by how much, without reading
 		// Claude's own log file. pre_tokens/post_tokens/duration_ms are Claude's own fields.
 		if (event.subtype === 'compact_boundary') {
-			const meta = (data.compact_metadata ?? {}) as Record<string, unknown>;
+			const meta = data.compact_metadata ?? {};
 			return {
 				id: this.nextId(),
 				timestamp: Date.now(),
@@ -282,8 +284,8 @@ export class StreamEventMapper {
 		const data = event.data;
 		// NOTE: schema is tentative -- not verified against a live Claude run.
 		// data.hook?.type is expected to be 'PreToolUse' or 'PostToolUse'.
-		const hookType: string = data['hook']?.type ?? data['hook_type'] ?? 'unknown';
-		const toolName: string = data['tool_name'] ?? 'unknown';
+		const hookType: string = data.hook?.type ?? data.hook_type ?? 'unknown';
+		const toolName: string = data.tool_name ?? 'unknown';
 
 		return {
 			id: this.nextId(),
@@ -299,7 +301,7 @@ export class StreamEventMapper {
 	 * Create a short summary of tool input for log display.
 	 * File paths are shown in full (or smartly truncated to keep the filename visible).
 	 */
-	private summarizeToolInput(input: any): string {
+	private summarizeToolInput(input: unknown): string {
 		if (!input || typeof input !== 'object') {
 			return '';
 		}
@@ -319,7 +321,7 @@ export class StreamEventMapper {
 				break;
 			}
 
-			const value = input[key];
+			const value = Reflect.get(input, key);
 			let valueStr: string;
 			if (typeof value === 'string') {
 				valueStr = this.truncateValue(key, value);

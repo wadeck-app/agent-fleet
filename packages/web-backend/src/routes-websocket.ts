@@ -1,5 +1,6 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { createLogger } from 'shared-common/logger';
+import type { WebSocket } from 'ws';
 
 import type { DataStoreFactory } from './factories';
 import { ProductsWebSocketService } from './services/ProductsWebSocketService';
@@ -46,7 +47,7 @@ export async function registerProductsWebSocketRoutes(
 	 * GET /api/products/events
 	 * WebSocket endpoint for real-time product updates
 	 */
-	fastify.get('/api/products/events', { websocket: true }, async (ws: any, request: FastifyRequest) => {
+	fastify.get('/api/products/events', { websocket: true }, async (ws: WebSocket) => {
 		log.info('New WebSocket connection for products');
 
 		try {

@@ -1,5 +1,5 @@
 import fastifyWebsocket from '@fastify/websocket';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { createLogger } from 'shared-common/logger';
 import type { WebSocket } from 'ws';
 
@@ -13,7 +13,7 @@ import type {
 } from '@app/shared/transport';
 
 import type { ITransportServer } from '../ITransportServer';
-import type { TransportRouter } from '../TransportRouter';
+import type { RuntimeTransportRequest, TransportRouter } from '../TransportRouter';
 import type { TransportSessionManager } from '../TransportSessionManager';
 
 const log = createLogger('WebSocketTransportServer');
@@ -81,8 +81,8 @@ export class WebSocketTransportServer implements ITransportServer {
 		await app.register(fastifyWebsocket);
 
 		// Register WebSocket endpoint (NEW with /api prefix)
-		app.get('/api/transports/ws', { websocket: true }, (connection: any, req: any) => {
-			log.info('connection.socket exists?', !!connection?.socket);
+		app.get('/api/transports/ws', { websocket: true }, (connection: WebSocket, req: FastifyRequest) => {
+			log.info('WebSocket connection received', !!connection);
 
 			if (!connection) {
 				log.error('Connection is null/undefined');
@@ -95,7 +95,7 @@ export class WebSocketTransportServer implements ITransportServer {
 		// Backward compatibility redirect (temporary)
 		// Note: WebSocket upgrade requests cannot be redirected with 308
 		// Clients should be updated to use /api/transports/ws
-		app.get('/ws', { websocket: true }, (connection: any, req: any) => {
+		app.get('/ws', { websocket: true }, (connection: WebSocket, req: FastifyRequest) => {
 			log.info('DEPRECATED: Client connecting via /ws, use /api/transports/ws instead');
 
 			if (!connection) {
@@ -110,7 +110,7 @@ export class WebSocketTransportServer implements ITransportServer {
 	/**
 	 * Handle new WebSocket connection
 	 */
-	private handleConnection(socket: WebSocket, req: any): void {
+	private handleConnection(socket: WebSocket, req: FastifyRequest): void {
 		// Validate socket exists
 		if (!socket) {
 			log.error('Connection handler called with undefined socket');
@@ -131,8 +131,10 @@ export class WebSocketTransportServer implements ITransportServer {
 		}
 
 		// Setup message handlers immediately (don't wait for auth)
-		socket.on('message', async (rawMessage: Buffer) => {
-			await this.handleMessage(clientId, socket, rawMessage);
+		socket.on('message', (rawMessage: Buffer) => {
+			this.handleMessage(clientId, socket, rawMessage).catch(error => {
+				log.error(`Unhandled error while handling message from client ${clientId}:`, error);
+			});
 		});
 
 		// Handle disconnection
@@ -168,7 +170,7 @@ export class WebSocketTransportServer implements ITransportServer {
 				// Schedule expiration warning
 				//TODO			this.scheduleExpirationWarning(clientId, session.tokenExpiresAt);
 			})
-			.catch((error: any) => {
+			.catch((error: unknown) => {
 				log.error('Authentication failed', error);
 
 				// Send auth error (socket might be closed, so check first)
@@ -269,15 +271,14 @@ export class WebSocketTransportServer implements ITransportServer {
 			const { userId } = this.sessionManager.validateSession(clientId);
 
 			// Add userId to request context
-			// violations-suppress: ts/no-unsafe-type-cast attaching userId to request at the WebSocket authentication point; not exposed in the generic request interface
-			(request as any).userId = userId;
+			(request as RuntimeTransportRequest).userId = userId;
 
 			// Route request through TransportRouter
 			const response = await this.router.handleRequest(request);
 
 			// Send response
 			this.sendMessage(socket, response);
-		} catch (error: any) {
+		} catch (error: unknown) {
 			log.error('Request handling error:', error);
 
 			// Check if token expired
@@ -477,7 +478,7 @@ export class WebSocketTransportServer implements ITransportServer {
 	/**
 	 * Send message to WebSocket
 	 */
-	private sendMessage(socket: WebSocket, message: any): void {
+	private sendMessage(socket: WebSocket, message: unknown): void {
 		if (socket && socket.readyState === 1) {
 			// 1 = OPEN
 			socket.send(JSON.stringify(message));

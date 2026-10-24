@@ -68,7 +68,6 @@ function captureRoutes(
 ): Map<string, (req: Record<string, unknown>) => Promise<unknown>> {
 	const handlers = new Map<string, (req: Record<string, unknown>) => Promise<unknown>>();
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const mockAdd = vi.fn((method: string, path: string, handler: any) => {
 		handlers.set(`${method} ${path}`, handler);
 	});

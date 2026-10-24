@@ -419,7 +419,9 @@ describe('InterventionsService', () => {
 
 		it('should not fail operation if broadcast fails', async () => {
 			vi.mocked(mockRepository.respond).mockResolvedValue(updatedIntervention);
-			vi.mocked(mockEventBroadcaster.broadcast).mockRejectedValue(new Error('Broadcast failed'));
+			vi.mocked(mockEventBroadcaster.broadcast).mockImplementation(() => {
+				throw new Error('Broadcast failed');
+			});
 
 			const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -475,7 +477,9 @@ describe('InterventionsService', () => {
 
 		it('should not fail operation if broadcast fails', async () => {
 			vi.mocked(mockRepository.cancel).mockResolvedValue(cancelledResult);
-			vi.mocked(mockEventBroadcaster.broadcast).mockRejectedValue(new Error('Broadcast failed'));
+			vi.mocked(mockEventBroadcaster.broadcast).mockImplementation(() => {
+				throw new Error('Broadcast failed');
+			});
 
 			const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -555,7 +559,9 @@ describe('InterventionsService', () => {
 			};
 
 			vi.mocked(mockRepository.bulkCancel).mockResolvedValue(bulkResult);
-			vi.mocked(mockEventBroadcaster.broadcast).mockRejectedValue(new Error('Broadcast failed'));
+			vi.mocked(mockEventBroadcaster.broadcast).mockImplementation(() => {
+				throw new Error('Broadcast failed');
+			});
 
 			const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -597,7 +603,9 @@ describe('InterventionsService', () => {
 
 		it('should not throw error if broadcast fails', async () => {
 			vi.mocked(mockRepository.findById).mockResolvedValue(sampleIntervention);
-			vi.mocked(mockEventBroadcaster.broadcast).mockRejectedValue(new Error('Broadcast failed'));
+			vi.mocked(mockEventBroadcaster.broadcast).mockImplementation(() => {
+				throw new Error('Broadcast failed');
+			});
 
 			const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 

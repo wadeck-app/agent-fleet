@@ -28,6 +28,7 @@ import type {
 	UserInterventionStep,
 	Workspace,
 } from '../types';
+import type { FlowExecutor } from './FlowExecutor';
 import type { InterventionHandler } from './InterventionHandler';
 import { executeModelStep } from './ModelStepExecutor';
 import { ScriptExecutor } from './ScriptExecutor';
@@ -58,7 +59,7 @@ export interface StepRunnerConfig {
 	/** Flow registry for looking up subflows */
 	flowRegistry?: FlowRegistry;
 	/** Flow executor for recursive subflow execution */
-	flowExecutor?: any;
+	flowExecutor?: Pick<FlowExecutor, 'execute'>;
 	/** Intervention handler for user intervention steps (legacy) */
 	interventionHandler?: InterventionHandler;
 	/** Approval provider for user intervention steps (preferred) */
@@ -116,7 +117,7 @@ export class StepRunner {
 	public setFlowRegistry(flowRegistry: FlowRegistry): void {
 		this.config.flowRegistry = flowRegistry;
 	}
-	public setFlowExecutor(flowExecutor: any): void {
+	public setFlowExecutor(flowExecutor: Pick<FlowExecutor, 'execute'>): void {
 		this.config.flowExecutor = flowExecutor;
 	}
 	public setInterventionHandler(interventionHandler: InterventionHandler): void {

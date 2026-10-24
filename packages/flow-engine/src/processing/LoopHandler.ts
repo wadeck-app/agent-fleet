@@ -249,8 +249,6 @@ export class LoopHandler {
 	 * @returns Array of step IDs in the loop path
 	 */
 	public getLoopPath(dag: DAG, fromStepId: string, toStepId: string): string[] {
-		const path: string[] = [];
-
 		// Simple BFS to find path from toStepId to fromStepId
 		const queue: Array<{ stepId: string; path: string[] }> = [{ stepId: toStepId, path: [toStepId] }];
 		const visited = new Set<string>([toStepId]);
@@ -263,7 +261,9 @@ export class LoopHandler {
 			}
 
 			const node = dag.nodes.get(stepId);
-			if (!node) continue;
+			if (!node) {
+				continue;
+			}
 
 			for (const dependentId of node.dependents) {
 				if (!visited.has(dependentId)) {

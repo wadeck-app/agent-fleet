@@ -256,7 +256,9 @@ export class SSETransportServer implements ITransportServer {
 	 */
 	private handleDisconnection(connId: string): void {
 		const connection = this.connections.get(connId);
-		if (!connection) return;
+		if (!connection) {
+			return;
+		}
 
 		this.connections.delete(connId);
 		this.sessionManager.removeSession(connId);
@@ -433,10 +435,10 @@ export class SSETransportServer implements ITransportServer {
 		}
 
 		// Close all connections
-		for (const [connId, connection] of this.connections) {
+		for (const connection of this.connections.values()) {
 			try {
 				connection.reply.raw.end();
-			} catch (error) {
+			} catch {
 				// Ignore errors during shutdown
 			}
 		}

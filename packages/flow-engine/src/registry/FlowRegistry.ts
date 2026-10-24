@@ -14,13 +14,47 @@ import type {
 	FlowDefinition,
 	FlowStep,
 	InputDefinition,
-	InputSpec,
+	ModelFlowStep,
 	NormalizedInputDefinition,
+	ScriptFlowStep,
+	SubFlowStep,
+	UserInterventionStep,
 	VariableType,
 	WorkspaceConfig,
 } from '../types';
 import { FlowValidator } from '../validation/FlowValidator';
 import type { ValidationResult } from '../validation/FlowValidator';
+
+/**
+ * Raw (unvalidated) YAML mapping, as returned by the YAML parser
+ */
+type RawYamlObject = Record<string, unknown>;
+
+/**
+ * Raw flow step from YAML: every property of every step kind is optional and unchecked
+ * until `parseFlowStep` validates the discriminating `type`. `id` and `interventionType` are typed as
+ * present but are not checked at parse time; the schema validator reports their absence.
+ */
+type RawFlowStep = Partial<
+	Omit<ModelFlowStep, 'type'> &
+		Omit<ScriptFlowStep, 'type'> &
+		Omit<SubFlowStep, 'type'> &
+		Omit<UserInterventionStep, 'type'>
+> & { type?: string; id: string; interventionType: UserInterventionStep['interventionType'] };
+
+/**
+ * Raw flow definition from YAML (or from an external `source` file), before validation
+ */
+interface RawFlowData extends Partial<Omit<FlowDefinition, 'id' | 'workspace' | 'steps'>> {
+	source?: string;
+	workspace?: Partial<WorkspaceConfig>;
+	steps?: RawFlowStep[];
+}
+
+/**
+ * Flow definition keys whose object values are merged key by key when a local flow overrides an external one
+ */
+const DEEP_MERGED_FLOW_KEYS = new Set(['workspace', 'inputs', 'hooks', 'statusTransitions']);
 
 /**
  * Validation error for flow definitions
@@ -183,7 +217,7 @@ export class FlowRegistry {
 
 		try {
 			const content = fs.readFileSync(this.configPath, 'utf-8');
-			const parsed = yaml.load(content) as Record<string, any>;
+			const parsed = yaml.load(content) as RawYamlObject;
 
 			if (!parsed || typeof parsed !== 'object') {
 				throw new Error('Invalid YAML structure: expected object');
@@ -202,9 +236,11 @@ export class FlowRegistry {
 
 			const RESERVED_KEYS = new Set(['includes']);
 			for (const [id, flowData] of Object.entries(parsed)) {
-				if (RESERVED_KEYS.has(id)) continue;
+				if (RESERVED_KEYS.has(id)) {
+					continue;
+				}
 				try {
-					const flow = await this.parseFlowDefinition(id, flowData);
+					const flow = await this.parseFlowDefinition(id, flowData as RawFlowData);
 
 					// Use new validator for comprehensive validation
 					const validationResult = this.validator.validate(flow);
@@ -279,7 +315,7 @@ export class FlowRegistry {
 	 * @param flowId - Flow ID for error messages
 	 * @throws Error if input format is invalid
 	 */
-	private validateInputFormat(rawInputs: Record<string, any> | undefined, flowId: string): void {
+	private validateInputFormat(rawInputs: RawYamlObject | undefined, flowId: string): void {
 		if (!rawInputs || typeof rawInputs !== 'object') {
 			return;
 		}
@@ -362,7 +398,7 @@ export class FlowRegistry {
 	 * @param rawInputs - Raw inputs from YAML (can be undefined)
 	 * @returns Record of normalized input definitions
 	 */
-	public normalizeInputs(rawInputs: Record<string, any> | undefined): Record<string, NormalizedInputDefinition> {
+	public normalizeInputs(rawInputs: RawYamlObject | undefined): Record<string, NormalizedInputDefinition> {
 		if (!rawInputs || typeof rawInputs !== 'object') {
 			return {};
 		}
@@ -398,8 +434,8 @@ export class FlowRegistry {
 	/**
 	 * Parse raw YAML data into a FlowDefinition
 	 */
-	private async parseFlowDefinition(id: string, data: any): Promise<FlowDefinition> {
-		let baseDefinition: any = {};
+	private async parseFlowDefinition(id: string, data: RawFlowData): Promise<FlowDefinition> {
+		let baseDefinition: RawFlowData = {};
 
 		// Check for 'source' field to load from external file
 		if (data.source && typeof data.source === 'string') {
@@ -440,7 +476,7 @@ export class FlowRegistry {
 			description: mergedData.description || '',
 			workspace: this.parseWorkspaceConfig(mergedData.workspace),
 			inputs: mergedData.inputs || {},
-			steps: (mergedData.steps || []).map((step: any) => this.parseFlowStep(step)),
+			steps: (mergedData.steps || []).map(step => this.parseFlowStep(step)),
 			hooks: mergedData.hooks,
 			statusTransitions: mergedData.statusTransitions,
 			execution: mergedData.execution,
@@ -455,7 +491,7 @@ export class FlowRegistry {
 	 * @returns Parsed YAML content
 	 * @throws Error if file doesn't exist, is outside allowed directory, or parse fails
 	 */
-	private async loadExternalFlowFile(sourcePath: string, flowId: string): Promise<Record<string, any>> {
+	private async loadExternalFlowFile(sourcePath: string, flowId: string): Promise<Record<string, RawFlowData>> {
 		// Validate path security
 		this.validateExternalFilePath(sourcePath, flowId);
 
@@ -470,7 +506,7 @@ export class FlowRegistry {
 
 		try {
 			const content = fs.readFileSync(absolutePath, 'utf-8');
-			const parsed = yaml.load(content) as Record<string, any>;
+			const parsed = yaml.load(content) as Record<string, RawFlowData>;
 
 			if (!parsed || typeof parsed !== 'object') {
 				throw new Error(`Invalid YAML structure in ${sourcePath}: expected object`);
@@ -504,7 +540,7 @@ export class FlowRegistry {
 
 		try {
 			const content = fs.readFileSync(absolutePath, 'utf-8');
-			const parsedInclude = yaml.load(content) as Record<string, any>;
+			const parsedInclude = yaml.load(content) as RawYamlObject;
 
 			// null = empty file or comments-only -- valid, just no flows to load
 			if (parsedInclude === null || parsedInclude === undefined) {
@@ -522,7 +558,7 @@ export class FlowRegistry {
 			console.log(`Loading flows from included file: ${filePath}`);
 			for (const [id, flowData] of Object.entries(parsedInclude)) {
 				try {
-					const flow = await this.parseFlowDefinition(id, flowData);
+					const flow = await this.parseFlowDefinition(id, flowData as RawFlowData);
 					const validationResult = this.validator.validate(flow);
 
 					if (!validationResult.valid) {
@@ -586,12 +622,12 @@ export class FlowRegistry {
 	 * @param local - Override definition from flows.yml
 	 * @returns Merged definition
 	 */
-	private mergeFlowDefinitions(external: any, local: any): any {
+	private mergeFlowDefinitions(external: RawFlowData, local: RawFlowData): RawFlowData {
 		// Remove 'source' field from local (not part of flow definition)
-		const { source, ...localWithoutSource } = local;
+		const { source: _source, ...localWithoutSource } = local;
 
 		// Start with external as base
-		const merged = { ...external };
+		const merged: RawYamlObject = { ...external };
 
 		// Override with local fields
 		for (const [key, value] of Object.entries(localWithoutSource)) {
@@ -599,22 +635,16 @@ export class FlowRegistry {
 				continue; // Skip undefined values
 			}
 
-			// Deep merge for objects (workspace, inputs, hooks)
-			if (key === 'workspace' && typeof value === 'object' && typeof merged[key] === 'object') {
-				merged[key] = { ...merged[key], ...value };
-			} else if (key === 'inputs' && typeof value === 'object' && typeof merged[key] === 'object') {
-				merged[key] = { ...merged[key], ...value };
-			} else if (key === 'hooks' && typeof value === 'object' && typeof merged[key] === 'object') {
-				merged[key] = { ...merged[key], ...value };
-			} else if (key === 'statusTransitions' && typeof value === 'object' && typeof merged[key] === 'object') {
-				merged[key] = { ...merged[key], ...value };
+			// Deep merge for objects (workspace, inputs, hooks, statusTransitions)
+			if (DEEP_MERGED_FLOW_KEYS.has(key) && typeof value === 'object' && typeof merged[key] === 'object') {
+				merged[key] = { ...(merged[key] as object), ...value };
 			} else {
 				// Simple override (including steps array)
 				merged[key] = value;
 			}
 		}
 
-		return merged;
+		return merged as RawFlowData;
 	}
 
 	/**
@@ -628,7 +658,7 @@ export class FlowRegistry {
 	/**
 	 * Parse workspace configuration
 	 */
-	private parseWorkspaceConfig(data: any): WorkspaceConfig {
+	private parseWorkspaceConfig(data: Partial<WorkspaceConfig> | undefined): WorkspaceConfig {
 		return {
 			mode: data?.mode || 'isolated',
 			gitStrategy: data?.gitStrategy || 'main-only',
@@ -641,7 +671,7 @@ export class FlowRegistry {
 	 * Parse a single flow step
 	 * Supports 'model', 'script', 'subflow', and 'user_intervention' step types
 	 */
-	private parseFlowStep(data: any): FlowStep {
+	private parseFlowStep(data: RawFlowStep): FlowStep {
 		const stepType = data.type;
 
 		// Validate that type is specified
@@ -833,7 +863,7 @@ export class FlowRegistry {
 		}
 
 		try {
-			this.watcher = fs.watch(this.configPath, (eventType, filename) => {
+			this.watcher = fs.watch(this.configPath, eventType => {
 				if (eventType === 'change') {
 					this.scheduleReload();
 				}
@@ -859,7 +889,7 @@ export class FlowRegistry {
 			}
 
 			try {
-				fs.watch(externalPath, (eventType, filename) => {
+				fs.watch(externalPath, eventType => {
 					if (eventType === 'change') {
 						console.log(`[FlowRegistry] External flow file changed: ${externalPath}`);
 						this.scheduleReload();
@@ -884,7 +914,7 @@ export class FlowRegistry {
 
 		this.reloadTimeout = setTimeout(() => {
 			console.log('[FlowRegistry] Flows file changed, reloading...');
-			this.reloadFlows();
+			void this.reloadFlows();
 		}, 100); // 100ms debounce
 	}
 
@@ -956,11 +986,11 @@ export class FlowRegistry {
 		const tmpPath = `${customFlowsPath}.tmp`;
 
 		// Load existing custom flows from file (if exists)
-		let existingFlows: Record<string, any> = {};
+		let existingFlows: RawYamlObject = {};
 		if (fs.existsSync(customFlowsPath)) {
 			try {
 				const content = fs.readFileSync(customFlowsPath, 'utf-8');
-				const parsed = yaml.load(content) as Record<string, any> | null;
+				const parsed = yaml.load(content) as RawYamlObject | null;
 				if (parsed && typeof parsed === 'object') {
 					existingFlows = parsed;
 				}
@@ -1016,8 +1046,8 @@ export class FlowRegistry {
 			if (value && typeof value === 'object' && !Array.isArray(value)) {
 				return Object.keys(value)
 					.sort()
-					.reduce((sorted: any, k) => {
-						sorted[k] = value[k];
+					.reduce((sorted: RawYamlObject, k) => {
+						sorted[k] = (value as RawYamlObject)[k];
 						return sorted;
 					}, {});
 			}

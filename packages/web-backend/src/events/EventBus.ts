@@ -126,13 +126,7 @@ export class EventBus {
 	 * @returns Unsubscribe function
 	 */
 	on<T extends InternalEventName>(event: T, listener: EventListener<T>): () => void {
-		const wrappedListener = async (payload: InternalEventMap[T]) => {
-			try {
-				await listener(payload);
-			} catch (error) {
-				log.error(`Error in EventBus listener for '${event}':`, error);
-			}
-		};
+		const wrappedListener = (payload: InternalEventMap[T]) => this.invokeListener(event, listener, payload);
 		this.emitter.on(event, wrappedListener);
 		return () => this.emitter.off(event, wrappedListener);
 	}
@@ -141,7 +135,25 @@ export class EventBus {
 	 * Subscribe to a typed event for a single invocation
 	 */
 	once<T extends InternalEventName>(event: T, listener: EventListener<T>): void {
-		this.emitter.once(event, listener);
+		this.emitter.once(event, (payload: InternalEventMap[T]) => this.invokeListener(event, listener, payload));
+	}
+
+	/**
+	 * Invoke a listener synchronously and log (instead of leaking) both sync throws and async rejections
+	 */
+	private invokeListener<T extends InternalEventName>(
+		event: T,
+		listener: EventListener<T>,
+		payload: InternalEventMap[T]
+	): void {
+		const logListenerError = (error: unknown) => {
+			log.error(`Error in EventBus listener for '${event}':`, error);
+		};
+		try {
+			Promise.resolve(listener(payload)).catch(logListenerError);
+		} catch (error) {
+			logListenerError(error);
+		}
 	}
 
 	/**

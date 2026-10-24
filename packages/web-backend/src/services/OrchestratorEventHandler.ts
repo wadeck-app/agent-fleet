@@ -1,10 +1,11 @@
 import { createLogger } from 'shared-common/logger';
+import type { TicketStatus } from 'shared-orch-worker/domain-types';
 
 import { B2F_TASK_TRACE_UPDATED } from '@app/shared/transport/B2FEventConstants';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { InterventionsService } from './InterventionsService';
-import type { TasksService } from './TasksService';
+import type { TaskTraceChunk, TasksService } from './TasksService';
 import type { TicketsService } from './TicketsService';
 import type { WorkersService } from './WorkersService';
 
@@ -193,8 +194,7 @@ export class OrchestratorEventHandler {
 	 * Writes trace chunk to storage for real-time log updates
 	 * @param data { taskId: string, traceChunk: any }
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private async handleTaskTraceUpdate(data: { taskId: string; traceChunk: any }): Promise<void> {
+	private async handleTaskTraceUpdate(data: { taskId: string; traceChunk: TaskTraceChunk }): Promise<void> {
 		try {
 			log.info(`[TRACE] Task trace update: ${data.taskId}, steps: ${data.traceChunk?.steps?.length || 0}`);
 
@@ -227,7 +227,7 @@ export class OrchestratorEventHandler {
 		success: boolean;
 		newStatus?: string;
 		ticketId?: string;
-		ticketStatus?: string;
+		ticketStatus?: TicketStatus;
 		flowResult: {
 			status: 'completed' | 'failed';
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -252,8 +252,7 @@ export class OrchestratorEventHandler {
 			// Update linked ticket status if provided
 			if (data.ticketId && data.ticketStatus && this.ticketsService) {
 				try {
-					// violations-suppress: ts/no-unsafe-type-cast data.ticketStatus is string from untyped orchestrator event; TicketStatus is a string union - equivalent at runtime
-					await this.ticketsService.updateTicketStatusById(data.ticketId, data.ticketStatus as any);
+					await this.ticketsService.updateTicketStatusById(data.ticketId, data.ticketStatus);
 					log.info(`Ticket ${data.ticketId} status updated to ${data.ticketStatus}`);
 				} catch (error) {
 					log.error(`Failed to update ticket ${data.ticketId} status:`, error);

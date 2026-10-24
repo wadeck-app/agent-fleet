@@ -76,7 +76,7 @@ export class WorkerWebSocketServer {
 	private handleConnection(socket: WebSocket): void {
 		let workerId: string | null = null;
 
-		socket.on('message', async (data: Buffer) => {
+		const handleMessage = async (data: Buffer): Promise<void> => {
 			try {
 				const message = parseMessage(data.toString()) as W2OMessage;
 
@@ -94,6 +94,12 @@ export class WorkerWebSocketServer {
 					})
 				);
 			}
+		};
+
+		socket.on('message', (data: Buffer) => {
+			handleMessage(data).catch((error: unknown) => {
+				log.error('[WS] Unhandled error while handling a message:', error);
+			});
 		});
 
 		socket.on('close', () => {
@@ -117,8 +123,8 @@ export class WorkerWebSocketServer {
 	/**
 	 * Try to assign tasks to idle workers
 	 */
-	tryAssignTasksToIdleWorkers(): void {
-		this.connectionManager.tryAssignTasksToIdleWorkers();
+	async tryAssignTasksToIdleWorkers(): Promise<void> {
+		await this.connectionManager.tryAssignTasksToIdleWorkers();
 	}
 
 	getPort(): number {

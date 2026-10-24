@@ -53,7 +53,7 @@ export interface ClaudeLaunchOptions {
 	settingsPath?: string;
 
 	/** Callback when process starts */
-	onProcessStarted?: (process: any) => void;
+	onProcessStarted?: (process: import('node:child_process').ChildProcess) => void;
 
 	/** Enable --output-format stream-json */
 	streamJson?: boolean;
@@ -101,14 +101,18 @@ export class ClaudeLauncher {
 				const result = execSync('where claude', { encoding: 'utf8', windowsHide: true }).trim();
 				const paths = result.split('\n').map(p => p.trim());
 				const cmdPath = paths.find(p => p.endsWith('.cmd'));
-				if (cmdPath) return cmdPath;
+				if (cmdPath) {
+					return cmdPath;
+				}
 				const batPath = paths.find(p => p.endsWith('.bat'));
-				if (batPath) return batPath;
+				if (batPath) {
+					return batPath;
+				}
 				return paths[0];
 			} else {
 				return execSync('which claude', { encoding: 'utf8', windowsHide: true }).trim();
 			}
-		} catch (error) {
+		} catch {
 			console.warn('Could not find claude in PATH, using "claude" as fallback');
 			return 'claude';
 		}
@@ -279,7 +283,9 @@ export class ClaudeLauncher {
 			const rawEnvInteractive = { ...baseEnvInteractive, ...(options.env ?? {}) };
 			const processEnvInteractive: Record<string, string> = {};
 			for (const [k, v] of Object.entries(rawEnvInteractive)) {
-				if (v !== undefined) processEnvInteractive[k] = v;
+				if (v !== undefined) {
+					processEnvInteractive[k] = v;
+				}
 			}
 			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; this spawn must inherit the daemon's hidden console (d032e7e). Guarded by ClaudeLauncher.windows-console.test.ts
 			const claudeProcess = spawn(command, args, {
@@ -337,7 +343,9 @@ export class ClaudeLauncher {
 			const rawEnvBackground = { ...baseEnvBackground, ...(options.env ?? {}) };
 			const processEnvBackground: Record<string, string> = {};
 			for (const [k, v] of Object.entries(rawEnvBackground)) {
-				if (v !== undefined) processEnvBackground[k] = v;
+				if (v !== undefined) {
+					processEnvBackground[k] = v;
+				}
 			}
 			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; this spawn must inherit the daemon's hidden console (d032e7e). Guarded by ClaudeLauncher.windows-console.test.ts
 			const claudeProcess = spawn(command, args, {

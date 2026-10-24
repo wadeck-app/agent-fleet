@@ -1,6 +1,12 @@
 import type { ScriptProcess, ScriptProcessStatus } from '@app/shared/api/workspaceScripts.contract';
+import type { BaseEntity } from '@app/shared/common/base-entity';
 
 import type { DataStorage } from '../storage/DataStorage';
+
+/**
+ * DataStorage only accepts BaseEntity records; ScriptProcess is stored through this intersection
+ */
+type ScriptProcessRecord = ScriptProcess & BaseEntity;
 
 /**
  * ===========================================================================================
@@ -38,36 +44,32 @@ export class ScriptProcessRepository {
 	 */
 	async findByScriptId(workspaceScriptId: string): Promise<ScriptProcess | null> {
 		const results = await this.storage
-			.query<any>(this.tableName)
+			.query<ScriptProcessRecord>(this.tableName)
 			.where('workspaceScriptId', '=', workspaceScriptId)
 			.execute();
 
-		return (results[0] as ScriptProcess) || null;
+		return results[0] || null;
 	}
 
 	/**
 	 * Find all running processes
 	 */
 	async findRunning(): Promise<ScriptProcess[]> {
-		return this.storage.query<any>(this.tableName).where('status', '=', 'running').execute() as Promise<
-			ScriptProcess[]
-		>;
+		return this.storage.query<ScriptProcessRecord>(this.tableName).where('status', '=', 'running').execute();
 	}
 
 	/**
 	 * Find processes by status
 	 */
 	async findByStatus(status: ScriptProcessStatus): Promise<ScriptProcess[]> {
-		return this.storage.query<any>(this.tableName).where('status', '=', status).execute() as Promise<
-			ScriptProcess[]
-		>;
+		return this.storage.query<ScriptProcessRecord>(this.tableName).where('status', '=', status).execute();
 	}
 
 	/**
 	 * Find process by ID
 	 */
 	async findById(id: string): Promise<ScriptProcess | null> {
-		return this.storage.getById<any>(this.tableName, id) as Promise<ScriptProcess | null>;
+		return this.storage.getById<ScriptProcessRecord>(this.tableName, id);
 	}
 
 	/**
@@ -90,14 +92,14 @@ export class ScriptProcessRepository {
 
 		// Use storage.create with type assertion since ScriptProcess doesn't extend BaseEntity
 		// violations-suppress: ts/no-unsafe-type-cast ScriptProcess does not extend BaseEntity; the repository bridges the type gap via intersection types in FlowFeedbackRepository
-		return this.storage.create<any>(this.tableName, processData as any) as Promise<ScriptProcess>;
+		return this.storage.create<ScriptProcessRecord>(this.tableName, processData as ScriptProcessRecord);
 	}
 
 	/**
 	 * Update an existing process
 	 */
 	async update(id: string, data: Partial<Omit<ScriptProcess, 'id'>>): Promise<ScriptProcess> {
-		return this.storage.update<any>(this.tableName, id, data) as Promise<ScriptProcess>;
+		return this.storage.update<ScriptProcessRecord>(this.tableName, id, data);
 	}
 
 	/**

@@ -49,7 +49,7 @@ export class InMemoryStorage implements DataStorage {
 
 		// Extract id if provided in data (for testing with explicit IDs)
 		// violations-suppress: ts/no-unsafe-type-cast data is Omit<T, keyof BaseEntity> which excludes 'id'; callers may pass 'id' for testing with explicit IDs -- widening to access it
-		const dataAsAny = data as any;
+		const dataAsAny = data as typeof data & { id?: string };
 		const providedId = dataAsAny.id;
 		const entityId = providedId ? providedId : this.generateId();
 

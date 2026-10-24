@@ -1,9 +1,18 @@
 import type { FastifyInstance } from 'fastify';
+import type { IncomingMessage } from 'node:http';
 import { createLogger } from 'shared-common/logger';
 
 import type { EventData, EventType } from '@app/shared/transport';
 
 import type { ITransportServer } from '../ITransportServer';
+import type { TransportSessionManager } from '../TransportSessionManager';
+
+/**
+ * Minimal auth service surface needed to open authenticated mock connections
+ */
+interface AccessTokenIssuer {
+	createAccessToken(userId: string): Promise<{ accessToken: string }>;
+}
 
 const log = createLogger('MockTransportServer');
 
@@ -41,7 +50,7 @@ const log = createLogger('MockTransportServer');
  */
 export interface BroadcastRecord {
 	event: string;
-	data: any;
+	data: unknown;
 	timestamp: number;
 }
 
@@ -51,7 +60,7 @@ export interface BroadcastRecord {
 export interface ClientSendRecord {
 	clientId: string;
 	event: string;
-	data: any;
+	data: unknown;
 	timestamp: number;
 }
 
@@ -68,8 +77,8 @@ export class MockTransportServer implements ITransportServer {
 	public clientSends: ClientSendRecord[] = [];
 
 	// Optional session manager and auth service for testing authenticated connections
-	private sessionManager?: any;
-	private authService?: any;
+	private sessionManager?: TransportSessionManager;
+	private authService?: AccessTokenIssuer;
 
 	/**
 	 * Initialize (no-op for mock)
@@ -81,7 +90,7 @@ export class MockTransportServer implements ITransportServer {
 	/**
 	 * Set session manager and auth service for testing authenticated connections
 	 */
-	setTestDependencies(sessionManager: any, authService: any): void {
+	setTestDependencies(sessionManager: TransportSessionManager, authService: AccessTokenIssuer): void {
 		this.sessionManager = sessionManager;
 		this.authService = authService;
 	}
@@ -171,7 +180,7 @@ export class MockTransportServer implements ITransportServer {
 					cookie: `access_token=${accessToken}`,
 				},
 				// violations-suppress: ts/no-unsafe-type-cast mock request object only implements the subset of fields needed for auth; full type not required here
-			} as any;
+			} as IncomingMessage;
 
 			// Authenticate the connection
 			await this.sessionManager.authenticateConnection(clientId, mockRequest);

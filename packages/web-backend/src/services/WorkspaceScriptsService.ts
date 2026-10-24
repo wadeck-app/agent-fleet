@@ -197,12 +197,24 @@ export class WorkspaceScriptsService {
 				version: existing.version + 1,
 			};
 
-			if (data.scriptName !== undefined) updateData.scriptName = data.scriptName;
-			if (data.enabled !== undefined) updateData.enabled = data.enabled;
-			if (data.displayName !== undefined) updateData.displayName = data.displayName;
-			if (data.description !== undefined) updateData.description = data.description;
-			if (data.url !== undefined) updateData.url = data.url;
-			if (data.order !== undefined) updateData.order = data.order;
+			if (data.scriptName !== undefined) {
+				updateData.scriptName = data.scriptName;
+			}
+			if (data.enabled !== undefined) {
+				updateData.enabled = data.enabled;
+			}
+			if (data.displayName !== undefined) {
+				updateData.displayName = data.displayName;
+			}
+			if (data.description !== undefined) {
+				updateData.description = data.description;
+			}
+			if (data.url !== undefined) {
+				updateData.url = data.url;
+			}
+			if (data.order !== undefined) {
+				updateData.order = data.order;
+			}
 
 			// Update script
 			const script = await this.workspaceScriptsRepository.update(scriptId, updateData);
@@ -284,7 +296,7 @@ export class WorkspaceScriptsService {
 			}
 
 			// Parse package.json
-			let packageJson: any;
+			let packageJson: { scripts?: Record<string, string> };
 			try {
 				packageJson = JSON.parse(packageJsonContent);
 			} catch (error) {

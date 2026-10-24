@@ -22,6 +22,13 @@ import { createLogger } from 'shared-common/logger';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { type OrchestratorStats, OrchestratorStatsSchema, type Task } from 'shared-orch-worker/domain-types';
 
+/**
+ * Task status type expected by the orchestrator's TaskManager
+ */
+type OrchestratorTaskStatus = Parameters<
+	ReturnType<ReturnType<OrchestratorWrapper['getOrchestrator']>['getTaskManager']>['updateTaskStatus']
+>[1];
+
 const log = createLogger('OrchestratorRepository');
 
 /**
@@ -189,7 +196,8 @@ export class OrchestratorRepository {
 					// Notify idle workers about the new task
 					const wsServer = orchestrator.getWsServer();
 					if (wsServer) {
-						wsServer.tryAssignTasksToIdleWorkers();
+						// Fire-and-forget as before: the assignment must not delay or fail the task update
+						void wsServer.tryAssignTasksToIdleWorkers();
 					}
 				}
 			}
@@ -232,7 +240,7 @@ export class OrchestratorRepository {
 
 			// @formatter:off
 			// violations-suppress: ts/no-unsafe-type-cast newStatus is a string; TaskStatus is a string enum -- equivalent at runtime, cast bridges the TypeScript mismatch
-			await taskManager.updateTaskStatus(taskId, newStatus as any);
+			await taskManager.updateTaskStatus(taskId, newStatus as OrchestratorTaskStatus);
 			// @formatter:on
 			const task = taskManager.getTask(taskId);
 

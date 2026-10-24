@@ -122,9 +122,15 @@ export class FlowWorker implements Shutdownable {
 		this.interactive = interactive;
 		this.projectRoot = projectRoot;
 		this.logger.info(` Initializing with project root: ${projectRoot}`);
-		if (interactive) this.logger.info(` Interactive mode enabled`);
-		if (preferredWorkerId) this.logger.info(` Preferred worker ID: ${preferredWorkerId}`);
-		if (enableUI) this.logger.info(` UI enabled`);
+		if (interactive) {
+			this.logger.info(` Interactive mode enabled`);
+		}
+		if (preferredWorkerId) {
+			this.logger.info(` Preferred worker ID: ${preferredWorkerId}`);
+		}
+		if (enableUI) {
+			this.logger.info(` UI enabled`);
+		}
 
 		// Initialize specialized managers
 		this.claudeProcessManager = new ClaudeLifecycleManager(this.workerId);
@@ -141,7 +147,7 @@ export class FlowWorker implements Shutdownable {
 		this.workspaceManager = new WorkspaceManager(projectRoot);
 
 		// Load project flows
-		this.loadFlows();
+		this.runDetached('load flows', this.loadFlows());
 	}
 
 	/**
@@ -350,11 +356,11 @@ export class FlowWorker implements Shutdownable {
 				break;
 
 			case O2WMessageType.WORKER_WELCOME:
-				this.handleWelcome(message as WorkerWelcomeMessage);
+				this.runDetached('handle welcome', this.handleWelcome(message as WorkerWelcomeMessage));
 				break;
 
 			case O2WMessageType.ASSIGN_TASK:
-				this.handleAssignTask(message as AssignTaskMessage);
+				this.runDetached('handle assign task', this.handleAssignTask(message as AssignTaskMessage));
 				break;
 
 			case O2WMessageType.KILL_CLAUDE:
@@ -381,7 +387,7 @@ export class FlowWorker implements Shutdownable {
 				break;
 
 			case O2WMessageType.SAVE_FLOW_DEFINITION:
-				this.handleSaveFlowDefinition(message);
+				this.runDetached('handle save flow definition', this.handleSaveFlowDefinition(message));
 				break;
 
 			case O2WMessageType.INTERVENTION_RESPONSE:
@@ -678,6 +684,16 @@ export class FlowWorker implements Shutdownable {
 	}
 
 	/**
+	 * Runs an operation nobody waits for (message handlers, shutdown): a rejection is logged instead of becoming an
+	 * unhandled rejection that would crash the worker.
+	 */
+	private runDetached(operation: string, promise: Promise<void>): void {
+		promise.catch((error: unknown) => {
+			this.logger.error(` Failed to ${operation}: ${normalizeError(error).message}`);
+		});
+	}
+
+	/**
 	 * Load flows from project configuration
 	 */
 	private async loadFlows(): Promise<void> {
@@ -874,8 +890,12 @@ export class FlowWorker implements Shutdownable {
 			value: TaskStatus | import('flow-engine/types').StatusTransitionConfig | undefined,
 			defaultValue: TaskStatus
 		): TaskStatus => {
-			if (!value) return defaultValue;
-			if (typeof value === 'string') return value as TaskStatus;
+			if (!value) {
+				return defaultValue;
+			}
+			if (typeof value === 'string') {
+				return value as TaskStatus;
+			}
 			return (value.task as TaskStatus) ?? defaultValue;
 		};
 		type FlowTransitionValue = TaskStatus | import('flow-engine/types').StatusTransitionConfig | undefined;
@@ -1092,7 +1112,9 @@ export class FlowWorker implements Shutdownable {
 	 * Send task started notification
 	 */
 	protected sendTaskStarted(newStatus?: TaskStatus): void {
-		if (!this.currentTask) return;
+		if (!this.currentTask) {
+			return;
+		}
 
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.TASK_STARTED, {
@@ -1107,7 +1129,9 @@ export class FlowWorker implements Shutdownable {
 	 * Send task progress update
 	 */
 	protected sendTaskProgress(progress: string): void {
-		if (!this.currentTask) return;
+		if (!this.currentTask) {
+			return;
+		}
 
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.TASK_PROGRESS, {
@@ -1197,7 +1221,9 @@ export class FlowWorker implements Shutdownable {
 		ticketId?: string,
 		ticketStatus?: import('shared-orch-worker/domain-types').TicketStatus
 	): void {
-		if (!this.currentTask) return;
+		if (!this.currentTask) {
+			return;
+		}
 
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.TASK_COMPLETED, {
@@ -1225,7 +1251,9 @@ export class FlowWorker implements Shutdownable {
 		ticketId?: string,
 		ticketStatus?: import('shared-orch-worker/domain-types').TicketStatus
 	): void {
-		if (!this.currentTask) return;
+		if (!this.currentTask) {
+			return;
+		}
 
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.TASK_FAILED, {
@@ -1248,7 +1276,9 @@ export class FlowWorker implements Shutdownable {
 	 * Send task question
 	 */
 	protected sendTaskQuestion(question: string): void {
-		if (!this.currentTask) return;
+		if (!this.currentTask) {
+			return;
+		}
 
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.TASK_QUESTION, {
@@ -1263,7 +1293,9 @@ export class FlowWorker implements Shutdownable {
 	 * Send stop requested (from Claude hook)
 	 */
 	protected sendStopRequested(claudePid: number): void {
-		if (!this.currentTask) return;
+		if (!this.currentTask) {
+			return;
+		}
 
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.STOP_REQUESTED, {
@@ -1353,7 +1385,7 @@ export class FlowWorker implements Shutdownable {
 		this.claudeProcessManager.shutdown();
 
 		// Cleanup all workspaces
-		this.workspaceManager.cleanupAll();
+		this.runDetached('cleanup workspaces', this.workspaceManager.cleanupAll());
 
 		// Close WebSocket connection
 		this.stopHeartbeat();

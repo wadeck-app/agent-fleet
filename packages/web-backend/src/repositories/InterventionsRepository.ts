@@ -27,6 +27,14 @@ import type { BaseRepository } from './BaseRepository';
  * ===========================================================================================
  */
 
+/**
+ * Subset of the file-based storage used by createWithId (not part of the DataStorage interface)
+ */
+interface InterventionTableStorage {
+	getTable(tableName: string): Promise<Intervention[]>;
+	saveTable(tableName: string): Promise<void>;
+}
+
 export class InterventionsRepository {
 	constructor(private readonly base: BaseRepository<Intervention>) {}
 
@@ -132,7 +140,7 @@ export class InterventionsRepository {
 		// This is a temporary workaround until we add createWithId() to DataStorage interface
 		// @formatter:off
 		// violations-suppress: ts/no-unsafe-type-cast accessing internal storage field on BaseRepository to inject a record with a specific ID; workaround until createWithId() is added to DataStorage interface
-		const storage = (this.base as any).storage;
+		const storage = (this.base as unknown as { storage: InterventionTableStorage }).storage;
 		// @formatter:on
 		const tableName = this.base.getTableName();
 

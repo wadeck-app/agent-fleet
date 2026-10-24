@@ -1,5 +1,5 @@
 import { createLogger } from 'shared-common/logger';
-import type { OrchestratorStats } from 'shared-orch-worker/domain-types';
+import type { OrchestratorStats, Task } from 'shared-orch-worker/domain-types';
 
 import type { ActivityEntry, DashboardData } from '@app/shared/api/dashboard.contract';
 
@@ -123,8 +123,7 @@ export class DashboardService {
 		stats: { uptime?: number },
 		done: number,
 		failed: number,
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		tasks: any[]
+		tasks: Task[]
 	): { tasksPerHour: number; successRate: number; avgTaskDuration: number } {
 		const uptimeHours = (stats.uptime || 0) / (1000 * 60 * 60);
 		const completed = done + failed;
@@ -149,12 +148,11 @@ export class DashboardService {
 	 * Calculate average task duration from completed tasks
 	 * Uses startedAt and completedAt timestamps
 	 */
-	private calculateAvgTaskDuration(tasks: any[]): number {
+	private calculateAvgTaskDuration(tasks: Task[]): number {
 		// Filter completed tasks that have both startedAt and completedAt
 
 		const completedTasks = tasks.filter(
-			(task: any) =>
-				task.startedAt && task.completedAt && ['APPROVED', 'MERGED', 'CANCELLED'].includes(task.status)
+			task => task.startedAt && task.completedAt && ['APPROVED', 'MERGED', 'CANCELLED'].includes(task.status)
 		);
 
 		if (completedTasks.length === 0) {
@@ -163,10 +161,9 @@ export class DashboardService {
 		}
 
 		// Calculate duration for each task and get average
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const totalDuration = completedTasks.reduce((sum: number, task: any) => {
-			const startedAt = new Date(task.startedAt).getTime();
-			const completedAt = new Date(task.completedAt).getTime();
+		const totalDuration = completedTasks.reduce((sum: number, task) => {
+			const startedAt = new Date(task.startedAt as string).getTime();
+			const completedAt = new Date(task.completedAt as string).getTime();
 			return sum + (completedAt - startedAt);
 		}, 0);
 
@@ -185,15 +182,15 @@ export class DashboardService {
 		// Generate activity for busy workers (tasks in progress)
 
 		stats.workersList
-			.filter((w: any) => w.taskId)
+			.filter(w => w.taskId)
 			.slice(0, 3)
-			.forEach((worker: any, index: number) => {
+			.forEach((worker, index) => {
 				const timestamp = new Date(now.getTime() - (index + 1) * 60 * 1000); // Stagger by minutes
 				activities.push({
 					timestamp: timestamp.toISOString(),
 					type: 'task_started',
-					message: `Started task (${worker.type})`,
-					taskId: worker.taskId,
+					message: `Started task`,
+					taskId: worker.taskId ?? undefined,
 					workerId: worker.id,
 				});
 			});
@@ -211,8 +208,7 @@ export class DashboardService {
 		}
 
 		// Add worker connection events
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		stats.workersList.slice(0, 2).forEach((worker: any, index: number) => {
+		stats.workersList.slice(0, 2).forEach((worker, index) => {
 			const timestamp = new Date(now.getTime() - (10 + index) * 60 * 1000);
 			activities.push({
 				timestamp: timestamp.toISOString(),

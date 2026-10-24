@@ -341,7 +341,7 @@ export class WorkspacesService {
 
 			// Broadcast event
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Workspace[] but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
+			this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as unknown as Workspace[]);
 
 			log.info('Successfully created workspace', { id: workspace.id });
 			return workspace;
@@ -408,7 +408,9 @@ export class WorkspacesService {
 	 */
 	private applySearch(workspaces: Workspace[], searchQuery: string): Workspace[] {
 		const lowerQuery = searchQuery.toLowerCase().trim();
-		if (!lowerQuery) return workspaces;
+		if (!lowerQuery) {
+			return workspaces;
+		}
 
 		return workspaces.filter(
 			w =>
@@ -432,8 +434,12 @@ export class WorkspacesService {
 			const aVal = (a as { [k: string]: unknown })[sortBy];
 			const bVal = (b as { [k: string]: unknown })[sortBy];
 
-			if (aVal === null || aVal === undefined) return 1;
-			if (bVal === null || bVal === undefined) return -1;
+			if (aVal === null || aVal === undefined) {
+				return 1;
+			}
+			if (bVal === null || bVal === undefined) {
+				return -1;
+			}
 
 			let comparison = 0;
 			if (typeof aVal === 'string' && typeof bVal === 'string') {

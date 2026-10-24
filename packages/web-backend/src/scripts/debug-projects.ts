@@ -20,19 +20,41 @@ import { createLogger } from 'shared-common/logger';
 
 const log = createLogger('DebugProjects');
 
+/**
+ * Project record as stored in projects.json; every field may be missing in pre-migration data
+ */
+interface StoredProject {
+	id: string;
+	name: string;
+	workspaceIds?: string[];
+	taskCount?: number;
+	archived?: boolean;
+	pinned?: boolean;
+	version?: number;
+	order?: number;
+}
+
+/**
+ * Migration record as stored in migrations.json
+ */
+interface StoredMigration {
+	migrated?: unknown;
+	migratedAt?: unknown;
+}
+
 async function debugProjects() {
 	try {
 		// Read projects.json
 		const projectsPath = join(process.cwd(), 'data', 'projects.json');
 		const projectsContent = await readFile(projectsPath, 'utf-8');
-		const projectsData = JSON.parse(projectsContent);
+		const projectsData = JSON.parse(projectsContent) as { projects: StoredProject[] };
 
 		log.info('=== PROJECTS DATA ===');
 		log.info(`Total projects: ${projectsData.projects.length}`);
 		log.info('');
 
 		// Display each project
-		projectsData.projects.forEach((project: any, index: number) => {
+		projectsData.projects.forEach((project, index) => {
 			log.info(`[${index + 1}] ${project.name} (${project.id})`);
 			log.info(`  - workspaceIds: ${JSON.stringify(project.workspaceIds)}`);
 			log.info(`  - workspaceIds length: ${project.workspaceIds?.length ?? 'undefined'}`);
@@ -47,27 +69,25 @@ async function debugProjects() {
 		try {
 			const migrationsPath = join(process.cwd(), 'data', 'migrations.json');
 			const migrationsContent = await readFile(migrationsPath, 'utf-8');
-			const migrationsData = JSON.parse(migrationsContent);
+			const migrationsData = JSON.parse(migrationsContent) as { migrations: StoredMigration[] };
 
 			log.info('=== MIGRATIONS STATUS ===');
 			log.info(`Migrations executed: ${migrationsData.migrations.length}`);
-			migrationsData.migrations.forEach((migration: any) => {
+			migrationsData.migrations.forEach(migration => {
 				log.info(`  - Migrated: ${migration.migrated}`);
 				log.info(`  - At: ${migration.migratedAt}`);
 			});
 			log.info('');
-		} catch (error) {
+		} catch {
 			log.warn('No migrations file found');
 			log.info('');
 		}
 
 		// Summary
 		const emptyWorkspaceProjects = projectsData.projects.filter(
-			(p: any) => !p.workspaceIds || p.workspaceIds.length === 0
+			p => !p.workspaceIds || p.workspaceIds.length === 0
 		);
-		const projectsWithWorkspaces = projectsData.projects.filter(
-			(p: any) => p.workspaceIds && p.workspaceIds.length > 0
-		);
+		const projectsWithWorkspaces = projectsData.projects.filter(p => p.workspaceIds && p.workspaceIds.length > 0);
 
 		log.info('=== SUMMARY ===');
 		log.info(`Projects with empty workspaceIds: ${emptyWorkspaceProjects.length}`);
@@ -93,7 +113,7 @@ async function debugProjects() {
 
 		// Check for undefined fields (pre-migration data)
 		const projectsWithUndefined = projectsData.projects.filter(
-			(p: any) =>
+			p =>
 				p.workspaceIds === undefined ||
 				p.taskCount === undefined ||
 				p.archived === undefined ||
@@ -104,13 +124,23 @@ async function debugProjects() {
 		if (projectsWithUndefined.length > 0) {
 			log.warn('');
 			log.warn(`  WARNING: ${projectsWithUndefined.length} projects have undefined fields (pre-migration data)`);
-			projectsWithUndefined.forEach((p: any) => {
+			projectsWithUndefined.forEach(p => {
 				log.warn(`  - ${p.name} (${p.id})`);
-				if (p.workspaceIds === undefined) log.warn('    - workspaceIds is undefined');
-				if (p.taskCount === undefined) log.warn('    - taskCount is undefined');
-				if (p.archived === undefined) log.warn('    - archived is undefined');
-				if (p.pinned === undefined) log.warn('    - pinned is undefined');
-				if (p.order === undefined) log.warn('    - order is undefined');
+				if (p.workspaceIds === undefined) {
+					log.warn('    - workspaceIds is undefined');
+				}
+				if (p.taskCount === undefined) {
+					log.warn('    - taskCount is undefined');
+				}
+				if (p.archived === undefined) {
+					log.warn('    - archived is undefined');
+				}
+				if (p.pinned === undefined) {
+					log.warn('    - pinned is undefined');
+				}
+				if (p.order === undefined) {
+					log.warn('    - order is undefined');
+				}
 			});
 			log.info('');
 			log.info('ACTION REQUIRED: Run the migration script:');
@@ -129,4 +159,4 @@ async function debugProjects() {
 }
 
 // Run the debug script
-debugProjects();
+void debugProjects();

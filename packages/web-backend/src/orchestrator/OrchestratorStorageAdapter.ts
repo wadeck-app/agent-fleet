@@ -3,9 +3,15 @@ import { createLogger } from 'shared-common/logger';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { Intervention, InterventionStatus, Task } from 'shared-orch-worker/domain-types';
 
+import type { BaseEntity } from '@app/shared/common/base-entity';
+
 import type { DataStorage } from '../storage/DataStorage';
 
 const log = createLogger('OrchestratorStorageAdapter');
+
+// Orchestrator-native types persisted through the backend storage, which adds the BaseEntity fields (version)
+type StoredTask = Task & BaseEntity;
+type StoredIntervention = Intervention & BaseEntity;
 
 const TASKS_TABLE = 'orch_tasks';
 const INTERVENTIONS_TABLE = 'orch_interventions';
@@ -35,12 +41,9 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 		try {
 			const existing = await this.loadTask(task.id);
 			if (existing) {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				await this.storage.update<any>(TASKS_TABLE, task.id, task);
+				await this.storage.update<StoredTask>(TASKS_TABLE, task.id, task);
 			} else {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				// violations-suppress: ts/no-unsafe-type-cast orchestrator Task type does not extend BaseEntity; the storage adapter bridges the type gap at runtime
-				await this.storage.create<any>(TASKS_TABLE, task as any);
+				await this.storage.create<StoredTask>(TASKS_TABLE, task);
 			}
 		} catch (error) {
 			log.error(`Failed to save task ${task.id}:`, error);
@@ -50,8 +53,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 
 	async loadTask(taskId: string): Promise<Task | null> {
 		try {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const entity = await this.storage.getById<any>(TASKS_TABLE, taskId);
+			const entity = await this.storage.getById<StoredTask>(TASKS_TABLE, taskId);
 			if (!entity) {
 				return null;
 			}
@@ -66,8 +68,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 
 	async listTasks(): Promise<Task[]> {
 		try {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const entities = await this.storage.query<any>(TASKS_TABLE).execute();
+			const entities = await this.storage.query<StoredTask>(TASKS_TABLE).execute();
 			return entities.map(({ version: _v, ...task }) => task as Task);
 		} catch (error) {
 			log.error('Failed to list tasks:', error);
@@ -78,7 +79,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 	async deleteTask(taskId: string): Promise<void> {
 		try {
 			await this.storage.delete(TASKS_TABLE, taskId);
-		} catch (error: any) {
+		} catch (error) {
 			// Ignore "not found" errors
 			if (String(error)?.includes('not found')) {
 				return;
@@ -108,12 +109,9 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 		try {
 			const existing = await this.loadIntervention(intervention.id);
 			if (existing) {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				await this.storage.update<any>(INTERVENTIONS_TABLE, intervention.id, intervention);
+				await this.storage.update<StoredIntervention>(INTERVENTIONS_TABLE, intervention.id, intervention);
 			} else {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				// violations-suppress: ts/no-unsafe-type-cast orchestrator Intervention type does not extend BaseEntity; the storage adapter bridges the type gap at runtime
-				await this.storage.create<any>(INTERVENTIONS_TABLE, intervention as any);
+				await this.storage.create<StoredIntervention>(INTERVENTIONS_TABLE, intervention);
 			}
 		} catch (error) {
 			log.error(`Failed to save intervention ${intervention.id}:`, error);
@@ -123,8 +121,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 
 	async loadIntervention(id: string): Promise<Intervention | null> {
 		try {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const entity = await this.storage.getById<any>(INTERVENTIONS_TABLE, id);
+			const entity = await this.storage.getById<StoredIntervention>(INTERVENTIONS_TABLE, id);
 			if (!entity) {
 				return null;
 			}
@@ -138,8 +135,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 
 	async listInterventions(): Promise<Intervention[]> {
 		try {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const entities = await this.storage.query<any>(INTERVENTIONS_TABLE).execute();
+			const entities = await this.storage.query<StoredIntervention>(INTERVENTIONS_TABLE).execute();
 			return entities.map(({ version: _v, ...intervention }) => intervention as Intervention);
 		} catch (error) {
 			log.error('Failed to list interventions:', error);
@@ -150,7 +146,7 @@ export class OrchestratorStorageAdapter implements IOrchestratorStorage {
 	async deleteIntervention(id: string): Promise<void> {
 		try {
 			await this.storage.delete(INTERVENTIONS_TABLE, id);
-		} catch (error: any) {
+		} catch (error) {
 			// Ignore "not found" errors
 			if (String(error)?.includes('not found')) {
 				return;

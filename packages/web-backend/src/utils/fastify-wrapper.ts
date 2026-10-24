@@ -3,6 +3,8 @@ import { ZodError } from 'zod';
 
 import type { ApiUrl } from '@app/shared/route-builder';
 
+import type { RouteContract } from './internal-router';
+
 /**
  * ===========================================================================================
  * ULTRA-TYPED ROUTE WRAPPER FUNCTION (GENERIC VERSION)
@@ -39,7 +41,7 @@ export type PathsForMethod<M extends HttpMethod, Routes> = {
 export type RouteParams<M extends HttpMethod, P extends string, Routes> = P extends keyof Routes
 	? M extends keyof Routes[P]
 		? Routes[P][M] extends { params: infer Params }
-			? Params extends { parse: (data: any) => infer T }
+			? Params extends { parse: (data: unknown) => infer T }
 				? T
 				: never
 			: Record<string, never>
@@ -53,7 +55,7 @@ export type RouteParams<M extends HttpMethod, P extends string, Routes> = P exte
 export type RouteQuery<M extends HttpMethod, P extends string, Routes> = P extends keyof Routes
 	? M extends keyof Routes[P]
 		? Routes[P][M] extends { query: infer Query }
-			? Query extends { parse: (data: any) => infer T }
+			? Query extends { parse: (data: unknown) => infer T }
 				? T
 				: never
 			: Record<string, never>
@@ -67,7 +69,7 @@ export type RouteQuery<M extends HttpMethod, P extends string, Routes> = P exten
 export type RouteBody<M extends HttpMethod, P extends string, Routes> = P extends keyof Routes
 	? M extends keyof Routes[P]
 		? Routes[P][M] extends { body: infer Body }
-			? Body extends { parse: (data: any) => infer T }
+			? Body extends { parse: (data: unknown) => infer T }
 				? T
 				: never
 			: Record<string, never>
@@ -81,7 +83,7 @@ export type RouteBody<M extends HttpMethod, P extends string, Routes> = P extend
 export type RouteResponse<M extends HttpMethod, P extends string, Routes> = P extends keyof Routes
 	? M extends keyof Routes[P]
 		? Routes[P][M] extends { response: infer Response }
-			? Response extends { parse: (data: any) => infer T }
+			? Response extends { parse: (data: unknown) => infer T }
 				? T
 				: never
 			: never
@@ -152,7 +154,7 @@ export function createRouteWrapper<Routes>(fastify: FastifyInstance, routes: Rou
 		// Access pattern changed: routes[path][method] instead of routes[method][path]
 		// @formatter:on
 		// violations-suppress: ts/no-unsafe-type-cast ALL_API_ROUTES uses path/method as dynamic keys; no mapped type available to index by string path and method
-		const contract = (routes as any)[path]?.[method];
+		const contract = (routes as Record<string, Record<string, RouteContract> | undefined>)[path]?.[method];
 
 		if (!contract) {
 			throw new Error(`No contract found for ${method} ${path}`);
@@ -163,30 +165,22 @@ export function createRouteWrapper<Routes>(fastify: FastifyInstance, routes: Rou
 				// Extract connId from X-Conn-Id header for request correlation
 				const connId = req.headers['x-conn-id'] as string | undefined;
 
-				const validated: any = {
-					params: {},
-					query: {},
-					body: {},
+				const validated = {
+					params: contract.params ? contract.params.parse(req.params) : {},
+					query: contract.query ? contract.query.parse(req.query) : {},
+					body: contract.body ? contract.body.parse(req.body) : {},
 					reply,
 					request: req,
 					// violations-suppress: ts/no-unsafe-type-cast Fastify does not expose cookies on FastifyRequest without the cookie plugin type declaration
-					cookies: (req as any).cookies || {},
+					cookies: (req as FastifyRequest & { cookies?: Record<string, string | undefined> }).cookies || {},
 					connId,
 				};
 
-				if (contract.params) {
-					validated.params = contract.params.parse(req.params);
+				// violations-suppress: ts/no-unsafe-type-cast the contract is resolved at runtime by path/method, so the parsed parts cannot be statically tied to the generic handler parameter
+				const result = await handler(validated as unknown as Parameters<typeof handler>[0]);
+				if (!contract.response) {
+					throw new Error(`No response schema in contract for ${method} ${path}`);
 				}
-
-				if (contract.query) {
-					validated.query = contract.query.parse(req.query);
-				}
-
-				if (contract.body) {
-					validated.body = contract.body.parse(req.body);
-				}
-
-				const result = await handler(validated);
 				const validatedResponse = contract.response.parse(result);
 
 				return reply.send(validatedResponse);

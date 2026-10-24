@@ -1,6 +1,8 @@
 import { createLogger } from 'shared-common/logger';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
+import type { Task as OrchestratorTask } from 'shared-orch-worker/domain-types';
 
+import type { FlowMetadata } from '@app/shared/api/flows.contract';
 import type {
 	CreateTask,
 	LogEntry,
@@ -24,6 +26,44 @@ import type { EventBroadcaster } from '../transport/EventBroadcaster';
 import type { FlowsService } from './FlowsService';
 
 const log = createLogger('TasksService');
+
+/**
+ * Trace chunk received from the orchestrator (only `steps` is inspected here)
+ */
+export interface TaskTraceChunk {
+	steps?: unknown[];
+}
+
+/**
+ * Live log entry streamed by a model step
+ */
+interface TraceLiveLogEntry {
+	timestamp: number;
+	level: string;
+	message: string;
+	eventType?: string;
+	metadata?: Record<string, unknown>;
+}
+
+/**
+ * Step result as stored in the trace chunks
+ */
+interface TraceStepLog {
+	stepId: string;
+	stepName: string;
+	stepType: NonNullable<LogEntry['stepType']>;
+	startTime: number;
+	endTime?: number;
+	durationMs?: number;
+	model?: string;
+	exitCode?: number;
+	subFlowId?: string;
+	prompt?: string;
+	response?: string;
+	stdout?: string;
+	stderr?: string;
+	liveLogEntries?: TraceLiveLogEntry[];
+}
 
 /**
  * ===========================================================================================
@@ -169,12 +209,18 @@ export class TasksService {
 	 * Returns false if value is undefined/null but query is not empty
 	 */
 	private matchesPartialString(value: string | undefined | null, query: string | undefined): boolean {
-		if (!query) return true;
+		if (!query) {
+			return true;
+		}
 
 		const trimmedQuery = query.toLowerCase().trim();
-		if (!trimmedQuery) return true;
+		if (!trimmedQuery) {
+			return true;
+		}
 
-		if (!value) return false;
+		if (!value) {
+			return false;
+		}
 
 		return value.toLowerCase().includes(trimmedQuery);
 	}
@@ -184,7 +230,9 @@ export class TasksService {
 	 */
 	private applySearch(tasks: Task[], searchQuery: string): Task[] {
 		const lowerQuery = searchQuery.toLowerCase().trim();
-		if (!lowerQuery) return tasks;
+		if (!lowerQuery) {
+			return tasks;
+		}
 
 		return tasks.filter(
 			task =>
@@ -207,8 +255,12 @@ export class TasksService {
 			const aVal = this.getTaskValue(a, sortBy);
 			const bVal = this.getTaskValue(b, sortBy);
 
-			if (aVal === null || aVal === undefined) return 1;
-			if (bVal === null || bVal === undefined) return -1;
+			if (aVal === null || aVal === undefined) {
+				return 1;
+			}
+			if (bVal === null || bVal === undefined) {
+				return -1;
+			}
 
 			let comparison = 0;
 			if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -276,11 +328,11 @@ export class TasksService {
 
 			// Emit specific event AFTER successful deletion
 			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { id } filter key; EventTypes expects full Task object
-			this.eventBroadcaster.broadcast(B2F_TASK_DELETED, { id: taskId } as any);
+			this.eventBroadcaster.broadcast(B2F_TASK_DELETED, { id: taskId } as unknown as Task);
 
 			// Emit aggregate event for dashboard updates
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as unknown as TasksData);
 		} catch (error) {
 			log.error('Failed to delete task:', error);
 			throw error;
@@ -312,7 +364,7 @@ export class TasksService {
 		if (deleted.length > 0) {
 			// Emit aggregate event for dashboard updates
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as unknown as TasksData);
 		}
 
 		return {
@@ -337,11 +389,11 @@ export class TasksService {
 			// Emit filtered event for task detail pages
 			// Payload includes taskId for server-side filtering
 			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { taskId } filter key; EventTypes expects full Task object
-			this.eventBroadcaster.broadcast(B2F_TASK_UPDATED, { taskId } as any);
+			this.eventBroadcaster.broadcast(B2F_TASK_UPDATED, { taskId } as unknown as Task);
 
 			// Emit aggregate event for dashboard/board updates
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as unknown as TasksData);
 
 			return task;
 		} catch (error) {
@@ -399,7 +451,7 @@ export class TasksService {
 			// Enqueue task in orchestrator for assignment to worker
 			try {
 				// violations-suppress: ts/no-unsafe-type-cast cross-package type boundary; web-backend Task and orchestrator Task share the same shape at runtime but differ in TypeScript type declarations
-				this.orchestratorRepository.enqueueTask(task as any);
+				this.orchestratorRepository.enqueueTask(task as unknown as OrchestratorTask);
 				log.info(`Task ${task.id} enqueued to orchestrator`);
 			} catch (error) {
 				log.error('Failed to enqueue task to orchestrator:', error);
@@ -411,7 +463,7 @@ export class TasksService {
 
 			// Emit aggregate event for dashboard updates
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as unknown as TasksData);
 
 			return task;
 		} catch (error) {
@@ -434,7 +486,7 @@ export class TasksService {
 			const flowsByProject = await this.flowsService.getFlows();
 
 			// Search for the flow across all projects
-			let flowMetadata: any = null;
+			let flowMetadata: FlowMetadata | null = null;
 			for (const projectId of Object.keys(flowsByProject)) {
 				const projectFlows = flowsByProject[projectId];
 				if (projectFlows[flowId]) {
@@ -450,8 +502,7 @@ export class TasksService {
 
 			// Validate required inputs are provided
 			for (const [inputName, inputDef] of Object.entries(flowMetadata.inputs || {})) {
-				// violations-suppress: ts/no-unsafe-type-cast flowMetadata is untyped JSON from flow registry; input definition shape is not statically known
-				const def = inputDef as any;
+				const def = inputDef;
 
 				// Check if required input is missing
 				if (def.required && (flowInputs[inputName] === undefined || flowInputs[inputName] === null)) {
@@ -605,8 +656,7 @@ export class TasksService {
 	 * This ensures tasks triggered by ticket events are visible via the tasks API.
 	 * Uses the orchestrator task's ID so /tasks/:id links work correctly.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async syncFromOrchestratorTask(orchestratorTask: any, triggerEvent: string): Promise<void> {
+	async syncFromOrchestratorTask(orchestratorTask: OrchestratorTask, triggerEvent: string): Promise<void> {
 		try {
 			const existing = await this.tasksRepository.findById(orchestratorTask.id);
 			if (existing) {
@@ -615,8 +665,8 @@ export class TasksService {
 			}
 
 			await this.tasksRepository.create({
-				// violations-suppress: ts/no-unsafe-type-cast injecting explicit id from orchestrator task; BaseRepository.create() omits id from its input type but accepts it at runtime
-				...(orchestratorTask.id ? ({ id: orchestratorTask.id } as any) : {}),
+				// BaseRepository.create() omits id from its input type but accepts it at runtime; spread bypasses the excess-property check
+				...(orchestratorTask.id ? { id: orchestratorTask.id } : {}),
 				description: orchestratorTask.description,
 				status: 'backlog',
 				priority: orchestratorTask.priority || 'medium',
@@ -636,7 +686,7 @@ export class TasksService {
 			// OrchestratorEventBridge intentionally suppresses B2F_TASKS_UPDATED on
 			// TASK_CREATED to avoid this race condition (task not yet in storage).
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+			this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as unknown as TasksData);
 		} catch (error) {
 			log.error(`[syncFromOrchestratorTask] Failed to sync task ${orchestratorTask.id}:`, error);
 			// Don't throw -- sync failure should not block task execution
@@ -704,7 +754,7 @@ export class TasksService {
 			let allLogs: LogEntry[] = [];
 			let logCounter = 0; // Counter for unique IDs within this batch
 
-			steps.forEach((step: any) => {
+			steps.forEach((step: TraceStepLog) => {
 				// Main step entry
 				const stepLog: LogEntry = {
 					id: `${taskId}-${step.stepId}-${logCounter++}`,
@@ -723,11 +773,12 @@ export class TasksService {
 				allLogs.push(stepLog);
 
 				// When liveLogEntries are present, use them instead of legacy entries
-				const hasLiveLogEntries = Array.isArray(step.liveLogEntries) && step.liveLogEntries.length > 0;
+				const liveLogEntries = step.liveLogEntries ?? [];
+				const hasLiveLogEntries = liveLogEntries.length > 0;
 
 				if (hasLiveLogEntries) {
 					// Convert liveLogEntries to LogEntry format
-					for (const entry of step.liveLogEntries) {
+					for (const entry of liveLogEntries) {
 						allLogs.push({
 							id: `${taskId}-${step.stepId}-live-${logCounter++}`,
 							timestamp: entry.timestamp,
@@ -837,7 +888,7 @@ export class TasksService {
 	/**
 	 * Infer log level from step result
 	 */
-	private inferLogLevel(step: any): LogLevel {
+	private inferLogLevel(step: TraceStepLog): LogLevel {
 		// Script steps with non-zero exit code = error
 		if (step.stepType === 'script' && step.exitCode && step.exitCode !== 0) {
 			return 'error';
@@ -855,7 +906,7 @@ export class TasksService {
 	/**
 	 * Format step message for display
 	 */
-	private formatStepMessage(step: any): string {
+	private formatStepMessage(step: TraceStepLog): string {
 		const duration = step.durationMs ? ` (${step.durationMs}ms)` : '';
 
 		if (step.stepType === 'model') {
@@ -878,7 +929,7 @@ export class TasksService {
 	 * Write trace data incrementally to storage
 	 * Used for real-time trace updates from orchestrator
 	 */
-	async writeTrace(taskId: string, trace: any): Promise<void> {
+	async writeTrace(taskId: string, trace: TaskTraceChunk): Promise<void> {
 		try {
 			log.info(`Writing trace for task ${taskId}, steps count: ${trace.steps?.length || 0}`);
 			await this.traceStorage.writeTraceIncremental(taskId, trace);

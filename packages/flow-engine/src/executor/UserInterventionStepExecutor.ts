@@ -121,19 +121,29 @@ async function executeViaInterventionHandler(
 		return stepTrace;
 	}
 
-	const renderedConfig: any = { ...config };
+	let renderedConfig = config;
 
 	if (step.interventionType === 'approval' && step.approval) {
-		if (typeof step.approval.title === 'string')
-			renderedConfig.title = templateRenderer.render(step.approval.title, context, true);
-		if (typeof step.approval.description === 'string')
-			renderedConfig.description = templateRenderer.render(step.approval.description, context, true);
+		const approval = { ...step.approval };
+		if (typeof approval.title === 'string') {
+			approval.title = templateRenderer.render(approval.title, context, true);
+		}
+		if (typeof approval.description === 'string') {
+			approval.description = templateRenderer.render(approval.description, context, true);
+		}
+		renderedConfig = approval;
 	} else if (step.interventionType === 'question' && step.question) {
-		if (typeof step.question.question === 'string')
-			renderedConfig.question = templateRenderer.render(step.question.question, context, true);
+		const question = { ...step.question };
+		if (typeof question.question === 'string') {
+			question.question = templateRenderer.render(question.question, context, true);
+		}
+		renderedConfig = question;
 	} else if (step.interventionType === 'choice' && step.choice) {
-		if (typeof step.choice.question === 'string')
-			renderedConfig.question = templateRenderer.render(step.choice.question, context, true);
+		const choice = { ...step.choice };
+		if (typeof choice.question === 'string') {
+			choice.question = templateRenderer.render(choice.question, context, true);
+		}
+		renderedConfig = choice;
 	}
 
 	const interventionRequest: import('./InterventionHandler').InterventionRequest = {

@@ -22,9 +22,11 @@ import type {
 	NormalizedInputDefinition,
 	ReusePolicy,
 	ScriptFlowStep,
+	StatusTransitions,
 	SubFlowStep,
 	UserInterventionStep,
 	VariableType,
+	WorkspaceConfig,
 	WorkspaceMode,
 	WorkspaceStrategy,
 } from '../types';
@@ -97,24 +99,24 @@ export class SchemaValidator {
 		}
 
 		// Validate workspace config
-		this.validateWorkspaceConfig(flow.workspace, flow.id);
+		this.validateWorkspaceConfig(flow.workspace);
 
 		// Validate execution config (optional)
 		this.validateExecutionConfig(flow);
 
 		// Validate status transitions (optional)
 		if (flow.statusTransitions) {
-			this.validateStatusTransitions(flow.statusTransitions, flow.id);
+			this.validateStatusTransitions(flow.statusTransitions);
 		}
 
 		// Validate and normalize inputs
-		const normalizedInputs = this.validateInputs(flow.inputs, flow.id);
+		const normalizedInputs = this.validateInputs(flow.inputs);
 
 		// Validate flow-level labels (optional)
 		this.validateFlowLabels(flow);
 
 		// Validate steps
-		const stepIds = this.validateSteps(flow.steps, flow.id);
+		const stepIds = this.validateSteps(flow.steps);
 
 		return { stepIds, normalizedInputs };
 	}
@@ -122,7 +124,7 @@ export class SchemaValidator {
 	/**
 	 * Validate workspace configuration
 	 */
-	private validateWorkspaceConfig(config: any, flowId: string): void {
+	private validateWorkspaceConfig(config: Partial<WorkspaceConfig> | undefined): void {
 		if (!config) {
 			this.issueCollector.addIssue({
 				severity: 'error',
@@ -230,7 +232,7 @@ export class SchemaValidator {
 	/**
 	 * Validate status transitions configuration
 	 */
-	private validateStatusTransitions(config: any, flowId: string): void {
+	private validateStatusTransitions(config: Partial<StatusTransitions> | undefined): void {
 		if (!config) {
 			return; // Optional field, no error if missing
 		}
@@ -250,7 +252,10 @@ export class SchemaValidator {
 						: 'Provide a valid status string',
 				context: { related: validStatuses },
 			});
-		} else if (validStatuses.length > 0 && !validStatuses.includes(config.onSuccess)) {
+		} else if (
+			validStatuses.length > 0 &&
+			(typeof config.onSuccess !== 'string' || !validStatuses.includes(config.onSuccess))
+		) {
 			this.issueCollector.addIssue({
 				severity: 'error',
 				code: ValidationCode.INVALID_VALUE,
@@ -278,7 +283,10 @@ export class SchemaValidator {
 						: 'Provide a valid status string',
 				context: { related: validStatuses },
 			});
-		} else if (validStatuses.length > 0 && !validStatuses.includes(config.onFailure)) {
+		} else if (
+			validStatuses.length > 0 &&
+			(typeof config.onFailure !== 'string' || !validStatuses.includes(config.onFailure))
+		) {
 			this.issueCollector.addIssue({
 				severity: 'error',
 				code: ValidationCode.INVALID_VALUE,
@@ -299,10 +307,7 @@ export class SchemaValidator {
 	 * Validates input format and returns normalized definitions
 	 * @returns Record of normalized input definitions
 	 */
-	private validateInputs(
-		inputs: Record<string, InputSpec>,
-		flowId: string
-	): Record<string, NormalizedInputDefinition> {
+	private validateInputs(inputs: Record<string, InputSpec>): Record<string, NormalizedInputDefinition> {
 		const normalized: Record<string, NormalizedInputDefinition> = {};
 
 		if (!inputs) {
@@ -452,7 +457,7 @@ export class SchemaValidator {
 	 * Validate steps
 	 * @returns Set of step IDs found in the flow
 	 */
-	private validateSteps(steps: FlowStep[], flowId: string): Set<string> {
+	private validateSteps(steps: FlowStep[]): Set<string> {
 		if (!steps || steps.length === 0) {
 			this.issueCollector.addIssue({
 				severity: 'error',

@@ -14,9 +14,7 @@ function makeRepository(): FlowFeedbackRepository {
 	const storage = new InMemoryStorage();
 	// StoredFlowFeedback / StoredFlowRetrospective are internal types in FlowFeedbackRepository.
 	// Casting to `any` here is intentional -- InMemoryStorage satisfies the constraint at runtime.
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const feedbackBase = new BaseRepository<any>('flow-feedback', storage);
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const retroBase = new BaseRepository<any>('flow-retrospectives', storage);
 	return new FlowFeedbackRepository(feedbackBase, retroBase);
 }

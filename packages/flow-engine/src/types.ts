@@ -293,7 +293,7 @@ export interface InputDefinition {
 	required?: boolean;
 
 	/** Default value if input is not provided */
-	default?: any;
+	default?: unknown;
 
 	/** Description for UI tooltips and documentation */
 	description?: string;
@@ -322,7 +322,7 @@ export interface NormalizedInputDefinition {
 	required: boolean;
 
 	/** Default value if input is not provided */
-	default?: any;
+	default?: unknown;
 
 	/** Description for UI tooltips and documentation */
 	description?: string;
@@ -373,7 +373,7 @@ export type ValidationRuleType = 'required' | 'pattern' | 'min' | 'max' | 'minLe
  */
 export interface ValidationRule {
 	type: ValidationRuleType;
-	value?: any;
+	value?: unknown;
 	message?: string;
 }
 
@@ -421,7 +421,7 @@ export interface OutputVariableConfig {
 	transform?: TransformFunction | string; // violations-suppress: ts/no-union-with-string string is a named transform function reference
 
 	/** Default value if extraction fails (only for non-required fields) */
-	default?: any;
+	default?: unknown;
 
 	/**
 	 * Write the extracted value to a file in the workspace directory.
@@ -967,7 +967,7 @@ export interface LiveLogEntry {
 	/** Stream-json event type: 'system', 'assistant', 'user', 'result' */
 	eventType: string;
 	/** Additional metadata (full content for expand-on-click) */
-	metadata?: Record<string, any>;
+	metadata?: Record<string, unknown>;
 }
 
 /**
@@ -1252,7 +1252,7 @@ export interface StepTrace {
 
 	/** User's response to intervention (for type='user_intervention') */
 	interventionResponse?: {
-		value: any;
+		value: unknown;
 		comment?: string;
 		answeredAt: string;
 		answeredBy: string;
@@ -1260,7 +1260,7 @@ export interface StepTrace {
 
 	// Common fields
 	/** Extracted output variables */
-	outputs?: Record<string, any>;
+	outputs?: Record<string, unknown>;
 
 	/** Error message if step failed */
 	error?: string;
@@ -1318,13 +1318,13 @@ export interface FlowExecutionContext {
 	workspace: Workspace;
 
 	/** Input variables from task */
-	inputs: Record<string, any>;
+	inputs: Record<string, unknown>;
 
 	/** Task metadata */
-	taskMetadata: Record<string, any>;
+	taskMetadata: Record<string, unknown>;
 
 	/** Outputs from completed steps (keyed by step ID) */
-	stepOutputs: Map<string, Record<string, any>>;
+	stepOutputs: Map<string, Record<string, unknown>>;
 
 	/** Current execution trace */
 	trace: FlowTrace;
@@ -1350,7 +1350,7 @@ export interface StepExecutionResult {
 	success: boolean;
 
 	/** Extracted output variables */
-	outputs?: Record<string, any>;
+	outputs?: Record<string, unknown>;
 
 	/** Model response */
 	response?: string;
@@ -1376,7 +1376,7 @@ export interface FlowExecutionResult {
 	error?: string;
 
 	/** Final outputs from all steps */
-	outputs: Record<string, Record<string, any>>;
+	outputs: Record<string, Record<string, unknown>>;
 }
 
 /**

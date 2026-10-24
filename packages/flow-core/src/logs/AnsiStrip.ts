@@ -12,8 +12,17 @@ const CSI_C1 = 0x9b;
 /** C1 control "ST" (string terminator). */
 const ST_C1 = 0x9c;
 
-// Any character the scanner may need to act on; a text without one is returned as is.
-const NEEDS_WORK = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/;
+// Any character the scanner may need to act on (C0 controls except TAB and LF, DEL, C1 controls); a text without
+// one is returned as is. Scanned by code because the no-control-regex rule forbids control characters in a regex.
+function needsWork(text: string): boolean {
+	for (let index = 0; index < text.length; index++) {
+		const code = text.charCodeAt(index);
+		if (code <= 0x08 || (code >= 0x0b && code <= 0x1f) || (code >= 0x7f && code <= 0x9f)) {
+			return true;
+		}
+	}
+	return false;
+}
 
 function isParameterByte(code: number): boolean {
 	return code >= 0x30 && code <= 0x3f;
@@ -147,7 +156,7 @@ function resolveCarriageReturns(text: string): string {
  * overwrite by a shorter text keeps only the shorter text, not the tail of the longer one.
  */
 export function stripAnsi(text: string): string {
-	if (!NEEDS_WORK.test(text)) {
+	if (!needsWork(text)) {
 		return text;
 	}
 	return resolveCarriageReturns(removeEscapes(text));

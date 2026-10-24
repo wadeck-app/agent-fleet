@@ -31,7 +31,7 @@ export function formatTemplateRoots(): string {
  */
 export interface TemplateContext {
 	/** Input variables from the flow */
-	inputs: Record<string, any>;
+	inputs: Record<string, unknown>;
 
 	/**
 	 * Values for the step's declared secrets (keyed by secret name), supplied by the executing worker.
@@ -40,13 +40,13 @@ export interface TemplateContext {
 	secrets?: Record<string, string>;
 
 	/** Outputs from completed steps (keyed by step ID) */
-	stepOutputs: Map<string, Record<string, any>>;
+	stepOutputs: Map<string, Record<string, unknown>>;
 
 	/** Execution metadata for completed steps (keyed by step ID) */
 	stepMeta?: Map<string, Record<string, unknown>>;
 
 	/** Task metadata (priority, createdAt, etc.) */
-	taskMetadata: Record<string, any>;
+	taskMetadata: Record<string, unknown>;
 
 	/** Current nesting depth for SubFlowStep recursion tracking */
 	nestingDepth?: number;
@@ -67,7 +67,7 @@ export interface TemplateContext {
 	context?: Record<string, string>;
 
 	/** Sub-step results accessible by sub-step ID when parent step is restarting */
-	subSteps?: Map<string, { outputs: Record<string, any>; status: string }>;
+	subSteps?: Map<string, { outputs: Record<string, unknown>; status: string }>;
 
 	/**
 	 * Every failed sub-step's own feedback (stderr/rawOutput/stdout), pre-aggregated into one
@@ -83,7 +83,7 @@ export interface TemplateContext {
 	subStepRelaunch?: { feedback: string };
 
 	/** Callback when Claude process starts */
-	onClaudeProcessStarted?: (process: any) => void;
+	onClaudeProcessStarted?: (process: import('node:child_process').ChildProcess) => void;
 }
 
 /**
@@ -126,7 +126,7 @@ export class TemplateRenderer {
 
 		// 2. Process {% if/else/endif %} blocks before interpolation so discarded branches
 		//    do not trigger errors for missing variables.
-		let result = this.processBlocks(escapedTemplate, context, strict);
+		let result = this.processBlocks(escapedTemplate, context);
 
 		// 3. Find all ${{ ... }} patterns (GitHub Actions syntax)
 		const pattern = /\$\{\{\s*([^}]+?)\s*\}\}/g;
@@ -165,7 +165,7 @@ export class TemplateRenderer {
 	 * Process {% if expr %}...{% else %}...{% endif %} block conditionals.
 	 * Evaluated before ${{ }} interpolation so discarded branches are not parsed.
 	 */
-	private processBlocks(template: string, context: TemplateContext, strict: boolean): string {
+	private processBlocks(template: string, context: TemplateContext): string {
 		const blockPattern = /\{%\s*if\s+(.+?)\s*%\}([\s\S]*?)(?:\{%\s*else\s*%\}([\s\S]*?))?\{%\s*endif\s*%\}/g;
 		return template.replace(blockPattern, (_, expr: string, ifContent: string, elseContent?: string) => {
 			let condValue: unknown;
@@ -175,7 +175,7 @@ export class TemplateRenderer {
 				// Condition evaluation failure is always treated as falsy regardless of strict mode.
 				// This allows {% if subSteps.xxx.status.failed %} blocks to work gracefully on
 				// the first parent run before any sub-step has executed (subSteps absent from context).
-				// The strict parameter still governs ${{ }} interpolation errors below.
+				// Strict mode still governs ${{ }} interpolation errors below.
 				condValue = false;
 			}
 			const isTruthy =
@@ -198,7 +198,7 @@ export class TemplateRenderer {
 	 * @param context - Template context
 	 * @returns Resolved value
 	 */
-	private resolveVariable(expression: string, context: TemplateContext): any {
+	private resolveVariable(expression: string, context: TemplateContext): unknown {
 		const parts = expression.split('.');
 		const root = parts[0];
 
@@ -302,7 +302,7 @@ export class TemplateRenderer {
 	 * @param fullExpression - Full expression for error messages
 	 * @returns Resolved value
 	 */
-	private resolveNested(obj: any, path: string[], fullExpression: string): any {
+	private resolveNested(obj: unknown, path: string[], fullExpression: string): unknown {
 		let current = obj;
 
 		for (const key of path) {
@@ -318,7 +318,7 @@ export class TemplateRenderer {
 				throw new TemplateRenderError(`Property '${key}' not found`, fullExpression, key);
 			}
 
-			current = current[key];
+			current = Reflect.get(current, key);
 		}
 
 		return current;
@@ -330,7 +330,7 @@ export class TemplateRenderer {
 	 * @param value - Value to format
 	 * @returns String representation
 	 */
-	private formatValue(value: any): string {
+	private formatValue(value: unknown): string {
 		if (value === null) {
 			return 'null';
 		}

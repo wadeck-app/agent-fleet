@@ -222,7 +222,7 @@ export class LongPollingTransportServer implements ITransportServer {
 				const responseEvent: TransportEvent = {
 					id: this.generateEventId(),
 					// violations-suppress: ts/no-unsafe-type-cast internal pseudo-event types not in EventType union; used for transport control signalling only
-					type: eventType as any,
+					type: eventType as TransportEvent['type'],
 					data: {
 						authenticated: true,
 						userId: session.userId,
@@ -550,12 +550,12 @@ export class LongPollingTransportServer implements ITransportServer {
 		}
 
 		// Cancel all pending polls
-		for (const [connId, pending] of this.pendingPolls) {
+		for (const pending of this.pendingPolls.values()) {
 			clearTimeout(pending.timeout);
 			try {
 				// Send empty response using helper (includes CORS headers)
 				this.sendHijackedResponse(pending.reply, { events: [], authenticated: true });
-			} catch (error) {
+			} catch {
 				// Ignore errors during shutdown
 			}
 		}

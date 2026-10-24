@@ -100,16 +100,16 @@ export interface ValidationIssue {
 	/** Additional context for UI */
 	context?: {
 		/** Expected value/type */
-		expected?: any;
+		expected?: unknown;
 
 		/** Actual value/type */
-		actual?: any;
+		actual?: unknown;
 
 		/** Related items (e.g., available steps, inputs) */
 		related?: string[];
 
 		/** Raw value for debugging */
-		raw?: any;
+		raw?: unknown;
 	};
 }
 

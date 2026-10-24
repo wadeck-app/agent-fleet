@@ -1,6 +1,7 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 import { createLogger } from 'shared-common/logger';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
+import type { Task as OrchestratorTask } from 'shared-orch-worker/domain-types';
 
 import type {
 	AddWorkspacesToProject,
@@ -176,7 +177,9 @@ export class ProjectsService {
 	 */
 	private applySearch(projects: Project[], searchQuery: string): Project[] {
 		const lowerQuery = searchQuery.toLowerCase().trim();
-		if (!lowerQuery) return projects;
+		if (!lowerQuery) {
+			return projects;
+		}
 
 		return projects.filter(
 			p =>
@@ -228,7 +231,7 @@ export class ProjectsService {
 
 			// Emit aggregate event
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
+			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as unknown as ProjectsData);
 
 			return normalizedProject;
 		} catch (error) {
@@ -269,7 +272,7 @@ export class ProjectsService {
 
 			// Emit aggregate event
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
+			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as unknown as ProjectsData);
 
 			return normalizedProject;
 		} catch (error) {
@@ -306,11 +309,11 @@ export class ProjectsService {
 
 			// Emit event AFTER successful deletion
 			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { id } filter key; EventTypes expects full Project object
-			this.eventBroadcaster.broadcast('b2f:project:deleted', { id } as any);
+			this.eventBroadcaster.broadcast('b2f:project:deleted', { id } as unknown as Project);
 
 			// Emit aggregate event
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
+			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as unknown as ProjectsData);
 		} catch (error) {
 			log.error(' Failed to delete project:', error);
 			throw error;
@@ -380,7 +383,7 @@ export class ProjectsService {
 
 			// Emit aggregate event
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
+			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as unknown as ProjectsData);
 
 			return normalizedProject;
 		} catch (error) {
@@ -401,11 +404,11 @@ export class ProjectsService {
 			const rawTasks = await this.orchestratorRepository.getTasks();
 
 			// Transform and filter tasks by projectId
-			const tasks: Task[] = this.transformTasks(rawTasks as any[]);
-			const projectTasks = tasks.filter((task: any) => task.projectId === id);
+			const tasks: Task[] = this.transformTasks(rawTasks);
+			const projectTasks = tasks.filter(task => task.projectId === id);
 
 			// Group tasks by status
-			const tasksByStatus: Record<string, any[]> = {};
+			const tasksByStatus: Record<string, Task[]> = {};
 
 			// Initialize all statuses with empty arrays
 			const allStatuses = [
@@ -453,7 +456,7 @@ export class ProjectsService {
 	/**
 	 * Transform raw orchestrator tasks to frontend Task schema
 	 */
-	private transformTasks(rawTasks: any[]): Task[] {
+	private transformTasks(rawTasks: OrchestratorTask[]): Task[] {
 		if (!Array.isArray(rawTasks)) {
 			return [];
 		}
@@ -463,7 +466,9 @@ export class ProjectsService {
 			description: task.description,
 			status: task.status,
 			priority: task.priority,
-			version: task.version,
+			// The tasks contract requires an optimistic-locking version that the orchestrator Task type does not declare
+			// violations-suppress: ts/no-unsafe-type-cast orchestrator tasks may carry a version at runtime that is absent from the domain type
+			version: (task as OrchestratorTask & { version: number }).version,
 			createdAt: task.createdAt,
 			updatedAt: task.updatedAt,
 			assignedWorker: task.assignedTo
@@ -491,7 +496,7 @@ export class ProjectsService {
 
 			// Emit aggregate event
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
+			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as unknown as ProjectsData);
 		} catch (error) {
 			log.error(' Failed to increment task count:', error);
 			throw error;
@@ -508,7 +513,7 @@ export class ProjectsService {
 
 			// Emit aggregate event
 			// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to ProjectsData but only the event name is used for cache invalidation
-			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as any);
+			this.eventBroadcaster.broadcast('b2f:projects:updated', {} as unknown as ProjectsData);
 		} catch (error) {
 			log.error(' Failed to decrement task count:', error);
 			throw error;

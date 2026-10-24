@@ -142,12 +142,10 @@ export class ContractValidator {
 			for (const [varName, rules] of Object.entries(preProcess.validateInputs)) {
 				// Determine if this is a flow input or step output reference
 				let varType: VariableType | undefined;
-				let varSource: string;
 
 				// Check if it's a flow input
 				if (inputTypes.has(varName)) {
 					varType = inputTypes.get(varName);
-					varSource = 'input';
 				} else {
 					// Check if it's a step output reference (format: stepId.outputName)
 					const parts = varName.split('.');
@@ -156,7 +154,6 @@ export class ContractValidator {
 						const stepOutputs = stepOutputTypes.get(stepId);
 						if (stepOutputs) {
 							varType = stepOutputs.get(outputName);
-							// varSource = `step ${stepId} output`; // Future: could be used for better error messages
 						}
 					}
 				}

@@ -23,16 +23,16 @@ export interface FlowExecutionOptions {
 	workspace: Workspace;
 
 	/** Input variables */
-	inputs: Record<string, any>;
+	inputs: Record<string, unknown>;
 
 	/** Task metadata (priority, createdAt, etc.) */
-	taskMetadata?: Record<string, any>;
+	taskMetadata?: Record<string, unknown>;
 
 	/** Environment variables for Claude (for hooks) */
 	claudeEnv?: Record<string, string>;
 
 	/** Callback when Claude process starts (to store reference for killing) */
-	onClaudeProcessStarted?: (process: any) => void;
+	onClaudeProcessStarted?: (process: import('node:child_process').ChildProcess) => void;
 
 	/** Handler for user interventions (approval, questions, choices) */
 	interventionHandler?: import('./InterventionHandler').InterventionHandler;
@@ -125,7 +125,7 @@ export class FlowExecutor {
 		this.orchestrator = new FlowOrchestrator(this.stepRunner);
 
 		// Context for template rendering
-		const stepOutputs = new Map<string, Record<string, any>>();
+		const stepOutputs = new Map<string, Record<string, unknown>>();
 		const context: TemplateContext = {
 			inputs,
 			stepOutputs,

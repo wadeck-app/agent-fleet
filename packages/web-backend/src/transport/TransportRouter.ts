@@ -5,7 +5,7 @@ import type { TransportRequest, TransportResponse } from '@app/shared/transport'
 import { ALL_API_ROUTES } from '@app/shared/types';
 
 import type { DataStoreFactory } from '../factories/DataStoreFactory';
-import type { LazyController } from '../utils/lazy-controller-plugin';
+import type { ErasedLazyController } from '../utils/lazy-controller-plugin';
 
 const log = createLogger('TransportRouter');
 
@@ -49,7 +49,24 @@ const log = createLogger('TransportRouter');
 /**
  * Route handler function signature
  */
-type RouteHandler = (request: TransportRequest) => Promise<any>;
+type RouteHandler = (request: TransportRequest) => Promise<unknown>;
+
+/**
+ * Fields set at runtime by transport adapters (authentication, cookie parsing); absent from the shared request type
+ */
+export interface RuntimeTransportRequest extends TransportRequest {
+	cookies?: Record<string, string>;
+	userId?: string;
+}
+
+/**
+ * Error shape thrown by controllers (HTTP-like status, code and details)
+ */
+interface TransportRouteError extends Error {
+	statusCode?: number;
+	code?: string;
+	details?: Record<string, unknown>;
+}
 
 /**
  * Route registration entry
@@ -68,7 +85,7 @@ interface RouteEntry {
  */
 export class TransportRouter {
 	private routes: RouteEntry[] = [];
-	private controllersCache = new Map<string, LazyController<any>>();
+	private controllersCache = new Map<string, ErasedLazyController>();
 
 	constructor(private factory: DataStoreFactory) {
 		this.registerRoutes();
@@ -84,8 +101,7 @@ export class TransportRouter {
 
 		// Register each route
 		Object.entries(routes).forEach(([path, methods]) => {
-			// violations-suppress: ts/no-unsafe-type-cast methods is a nested route contract map; no mapped index type available for runtime iteration
-			Object.keys(methods as any).forEach((method: string) => {
+			Object.keys(methods).forEach((method: string) => {
 				const httpMethod = method as HttpMethod;
 
 				// Convert path to regex pattern
@@ -163,7 +179,7 @@ export class TransportRouter {
 	 * Get or create controller for a path
 	 * Controllers are cached after first load
 	 */
-	private async getController(path: string): Promise<LazyController<any> | null> {
+	private async getController(path: string): Promise<ErasedLazyController | null> {
 		// Determine base path (e.g., /api/tasks/:id -> /api/tasks)
 		const basePath = this.getBasePath(path);
 
@@ -211,7 +227,7 @@ export class TransportRouter {
 	 * Load controller dynamically based on base path
 	 * Uses factory to get service dependencies
 	 */
-	private async loadController(basePath: string): Promise<LazyController<any> | null> {
+	private async loadController(basePath: string): Promise<ErasedLazyController | null> {
 		// Map base paths to controllers
 		switch (basePath) {
 			case '/api/auth':
@@ -240,19 +256,19 @@ export class TransportRouter {
 	 * Simulates the Fastify request/reply context for controllers
 	 */
 	private async invokeController(
-		controller: LazyController<any>,
+		controller: ErasedLazyController,
 		method: HttpMethod,
 		path: string,
 		request: TransportRequest
-	): Promise<any> {
+	): Promise<unknown> {
 		// Controllers use configureRoutes with a RouteWrapperFunc
 		// We need to simulate that environment
 
-		let result: any = null;
+		let result: unknown = null;
 		let error: Error | null = null;
 
 		// Create a mock "add" function that captures the route handler
-		const add = (routeMethod: HttpMethod, routePath: string, handler: any) => {
+		const add = (routeMethod: HttpMethod, routePath: string, handler: (validated: unknown) => Promise<unknown>) => {
 			if (routeMethod === method && routePath === path) {
 				// Found matching route, invoke handler
 				const mockRequest = {
@@ -260,16 +276,14 @@ export class TransportRouter {
 					params: request.params || {},
 					body: request.body,
 					headers: request.headers || {},
-					// violations-suppress: ts/no-unsafe-type-cast request.cookies is set at runtime by transport adapters; not present in the generic request type
-					cookies: (request as any).cookies || {},
+					cookies: (request as RuntimeTransportRequest).cookies || {},
 					// Add userId from request context (set by WebSocketTransportServer)
-					// violations-suppress: ts/no-unsafe-type-cast request.userId is set at runtime by WebSocketTransportServer authentication; not present in the generic request type
-					userId: (request as any).userId,
+					userId: (request as RuntimeTransportRequest).userId,
 				};
 
 				const mockReply = {
 					code: (_statusCode: number) => mockReply,
-					send: (data: any) => {
+					send: (data: unknown) => {
 						result = data;
 						return mockReply;
 					},
@@ -292,7 +306,7 @@ export class TransportRouter {
 
 		// Call configureRoutes to set up the route
 		// violations-suppress: ts/no-unsafe-type-cast add is a mock RouteWrapperFunc typed to the test request shape; RouteWrapperFunc generic is not directly compatible with the mock
-		controller.configureRoutes(add as any);
+		controller.configureRoutes(add as never);
 
 		// Wait for handler to complete (if async)
 		// Since we're not using actual async/await in the add function,
@@ -345,7 +359,8 @@ export class TransportRouter {
 				body,
 				timestamp: Date.now(),
 			};
-		} catch (err: any) {
+		} catch (caught) {
+			const err = caught as TransportRouteError;
 			log.error('Request error:', err);
 
 			return {

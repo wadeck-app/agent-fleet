@@ -129,8 +129,7 @@ export class FlowProposalsService {
 		});
 
 		// Notify flow-proposal subscribers so the UI refreshes without page reload (dj fix)
-		// violations-suppress: ts/no-unsafe-type-cast event payload carries only { ticketId } filter key; EventTypes expects this exact shape and it matches at runtime
-		this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId } as any);
+		this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId });
 
 		log.info('Flow proposal created', { ticketId, proposalId: created.id });
 		return created;
@@ -340,11 +339,10 @@ export class FlowProposalsService {
 
 			// Notify the ticket detail page that the ticket changed (e.g. currentFlowProposalId updated)
 			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { ticketId } filter key; EventTypes expects full Ticket object
-			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId } as any);
+			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId } as unknown as Ticket);
 			// Notify flow-proposal subscribers specifically -- allows the UI to refresh ONLY the
 			// Flow Design tab content without refreshing on unrelated ticket updates (cc fix).
-			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { ticketId } filter key; EventTypes expects this exact shape at runtime
-			this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId } as any);
+			this.eventBroadcaster.broadcast(B2F_FLOW_PROPOSAL_UPDATED, { ticketId });
 		} catch (err) {
 			log.error('Async redesign failed after rejection', {
 				ticketId,

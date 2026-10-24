@@ -150,7 +150,9 @@ export class ScriptExecutor {
 		const rawEnv = { ...baseEnv, ...options.env };
 		const cleanEnv: Record<string, string> = {};
 		for (const [k, v] of Object.entries(rawEnv)) {
-			if (v !== undefined) cleanEnv[k] = v;
+			if (v !== undefined) {
+				cleanEnv[k] = v;
+			}
 		}
 		const shell = options.shell !== undefined ? options.shell : true;
 		const strict = options.strict !== false;
@@ -183,7 +185,9 @@ export class ScriptExecutor {
 			// Git's bash is a thin shell: without its coreutils dirs on PATH, `sed`/`dirname` and npm
 			// POSIX shims fail with "command not found" when the daemon started without Git Bash on
 			// PATH (same as the implicit-bash path below).
-			if (shellKind === 'bash' && process.platform === 'win32') ensureGitCoreutilsOnPath(shellEnv, binary);
+			if (shellKind === 'bash' && process.platform === 'win32') {
+				ensureGitCoreutilsOnPath(shellEnv, binary);
+			}
 
 			const tempDir = os.tmpdir();
 			const timestamp = Date.now();
@@ -268,7 +272,7 @@ export class ScriptExecutor {
 				if (tempFilePath && fs.existsSync(tempFilePath)) {
 					try {
 						fs.unlinkSync(tempFilePath);
-					} catch (err) {
+					} catch {
 						// Ignore cleanup errors
 					}
 				}
@@ -299,7 +303,9 @@ export class ScriptExecutor {
 					const lines = text.split('\n');
 					lines.forEach((line: string, index: number) => {
 						// Skip empty last line from split
-						if (index === lines.length - 1 && line === '') return;
+						if (index === lines.length - 1 && line === '') {
+							return;
+						}
 						const timestamp = getTimestamp();
 						const prefix = options.stepId ? `[${options.stepId}]` : '';
 						console.log(`      ${prefix} [${timestamp}] ${line}`);
@@ -317,7 +323,9 @@ export class ScriptExecutor {
 					const lines = text.split('\n');
 					lines.forEach((line: string, index: number) => {
 						// Skip empty last line from split
-						if (index === lines.length - 1 && line === '') return;
+						if (index === lines.length - 1 && line === '') {
+							return;
+						}
 						const timestamp = getTimestamp();
 						const prefix = options.stepId ? `[${options.stepId}]` : '';
 						console.error(`      ${prefix} [${timestamp}] ${line}`);

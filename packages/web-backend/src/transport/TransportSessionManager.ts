@@ -344,7 +344,9 @@ export class TransportSessionManager {
 	 */
 	getTimeUntilExpiration(connId: string): number {
 		const session = this.sessions.get(connId);
-		if (!session) return 0;
+		if (!session) {
+			return 0;
+		}
 		return Math.max(0, session.tokenExpiresAt - Date.now());
 	}
 
@@ -363,7 +365,9 @@ export class TransportSessionManager {
 		filters?: Record<string, unknown>
 	): void {
 		const session = this.sessions.get(connId);
-		if (!session) return;
+		if (!session) {
+			return;
+		}
 
 		if (action === 'subscribe') {
 			events.forEach(event => {
@@ -455,10 +459,14 @@ export class TransportSessionManager {
 	 */
 	isSubscribed(connId: string, eventType: string): boolean {
 		const session = this.sessions.get(connId);
-		if (!session) return false;
+		if (!session) {
+			return false;
+		}
 
 		// If no subscriptions yet, allow all (backward compat during connection)
-		if (session.subscribedEvents.size === 0) return true;
+		if (session.subscribedEvents.size === 0) {
+			return true;
+		}
 
 		return session.subscribedEvents.has(eventType);
 	}
@@ -483,7 +491,9 @@ export class TransportSessionManager {
 	 */
 	matchesFilters(connId: string, eventType: string, eventData: unknown): boolean {
 		const session = this.sessions.get(connId);
-		if (!session) return false;
+		if (!session) {
+			return false;
+		}
 
 		// Get filters for this event
 		const filters = session.eventFilters.get(eventType);
@@ -502,7 +512,7 @@ export class TransportSessionManager {
 		// Check each filter - ALL must match
 		for (const [key, expectedValue] of Object.entries(filters)) {
 			// violations-suppress: ts/no-unsafe-type-cast eventData is typed as EventData<E> (event-specific); indexing by filter key string requires widening to a map type
-			const actualValue = (eventData as any)[key];
+			const actualValue = (eventData as Record<string, unknown>)[key];
 
 			// Deep equality check for primitives
 			if (actualValue !== expectedValue) {
@@ -532,7 +542,9 @@ export class TransportSessionManager {
 	 */
 	removeSession(connId: string): void {
 		const session = this.sessions.get(connId);
-		if (!session) return;
+		if (!session) {
+			return;
+		}
 
 		const transportType = this.transportTypes.get(connId);
 
@@ -594,7 +606,9 @@ export class TransportSessionManager {
 	 */
 	getUserSessions(userId: string): BaseSession[] {
 		const connIds = this.userSessions.get(userId);
-		if (!connIds) return [];
+		if (!connIds) {
+			return [];
+		}
 
 		return Array.from(connIds)
 			.map(connId => this.sessions.get(connId))
@@ -717,8 +731,6 @@ export class TransportSessionManager {
 	 * Useful for monitoring and debugging transport usage.
 	 */
 	logTransportDistribution(): void {
-		const stats = this.getTransportStats();
-
 		// console.log('[Transport] Session distribution:');
 		// console.log(`  - Total sessions: ${stats.totalSessions}`);
 		// console.log(`  - Total users: ${stats.totalUsers}`);

@@ -176,7 +176,6 @@ export class TicketsService {
 			this.eventBroadcaster.broadcast(B2F_TICKET_CREATED, ticket);
 
 			// Emit aggregate event for dashboard updates
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {});
 
 			// Emit internal event for worker flow triggers -- skipped when title is a placeholder
@@ -255,7 +254,9 @@ export class TicketsService {
 			// Determine which fields changed (computed before broadcasts to drive routing logic)
 			const changedFields: string[] = [];
 			for (const key of Object.keys(data) as Array<keyof typeof data>) {
-				if (key === 'version') continue;
+				if (key === 'version') {
+					continue;
+				}
 				if (JSON.stringify(data[key]) !== JSON.stringify(currentTicket[key as keyof typeof currentTicket])) {
 					changedFields.push(key);
 				}
@@ -264,13 +265,12 @@ export class TicketsService {
 			// B2F_TICKET_UPDATED -- always broadcast for detail page subscribers.
 			// Use { ticketId } as server-side filter so only the open detail page for this ticket receives it.
 			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { ticketId } filter key; EventTypes expects full Ticket object
-			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId: id } as any);
+			this.eventBroadcaster.broadcast(B2F_TICKET_UPDATED, { ticketId: id } as unknown as Ticket);
 
 			// B2F_TICKETS_UPDATED -- only broadcast when a list-visible field actually changed
 			// (title, status, labels). Avoids unnecessary list refreshes for description/fields/etc.
 			const listNeedsRefresh = changedFields.some(f => TicketsService.LIST_VISIBLE_FIELDS.has(f));
 			if (listNeedsRefresh) {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {});
 			}
 
@@ -279,7 +279,9 @@ export class TicketsService {
 				// Build before/after snapshot for changed fields only (excluding version, taskIds)
 				const changes: Record<string, { from: unknown; to: unknown }> = {};
 				for (const field of changedFields) {
-					if (field === 'taskIds') continue;
+					if (field === 'taskIds') {
+						continue;
+					}
 					changes[field] = {
 						from: currentTicket[field as keyof typeof currentTicket],
 						to: updatedTicket[field as keyof typeof updatedTicket],
@@ -304,7 +306,7 @@ export class TicketsService {
 					oldStatus: currentTicket.status,
 					newStatus: data.status,
 					// violations-suppress: ts/no-unsafe-type-cast event payload carries status transition fields; EventTypes expects full Ticket object
-				} as any);
+				} as unknown as Ticket);
 
 				// Emit internal event for backend-to-backend routing (legacy)
 				this.eventBus?.emit('ticket.status.changed', {
@@ -387,7 +389,6 @@ export class TicketsService {
 			}
 
 			// Emit aggregate event for dashboard updates
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {});
 
 			return updatedTicket;
@@ -406,10 +407,9 @@ export class TicketsService {
 
 			// Emit specific event AFTER successful deletion
 			// violations-suppress: ts/no-unsafe-type-cast event payload carries only { id } filter key; EventTypes expects full Ticket object
-			this.eventBroadcaster.broadcast(B2F_TICKET_DELETED, { id } as any);
+			this.eventBroadcaster.broadcast(B2F_TICKET_DELETED, { id } as unknown as Ticket);
 
 			// Emit aggregate event for dashboard updates
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {});
 
 			return { success: true, id };
@@ -444,7 +444,6 @@ export class TicketsService {
 
 			// B2F_TICKETS_UPDATED only -- order affects list sorting but is not shown in the detail page.
 			// B2F_TICKET_UPDATED is intentionally NOT broadcast here.
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			this.eventBroadcaster.broadcast(B2F_TICKETS_UPDATED, {});
 
 			return updatedTicket;

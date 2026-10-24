@@ -69,7 +69,7 @@ export class FlowKnowledgeService {
 	 * Build the full knowledge context for the given project and ticket description.
 	 * Used by FlowDesignerAgent to enrich the prompt with relevant information.
 	 */
-	async buildKnowledgeContext(projectId: string, ticketDescription: string): Promise<FlowKnowledgeContext> {
+	async buildKnowledgeContext(projectId: string, _ticketDescription: string): Promise<FlowKnowledgeContext> {
 		const [flowsList, projectTickets] = await Promise.all([
 			this.flowsService.getFlowsList().catch(err => {
 				log.warn('Failed to load flows list for knowledge context', { err });

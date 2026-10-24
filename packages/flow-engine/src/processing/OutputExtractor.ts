@@ -54,8 +54,8 @@ export class OutputExtractor {
 		rawOutput: string,
 		config: StepOutput | undefined,
 		stepId: string,
-		additionalContext?: Record<string, any>
-	): Record<string, any> {
+		additionalContext?: Record<string, unknown>
+	): Record<string, unknown> {
 		if (!config) {
 			// No output config, return just the raw output and additional context
 			return {
@@ -64,7 +64,7 @@ export class OutputExtractor {
 			};
 		}
 
-		const outputs: Record<string, any> = { ...additionalContext };
+		const outputs: Record<string, unknown> = { ...additionalContext };
 
 		// Extract each configured output variable
 		for (const [varName, varConfig] of Object.entries(config)) {
@@ -94,9 +94,9 @@ export class OutputExtractor {
 		config: OutputVariableConfig,
 		rawOutput: string,
 		stepId: string,
-		additionalContext?: Record<string, any>
-	): any {
-		let value: any;
+		additionalContext?: Record<string, unknown>
+	): unknown {
+		let value: unknown;
 
 		if (config.jsonpath && config.pattern) {
 			throw new OutputExtractionError(`'jsonpath' and 'pattern' are mutually exclusive`, varName, stepId);
@@ -151,10 +151,10 @@ export class OutputExtractor {
 	 */
 	private extractFromPath(
 		path: string,
-		additionalContext: Record<string, any> | undefined,
+		additionalContext: Record<string, unknown> | undefined,
 		varName: string,
 		stepId: string
-	): any {
+	): unknown {
 		if (!additionalContext) {
 			throw new OutputExtractionError(
 				`Cannot extract from path '${path}': no context available`,
@@ -164,7 +164,7 @@ export class OutputExtractor {
 		}
 
 		const parts = path.split('.');
-		let current: any = additionalContext;
+		let current: unknown = additionalContext;
 
 		for (const part of parts) {
 			if (current == null || typeof current !== 'object') {
@@ -179,7 +179,7 @@ export class OutputExtractor {
 				throw new OutputExtractionError(`Path '${path}' not found: missing '${part}'`, varName, stepId);
 			}
 
-			current = current[part];
+			current = Reflect.get(current, part);
 		}
 
 		return current;
@@ -248,8 +248,13 @@ export class OutputExtractor {
 	/**
 	 * Apply transform function
 	 */
-	// violations-suppress: ts/no-union-with-string string is a named transform function reference, not a free-form string
-	private applyTransform(transform: TransformFunction | string, value: any, varName: string, stepId: string): any {
+	private applyTransform(
+		// violations-suppress: ts/no-union-with-string string is a named transform function reference, not a free-form string
+		transform: TransformFunction | string,
+		value: unknown,
+		varName: string,
+		stepId: string
+	): unknown {
 		try {
 			switch (transform) {
 				case 'parseJSON':
@@ -305,7 +310,7 @@ export class OutputExtractor {
 	/**
 	 * Parse boolean from various formats
 	 */
-	private parseBoolean(value: any): boolean {
+	private parseBoolean(value: unknown): boolean {
 		if (typeof value === 'boolean') {
 			return value;
 		}
@@ -326,7 +331,12 @@ export class OutputExtractor {
 	/**
 	 * Convert value to target type
 	 */
-	private convertType(value: any, targetType: VariableType | undefined, varName: string, stepId: string): any {
+	private convertType(
+		value: unknown,
+		targetType: VariableType | undefined,
+		varName: string,
+		stepId: string
+	): unknown {
 		// No type declared -- return value as-is
 		if (!targetType) {
 			return value;
@@ -410,8 +420,10 @@ export class OutputExtractor {
 	/**
 	 * Validate that required outputs are present
 	 */
-	public validateRequired(outputs: Record<string, any>, config: StepOutput | undefined, stepId: string): void {
-		if (!config) return;
+	public validateRequired(outputs: Record<string, unknown>, config: StepOutput | undefined, stepId: string): void {
+		if (!config) {
+			return;
+		}
 
 		for (const [varName, varConfig] of Object.entries(config)) {
 			if (varConfig.required && !(varName in outputs)) {

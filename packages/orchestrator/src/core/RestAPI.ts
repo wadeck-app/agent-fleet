@@ -1,4 +1,4 @@
-import express, { type Express, type Request, type Response } from 'express';
+import express, { type Express, type Request, type RequestHandler, type Response } from 'express';
 import type { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { readFileSync } from 'node:fs';
 import type { Server as HttpServer, IncomingMessage } from 'node:http';
@@ -61,6 +61,16 @@ export class RestAPI {
 		});
 	}
 
+	/**
+	 * Adapts an async route to Express: a rejection the route did not handle itself reaches the error middleware
+	 * instead of becoming an unhandled rejection.
+	 */
+	private asyncRoute(route: (req: Request, res: Response) => Promise<void>): RequestHandler {
+		return (req, res, next) => {
+			route(req, res).catch(next);
+		};
+	}
+
 	private setupRoutes(): void {
 		// Health check
 		this.app.get('/health', (req: Request, res: Response) => {
@@ -85,63 +95,66 @@ export class RestAPI {
 		});
 
 		// Create a task (supports both regular and flow-based tasks)
-		this.app.post('/tasks', async (req: Request, res: Response) => {
-			try {
-				const { description, priority, metadata, flowId, flowInputs, workspacePath, assignedTo } = req.body;
+		this.app.post(
+			'/tasks',
+			this.asyncRoute(async (req: Request, res: Response) => {
+				try {
+					const { description, priority, metadata, flowId, flowInputs, workspacePath, assignedTo } = req.body;
 
-				if (!description) {
-					res.status(400).json({ error: 'Description is required' });
-					return;
-				}
-
-				// Note: Flow validation is now done by workers, not orchestrator
-				// The orchestrator no longer validates flowId existence
-
-				const task = await this.taskManager.createTask(description, {
-					priority,
-					...metadata,
-				});
-
-				// Add flow-specific fields if flowId is provided
-				if (flowId) {
-					task.flowId = flowId;
-					task.flowInputs = flowInputs || {};
-				}
-
-				// Add workspace path if provided (for manual workspace mode)
-				if (workspacePath) {
-					task.workspacePath = workspacePath;
-				}
-
-				// Add worker assignment if provided
-				if (assignedTo?.workerId) {
-					task.assignedTo = assignedTo;
-				}
-
-				// IMPORTANT: Update task in TaskManager's memory + storage
-				// (createTask() saves before we add flowInputs/workspacePath/assignedTo)
-				if (flowId || workspacePath || assignedTo) {
-					await this.taskManager.updateTask(task);
-
-					// Re-route task if assignedTo was added
-					// The task was initially added to global backlog, we need to remove it and add to worker queue
-					if (assignedTo?.workerId) {
-						// Remove from global backlog
-						this.taskManager.removeTaskFromBacklog(task.id);
-						// Add to worker queue
-						this.taskManager.addTaskToWorkerQueue(assignedTo.workerId, task);
+					if (!description) {
+						res.status(400).json({ error: 'Description is required' });
+						return;
 					}
+
+					// Note: Flow validation is now done by workers, not orchestrator
+					// The orchestrator no longer validates flowId existence
+
+					const task = await this.taskManager.createTask(description, {
+						priority,
+						...metadata,
+					});
+
+					// Add flow-specific fields if flowId is provided
+					if (flowId) {
+						task.flowId = flowId;
+						task.flowInputs = flowInputs || {};
+					}
+
+					// Add workspace path if provided (for manual workspace mode)
+					if (workspacePath) {
+						task.workspacePath = workspacePath;
+					}
+
+					// Add worker assignment if provided
+					if (assignedTo?.workerId) {
+						task.assignedTo = assignedTo;
+					}
+
+					// IMPORTANT: Update task in TaskManager's memory + storage
+					// (createTask() saves before we add flowInputs/workspacePath/assignedTo)
+					if (flowId || workspacePath || assignedTo) {
+						await this.taskManager.updateTask(task);
+
+						// Re-route task if assignedTo was added
+						// The task was initially added to global backlog, we need to remove it and add to worker queue
+						if (assignedTo?.workerId) {
+							// Remove from global backlog
+							this.taskManager.removeTaskFromBacklog(task.id);
+							// Add to worker queue
+							this.taskManager.addTaskToWorkerQueue(assignedTo.workerId, task);
+						}
+					}
+
+					// Try to assign the task to an available worker
+					await this.wsServer.tryAssignTasksToIdleWorkers();
+
+					res.status(201).json(task);
+				} catch (error) {
+					log.error('[API] Error creating task:', error);
+					res.status(500).json({ error: (error as Error).message });
 				}
-
-				// Try to assign the task to an available worker
-				this.wsServer.tryAssignTasksToIdleWorkers();
-
-				res.status(201).json(task);
-			} catch (error) {
-				log.error('[API] Error creating task:', error);
-				res.status(500).json({ error: (error as Error).message });
-			}
-		});
+			})
+		);
 
 		// List all tasks
 		this.app.get('/tasks', (req: Request, res: Response) => {
@@ -180,72 +193,84 @@ export class RestAPI {
 		});
 
 		// Update task status
-		this.app.patch('/tasks/:id/status', async (req: Request, res: Response) => {
-			try {
-				const { status } = req.body;
+		this.app.patch(
+			'/tasks/:id/status',
+			this.asyncRoute(async (req: Request, res: Response) => {
+				try {
+					const { status } = req.body;
 
-				if (!status) {
-					res.status(400).json({ error: 'Status is required' });
-					return;
+					if (!status) {
+						res.status(400).json({ error: 'Status is required' });
+						return;
+					}
+
+					await this.taskManager.updateTaskStatus(req.params.id, status as TaskStatus);
+					const task = this.taskManager.getTask(req.params.id);
+
+					res.json(task);
+				} catch (error) {
+					log.error('[API] Error updating task status:', error);
+					res.status(500).json({ error: (error as Error).message });
 				}
-
-				await this.taskManager.updateTaskStatus(req.params.id, status as TaskStatus);
-				const task = this.taskManager.getTask(req.params.id);
-
-				res.json(task);
-			} catch (error) {
-				log.error('[API] Error updating task status:', error);
-				res.status(500).json({ error: (error as Error).message });
-			}
-		});
+			})
+		);
 
 		// Add a comment to a task
-		this.app.post('/tasks/:id/comments', async (req: Request, res: Response) => {
-			try {
-				const { author, content } = req.body;
+		this.app.post(
+			'/tasks/:id/comments',
+			this.asyncRoute(async (req: Request, res: Response) => {
+				try {
+					const { author, content } = req.body;
 
-				if (!author || !content) {
-					res.status(400).json({ error: 'Author and content are required' });
-					return;
+					if (!author || !content) {
+						res.status(400).json({ error: 'Author and content are required' });
+						return;
+					}
+
+					await this.taskManager.addComment(req.params.id, author, content);
+					const task = this.taskManager.getTask(req.params.id);
+
+					res.json(task);
+				} catch (error) {
+					log.error('[API] Error adding comment:', error);
+					res.status(500).json({ error: (error as Error).message });
 				}
-
-				await this.taskManager.addComment(req.params.id, author, content);
-				const task = this.taskManager.getTask(req.params.id);
-
-				res.json(task);
-			} catch (error) {
-				log.error('[API] Error adding comment:', error);
-				res.status(500).json({ error: (error as Error).message });
-			}
-		});
+			})
+		);
 
 		// Delete a task
-		this.app.delete('/tasks/:id', async (req: Request, res: Response) => {
-			try {
-				const deleted = await this.taskManager.deleteTask(req.params.id);
+		this.app.delete(
+			'/tasks/:id',
+			this.asyncRoute(async (req: Request, res: Response) => {
+				try {
+					const deleted = await this.taskManager.deleteTask(req.params.id);
 
-				if (!deleted) {
-					res.status(404).json({ error: 'Task not found' });
-					return;
+					if (!deleted) {
+						res.status(404).json({ error: 'Task not found' });
+						return;
+					}
+
+					res.json({ message: 'Task deleted successfully' });
+				} catch (error) {
+					log.error('[API] Error deleting task:', error);
+					res.status(500).json({ error: (error as Error).message });
 				}
-
-				res.json({ message: 'Task deleted successfully' });
-			} catch (error) {
-				log.error('[API] Error deleting task:', error);
-				res.status(500).json({ error: (error as Error).message });
-			}
-		});
+			})
+		);
 
 		// Clear all tasks
-		this.app.delete('/tasks', async (req: Request, res: Response) => {
-			try {
-				const count = await this.taskManager.clearAllTasks();
-				res.json({ message: `Cleared ${count} tasks` });
-			} catch (error) {
-				log.error('[API] Error clearing tasks:', error);
-				res.status(500).json({ error: (error as Error).message });
-			}
-		});
+		this.app.delete(
+			'/tasks',
+			this.asyncRoute(async (req: Request, res: Response) => {
+				try {
+					const count = await this.taskManager.clearAllTasks();
+					res.json({ message: `Cleared ${count} tasks` });
+				} catch (error) {
+					log.error('[API] Error clearing tasks:', error);
+					res.status(500).json({ error: (error as Error).message });
+				}
+			})
+		);
 
 		// List workers
 		this.app.get('/workers', (req: Request, res: Response) => {

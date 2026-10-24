@@ -125,7 +125,7 @@ describe('FlowWorker', () => {
 		mockWorkspaceManager = {
 			allocate: vi.fn().mockResolvedValue(mockWorkspace),
 			release: vi.fn().mockResolvedValue(undefined),
-			cleanupAll: vi.fn(),
+			cleanupAll: vi.fn().mockResolvedValue(undefined),
 		};
 		mockWorkspaceManagerInstance = mockWorkspaceManager;
 

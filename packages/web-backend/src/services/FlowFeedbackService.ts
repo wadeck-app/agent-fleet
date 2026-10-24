@@ -184,13 +184,14 @@ export class FlowFeedbackService {
 			await this.ticketsRepository.update(existing.ticketId, { flowFeedbackId: undefined });
 		}
 
-		this.eventBroadcaster.broadcast(B2F_TICKET_FEEDBACK_SUBMITTED, {
+		// Extra 'deleted' flag is read by consumers at runtime; a typed variable avoids the excess-property check
+		const deletedPayload = {
 			ticketId: existing.ticketId,
 			feedbackId: existing.id,
 			rating: existing.rating,
 			deleted: true,
-			// violations-suppress: ts/no-unsafe-type-cast event payload has extra 'deleted' field not in EventTypes definition; consumers read all fields at runtime
-		} as any);
+		};
+		this.eventBroadcaster.broadcast(B2F_TICKET_FEEDBACK_SUBMITTED, deletedPayload);
 
 		log.info(`Flow feedback ${feedbackId} deleted`);
 	}

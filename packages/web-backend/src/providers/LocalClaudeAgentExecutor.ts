@@ -233,7 +233,7 @@ Output EXACTLY 3 lines, one shortened title per line, no numbering.
 		return yaml;
 	}
 
-	async suggestLabels(description: string, existingLabels: string[]): Promise<string[]> {
+	async suggestLabels(_description: string, _existingLabels: string[]): Promise<string[]> {
 		log.info('suggestLabels called (stub)');
 		return [];
 	}

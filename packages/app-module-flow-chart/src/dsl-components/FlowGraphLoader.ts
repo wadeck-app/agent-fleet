@@ -126,6 +126,7 @@ export function useFlowGraph(
 			}
 		};
 		// `target` is represented by `key`; the fetch function is stable by contract.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [key]);
 
 	return state;

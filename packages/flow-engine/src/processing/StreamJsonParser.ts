@@ -6,6 +6,42 @@
  */
 
 /**
+ * One content block of a stream-json assistant/user message
+ */
+export interface StreamContentBlock {
+	type?: string;
+	text?: string;
+	name?: string;
+	input?: unknown;
+	tool_use_id?: string;
+	content?: unknown;
+}
+
+/**
+ * Raw parsed JSON object of a stream-json event. Only the fields read by this package are
+ * declared; any other field stays reachable as `unknown` through the index signature.
+ */
+export interface StreamEventData {
+	type?: string;
+	subtype?: string;
+	session_id?: string;
+	model?: string;
+	result?: string;
+	num_turns?: number;
+	total_cost_usd?: number;
+	cost_usd?: number;
+	duration_ms?: number;
+	compact_result?: string;
+	compact_error?: string;
+	compact_metadata?: Record<string, unknown>;
+	hook?: { type?: string };
+	hook_type?: string;
+	tool_name?: string;
+	message?: { content?: StreamContentBlock[] | string };
+	[key: string]: unknown;
+}
+
+/**
  * Typed event from Claude CLI stream-json output
  */
 export interface StreamJsonEvent {
@@ -14,7 +50,7 @@ export interface StreamJsonEvent {
 	/** Subtype extracted from message content (e.g., 'text', 'tool_use', 'tool_result') */
 	subtype?: string;
 	/** Full parsed JSON object */
-	data: Record<string, any>;
+	data: StreamEventData;
 }
 
 /**
@@ -83,7 +119,7 @@ export class StreamJsonParser {
 	/**
 	 * Classify a parsed JSON object into a StreamJsonEvent
 	 */
-	private classifyEvent(data: Record<string, any>): StreamJsonEvent {
+	private classifyEvent(data: StreamEventData): StreamJsonEvent {
 		const type = data.type || 'unknown';
 		let subtype: string | undefined;
 

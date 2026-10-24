@@ -3,6 +3,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
 import type { FlowRegistry } from '../registry/FlowRegistry';
 import type { StepTrace, SubFlowStep, Workspace } from '../types';
+import type { FlowExecutor } from './FlowExecutor';
 
 export async function executeSubFlowStep(
 	step: SubFlowStep,
@@ -11,7 +12,7 @@ export async function executeSubFlowStep(
 	stepTrace: StepTrace,
 	config: {
 		flowRegistry?: FlowRegistry;
-		flowExecutor?: any;
+		flowExecutor?: Pick<FlowExecutor, 'execute'>;
 	},
 	templateRenderer: TemplateRenderer
 ): Promise<StepTrace> {
@@ -55,7 +56,7 @@ export async function executeSubFlowStep(
 		return stepTrace;
 	}
 
-	const renderedInputs: Record<string, any> = {};
+	const renderedInputs: Record<string, unknown> = {};
 	for (const [key, template] of Object.entries(step.inputs)) {
 		try {
 			renderedInputs[key] = templateRenderer.render(template, context, true);
@@ -94,12 +95,12 @@ export async function executeSubFlowStep(
 			console.log(`[StepRunner] SubFlowStep ${step.id} completed successfully`);
 
 			if (step.output) {
-				const subflowOutputsMap = new Map<string, Record<string, any>>();
+				const subflowOutputsMap = new Map<string, Record<string, unknown>>();
 				for (const [stepId, outputs] of Object.entries(result.outputs)) {
-					subflowOutputsMap.set(stepId, outputs as Record<string, any>);
+					subflowOutputsMap.set(stepId, outputs);
 				}
 				const outputContext: TemplateContext = { ...context, stepOutputs: subflowOutputsMap };
-				const extractedOutputs: Record<string, any> = {};
+				const extractedOutputs: Record<string, unknown> = {};
 				for (const [outputKey, template] of Object.entries(step.output)) {
 					if (typeof template === 'string') {
 						try {

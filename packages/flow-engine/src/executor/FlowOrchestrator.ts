@@ -119,7 +119,7 @@ export class FlowOrchestrator {
 		workspace: Workspace,
 		context: TemplateContext,
 		trace: FlowTrace,
-		stepOutputs: Map<string, Record<string, any>>,
+		stepOutputs: Map<string, Record<string, unknown>>,
 		onTraceUpdate?: (trace: FlowTrace) => void
 	): Promise<FlowExecutionResult> {
 		// parent implicitly depends on the parent step; auto-inject to avoid redundant YAML declarations
@@ -212,7 +212,7 @@ export class FlowOrchestrator {
 				// A model step's session is what a later sub-step relaunch of it resumes
 				if (!stepTrace.error && stepTrace.meta !== undefined) {
 					context.stepMeta ??= new Map();
-					context.stepMeta.set(item.stepId, stepTrace.meta as unknown as Record<string, unknown>);
+					context.stepMeta.set(item.stepId, { ...stepTrace.meta });
 				}
 
 				const outcome: StepOutcome = stepTrace.error
@@ -299,8 +299,8 @@ export class FlowOrchestrator {
 	/**
 	 * Convert Map to plain object for serialization
 	 */
-	private mapToObject(map: Map<string, Record<string, any>>): Record<string, Record<string, any>> {
-		const obj: Record<string, Record<string, any>> = {};
+	private mapToObject(map: Map<string, Record<string, unknown>>): Record<string, Record<string, unknown>> {
+		const obj: Record<string, Record<string, unknown>> = {};
 		for (const [key, value] of Array.from(map.entries())) {
 			obj[key] = value;
 		}

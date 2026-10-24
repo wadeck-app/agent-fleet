@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { Orchestrator } from 'orchestrator';
 import { getOrchestratorPortsFromEnv } from 'shared-common/PortCalculator';
 import { createLogger } from 'shared-common/logger';
+import type { WebSocketServer } from 'ws';
 
 import { TransportsController } from './controllers/TransportsController';
 import type { DataStoreFactory } from './factories';
@@ -35,6 +36,15 @@ import { WebSocketTransportServer } from './transport/adapters/WebSocketTranspor
 import { initializeFactory } from './utils/factory-instance';
 
 const log = createLogger('BackendServer');
+
+/**
+ * Run an async task without awaiting it (event callbacks and signal handlers expect a void return); failures are logged
+ */
+function detach(task: () => Promise<void>): void {
+	task().catch(error => {
+		log.error('Unhandled error in detached task:', error);
+	});
+}
 
 // Get __dirname equivalent in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -276,7 +286,9 @@ function getNetworkAddresses(): string[] {
 
 	for (const name of Object.keys(interfaces)) {
 		const nets = interfaces[name];
-		if (!nets) continue;
+		if (!nets) {
+			continue;
+		}
 
 		for (const net of nets) {
 			// Skip internal and non-IPv4 addresses
@@ -351,15 +363,15 @@ function startDashboardBroadcaster(factory: DataStoreFactory): void {
 	};
 
 	// Initial broadcast on startup
-	broadcastDashboardData();
+	detach(broadcastDashboardData);
 
 	// Listen to orchestrator events and broadcast on changes (reactive mode)
-	orchestratorWrapper.on('task.created', broadcastDashboardData);
-	orchestratorWrapper.on('task.updated', broadcastDashboardData);
-	orchestratorWrapper.on('task.status_changed', broadcastDashboardData);
-	orchestratorWrapper.on('worker.connected', broadcastDashboardData);
-	orchestratorWrapper.on('worker.disconnected', broadcastDashboardData);
-	orchestratorWrapper.on('worker.status', broadcastDashboardData);
+	orchestratorWrapper.on('task.created', () => detach(broadcastDashboardData));
+	orchestratorWrapper.on('task.updated', () => detach(broadcastDashboardData));
+	orchestratorWrapper.on('task.status_changed', () => detach(broadcastDashboardData));
+	orchestratorWrapper.on('worker.connected', () => detach(broadcastDashboardData));
+	orchestratorWrapper.on('worker.disconnected', () => detach(broadcastDashboardData));
+	orchestratorWrapper.on('worker.status', () => detach(broadcastDashboardData));
 
 	log.info('[Dashboard Broadcaster] Started (reactive/event-driven mode)');
 }
@@ -389,12 +401,12 @@ function startTasksBroadcaster(factory: DataStoreFactory): void {
 	};
 
 	// Initial broadcast on startup
-	broadcastTasksData();
+	detach(broadcastTasksData);
 
 	// Listen to orchestrator events and broadcast on changes (reactive mode)
-	orchestratorWrapper.on('task.created', broadcastTasksData);
-	orchestratorWrapper.on('task.updated', broadcastTasksData);
-	orchestratorWrapper.on('task.status_changed', broadcastTasksData);
+	orchestratorWrapper.on('task.created', () => detach(broadcastTasksData));
+	orchestratorWrapper.on('task.updated', () => detach(broadcastTasksData));
+	orchestratorWrapper.on('task.status_changed', () => detach(broadcastTasksData));
 
 	log.info('[Tasks Broadcaster] Started (reactive/event-driven mode)');
 }
@@ -424,12 +436,12 @@ function startWorkersBroadcaster(factory: DataStoreFactory): void {
 	};
 
 	// Initial broadcast on startup
-	broadcastWorkersData();
+	detach(broadcastWorkersData);
 
 	// Listen to orchestrator events and broadcast on changes (reactive mode)
-	orchestratorWrapper.on('worker.connected', broadcastWorkersData);
-	orchestratorWrapper.on('worker.disconnected', broadcastWorkersData);
-	orchestratorWrapper.on('worker.status', broadcastWorkersData);
+	orchestratorWrapper.on('worker.connected', () => detach(broadcastWorkersData));
+	orchestratorWrapper.on('worker.disconnected', () => detach(broadcastWorkersData));
+	orchestratorWrapper.on('worker.status', () => detach(broadcastWorkersData));
 
 	log.info('[Workers Broadcaster] Started (reactive/event-driven mode)');
 }
@@ -457,49 +469,51 @@ function logToFile(message: string) {
 // This ensures clean shutdown even if SIGTERM arrives during startup
 const signals = ['SIGTERM', 'SIGINT', 'SIGBREAK'] as const;
 signals.forEach(signal => {
-	process.on(signal, async () => {
-		logToFile(` ${signal} SIGNAL RECEIVED `);
-		// Signal already logged by log.info below
-		log.info(`${signal} signal received: initiating graceful shutdown`);
-		try {
-			// Cleanup script processes first
-			if (factoryInstance) {
-				try {
-					logToFile('Cleaning up script processes...');
-					log.info('Cleaning up script processes...');
-					const scriptProcessService = factoryInstance.getScriptProcessService();
-					await scriptProcessService.cleanupAllProcesses();
-					logToFile('Script processes cleanup complete');
-				} catch (err) {
-					logToFile(`Error cleaning up script processes: ${err}`);
-					log.error('Error cleaning up script processes:', err);
+	process.on(signal, () => {
+		detach(async () => {
+			logToFile(` ${signal} SIGNAL RECEIVED `);
+			// Signal already logged by log.info below
+			log.info(`${signal} signal received: initiating graceful shutdown`);
+			try {
+				// Cleanup script processes first
+				if (factoryInstance) {
+					try {
+						logToFile('Cleaning up script processes...');
+						log.info('Cleaning up script processes...');
+						const scriptProcessService = factoryInstance.getScriptProcessService();
+						await scriptProcessService.cleanupAllProcesses();
+						logToFile('Script processes cleanup complete');
+					} catch (err) {
+						logToFile(`Error cleaning up script processes: ${err}`);
+						log.error('Error cleaning up script processes:', err);
+					}
 				}
-			}
 
-			// Close orchestrator second (if it was initialized)
-			if (orchestratorClient) {
-				logToFile('Shutting down orchestrator...');
-				log.info('Shutting down orchestrator...');
-				await orchestratorClient.shutdown();
-				logToFile('Orchestrator shutdown complete');
-			}
+				// Close orchestrator second (if it was initialized)
+				if (orchestratorClient) {
+					logToFile('Shutting down orchestrator...');
+					log.info('Shutting down orchestrator...');
+					await orchestratorClient.shutdown();
+					logToFile('Orchestrator shutdown complete');
+				}
 
-			// Then close fastify (if it was initialized)
-			if (fastifyInstance) {
-				logToFile('Closing fastify server...');
-				log.info('Closing fastify server...');
-				await fastifyInstance.close();
-				logToFile('Fastify closed');
-			}
+				// Then close fastify (if it was initialized)
+				if (fastifyInstance) {
+					logToFile('Closing fastify server...');
+					log.info('Closing fastify server...');
+					await fastifyInstance.close();
+					logToFile('Fastify closed');
+				}
 
-			logToFile('Server shutdown complete - exiting');
-			log.info('Server shutdown complete');
-			process.exit(0);
-		} catch (err) {
-			logToFile(`Error during shutdown: ${err}`);
-			log.error('Error during shutdown:', err);
-			process.exit(1);
-		}
+				logToFile('Server shutdown complete - exiting');
+				log.info('Server shutdown complete');
+				process.exit(0);
+			} catch (err) {
+				logToFile(`Error during shutdown: ${err}`);
+				log.error('Error during shutdown:', err);
+				process.exit(1);
+			}
+		});
 	});
 });
 
@@ -758,7 +772,7 @@ async function start(): Promise<void> {
 
 		// Add onClose hook to terminate all WebSocket connections before shutdown
 		// This prevents Fastify from hanging when trying to close with active connections
-		fastify.addHook('onClose', async instance => {
+		fastify.addHook('onClose', async () => {
 			log.info('[Fastify] onClose: Terminating all active WebSocket connections...');
 
 			// Close products WebSocket connections
@@ -770,13 +784,10 @@ async function start(): Promise<void> {
 				// Get WebSocketTransportServer and close all connections
 				// @formatter:off
 				// violations-suppress: ts/no-unsafe-type-cast ITransportServer does not expose .wss; accessing internal WebSocketServer for graceful shutdown
-				const wsServer = (transportServer as any).wss;
+				const wsServer = (transportServer as unknown as { wss?: WebSocketServer }).wss;
 				// @formatter:on
 				if (wsServer?.clients) {
-					// @formatter:off
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					wsServer.clients.forEach((client: any) => {
-						// @formatter:on
+					wsServer.clients.forEach(client => {
 						client.terminate();
 					});
 					log.info(`[Fastify] Terminated ${wsServer.clients.size} WebSocket connections`);
@@ -834,4 +845,4 @@ async function start(): Promise<void> {
 }
 
 logToFile('=== MODULE LOADED === About to call start()');
-start();
+detach(start);

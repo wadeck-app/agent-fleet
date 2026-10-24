@@ -1,10 +1,10 @@
 import { execFile } from 'node:child_process';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
-const COUNTED_IMAGES = ['bash.exe', 'conhost.exe', 'node.exe'] as const;
+type CountedImage = 'bash.exe' | 'conhost.exe' | 'node.exe';
 const TASKLIST_TIMEOUT_MS = 5000;
 
-export type ProcessCountResult =
-	{ ok: true; counts: Record<(typeof COUNTED_IMAGES)[number], number> } | { ok: false; error: string };
+export type ProcessCountResult = { ok: true; counts: Record<CountedImage, number> } | { ok: false; error: string };
 
 /** Returns `tasklist /FO CSV /NH` output; injectable for tests. */
 export type TaskListRunner = () => Promise<string>;
@@ -33,11 +33,13 @@ export class WindowsProcessCounter {
 			const counts = { 'bash.exe': 0, 'conhost.exe': 0, 'node.exe': 0 };
 			for (const line of output.split(/\r?\n/)) {
 				const image = /^"([^"]*)"/.exec(line)?.[1]?.toLowerCase();
-				if (image && image in counts) counts[image as keyof typeof counts]++;
+				if (image && image in counts) {
+					counts[image as keyof typeof counts]++;
+				}
 			}
 			return { ok: true, counts };
 		} catch (error) {
-			return { ok: false, error: error instanceof Error ? error.message : String(error) };
+			return { ok: false, error: normalizeError(error).message };
 		}
 	}
 }

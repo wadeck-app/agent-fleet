@@ -39,7 +39,7 @@ Runs a shell command via `execFile`. The payload fields are passed as environmen
 **`debug: true`** -- pipes the hook's stdout and stderr directly to the calling terminal. For debugging only. Do NOT use in production (output mixes with CLI output, incompatible with `--json` mode). Default: `false`.
 
 ```yaml
-# .flows/config.yml
+# .flow/config.yml
 hooks:
     onFlowStart:
         - type: cli
@@ -69,7 +69,7 @@ Note: task hook command strings are split on whitespace. Complex commands must u
 POSTs a JSON body to the configured URL. The payload is the raw object (camelCase keys, not SCREAMING_SNAKE_CASE).
 
 ```yaml
-# .flows/config.yml
+# .flow/config.yml
 hooks:
     onFlowEnd:
         - type: http
@@ -91,7 +91,7 @@ Both `http://` and `https://` URLs are supported. Timeout is 10 seconds.
 
 ### Flow hooks
 
-File: `.flows/config.yml` in the working directory where `flow run` is invoked.
+File: `.flow/config.yml` at the project root, found by walking up from the directory where `flow run` is invoked (else the git root).
 
 ```yaml
 hooks:

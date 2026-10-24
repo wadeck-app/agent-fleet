@@ -1,5 +1,6 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 import { createLogger } from 'shared-common/logger';
+import type { OrchestratorStats } from 'shared-orch-worker/domain-types';
 
 import type { WorkerFlows } from '@app/shared/api/flows.contract';
 import {
@@ -17,6 +18,21 @@ import type { WorkersRepository } from '../repositories/WorkersRepository';
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
 
 const log = createLogger('WorkersService');
+
+/**
+ * Connected worker as listed by the orchestrator stats.
+ * The stats schema does not declare taskStartedAt, but the orchestrator sends it at runtime.
+ */
+type RuntimeWorker = OrchestratorStats['workersList'][number] & { taskStartedAt?: string | null };
+
+/**
+ * Workspace of a connected worker, as reported by the orchestrator WebSocket server
+ */
+interface ConnectedWorkerWorkspace {
+	workerId: string;
+	workspacePath: string;
+	projectId: string;
+}
 
 /**
  * ===========================================================================================
@@ -72,7 +88,7 @@ export class WorkersService {
 
 			// Transform workers list
 			// Note: All workers in the list are connected (disconnected workers are removed)
-			const workers: Worker[] = stats.workersList.map((w: any) => ({
+			const workers: Worker[] = stats.workersList.map((w: RuntimeWorker) => ({
 				workerId: w.id,
 				name: metadataMap.get(w.id)?.name, // Merge name from metadata
 				version: metadataMap.get(w.id)?.version, // Merge version from metadata
@@ -140,7 +156,7 @@ export class WorkersService {
 			const allMetadata = await this.workersRepository.findAll();
 			const metadataMap = new Map(allMetadata.map(m => [m.workerId, m]));
 
-			let workers: Worker[] = stats.workersList.map((w: any) => ({
+			let workers: Worker[] = stats.workersList.map((w: RuntimeWorker) => ({
 				workerId: w.id,
 				name: metadataMap.get(w.id)?.name, // Merge name from metadata
 				version: metadataMap.get(w.id)?.version, // Merge version from metadata
@@ -201,7 +217,9 @@ export class WorkersService {
 	 */
 	private applySearch(workers: Worker[], searchQuery: string): Worker[] {
 		const lowerQuery = searchQuery.toLowerCase().trim();
-		if (!lowerQuery) return workers;
+		if (!lowerQuery) {
+			return workers;
+		}
 
 		return workers.filter(
 			w =>
@@ -222,8 +240,12 @@ export class WorkersService {
 			const aVal = (a as { [k: string]: unknown })[sortBy];
 			const bVal = (b as { [k: string]: unknown })[sortBy];
 
-			if (aVal === null || aVal === undefined) return 1;
-			if (bVal === null || bVal === undefined) return -1;
+			if (aVal === null || aVal === undefined) {
+				return 1;
+			}
+			if (bVal === null || bVal === undefined) {
+				return -1;
+			}
 
 			let comparison = 0;
 			if (typeof aVal === 'boolean') {
@@ -247,22 +269,22 @@ export class WorkersService {
 	 * @throws NotFoundException if worker not found in orchestrator and has no metadata
 	 */
 	async getWorker(workerId: string): Promise<Worker> {
-		let runtimeWorker: any = null;
-		let workerWorkspace: any = null;
+		let runtimeWorker: RuntimeWorker | undefined;
+		let workerWorkspace: ConnectedWorkerWorkspace | undefined;
 
 		// Try to fetch runtime data from orchestrator
 		try {
 			const stats = await this.orchestratorWrapper.getStats();
-			runtimeWorker = stats.workersList.find((w: any) => w.id === workerId);
+			runtimeWorker = stats.workersList.find((w: RuntimeWorker) => w.id === workerId);
 
 			// If worker is connected, fetch workspace info
 			if (runtimeWorker) {
 				const orchestrator = this.orchestratorWrapper.getOrchestrator();
 				const wsServer = orchestrator.getWsServer();
 				const connectedWorkspaces = wsServer?.getConnectionManager().getConnectedWorkspaces() ?? [];
-				workerWorkspace = connectedWorkspaces.find((w: any) => w.workerId === workerId);
+				workerWorkspace = connectedWorkspaces.find(w => w.workerId === workerId);
 			}
-		} catch (error) {
+		} catch {
 			// Orchestrator is offline - will check metadata below
 			log.debug('Orchestrator unavailable, checking metadata for worker:', workerId);
 		}
@@ -378,7 +400,7 @@ export class WorkersService {
 	async updateWorkerName(workerId: string, data: UpdateWorkerNameRequest, connId?: string): Promise<Worker> {
 		// 1. Validate worker exists in orchestrator (runtime data)
 		const stats = await this.orchestratorWrapper.getStats();
-		const runtimeWorker = stats.workersList.find((w: any) => w.id === workerId);
+		const runtimeWorker = stats.workersList.find((w: RuntimeWorker) => w.id === workerId);
 
 		if (!runtimeWorker) {
 			throw new NotFoundException(`Worker ${workerId} not found`, ERROR_CODES.RESOURCE_NOT_FOUND, { workerId });

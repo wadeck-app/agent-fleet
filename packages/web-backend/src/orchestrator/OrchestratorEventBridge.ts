@@ -1,6 +1,7 @@
 import type { OrchestratorWrapper } from 'orchestrator/core/OrchestratorWrapper';
 import { createLogger } from 'shared-common/logger';
 import { StateEvent } from 'shared-orch-worker/StateManager';
+import type { Intervention, WorkerInfo } from 'shared-orch-worker/domain-types';
 
 import type { Worker } from '@app/shared/api/workers.contract';
 import {
@@ -12,6 +13,7 @@ import {
 	B2F_WORKER_CONNECTED,
 	B2F_WORKER_DISCONNECTED,
 	B2F_WORKSPACES_UPDATED,
+	type EventData,
 } from '@app/shared/transport';
 
 import type { EventBroadcaster } from '../transport/EventBroadcaster';
@@ -83,7 +85,7 @@ export class OrchestratorEventBridge {
 			const stateManager = orchestrator.getTaskManager().getStateManager();
 
 			// Worker connected
-			stateManager.on(StateEvent.WORKER_CONNECTED, (data: { worker: any }) => {
+			stateManager.on(StateEvent.WORKER_CONNECTED, (data: { worker: WorkerInfo }) => {
 				log.info('WORKER_CONNECTED:', data.worker?.id);
 
 				const worker = this.transformWorker(data.worker);
@@ -93,11 +95,11 @@ export class OrchestratorEventBridge {
 
 				// Emit aggregate event for dashboard (used as invalidation signal by frontend)
 				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to WorkersData but only the event name is used for cache invalidation
-				this.eventBroadcaster.broadcast(B2F_WORKERS_UPDATED, {} as any);
+				this.eventBroadcaster.broadcast(B2F_WORKERS_UPDATED, {} as EventData<typeof B2F_WORKERS_UPDATED>);
 
 				// Emit workspaces updated event (new worker = new workspace potentially)
 				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Workspace[] but only the event name is used for cache invalidation
-				this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
+				this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as EventData<typeof B2F_WORKSPACES_UPDATED>);
 			});
 
 			// Worker disconnected
@@ -106,15 +108,17 @@ export class OrchestratorEventBridge {
 
 				// Emit specific event
 				// violations-suppress: ts/no-unsafe-type-cast event payload carries only workerId; EventTypes expects full Worker object for this event
-				this.eventBroadcaster.broadcast(B2F_WORKER_DISCONNECTED, { workerId: data.workerId } as any);
+				this.eventBroadcaster.broadcast(B2F_WORKER_DISCONNECTED, { workerId: data.workerId } as EventData<
+					typeof B2F_WORKER_DISCONNECTED
+				>);
 
 				// Emit aggregate event for dashboard (used as invalidation signal by frontend)
 				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to WorkersData but only the event name is used for cache invalidation
-				this.eventBroadcaster.broadcast(B2F_WORKERS_UPDATED, {} as any);
+				this.eventBroadcaster.broadcast(B2F_WORKERS_UPDATED, {} as EventData<typeof B2F_WORKERS_UPDATED>);
 
 				// Emit workspaces updated event (worker disconnected = workspace may disappear)
 				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Workspace[] but only the event name is used for cache invalidation
-				this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as any);
+				this.eventBroadcaster.broadcast(B2F_WORKSPACES_UPDATED, {} as EventData<typeof B2F_WORKSPACES_UPDATED>);
 			});
 
 			// Worker task assigned (worker state changed)
@@ -123,7 +127,7 @@ export class OrchestratorEventBridge {
 
 				// Emit aggregate event - dashboard needs to know worker states changed (invalidation signal)
 				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to WorkersData but only the event name is used for cache invalidation
-				this.eventBroadcaster.broadcast(B2F_WORKERS_UPDATED, {} as any);
+				this.eventBroadcaster.broadcast(B2F_WORKERS_UPDATED, {} as EventData<typeof B2F_WORKERS_UPDATED>);
 			});
 
 			// Task events (aggregate only - specific task events are emitted by TasksService)
@@ -138,13 +142,13 @@ export class OrchestratorEventBridge {
 			stateManager.on(StateEvent.TASK_UPDATED, () => {
 				log.debug('TASK_UPDATED');
 				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
-				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as EventData<typeof B2F_TASKS_UPDATED>);
 			});
 
 			stateManager.on(StateEvent.TASK_DELETED, () => {
 				log.debug('TASK_DELETED');
 				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to TasksData but only the event name is used for cache invalidation
-				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as any);
+				this.eventBroadcaster.broadcast(B2F_TASKS_UPDATED, {} as EventData<typeof B2F_TASKS_UPDATED>);
 			});
 
 			// Task trace updated (real-time log streaming)
@@ -158,7 +162,7 @@ export class OrchestratorEventBridge {
 
 			// Intervention events
 			// @formatter:off
-			stateManager.on('intervention.created', (intervention: any) => {
+			stateManager.on('intervention.created', (intervention: Intervention) => {
 				log.info('INTERVENTION_CREATED:', intervention.id);
 
 				// Transform intervention to match API contract (add missing BaseEntity fields)
@@ -170,11 +174,17 @@ export class OrchestratorEventBridge {
 
 				// Emit specific event
 				// violations-suppress: ts/no-unsafe-type-cast transformedIntervention has extra fields (version, updatedAt) not in Intervention; superset is safe for broadcast consumers
-				this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, transformedIntervention as any);
+				this.eventBroadcaster.broadcast(
+					B2F_INTERVENTION_CREATED,
+					transformedIntervention as EventData<typeof B2F_INTERVENTION_CREATED>
+				);
 
 				// Emit aggregate event (invalidation signal for frontend)
 				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Intervention[] but only the event name is used for cache invalidation
-				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, {} as any);
+				this.eventBroadcaster.broadcast(
+					B2F_INTERVENTIONS_UPDATED,
+					{} as EventData<typeof B2F_INTERVENTIONS_UPDATED>
+				);
 			});
 			// @formatter:on
 
@@ -219,7 +229,7 @@ export class OrchestratorEventBridge {
 	/**
 	 * Transform orchestrator worker info to frontend Worker format
 	 */
-	private transformWorker(worker: any): Worker {
+	private transformWorker(worker: WorkerInfo): Worker {
 		return {
 			workerId: worker.id,
 			name: undefined, // Name comes from WorkersRepository metadata

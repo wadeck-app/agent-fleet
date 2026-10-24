@@ -94,8 +94,12 @@ export class InMemoryQueryBuilder<T extends BaseEntity> implements QueryBuilder<
 					const bVal = b[sortClause.field];
 
 					let comparison = 0;
-					if (aVal < bVal) comparison = -1;
-					if (aVal > bVal) comparison = 1;
+					if (aVal < bVal) {
+						comparison = -1;
+					}
+					if (aVal > bVal) {
+						comparison = 1;
+					}
 
 					// If values are different, return the comparison
 					if (comparison !== 0) {
@@ -141,8 +145,8 @@ export class InMemoryQueryBuilder<T extends BaseEntity> implements QueryBuilder<
 				case '<=':
 					return fieldValue <= value;
 				case 'in':
-					// violations-suppress: ts/no-unsafe-type-cast 'in' operator checks array membership; fieldValue type is generic T[keyof T] which Array.includes does not accept without widening
-					return Array.isArray(value) && value.includes(fieldValue as any);
+					// violations-suppress: ts/no-unsafe-type-cast value is narrowed to an array of unknown; element type of the query value is not known statically
+					return Array.isArray(value) && (value as unknown[]).includes(fieldValue);
 				case 'contains':
 					return (
 						typeof fieldValue === 'string' &&
@@ -161,7 +165,9 @@ export class InMemoryQueryBuilder<T extends BaseEntity> implements QueryBuilder<
 	 * (OR logic would require more complex grouping)
 	 */
 	private evaluateWhereClauses(item: T): boolean {
-		if (this.whereClauses.length === 0) return true;
+		if (this.whereClauses.length === 0) {
+			return true;
+		}
 
 		// Simplified: treat all as AND for now
 		// To support OR properly, we'd need to group clauses

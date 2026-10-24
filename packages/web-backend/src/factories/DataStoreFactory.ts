@@ -17,7 +17,7 @@ import type { Product } from '@app/shared/api/products.contract';
 import type { Project } from '@app/shared/api/projects.contract';
 import type { Task } from '@app/shared/api/tasks.contract';
 import type { Ticket } from '@app/shared/api/tickets.contract';
-import type { ScriptProcess, WorkspaceScript } from '@app/shared/api/workspaceScripts.contract';
+import type { WorkspaceScript } from '@app/shared/api/workspaceScripts.contract';
 import type { WorkspaceMetadataEntity } from '@app/shared/api/workspaces.contract';
 
 import { FlowDesignerAgent } from '../agents/FlowDesignerAgent';

@@ -85,10 +85,9 @@ export class InterventionsService {
 			const sortOrder = query?.sortOrder || 'desc';
 
 			interventions.sort((a, b) => {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				let aVal: any = a[sortBy as keyof Intervention];
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				let bVal: any = b[sortBy as keyof Intervention];
+				// Sortable fields are primitives (string, number or boolean)
+				let aVal = a[sortBy as keyof Intervention] as string | number | boolean;
+				let bVal = b[sortBy as keyof Intervention] as string | number | boolean;
 
 				// Handle date comparisons
 				if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
@@ -103,8 +102,12 @@ export class InterventionsService {
 				}
 
 				// Compare
-				if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-				if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+				if (aVal < bVal) {
+					return sortOrder === 'asc' ? -1 : 1;
+				}
+				if (aVal > bVal) {
+					return sortOrder === 'asc' ? 1 : -1;
+				}
 				return 0;
 			});
 
@@ -153,7 +156,7 @@ export class InterventionsService {
 				this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, intervention);
 				// @formatter:off
 				// violations-suppress: ts/no-unsafe-type-cast aggregate invalidation signal; EventTypes maps this event to Intervention[] but only the event name is used for cache invalidation
-				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, {} as any);
+				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, {} as unknown as Intervention[]);
 				// @formatter:on
 			} catch (broadcastError) {
 				log.error(' Failed to broadcast events:', broadcastError);
@@ -222,10 +225,10 @@ export class InterventionsService {
 			// 3. Emit events for real-time UI updates
 			try {
 				// Broadcast the updated intervention
-				await this.eventBroadcaster.broadcast(B2F_INTERVENTION_ANSWERED, updatedIntervention);
+				this.eventBroadcaster.broadcast(B2F_INTERVENTION_ANSWERED, updatedIntervention);
 				// Broadcast updated list
 				const allInterventions = await this.interventionsRepository.findAll();
-				await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
+				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 			} catch (broadcastError) {
 				log.error(' Failed to broadcast intervention answered event:', broadcastError);
 			}
@@ -256,7 +259,7 @@ export class InterventionsService {
 			try {
 				// Broadcast updated list
 				const allInterventions = await this.interventionsRepository.findAll();
-				await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
+				this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 			} catch (broadcastError) {
 				log.error(' Failed to broadcast intervention cancelled event:', broadcastError);
 			}
@@ -286,7 +289,7 @@ export class InterventionsService {
 		try {
 			// Broadcast updated list
 			const allInterventions = await this.interventionsRepository.findAll();
-			await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
+			this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 		} catch (broadcastError) {
 			log.error(' Failed to broadcast bulk cancel event:', broadcastError);
 		}
@@ -302,11 +305,11 @@ export class InterventionsService {
 			// Get actual intervention from repository
 			const intervention = await this.interventionsRepository.findById(interventionId);
 			if (intervention) {
-				await this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, intervention);
+				this.eventBroadcaster.broadcast(B2F_INTERVENTION_CREATED, intervention);
 			}
 			// Broadcast updated list
 			const allInterventions = await this.interventionsRepository.findAll();
-			await this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
+			this.eventBroadcaster.broadcast(B2F_INTERVENTIONS_UPDATED, allInterventions);
 		} catch (error) {
 			log.error(' Failed to broadcast intervention created event:', error);
 		}

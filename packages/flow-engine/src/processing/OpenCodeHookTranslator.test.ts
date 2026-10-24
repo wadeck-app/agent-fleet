@@ -30,10 +30,8 @@ function extractAfterBody(js: string): string {
  * Evaluate a handler body with given input/output objects.
  * Returns undefined on success, re-throws on Error.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function runHandlerBody(body: string, input: Record<string, unknown>, output: Record<string, unknown>): void {
 	// new Function creates a function in the global scope -- safe for unit test evaluation
-	// eslint-disable-next-line no-new-func
 	const fn = new Function('input', 'output', body);
 	fn(input, output);
 }

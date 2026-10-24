@@ -21,9 +21,26 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
  */
 
 /**
+ * Anything exposing a Zod-like `parse` (Zod schemas satisfy this)
+ */
+export interface ParsableSchema {
+	parse(data: unknown): unknown;
+}
+
+/**
+ * Runtime shape of a route contract: optional Zod schemas for each request/response part
+ */
+export interface RouteContract {
+	params?: ParsableSchema;
+	query?: ParsableSchema;
+	body?: ParsableSchema;
+	response?: ParsableSchema;
+}
+
+/**
  * Route handler function signature
  */
-export type RouteHandler = (request: FastifyRequest, reply: FastifyReply, controller: any) => Promise<any>;
+export type RouteHandler = (request: FastifyRequest, reply: FastifyReply, controller: unknown) => Promise<unknown>;
 
 /**
  * Parameterized route information
@@ -32,7 +49,7 @@ interface ParamRoute {
 	method: string;
 	pattern: RegExp;
 	paramNames: string[];
-	contract: any;
+	contract: RouteContract;
 	relativePath: string; // The pattern path (e.g., '/:id')
 }
 
@@ -40,7 +57,7 @@ interface ParamRoute {
  * Match result
  */
 export interface MatchResult {
-	contract: any;
+	contract: RouteContract;
 	params: Record<string, string>;
 	relativePath: string; // The pattern path (e.g., '/:id') for handler lookup
 }
@@ -50,7 +67,7 @@ export interface MatchResult {
  */
 export class InternalRouter<Routes> {
 	// Exact routes: Map<"GET:/", contract>
-	private exactRoutes = new Map<string, any>();
+	private exactRoutes = new Map<string, RouteContract>();
 
 	// Parameterized routes: Array of patterns
 	private paramRoutes: ParamRoute[] = [];
@@ -73,12 +90,14 @@ export class InternalRouter<Routes> {
 		// New structure: iterate over paths first, then methods
 		// @formatter:on
 		// violations-suppress: ts/no-unsafe-type-cast ALL_API_ROUTES is a deeply-nested route map; no index type available to iterate it safely
-		for (const [fullPath, methods] of Object.entries(routes as any)) {
+		for (const [fullPath, methods] of Object.entries(routes as Record<string, unknown>)) {
 			// Skip internal properties (e.g., __baseUrl)
-			if (fullPath.startsWith('__')) continue;
+			if (fullPath.startsWith('__')) {
+				continue;
+			}
 
 			// violations-suppress: ts/no-unsafe-type-cast methods is a nested contract map; no index type available to iterate it safely
-			for (const [method, contract] of Object.entries(methods as any)) {
+			for (const [method, contract] of Object.entries(methods as Record<string, RouteContract>)) {
 				// Convert full path to relative path
 				const relativePath = this.toRelativePath(fullPath);
 
@@ -129,7 +148,9 @@ export class InternalRouter<Routes> {
 
 		// Try parameterized routes (O(n) but n is small, ~120ns)
 		for (const route of this.paramRoutes) {
-			if (route.method !== method) continue;
+			if (route.method !== method) {
+				continue;
+			}
 
 			const match = relativePath.match(route.pattern);
 			if (match && match.groups) {

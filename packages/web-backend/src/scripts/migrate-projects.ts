@@ -31,12 +31,6 @@ const DEFAULT_PROJECT = {
 	version: 0,
 };
 
-interface Task {
-	id: string;
-	projectId?: string;
-	[key: string]: unknown;
-}
-
 interface Project {
 	id: string;
 	name: string;

@@ -50,7 +50,7 @@ export class SemanticValidator {
 		// Validate subflow references and configuration
 		for (const step of flow.steps) {
 			if (step.type === 'subflow') {
-				this.validateSubFlowReferences(step as SubFlowStep, flow.id, stepIds);
+				this.validateSubFlowReferences(step as SubFlowStep, flow.id);
 			}
 		}
 	}
@@ -242,9 +242,8 @@ export class SemanticValidator {
 	 *
 	 * @param step - SubFlow step to validate
 	 * @param currentFlowId - ID of the flow containing this step
-	 * @param stepIds - Set of valid step IDs (for context)
 	 */
-	private validateSubFlowReferences(step: SubFlowStep, currentFlowId: string, stepIds: Set<string>): void {
+	private validateSubFlowReferences(step: SubFlowStep, currentFlowId: string): void {
 		// Check for circular references FIRST (before checking if flow exists)
 		// This is important because a flow might reference itself before it's registered
 		const isCircular = this.graphValidator.validateSubFlowCircularity(step, currentFlowId);

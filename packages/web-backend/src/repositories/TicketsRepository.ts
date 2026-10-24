@@ -29,6 +29,11 @@ import type { BaseRepository } from './BaseRepository';
  * ===========================================================================================
  */
 
+/**
+ * Ticket document including the embedded comments and audit trail (not part of the Ticket contract)
+ */
+type TicketDocument = Ticket & { comments?: TicketComment[]; history?: TicketHistoryEntry[] };
+
 export class TicketsRepository {
 	constructor(private readonly base: BaseRepository<Ticket>) {}
 
@@ -120,8 +125,10 @@ export class TicketsRepository {
 		};
 
 		const existing = ticket.comments ?? [];
-		// violations-suppress: ts/no-unsafe-type-cast BaseRepository.update() is public but not exposed on the TicketsRepository interface; widening to call it directly
-		await (this.base as any).update(ticketId, { comments: [...existing, comment] });
+		// violations-suppress: ts/no-unsafe-type-cast comments are embedded in the stored document but absent from the Ticket contract
+		await (this.base as unknown as BaseRepository<TicketDocument>).update(ticketId, {
+			comments: [...existing, comment],
+		});
 
 		return comment;
 	}
@@ -161,8 +168,10 @@ export class TicketsRepository {
 		};
 
 		const existing = ticket.history ?? [];
-		// violations-suppress: ts/no-unsafe-type-cast BaseRepository.update() is public but not exposed on the TicketsRepository interface; widening to call it directly
-		await (this.base as any).update(ticketId, { history: [...existing, entry] });
+		// violations-suppress: ts/no-unsafe-type-cast history is embedded in the stored document but absent from the Ticket contract
+		await (this.base as unknown as BaseRepository<TicketDocument>).update(ticketId, {
+			history: [...existing, entry],
+		});
 
 		return entry;
 	}

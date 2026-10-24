@@ -7,6 +7,7 @@ import { ROUTES_BY_BASE_URL } from '@app/shared/types';
 
 import { CONTROLLER_REGISTRY } from './controller-registry';
 import { getFactory } from './factory-instance';
+import type { RouteWrapperFunc } from './fastify-wrapper';
 import { InternalRouter } from './internal-router';
 
 const log = createLogger('LazyControllerPlugin');
@@ -38,31 +39,50 @@ const log = createLogger('LazyControllerPlugin');
 /**
  * Controller interface
  */
-export interface LazyController<Routes = any> {
+export interface LazyController<Routes = unknown> {
 	configureRoutes(add: RouteWrapperFunc<Routes>): void;
+}
+
+/**
+ * Controller with the contract-specific wrapper type erased ("never" parameter), so every concrete controller is assignable
+ */
+export interface ErasedLazyController {
+	configureRoutes(add: never): void;
 }
 
 /**
  * Controller class interface with static routes property
  */
-export interface LazyControllerClass<Routes = any> {
-	new (): LazyController<Routes>;
-	routes: Routes;
+export interface LazyControllerClass {
+	// Constructor arguments (services) are injected dynamically per baseUrl
+	new (...args: never[]): ErasedLazyController;
+	routes: unknown;
 }
 
 /**
  * Controller loader function type
  */
-type ControllerLoader<Routes = any> = () => Promise<{ default: LazyControllerClass<Routes> }>;
+type ControllerLoader = () => Promise<{ default: unknown }>;
 
 /**
- * Route wrapper function type (kept for controller compatibility)
+ * Validated request handed to a route handler by the plugin
  */
-export type RouteWrapperFunc<_Routes> = <M extends string, P extends string>(
-	method: M,
-	path: P,
-	handler: (validated: any) => Promise<any>
-) => void;
+export interface ValidatedRequest {
+	params: unknown;
+	query: unknown;
+	body: unknown;
+	connId: string | undefined;
+}
+
+/**
+ * Handler registered by a controller through the route wrapper
+ */
+type RouteHandlerFunc = (validated: ValidatedRequest) => Promise<unknown>;
+
+/**
+ * Loosely typed route collector: the plugin only stores handlers by key, the contract typing is enforced by the controllers
+ */
+type RouteHandlerCollector = (method: string, path: string, handler: RouteHandlerFunc) => void;
 
 // Track registered paths for ordering validation (dev-only)
 const registeredPaths: string[] = [];
@@ -72,7 +92,7 @@ const registeredPaths: string[] = [];
  * @param baseUrl - The base URL (e.g., '/api/ingredients')
  * @param loader - The controller loader function
  */
-export function registerControllerWithCheck(baseUrl: string, loader: () => Promise<any>) {
+export function registerControllerWithCheck(baseUrl: string, loader: ControllerLoader) {
 	// Check path ordering ONLY in development (not in production or test)
 	if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
 		// Check if a MORE SPECIFIC path (longer) was already registered
@@ -100,14 +120,11 @@ export function registerControllerWithCheck(baseUrl: string, loader: () => Promi
 /**
  * Creates a lazy loading controller plugin with true on-demand initialization
  */
-function createLazyControllerPlugin<Routes = any>(
-	baseUrl: string,
-	loader: ControllerLoader<Routes>
-): FastifyPluginAsync {
+function createLazyControllerPlugin(baseUrl: string, loader: ControllerLoader): FastifyPluginAsync {
 	// All state is null until first request (true lazy loading)
-	let controllerInstance: LazyController<Routes> | null = null;
-	let router: InternalRouter<Routes> | null = null;
-	let handlerMap: Map<string, (validated: any) => Promise<any>> | null = null;
+	let controllerInstance: ErasedLazyController | null = null;
+	let router: InternalRouter<unknown> | null = null;
+	let handlerMap: Map<string, RouteHandlerFunc> | null = null;
 	// Initialization promise ensures concurrent requests wait for a single init
 	let initializationPromise: Promise<void> | null = null;
 
@@ -144,7 +161,8 @@ function createLazyControllerPlugin<Routes = any>(
 
 		// 3. Load controller module and create instance with service injection
 		const module = await loader();
-		const ControllerClass = module.default;
+		// violations-suppress: ts/no-unsafe-type-cast loaders come from the untyped routes table; the default export is a controller class by convention and is checked for presence below
+		const ControllerClass = module.default as LazyControllerClass | undefined;
 
 		if (!ControllerClass) {
 			throw new Error(`Controller not found in module (missing default export?), baseUrl: ${baseUrl}`);
@@ -152,7 +170,6 @@ function createLazyControllerPlugin<Routes = any>(
 
 		// Get the appropriate service from factory based on baseUrl
 		const factory = getFactory();
-		let service: any;
 
 		//FIXME refactor this injection in a cleaner way!!!
 
@@ -164,32 +181,32 @@ function createLazyControllerPlugin<Routes = any>(
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(authService, sessionManager);
 		} else if (baseUrl === '/api/ingredients') {
-			service = factory.getIngredientsService();
+			const service = factory.getIngredientsService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/books') {
-			service = factory.getBooksService();
+			const service = factory.getBooksService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/dashboard') {
-			service = factory.getDashboardService();
+			const service = factory.getDashboardService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/flows') {
-			service = factory.getFlowsService();
+			const service = factory.getFlowsService();
 			const flowFeedbackService = factory.getFlowFeedbackService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service, flowFeedbackService);
 		} else if (baseUrl === '/api/flow-daemon') {
-			service = factory.getFlowQueryService();
+			const service = factory.getFlowQueryService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/workers') {
-			service = factory.getWorkersService();
+			const service = factory.getWorkersService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/tasks') {
-			service = factory.getTasksService();
+			const service = factory.getTasksService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/workspaces') {
@@ -200,7 +217,7 @@ function createLazyControllerPlugin<Routes = any>(
 			const scriptLogsStorage = factory.getScriptLogsStorage();
 			const workspaceFileService = factory.getWorkspaceFileService();
 			// violations-suppress: ts/no-unsafe-type-cast dynamic controller instantiation; ControllerClass is a union of concrete classes with different constructor signatures
-			controllerInstance = new (ControllerClass as any)(
+			controllerInstance = new (ControllerClass as unknown as new (...args: unknown[]) => ErasedLazyController)(
 				workspacesService,
 				workspaceScriptsService,
 				scriptProcessService,
@@ -208,23 +225,23 @@ function createLazyControllerPlugin<Routes = any>(
 				workspaceFileService
 			);
 		} else if (baseUrl === '/api/interventions') {
-			service = factory.getInterventionsService();
+			const service = factory.getInterventionsService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/products') {
-			service = factory.getProductsService();
+			const service = factory.getProductsService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/projects') {
-			service = factory.getProjectsService();
+			const service = factory.getProjectsService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/flow-feedback') {
-			service = factory.getFlowFeedbackService();
+			const service = factory.getFlowFeedbackService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
 			controllerInstance = new ControllerClass(service);
 		} else if (baseUrl === '/api/tickets') {
-			service = factory.getTicketsService();
+			const service = factory.getTicketsService();
 			const flowFeedbackService = factory.getFlowFeedbackService();
 			const flowProposalsService = factory.getFlowProposalsService();
 			// @ts-expect-error - Dynamic service injection based on baseUrl
@@ -239,13 +256,14 @@ function createLazyControllerPlugin<Routes = any>(
 		}
 
 		handlerMap = new Map();
-		const collectHandlers: RouteWrapperFunc<Routes> = (method, path, handler) => {
+		const collectHandlers: RouteHandlerCollector = (method, path, handler) => {
 			const relativePath = path.startsWith(baseUrl) ? path.substring(baseUrl.length) || '/' : path;
 			const key = `${method}:${relativePath}`;
 			handlerMap!.set(key, handler);
 		};
 
-		controllerInstance.configureRoutes(collectHandlers);
+		// violations-suppress: ts/no-unsafe-type-cast controllers receive the contract-typed wrapper; the collector only needs the untyped handler
+		controllerInstance.configureRoutes(collectHandlers as never);
 
 		// console.log(`[LAZY] ${baseUrl} initialized in ${(endTime - startTime).toFixed(2)}ms (${router.routeCount} routes)`);
 	};
@@ -279,7 +297,7 @@ function createLazyControllerPlugin<Routes = any>(
 				const connId = request.headers['x-conn-id'] as string | undefined;
 
 				// Validate input using Zod schemas from contract
-				const validated: any = {
+				const validated: ValidatedRequest = {
 					params: extractedParams,
 					query: {},
 					body: {},
@@ -300,7 +318,7 @@ function createLazyControllerPlugin<Routes = any>(
 				if (contract.params) {
 					const mergedParams = {
 						...extractedParams,
-						...((request.params as Record<string, any>) || {}),
+						...((request.params as object | null) || {}),
 					};
 					validated.params = contract.params.parse(mergedParams);
 				}

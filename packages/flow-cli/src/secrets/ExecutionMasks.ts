@@ -1,4 +1,5 @@
-import { MASKING_FAILED, SecretMasker, mapStringLeaves } from './SecretMasker';
+import { MASKING_FAILED, mapStringLeaves } from './SecretMasker';
+import type { SecretMasker } from './SecretMasker';
 
 /** Called when a masker throws; receives the execution id and the error, never the text. */
 export type MaskingFailureReporter = (executionId: string, error: unknown) => void;
