@@ -28,6 +28,7 @@ export class WebSocketServer {
 	private readonly httpServer: http.Server | https.Server;
 	private readonly bindAddress: string;
 	private _port: number;
+	private closed = false;
 
 	constructor(
 		port: number,
@@ -57,13 +58,21 @@ export class WebSocketServer {
 		this.wss.on('error', () => {});
 	}
 
-	/** Bind to the requested port, retrying up to 10 increments on EADDRINUSE (e.g. TIME_WAIT). */
+	/**
+	 * Bind to the requested port, retrying up to 10 increments on EADDRINUSE (e.g. TIME_WAIT).
+	 *
+	 * When the whole range is taken, an OS-assigned port is bound instead of failing: the bound port is published for
+	 * workers to read, so any free one serves, while a daemon with no listener accepts runs it can never execute.
+	 * Callers compare the returned port with the requested one to report the move.
+	 */
 	start(): Promise<number> {
 		return new Promise((resolve, reject) => {
 			const tryBind = (p: number, attemptsLeft: number): void => {
 				this.httpServer.once('error', (err: NodeJS.ErrnoException) => {
 					if (err.code === 'EADDRINUSE' && attemptsLeft > 0) {
 						tryBind(p + 1, attemptsLeft - 1);
+					} else if (err.code === 'EADDRINUSE' && p !== 0) {
+						tryBind(0, 0);
 					} else {
 						reject(err);
 					}
@@ -117,7 +126,12 @@ export class WebSocketServer {
 		});
 	}
 
+	/** Safe to call more than once: every stop path closes the listener, and some reach it twice. */
 	close(): void {
+		if (this.closed) {
+			return;
+		}
+		this.closed = true;
 		this.wss.close();
 		this.httpServer.close();
 	}

@@ -144,3 +144,44 @@ describe('WebSocketServer - P-5 enforcement', () => {
 		expect(port).toBeGreaterThan(0);
 	});
 });
+
+describe('WebSocketServer - crowded port range', () => {
+	// Orphaned daemons keep their worker listener bound, so the ports just above the requested one can all be taken.
+	// Rejecting then left the daemon with no listener: runs queued forever and every forked worker dialed a port
+	// nobody served. Any free port serves, because the bound one is published for workers to read.
+	it('binds an OS-assigned port when the requested port and the ten above it are all taken', async () => {
+		const occupant = new WebSocketServer(
+			0,
+			() => {},
+			() => {}
+		);
+		const base = await occupant.start();
+		const neighbours: WebSocketServer[] = [];
+		try {
+			for (let offset = 1; offset <= 10; offset++) {
+				const neighbour = new WebSocketServer(
+					base + offset,
+					() => {},
+					() => {}
+				);
+				// Each must bind exactly where asked, or the range is not actually crowded.
+				expect(await neighbour.start()).toBe(base + offset);
+				neighbours.push(neighbour);
+			}
+
+			server = new WebSocketServer(
+				base,
+				() => {},
+				() => {}
+			);
+			const bound = await server.start();
+
+			expect(bound).toBeGreaterThan(0);
+			expect(bound < base || bound > base + 10).toBe(true);
+			expect(server.port).toBe(bound);
+		} finally {
+			occupant.close();
+			for (const neighbour of neighbours) neighbour.close();
+		}
+	});
+});

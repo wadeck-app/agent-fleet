@@ -145,6 +145,14 @@ async function startDaemon(
 				if (updateCheckTimer !== undefined) {
 					clearInterval(updateCheckTimer);
 				}
+				// Every stop path releases the worker listener, not only the idle one. An open listener and
+				// connected workers keep the process alive after its command server is gone: an orphan holding a
+				// worker port that the next daemon then has to scan past, until none is left.
+				if (runtime !== undefined) {
+					runtime.workerRegistry.broadcastToEphemeral({ type: 'done' });
+					runtime.workerRegistry.disconnectExternal();
+					runtime.wsServer.close();
+				}
 				// The hook is synchronous: the flush runs on, and stop() below waits for it. Pushes in flight
 				// also keep the process alive until they settle.
 				shutdownFlush = eventPublisher.flush().catch((err: unknown) => {
@@ -231,6 +239,13 @@ async function startDaemon(
 						// getter reports the *requested* port until the listener binds, and the
 						// retry above means that request is often wrong.
 						workerListenerPort = boundPort;
+						if (boundPort !== wsPort) {
+							writeDaemonLog(
+								logsDir,
+								'info',
+								`Worker listener bound on port ${String(boundPort)} instead of ${String(wsPort)}: the requested port and the ones above it were in use (orphaned flow daemons keep theirs; look for stray node processes running flow.cjs). Workers read the real port from worker.port.`
+							);
+						}
 						// Published because the retry means the bound port is not always
 						// `httpPort + 1`. A client that assumed the offset would dial whatever
 						// else holds that port, so the real one is written down for them.

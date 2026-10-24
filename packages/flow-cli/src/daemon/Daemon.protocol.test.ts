@@ -152,3 +152,42 @@ describe('Daemon plugin config refusals', () => {
 		);
 	});
 });
+
+describe('Daemon stop releases the worker listener', () => {
+	// `flow stop`, a signal or an update stop the daemon through the kit, not through the idle path. Only the idle path
+	// used to close the worker listener, so every other stop left an orphan process holding a worker port; a dozen of
+	// them exhausted the retry range and the next daemon started with no listener at all.
+	it.each(['command', 'signal', 'update', 'error'] as const)(
+		'stops accepting workers after a stop for reason %s',
+		async reason => {
+			const daemonDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-stop-'));
+			const handle = await Daemon.start(
+				{ ...FlowConfigLoader.DEFAULT, worker: { ...FlowConfigLoader.DEFAULT.worker, wsPort: 0 } },
+				daemonDir,
+				{ port: 0, stopWhenIdle: false }
+			);
+			try {
+				const portFile = path.join(daemonDir, 'worker.port');
+				await waitUntil(() => fs.existsSync(portFile), {
+					timeoutMs: 4_000,
+					failureMessage: 'the daemon never published a worker port',
+				});
+				const { port } = JSON.parse(fs.readFileSync(portFile, 'utf8')) as { port: number };
+
+				await handle.stop(reason);
+
+				const outcome = await new Promise<string>(resolve => {
+					const probe = new WebSocket(`ws://127.0.0.1:${String(port)}`);
+					probe.once('open', () => {
+						probe.close();
+						resolve('still listening');
+					});
+					probe.once('error', () => resolve('refused'));
+				});
+				expect(outcome).toBe('refused');
+			} finally {
+				fs.rmSync(daemonDir, { recursive: true, force: true });
+			}
+		}
+	);
+});
