@@ -1,185 +1,78 @@
 import type { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
-import type {
-	ApprovalProvider,
-	InteractivityPolicyProvider,
-	StepPlacement,
-	WorkspaceHandle,
-	WorkspaceProvider,
-} from 'extension-points';
-import { releaseWorkspace } from 'extension-points';
+import type { ApprovalProvider, InteractivityPolicyProvider, WorkspaceProvider } from 'extension-points';
 import {
 	DefinitionSnapshotStore,
 	FlowDefinitionResolver,
 	definitionsDirOf,
 	executionsDirOf,
-	generateExecutionId,
 	logsDirOf,
 } from 'flow-core';
-import { WorkspaceManager } from 'flow-engine';
-import { FlowScheduler, buildSubStepFeedback } from 'flow-engine';
-import type { ReadyItem, SchedulerContext, SchedulerStep } from 'flow-engine';
-import { TemplateRenderer } from 'flow-engine';
-import type { FlowDefinition, FlowPluginOverrides, FlowStep } from 'flow-engine';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMessage';
+import type { FlowPluginOverrides } from 'flow-engine';
+import type { StepMeta } from 'flow-engine/types';
 import type { WebSocket } from 'ws';
 
-import { ProjectResolverFactory } from '../config/ProjectResolverFactory.js';
-import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
-import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
-import type { ExecutionSecrets } from '../secrets/ExecutionSecrets';
-import { SecretsResolutionFailedError } from '../secrets/SecretErrors';
+import type { ClientCommand, DaemonResponse, InjectedStep } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
-import { AssignmentLedger } from './AssignmentLedger.js';
-import { writeDaemonLog } from './DaemonLog.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
-import { assertStepLabels } from './LabelMatcher.js';
-import { ProjectResolutionRefusal } from './ProjectResolutionRefusal.js';
+import { ExecutionHooks } from './ExecutionHooks.js';
+import { ExecutionRegistry } from './ExecutionRegistry.js';
+import { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
+import { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
+import { ReadyStepQueue } from './ReadyStepQueue.js';
 import { RunDefinitionLoader } from './RunDefinitionLoader.js';
-import { StalledStepWatch } from './StalledStepWatch.js';
-import { StepRouter } from './StepRouter.js';
+import { RunRequestHandler } from './RunRequestHandler.js';
+import { RunStepPreparer } from './RunStepPreparer.js';
+import { StepDispatcher } from './StepDispatcher.js';
+import { DEFAULT_MAX_INJECTED_STEPS, DEFAULT_MAX_STEPS_PER_EXECUTION, StepInjection } from './StepInjection.js';
+import { StepOutcomes } from './StepOutcomes.js';
+import { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
+import { DEFAULT_STEP_SILENCE_LIMIT_MS, WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 
-// Default limits - overridden by FlowConfig.limits passed to CommandHandler constructor
+export { DEFAULT_STEP_SILENCE_LIMIT_MS, MAX_REDISPATCHES } from './WorkerAssignmentSupervisor.js';
+
 /**
- * How many times a step may be re-dispatched after a worker vanished before it started.
+ * The daemon's entry point for everything about executions and the work handed to workers.
  *
- * Each re-dispatch is free by design (D#43), so without a bound a step that every worker
- * drops before starting would be requeued forever and the flow would never finish or fail.
+ * A facade over the collaborators that each own one part of it: accepting a run
+ * (`RunRequestHandler`), dispatching ready steps (`StepDispatcher`), supervising what workers hold
+ * (`WorkerAssignmentSupervisor`), what a step's end means (`StepOutcomes`) and injected steps
+ * (`StepInjection`).
  */
-export const MAX_REDISPATCHES = 3;
-
-/**
- * How often dispatch is retried while S8 is waiting for a declared source.
- *
- * Needed because with no live worker there is no `ready` message coming and no other event
- * to re-run dispatch: without this the wait would never end and the queue would sit still.
- */
-const DEMAND_RECHECK_MS = 250;
-
-/**
- * Default silence after which an executing step is treated as stuck.
- *
- * Thirty minutes because a model step can think for a long time without printing, and failing honest
- * work is worse than noticing a wedged one late. Override with `queue.stepSilenceLimit`.
- */
-export const DEFAULT_STEP_SILENCE_LIMIT_MS = 30 * 60 * 1000;
-
-/**
- * Confirms a step is one the daemon can hand to a worker.
- *
- * This used to be a `.filter()` keeping `model` and `script`, which meant a
- * `user_intervention` step was **dropped**: the execution ran, reported success, and simply
- * never asked the question. That was survivable only while such a flow was refused outright
- * (D#37 has since lifted that), and it is the kind of silence a filter invites -- so an
- * unexpected type now throws, and `handleRun` turns it into a refused run.
- */
-function assertAssignable(step: FlowStep): AssignableStep {
-	if (step.type === 'model' || step.type === 'script' || step.type === 'user_intervention') {
-		return step as AssignableStep;
-	}
-	throw new Error(
-		`Step "${step.id}" is of type "${step.type}", which the daemon cannot dispatch. Supported types: model, script, user_intervention.`
-	);
-}
-
-const DEFAULT_MAX_INJECTED_STEPS = 20;
-const DEFAULT_MAX_STEPS_PER_EXECUTION = 50;
-
-/**
- * True when a step_failed error is the file-approval timeout's exact sentinel, as opposed to
- * an explicit decision (approved/rejected never throws -- see UserInterventionStepExecutor) or
- * an unrelated provider crash. Matched on this literal phrase rather than the step type alone
- * so a crash that merely happens to be a user_intervention step is still cleaned up normally,
- * not left dangling as "resumable" forever.
- */
-function isUnansweredInterventionError(error: string): boolean {
-	return error.includes('this step is unanswered, not denied');
-}
-
-interface ReadyStep {
-	stepId: string;
-	stepConfig: AssignableStep;
-	executionContext: ExecutionContext;
-}
-
 export class CommandHandler {
 	private readonly executionStore: ExecutionStore;
 	private readonly logWriter: LogWriter;
-	/** Parses, validates and version-resolves the flow of a run request. */
-	private readonly definitionLoader: RunDefinitionLoader;
-	/** Per-execution FlowScheduler instances */
-	private readonly schedulers = new Map<string, FlowScheduler>();
-	/** Per-execution ExecutionContext */
-	private readonly executionContexts = new Map<string, ExecutionContext>();
-	/** Per-execution step counts (initial + injected), for MAX_INJECTED_STEPS limit */
-	private readonly stepCounts = new Map<string, number>();
-	/** Central queue of ready steps across all executions */
-	private readonly readyQueue: ReadyStep[] = [];
-	/** Work actually handed to each worker, so results can be bound to it (T-05) */
-	private readonly assignments = new AssignmentLedger();
+	private readonly executions = new ExecutionRegistry();
+	private readonly queue = new ReadyStepQueue();
+	private readonly hooks: ExecutionHooks;
+	private readonly demand: UnmetDemandCoverage;
+	private readonly supervisor: WorkerAssignmentSupervisor;
+	private readonly dispatcher: StepDispatcher;
+	private readonly outcomes: StepOutcomes;
+	private readonly injection: StepInjection;
+	private readonly runRequests: RunRequestHandler;
 	/**
-	 * What was handed to a worker, kept until the assignment settles.
-	 *
-	 * A disconnect has to re-dispatch the *payload*, and the assignment record only names
-	 * the step -- the rendered config and context are not recoverable from it (D#62).
+	 * While draining, new runs are refused so in-flight executions can finish and a pending update
+	 * can restart the daemon. Refused rather than queued: execution state lives only in this
+	 * process's memory, so a queued run would be lost by the very restart the drain is waiting for.
+	 * Not persisted: the restart that ends a drain also clears it.
 	 */
-	private readonly dispatched = new Map<string, ReadyStep>();
-	/** Re-dispatches spent per step, so a step nobody ever starts cannot loop forever (D#62) */
-	private readonly redispatchCounts = new Map<string, number>();
-	/**
-	 * Project each execution belongs to, for routing (D#9).
-	 *
-	 * Absent for a run started outside any project (D#10), which is why routing treats a
-	 * missing entry as "only daemon-created workers apply" rather than defaulting.
-	 */
-	private readonly executionProjects = new Map<string, string>();
-	/** Chooses which live worker a step goes to (S3, S4) */
-	private readonly router = new StepRouter();
-	/** Notices an executing step whose worker went quiet; the only detector of a wedged worker */
-	private readonly stalledSteps: StalledStepWatch;
-	/** Decides the fate of a step needing a human when nothing can host one (S9) */
-	private readonly interactivityPolicy: InteractivityPolicyProvider = new DefaultInteractivityPolicy();
-	/** When each interactive step started waiting, so an S9 policy can bound its own wait */
-	private readonly interactiveWaitSince = new Map<string, number>();
-	/** When the current episode of unserved demand began, for the S8 wait (D#25) */
-	private unmetDemandSince: number | undefined;
-	/** Pending re-run of dispatch while S8 waits; nothing else would trigger one */
-	private demandRecheck: ReturnType<typeof setTimeout> | undefined;
-	/** Per-execution hook dispatchers */
-	private readonly executionHooks = new Map<string, HookDispatcher>();
-	/** Per-execution plugin workspace handles (only when workspaceProvider is set) */
-	private readonly pluginWorkspaceHandles = new Map<
-		string,
-		{ handle: WorkspaceHandle; provider: WorkspaceProvider }
-	>();
-	/** Per-execution WorkspaceManager handles for the non-plugin path */
-	private readonly nativeWorkspaceManagers = new Map<string, { manager: WorkspaceManager; workspaceId: string }>();
-	/** Step definitions by execution, consulted on failure to decide resumability. */
-	private readonly stepDefinitions = new Map<string, Map<string, AssignableStep>>();
-	/**
-	 * Executions kept alive (not cleaned up) after a `user_intervention` step timed out
-	 * unanswered, so a later `flow resume` can re-dispatch exactly that step (see handleResume).
-	 */
-	private readonly resumableInterventions = new Map<string, { stepId: string }>();
-	private activeExecutionCount = 0;
+	private draining = false;
 
 	constructor(
-		private readonly daemonDir: string,
-		private readonly registry: WorkerRegistry,
-		private readonly provisioner: WorkerProvisioner,
-		private hookDispatcher?: HookDispatcher,
+		daemonDir: string,
+		registry: WorkerRegistry,
+		provisioner: WorkerProvisioner,
+		hookDispatcher?: HookDispatcher,
 		executionStore?: ExecutionStore,
 		logWriter?: LogWriter,
-		private readonly allowAbsolutePaths: boolean = false,
-		private readonly maxInjectedSteps: number = DEFAULT_MAX_INJECTED_STEPS,
-		private readonly maxStepsPerExecution: number = DEFAULT_MAX_STEPS_PER_EXECUTION,
-		private readonly workspaceProvider?: WorkspaceProvider,
+		allowAbsolutePaths: boolean = false,
+		maxInjectedSteps: number = DEFAULT_MAX_INJECTED_STEPS,
+		maxStepsPerExecution: number = DEFAULT_MAX_STEPS_PER_EXECUTION,
+		workspaceProvider?: WorkspaceProvider,
 		/**
 		 * Accepted and unused, on purpose.
 		 *
@@ -190,8 +83,8 @@ export class CommandHandler {
 		 * (`WorkerCommand`). The parameter stays only so the daemon's existing call site keeps
 		 * its shape; nothing here may start using it.
 		 */
-		private readonly daemonSideApprovalProviderUnused?: ApprovalProvider,
-		private readonly resolvePerFlowWorkspaceProvider?: (
+		_daemonSideApprovalProviderUnused?: ApprovalProvider,
+		resolvePerFlowWorkspaceProvider?: (
 			section: NonNullable<FlowPluginOverrides['workspace']>
 		) => Promise<WorkspaceProvider>,
 		/**
@@ -201,7 +94,7 @@ export class CommandHandler {
 		 * registry, the published endpoint -- which this class deliberately knows nothing
 		 * about. Optional so the many tests that never exercise provisioning stay unchanged.
 		 */
-		private readonly requestFromDeclaredSources?: () => void,
+		requestFromDeclaredSources?: () => void,
 		/**
 		 * S9 policy deciding the fate of a step needing a human (D#39).
 		 *
@@ -215,13 +108,13 @@ export class CommandHandler {
 		 * Generous by default: a model step can think for a long time without printing, and failing
 		 * honest work is worse than noticing a wedged one late.
 		 */
-		private readonly stalledStepLimitMs: number = DEFAULT_STEP_SILENCE_LIMIT_MS,
+		stalledStepLimitMs: number = DEFAULT_STEP_SILENCE_LIMIT_MS,
 		/**
 		 * Resolves, hands out and masks the secrets the flows declare. The execution store and log
 		 * writer built here share its masks; ones injected by the caller must be built with the same
 		 * `ExecutionMasks` (the daemon does), or their output is not masked.
 		 */
-		private readonly daemonSecrets: DaemonSecrets = new DaemonSecrets(),
+		daemonSecrets: DaemonSecrets = new DaemonSecrets(),
 		/**
 		 * Chooses the flow version a run follows and keeps its immutable snapshot under `<daemonDir>/definitions`.
 		 * Injected so a test can use its own snapshot directory.
@@ -230,14 +123,67 @@ export class CommandHandler {
 			new DefinitionSnapshotStore(definitionsDirOf(daemonDir))
 		)
 	) {
-		if (interactivityPolicy !== undefined) {
-			this.interactivityPolicy = interactivityPolicy;
-		}
-		this.stalledSteps = new StalledStepWatch(stalledStepLimitMs);
 		this.executionStore =
 			executionStore ?? new ExecutionStore(executionsDirOf(daemonDir), undefined, daemonSecrets.masks);
 		this.logWriter = logWriter ?? new LogWriter(logsDirOf(daemonDir), undefined, daemonSecrets.masks);
-		this.definitionLoader = new RunDefinitionLoader(definitionResolver, this.logWriter);
+		this.hooks = new ExecutionHooks(this.logWriter);
+		this.demand = new UnmetDemandCoverage(provisioner, () => this.tryDispatch(), requestFromDeclaredSources);
+		this.supervisor = new WorkerAssignmentSupervisor(
+			registry,
+			this.logWriter,
+			this.queue,
+			this.executions,
+			(executionId, stepId, reason) => this.outcomes.failStep(executionId, stepId, reason),
+			stalledStepLimitMs
+		);
+		this.dispatcher = new StepDispatcher(
+			registry,
+			this.queue,
+			this.executions,
+			this.supervisor,
+			this.demand,
+			daemonSecrets,
+			this.executionStore,
+			this.hooks,
+			this.logWriter,
+			interactivityPolicy ?? new DefaultInteractivityPolicy(),
+			(executionId, stepId, reason) => this.outcomes.failStep(executionId, stepId, reason)
+		);
+		const workspaces = new ExecutionWorkspaces(this.logWriter, workspaceProvider, resolvePerFlowWorkspaceProvider);
+		this.outcomes = new StepOutcomes(
+			this.executions,
+			this.queue,
+			this.executionStore,
+			this.logWriter,
+			daemonSecrets,
+			workspaces,
+			this.hooks,
+			() => this.tryDispatch(),
+			executionId => {
+				this.supervisor.forgetExecution(executionId);
+				this.dispatcher.forgetExecution(executionId);
+			}
+		);
+		this.injection = new StepInjection(
+			this.executions,
+			this.queue,
+			daemonSecrets,
+			maxInjectedSteps,
+			maxStepsPerExecution
+		);
+		this.runRequests = new RunRequestHandler(
+			new FlowFileAccessGuard(allowAbsolutePaths),
+			new RunDefinitionLoader(definitionResolver, this.logWriter),
+			new RunStepPreparer(daemonDir, this.logWriter),
+			daemonSecrets,
+			workspaces,
+			this.executions,
+			this.queue,
+			this.hooks,
+			this.executionStore,
+			this.logWriter,
+			() => this.tryDispatch()
+		);
 	}
 
 	dispatchHook(
@@ -245,22 +191,19 @@ export class CommandHandler {
 		event: Parameters<HookDispatcher['dispatch']>[0],
 		payload: Record<string, unknown>
 	): void {
-		const dispatcher = this.executionHooks.get(executionId);
-		void dispatcher?.dispatch(event, payload, err => {
-			this.logWriter.writeExecution('__hook', `Hook '${event}' failed: ${String(err)}`, 'error');
-		});
+		this.hooks.dispatch(executionId, event, payload);
 	}
 
 	removeExecutionHooks(executionId: string): void {
-		this.executionHooks.delete(executionId);
+		this.hooks.remove(executionId);
 	}
 
 	isQueueEmpty(): boolean {
-		return this.readyQueue.length === 0;
+		return this.queue.length === 0;
 	}
 
 	hasActiveExecutions(): boolean {
-		return this.activeExecutionCount > 0;
+		return this.executions.activeExecutionCount() > 0;
 	}
 
 	/**
@@ -273,24 +216,24 @@ export class CommandHandler {
 	 * failed (and fire `onFlowError`) while the scheduler was in the middle of recovering it.
 	 */
 	isExecutionActive(executionId: string): boolean {
-		return this.schedulers.has(executionId);
+		return this.executions.isActive(executionId);
 	}
 
 	/**
 	 * Whether any execution is waiting on `flow resume` after an unanswered-intervention
-	 * timeout (see `resumableInterventions`).
+	 * timeout (see `ExecutionRegistry.markResumable`).
 	 *
 	 * Consulted by the daemon's own idle-exit check (`Daemon.ts`'s `isIdle()`) explicitly,
 	 * by name, rather than relying only on `hasActiveExecutions()` staying true for it: a
-	 * kept-alive execution not incrementing/decrementing `activeExecutionCount` the way an
-	 * ordinary running one does is an implementation detail of `cleanupExecution` being
+	 * kept-alive execution not incrementing/decrementing the active count the way an
+	 * ordinary running one does is an implementation detail of cleanup being
 	 * skipped, not a documented contract -- a future change to that bookkeeping could silently
 	 * reopen the race `flow resume` depends on not happening (idle-exit destroying the
 	 * in-memory scheduler/context state before an operator can plausibly run it). Naming the
 	 * actual condition here makes the dependency explicit instead of incidental.
 	 */
 	hasResumableInterventions(): boolean {
-		return this.resumableInterventions.size > 0;
+		return this.executions.resumableCount() > 0;
 	}
 
 	/**
@@ -305,16 +248,8 @@ export class CommandHandler {
 	 * requiring another investigation from scratch.
 	 */
 	describeIdleState(): string {
-		return `queue=${String(this.readyQueue.length)} activeExecutions=${String(this.activeExecutionCount)} resumableInterventions=${String(this.resumableInterventions.size)}`;
+		return `queue=${String(this.queue.length)} activeExecutions=${String(this.executions.activeExecutionCount())} resumableInterventions=${String(this.executions.resumableCount())}`;
 	}
-
-	/**
-	 * While draining, new runs are refused so in-flight executions can finish and a pending update
-	 * can restart the daemon. Refused rather than queued: execution state lives only in this
-	 * process's memory, so a queued run would be lost by the very restart the drain is waiting for.
-	 * Not persisted: the restart that ends a drain also clears it.
-	 */
-	private draining = false;
 
 	setDraining(draining: boolean): void {
 		this.draining = draining;
@@ -337,1131 +272,75 @@ export class CommandHandler {
 					'Retry once the update has been applied, or cancel the drain with: flow cli update --cancel-drain',
 			};
 		}
-
-		const flowFile = path.isAbsolute(cmd.flowFile) ? cmd.flowFile : path.resolve(cmd.cwd, cmd.flowFile);
-
-		if (!this.allowAbsolutePaths) {
-			// violations-suppress: shared/no-out-of-repo-path homedir is deliberately an allowed root for the flow-file path restriction, so flows under the user's home are runnable
-			const allowedRoots = [path.resolve(cmd.cwd), path.resolve(os.homedir())];
-			let realFlowFile: string;
-			try {
-				realFlowFile = fs.existsSync(flowFile) ? fs.realpathSync(flowFile) : flowFile;
-			} catch {
-				realFlowFile = flowFile;
-			}
-			const isAllowed = allowedRoots.some(root => {
-				let realRoot: string;
-				try {
-					realRoot = fs.realpathSync(root);
-				} catch {
-					realRoot = root;
-				}
-				const rel = path.relative(realRoot, realFlowFile);
-				return !rel.startsWith('..') && !path.isAbsolute(rel);
-			});
-			if (!isAllowed) {
-				return { type: 'error', code: 'FLOW_NOT_FOUND', message: 'Flow file not found.' };
-			}
-		}
-
-		// A registered id is resolved (latest or pinned version) and a flow file is parsed as it is; either way the
-		// result is validated and nothing is written yet (the snapshot is committed once the run is accepted, below).
-		const loaded = this.definitionLoader.load(cmd, flowFile);
-		if (!loaded.ok) {
-			return loaded.response;
-		}
-		const resolved = loaded.resolved;
-		const flow = resolved.flow;
-
-		// `user_intervention` used to be refused here alongside `subflow`. It is supported now
-		// (D#37): a worker with a terminal owns an approval provider and can put the question
-		// to the person in front of it (D#34), and routing only ever sends such a step to a
-		// worker that declared the capability (S4). `subflow` stays refused -- that is a
-		// separate v1 scope line, not the same limitation.
-		const subflowStep = flow.steps.find((s: FlowStep) => s.type === 'subflow');
-		if (subflowStep) {
-			return {
-				type: 'error',
-				code: 'UNSUPPORTED_STEP_TYPE',
-				message: `Step '${subflowStep.id}' is of type 'subflow' which is not supported in v1.`,
-			};
-		}
-
-		// --mock-config step ids are already validated against the flow at CLI time
-		// (RunCommand.loadMockConfig), but only an id, not a type: a step id that names a
-		// `user_intervention` step has no `env` to overlay. Checked here, before any workspace
-		// or execution-store allocation, so this is a refused run rather than a leak.
-		if (cmd.mockEnv) {
-			for (const stepId of Object.keys(cmd.mockEnv)) {
-				const step = flow.steps.find((s: FlowStep) => s.id === stepId);
-				if (step && step.type !== 'model' && step.type !== 'script') {
-					return {
-						type: 'error',
-						code: 'VALIDATION_FAILED',
-						message: `--mock-config references step '${stepId}', which is of type '${step.type}' and has no env to overlay (only 'model' and 'script' steps can be mocked).`,
-					};
-				}
-			}
-		}
-
-		// The project is resolved before anything is allocated, so a refusal leaves nothing
-		// behind. Running outside any project is legitimate (null: forked workers serve it, see
-		// DefaultWorkerAcceptance); a project that exists but cannot be read, such as the
-		// legacy layout (D#49), is refused rather than quietly run unattributed.
-		let projectRoot: string | undefined;
-		try {
-			projectRoot = ProjectResolverFactory.create().tryResolve(cmd.cwd)?.projectRoot;
-		} catch (err) {
-			this.logWriter.writeExecution('__project', `PROJECT_RESOLUTION_FAILED: ${getErrorMessage(err)}`, 'error');
-			return ProjectResolutionRefusal.toResponse(cmd.cwd, err);
-		}
-		if (projectRoot === undefined) {
-			this.logWriter.writeExecution(
-				'__project',
-				`Run not attributed to a project: "${cmd.cwd}" is in none`,
-				'info'
-			);
-		}
-
-		// Declared secrets are resolved before an execution id, a workspace or a record exists:
-		// a secret that cannot be resolved must leave nothing behind and start no step.
-		let secrets: ExecutionSecrets;
-		try {
-			secrets = this.daemonSecrets.prepare(flow, cmd.inputs ?? {}, cmd.cwd);
-		} catch (err) {
-			if (!(err instanceof SecretsResolutionFailedError)) {
-				throw err;
-			}
-			// Messages name the input and the reference, never a value.
-			this.logWriter.writeExecution(
-				'__secrets',
-				`SECRET_RESOLUTION_FAILED: ${normalizeError(err).message}`,
-				'error'
-			);
-			return { type: 'error', code: 'SECRET_RESOLUTION_FAILED', message: normalizeError(err).message };
-		}
-
-		const flowId = resolved.flowId;
-		const executionId = generateExecutionId();
-		// From here on every line written for this execution is masked.
-		this.daemonSecrets.activate(executionId, flow, secrets, cmd.cwd);
-
-		let workspaceDir: string;
-		let workspaceMetaDir: string;
-
-		// Tracks the allocated plugin handle so it can be released if setup throws after allocate
-		let pluginHandleEntry: { handle: WorkspaceHandle; provider: WorkspaceProvider } | undefined;
-
-		// Resolve per-flow workspace provider override if the flow declares one
-		let effectiveWorkspaceProvider: WorkspaceProvider | undefined = this.workspaceProvider;
-		if (flow.plugins?.workspace && this.resolvePerFlowWorkspaceProvider) {
-			try {
-				effectiveWorkspaceProvider = await this.resolvePerFlowWorkspaceProvider(flow.plugins.workspace);
-			} catch (err) {
-				this.logWriter.writeExecution('__workspace', `PER_FLOW_WORKSPACE_ERROR: ${String(err)}`, 'error');
-				return {
-					type: 'error',
-					code: 'WORKSPACE_ERROR',
-					message: `Failed to resolve per-flow workspace provider: ${String(err)}`,
-				};
-			}
-		}
-
-		if (effectiveWorkspaceProvider) {
-			let pluginHandle: WorkspaceHandle;
-			try {
-				pluginHandle = await effectiveWorkspaceProvider.allocate({ taskId: executionId });
-			} catch (err) {
-				this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
-				return {
-					type: 'error',
-					code: 'WORKSPACE_ERROR',
-					message: 'Failed to allocate workspace via plugin provider.',
-				};
-			}
-			pluginHandleEntry = { handle: pluginHandle, provider: effectiveWorkspaceProvider };
-			workspaceDir = pluginHandle.path;
-			workspaceMetaDir = pluginHandle.path + '.meta';
-			try {
-				fs.mkdirSync(path.join(workspaceMetaDir, 'outputs'), { recursive: true });
-				this.pluginWorkspaceHandles.set(executionId, {
-					handle: pluginHandle,
-					provider: effectiveWorkspaceProvider,
-				});
-			} catch (setupErr) {
-				// Meta dir creation failed - release the handle before propagating
-				void pluginHandleEntry.provider.release(pluginHandleEntry.handle).catch((releaseErr: unknown) => {
-					process.stderr.write(
-						`[CommandHandler] Failed to release plugin workspace after setup error for ${executionId}: ${String(releaseErr)}\n`
-					);
-				});
-				throw setupErr;
-			}
-		} else {
-			const workspaceManager = new WorkspaceManager(cmd.cwd);
-			let workspace: Awaited<ReturnType<typeof workspaceManager.allocate>>;
-			try {
-				workspace = await workspaceManager.allocate({
-					taskId: executionId,
-					config: flow.workspace,
-					existingPath: cmd.cwd,
-				});
-			} catch (err) {
-				this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
-				return {
-					type: 'error',
-					code: 'WORKSPACE_ERROR',
-					message: 'Failed to allocate workspace. Ensure the flow workspace directory is writable.',
-				};
-			}
-			workspaceDir = workspace.path;
-			workspaceMetaDir = workspace.metaDir;
-			this.nativeWorkspaceManagers.set(executionId, { manager: workspaceManager, workspaceId: workspace.id });
-		}
-
-		const stepIds = flow.steps.map((s: FlowStep) => s.id);
-		try {
-			// Each run records its project (resolved above) so the projects with active runs
-			// can be listed (D#10).
-			// Also kept in memory: routing consults it per dispatch, and a worker the daemon
-			// did not create only serves the projects it declared (D#9).
-			if (projectRoot !== undefined) {
-				this.executionProjects.set(executionId, projectRoot);
-			}
-			// The definition is frozen only now that the run is accepted: a refused run must not claim its version.
-			resolved.commit();
-			for (const warning of resolved.warnings) {
-				this.logWriter.writeExecution(executionId, warning, 'warning');
-			}
-			this.executionStore.create({
-				executionId,
-				flowFile,
-				flowId,
-				stepIds,
-				projectRoot,
-				definition: {
-					flowVersion: resolved.version,
-					definitionHash: resolved.hash,
-					definitionSnapshot: resolved.definitionSnapshot,
-					versionChoice: resolved.choice,
-				},
-			});
-		} catch (err) {
-			// Execution setup failed after workspace was allocated - release before propagating
-			if (pluginHandleEntry) {
-				this.pluginWorkspaceHandles.delete(executionId);
-				void pluginHandleEntry.provider.release(pluginHandleEntry.handle).catch((releaseErr: unknown) => {
-					process.stderr.write(
-						`[CommandHandler] Failed to release workspace after setup error for ${executionId}: ${String(releaseErr)}\n`
-					);
-				});
-			}
-			throw err;
-		}
-
-		const context: ExecutionContext = {
-			executionId,
-			// Secret inputs (references) never travel with the ordinary inputs of every step.
-			inputs: secrets.publicInputs(cmd.inputs ?? {}),
-			stepOutputs: {},
-			stepMeta: {},
-			workspaceDir,
-			outputsDir: workspaceMetaDir + '/outputs',
-			cwd: cmd.cwd,
-			...(flow.workingDir ? { flowWorkingDir: flow.workingDir } : {}),
-			flowId: flow.id,
-			flowVersion: flow.version,
-		};
-
-		const schedulerCtx: SchedulerContext = {
-			inputs: context.inputs,
-			stepOutputs: new Map(),
-			subStepErrors: new Map(),
-		};
-
-		// Resolve global flow env templates (context.* available: cwd, projectDir, workspaceDir)
-		let resolvedGlobalEnv: Record<string, string> | undefined;
-		if (flow.env) {
-			const templateRenderer = new TemplateRenderer();
-			const templateCtx = {
-				inputs: context.inputs,
-				stepOutputs: new Map<string, Record<string, unknown>>(),
-				taskMetadata: {},
-				context: { cwd: cmd.cwd, projectDir: cmd.cwd, workspaceDir },
-			};
-			resolvedGlobalEnv = Object.fromEntries(
-				Object.entries(flow.env as Record<string, string>).map(([k, v]) => [
-					k,
-					templateRenderer.render(v, templateCtx, false),
-				])
-			);
-		}
-
-		// parent implicitly depends on the parent step
-		const depends = new Map<string, string[]>(
-			flow.steps.map((s: FlowStep) => {
-				const explicit = s.depends ?? [];
-				return [s.id, s.parent && !explicit.includes(s.parent) ? [...explicit, s.parent] : explicit];
-			})
-		);
-		// Flow-level `labels:` (Proposal 4) are unioned into every step's own `labels:`, never
-		// overriding them -- a step with unrelated labels (e.g. `gpu`) must keep the flow-wide
-		// pin, or a forgotten per-step `labels:` would silently fall back to "any worker".
-		const flowLabels = flow.labels ?? [];
-		const assignable = (
-			resolvedGlobalEnv || flowLabels.length > 0
-				? flow.steps.map((s: FlowStep) => {
-						const withEnv =
-							resolvedGlobalEnv && (s.type === 'script' || s.type === 'model')
-								? {
-										...s,
-										env: {
-											...resolvedGlobalEnv,
-											...((s as { env?: Record<string, string> }).env ?? {}),
-										},
-									}
-								: s;
-						if (flowLabels.length === 0) {
-							return withEnv;
-						}
-						const stepLabels = (withEnv as { labels?: string[] }).labels ?? [];
-						return { ...withEnv, labels: [...new Set([...flowLabels, ...stepLabels])] };
-					})
-				: flow.steps
-		).map((s: FlowStep) => assertAssignable(s));
-
-		// --mock-config overlay: merged last, so it outranks both the flow's global `env:` and
-		// the step's own declared `env:`. Always loud (D#55-equivalent): a mocked run must never
-		// be mistaken for a real one later, so every overridden step gets a visible banner in
-		// both the daemon log and the execution log.
-		if (cmd.mockEnv) {
-			for (const step of assignable) {
-				const overlay = cmd.mockEnv[step.id];
-				if (!overlay) {
-					continue;
-				}
-				// Step type (model/script) was already confirmed above, before any allocation.
-				if (step.type !== 'model' && step.type !== 'script') {
-					continue;
-				}
-				step.env = { ...(step.env ?? {}), ...overlay };
-				const banner = `MOCK: step '${step.id}' output replaced by ${cmd.mockConfigPath ?? '--mock-config'}`;
-				writeDaemonLog(logsDirOf(this.daemonDir), 'info', `[warn] ${banner}`);
-				this.logWriter.writeExecution(executionId, `[warn] ${banner}`, 'info');
-			}
-		}
-
-		const scheduler = new FlowScheduler(schedulerCtx);
-		const readyItems = scheduler.start(assignable as unknown as SchedulerStep[], depends);
-
-		this.schedulers.set(executionId, scheduler);
-		this.executionContexts.set(executionId, context);
-		this.stepDefinitions.set(executionId, new Map(assignable.map(s => [s.id, s])));
-		this.stepCounts.set(executionId, assignable.length);
-		this.activeExecutionCount++;
-
-		if (hookDispatcher) {
-			this.executionHooks.set(executionId, hookDispatcher);
-		}
-
-		this.enqueueReadyItems(executionId, readyItems, context);
-		this.logWriter.writeExecution(executionId, `Execution started for flow ${flowId}`);
-		this.dispatchHook(executionId, 'onFlowStart', { executionId, flowId, flowFile });
-
-		this.tryDispatch();
-
-		return { type: 'execution_started', executionId };
+		return this.runRequests.handleRun(cmd, hookDispatcher);
 	}
 
-	/**
-	 * Confirms a worker is reporting against work this daemon actually gave it (T-05).
-	 *
-	 * Returns false when the report cannot be bound to an outstanding assignment, having
-	 * already logged why. The caller must then drop the message: accepting it would let
-	 * one worker write another execution's step outputs.
-	 */
+	/** See {@link WorkerAssignmentSupervisor.verifyAssignment}. */
 	verifyAssignment(worker: WebSocket, assignmentId: string, executionId: string, stepId: string): boolean {
-		const result = this.assignments.verify(worker, assignmentId, executionId, stepId);
-		if (!result.ok) {
-			process.stderr.write(`[CommandHandler] rejected worker report: ${result.reason}\n`);
-			return false;
-		}
-		return true;
+		return this.supervisor.verifyAssignment(worker, assignmentId, executionId, stepId);
 	}
 
 	/** As {@link verifyAssignment}, for messages that name no step (inject_steps). */
 	verifyAssignmentScope(worker: WebSocket, assignmentId: string, executionId: string): boolean {
-		const result = this.assignments.verifyScope(worker, assignmentId, executionId);
-		if (!result.ok) {
-			process.stderr.write(`[CommandHandler] rejected worker report: ${result.reason}\n`);
-			return false;
-		}
-		return true;
+		return this.supervisor.verifyAssignmentScope(worker, assignmentId, executionId);
 	}
 
 	/** Closes an assignment once its outcome has been accepted. */
 	settleAssignment(assignmentId: string): void {
-		this.assignments.settle(assignmentId);
-		this.stalledSteps.settled(assignmentId);
-		// The payload was only kept for a possible re-dispatch, which can no longer happen.
-		this.dispatched.delete(assignmentId);
+		this.supervisor.settleAssignment(assignmentId);
 	}
 
 	/** Records that a worker is still saying something about an assignment it holds. */
 	noteAssignmentActivity(assignmentId: string): void {
-		this.stalledSteps.progressed(assignmentId);
+		this.supervisor.noteAssignmentActivity(assignmentId);
 	}
 
-	/**
-	 * Fails the steps whose worker went quiet, and reports each one.
-	 *
-	 * Called on a timer by `Daemon`: nothing else would notice, since a wedged worker keeps its
-	 * socket open and answers pings. The step is failed rather than re-dispatched -- it was already
-	 * executing, so it may have changed something, exactly as for a mid-step disconnect (D#65).
-	 */
+	/** Called on a timer by `Daemon`; see {@link WorkerAssignmentSupervisor.failStalledSteps}. */
 	failStalledSteps(): void {
-		for (const assignmentId of this.stalledSteps.stalled()) {
-			const step = this.dispatched.get(assignmentId);
-			const assignment = this.assignments.describe(assignmentId);
-			if (assignment === undefined) {
-				continue;
-			}
-			if (!assignment.started) {
-				// Nothing ran, so there is nothing to protect: drop the worker and let the normal
-				// disconnect path hand the step to another one, instead of failing it.
-				const connection = this.assignments.connectionOf(assignmentId);
-				this.logWriter.writeExecution(
-					assignment.executionId,
-					`Worker never confirmed starting step ${assignment.stepId} within ${String(Math.round(this.stalledStepLimitMs / 1000))}s; dropping its connection so the step is handed over again`,
-					'warning'
-				);
-				if (connection !== undefined) {
-					this.registry.disconnect(connection);
-				}
-				continue;
-			}
-			this.dispatched.delete(assignmentId);
-			const connection = this.assignments.connectionOf(assignmentId);
-			this.assignments.settle(assignmentId);
-			// A wedged worker never sends the `ready` that would free it, so without this it would stay
-			// "busy" forever: the daemon could never hibernate and updates would wait on it for good.
-			if (connection !== undefined) {
-				this.registry.disconnect(connection);
-			}
-			this.failStep(
-				assignment.executionId,
-				step?.stepId ?? assignment.stepId,
-				`the worker running this step reported nothing for ${String(Math.round(this.stalledStepLimitMs / 1000))}s, so it is treated as stuck. ` +
-					'It was not retried automatically because it may have already had an effect. ' +
-					'A step that is legitimately quiet for that long needs a higher queue.stepSilenceLimitSeconds.'
-			);
-		}
+		this.supervisor.failStalledSteps();
 	}
 
-	/**
-	 * Records that a worker has begun executing an assigned step (D#65).
-	 *
-	 * Verified like any other result message: a worker must not be able to change how
-	 * another worker's disconnect is classified (T-05).
-	 */
+	/** Records that a worker has begun executing an assigned step (D#65). */
 	onStepStarted(worker: WebSocket, assignmentId: string, executionId: string, stepId: string): void {
-		const verified = this.assignments.verify(worker, assignmentId, executionId, stepId);
-		if (!verified.ok) {
-			process.stderr.write(`[CommandHandler] rejected step_started: ${verified.reason}\n`);
-			return;
-		}
-		this.assignments.markStarted(assignmentId);
-		// Watching begins now, not at dispatch: a step waiting to be picked up is not stuck.
-		this.stalledSteps.started(assignmentId);
-		// The re-dispatch budget counts hand-offs that never began. This one did, so the
-		// step's earlier aborted hand-offs must not still be held against it: a later retry
-		// would otherwise start part-way through a budget it never spent.
-		this.redispatchCounts.delete(`${executionId}:${stepId}`);
-		this.logWriter.writeExecution(executionId, `Step ${stepId} started executing`, 'info');
+		this.supervisor.onStepStarted(worker, assignmentId, executionId, stepId);
 	}
 
 	/**
 	 * Decides what happens to the steps a disconnected worker was holding (D#65).
 	 *
-	 * Deliberately does **not** dispatch: the caller removes the worker from the registry
-	 * afterwards, so dispatching here could hand the requeued step straight back to the
-	 * socket that just died. `Daemon` calls `tryDispatch()` once the removal is done.
+	 * Deliberately does **not** dispatch: `Daemon` calls `tryDispatch()` once the worker is removed.
 	 */
 	handleWorkerDisconnect(worker: WebSocket): void {
-		for (const assignment of this.assignments.revokeWorker(worker)) {
-			const { executionId, stepId, assignmentId, started } = assignment;
-			const step = this.dispatched.get(assignmentId);
-			this.dispatched.delete(assignmentId);
-
-			if (started) {
-				// It may already have changed something, so the author's retry/onFailure
-				// decides rather than us silently replaying a half-run step.
-				this.failStep(
-					executionId,
-					stepId,
-					`the worker running this step disconnected while it was executing. It was not retried automatically because it may have already had an effect; re-run the flow, or declare "retry" on the step if it is safe to repeat.`
-				);
-				continue;
-			}
-
-			const key = `${executionId}:${stepId}`;
-			const spent = (this.redispatchCounts.get(key) ?? 0) + 1;
-			if (step === undefined) {
-				// Nothing to re-send, so waiting for this step would hang the execution.
-				this.failStep(
-					executionId,
-					stepId,
-					`the worker holding this step disconnected before starting it, and the daemon no longer has the assignment to re-send. Please report this.`
-				);
-				continue;
-			}
-			if (spent > MAX_REDISPATCHES) {
-				this.failStep(
-					executionId,
-					stepId,
-					`no worker started this step: it was handed out ${String(MAX_REDISPATCHES + 1)} times and every worker disconnected first. Check that a worker stays connected ("flow worker list") and that it serves this project.`
-				);
-				continue;
-			}
-
-			this.redispatchCounts.set(key, spent);
-			// The step was never sent as far as the flow is concerned, which is exactly
-			// what unacknowledge means -- so no retry attempt is consumed (D#43).
-			this.schedulers.get(executionId)?.unacknowledge(stepId);
-			this.readyQueue.unshift(step);
-			this.logWriter.writeExecution(
-				executionId,
-				`Worker disconnected before starting ${stepId}; re-queued (attempt ${String(spent)} of ${String(MAX_REDISPATCHES)})`,
-				'info'
-			);
-		}
+		this.supervisor.handleWorkerDisconnect(worker);
 	}
 
 	/** Called by Daemon when a worker reports step_completed. */
-	onStepCompleted(
-		executionId: string,
-		stepId: string,
-		rawOutput: Record<string, unknown>,
-		rawMeta?: import('flow-engine/types').StepMeta
-	): void {
-		// What later steps, hooks and the scheduler see has the execution's secrets masked.
-		const output = this.daemonSecrets.masks.maskDeep(executionId, rawOutput);
-		const meta = this.daemonSecrets.masks.maskDeep(executionId, rawMeta);
-		const scheduler = this.schedulers.get(executionId);
-		if (!scheduler) {
-			process.stderr.write(
-				`[CommandHandler] onStepCompleted: no scheduler for execution ${executionId} (step ${stepId}) - late message after cleanup\n`
-			);
-			return;
-		}
-
-		// Sync output and meta to ExecutionContext (used by worker for template rendering in next step)
-		const context = this.executionContexts.get(executionId)!;
-		context.stepOutputs[stepId] = output;
-		if (meta) {
-			context.stepMeta[stepId] = meta;
-		}
-
-		// Parent-blocking and deferral logic is handled inside FlowScheduler.complete().
-		// It returns [] while children are pending; fires deferred completion when all children settle.
-		const newReady = scheduler.complete(stepId, { type: 'completed', outputs: output });
-
-		if (scheduler.isTerminal()) {
-			// Mark any steps skipped by the scheduler (still 'pending' in store) as completed
-			// so the daemon's allDone check can detect execution completion.
-			this.markSkippedStepsCompleted(executionId);
-			this.cleanupExecution(executionId);
-		} else {
-			this.enqueueReadyItems(executionId, newReady, context);
-			// Note: tryDispatch() is called by Daemon after onStepCompleted returns
-		}
+	onStepCompleted(executionId: string, stepId: string, rawOutput: Record<string, unknown>, rawMeta?: StepMeta): void {
+		this.outcomes.onStepCompleted(executionId, stepId, rawOutput, rawMeta);
 	}
 
 	/** Called by Daemon when a worker reports step_failed. */
 	onStepFailed(executionId: string, stepId: string, rawError: string, rawOutputs?: Record<string, unknown>): void {
-		const error = this.daemonSecrets.masks.mask(executionId, rawError);
-		const outputs = this.daemonSecrets.masks.maskDeep(executionId, rawOutputs);
-		const scheduler = this.schedulers.get(executionId);
-		if (!scheduler) {
-			process.stderr.write(
-				`[CommandHandler] onStepFailed: no scheduler for execution ${executionId} (step ${stepId}) - late message after cleanup\n`
-			);
-			return;
-		}
-
-		const context = this.executionContexts.get(executionId)!;
-
-		// FlowScheduler.complete() handles child-failure propagation internally:
-		// - If the failed step is a child and the parent is deferred, the parent is re-queued
-		//   (with error recorded in subStepErrors) up to maxSubStepIterations times.
-		// - After max iterations the parent is failed terminally, hasFailed() returns true.
-		const newReady = scheduler.complete(stepId, { type: 'failed', error, outputs });
-
-		if (scheduler.hasFailed()) {
-			// Terminal failure - purge queued steps for this execution and cleanup
-			for (let i = this.readyQueue.length - 1; i >= 0; i--) {
-				if (this.readyQueue[i]!.executionContext.executionId === executionId) {
-					this.readyQueue.splice(i, 1);
-				}
-			}
-			this.executionStore.markExecutionFailed(executionId);
-
-			const stepType = this.stepDefinitions.get(executionId)?.get(stepId)?.type;
-			if (stepType === 'user_intervention' && isUnansweredInterventionError(error)) {
-				// Kept alive on purpose: no other step is touched, so there is nothing to
-				// re-validate when this one is answered late (see handleResume).
-				this.resumableInterventions.set(executionId, { stepId });
-				this.logWriter.writeExecution(
-					executionId,
-					`Step ${stepId} is an unanswered intervention -- kept resumable via "flow resume ${executionId}" instead of being cleaned up.`,
-					'info'
-				);
-				return;
-			}
-
-			this.cleanupExecution(executionId, new Error(error));
-		} else {
-			// Loop/retry/sub-step-re-run in progress - re-enqueue steps returned by the scheduler
-			this.enqueueReadyItems(executionId, newReady, context);
-			this.tryDispatch();
-		}
+		this.outcomes.onStepFailed(executionId, stepId, rawError, rawOutputs);
 	}
 
-	/**
-	 * Resumes an execution that was kept alive after a `user_intervention` step timed out
-	 * unanswered, re-dispatching exactly that one step.
-	 *
-	 * No other step is re-run: the scheduler, context, and workspace are exactly as they were
-	 * the moment the step timed out, because `onStepFailed` deliberately skipped cleanup for
-	 * this case. Only possible while the same daemon process that ran the step is still alive
-	 * -- there is no on-disk reconstruction of in-memory execution state (crash recovery is
-	 * tracked separately; see the 're-queued' comment on ExecutionStatus in Protocol.ts).
-	 */
+	/** Resumes an execution kept alive after an unanswered `user_intervention` step; see {@link StepOutcomes.handleResume}. */
 	handleResume(executionId: string): DaemonResponse {
-		const resumable = this.resumableInterventions.get(executionId);
-		if (!resumable) {
-			if (!this.executionStore.exists(executionId)) {
-				return {
-					type: 'error',
-					code: 'EXECUTION_NOT_FOUND',
-					message: `No execution found with id "${executionId}".`,
-				};
-			}
-			return {
-				type: 'error',
-				code: 'NOT_RESUMABLE',
-				message:
-					`Execution "${executionId}" is not resumable. Either it did not fail on an unanswered ` +
-					'user_intervention step, it was already resumed, or the daemon has restarted since it ' +
-					'failed (resume only works while the same daemon process that ran it is still alive).',
-			};
-		}
-
-		const scheduler = this.schedulers.get(executionId);
-		const context = this.executionContexts.get(executionId);
-		if (!scheduler || !context) {
-			// Should be unreachable: resumableInterventions is only ever set alongside a live
-			// scheduler/context, and cleanupExecution is never called while it holds an entry.
-			// Fail loudly rather than silently drop the resume if it ever happens.
-			this.resumableInterventions.delete(executionId);
-			return {
-				type: 'error',
-				code: 'NOT_RESUMABLE',
-				message: `Execution "${executionId}" lost its in-memory state and cannot be resumed. Re-run the flow instead.`,
-			};
-		}
-
-		// Secrets are never persisted: the references are resolved again, so a rotated value is used.
-		// A reference that no longer resolves leaves the execution resumable, with the reason.
-		try {
-			this.daemonSecrets.resume(executionId);
-		} catch (err) {
-			if (!(err instanceof SecretsResolutionFailedError)) {
-				throw err;
-			}
-			return { type: 'error', code: 'SECRET_RESOLUTION_FAILED', message: normalizeError(err).message };
-		}
-
-		this.resumableInterventions.delete(executionId);
-		const readyItem = scheduler.resumeFailedStep(resumable.stepId);
-		this.executionStore.markExecutionResumed(executionId, resumable.stepId);
-		this.logWriter.writeExecution(executionId, `Execution resumed at step ${resumable.stepId}`, 'info');
-
-		this.enqueueReadyItems(executionId, [readyItem], context);
-		this.tryDispatch();
-
-		return { type: 'execution_resumed', executionId, stepId: resumable.stepId };
-	}
-
-	/**
-	 * Fails a step the daemon itself decided cannot proceed, with the same treatment a
-	 * failure reported by a worker gets.
-	 *
-	 * The store write and the hook are not optional extras: a step left `running` in the
-	 * execution store shows up in `flow history` as still running forever, and a hook that
-	 * fires for a failing script but not for a lost worker is a gap the author cannot see.
-	 */
-	private failStep(executionId: string, stepId: string, reason: string): void {
-		this.executionStore.markStepFailed(executionId, stepId, reason);
-		this.logWriter.writeExecution(executionId, `Step ${stepId} failed: ${reason}`, 'error');
-		this.onStepFailed(executionId, stepId, reason);
-		this.dispatchHook(executionId, 'onStepFailed', { executionId, stepId, error: reason });
+		return this.outcomes.handleResume(executionId);
 	}
 
 	/** Called by Daemon for inject_steps messages. */
 	injectSteps(executionId: string, injectedSteps: InjectedStep[]): void {
-		const scheduler = this.schedulers.get(executionId);
-		if (!scheduler) {
-			throw new Error(`No active execution found for id: ${executionId}`);
-		}
-
-		// Per-call limit check applies to the full requested batch (before dedup)
-		if (injectedSteps.length > this.maxInjectedSteps) {
-			throw new Error(
-				`provideSteps: ${injectedSteps.length} steps exceeds per-call limit of ${this.maxInjectedSteps}`
-			);
-		}
-
-		const allKnownIds = new Set([...this.getKnownStepIds(executionId), ...injectedSteps.map(s => s.id)]);
-
-		// Separate steps into those to skip (existing non-in-flight) and those to inject.
-		// Idempotent: a step that already exists and is not in-flight is a no-op (loop re-run scenario).
-		const stepsToInject: InjectedStep[] = [];
-		for (const injected of injectedSteps) {
-			if (this.isKnownStepId(executionId, injected.id)) {
-				if (scheduler.isInFlight(injected.id)) {
-					throw new Error(
-						`Step id '${injected.id}' is currently in-flight in execution ${executionId} and cannot be re-injected`
-					);
-				}
-				// Non-in-flight existing step: treat as no-op (idempotent re-injection after loop reset)
-				continue;
-			}
-			// A step added while the flow runs was not scanned for secrets at start: refuse it
-			// rather than run it with an empty value.
-			this.daemonSecrets.assertInjectable(executionId, injected as unknown as FlowStep);
-			if (injected.parent !== undefined && !allKnownIds.has(injected.parent)) {
-				throw new Error(`Parent step '${injected.parent}' does not exist in execution ${executionId}`);
-			}
-			if (injected.depends) {
-				for (const dep of injected.depends) {
-					if (!allKnownIds.has(dep)) {
-						throw new Error(`Dependency step '${dep}' does not exist in execution ${executionId}`);
-					}
-				}
-			}
-			stepsToInject.push(injected);
-		}
-
-		// Limit check uses only genuinely new steps
-		const currentCount = this.stepCounts.get(executionId) ?? 0;
-		const totalAfterInject = currentCount + stepsToInject.length;
-		if (totalAfterInject > this.maxStepsPerExecution) {
-			throw new Error(
-				`Execution ${executionId} would exceed max steps per execution (${this.maxStepsPerExecution}) after injection`
-			);
-		}
-
-		this.stepCounts.set(executionId, totalAfterInject);
-
-		if (stepsToInject.length === 0) {
-			return;
-		}
-
-		const context = this.executionContexts.get(executionId)!;
-		// Pass `parent` through -- FlowScheduler.inject() registers parent-child relationships natively
-		const newReady = scheduler.inject(stepsToInject as SchedulerStep[]);
-		this.enqueueReadyItems(executionId, newReady, context);
+		this.injection.injectSteps(executionId, injectedSteps);
 	}
 
-	/**
-	 * Hands out as many queued steps as current capacity allows.
-	 *
-	 * Every queued step is considered, not just the head: which workers may run a step now
-	 * depends on the step (labels, project, interactivity), so stopping at the first
-	 * unplaceable one would let a single unsatisfiable label stall independent work behind
-	 * it. Steps that find no worker keep their place in the queue.
-	 */
+	/** Hands out as many queued steps as current capacity allows; see {@link StepDispatcher.tryDispatch}. */
 	tryDispatch(): void {
-		/** Steps nothing could run this pass, put back in order once the pass ends. */
-		const unplaced: ReadyStep[] = [];
-
-		while (this.readyQueue.length > 0) {
-			const step = this.readyQueue.shift()!;
-
-			let placement: StepPlacement;
-			try {
-				placement = this.placementFor(step);
-			} catch (err) {
-				// A step whose routing cannot even be described is never placeable, so
-				// leaving it queued would stall the flow with no explanation.
-				this.failStep(step.executionContext.executionId, step.stepId, normalizeError(err).message);
-				continue;
-			}
-
-			const idleWorker = this.router.select(placement, this.registry.listIdle());
-			if (idleWorker === undefined && placement.requiresUserInterface && this.failIfNobodyCanAnswer(step)) {
-				continue;
-			}
-			if (idleWorker) {
-				const scheduler = this.schedulers.get(step.executionContext.executionId);
-
-				// Before dispatching, sync sub-step errors and sub-step outputs from the scheduler
-				// into ExecutionContext so the worker can render ${{ context.lastSubStepError }},
-				// ${{ subSteps.stepId.outputs.stderr }}, and {% if subSteps.stepId.status.failed %}
-				if (scheduler) {
-					const errors = scheduler.getSubStepErrors(step.stepId);
-					if (errors.length > 0) {
-						if (!step.executionContext.subStepErrors) {
-							step.executionContext.subStepErrors = {};
-						}
-						step.executionContext.subStepErrors[step.stepId] = errors;
-					}
-					const subStepsMap = scheduler.getSubSteps();
-					if (subStepsMap && subStepsMap.size > 0) {
-						step.executionContext.subSteps = Object.fromEntries(subStepsMap);
-						step.executionContext.subStepFeedback = buildSubStepFeedback(subStepsMap);
-					}
-				}
-
-				// A parent re-queued because a sub-step failed continues its own session with just
-				// the feedback. Decided per assignment from the scheduler: `subSteps` above is
-				// execution-wide and reaches unrelated steps, so it cannot tell which one this is.
-				const relaunchFeedback = scheduler?.getSubStepRelaunchFeedback(step.stepId);
-				const stepSecrets = this.daemonSecrets.valuesForStep(step.executionContext.executionId, step.stepId);
-				if (stepSecrets !== undefined && !this.workerSupportsSecrets(idleWorker)) {
-					this.failStep(
-						step.executionContext.executionId,
-						step.stepId,
-						this.describeWorkerWithoutSecrets(step.stepId, Object.keys(stepSecrets), idleWorker)
-					);
-					continue;
-				}
-				const sessionContext =
-					relaunchFeedback === undefined
-						? step.executionContext
-						: { ...step.executionContext, subStepRelaunch: { feedback: relaunchFeedback } };
-				// Per assignment, never on the shared context: only the step that uses a secret gets it.
-				const executionContext =
-					stepSecrets === undefined ? sessionContext : { ...sessionContext, secrets: stepSecrets };
-				if (relaunchFeedback !== undefined) {
-					this.warnIfWorkerCannotResume(step, idleWorker);
-				}
-
-				this.registry.markBusy(idleWorker);
-				// Acknowledge: marks step as in-flight in scheduler to prevent double-dispatch
-				scheduler?.acknowledge(step.stepId);
-				// Provenance recorded at dispatch: this is the only moment both the source
-				// and the worker identity are known (T-06).
-				const worker = this.registry.describe(idleWorker);
-				this.executionStore.markStepRunning(
-					step.executionContext.executionId,
-					step.stepId,
-					{ sourceId: worker?.sourceId, workerId: worker?.workerId },
-					relaunchFeedback
-				);
-				this.dispatchHook(step.executionContext.executionId, 'onStepStart', {
-					executionId: step.executionContext.executionId,
-					stepId: step.stepId,
-				});
-
-				const assignment = this.assignments.issue(idleWorker, step.executionContext.executionId, step.stepId);
-				// Kept so a disconnect can re-send this exact payload (D#62).
-				this.dispatched.set(assignment.assignmentId, step);
-				const sent = this.registry.send(idleWorker, {
-					type: 'assign',
-					assignmentId: assignment.assignmentId,
-					stepId: step.stepId,
-					stepConfig: step.stepConfig,
-					executionContext,
-				});
-				// Watched from the hand-over, not only from step_started: a worker confirms with
-				// step_started before anything else, so an assignment it never confirms would
-				// otherwise be waited on forever.
-				if (sent) {
-					this.stalledSteps.started(assignment.assignmentId);
-				}
-				if (!sent) {
-					// Never handed over, so the assignment must not stay outstanding.
-					this.assignments.settle(assignment.assignmentId);
-					this.dispatched.delete(assignment.assignmentId);
-					// Worker disconnected between getIdleWorker() and send - re-queue the step
-					this.registry.remove(idleWorker);
-					// Transport failure: not a flow-level failure - unacknowledge and put back
-					scheduler?.unacknowledge(step.stepId);
-					this.readyQueue.unshift(step);
-					continue;
-				}
-			} else {
-				unplaced.push(step);
-			}
-		}
-
-		this.readyQueue.unshift(...unplaced);
-		this.coverUnmetDemand(unplaced.length);
+		this.dispatcher.tryDispatch();
 	}
 
-	private workerSupportsSecrets(worker: WebSocket): boolean {
-		return this.registry.describe(worker)?.features.includes(WORKER_FEATURE_SECRETS) === true;
-	}
-
-	private describeWorkerWithoutSecrets(stepId: string, secretNames: string[], worker: WebSocket): string {
-		const registered = this.registry.describe(worker);
-		return (
-			`Step '${stepId}' uses secret(s) ${secretNames.join(', ')} but worker ${registered?.workerId ?? 'unknown'} ` +
-			`(flow-cli ${registered?.version ?? 'unknown version'}) does not support secrets and would run it with the ` +
-			`variable missing. Update flow-cli on that worker (\`flow cli update\`) and restart it.`
-		);
-	}
-
-	/**
-	 * Names, in the execution log, a worker that cannot resume the parent's session.
-	 *
-	 * Such a worker (built before `WORKER_FEATURE_SUB_STEP_SESSION_RESUME`) ignores the relaunch
-	 * payload and renders the parent's whole prompt again, which is the previous behaviour. It is
-	 * allowed to run the step -- routing is an extension point and refusing would stall a flow in
-	 * the middle of a rolling worker update -- but never silently.
-	 */
-	private warnIfWorkerCannotResume(step: ReadyStep, worker: WebSocket): void {
-		const registered = this.registry.describe(worker);
-		if (registered?.features.includes(WORKER_FEATURE_SUB_STEP_SESSION_RESUME) === true) {
-			return;
-		}
-		this.logWriter.writeExecution(
-			step.executionContext.executionId,
-			`Step '${step.stepId}' is re-run because a sub-step failed, but worker ${registered?.workerId ?? 'unknown'} (flow-cli ${registered?.version ?? 'unknown version'}) cannot resume its session: it will render the step's prompt again from scratch instead of receiving only the sub-step feedback. Update flow-cli on that worker (\`flow cli update\`) and restart it to get the session-resume behaviour.`,
-			'warning'
-		);
-	}
-
-	/**
-	 * Asks S9 what to do about a step needing a human that nothing can host (D#39, D#61).
-	 *
-	 * Kept out of the provisioning path on purpose: no amount of provisioning helps here. A
-	 * forked worker has no terminal, so the daemon cannot create its way out of this, and
-	 * treating it as ordinary unmet demand would leave the step queued forever.
-	 *
-	 * @returns true when the step was failed and must not be re-queued.
-	 */
-	private failIfNobodyCanAnswer(step: ReadyStep): boolean {
-		const key = `${step.executionContext.executionId}:${step.stepId}`;
-		const since = this.interactiveWaitSince.get(key) ?? Date.now();
-		this.interactiveWaitSince.set(key, since);
-
-		const interactiveWorkers = this.registry.summarize().filter(worker => worker.hasUserInterface).length;
-		const decision = this.interactivityPolicy.decide({
-			stepId: step.stepId,
-			waitingMs: Date.now() - since,
-			interactiveWorkers,
-		});
-		if (decision.action === 'wait') {
-			return false;
-		}
-
-		this.interactiveWaitSince.delete(key);
-		this.failStep(step.executionContext.executionId, step.stepId, decision.reason);
-		return true;
-	}
-
-	/**
-	 * Acts on steps nothing could take, per the provisioning extension point (S8).
-	 *
-	 * The daemon owns the clock here and hands S8 how long the demand has gone unserved, so
-	 * the default can wait briefly for a declared source without anything blocking (D#25,
-	 * D#66). Waiting is expressed as forking nothing yet, and the next pass asks again --
-	 * either when a worker registers or when the next step becomes ready.
-	 *
-	 * The re-check timer matters: with no live worker there is no `ready` message coming, so
-	 * nothing else would ever re-run dispatch and the wait would never end.
-	 */
-	private coverUnmetDemand(unmetDemand: number): void {
-		if (unmetDemand === 0) {
-			this.unmetDemandSince = undefined;
-			this.clearDemandRecheck();
-			return;
-		}
-
-		const now = Date.now();
-		const isNewEpisode = this.unmetDemandSince === undefined;
-		this.unmetDemandSince ??= now;
-
-		// Ask the declared sources first, and exactly once for this episode (D#66). Before this
-		// they were contacted only at daemon startup, which made the S8 wait a wait for something
-		// nobody had been asked for -- and put remote capacity out of reach of any run that began
-		// later. Once per episode, not once per pass: the re-check fires several times a second.
-		if (isNewEpisode) {
-			this.requestFromDeclaredSources?.();
-		}
-
-		const plan = this.provisioner.planProvisioning(unmetDemand, now - this.unmetDemandSince);
-
-		// Checked rather than trusted: this runs from a timer as well as from a message, and an
-		// exception there takes the daemon down with no stack a user could act on. Reported and
-		// the re-check dropped, so the same broken answer is not repeated four times a second;
-		// the queue resumes on the next real event.
-		if (typeof plan?.fork !== 'number' || !Number.isFinite(plan.fork)) {
-			process.stderr.write(
-				`[CommandHandler] the provisioning plugin returned no usable decision (${JSON.stringify(plan)}); it must return { fork: <number> }. ${String(unmetDemand)} step(s) are waiting and no worker was requested.\n`
-			);
-			this.clearDemandRecheck();
-			return;
-		}
-
-		if (plan.fork === 0) {
-			this.scheduleDemandRecheck();
-			return;
-		}
-
-		if (plan.warning !== undefined) {
-			process.stderr.write(`[CommandHandler] ${plan.warning}\n`);
-		}
-		this.clearDemandRecheck();
-		// The demand is now covered as far as this pass can tell; a new episode starts its
-		// own wait rather than inheriting this one's elapsed time.
-		this.unmetDemandSince = undefined;
-
-		for (let i = 0; i < plan.fork; i++) {
-			// Obtaining a worker is asynchronous by contract (D#66) and dispatch resumes when
-			// it registers, so this is deliberately not awaited. A failure is reported rather
-			// than swallowed: the queue would otherwise stall with no explanation.
-			void this.provisioner.provision().catch((err: unknown) => {
-				process.stderr.write(`[CommandHandler] failed to obtain a worker: ${getErrorMessage(err)}\n`);
-			});
-		}
-	}
-
-	/** Re-runs dispatch once the S8 wait can have elapsed, since nothing else would. */
-	private scheduleDemandRecheck(): void {
-		if (this.demandRecheck !== undefined) {
-			return;
-		}
-		this.demandRecheck = setTimeout(() => {
-			this.demandRecheck = undefined;
-			this.tryDispatch();
-		}, DEMAND_RECHECK_MS);
-		// Never the reason the daemon stays up: idle shutdown is decided elsewhere (D#51).
-		this.demandRecheck.unref?.();
-	}
-
-	private clearDemandRecheck(): void {
-		if (this.demandRecheck === undefined) {
-			return;
-		}
-		clearTimeout(this.demandRecheck);
-		this.demandRecheck = undefined;
-	}
-
-	/**
-	 * Drops work scheduled for later, when the daemon is shutting down.
-	 *
-	 * Without this the pending re-check survives the shutdown and runs against a daemon that
-	 * has closed its listener, so it asks for capacity nothing can deliver and reports against
-	 * torn-down collaborators. The timer is unref'd, so it never *delays* exit -- it just
-	 * should not fire after the decision to stop.
-	 */
+	/** Drops work scheduled for later, when the daemon is shutting down; see {@link UnmetDemandCoverage.stop}. */
 	stopBackgroundWork(): void {
-		this.clearDemandRecheck();
-	}
-
-	/**
-	 * Describes a step for routing.
-	 *
-	 * @throws when the step's `labels` are not a list. Schema validation already refuses
-	 *         such a flow before it starts (D#7), so this covers the path that skips it --
-	 *         a step injected at runtime. Reported as a step failure by the caller, because
-	 *         an unmatchable label set means no worker is ever eligible and presenting that
-	 *         as "waiting for capacity" would hide the mistake forever.
-	 */
-	private placementFor(step: ReadyStep): StepPlacement {
-		const labels = (step.stepConfig as { labels?: unknown }).labels;
-		assertStepLabels(labels, step.stepId);
-		// Only `type: script` steps carry `shell:` (Proposal 1); every other step type has
-		// no such field, which `workerSatisfiesShell` already treats as "no constraint".
-		const shellKind = (step.stepConfig as { shell?: 'bash' | 'cmd' | 'pwsh' }).shell;
-		return {
-			stepId: step.stepId,
-			labels: labels ?? [],
-			// The step type is the only signal for this: there is no step-level
-			// `interactive` field, by design (D#60).
-			requiresUserInterface: step.stepConfig.type === 'user_intervention',
-			...(this.executionProjects.get(step.executionContext.executionId) !== undefined
-				? { projectRoot: this.executionProjects.get(step.executionContext.executionId)! }
-				: {}),
-			...(shellKind !== undefined ? { shellKind } : {}),
-		};
-	}
-
-	private enqueueReadyItems(executionId: string, items: ReadyItem[], context: ExecutionContext): void {
-		for (const item of items) {
-			this.readyQueue.push({
-				stepId: item.stepId,
-				stepConfig: item.step as unknown as AssignableStep,
-				executionContext: context,
-			});
-		}
-	}
-
-	private markSkippedStepsCompleted(executionId: string): void {
-		if (!this.executionStore.exists(executionId)) {
-			return;
-		}
-		const state = this.executionStore.read(executionId);
-		for (const [sid, stepState] of Object.entries(state.steps)) {
-			if (stepState.status === 'pending') {
-				this.executionStore.markStepCompleted(executionId, sid);
-			}
-		}
-	}
-
-	private cleanupExecution(executionId: string, priorError?: unknown): void {
-		this.schedulers.delete(executionId);
-		this.executionContexts.delete(executionId);
-		this.stepDefinitions.delete(executionId);
-		this.resumableInterventions.delete(executionId);
-		this.stepCounts.delete(executionId);
-		this.executionProjects.delete(executionId);
-		this.activeExecutionCount--;
-		// Per-step bookkeeping dies with the execution it was kept for. Both maps are keyed
-		// by execution and step, so nothing else would ever remove these entries and a
-		// long-lived daemon would accumulate one per step it has ever run.
-		for (const key of this.redispatchCounts.keys()) {
-			if (key.startsWith(`${executionId}:`)) {
-				this.redispatchCounts.delete(key);
-			}
-		}
-		for (const key of this.interactiveWaitSince.keys()) {
-			if (key.startsWith(`${executionId}:`)) {
-				this.interactiveWaitSince.delete(key);
-			}
-		}
-
-		const pluginWs = this.pluginWorkspaceHandles.get(executionId);
-		if (pluginWs) {
-			this.pluginWorkspaceHandles.delete(executionId);
-			void releaseWorkspace(pluginWs.provider, pluginWs.handle, priorError).catch((err: unknown) => {
-				process.stderr.write(
-					`[CommandHandler] Failed to release plugin workspace for ${executionId}: ${String(err)}\n`
-				);
-			});
-		}
-
-		const nativeWs = this.nativeWorkspaceManagers.get(executionId);
-		if (nativeWs) {
-			this.nativeWorkspaceManagers.delete(executionId);
-			void nativeWs.manager.release(nativeWs.workspaceId, executionId).catch((err: unknown) => {
-				process.stderr.write(
-					`[CommandHandler] Failed to release workspace for ${executionId}: ${String(err)}\n`
-				);
-			});
-		}
-	}
-
-	/** Returns all known step IDs for an execution (initial + injected so far). */
-	private getKnownStepIds(executionId: string): Set<string> {
-		return this.schedulers.get(executionId)?.getStepIds() ?? new Set();
-	}
-
-	private isKnownStepId(executionId: string, stepId: string): boolean {
-		return this.getKnownStepIds(executionId).has(stepId);
+		this.demand.stop();
 	}
 }

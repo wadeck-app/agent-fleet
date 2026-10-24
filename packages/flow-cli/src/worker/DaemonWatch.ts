@@ -1,6 +1,6 @@
 import { type FSWatcher, watch } from 'node:fs';
 
-import { WORKER_PORT_FILE } from '../daemon/Daemon.js';
+import { WORKER_PORT_FILE } from '../daemon/publishWorkerPort.js';
 import type { ReconnectNotifier } from './ReconnectNotifier.js';
 
 /** Collapses the burst of events a single write produces into one notification. */
@@ -28,13 +28,21 @@ export function watchForDaemon(daemonDir: string, onDaemonReady: () => void): ()
 
 	try {
 		watcher = watch(daemonDir, (_event, filename) => {
-			if (disposed) return;
+			if (disposed) {
+				return;
+			}
 			// filename is null on some platforms for some events; nothing to match on then.
-			if (filename === null || filename.toString() !== WORKER_PORT_FILE) return;
-			if (timer !== undefined) clearTimeout(timer);
+			if (filename === null || filename.toString() !== WORKER_PORT_FILE) {
+				return;
+			}
+			if (timer !== undefined) {
+				clearTimeout(timer);
+			}
 			timer = setTimeout(() => {
 				timer = undefined;
-				if (!disposed) onDaemonReady();
+				if (!disposed) {
+					onDaemonReady();
+				}
 			}, DEBOUNCE_MS);
 		});
 		// A watcher must not be what keeps the process alive: the reconnect timer already does that
@@ -48,7 +56,9 @@ export function watchForDaemon(daemonDir: string, onDaemonReady: () => void): ()
 
 	return () => {
 		disposed = true;
-		if (timer !== undefined) clearTimeout(timer);
+		if (timer !== undefined) {
+			clearTimeout(timer);
+		}
 		watcher?.close();
 	};
 }

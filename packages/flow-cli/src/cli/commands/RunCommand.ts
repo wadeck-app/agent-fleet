@@ -1,343 +1,20 @@
-import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
-import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
-import { createRemoteDaemonClient, executionsDirOf, logFilePath, todayLogDate } from 'flow-core';
-import type { FlowDefinition } from 'flow-engine/types';
-import * as yaml from 'js-yaml';
-import { spawn } from 'node:child_process';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
-import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
+import { FlowConfigLoader } from '../../config/FlowConfig';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
-import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
-import { ExecutionStore } from '../../storage/ExecutionStore';
-import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
+import { ExecutionTimeoutError, waitForCompletion } from './ExecutionCompletionWaiter';
+import { hasFastLogMode } from './FlowLogModeDetector';
 import { resolveFlowReference } from './FlowReference';
+import { loadMockConfig } from './MockConfigLoader';
+import { parseInputArgs, parseTimeout } from './RunArgumentParser';
+import { sendToDaemon } from './RunDaemonSender';
 import { checkSecretInputs } from './SecretInputCheck';
 
 // violations-suppress-end: ts/no-deep-relative
-
-type FlowCommands = { run?: (payload: unknown) => Promise<DaemonResponse> };
-
-function parseTimeout(value: string): number {
-	const match = /^(\d+)(ms|s|m|h)?$/.exec(value);
-	if (!match) {
-		throw new Error(`Invalid timeout: ${value}. Use e.g. 10m, 30s, 5000ms`);
-	}
-	const n = parseInt(match[1]!, 10);
-	switch (match[2] ?? 's') {
-		case 'ms':
-			return n;
-		case 's':
-			return n * 1000;
-		case 'm':
-			return n * 60 * 1000;
-		case 'h':
-			return n * 3600 * 1000;
-		default:
-			throw new Error(`Unknown time unit`);
-	}
-}
-
-interface LogLine {
-	prefix: string;
-	timestamp: string;
-	level: string;
-	message: string;
-}
-
-// TODO(Option B): replace file-tail with WebSocket Channel 3 (CLI->Daemon) for real-time
-// streaming without polling delay. See docs/architecture.md for Channel 3 spec.
-export function tailLogFile(
-	logFile: string,
-	executionId: string,
-	lastByte: number,
-	onLog: (stepId: string, message: string) => void
-): number {
-	if (!fs.existsSync(logFile)) {
-		return lastByte;
-	}
-
-	const stat = fs.statSync(logFile);
-	if (stat.size <= lastByte) {
-		return lastByte;
-	}
-
-	const buf = Buffer.alloc(stat.size - lastByte);
-	const fd = fs.openSync(logFile, 'r');
-	fs.readSync(fd, buf, 0, buf.length, lastByte);
-	fs.closeSync(fd);
-
-	const chunk = buf.toString('utf8');
-	const lines = chunk.split('\n');
-
-	for (const raw of lines) {
-		const trimmed = raw.trim();
-		if (!trimmed) {
-			continue;
-		}
-		let line: LogLine;
-		try {
-			line = JSON.parse(trimmed) as LogLine;
-		} catch {
-			continue;
-		}
-		const prefix = `[${executionId}|`;
-		if (typeof line.prefix !== 'string' || !line.prefix.startsWith(prefix)) {
-			continue;
-		}
-		const stepId = line.prefix.slice(prefix.length, -1);
-		if (stepId === '__execution') {
-			continue;
-		}
-		onLog(stepId, line.message);
-	}
-
-	return stat.size;
-}
-
-class ExecutionTimeoutError extends Error {}
-
-async function waitForCompletion(
-	executionId: string,
-	daemonDir: string,
-	timeoutMs: number,
-	onLog?: (stepId: string, message: string) => void,
-	options?: { fastPoll?: boolean }
-): Promise<ExecutionState> {
-	const store = new ExecutionStore(executionsDirOf(daemonDir));
-	const logFile = logFilePath(daemonDir, todayLogDate());
-	const deadline = Date.now() + timeoutMs;
-	// fastPoll: fixed 50ms (streaming/polling log modes). Normal: starts 200ms, grows to 2000ms.
-	let delay = options?.fastPoll ? 50 : 200;
-	let lastByte = 0;
-	while (Date.now() < deadline) {
-		if (onLog) {
-			lastByte = tailLogFile(logFile, executionId, lastByte, onLog);
-		}
-		// Only read once the file exists -- avoids swallowing real I/O errors (disk-full, bad JSON)
-		// by conflating them with the normal "not yet written" case.
-		if (store.exists(executionId)) {
-			const state = store.read(executionId);
-			if (state.status === 'completed' || state.status === 'failed') {
-				if (onLog) {
-					tailLogFile(logFile, executionId, lastByte, onLog);
-				}
-				return state;
-			}
-		}
-		await new Promise(r => setTimeout(r, delay));
-		if (!options?.fastPoll) {
-			delay = Math.min(delay * 1.5, 2000);
-		}
-	}
-	throw new ExecutionTimeoutError(`Execution ${executionId} did not complete within ${timeoutMs}ms`);
-}
-
-/**
- * Loads `--mock-config <path>`: a YAML/JSON file mapping step id to an env overlay that
- * replaces that step's real execution via the existing mock-CLI convention
- * (`*_MOCK_PATH`/`*_MOCK_RESPONSE`/`*_MOCK_EXIT_CODE`). Fails loudly -- missing file, bad
- * syntax, or a step id absent from the flow are all caller errors, not silently ignored.
- */
-function loadMockConfig(mockConfigPath: string, flowFilePath: string): Record<string, Record<string, string>> {
-	const resolvedPath = path.isAbsolute(mockConfigPath) ? mockConfigPath : path.resolve(process.cwd(), mockConfigPath);
-	if (!fs.existsSync(resolvedPath)) {
-		console.error(`Error:Mock config file not found: ${resolvedPath}`);
-		process.exit(2);
-	}
-
-	let parsed: unknown;
-	try {
-		const content = fs.readFileSync(resolvedPath, 'utf8');
-		parsed = yaml.load(content, { schema: yaml.JSON_SCHEMA });
-	} catch (err) {
-		const detail = getErrorMessage(err);
-		console.error(`Error:Mock config file "${resolvedPath}" is not valid YAML/JSON. ${detail}`);
-		process.exit(2);
-	}
-
-	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-		console.error(`Error:Mock config file "${resolvedPath}" must be an object mapping step id to env vars.`);
-		process.exit(2);
-	}
-	const mockEnv = parsed as Record<string, Record<string, string>>;
-
-	let flow: FlowDefinition;
-	try {
-		const flowContent = fs.readFileSync(flowFilePath, 'utf8');
-		flow = yaml.load(flowContent, { schema: yaml.JSON_SCHEMA }) as FlowDefinition;
-	} catch (err) {
-		console.error(
-			`Error:Could not read flow file "${flowFilePath}" to validate --mock-config step ids. ${getErrorMessage(err)}`
-		);
-		process.exit(2);
-	}
-
-	const flowStepIds = new Set((flow?.steps ?? []).map(s => s.id));
-	for (const stepId of Object.keys(mockEnv)) {
-		if (!flowStepIds.has(stepId)) {
-			console.error(
-				`Error:--mock-config references step '${stepId}', which does not exist in "${flowFilePath}". ` +
-					`Known step ids: ${[...flowStepIds].join(', ')}`
-			);
-			process.exit(2);
-		}
-	}
-
-	return mockEnv;
-}
-
-function parseInputArgs(rawInputs: string[]): Record<string, string> {
-	const inputs: Record<string, string> = {};
-	for (const entry of rawInputs) {
-		const idx = entry.indexOf('=');
-		if (idx === -1) {
-			console.error(`Invalid input: '${entry}'. Use key=value`);
-			process.exit(1);
-		}
-		inputs[entry.slice(0, idx)] = entry.slice(idx + 1);
-	}
-	return inputs;
-}
-
-/**
- * Spawn the daemon as a detached background process (like `flow start` does) and wait
- * for its port file to appear -- avoids the WebSocket race condition of the in-process path.
- */
-async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Promise<void> {
-	// Resolve the .cjs bundle from the launcher override or the installed bundle location
-	const resolvedBundle = (() => {
-		// In the installed binary, __filename points to the flow.cjs bundle.
-		// In dev mode (tsx), we approximate via import.meta.url.
-		const self = (() => {
-			try {
-				return fileURLToPath(import.meta.url).replace(/\/cli\/commands\/RunCommand\.[jt]s$/, '/../../flow.cjs');
-			} catch {
-				return process.argv[1]!;
-			}
-		})();
-		return resolveOwnBundlePath(FLOW_BUNDLE_NAME, self);
-	})();
-
-	// A foreign override must not reach the daemon either: it would resolve its own updater path
-	// from another CLI's directory. Pass on the value we accepted, or nothing.
-	const daemonEnv: NodeJS.ProcessEnv = { ...process.env, FLOW_DAEMON_MODE: '1' };
-	if (daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'] !== resolvedBundle) {
-		delete daemonEnv['LAUNCHER_BUNDLE_OVERRIDE'];
-	}
-
-	// On Windows the daemon is spawned via VBScript, which loses the Git Bash PATH enrichment
-	// (MSYS2 paths like C:\Program Files\Git\usr\bin are absent in the system PATH). Resolve
-	// bash.exe now, while we still have the Git Bash PATH, and pass the absolute path so the
-	// daemon and its forked workers never depend on PATH lookup for bash.
-	if (process.platform === 'win32') {
-		const resolved = resolveFlowBashPath(daemonEnv);
-		if (resolved) {
-			daemonEnv['FLOW_BASH_PATH'] = resolved;
-		}
-	}
-
-	// Remove stale port file before spawning so the poll below only resolves on a fresh write
-	const portFile = path.join(daemonDir, 'config.port');
-	try {
-		fs.unlinkSync(portFile);
-	} catch {
-		/* file may not exist */
-	}
-
-	if (process.platform === 'win32') {
-		const vbsPath = path.join(os.tmpdir(), `flow-daemon-run-${Date.now()}.vbs`);
-		const safeNode = process.execPath.replace(/"/g, '""');
-		const safeBundle = resolvedBundle.replace(/"/g, '""');
-		// Only forward an override we accepted: forwarding a foreign one would hand the daemon a
-		// bundle path belonging to another CLI (that is the bug this resolution guards against).
-		const overrideLines =
-			process.env['LAUNCHER_BUNDLE_OVERRIDE'] === resolvedBundle
-				? [
-						`oShell.Environment("Process")("LAUNCHER_BUNDLE_OVERRIDE") = "${resolvedBundle.replace(/"/g, '""')}"`,
-					]
-				: [];
-		fs.writeFileSync(
-			vbsPath,
-			[
-				'Dim oShell',
-				'Set oShell = CreateObject("WScript.Shell")',
-				'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
-				...overrideLines,
-				...buildWindowsDaemonEnvLines(daemonEnv),
-				`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
-			].join('\r\n')
-		);
-		const wscript = spawn('wscript.exe', [vbsPath], {
-			detached: true,
-			stdio: 'ignore',
-			windowsHide: true,
-			env: daemonEnv,
-		});
-		wscript.unref();
-	} else {
-		// violations-suppress: cli/no-spawn-without-windows-hide this is the non-Windows branch (win32 uses wscript.exe above), where windowsHide has no effect
-		const child = spawn(process.execPath, [resolvedBundle], {
-			stdio: 'ignore',
-			env: daemonEnv,
-		});
-		child.unref();
-	}
-
-	// Poll for port file written by the freshly-spawned daemon
-	const deadline = Date.now() + timeoutMs;
-	while (Date.now() < deadline) {
-		if (fs.existsSync(portFile)) {
-			return;
-		}
-		await new Promise(r => setTimeout(r, 50));
-	}
-	throw new Error(`Daemon did not start within ${timeoutMs}ms (port file not found: ${portFile})`);
-}
-
-async function sendToDaemon(
-	cmd: Extract<ClientCommand, { type: 'run' }>,
-	config: FlowConfig,
-	daemonDir: string
-): Promise<DaemonResponse> {
-	const makeClient = () => createRemoteDaemonClient<FlowCommands>(daemonDir);
-	try {
-		return (await makeClient().send('run', cmd)) as DaemonResponse;
-	} catch (err) {
-		if (!(err instanceof DaemonNotRunningError)) {
-			throw err;
-		}
-		try {
-			await spawnDaemonBackground(daemonDir);
-			// On Windows the daemon writes the port file before the TCP server is ready.
-			// Retry with backoff until the server accepts connections.
-			let lastErr: unknown;
-			for (let attempt = 0; attempt < 8; attempt++) {
-				try {
-					return (await makeClient().send('run', cmd)) as DaemonResponse;
-				} catch (eRetry) {
-					const code = (eRetry as NodeJS.ErrnoException).code;
-					if (code !== 'ECONNRESET' && !(eRetry instanceof DaemonNotRunningError)) {
-						throw eRetry;
-					}
-					lastErr = eRetry;
-					await new Promise(r => setTimeout(r, 150 * (attempt + 1)));
-				}
-			}
-			throw lastErr;
-		} catch (e2) {
-			console.error('Daemon could not be started:', e2);
-			process.exit(3); // D34: exit 3 = daemon start failed
-		}
-	}
-}
 
 export function registerRunCommand(program: Command): void {
 	program
@@ -433,7 +110,8 @@ export function registerRunCommand(program: Command): void {
 				// The same single location the daemon reads, so a run and the daemon it starts
 				// never disagree about the configuration (D#58). The legacy-file warning is left
 				// to the daemon, which is the process whose behaviour it would have changed.
-				const { config } = FlowConfigLoader.loadForDaemon(daemonDir);
+				// Loaded for validation only: an invalid configuration must fail the run before any daemon contact.
+				FlowConfigLoader.loadForDaemon(daemonDir);
 
 				const resolvedMockConfigPath = options.mockConfig
 					? path.isAbsolute(options.mockConfig)
@@ -455,7 +133,7 @@ export function registerRunCommand(program: Command): void {
 
 				let response: DaemonResponse;
 				try {
-					response = await sendToDaemon(cmd, config, daemonDir);
+					response = await sendToDaemon(cmd, daemonDir);
 				} catch {
 					console.error('Failed to contact the daemon.');
 					process.exit(1);
@@ -501,19 +179,7 @@ export function registerRunCommand(program: Command): void {
 						: undefined;
 
 				// Use fast 50ms poll when any model step has log:streaming or log:polling
-				const flowYaml =
-					!registered && fs.existsSync(flowFile)
-						? (() => {
-								try {
-									return yaml.load(fs.readFileSync(flowFile, 'utf8'), {
-										schema: yaml.JSON_SCHEMA,
-									}) as { steps?: { log?: string }[] };
-								} catch {
-									return null;
-								}
-							})()
-						: null;
-				const fastPoll = flowYaml?.steps?.some(s => s.log === 'streaming' || s.log === 'polling') ?? false;
+				const fastPoll = !registered && hasFastLogMode(flowFile);
 
 				let finalState: ExecutionState;
 				try {

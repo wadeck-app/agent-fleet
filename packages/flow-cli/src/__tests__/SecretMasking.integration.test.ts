@@ -7,8 +7,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { tailLogFile } from '../cli/commands/ExecutionLogTail';
 import { logsCommand } from '../cli/commands/LogsCommand';
-import { tailLogFile } from '../cli/commands/RunCommand';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');

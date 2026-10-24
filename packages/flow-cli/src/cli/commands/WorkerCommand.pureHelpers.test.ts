@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildReExecArgs, isNewerVersionAvailable } from './WorkerCommand';
+import { buildReExecArgs, isNewerVersionAvailable } from './WorkerSelfUpdate';
 
 describe('buildReExecArgs', () => {
 	it('includes --source only when a sourceId is present', () => {

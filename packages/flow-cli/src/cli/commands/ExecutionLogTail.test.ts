@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { tailLogFile } from './RunCommand.js';
+import { tailLogFile } from './ExecutionLogTail.js';
 
 let tmpDir: string;
 

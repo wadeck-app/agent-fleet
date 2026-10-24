@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 // and cannot be exercised in a unit test. Inspecting the source is the reliable way
 // to guard against accidental regressions (windowsHide removed from wscript spawn,
 // wscript replaced with direct node spawn, etc.).
-const RUN_COMMAND_SRC = fs.readFileSync(path.join(import.meta.dirname, 'RunCommand.ts'), 'utf8');
+const RUN_COMMAND_SRC = fs.readFileSync(path.join(import.meta.dirname, 'DaemonBackgroundSpawner.ts'), 'utf8');
 
 const FLOW_INDEX_SRC = fs.readFileSync(path.join(import.meta.dirname, '../FlowIndex.ts'), 'utf8');
 

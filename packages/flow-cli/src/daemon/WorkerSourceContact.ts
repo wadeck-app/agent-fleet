@@ -2,9 +2,9 @@ import type { WorkerRequest, WorkerSourceProvider } from 'extension-points';
 import { spawn } from 'node:child_process';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+import { sendNudge } from './NudgeDispatch.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { RelayWorkerSource } from './RelayWorkerSource.js';
-import { sendNudge } from './NudgeDispatch.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
 /** The S1 implementations that ship with flow. */

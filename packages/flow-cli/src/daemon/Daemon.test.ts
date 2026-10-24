@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FlowConfigLoader } from '../config/FlowConfig.js';
 import { observeFor } from '../test-utils/WaitHelpers';
-import { Daemon, declaresPlugins, loadFlowHooks, writeDaemonLog } from './Daemon.js';
+import { Daemon } from './Daemon.js';
+import { writeDaemonLog } from './DaemonLog.js';
+import { declaresPlugins } from './declaresPlugins.js';
+import { loadFlowHooks } from './loadFlowHooks.js';
 
 // Daemon.js is imported statically: dynamic imports inside the tests put the cold load of the daemon module graph
 // (1.7 s idle, more under load) inside the first test's 5 s timeout.

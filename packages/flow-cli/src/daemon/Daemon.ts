@@ -1,281 +1,44 @@
-import { UpdateManager } from '@wadeck-app/shared-cli';
-import { type HookConfig, HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
-import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
-import { readUpdateConfig } from '@wadeck-app/shared-updater';
 import { type DaemonHandle, createDaemon } from '@wadeck-app/singleton-daemon-kit';
-import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
 import { executionsDirOf, logsDirOf } from 'flow-core';
-import { WorkspaceManager } from 'flow-engine';
-import * as yaml from 'js-yaml';
-import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
-import type { WebSocket } from 'ws';
 
-import { FLOW_BUNDLE_NAME } from '../cli/FlowBundleName.js';
 import { VERSION } from '../cli/version.js';
-import { LegacyProjectLayoutError } from '../config/DefaultProjectResolver.js';
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { PluginResolver } from '../config/PluginResolver.js';
-import { ProjectResolverFactory } from '../config/ProjectResolverFactory.js';
 import { FlowEventMapper } from '../events/FlowEventMapper.js';
 import type { FlowEventPublisher } from '../events/FlowEventPublisher.js';
 import { flowEventsStatusLine } from '../events/FlowEventsStatusLine.js';
 import { NullFlowEventPublisher } from '../events/NullFlowEventPublisher.js';
-import type { ClientCommand, SourceReady, UpdateWorkerRequest, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
-import { registerWithAppCore } from './AppCoreRegistration.js';
 import { CommandHandler } from './CommandHandler';
 import { buildDaemonHealth } from './DaemonHealth';
+import { DaemonIdleShutdown } from './DaemonIdleShutdown.js';
 import { writeDaemonLog } from './DaemonLog.js';
+import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
+import { DaemonSourceContact } from './DaemonSourceContact.js';
+import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
-import { injectedStepState } from './InjectedStepState.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
-import { ProjectResolutionRefusal } from './ProjectResolutionRefusal.js';
 import { RelayRegistry } from './RelayRegistry.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WebSocketServer } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
-import { contactDeclaredSources } from './WorkerSourceContact.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
-
-/** Name of the file the daemon publishes its bound WebSocket port in. */
-export const WORKER_PORT_FILE = 'worker.port';
+import { createDaemonCommands } from './createDaemonCommands.js';
+import { publishWorkerPort } from './publishWorkerPort.js';
+import { registerAppCoreModules } from './registerAppCoreModules.js';
+import { resolveClaudePath } from './resolveClaudePath.js';
+import { startPeriodicUpdateCheck } from './startPeriodicUpdateCheck.js';
+import { tryResolvePlugins } from './tryResolvePlugins.js';
 
 /** How often the daemon looks for a step whose worker went quiet. */
 const STALLED_SWEEP_INTERVAL_MS = 60_000;
-
-/**
- * Grace period between the idle condition becoming true and the daemon actually stopping.
- *
- * `flow run` auto-starts the daemon, then dials it over IPC to submit the "run" command --
- * that is a separate connect-and-send round trip, not instant. A worker's own `'ready'`
- * message (e.g. a stale external worker reconnecting, or a daemon-forked source answering)
- * can land in that window and find the queue genuinely empty, because the run has not been
- * enqueued into `commandHandler` yet. Reacting immediately then stops the daemon before the
- * command it was started for ever arrives, leaving that execution stuck at `status: "queued"`
- * forever. 1s is well above the sub-150ms window observed in practice while costing nothing
- * once the daemon is actually idle -- it only delays a shutdown that was never time-critical.
- */
-const SHUTDOWN_GRACE_MS = 1_000;
-
-/**
- * Records the port workers must dial.
- *
- * Necessary because the WebSocket server retries upward on EADDRINUSE, so the bound port
- * is not reliably `httpPort + 1`. A client computing the offset itself would dial whatever
- * else holds that port -- failing obscurely, or joining something unrelated.
- */
-export function publishWorkerPort(daemonDir: string, port: number): void {
-	const filePath = path.join(daemonDir, WORKER_PORT_FILE);
-	try {
-		fs.writeFileSync(filePath, JSON.stringify({ port }), { encoding: 'utf8', mode: 0o600 });
-	} catch (err) {
-		// Not fatal for forked workers, which read the port in-process, but every externally
-		// launched worker now has nothing to dial -- so say so rather than continue quietly.
-		process.stderr.write(
-			`[daemon] Failed to publish the worker port to "${filePath}": ${getErrorMessage(err)}. Externally launched workers will not be able to connect.\n`
-		);
-	}
-}
-
-// Re-exported for backward compatibility (Daemon.test.ts imports it from here). The
-// implementation lives in DaemonLog.ts to avoid a Daemon.ts <-> CommandHandler.ts import cycle.
-export { writeDaemonLog } from './DaemonLog.js';
-
-function resolveClaudePath(): string {
-	try {
-		// "2>nul" discards at the shell level, not just Node's stdio pipe -- where.exe writes its
-		// localized "could not find files" message straight to the console on a miss, bypassing
-		// the stdio option above (confirmed live: it leaks even with stdio: 'pipe'/'ignore').
-		const cmd = process.platform === 'win32' ? 'where.exe claude 2>nul' : 'which claude';
-		const result = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
-		return result.trim().split('\n')[0]?.trim() ?? '';
-	} catch {
-		// Claude not found on PATH -- workers will need to locate it themselves
-		process.stderr.write('[daemon] Warning: claude binary not found on PATH. Model steps may fail.\n');
-		return '';
-	}
-}
-
-/**
- * Prunes the workspaces of the project a run belongs to.
- *
- * Keyed on the requesting client's cwd, never on the daemon's own: the daemon is
- * a per-user machine-wide singleton serving every project concurrently, so its
- * launch directory would prune an unrelated project's workspaces (Q#22).
- */
-function pruneProjectWorkspaces(cwd: string, config: FlowConfig): void {
-	// Throws for a project that cannot be read (legacy layout); only "no project" skips.
-	const resolution = ProjectResolverFactory.create().tryResolve(cwd);
-	if (resolution === null) {
-		process.stderr.write(`[daemon] Skipped workspace pruning: "${cwd}" belongs to no project.\n`);
-		return;
-	}
-	WorkspaceManager.pruneOldWorkspaceDir(
-		path.join(resolution.projectRoot, '.flow', 'workspaces'),
-		config.workspace.retainDays,
-		config.workspace.maxWorkspaces
-	);
-}
-
-/**
- * Reads the `hooks:` section of the project's `.flow/config.yml`.
- *
- * Resolves the project root from `cwd` rather than reading `<cwd>/.flow/config.yml`
- * directly, so a run started from a subdirectory still picks up the project's hooks.
- */
-export function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
-	// Throws for a project that cannot be read (legacy layout): running without its hooks
-	// would look like "no hooks configured". Only "no project" yields no hooks.
-	const resolution = ProjectResolverFactory.create().tryResolve(cwd);
-	if (resolution === null) {
-		process.stderr.write(`[daemon] No flow hooks loaded: "${cwd}" belongs to no project.\n`);
-		return {};
-	}
-	const configPath = path.join(resolution.projectRoot, '.flow', 'config.yml');
-	if (!fs.existsSync(configPath)) {
-		return {};
-	}
-	let raw: Record<string, unknown> | null;
-	try {
-		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
-			string,
-			unknown
-		> | null;
-	} catch (err) {
-		// Fails rather than running the flow with no hooks: silently dropping every
-		// hook because of a typo is worse than refusing to start.
-		throw new Error(`Failed to parse flow config at "${configPath}": ${String(err)}`);
-	}
-	return (raw?.['hooks'] as Record<string, HookConfig[]> | undefined) ?? {};
-}
-
-/**
- * True when a config file actually declares a `plugins:` section.
- *
- * Tested instead of mere file existence because the global config now lives at
- * `~/.config/flow/config.yml` (D#58) -- the same file that carries daemon
- * settings such as `queue:` and `autoUpdate:`. Keying on existence would make
- * every user who has ever set `queue.concurrency` fail with "No workspace
- * provider configured", since `resolveAll()` requires one by design (P-4).
- */
-export function declaresPlugins(configPath: string): boolean {
-	if (!fs.existsSync(configPath)) {
-		return false;
-	}
-	let raw: Record<string, unknown> | null;
-	try {
-		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
-			string,
-			unknown
-		> | null;
-	} catch (err) {
-		// A config file that cannot be parsed is a hard error: guessing either way
-		// would either hide the typo or blame a missing workspace provider for it.
-		throw new Error(`Failed to parse flow config at "${configPath}": ${String(err)}`);
-	}
-	return raw?.['plugins'] !== undefined;
-}
-
-/**
- * Extension points the daemon declares but does not resolve from config yet: it
- * constructs the built-in implementation directly.
- *
- * Configuring one has to be an error. Loading the section and ignoring it would leave the
- * user believing their own implementation was in force when it never ran -- and for
- * routing in particular, the flow would keep working, just not the way they asked.
- */
-const UNRESOLVED_PLUGIN_POINTS: Record<string, string> = {
-	authentication: 'the built-in shared-token authenticator',
-	workerAcceptance: 'the built-in permissive acceptance rules',
-	stepDistribution: 'the built-in registered-workers-first order',
-	provisioning: 'the built-in bounded-wait-then-fork policy',
-	interactivityPolicy: 'the built-in loud failure when no worker has a user interface',
-};
-
-/** Names the unresolved plugin sections a config file declares, if any. */
-function declaresUnresolvedPlugins(configPath: string): string[] {
-	if (!fs.existsSync(configPath)) {
-		return [];
-	}
-	let raw: Record<string, unknown> | null;
-	try {
-		raw = yaml.load(fs.readFileSync(configPath, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<
-			string,
-			unknown
-		> | null;
-	} catch {
-		// declaresPlugins already reports a parse failure with the path; do not double-report.
-		return [];
-	}
-	const plugins = raw?.['plugins'];
-	if (typeof plugins !== 'object' || plugins === null) {
-		return [];
-	}
-	// violations-suppress: ts/no-unsafe-type-cast parsed YAML has no static shape; the plugins key is checked before use
-	const declared = plugins as Record<string, unknown>;
-	return Object.keys(UNRESOLVED_PLUGIN_POINTS).filter(point => declared[point] !== undefined);
-}
-
-/**
- * Attempts to load plugin config. Returns empty providers when no config file declares
- * a `plugins:` section (backward-compatible). Re-throws on config parse errors or
- * plugin load failures.
- */
-async function tryResolvePlugins(): Promise<{
-	workspaceProvider?: WorkspaceProvider;
-	approvalProvider?: ApprovalProvider;
-}> {
-	const globalConfigPath = path.join(flowConfigDir(), 'config.yml');
-	const envOverride = process.env['FLOW_CONFIG'];
-
-	// The daemon is a per-user machine-wide singleton, so it has no single project.
-	// Resolve the project from the launching cwd instead of reading `<cwd>/.flow/`
-	// literally; absence is not an error here because a global config alone is enough.
-	let projectConfigPath: string | null = null;
-	try {
-		const resolution = ProjectResolverFactory.create().tryResolve(process.cwd());
-		// null: no project at the launch directory -- global config still applies.
-		if (resolution !== null) {
-			projectConfigPath = path.join(resolution.projectRoot, '.flow', 'config.yml');
-		}
-	} catch (err) {
-		// Not absorbed: the launch directory is arbitrary (Q#22), so refusing to start would
-		// punish an unrelated project, but the project config it hides must not vanish unseen.
-		process.stderr.write(
-			`[daemon] Project plugin config at the launch directory not loaded: ${getErrorMessage(err)}\n`
-		);
-	}
-
-	if (
-		!envOverride &&
-		!declaresPlugins(globalConfigPath) &&
-		(projectConfigPath === null || !declaresPlugins(projectConfigPath))
-	) {
-		return {};
-	}
-
-	for (const configPath of [globalConfigPath, projectConfigPath]) {
-		if (configPath === null) {
-			continue;
-		}
-		for (const point of declaresUnresolvedPlugins(configPath)) {
-			throw new Error(
-				`"${configPath}" configures plugins.${point}, but the daemon does not load a ${point} plugin yet -- it uses ${UNRESOLVED_PLUGIN_POINTS[point] ?? 'a built-in implementation'}. Remove that section, or track the work to make it pluggable, rather than assuming it is active.`
-			);
-		}
-	}
-
-	return PluginResolver.create().resolveAll();
-}
 
 export interface StartDaemonOptions {
 	/**
@@ -317,100 +80,55 @@ async function startDaemon(
 	const pluginProviders = await tryResolvePlugins();
 	const perFlowWorkspaceResolver = await PluginResolver.create().createPerFlowWorkspaceResolver();
 
-	let workerRegistry: WorkerRegistry;
-	let relayRegistry: RelayRegistry;
-	let launchTokens: LaunchTokenIssuer;
-	let workerProvisioner: WorkerProvisioner;
-	let wsServer: WebSocketServer;
+	/** Built by onStart; the commands, message handler and idle shutdown below only run after it. */
+	let runtime: DaemonRuntime | undefined;
+	const getRuntime = (): DaemonRuntime => {
+		if (runtime === undefined) {
+			throw new Error('The daemon used its components before its start hook built them.');
+		}
+		return runtime;
+	};
 	/** The port workers must dial, known only once the listener has bound. */
 	let workerListenerPort: number | undefined;
 	/** Held so shutdown can stop it: an unref'd timer still fires while the daemon tears down. */
 	let stalledSweep: ReturnType<typeof setInterval> | undefined;
 	/**
-	 * Held so shutdown can stop it.
-	 *
-	 * Keeps this daemon's own updater cache fresh (`readUpdateConfig`/`readCache`, see
-	 * `UpdateManager`): the worker side refreshes it on its own self-restart (Part 2), but a
-	 * long-running daemon that never restarts would otherwise read a `latestVersion` from
-	 * whenever it last happened to start -- stale for however many days it stays up. Pure
-	 * refresh, not a gate: `StepRouter`'s version preference degrades to "no preference"
-	 * when the cache is missing or stale, so a slow or failed check never blocks dispatch.
+	 * Held so shutdown can stop it. Keeps this daemon's own updater cache fresh, see
+	 * `startPeriodicUpdateCheck`.
 	 */
 	let updateCheckTimer: ReturnType<typeof setInterval> | undefined;
-	let commandHandler: CommandHandler;
-	let executionStore: ExecutionStore;
-	let logWriter: LogWriter;
-	let daemonSecrets: DaemonSecrets;
-	/** checkShutdown() can be re-entered (e.g. a worker's own close event fires while
-	 * its socket is also being torn down by this same shutdown): without this guard
-	 * the idle-stop log line and daemonHandle.stop('idle') would both run twice. */
-	let shuttingDown = false;
-	/** Pending debounced shutdown (SHUTDOWN_GRACE_MS), or none scheduled. */
-	let pendingShutdown: ReturnType<typeof setTimeout> | undefined;
+
+	const idleShutdown = new DaemonIdleShutdown(
+		logsDir,
+		getRuntime,
+		() => {
+			if (stalledSweep !== undefined) {
+				clearInterval(stalledSweep);
+			}
+		},
+		() => daemonHandle.stop('idle')
+	);
+	const workerMessages = new DaemonWorkerMessageHandler(logsDir, getRuntime, () => {
+		idleShutdown.checkShutdown();
+	});
 
 	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });
 
-	const daemonHandle = await createDaemon({
+	const daemonHandle: DaemonHandle = await createDaemon({
 		configDir: resolvedDaemonDir,
 		appVersion: VERSION,
 		...(options.port !== undefined ? { port: options.port } : {}),
 		idleTimeout: null,
-		commands: {
-			run: async (payload: unknown): Promise<unknown> => {
-				const cmd = payload as Extract<ClientCommand, { type: 'run' }>;
-				let flowHooks: Record<string, HookConfig[]>;
-				try {
-					pruneProjectWorkspaces(cmd.cwd, config);
-					flowHooks = loadFlowHooks(cmd.cwd);
-				} catch (err) {
-					// Refused as a typed response, like handleRun does for the same cause.
-					if (err instanceof LegacyProjectLayoutError) {
-						return ProjectResolutionRefusal.toResponse(cmd.cwd, err);
-					}
-					throw err;
-				}
-				return commandHandler.handleRun(cmd, new HookDispatcher(flowHooks));
-			},
-			// Resumes an execution kept alive after a `user_intervention` step timed out
-			// unanswered (see CommandHandler.handleResume). Only works against this same
-			// daemon process -- there is no on-disk reconstruction of in-memory state.
-			resume: (payload: unknown): unknown => {
-				const { executionId } = payload as Extract<ClientCommand, { type: 'resume' }>;
-				if (typeof executionId !== 'string' || executionId.trim() === '') {
-					throw new Error('resume requires a non-empty "executionId".');
-				}
-				return commandHandler.handleResume(executionId);
-			},
-			// Live connections only: a declared source with nothing connected is not
-			// capacity, and reporting it as available would suggest a step could reach it (D#4).
-			workers: (): unknown => workerRegistry.summarize(),
-			// Proposal 3: updates an already-connected worker's labels/shellCapabilities on
-			// this daemon's registry, so the next tryDispatch() sees them without a restart.
-			// Thrown errors (unknown workerId, blank label, unknown shell) propagate to the
-			// CLI as a rejected command -- there is no silent no-op path here.
-			// `flow cli update --drain` / `--cancel-drain`: see CommandHandler.setDraining.
-			setDraining: (payload: unknown): unknown => {
-				const { draining } = payload as { draining?: unknown };
-				if (typeof draining !== 'boolean') {
-					throw new Error('setDraining requires a boolean "draining".');
-				}
-				commandHandler.setDraining(draining);
-				return { draining };
-			},
-			updateWorker: (payload: unknown): unknown => {
-				const { workerId, labels, shellCapabilities } = payload as UpdateWorkerRequest;
-				if (typeof workerId !== 'string' || workerId.trim() === '') {
-					throw new Error('updateWorker requires a non-empty "workerId".');
-				}
-				workerRegistry.updateWorker(workerId, { labels, shellCapabilities });
-				return workerRegistry.summarize().find(w => w.workerId === workerId);
-			},
-		},
-		health: () => buildDaemonHealth({ isIdle, isDraining: () => commandHandler.isDraining() }),
+		commands: createDaemonCommands(config, getRuntime),
+		health: () =>
+			buildDaemonHealth({
+				isIdle: () => idleShutdown.isIdle(),
+				isDraining: () => getRuntime().commandHandler.isDraining(),
+			}),
 		hooks: {
 			// Fires on every stop() path (idle, signal, command, error, update -- see
 			// singleton-daemon-kit's `handle.stop()`), unlike the idle-only teardown inside
-			// `checkShutdown()` below. The update-check timer is unref'd, so leaking it past
+			// `DaemonIdleShutdown`. The update-check timer is unref'd, so leaking it past
 			// shutdown costs nothing once the process actually exits -- but a daemon stopped
 			// in-process (tests, or `flow daemon stop` reusing the same process) must not keep
 			// firing it against a torn-down daemon.
@@ -439,34 +157,14 @@ async function startDaemon(
 
 				// Fire-and-forget: app-core being absent or slow (the SDK waits up to 3 s) must not delay or break the
 				// daemon start. Whatever app-core answers lands in the daemon log, `flow logs` shows it.
-				// Modules go one after the other, in the given order (flow-chart requires flow, so flow first). A
-				// failure on one never prevents the next from being tried: app-core states its own reason if a
-				// requirement is missing.
 				if (options.appCoreModules && options.appCoreModules.length > 0) {
-					const modules = options.appCoreModules;
-					void (async () => {
-						for (const appModule of modules) {
-							try {
-								await registerWithAppCore(
-									appModule.manifestPath,
-									entry => writeDaemonLog(logsDir, entry.level, `[${entry.source}] ${entry.message}`),
-									appModule.id
-								);
-							} catch (err) {
-								writeDaemonLog(
-									logsDir,
-									'error',
-									`[AppCoreRegistration] unexpected failure registering module "${appModule.id}" with app-core: ${getErrorMessage(err)}`
-								);
-							}
-						}
-					})();
+					void registerAppCoreModules(options.appCoreModules, logsDir);
 				}
 
 				const wsPort = config.worker.wsPort ?? port + 1;
 				// One set of masks for everything that writes execution data: the stores below, the
 				// command handler and the ingress of worker messages.
-				daemonSecrets = new DaemonSecrets(
+				const daemonSecrets = new DaemonSecrets(
 					new ExecutionMasks((executionId, error) => {
 						// Neither the text nor a secret is in the message: only the execution and the cause.
 						writeDaemonLog(
@@ -476,7 +174,7 @@ async function startDaemon(
 						);
 					})
 				);
-				executionStore = new ExecutionStore(
+				const executionStore = new ExecutionStore(
 					executionsDir,
 					config.logs.retainDays,
 					daemonSecrets.masks,
@@ -484,7 +182,7 @@ async function startDaemon(
 						writeDaemonLog(logsDir, 'error', `Queue events: publishing failed: ${getErrorMessage(err)}`)
 					)
 				);
-				logWriter = new LogWriter(logsDir, config.logs.retainDays, daemonSecrets.masks);
+				const logWriter = new LogWriter(logsDir, config.logs.retainDays, daemonSecrets.masks);
 				executionStore.pruneOldExecutions();
 				// Workspace pruning is per-project and so runs per request, not here:
 				// this daemon is shared across projects and its launch directory says
@@ -493,10 +191,19 @@ async function startDaemon(
 				if (!claudePath) {
 					writeDaemonLog(logsDir, 'error', 'claude binary not found on PATH - model steps may fail');
 				}
-				wsServer = new WebSocketServer(wsPort, handleWorkerMessage, handleWorkerClose, {
-					bindAddress: config.worker.bindAddress,
-					tls: config.worker.tls,
-				});
+				const wsServer = new WebSocketServer(
+					wsPort,
+					(ws, message) => {
+						workerMessages.handleMessage(ws, message);
+					},
+					ws => {
+						workerMessages.handleClose(ws);
+					},
+					{
+						bindAddress: config.worker.bindAddress,
+						tls: config.worker.tls,
+					}
+				);
 				// Fire-and-forget: start() retries on EADDRINUSE (TIME_WAIT). Workers read port
 				// lazily via getter -- they are only spawned after tryDispatch(), which happens
 				// after handleRun(), which happens after this onStart returns. By then start()
@@ -519,12 +226,12 @@ async function startDaemon(
 						// do stops in about a second, so the worker it just created was disconnected
 						// 20ms after connecting. "Contact at startup only if there is work" is the
 						// on-demand path with extra steps, so there is only the on-demand path.
-						pruneDeadSources();
+						sourceContact.pruneDeadSources();
 					})
 					.catch((err: Error) => {
 						process.stderr.write(`[daemon] WebSocket server failed to start: ${String(err)}\n`);
 					});
-				workerRegistry = new WorkerRegistry();
+				const workerRegistry = new WorkerRegistry();
 				// Reads the bound port, not the requested one, for the same reason as above: a
 				// forked worker handed a port the listener moved away from can never register.
 				// It falls back to the getter only if a fork somehow precedes the bind, where
@@ -533,11 +240,12 @@ async function startDaemon(
 				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir);
 				// Relays are tracked apart from workers because the two roles carry different
 				// credentials and neither may stand in for the other (T-04, T-11).
-				relayRegistry = new RelayRegistry(sourceRegistry);
+				const relayRegistry = new RelayRegistry(sourceRegistry);
 				// One issuer, shared: the credential a launched worker presents has to be the one
 				// this daemon minted for it, and it is only ever valid here, once (T-09).
-				launchTokens = new LaunchTokenIssuer();
-				workerProvisioner = new WorkerProvisioner(
+				const launchTokens = new LaunchTokenIssuer();
+				const sourceContact = new DaemonSourceContact(logsDir, sourceRegistry, relayRegistry, launchTokens);
+				const workerProvisioner = new WorkerProvisioner(
 					config.queue.concurrency,
 					workerRegistry,
 					forkSource,
@@ -551,7 +259,7 @@ async function startDaemon(
 						writeDaemonLog(logsDir, 'error', message);
 					}
 				);
-				commandHandler = new CommandHandler(
+				const commandHandler = new CommandHandler(
 					resolvedDaemonDir,
 					workerRegistry,
 					workerProvisioner,
@@ -579,12 +287,22 @@ async function startDaemon(
 							);
 							return;
 						}
-						contactSources(workerListenerPort);
+						sourceContact.contactSources(workerListenerPort);
 					},
 					undefined,
 					config.queue.stepSilenceLimitSeconds * 1000,
 					daemonSecrets
 				);
+				runtime = {
+					commandHandler,
+					workerRegistry,
+					relayRegistry,
+					workerProvisioner,
+					wsServer,
+					executionStore,
+					logWriter,
+					daemonSecrets,
+				};
 
 				// Nothing else would notice a wedged worker: it keeps its socket open and answers
 				// pings, so only the absence of output over time says anything. Swept rather than
@@ -595,354 +313,10 @@ async function startDaemon(
 				}, STALLED_SWEEP_INTERVAL_MS);
 				stalledSweep.unref();
 
-				// Same mechanism as the worker side's self-restart check (Part 2): schedule a
-				// background update check now, then keep re-triggering it on the configured
-				// cadence so this daemon's own `latestVersion` cache does not go stale across a
-				// long-running process. Re-arming at exactly checkIntervalMs used to beat against
-				// shared-updater's own cache.lastCheckedAt gate (same threshold, so the check
-				// that finishes a few seconds after each tick made the NEXT tick land a hair
-				// short of the gate -- it skipped every other tick, silently halving the real
-				// cadence). UPDATER_SKIP_THROTTLE tells the spawned updater this caller already
-				// owns its schedule, so the gate is not needed on top of it.
-				process.env['UPDATER_SKIP_THROTTLE'] = '1';
-				const updateManager = new UpdateManager('@wadeck-app/flow-cli');
-				const bundlePath = resolveOwnBundlePath(FLOW_BUNDLE_NAME, fileURLToPath(import.meta.url));
-				const scheduleUpdateCheck = (): void => {
-					updateManager.scheduleBackgroundUpdate(bundlePath, 'flow-updater.cjs');
-				};
-				scheduleUpdateCheck();
-				updateCheckTimer = setInterval(
-					scheduleUpdateCheck,
-					readUpdateConfig(resolvedDaemonDir).checkIntervalMs
-				);
-				updateCheckTimer.unref();
-
-				/**
-				 * Drops entries whose declaring worker is gone.
-				 *
-				 * Runs at startup and before each contact: a worker that declared itself and was then
-				 * killed cannot clean up, and declared capacity that can never appear reads as
-				 * "something exists" to whoever is looking.
-				 */
-				function pruneDeadSources(): void {
-					const pruned = sourceRegistry.pruneDead();
-					if (pruned.length > 0) {
-						writeDaemonLog(
-							logsDir,
-							'info',
-							`Pruned worker sources whose process is gone: ${pruned.join(', ')}`
-						);
-					}
-				}
-
-				// Asks each declared source to produce a worker. The daemon pushes; a worker
-				// never polls. Fire-and-forget on purpose -- nothing waits for a worker to
-				// appear (D#51, D#66), and dispatch only ever targets a live connection (D#4),
-				// so a source that produces nothing simply has no capacity here.
-				//
-				// Called only when dispatch finds demand nothing can serve (D#66). A source told to
-				// dial a port nothing is listening on would produce a worker that cannot join, which
-				// is why the caller checks the bind first.
-				function contactSources(boundPort: number): void {
-					pruneDeadSources();
-					void contactDeclaredSources(
-						sourceRegistry.list(),
-						`ws://127.0.0.1:${String(boundPort)}`,
-						message => {
-							process.stderr.write(`[daemon] ${message}\n`);
-							writeDaemonLog(logsDir, 'error', message);
-						},
-						// A relay source is reached through its live connection, so the provider
-						// needs to look one up. At startup none has dialled in yet, which reports
-						// as "no relay connected" rather than pretending capacity exists.
-						{
-							findRelay: (sourceId: string) => relayRegistry.find(sourceId),
-							// A worker this daemon launches cannot present the source's registration
-							// token -- only its hash is stored (T-09) -- so it is given a credential
-							// minted for that launch alone.
-							issueLaunchToken: (sourceId: string) => launchTokens.issue(sourceId),
-						}
-					).catch((err: unknown) => {
-						process.stderr.write(`[daemon] contacting worker sources failed: ${getErrorMessage(err)}\n`);
-					});
-				}
+				updateCheckTimer = startPeriodicUpdateCheck(resolvedDaemonDir);
 			},
 		},
 	});
-
-	function handleWorkerMessage(ws: WebSocket, message: WorkerToDaemon): void {
-		// A relay registering as a source arrives on the same listener but is not a worker: it
-		// presents a different credential and is never dispatched to (T-04, T-11).
-		if ((message as { type?: string }).type === 'source_ready') {
-			handleSourceRegistration(ws, message as unknown as SourceReady);
-			return;
-		}
-
-		switch (message.type) {
-			case 'ready': {
-				// Refused registrations are already reported and the socket terminated;
-				// dispatching afterwards would target a worker that was rejected.
-				if (!workerProvisioner.registerWorker(ws, message)) {
-					break;
-				}
-				commandHandler.tryDispatch();
-				checkShutdown();
-				break;
-			}
-			case 'step_completed': {
-				try {
-					const { assignmentId, executionId, stepId, output, meta, io } = message;
-					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
-						break;
-					}
-					// The outcome is accepted from here on, so the assignment is closed and
-					// the same result cannot be replayed.
-					commandHandler.settleAssignment(assignmentId);
-					executionStore.markStepCompleted(executionId, stepId, meta, { capture: io, outputs: output });
-					commandHandler.onStepCompleted(executionId, stepId, output, meta);
-					logWriter.writeExecution(executionId, `Step ${stepId} completed`);
-					commandHandler.dispatchHook(executionId, 'onStepEnd', { executionId, stepId });
-
-					const state = executionStore.read(executionId);
-					// The store alone cannot tell "settled" from "a failed step is about to be re-run"
-					// (sub-step restart, retry, loop): a step that failed earlier still reads failed
-					// until its next attempt starts. While the scheduler has work left, nothing is final.
-					const allDone =
-						!commandHandler.isExecutionActive(executionId) &&
-						Object.values(state.steps).every(s => s.status === 'completed' || s.status === 'failed');
-					if (allDone) {
-						if (Object.values(state.steps).every(s => s.status === 'completed')) {
-							executionStore.markExecutionCompleted(executionId);
-							logWriter.writeExecution(executionId, `Execution completed`);
-							commandHandler.dispatchHook(executionId, 'onFlowEnd', { executionId });
-						} else {
-							executionStore.markExecutionFailed(executionId);
-							logWriter.writeExecution(executionId, `Execution failed`, 'error');
-							commandHandler.dispatchHook(executionId, 'onFlowError', { executionId });
-						}
-						commandHandler.removeExecutionHooks(executionId);
-					}
-
-					// Try to dispatch newly ready steps
-					commandHandler.tryDispatch();
-				} catch (err) {
-					process.stderr.write(`[daemon] step_completed handler error: ${String(err)}\n`);
-					writeDaemonLog(logsDir, 'error', `step_completed handler error: ${String(err)}`);
-				}
-				break;
-			}
-			case 'step_failed': {
-				try {
-					const {
-						assignmentId,
-						executionId,
-						stepId,
-						error: reportedError,
-						output,
-						stdout,
-						stderr,
-						io,
-					} = message;
-					// The worker already masked it; this is the daemon's own pass, before hooks and logs see it.
-					const error = daemonSecrets.masks.mask(executionId, reportedError);
-					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
-						break;
-					}
-					commandHandler.settleAssignment(assignmentId);
-					executionStore.markStepFailed(executionId, stepId, error, stdout, stderr, {
-						capture: io,
-						outputs: output ?? {},
-					});
-					commandHandler.onStepFailed(executionId, stepId, error, output);
-					// markExecutionFailed is now called inside onStepFailed only when the failure is terminal
-					logWriter.writeExecution(executionId, `Step ${stepId} failed: ${error}`, 'error');
-					commandHandler.dispatchHook(executionId, 'onStepFailed', { executionId, stepId, error });
-				} catch (err) {
-					process.stderr.write(`[daemon] step_failed handler error: ${String(err)}\n`);
-					writeDaemonLog(logsDir, 'error', `step_failed handler error: ${String(err)}`);
-				}
-				break;
-			}
-			case 'log': {
-				try {
-					const { assignmentId, executionId, stepId, entry } = message;
-					// Logs are bound too: they land in another execution's log file otherwise.
-					if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
-						break;
-					}
-					// Output is the proof a step is still working: a wedged worker keeps its socket
-					// open and answers pings, so silence is the only signal there is.
-					commandHandler.noteAssignmentActivity(assignmentId);
-					logWriter.write(executionId, stepId, entry);
-				} catch (err) {
-					process.stderr.write(`[daemon] log handler error: ${String(err)}\n`);
-				}
-				break;
-			}
-			case 'step_started': {
-				// Only changes how a later disconnect is classified (D#65); nothing else acts on it.
-				const { assignmentId, executionId, stepId } = message;
-				commandHandler.onStepStarted(ws, assignmentId, executionId, stepId);
-				break;
-			}
-			case 'step_progress': {
-				// Carries no content -- unlike 'log', this is never written to the execution log,
-				// only used to reset the silence clock (see Protocol.ts for why this exists).
-				const { assignmentId, executionId, stepId } = message;
-				if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
-					break;
-				}
-				commandHandler.noteAssignmentActivity(assignmentId);
-				break;
-			}
-			case 'inject_steps': {
-				const { assignmentId, executionId, steps } = message;
-				if (!commandHandler.verifyAssignmentScope(ws, assignmentId, executionId)) {
-					break;
-				}
-				try {
-					commandHandler.injectSteps(executionId, steps);
-					// H1: also register injected step IDs in ExecutionStore so the allDone check is accurate
-					const current = executionStore.read(executionId);
-					const newSteps = { ...current.steps };
-					for (const s of steps) {
-						newSteps[s.id] = injectedStepState(s);
-					}
-					executionStore.update(executionId, { steps: newSteps });
-					commandHandler.tryDispatch();
-				} catch (err) {
-					logWriter.writeExecution(executionId, `Failed to inject steps: ${String(err)}`, 'error');
-				}
-				break;
-			}
-			default: {
-				const _exhaustive: never = message;
-				throw new Error(`Unknown worker message type: ${JSON.stringify(_exhaustive)}`);
-			}
-		}
-	}
-
-	/**
-	 * Admits or refuses a relay claiming to be a declared source (D#17, T-11).
-	 *
-	 * A refusal closes the socket: an unauthenticated peer must not stay connected, and it is
-	 * told why, because the honest case -- a mistyped source id or the worker token used by
-	 * mistake -- is indistinguishable from an attack at this point.
-	 */
-	function handleSourceRegistration(ws: WebSocket, ready: SourceReady): void {
-		const admission = relayRegistry.register(ws, ready);
-		if (!admission.ok) {
-			process.stderr.write(`[daemon] ${admission.reason}\n`);
-			writeDaemonLog(logsDir, 'error', admission.reason);
-			ws.terminate();
-			return;
-		}
-		const note = `relay registered for source "${admission.relay.sourceId}" with capacity ${String(admission.relay.capacity)}`;
-		writeDaemonLog(logsDir, 'info', note);
-		// Registering a relay creates no capacity by itself: it is a process that *can* make
-		// workers, and only a worker's own connection proves one exists (D#4). Dispatch is
-		// therefore not retried here.
-	}
-
-	function handleWorkerClose(ws: WebSocket): void {
-		// A disconnected worker can no longer report on its assignments; leaving them
-		// outstanding would let a reconnecting socket be matched against stale work.
-		// Classifies each interrupted step and re-queues the ones that never started (D#65).
-		commandHandler.handleWorkerDisconnect(ws);
-		// Only dispatch once this socket is out of the registry, or a re-queued step could
-		// go straight back to the worker that just vanished.
-		workerRegistry.remove(ws);
-		// The same listener carries relays. Dropping one costs no in-flight work -- a relay runs
-		// no steps -- but leaving it recorded would have the daemon ask a dead socket for
-		// workers and report the source as merely unproductive.
-		relayRegistry.remove(ws);
-		commandHandler.tryDispatch();
-		checkShutdown();
-	}
-
-	function isIdle(): boolean {
-		return (
-			commandHandler.isQueueEmpty() &&
-			!commandHandler.hasActiveExecutions() &&
-			!workerRegistry.hasBusyWorkers() &&
-			// A failed-on-unanswered-intervention execution is kept alive specifically so a
-			// later `flow resume` can re-dispatch it (CommandHandler.handleResume) -- that only
-			// works against this same daemon process's in-memory scheduler/context state, so
-			// idle-exit must not tear it down just because nothing is queued or running right
-			// this second.
-			!commandHandler.hasResumableInterventions()
-		);
-	}
-
-	/**
-	 * One-line snapshot of every `isIdle()` input, for the idle-exit diagnostic log entries
-	 * below -- see `CommandHandler.describeIdleState()` for why this exists.
-	 */
-	function diagnosticSnapshot(): string {
-		return `${commandHandler.describeIdleState()} liveWorkers=${String(workerRegistry.liveCount)} idleWorkers=${String(workerRegistry.idleCount)}`;
-	}
-
-	/**
-	 * Looks idle right now and schedules the actual stop after SHUTDOWN_GRACE_MS, rather than
-	 * stopping synchronously -- see SHUTDOWN_GRACE_MS for why. The grace period re-checks
-	 * idleness itself when it elapses, so nothing here needs to notice "something changed" and
-	 * cancel early: a run that lands late simply finds the daemon still up and makes the
-	 * recheck below see activity, at which point the schedule is dropped without acting.
-	 */
-	function checkShutdown(): void {
-		if (shuttingDown) {
-			return;
-		}
-		if (!isIdle()) {
-			if (pendingShutdown !== undefined) {
-				clearTimeout(pendingShutdown);
-				pendingShutdown = undefined;
-				writeDaemonLog(logsDir, 'info', `Idle shutdown cancelled, no longer idle (${diagnosticSnapshot()})`);
-			}
-			return;
-		}
-		// already scheduled
-		if (pendingShutdown !== undefined) {
-			return;
-		}
-		writeDaemonLog(
-			logsDir,
-			'info',
-			`Idle detected, scheduling shutdown in ${String(SHUTDOWN_GRACE_MS)}ms (${diagnosticSnapshot()})`
-		);
-		pendingShutdown = setTimeout(() => {
-			pendingShutdown = undefined;
-			if (shuttingDown) {
-				return;
-			}
-			if (!isIdle()) {
-				writeDaemonLog(logsDir, 'info', `Idle shutdown skipped on recheck (${diagnosticSnapshot()})`);
-				return;
-			}
-			shuttingDown = true;
-			// Only the workers this daemon forked are told to exit. A worker the user
-			// launched in a terminal must survive an idle period: it is registered, not
-			// owned (D#51), and telling it to exit is what made `flow worker` unusable
-			// (D#48).
-			workerRegistry.broadcastToEphemeral({ type: 'done' });
-			// Their sockets are still closed, or the daemon could never exit: an open
-			// WebSocket keeps the event loop alive, leaving an orphan process holding no
-			// port file. The worker re-registers once a daemon is available again.
-			workerRegistry.disconnectExternal();
-			// Nothing queued for later may outlive the decision to stop: a pending dispatch
-			// re-check would run against a closed listener.
-			commandHandler.stopBackgroundWork();
-			// Nothing is executing at this point, so a sweep would only run against a torn-down handler.
-			if (stalledSweep !== undefined) {
-				clearInterval(stalledSweep);
-			}
-			// updateCheckTimer is cleared by the onShutdown hook, which fires for every stop()
-			// path -- including the daemonHandle.stop('idle') call just below.
-			wsServer.close();
-			writeDaemonLog(logsDir, 'info', `Daemon stopped (idle) (${diagnosticSnapshot()})`);
-			void daemonHandle.stop('idle');
-		}, SHUTDOWN_GRACE_MS);
-	}
 
 	return {
 		get port(): number {
