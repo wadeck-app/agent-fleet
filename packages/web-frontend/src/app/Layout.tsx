@@ -103,6 +103,9 @@ import { SWsPage as LegoA6SWsPage } from '@app/pages/_lego/_6_data2-based/S_WS/S
 import { ProtectedRoute } from '@app/pages/auth/ProtectedRoute';
 import { BooksPage } from '@app/pages/books/BooksPage';
 import { DashboardPage } from '@app/pages/dashboard/DashboardPage';
+import { FlowDaemonPage } from '@app/pages/flow-daemon/FlowDaemonPage';
+import { FlowExecutionDetailPage } from '@app/pages/flow-daemon/FlowExecutionDetailPage';
+import { FlowExecutionsPage } from '@app/pages/flow-daemon/FlowExecutionsPage';
 import { FlowEditorPage } from '@app/pages/flows/flow-editor/FlowEditorPage';
 import { Ingredients2TablePage } from '@app/pages/ingredients2/Ingredients2TablePage';
 import { Ingredients3GridPage } from '@app/pages/ingredients3/Ingredients3GridPage';
@@ -177,6 +180,9 @@ export function Layout() {
 						<Route path="/books/:id/:mode" element={<BooksPage />} />
 						<Route path="/flows/new" element={<FlowEditorPage />} />
 						<Route path="/flows/:flowId/edit" element={<FlowEditorPage />} />
+						<Route path="/flow/executions" element={<FlowExecutionsPage />} />
+						<Route path="/flow/executions/:id" element={<FlowExecutionDetailPage />} />
+						<Route path="/flow/daemon" element={<FlowDaemonPage />} />
 						{/* Lego Approach 1 -- Widget Isolated */}
 						<Route path="/lego/1/s1" element={<LegoA1S1Page />} />
 						<Route path="/lego/1/s2" element={<LegoA1S2Page />} />
