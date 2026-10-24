@@ -118,3 +118,40 @@ describe('validateFlowFile versions', () => {
 		expect(result.warnings[0]).toMatch(/lower than the latest known version 2\.0\.0/);
 	});
 });
+
+describe('validateFlowFile on a flow registry file', () => {
+	const writeRaw = (name: string, text: string): string => {
+		const file = path.join(tmpDir, name);
+		fs.writeFileSync(file, text);
+		return file;
+	};
+	const flowBody = { name: 'A flow', steps: [{ type: 'script', id: 's', script: 'echo hi' }] };
+
+	it('reports a file with an includes key as a registry, listing the included files', () => {
+		const file = writeRaw('flows.yml', yaml.dump({ includes: ['flows-custom.yml'], 'my-flow': flowBody }));
+
+		const result = validateFlowFile(file, store);
+
+		if (result.exit !== 4) throw new Error(`Expected exit 4, got ${JSON.stringify(result)}`);
+		expect(result.includes).toEqual(['flows-custom.yml']);
+		expect(result.flowIds).toEqual(['my-flow']);
+		expect(result.message).toContain('is a flow registry');
+		expect(result.message).toContain('includes:');
+		expect(result.message).toContain('flow validate <path-to-flow-file>');
+	});
+
+	it('reports a top-level map of flows without includes as a registry', () => {
+		const file = writeRaw('flows.yml', yaml.dump({ 'flow-a': flowBody, 'flow-b': flowBody }));
+
+		const result = validateFlowFile(file, store);
+
+		if (result.exit !== 4) throw new Error(`Expected exit 4, got ${JSON.stringify(result)}`);
+		expect(result.flowIds).toEqual(['flow-a', 'flow-b']);
+		expect(result.includes).toEqual([]);
+		expect(result.message).toContain('lists flows');
+	});
+
+	it('does not treat a single flow as a registry', () => {
+		expect(validateFlowFile(SIMPLE_FLOW, store).exit).toBe(0);
+	});
+});

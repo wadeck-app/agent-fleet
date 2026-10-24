@@ -18,7 +18,45 @@ export type ValidateResult =
 	| { exit: 0; version: string; warnings: string[] }
 	| { exit: 1; errors: CliValidationError[] }
 	| { exit: 2; message: string }
-	| { exit: 3; errors: CliValidationError[] };
+	| { exit: 3; errors: CliValidationError[] }
+	// The file is a flow registry (flows.yml format), not a single flow. The CLI maps it to process exit code 1.
+	| { exit: 4; message: string; flowIds: string[]; includes: string[] };
+
+// Same reserved key as FlowRegistry.loadProjectFlows
+const REGISTRY_INCLUDES_KEY = 'includes';
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Mirrors the FlowRegistry loader format: a registry is a top-level map of flow ids (each value a flow body with a
+ * `steps` list) and/or the reserved `includes:` key. A single flow has its own top-level `steps`.
+ */
+function describeRegistry(filePath: string, parsed: object): ValidateResult | undefined {
+	if (!isPlainObject(parsed)) {
+		throw new Error(`Expected a YAML mapping for ${filePath}`);
+	}
+	const raw = parsed;
+	const hasIncludes = REGISTRY_INCLUDES_KEY in raw;
+	const entries = Object.entries(raw).filter(([key]) => key !== REGISTRY_INCLUDES_KEY);
+	const isFlowMap =
+		!('steps' in raw) &&
+		entries.length > 0 &&
+		entries.every(([, value]) => isPlainObject(value) && Array.isArray(value['steps']));
+	if (!hasIncludes && !isFlowMap) {
+		return undefined;
+	}
+	const includesValue = raw[REGISTRY_INCLUDES_KEY];
+	return {
+		exit: 4,
+		message:
+			`${filePath} is a flow registry (it ${hasIncludes ? 'has `includes:`' : 'lists flows'}), not a single flow definition. ` +
+			'Validate a flow with: flow validate <path-to-flow-file>',
+		flowIds: isFlowMap ? entries.map(([key]) => key) : [],
+		includes: Array.isArray(includesValue) ? includesValue.map(String) : [],
+	};
+}
 
 /**
  * `versions` is where the snapshots of earlier runs live: it lets the validation say what a run would do with the
@@ -51,6 +89,10 @@ export function validateFlowFile(filePath: string, versions: DefinitionSnapshotS
 					},
 				],
 			};
+		}
+		const registry = describeRegistry(filePath, raw);
+		if (registry) {
+			return registry;
 		}
 		flow = raw as FlowDefinition;
 	} catch {

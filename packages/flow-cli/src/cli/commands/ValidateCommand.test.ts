@@ -49,6 +49,24 @@ describe('ValidateCommand', () => {
 			expect(exitMock).toHaveBeenCalledWith(0);
 		});
 
+		it('prints the registry message with the referenced flows and exits 1, without a flow error count', () => {
+			mockValidateFlowFile.mockReturnValue({
+				exit: 4,
+				message: 'f.yml is a flow registry (it has `includes:`), not a single flow definition.',
+				flowIds: ['flow-a'],
+				includes: ['x.yml'],
+			});
+
+			runValidate(['f.yml']);
+
+			const printed = consoleErrorMock.mock.calls.map(c => String(c[0])).join('\n');
+			expect(printed).toContain('[fail] f.yml is a flow registry');
+			expect(printed).toContain('flow-a');
+			expect(printed).toContain('x.yml');
+			expect(printed).not.toContain('Flow has');
+			expect(exitMock).toHaveBeenCalledWith(1);
+		});
+
 		it('prints each version warning and still exits 0', () => {
 			mockValidateFlowFile.mockReturnValue({ exit: 0, version: '0.0.0', warnings: ['Flow has no version'] });
 
@@ -106,6 +124,32 @@ describe('ValidateCommand', () => {
 			runValidate(['/some/flow.yml', '--json']);
 
 			expect(stdoutWriteMock).toHaveBeenCalledWith(expect.stringContaining('"valid":false'));
+			expect(exitMock).toHaveBeenCalledWith(1);
+		});
+
+		it('writes a structured registry error with the hint, flow ids and includes, and exits 1', () => {
+			mockValidateFlowFile.mockReturnValue({
+				exit: 4,
+				message: 'f.yml is a flow registry (it has `includes:`), not a single flow definition.',
+				flowIds: ['a'],
+				includes: ['x.yml'],
+			});
+
+			runValidate(['f.yml', '--json']);
+
+			const written = JSON.parse(String(stdoutWriteMock.mock.calls[0]![0]));
+			expect(written).toEqual({
+				valid: false,
+				errors: [
+					{
+						type: 'registry_file',
+						message: 'f.yml is a flow registry (it has `includes:`), not a single flow definition.',
+						path: '',
+						flowIds: ['a'],
+						includes: ['x.yml'],
+					},
+				],
+			});
 			expect(exitMock).toHaveBeenCalledWith(1);
 		});
 

@@ -45,6 +45,23 @@ export function registerValidateCommand(program: Command, getConfigDir: () => st
 						process.stdout.write(JSON.stringify({ valid: false, errors: result.errors }) + '\n');
 						process.exit(3);
 						break;
+					case 4:
+						process.stdout.write(
+							JSON.stringify({
+								valid: false,
+								errors: [
+									{
+										type: 'registry_file',
+										message: result.message,
+										path: '',
+										flowIds: result.flowIds,
+										includes: result.includes,
+									},
+								],
+							}) + '\n'
+						);
+						process.exit(1);
+						break;
 					default: {
 						const _exhaustive: never = result;
 						throw new Error(`Unexpected result: ${JSON.stringify(_exhaustive)}`);
@@ -55,6 +72,16 @@ export function registerValidateCommand(program: Command, getConfigDir: () => st
 			// Human-readable: Repo A contract
 			if (result.exit === 2) {
 				console.error(`[fail] ${result.message}`);
+				process.exit(1);
+			}
+			if (result.exit === 4) {
+				console.error(`[fail] ${result.message}`);
+				if (result.flowIds.length > 0) {
+					console.error(`  Flows in this registry: ${result.flowIds.join(', ')}`);
+				}
+				if (result.includes.length > 0) {
+					console.error(`  Included flow files (validate these directly): ${result.includes.join(', ')}`);
+				}
 				process.exit(1);
 			}
 			if (result.exit === 3) {
