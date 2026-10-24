@@ -3663,3 +3663,8 @@ A sub-agent added a new source file; `git add -u` staged only tracked files, so 
 ## A mock that "passes" can model the wrong provider
 
 The codex mock and `CodexModelProvider` used opencode's event format for months; every mock-based test was green while real codex would have returned an empty response. The mock-vs-real suites and the version cache exist to catch exactly this: see `.claude/docs/mock-fidelity.md`. A provider is not covered until a real-vs-mock comparison has run against its real CLI.
+
+## flow-engine runtime imports (2026-10-24)
+
+- A runtime (non-type) import from flow-engine must use the package root (`from 'flow-engine'`, export it in `packages/flow-engine/src/index.ts`). A deep path (`flow-engine/record/X`) type-checks and passes vitest (alias) but the tsx-run CLI fails with ERR_MODULE_NOT_FOUND; only `CliSmoke.integration.test.ts` shows it.
+- A script step without `output:` yields outputs `rawOutput`, `stdout`, `stderr`, `exitCode`, `success`, so its stdout is recorded three times (`outputs.stdout`, `outputs.rawOutput`, `io.stdout`). `captureOutput` is not read by the engine.

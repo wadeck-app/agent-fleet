@@ -22,10 +22,14 @@ export const FLOW_ACTION_SLOT_ACCEPTS: readonly string[] = ['flow-chart:FlowChar
 
 /** Extension slots the flow module exposes (manifest `expose.slots`): slot name, without the `flow:` prefix a contributor writes -> root `$type`s it accepts. */
 export const FLOW_EXPOSED_SLOTS: Readonly<Record<string, readonly string[]>> = {
+	// Beside the badges of the detail page, BEFORE the flow module's own Logs button; `execution-actions` comes after it.
+	'execution-links': FLOW_ACTION_SLOT_ACCEPTS,
 	'execution-actions': FLOW_ACTION_SLOT_ACCEPTS,
 	'executions-actions': FLOW_ACTION_SLOT_ACCEPTS,
 	// Rendered inside the expanded panel of a row of the executions table: the contribution reads the row as $ctx.row.<field>.
 	'execution-row-actions': FLOW_ACTION_SLOT_ACCEPTS,
+	// Same panel, BEFORE the own Logs button (`execution-row-actions` comes after it).
+	'execution-row-links': FLOW_ACTION_SLOT_ACCEPTS,
 };
 
 /** Fields of an executions-table row a contribution to `execution-row-actions` can read as `$ctx.row.<field>` (whole-string expressions only). */

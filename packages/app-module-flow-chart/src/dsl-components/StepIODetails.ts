@@ -1,4 +1,4 @@
-import type { CappedText, FlowGraphNode, StepDataLink } from 'flow-core';
+import type { CappedText, FlowGraphNode, RecordedValue, StepDataLink } from 'flow-core';
 
 import type { DetailRow } from './StepDetails.js';
 
@@ -12,14 +12,27 @@ export interface IOLinkView {
 	detail: string;
 }
 
+/** A value shown in a monospace block, with the visible note when it is cut. */
+export interface ValueBlock {
+	title: string;
+	capped: CappedText;
+	/** Set when the text is only part of the original, e.g. `truncated, 5000 chars (11 shown)`. */
+	note?: string;
+}
+
 export interface IOView {
+	/** Declared inputs without a recorded value (or all of them for an older record). */
 	inputs: { name: string; text: string }[];
+	/** Resolved inputs the daemon recorded, declared ones first. */
+	recordedInputs: ValueBlock[];
 	inputsNote: string;
 	usesOutputOf: IOLinkView[];
 	usedBy: IOLinkView[];
+	/** Declared outputs without a recorded value. */
 	declaredOutputs: { name: string; text: string }[];
-	/** Output the record kept (failed steps only), stdout first. */
-	captured: { title: string; capped: CappedText }[];
+	recordedOutputs: ValueBlock[];
+	/** stdout then stderr: the recorded tails, else the output kept for a failed step of an older record. */
+	captured: ValueBlock[];
 	outputsNote: string;
 	/** Facts of the run the record holds, beyond the rows of the details panel. */
 	run: DetailRow[];
@@ -39,6 +52,14 @@ function linkView(link: StepDataLink, labelOf: (stepId: string) => string): IOLi
 // "last 2000 of 30880 characters" is 2000 of the 30880 characters the panel could show, not of the raw capture.
 function capturedTitle(stream: string, capped: CappedText): string {
 	return capped.truncated ? `${stream} (last ${capped.text.length} of ${capped.totalChars} characters)` : stream;
+}
+
+function valueBlock(title: string, value: RecordedValue): ValueBlock {
+	return {
+		title,
+		capped: { text: value.text, truncated: value.truncated, totalChars: value.chars },
+		...(value.truncated ? { note: `truncated, ${value.chars} chars (${value.text.length} shown)` } : {}),
+	};
 }
 
 /** What the panel shows about the inputs and outputs of a step; undefined when the node carries no `io` (older API). */
@@ -65,24 +86,46 @@ export function describeIO(step: FlowGraphNode, labelOf: (stepId: string) => str
 			value: `${t.input} in, ${t.output} out, ${t.cacheRead} cache read, ${t.cacheWrite} cache write`,
 		});
 	}
+	const recordedIo = recorded.io;
+	const recordedInputKeys = new Set(Object.keys(recordedIo?.inputs ?? {}));
+	const recordedOutputKeys = new Set(Object.keys(recordedIo?.outputs ?? {}));
+	// A model step's stdout is its final response; the CLI's own stdout is the transport.
+	const stdoutLabel = step.kind === 'model' ? 'final response' : 'stdout';
+	const captured: ValueBlock[] =
+		recordedIo === undefined
+			? [
+					...(recorded.stdout
+						? [{ title: capturedTitle('stdout', recorded.stdout), capped: recorded.stdout }]
+						: []),
+					...(recorded.stderr
+						? [{ title: capturedTitle('stderr', recorded.stderr), capped: recorded.stderr }]
+						: []),
+				]
+			: [
+					...(recordedIo.stdout ? [valueBlock(stdoutLabel, recordedIo.stdout)] : []),
+					...(recordedIo.stderr ? [valueBlock('stderr', recordedIo.stderr)] : []),
+				];
 	return {
-		inputs: io.declaredInputs.map(input => ({
-			name: input.name,
-			text:
-				input.value ??
-				`${input.length ?? 0} chars; ${input.references.length > 0 ? `uses ${input.references.join(', ')}` : 'no reference'}`,
-		})),
+		inputs: io.declaredInputs
+			.filter(input => !recordedInputKeys.has(input.name))
+			.map(input => ({
+				name: input.name,
+				text:
+					input.value ??
+					`${input.length ?? 0} chars; ${input.references.length > 0 ? `uses ${input.references.join(', ')}` : 'no reference'}`,
+			})),
+		recordedInputs: Object.entries(recordedIo?.inputs ?? {}).map(([key, value]) => valueBlock(key, value)),
 		inputsNote: io.notes.inputs,
 		usesOutputOf: io.usesOutputOf.map(link => linkView(link, labelOf)),
 		usedBy: io.usedBy.map(link => linkView(link, labelOf)),
-		declaredOutputs: io.declaredOutputs.map(output => ({
-			name: output.name,
-			text: output.source === undefined ? output.type : `${output.type}, from ${output.source}`,
-		})),
-		captured: [
-			...(recorded.stdout ? [{ title: capturedTitle('stdout', recorded.stdout), capped: recorded.stdout }] : []),
-			...(recorded.stderr ? [{ title: capturedTitle('stderr', recorded.stderr), capped: recorded.stderr }] : []),
-		],
+		declaredOutputs: io.declaredOutputs
+			.filter(output => !recordedOutputKeys.has(output.name))
+			.map(output => ({
+				name: output.name,
+				text: output.source === undefined ? output.type : `${output.type}, from ${output.source}`,
+			})),
+		recordedOutputs: Object.entries(recordedIo?.outputs ?? {}).map(([key, value]) => valueBlock(key, value)),
+		captured,
 		outputsNote: io.notes.outputs,
 		run,
 		relaunches: recorded.relaunches.map(relaunch => `${relaunch.at}: ${relaunch.feedback}`),

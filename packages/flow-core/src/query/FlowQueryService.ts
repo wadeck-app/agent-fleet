@@ -1,6 +1,5 @@
 import { executionsDirOf } from '../config/FlowConfigLayout.js';
 import { FlowCoreError, errorMessage } from '../errors.js';
-import type { ExecutionState } from '../execution/ExecutionState.js';
 import type { FlowGraphResult, FlowGraphTarget } from '../graph/FlowGraph.js';
 import { queryFlowGraph } from '../graph/FlowGraphQuery.js';
 import { type ExecutionFilterOptions, type FilteredExecutions, filterExecutions } from '../history/ExecutionFilter.js';
@@ -151,13 +150,9 @@ export class FlowQueryService {
 		return countByStatus(loadExecutionReport(this.directories.executionsDir).executions, flow);
 	}
 
-	/** Counts, health, trends and short lists of the runs for a dashboard card (one read of the executions, at the service clock). */
-	digestRuns(prepareRecord: (record: ExecutionState) => ExecutionState = record => record): RunDigest {
-		// `prepareRecord` runs before the digest cuts its texts (a server hides secrets first; a cut could split one).
-		return buildRunDigest(
-			loadExecutionReport(this.directories.executionsDir).executions.map(prepareRecord),
-			this.now()
-		);
+	/** Counters, per-day counts and latest runs for the dashboard card (one read of the executions, at the service clock). */
+	digestRuns(): RunDigest {
+		return buildRunDigest(loadExecutionReport(this.directories.executionsDir).executions, this.now());
 	}
 
 	/** The text `flow history` prints (table, or detail view when `filter.id` is set). */

@@ -1,0 +1,7 @@
+# Contributed to the slot "flow:execution-links" of the flow module (execution detail page), which renders BEFORE the
+# flow module's own Logs button. The view is rendered with the host page's context: the flow id is the one of the
+# execution the page loaded. A custom component builds the link because a DSL string cannot be concatenated.
+# Same root and fixed style as every contribution (flow-core FLOW_ACTION_SLOT_ACCEPTS).
+$type: flow-chart:FlowChartLink
+target: flow
+flowId: $sources.execution.flowId

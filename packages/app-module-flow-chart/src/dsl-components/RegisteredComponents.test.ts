@@ -41,6 +41,6 @@ describe('custom components used by the views', () => {
 	it('read the ids the views pass (knownKeys), so the DSL validator accepts them', () => {
 		const keys = Object.fromEntries(entries.map(e => [e.name, e.knownKeys]));
 		expect(keys['FlowGraph']).toEqual(['executionId', 'flowId']);
-		expect(keys['FlowChartLink']).toEqual(['target', 'executionId']);
+		expect(keys['FlowChartLink']).toEqual(['target', 'executionId', 'flowId']);
 	});
 });

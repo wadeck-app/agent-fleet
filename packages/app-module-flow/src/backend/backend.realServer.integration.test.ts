@@ -1,6 +1,6 @@
-import { FlowConfigFixture } from 'flow-core/testing';
+import { FlowConfigFixture, OWN_PROCESS_GROUP, killProcessTree, removeTempDirectory } from 'flow-core/testing';
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -103,9 +103,11 @@ function startServer(builtModule: string, xdgConfigHome: string): Promise<string
 				),
 			SERVER_START_TIMEOUT_MS
 		);
-		// node + the CLI file, no shell: child.kill() reaches the real server process
+		// node + the CLI file, no shell: the child is the real server process
 		child = spawn(process.execPath, [cliEntry, 'dev', builtModule], {
 			windowsHide: true,
+			// Own process group on POSIX so the whole tree can be killed (see killProcessTree).
+			detached: OWN_PROCESS_GROUP,
 			// Port 0: a free port, never the developer's real app-core. XDG_CONFIG_HOME: the module's ConfigDir.get('flow') is the fixture.
 			env: { ...process.env, APP_CORE_PORT: '0', XDG_CONFIG_HOME: xdgConfigHome },
 		});
@@ -142,9 +144,13 @@ describe('the packaged module through a real app-core server', () => {
 		SERVER_START_TIMEOUT_MS + PACKAGE_TIMEOUT_MS + 5_000
 	);
 
-	afterAll(() => {
-		child?.kill();
-		rmSync(workDir, { recursive: true, force: true });
+	// The server (and anything it started) holds the work dir as cwd or open files: on Windows removing it before the
+	// process tree is gone fails with EPERM. Kill the tree, wait for exit, then remove.
+	afterAll(async () => {
+		if (child) {
+			await killProcessTree(child);
+		}
+		removeTempDirectory(workDir);
 	});
 
 	async function get(path: string): Promise<{ status: number; body: Record<string, unknown> }> {

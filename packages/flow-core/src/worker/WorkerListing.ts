@@ -27,8 +27,8 @@ function formatUptime(ms: number): string {
 	return `${String(Math.floor(minutes / 60))}h${String(minutes % 60)}m`;
 }
 
-/** The step that brings a stopped daemon back; shared by the worker listing text and the dashboard digest. */
-export const START_DAEMON_ADVICE = 'run "flow start" or a flow';
+/** The step that brings a stopped daemon back. */
+const START_DAEMON_ADVICE = 'run "flow start" or a flow';
 
 /**
  * Why the list can be empty while workers are alive: a daemon idle-stops by design (D#51) and

@@ -1,6 +1,7 @@
 import { FLOW_ACTION_SLOT_ACCEPTS, FLOW_EXPOSED_SLOTS } from 'flow-core';
+import { removeTempDirectory } from 'flow-core/testing';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,8 +73,9 @@ beforeAll(() => {
 	}
 });
 
+// A process started by the checker may hold the directory a moment longer (EPERM on Windows): see removeTempDirectory.
 afterAll(() => {
-	rmSync(WORK_DIR, { recursive: true, force: true });
+	removeTempDirectory(WORK_DIR);
 });
 
 describe('the platform refuses a contribution outside the action-slot contract', () => {

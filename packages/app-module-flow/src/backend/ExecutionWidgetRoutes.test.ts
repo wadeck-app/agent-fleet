@@ -18,28 +18,23 @@ describe('GET /widgets/executions', () => {
 
 	afterEach(() => fixture.dispose());
 
-	it('answers zeros and empty lists when nothing ran yet', async () => {
+	it('answers zeros, an empty list and the seven empty days when nothing ran yet', async () => {
 		const { status, body } = await callRoute(routes, 'GET /widgets/executions', { query: {} });
 		expect(status).toBe(200);
-		expect(body).toMatchObject({
-			total: 0,
-			running: 0,
-			failed: 0,
-			lastRun: [],
-			viewAllLabel: 'View all executions',
-			latest: [],
-			failures: [],
-			active: [],
-			flows: [],
-			hasNoLatestFailure: true,
-		});
+		expect(body).toMatchObject({ total: 0, running: 0, failed: 0, latest: [] });
+		expect((body as { daily: unknown[] }).daily).toHaveLength(7);
 	});
 
-	it('serves the runs of the config directory: counts, lists and the shortcut to the latest failure', async () => {
+	it('serves exactly the fields the widget view reads', async () => {
+		const { body } = await callRoute(routes, 'GET /widgets/executions', { query: {} });
+		expect(Object.keys(body as object).sort()).toEqual(['daily', 'failed', 'latest', 'running', 'total']);
+	});
+
+	it('serves the runs of the config directory: counters and the latest runs with the full flow name', async () => {
 		fixture.addExecution({ executionId: 'ok1', startedAt: '2026-10-19T11:01:00.000Z' });
 		fixture.addExecution({
 			executionId: 'bad',
-			flowId: 'factory_retrospective',
+			flowId: 'factory_retrospective_long_running_pipeline',
 			status: 'failed',
 			lastError: 'exit 2\nstack',
 			startedAt: '2026-10-19T11:55:00.000Z',
@@ -55,19 +50,13 @@ describe('GET /widgets/executions', () => {
 		expect(status).toBe(200);
 		expect(body).toMatchObject({
 			total: 3,
-			viewAllLabel: 'View all 3 executions',
 			running: 1,
 			failed: 1,
-			lastRun: [{ startedAt: '2026-10-19T11:58:00.000Z' }],
 			latest: [
 				{ executionId: 'run', statusLabel: 'running' },
-				{ executionId: 'bad', statusLabel: 'FAILED' },
+				{ executionId: 'bad', statusLabel: 'FAILED', flowId: 'factory_retrospective_long_running_pipeline' },
 				{ executionId: 'ok1', statusLabel: 'ok' },
 			],
-			failures: [{ executionId: 'bad', flowId: 'factory_retrospective', error: 'exit 2' }],
-			active: [{ executionId: 'run', statusLabel: 'running' }],
-			hasLatestFailure: true,
-			latestFailureChartPath: '/modules/flow-chart/flows/runs/bad',
 		});
 	});
 

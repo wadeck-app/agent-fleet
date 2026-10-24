@@ -25,7 +25,14 @@ export {
 	looksLikeExecutionId,
 } from './execution/ExecutionId.js';
 
-export type { ExecutionState, ExecutionStatus, StepState, StepStatus } from './execution/ExecutionState.js';
+export type {
+	ExecutionState,
+	ExecutionStatus,
+	RecordedValue,
+	StepIoRecord,
+	StepState,
+	StepStatus,
+} from './execution/ExecutionState.js';
 
 export { createRemoteDaemonClient, isUnknownCommandError, outdatedDaemonMessage } from './daemon/RemoteDaemonClient.js';
 export { DEFAULT_HISTORY_LIMIT, RECOVERED_STATUS, filterExecutions } from './history/ExecutionFilter.js';
@@ -33,12 +40,10 @@ export type { ExecutionFilterOptions, FilteredExecutions } from './history/Execu
 export { countByStatus } from './history/StatusCounts.js';
 export type { StatusCounts } from './history/StatusCounts.js';
 export { summarizeFlows } from './history/FlowSummaries.js';
-export { describeFlowHealth } from './history/HealthBanner.js';
-export type { HealthBanner, HealthBannerVariant } from './history/HealthBanner.js';
-export { DIGEST_DAYS, DIGEST_ROWS, DIGEST_WINDOW, buildRunDigest } from './history/RunDigest.js';
+export { buildRunDigest } from './history/RunDigest.js';
 export type { RunDigest } from './history/RunDigest.js';
-export type { ActiveRunRow, FailureRow, FlowRow, LatestRunRow } from './history/RunRows.js';
-export type { DailyRunCount, SuccessTrend, SuccessWindow } from './history/RunTrend.js';
+export type { LatestRunRow } from './history/RunRows.js';
+export type { DailyRunCount } from './history/RunTrend.js';
 export type { FlowSummary } from './history/FlowSummaries.js';
 export { formatDuration, formatModelCost, formatStarted } from './history/ExecutionFormat.js';
 export { describeSkippedExecutions, loadExecutionReport, loadExecutions } from './history/ExecutionLoader.js';
@@ -53,6 +58,7 @@ export {
 	tailText,
 } from './show/ExecutionDetail.js';
 export type { ExecutionLookupErrorKind, RenderOptions, ResolvedExecution } from './show/ExecutionDetail.js';
+export { renderStepIoLines } from './show/StepIoLines.js';
 export {
 	formatInputs,
 	formatStatus,
@@ -64,9 +70,7 @@ export {
 
 export { WorkerListError, describeRunningDaemon, formatWorkerLine, readWorkerList } from './worker/WorkerList.js';
 export type { WorkerListErrorKind, WorkerListSnapshot } from './worker/WorkerList.js';
-export { summarizeDaemon } from './worker/DaemonDigest.js';
-export type { DaemonDigest, DaemonDigestVariant } from './worker/DaemonDigest.js';
-export { START_DAEMON_ADVICE, describeNoLiveWorkers } from './worker/WorkerListing.js';
+export { describeNoLiveWorkers } from './worker/WorkerListing.js';
 export type { DaemonStatus } from './worker/WorkerListing.js';
 export {
 	RELAY_PROVIDER,
@@ -110,7 +114,6 @@ export { classifyFlowError, httpAnswerOfFlowError, httpStatusOfFlowError } from 
 export type { FlowErrorCategory, HttpErrorAnswer } from './ErrorClassification.js';
 export {
 	ellipsize,
-	excerptOf,
 	outcomeLabel,
 	requireTimestamp,
 	runLabel,
@@ -138,6 +141,15 @@ export {
 	optionalString,
 	readPageOffset,
 } from './query/QueryParameters.js';
+export {
+	MAX_COUNTED_RETRIES,
+	NO_RETRY_LEFT,
+	RETRY_BADGE_VARIANTS,
+	retryLabel,
+	retryPoliciesOf,
+} from './view/RetryBadge.js';
+export type { StepRetryFacts, StepRetryPolicy } from './view/RetryBadge.js';
+export { readRetryPolicies } from './view/RetryPolicyFile.js';
 export { toExecutionDetail, toExecutionSummary } from './view/ExecutionView.js';
 export type { ExecutionDetailView, ExecutionSummary, StepView } from './view/ExecutionView.js';
 
@@ -146,8 +158,13 @@ export { annotateGraph } from './graph/RunGraphAnnotation.js';
 export { computeRunPath, isEdgeTraversed } from './graph/RunPath.js';
 export type { AttemptKind, RunOutcome, StepRunPath } from './graph/RunPath.js';
 export { stripAnsi } from './logs/AnsiStrip.js';
-export { stripErrorsForServing, stripForServing, stripRecordForServing } from './logs/ServingText.js';
-export { describeStepIO, findDataLinks } from './graph/StepIO.js';
+export {
+	stripErrorsForServing,
+	stripForServing,
+	stripIoForServing,
+	stripRecordForServing,
+} from './logs/ServingText.js';
+export { describeStepIO, findDataLinks, referencedInputNames } from './graph/StepIO.js';
 export type {
 	CappedText,
 	DeclaredInput,

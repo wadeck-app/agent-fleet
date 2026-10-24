@@ -99,7 +99,9 @@ export function buildPanelSections({
 			id: 'inputs',
 			title: 'Inputs',
 			openByDefault: false,
-			render: showHeading => <InputsSection view={io} showHeading={showHeading} />,
+			render: showHeading => (
+				<InputsSection view={io} showHeading={showHeading} blockHeightClass={density.block} />
+			),
 		});
 	}
 	const hasLinks = io !== undefined && (io.usesOutputOf.length > 0 || io.usedBy.length > 0);

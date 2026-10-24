@@ -14,8 +14,26 @@
 	"extensionPoints": [
 		{
 			"kind": "widget",
+			"slot": "flow:execution-links",
+			"label": "Flow definition",
+			"view": {
+				"type": "path",
+				"value": "./src/dsl-views/execution-link.yaml"
+			}
+		},
+		{
+			"kind": "widget",
+			"slot": "flow:execution-row-links",
+			"label": "Flow definition",
+			"view": {
+				"type": "path",
+				"value": "./src/dsl-views/execution-row-link.yaml"
+			}
+		},
+		{
+			"kind": "widget",
 			"slot": "flow:execution-actions",
-			"label": "See flow chart",
+			"label": "Flow chart",
 			"view": {
 				"type": "path",
 				"value": "./src/dsl-views/execution-action.yaml"
@@ -24,7 +42,7 @@
 		{
 			"kind": "widget",
 			"slot": "flow:execution-row-actions",
-			"label": "See flow chart",
+			"label": "Flow chart",
 			"view": {
 				"type": "path",
 				"value": "./src/dsl-views/execution-row-action.yaml"

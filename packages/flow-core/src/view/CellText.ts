@@ -47,14 +47,6 @@ export function ellipsize(text: string, limit: number): string {
 	return text.length <= limit ? text : `${text.slice(0, limit - ELLIPSIS.length)}${ELLIPSIS}`;
 }
 
-/** An error message as one line of at most `limit` characters; the full text stays in the detail view. */
-export function excerptOf(text: string | undefined, limit: number): string {
-	if (text === undefined) {
-		return '';
-	}
-	return ellipsize(text.replace(/\s+/g, ' ').trim(), limit);
-}
-
 /** "2026-10-18 16:15" (UTC): `flow history` Started column without the seconds. */
 export function startedLabel(iso: string): string {
 	return formatStarted(iso).slice(0, 16);

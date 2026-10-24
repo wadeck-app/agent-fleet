@@ -100,7 +100,7 @@ describe('FlowQueryService', () => {
 				...service.directories,
 				now: () => Date.parse('2026-08-16T13:00:00.000Z'),
 			});
-			expect(clocked.digestRuns()).toMatchObject({ total: 2, failed: 1, last24h: { total: 2, failed: 1 } });
+			expect(clocked.digestRuns()).toMatchObject({ total: 2, failed: 1 });
 		});
 
 		it('renders the history table or the detail view from the same filter', () => {

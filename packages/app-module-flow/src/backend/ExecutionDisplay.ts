@@ -3,20 +3,16 @@ import {
 	type ExecutionStatus,
 	type ExecutionSummary,
 	type FlowSummary,
+	type StepRetryPolicy,
 	type StepView,
-	excerptOf,
 	executionLogsPath,
+	executionPagePath,
 	outcomeLabel,
 	requireTimestamp,
+	retryLabel,
 	statusTag,
 	stepStatusTag,
 } from 'flow-core';
-
-/**
- * Longest error shown in a table cell. The dsl-ui DataTable ignores a column's width/truncate and wraps a cell
- * anywhere, so the excerpt is cut here; the full error stays in the detail page and in `lastError`/`error`.
- */
-export const MAX_ERROR_EXCERPT_LENGTH = 30;
 
 type BadgeVariant = 'success' | 'danger' | 'info' | 'warning';
 
@@ -31,21 +27,9 @@ const STATUS_VARIANTS: Record<ExecutionStatus, BadgeVariant> = {
 };
 // @formatter:on
 
-const RECOVERED_PREFIX = 'recovered: ';
-
-/** One line of the error; the text of a run (or step) that went on to complete says it was recovered. */
-function errorExcerptOf(error: string | undefined, recovered: boolean): string {
-	if (error === undefined) {
-		return '';
-	}
-	return recovered
-		? `${RECOVERED_PREFIX}${excerptOf(error, MAX_ERROR_EXCERPT_LENGTH - RECOVERED_PREFIX.length)}`
-		: excerptOf(error, MAX_ERROR_EXCERPT_LENGTH);
-}
-
 /**
  * A history row plus the short ASCII status the table shows as it is ("ok, recovered") and the links of the run
- * (a DSL string cannot be concatenated, so the paths are built here from flow-core's contract). The flow name and the
+ * (detailHref and logsHref: a DSL string cannot be concatenated, so the paths are built here from flow-core's contract). The flow name and the
  * id are sent whole: the table column truncates with an ellipsis when the viewport needs it.
  * Timestamps stay ISO 8601 (startedAt): the shell formats them (DataTable `format: datetime`), like everywhere in app-core.
  */
@@ -54,33 +38,32 @@ export function toExecutionRow(summary: ExecutionSummary) {
 		...summary,
 		startedAt: requireTimestamp(summary.startedAt),
 		statusLabel: outcomeLabel(statusTag(summary.status), { recovered: summary.lastErrorRecovered }),
-		errorExcerpt: errorExcerptOf(summary.lastError, summary.lastErrorRecovered),
+		detailHref: executionPagePath(summary.executionId),
 		logsHref: executionLogsPath(summary.executionId),
 	};
 }
 
-export function toStepRow(step: StepView) {
+/**
+ * A step row: the short status word and the retry cell. `policy` is the retry budget the flow file declares for this step,
+ * undefined when it is unknown (see retryLabel).
+ */
+export function toStepRow(step: StepView, policy: StepRetryPolicy | undefined) {
 	const recovered = step.status === 'completed' && step.error !== undefined;
 	return {
 		...step,
-		statusLabel: outcomeLabel(stepStatusTag(step.status), { recovered, attempts: step.attempts }),
-		errorExcerpt: errorExcerptOf(step.error, recovered),
+		statusLabel: outcomeLabel(stepStatusTag(step.status), { recovered }),
+		retryLabel: retryLabel(step, policy),
 	};
 }
 
-/** Short texts for the stat tiles of the detail: how many steps, how many retries, what went wrong. */
-function summaryOf(detail: ExecutionDetailView) {
-	return {
-		stepsSummary: `${detail.stepCount} ${detail.stepCount === 1 ? 'step' : 'steps'}, ${detail.failedStepCount} failed`,
-		// A step that ran 3 times was retried twice.
-		retryCount: detail.steps.reduce((sum, step) => sum + Math.max(0, (step.attempts ?? 1) - 1), 0),
-		errorSummary:
-			detail.lastError === undefined ? 'none' : errorExcerptOf(detail.lastError, detail.lastErrorRecovered),
-	};
-}
-
-/** The detail plus a colour for its status badge (the only place the DSL can colour a status). */
-export function toExecutionDetailRow(detail: ExecutionDetailView) {
+/**
+ * The detail plus a colour for its status badge (the only place the DSL can colour a status). `policies` are the retry
+ * budgets of the flow file by step id, undefined when the file cannot be read.
+ */
+export function toExecutionDetailRow(
+	detail: ExecutionDetailView,
+	policies: Readonly<Record<string, StepRetryPolicy>> | undefined
+) {
 	const statusVariant = (STATUS_VARIANTS as Record<string, BadgeVariant | undefined>)[detail.status];
 	if (statusVariant === undefined) {
 		throw new Error(
@@ -95,8 +78,7 @@ export function toExecutionDetailRow(detail: ExecutionDetailView) {
 		statusText: detail.lastErrorRecovered ? 'completed, recovered an error' : detail.status,
 		statusVariant: detail.lastErrorRecovered ? 'warning' : statusVariant,
 		logsHref: executionLogsPath(detail.executionId),
-		...summaryOf(detail),
-		steps: detail.steps.map(toStepRow),
+		steps: detail.steps.map(step => toStepRow(step, policies?.[step.stepId])),
 	};
 }
 

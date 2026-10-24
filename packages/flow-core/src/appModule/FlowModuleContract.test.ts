@@ -12,10 +12,12 @@ import {
 } from './FlowModuleContract.js';
 
 describe('FLOW_EXPOSED_SLOTS', () => {
-	it('exposes the execution detail, executions list and per-row action slots', () => {
+	it('exposes the execution detail, executions list and per-row slots, with a links slot before the own Logs button', () => {
 		expect(Object.keys(FLOW_EXPOSED_SLOTS).sort()).toEqual([
 			'execution-actions',
+			'execution-links',
 			'execution-row-actions',
+			'execution-row-links',
 			'executions-actions',
 		]);
 	});

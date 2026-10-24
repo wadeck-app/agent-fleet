@@ -102,6 +102,85 @@ describe('describeIO', () => {
 	});
 });
 
+describe('describeIO with recorded values', () => {
+	const value = (text: string, truncated = false, chars = text.length) => ({ text, truncated, chars });
+
+	function recordedStep(kind: 'model' | 'script') {
+		return {
+			...withIO({
+				declaredInputs: [
+					{ name: 'env.REGION', value: 'eu', references: [] },
+					{ name: 'prompt', references: ['inputs.task'], length: 120 },
+					{ name: 'script', references: [], length: 9 },
+				],
+				declaredOutputs: [
+					{ name: 'plan', type: 'string' },
+					{ name: 'passed', type: 'boolean' },
+				],
+				recorded: {
+					relaunches: [],
+					io: {
+						inputs: {
+							'env.REGION': value('eu-west'),
+							prompt: value('do the task', true, 5000),
+							'secrets.TOKEN': value('[secret:TOKEN]'),
+						},
+						outputs: { plan: value('the plan') },
+						stdout: value('answer', true, 9000),
+						stderr: value('warn'),
+						truncated: true,
+						storedChars: 100,
+					},
+				},
+				notes: { inputs: '', outputs: '' },
+			}),
+			kind,
+		};
+	}
+
+	it('replaces the declared inputs that were recorded and keeps the others and the undeclared recorded ones', () => {
+		const view = describeIO(recordedStep('script'), labelOf)!;
+
+		expect(view.inputs).toEqual([{ name: 'script', text: '9 chars; no reference' }]);
+		expect(view.recordedInputs.map(block => block.title)).toEqual(['env.REGION', 'prompt', 'secrets.TOKEN']);
+		expect(view.inputsNote).toBe('');
+	});
+
+	it('flags a truncated value with the size of the original and the size shown', () => {
+		const view = describeIO(recordedStep('script'), labelOf)!;
+		const prompt = view.recordedInputs.find(block => block.title === 'prompt')!;
+
+		expect(prompt.capped).toEqual({ text: 'do the task', truncated: true, totalChars: 5000 });
+		expect(prompt.note).toBe('truncated, 5000 chars (11 shown)');
+		expect(view.recordedInputs[0]!.note).toBeUndefined();
+	});
+
+	it('shows recorded outputs, stdout then stderr, and keeps the declared outputs that were not recorded', () => {
+		const view = describeIO(recordedStep('script'), labelOf)!;
+
+		expect(view.declaredOutputs.map(o => o.name)).toEqual(['passed']);
+		expect(view.recordedOutputs.map(block => block.title)).toEqual(['plan']);
+		expect(view.captured.map(block => block.title)).toEqual(['stdout', 'stderr']);
+		expect(view.captured[0]!.note).toBe('truncated, 9000 chars (6 shown)');
+		expect(view.outputsNote).toBe('');
+	});
+
+	it('calls the stdout of a model step its final response', () => {
+		const view = describeIO(recordedStep('model'), labelOf)!;
+
+		expect(view.captured.map(block => block.title)).toEqual(['final response', 'stderr']);
+	});
+
+	it('keeps the note and shows no recorded block for an older record', () => {
+		const view = describeIO(withIO({ declaredInputs: [{ name: 'prompt', references: [], length: 1 }] }), labelOf)!;
+
+		expect(view.recordedInputs).toEqual([]);
+		expect(view.recordedOutputs).toEqual([]);
+		expect(view.inputs).toHaveLength(1);
+		expect(view.inputsNote).toBe('inputs not recorded');
+	});
+});
+
 describe('previewOf', () => {
 	it('shows a short text whole', () => {
 		expect(previewOf({ text: 'abc', truncated: false, totalChars: 3 }, false)).toEqual({

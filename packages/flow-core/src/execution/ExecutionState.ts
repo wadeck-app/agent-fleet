@@ -7,6 +7,34 @@ import type { StepMeta } from 'flow-engine/types';
 export type ExecutionStatus = 'queued' | 'running' | 'completed' | 'failed' | 're-queued';
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed';
 
+/** One recorded value: the (possibly cut) text and the length of the original, so a cut is never silent. */
+export interface RecordedValue {
+	text: string;
+	/** True when `text` is shorter than the original (cut) or empty because a budget was spent. */
+	truncated: boolean;
+	/** Length of the original text, after secrets were masked. */
+	chars: number;
+}
+
+/**
+ * What a step attempt received and produced (format note: additive, absent on records written before it existed;
+ * readers must treat absence as "not recorded for this run"). Every text was masked with the execution's secrets
+ * BEFORE being cut. `inputs` keys: `inputs.NAME` (flow input), `env.NAME`, `secrets.NAME`, `prompt`. A new attempt
+ * of the step replaces it. A model step's `stdout` is its final response.
+ */
+export interface StepIoRecord {
+	inputs: Record<string, RecordedValue>;
+	outputs: Record<string, RecordedValue>;
+	/** Tail of the step's stdout. */
+	stdout?: RecordedValue;
+	/** Tail of the step's stderr. */
+	stderr?: RecordedValue;
+	/** True when any value above is cut or emptied. */
+	truncated: boolean;
+	/** Characters of text stored; counts against the per-execution budget. */
+	storedChars: number;
+}
+
 export interface StepState {
 	status: StepStatus;
 	startedAt?: string;
@@ -23,6 +51,8 @@ export interface StepState {
 	stdout?: string;
 	/** Full stderr captured during the step's execution, when the step failed. */
 	stderr?: string;
+	/** Resolved inputs, outputs and stdout/stderr tails of the current attempt; see {@link StepIoRecord}. */
+	io?: StepIoRecord;
 	/** Execution metadata reported by the worker on step_completed (cost/tokens/duration). */
 	meta?: StepMeta;
 	/** Number of times the step was started (retries, onFailure loops, resumes); absent on records written before this existed. */

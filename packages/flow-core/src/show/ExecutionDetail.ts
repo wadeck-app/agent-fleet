@@ -5,6 +5,7 @@ import { FlowCoreError, errorMessage } from '../errors.js';
 import { looksLikeExecutionId } from '../execution/ExecutionId.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
 import { formatDuration, formatModelCost, formatStarted } from '../history/ExecutionFormat.js';
+import { renderStepIoLines } from './StepIoLines.js';
 
 /** Default number of trailing characters printed for a failed step's stdout/stderr. */
 export const DEFAULT_TAIL_CHARS = 2000;
@@ -18,6 +19,8 @@ export interface RenderOptions {
 	/** Max trailing characters of stdout/stderr per failed step. Ignored when `full` is set. */
 	tail: number;
 	full: boolean;
+	/** Also print what each step received and produced (`flow show --io`). Off by default to keep the output small. */
+	io?: boolean;
 }
 
 export type ExecutionLookupErrorKind = 'invalid-id' | 'not-found' | 'ambiguous' | 'corrupt' | 'invalid-record';
@@ -174,6 +177,9 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 		if (step.meta && 'cost' in step.meta) {
 			hasCost = true;
 			totalCostUsd += (step.meta as { cost: { usd: number } }).cost.usd;
+		}
+		if (options.io === true) {
+			lines.push(...renderStepIoLines(step));
 		}
 		if (step.status === 'failed') {
 			for (const [label, text] of [

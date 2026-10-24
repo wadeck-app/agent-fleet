@@ -16,8 +16,8 @@ The record keeps per step: status, start of the latest attempt, completion, atte
 
 ## Step panel: inputs and outputs (`StepIO.ts`)
 
-- Not recorded: resolved inputs and step outputs. Only failed steps keep stdout/stderr (last 2000 chars), plus error, meta (exit code, session id, tokens, cost) and relaunch feedback. The panel says so.
-- Inputs show the declaration: references (`${{ ... }}`) of prompts and scripts (never their text), values of env / sub-flow inputs (200 chars max).
+- Recorded since 2026-10-24 (`StepState.io`, see `.claude/plans/2026-10-24_step-io-recording.md`): resolved inputs (flow inputs read, rendered env, model prompt), the output map, and stdout/stderr tails of every step, capped (4096 per value, 32768 per step, 1 MiB per run) and masked. A cut value shows `truncated, N chars`. Records written before say "not recorded for this run" and the panel falls back to the declaration. Failed steps also keep the legacy full `stdout`/`stderr`, error, meta and relaunch feedback.
+- Inputs show the declaration (and, when recorded, the resolved value next to it): references (`${{ ... }}`) of prompts and scripts (never their text), values of env / sub-flow inputs (200 chars max).
 - Data-flow links ("Uses output of" / "Used by") come from `steps.<id>.outputs` references in prompt, script, env, inputs, `when`, `context.previousOutputs` and `session.continue`; names select the node.
 - Served text: stdout, stderr, errors and relaunch feedback are ANSI-stripped before the 2000-char cut, so "last 2000 of N characters" counts the stripped text. Nothing else is hidden: secrets are masked by the daemon at write time (declared ones only), older records may contain some. Details and grep recipe: [app-module-flow `.docs/served-text.md`](../../app-module-flow/.docs/served-text.md).
 - "Logs of this step" opens `/modules/flow/executions/<id>/logs?step=<stepId>` (`executionStepLogsPath`).

@@ -33,10 +33,9 @@ Terminal control is stripped **before** any truncation, so a cut cannot split an
 | Endpoint                         | Fields served                                                        |
 | -------------------------------- | -------------------------------------------------------------------- |
 | `GET /executions/:id`            | `text`, `lastError`, step `error`, relaunch `feedback`               |
-| `GET /executions`                | `lastError`, `errorExcerpt` (stripped before the 30-char cut)        |
+| `GET /executions`                | `lastError`                                                          |
 | `GET /executions/:id/logs`       | entry `message`, `recordedOutput`                                    |
 | `GET /logs`                      | `text` (`human=false`: NDJSON as written, escapes stay JSON-escaped) |
-| `GET /widgets/executions`        | failure `error` / `summary` (digest built from stripped errors)      |
 | `GET /graph` (flow-chart module) | node `meta.error`, `io.recorded` stdout / stderr / relaunches        |
 
-Not covered because they carry no run text: `GET /flows`, `/workers`, `/widgets/daemon`, `/plugins`. Declared inputs shown by the chart are the flow file's values, as written.
+Not covered because they carry no run text: `GET /flows`, `/workers`, `/widgets/executions`, `/plugins`. Declared inputs shown by the chart are the flow file's values, as written.

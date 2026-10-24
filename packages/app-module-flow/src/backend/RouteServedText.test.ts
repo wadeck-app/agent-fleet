@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { registerExecutionLogRoutes } from './ExecutionLogRoutes.js';
 import { registerExecutionRoutes } from './ExecutionRoutes.js';
-import { registerExecutionWidgetRoutes } from './ExecutionWidgetRoutes.js';
 import { registerLogRoutes } from './LogRoutes.js';
 
 // The routes serve free text from a run with ANSI stripped and NOTHING else: no secret guessing, no counters. What is
@@ -26,7 +25,6 @@ beforeEach(() => {
 	const service = FlowQueryService.forConfigDir(fixture.configDir);
 	registerExecutionRoutes(collected.ctx, service);
 	registerExecutionLogRoutes(collected.ctx, service);
-	registerExecutionWidgetRoutes(collected.ctx, service);
 	registerLogRoutes(collected.ctx, service);
 });
 
@@ -140,18 +138,6 @@ describe('GET /logs', () => {
 
 		expect(log.text).toContain(LOOKS_SECRET);
 		expect(log.text).not.toContain(ESC);
-		expect(body).not.toHaveProperty('redactions');
-	});
-});
-
-describe('GET /widgets/executions', () => {
-	it('serves the failure lines of the digest without ANSI', async () => {
-		addFailedRun();
-		const { body } = await callRoute(routes, 'GET /widgets/executions', { query: {} });
-		const widget = body as { failures: { error: string }[] };
-
-		expect(JSON.stringify(widget.failures)).not.toContain(ESC);
-		expect(widget.failures[0]!.error).toBe('push failed');
 		expect(body).not.toHaveProperty('redactions');
 	});
 });

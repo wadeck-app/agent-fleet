@@ -3,7 +3,6 @@ import { FlowQueryService } from 'flow-core';
 import { FlowConfigFixture, callRoute, collectRoutes } from 'flow-core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { MAX_ERROR_EXCERPT_LENGTH } from './ExecutionDisplay.js';
 import { registerExecutionRoutes } from './ExecutionRoutes.js';
 
 let fixture: FlowConfigFixture;
@@ -351,14 +350,15 @@ ${'word '.repeat(40)}`,
 			executionId: 'bad1',
 			statusLabel: 'FAILED',
 			logsHref: '/modules/flow/executions/bad1/logs',
+			detailHref: '/modules/flow/executions/bad1',
 		});
 		expect(bad).not.toHaveProperty('runLabel');
 		// The shell formats the ISO startedAt itself (DataTable format: datetime): no server-side label.
 		expect(bad).not.toHaveProperty('startedLabel');
-		expect(String(bad!['errorExcerpt'])).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
-		expect(String(bad!['errorExcerpt'])).toMatch(/^first line word word .*...$/);
+		// No view reads a shortened error: the full one stays in lastError and on the detail page.
+		expect(bad).not.toHaveProperty('errorExcerpt');
 		expect(bad!['lastError']).toContain('\n');
-		expect(ok).toMatchObject({ status: 'completed', statusLabel: 'ok', errorExcerpt: '' });
+		expect(ok).toMatchObject({ status: 'completed', statusLabel: 'ok' });
 	});
 
 	it('never cuts a long flow name: the column truncates it with an ellipsis when the viewport needs it', async () => {
@@ -368,13 +368,11 @@ ${'word '.repeat(40)}`,
 		expect((body as { items: { flowId: string }[] }).items[0]!.flowId).toBe(flowId);
 	});
 
-	it('labels the error of a completed run as recovered, in the status and in the excerpt', async () => {
+	it('labels the error of a completed run as recovered in the status', async () => {
 		fixture.addExecution({ executionId: 'rec1', lastError: 'worker lost the connection and was retried' });
 		const { body } = await callRoute(routes, 'GET /executions', { query: {} });
 		const [row] = (body as { items: Record<string, unknown>[] }).items;
 		expect(row).toMatchObject({ status: 'completed', statusLabel: 'ok, recovered' });
-		expect(String(row!['errorExcerpt'])).toMatch(/^recovered: worker/);
-		expect(String(row!['errorExcerpt']).length).toBeLessThanOrEqual(MAX_ERROR_EXCERPT_LENGTH);
 	});
 
 	it('sends the path of the logs page of the run with the detail', async () => {
@@ -383,31 +381,7 @@ ${'word '.repeat(40)}`,
 		expect(body).toMatchObject({ logsHref: '/modules/flow/executions/det1/logs' });
 	});
 
-	it('summarises the detail for stat tiles: steps, retries and the error', async () => {
-		fixture.addExecution({
-			executionId: 'sum1',
-			status: 'failed',
-			lastError: 'e'.repeat(80),
-			steps: {
-				build: { status: 'completed' },
-				flaky: { status: 'completed', error: 'boom', attempts: 3 },
-				test: { status: 'failed', error: 'e'.repeat(80), attempts: 2 },
-				ship: { status: 'pending' },
-			},
-		});
-		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'sum1' }, query: {} });
-		const detail = body as { stepsSummary: string; retryCount: number; errorSummary: string };
-		expect(detail).toMatchObject({ stepsSummary: '4 steps, 1 failed', retryCount: 3 });
-		expect(detail.errorSummary).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
-	});
-
-	it('says there is no error, and counts a single step as a step, when the run is clean', async () => {
-		fixture.addExecution({ executionId: 'sum2', steps: { build: { status: 'completed' } } });
-		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'sum2' }, query: {} });
-		expect(body).toMatchObject({ stepsSummary: '1 step, 0 failed', retryCount: 0, errorSummary: 'none' });
-	});
-
-	it('labels every step with a short status word, and notes retries and recovered errors', async () => {
+	it('labels every step with a short status word, noting recovered errors (the retries have their own cell)', async () => {
 		fixture.addExecution({
 			executionId: 'abc124',
 			steps: {
@@ -418,10 +392,11 @@ ${'word '.repeat(40)}`,
 			},
 		});
 		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'abc124' }, query: {} });
-		const steps = (body as { steps: { statusLabel: string; errorExcerpt: string }[] }).steps;
-		expect(steps.map(step => step.statusLabel)).toEqual(['ok', 'ok, recovered, 3 tries', 'FAILED', 'pending']);
-		expect(steps[1]!.errorExcerpt).toBe('recovered: boom');
-		expect(steps[2]!.errorExcerpt).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
+		const steps = (body as { steps: { statusLabel: string }[] }).steps;
+		expect(steps.map(step => step.statusLabel)).toEqual(['ok', 'ok, recovered', 'FAILED', 'pending']);
+		// The summary tiles and the excerpts of the retired designs are not sent any more.
+		expect(body).not.toHaveProperty('stepsSummary');
+		expect(steps[1]).not.toHaveProperty('errorExcerpt');
 	});
 
 	it('sends the start and end of the run as ISO timestamps in a one-row table, for the shell to format', async () => {
@@ -470,10 +445,9 @@ ${'word '.repeat(40)}`,
 		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'abc123' }, query: {} });
 		const detail = body as { statusLabel: string; statusVariant: string; steps: Record<string, unknown>[] };
 		expect(detail).toMatchObject({ status: 'failed', statusVariant: 'danger' });
-		expect(detail.steps[0]).toMatchObject({ status: 'completed', errorExcerpt: '' });
-		expect(String(detail.steps[1]!['errorExcerpt'])).toHaveLength(MAX_ERROR_EXCERPT_LENGTH);
+		expect(detail.steps[0]).toMatchObject({ status: 'completed' });
 		expect(detail.steps[1]!['error']).toHaveLength(300);
-		expect(detail.steps[2]).toMatchObject({ status: 'pending', errorExcerpt: '' });
+		expect(detail.steps[2]).toMatchObject({ status: 'pending' });
 	});
 
 	it.each([
@@ -486,5 +460,42 @@ ${'word '.repeat(40)}`,
 		fixture.addExecution({ executionId: 'abc123', status: status as 'completed' });
 		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'abc123' }, query: {} });
 		expect(body).toMatchObject({ statusVariant: variant });
+	});
+});
+
+describe('GET /executions/:id ioText', () => {
+	const value = (text: string) => ({ text, truncated: false, chars: text.length });
+
+	it('sends the recorded inputs and outputs of each started step, with terminal control stripped', async () => {
+		fixture.addExecution({
+			executionId: 'io1',
+			steps: {
+				build: {
+					status: 'completed',
+					io: {
+						inputs: { branch: value('ma\u001b[31min\u001b[0m') },
+						outputs: { sha: value('abc') },
+						truncated: false,
+						storedChars: 9,
+					},
+				},
+			},
+		});
+		const { status, body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'io1' }, query: {} });
+		const detail = body as { ioText: string; steps: object[] };
+		expect(status).toBe(200);
+		expect(detail.ioText).toContain('build (completed)');
+		expect(detail.ioText).toContain('branch: main');
+		expect(detail.ioText).toContain('sha: abc');
+		expect(detail.ioText).not.toContain('\u001b');
+		// The step rows stay light: the values are only in ioText.
+		expect(JSON.stringify(detail.steps)).not.toContain('abc');
+	});
+
+	it('answers 200 with "not recorded" for a record written before io existed', async () => {
+		fixture.addExecution({ executionId: 'io2', steps: { build: { status: 'completed' } } });
+		const { status, body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'io2' }, query: {} });
+		expect(status).toBe(200);
+		expect((body as { ioText: string }).ioText).toContain('not recorded for this run');
 	});
 });

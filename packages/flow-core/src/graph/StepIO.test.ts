@@ -2,7 +2,7 @@ import type { FlowStep } from 'flow-engine/types';
 import { describe, expect, it } from 'vitest';
 
 import { BUILD_FLOW, COMPLETED_WITH_LOOP, FAILED_AT_TEST } from './RunFixtures.js';
-import { MAX_CAPPED_CHARS, capText, describeStepIO, findDataLinks } from './StepIO.js';
+import { MAX_CAPPED_CHARS, capText, describeStepIO, findDataLinks, referencedInputNames } from './StepIO.js';
 
 const step = (id: string): FlowStep => BUILD_FLOW.steps.find(s => s.id === id)!;
 
@@ -66,8 +66,8 @@ describe('describeStepIO: declared', () => {
 	it('says what the record does not hold', () => {
 		const { notes } = describeStepIO(step('plan'), undefined);
 
-		expect(notes.inputs).toMatch(/resolved values not recorded/i);
-		expect(notes.outputs).toMatch(/outputs are not recorded/i);
+		expect(notes.inputs).toMatch(/not recorded for this run/i);
+		expect(notes.outputs).toMatch(/not recorded for this run/i);
 	});
 });
 
@@ -185,5 +185,64 @@ describe('findDataLinks', () => {
 		expect(found['b']!.usesOutputOf).toEqual([
 			{ stepId: 'a', outputs: [], fields: ['context.previousOutputs', 'session.continue'] },
 		]);
+	});
+});
+
+describe('referencedInputNames', () => {
+	it('finds the flow inputs a step reads in its prompt, script, env and when, once each', () => {
+		const model = {
+			id: 'm',
+			name: 'M',
+			type: 'model',
+			prompt: 'A ${{ inputs.task }} {% if inputs.mode %}x{% endif %} ${{ inputs.task }}',
+			env: { K: '${{ inputs.region }}' },
+			when: '${{ inputs.gate }} == "go"',
+		} as unknown as FlowStep;
+
+		expect(referencedInputNames(model)).toEqual(['task', 'mode', 'region', 'gate']);
+	});
+
+	it('ignores text outside template syntax and other namespaces', () => {
+		const script = {
+			id: 's',
+			name: 'S',
+			type: 'script',
+			script: 'echo inputs.fake ${{ steps.a.outputs.inputs_x }} ${{ context.inputs.y }}',
+		} as unknown as FlowStep;
+
+		expect(referencedInputNames(script)).toEqual([]);
+	});
+});
+
+describe('describeStepIO: recorded inputs and outputs', () => {
+	const value = (text: string, truncated = false, chars = text.length) => ({ text, truncated, chars });
+	const io = {
+		inputs: { 'inputs.task': value('fix it'), prompt: value(`${ESC}[31mred${ESC}[0m`) },
+		outputs: { plan: value('step one', true, 9000) },
+		stdout: value('done'),
+		truncated: true,
+		storedChars: 40,
+	};
+
+	it('exposes the recorded values with terminal control stripped and the original length kept', () => {
+		const { recorded } = describeStepIO(undefined, { status: 'completed', io });
+
+		expect(recorded.io?.inputs['inputs.task']).toEqual(value('fix it'));
+		expect(recorded.io?.inputs['prompt']?.text).toBe('red');
+		expect(recorded.io?.outputs['plan']).toEqual(value('step one', true, 9000));
+		expect(recorded.io?.stdout?.text).toBe('done');
+		expect(recorded.io?.truncated).toBe(true);
+	});
+
+	it('has no notes about missing values when they were recorded', () => {
+		expect(describeStepIO(undefined, { status: 'completed', io }).notes).toEqual({ inputs: '', outputs: '' });
+	});
+
+	it('says "not recorded for this run" for an old record', () => {
+		const { notes, recorded } = describeStepIO(step('plan'), COMPLETED_WITH_LOOP.steps['plan']);
+
+		expect(recorded.io).toBeUndefined();
+		expect(notes.inputs).toMatch(/not recorded for this run/i);
+		expect(notes.outputs).toMatch(/not recorded for this run/i);
 	});
 });

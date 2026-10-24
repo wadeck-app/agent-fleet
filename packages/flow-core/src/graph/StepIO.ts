@@ -1,12 +1,11 @@
 import type { FlowDefinition, FlowStep } from 'flow-engine/types';
 
-import type { StepState } from '../execution/ExecutionState.js';
-import { stripForServing } from '../logs/ServingText.js';
+import type { StepIoRecord, StepState } from '../execution/ExecutionState.js';
+import { stripForServing, stripIoForServing } from '../logs/ServingText.js';
 
-// What a step received and produced, as far as the flow file and the execution record tell. The record does NOT
-// hold resolved inputs or step outputs (flow-cli's ExecutionStore keeps status, times, attempts, error, meta and,
-// for failed steps only, stdout/stderr); the daemon keeps outputs in memory while the run lasts. So this shows
-// the declaration (references, not whole prompts or scripts, which may embed secrets) plus what was recorded.
+// What a step received and produced, as far as the flow file and the execution record tell. The declaration
+// (references, not whole prompts or scripts) comes from the flow file; the resolved inputs, outputs and stdout/stderr
+// tails come from `StepState.io`, which records written before it existed do not have (see ExecutionState.ts).
 
 /**
  * Longest text of a captured stdout/stderr kept; same size as the default tail of `flow show`. The cut is made AFTER
@@ -61,6 +60,8 @@ export interface RecordedStepIO {
 	costUsd?: number;
 	/** One per relaunch caused by a failed sub-step, feedback shortened. */
 	relaunches: { at: string; feedback: string }[];
+	/** Resolved inputs, outputs and stdout/stderr tails; absent on a record written before they were recorded. */
+	io?: StepIoRecord;
 }
 
 export interface StepIO {
@@ -73,13 +74,14 @@ export interface StepIO {
 	notes: { inputs: string; outputs: string };
 }
 
-const NOTES = {
-	inputs: 'Resolved values not recorded: the references are shown as written in the flow file.',
-	outputs:
-		'Outputs are not recorded in the execution file; only the stdout/stderr of a failed step is kept. The rest is in the logs of the run.',
+const NOT_RECORDED = {
+	inputs: 'Resolved values not recorded for this run (older record): the references are shown as written in the flow file.',
+	outputs: 'Outputs not recorded for this run (older record). Look in the logs of the run.',
 };
 
 const EXPRESSION = /\$\{\{([\s\S]*?)\}\}/g;
+const TEMPLATE_BLOCK = /\$\{\{([\s\S]*?)\}\}|\{%([\s\S]*?)%\}/g;
+const INPUT_REFERENCE = /(?<![\w.])inputs\.([A-Za-z0-9_-]+)/g;
 const STEP_REFERENCE = /\bsteps\.([A-Za-z0-9_-]+)(?:\.outputs?\.([A-Za-z0-9_-]+))?/g;
 
 /** Keeps the last {@link MAX_CAPPED_CHARS} characters. */
@@ -186,10 +188,29 @@ function declaredOutputsOf(step: FlowStep): DeclaredOutput[] {
 	return outputs;
 }
 
+/** The flow inputs a step reads (`inputs.NAME` inside `${{ }}` or `{% %}`, or in `when`), once each, in order of appearance. */
+export function referencedInputNames(step: FlowStep): string[] {
+	const names = new Set<string>();
+	for (const field of templateFields(step)) {
+		const expressions = field.wholeExpression
+			? [field.text]
+			: [...field.text.matchAll(TEMPLATE_BLOCK)].map(match => match[1] ?? match[2] ?? '');
+		for (const expression of expressions) {
+			for (const match of expression.matchAll(INPUT_REFERENCE)) {
+				names.add(match[1]!);
+			}
+		}
+	}
+	return [...names];
+}
+
 function recordedOf(state: StepState | undefined): RecordedStepIO {
 	const recorded: RecordedStepIO = { relaunches: [] };
 	if (!state) {
 		return recorded;
+	}
+	if (state.io !== undefined) {
+		recorded.io = stripIoForServing(state.io);
 	}
 	if (state.stdout !== undefined) {
 		recorded.stdout = capText(stripForServing(state.stdout));
@@ -252,7 +273,7 @@ export function describeStepIO(step: FlowStep | undefined, state: StepState | un
 		recorded: recordedOf(state),
 		usesOutputOf: [],
 		usedBy: [],
-		notes: { ...NOTES },
+		notes: state?.io !== undefined ? { inputs: '', outputs: '' } : { ...NOT_RECORDED },
 	};
 }
 

@@ -84,3 +84,38 @@ describe('stripRecordForServing', () => {
 		expect(stripRecordForServing(plain).lastError).toBeUndefined();
 	});
 });
+
+describe('stripRecordForServing: recorded io', () => {
+	const value = (text: string) => ({ text, truncated: false, chars: text.length });
+	const withIo: ExecutionState = {
+		...RECORD,
+		steps: {
+			a: {
+				status: 'completed',
+				io: {
+					inputs: { prompt: value(`${ESC}[31mred${ESC}[0m`) },
+					outputs: { out: value(`${ESC}[1mbold${ESC}[0m`) },
+					stdout: value(`${ESC}[36mcyan${ESC}[0m\n10%\r100%\n`),
+					stderr: value(`${ESC}[33mwarn${ESC}[0m`),
+					truncated: false,
+					storedChars: 30,
+				},
+			},
+		},
+	};
+
+	it('strips terminal control from every recorded text in a copy, keeping the lengths of the originals', () => {
+		const before = JSON.stringify(withIo);
+		const io = stripRecordForServing(withIo).steps['a']!.io!;
+
+		expect(io.inputs['prompt']).toEqual({ text: 'red', truncated: false, chars: 12 });
+		expect(io.outputs['out']?.text).toBe('bold');
+		expect(io.stdout?.text).toBe('cyan\n100%\n');
+		expect(io.stderr?.text).toBe('warn');
+		expect(JSON.stringify(withIo)).toBe(before);
+	});
+
+	it('leaves the recorded texts alone when only the errors are served', () => {
+		expect(stripErrorsForServing(withIo).steps['a']!.io).toEqual(withIo.steps['a']!.io);
+	});
+});

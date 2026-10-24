@@ -2,6 +2,9 @@
 	"id": "flow",
 	"expose": {
 		"slots": {
+			"execution-links": {
+				"accepts": ["flow-chart:FlowChartLink"]
+			},
 			"execution-actions": {
 				"accepts": ["flow-chart:FlowChartLink"]
 			},
@@ -9,6 +12,9 @@
 				"accepts": ["flow-chart:FlowChartLink"]
 			},
 			"execution-row-actions": {
+				"accepts": ["flow-chart:FlowChartLink"]
+			},
+			"execution-row-links": {
 				"accepts": ["flow-chart:FlowChartLink"]
 			}
 		}

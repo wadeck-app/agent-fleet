@@ -24,10 +24,10 @@ describe('FlowChartLink', () => {
 	it('links to the chart page of the execution', () => {
 		render(
 			<MemoryRouter>
-				<FlowChartLink target="execution" executionId="abc 1" unexpectedKeys={[]} />
+				<FlowChartLink target="execution" executionId="abc 1" flowId={undefined} unexpectedKeys={[]} />
 			</MemoryRouter>
 		);
-		expect(screen.getByRole('link', { name: 'See flow chart' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'Flow chart' })).toHaveAttribute(
 			'href',
 			'/modules/flow-chart/flows/runs/abc%201'
 		);
@@ -36,7 +36,7 @@ describe('FlowChartLink', () => {
 	it('links to the flows index for the index target', () => {
 		render(
 			<MemoryRouter>
-				<FlowChartLink target="index" executionId={undefined} unexpectedKeys={[]} />
+				<FlowChartLink target="index" executionId={undefined} flowId={undefined} unexpectedKeys={[]} />
 			</MemoryRouter>
 		);
 		expect(screen.getByRole('link', { name: 'Flow charts' })).toHaveAttribute('href', FLOW_CHART_INDEX_PATH);
@@ -45,12 +45,13 @@ describe('FlowChartLink', () => {
 	it('renders exactly the classes of a ButtonLink with the contract style, whatever the target', () => {
 		const expected = referenceClassName();
 		for (const [target, name] of [
-			['execution', 'See flow chart'],
+			['execution', 'Flow chart'],
 			['index', 'Flow charts'],
+			['flow', 'Flow definition'],
 		] as const) {
 			const { unmount } = render(
 				<MemoryRouter>
-					<FlowChartLink target={target} executionId="e1" unexpectedKeys={[]} />
+					<FlowChartLink target={target} executionId="e1" flowId="deploy" unexpectedKeys={[]} />
 				</MemoryRouter>
 			);
 			expect(screen.getByRole('link', { name }).className, target).toBe(expected);
@@ -59,21 +60,27 @@ describe('FlowChartLink', () => {
 	});
 
 	it('says what is wrong when no id reaches the execution target, instead of rendering nothing', () => {
-		render(<FlowChartLink target="execution" executionId={undefined} unexpectedKeys={[]} />);
+		render(<FlowChartLink target="execution" executionId={undefined} flowId={undefined} unexpectedKeys={[]} />);
 		expect(screen.getByRole('alert')).toHaveTextContent('executionId: $route.id');
 	});
 
 	it('refuses a target it does not know, naming the allowed ones', () => {
-		render(<FlowChartLink target="elsewhere" executionId="e1" unexpectedKeys={[]} />);
+		render(<FlowChartLink target="elsewhere" executionId="e1" flowId="f1" unexpectedKeys={[]} />);
 		expect(screen.getByRole('alert')).toHaveTextContent('target: execution');
 		expect(screen.getByRole('alert')).toHaveTextContent('target: index');
+		expect(screen.getByRole('alert')).toHaveTextContent('target: flow');
 		expect(screen.queryByRole('link')).toBeNull();
 	});
 
 	it('refuses to render when the contribution carries a key outside its contract, naming the key and why', () => {
 		render(
 			<MemoryRouter>
-				<FlowChartLink target="execution" executionId="e1" unexpectedKeys={['className', 'variant']} />
+				<FlowChartLink
+					target="execution"
+					executionId="e1"
+					flowId={undefined}
+					unexpectedKeys={['className', 'variant']}
+				/>
 			</MemoryRouter>
 		);
 		const alert = screen.getByRole('alert');
@@ -89,7 +96,7 @@ describe('FlowChartLink registry entry', () => {
 		render(<MemoryRouter>{entry.render({ node, registry: {}, ctx })}</MemoryRouter>);
 
 	it('declares exactly the keys of its contract', () => {
-		expect(entry.knownKeys).toEqual(['target', 'executionId']);
+		expect(entry.knownKeys).toEqual(['target', 'executionId', 'flowId']);
 	});
 
 	it('reads executionId from the host page context ($route.id)', () => {
@@ -97,9 +104,20 @@ describe('FlowChartLink registry entry', () => {
 			{ $type: 'flow-chart:FlowChartLink', target: 'execution', executionId: '$route.id' },
 			{ $route: { id: 'exec9' } }
 		);
-		expect(screen.getByRole('link', { name: 'See flow chart' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'Flow chart' })).toHaveAttribute(
 			'href',
 			'/modules/flow-chart/flows/runs/exec9'
+		);
+	});
+
+	it('reads flowId from a row of the executions table ($ctx.row.flowId)', () => {
+		renderNode(
+			{ $type: 'flow-chart:FlowChartLink', target: 'flow', flowId: '$ctx.row.flowId' },
+			{ row: { flowId: 'deploy it' } }
+		);
+		expect(screen.getByRole('link', { name: 'Flow definition' })).toHaveAttribute(
+			'href',
+			'/modules/flow-chart/flows/deploy%20it'
 		);
 	});
 
@@ -111,4 +129,24 @@ describe('FlowChartLink registry entry', () => {
 			expect(screen.queryByRole('link')).toBeNull();
 		}
 	);
+});
+
+describe('FlowChartLink flow target', () => {
+	it('links to the definition chart of the flow', () => {
+		render(
+			<MemoryRouter>
+				<FlowChartLink target="flow" executionId={undefined} flowId="deploy it" unexpectedKeys={[]} />
+			</MemoryRouter>
+		);
+		expect(screen.getByRole('link', { name: 'Flow definition' })).toHaveAttribute(
+			'href',
+			'/modules/flow-chart/flows/deploy%20it'
+		);
+	});
+
+	it('says what is wrong when no flow id reaches the flow target, instead of rendering nothing', () => {
+		render(<FlowChartLink target="flow" executionId="e1" flowId={undefined} unexpectedKeys={[]} />);
+		expect(screen.getByRole('alert')).toHaveTextContent('flowId');
+		expect(screen.queryByRole('link')).toBeNull();
+	});
 });

@@ -144,6 +144,35 @@ describe('ExecutionDetail', () => {
 			expect(out).toContain('a  [completed]  1.0s  attempts: 3 (total 4m51s)');
 		});
 
+		it('prints the recorded inputs and outputs of a step only with --io, and says so for an older record', () => {
+			const record = minimal('iorecord');
+			Object.assign(record.steps.a, {
+				io: {
+					inputs: { 'inputs.task': { text: 'fix it', truncated: false, chars: 6 } },
+					outputs: { plan: { text: 'one', truncated: false, chars: 3 } },
+					truncated: false,
+					storedChars: 20,
+				},
+			});
+			writeExec('iorecord', record);
+			const resolved = resolveExecution(tmpDir, 'iorecord');
+
+			const without = renderExecutionDetail(resolved, { tail: 10, full: false });
+			const withIo = renderExecutionDetail(resolved, { tail: 10, full: false, io: true });
+
+			expect(without).not.toContain('inputs.task');
+			expect(withIo).toContain('inputs.task: fix it');
+			expect(withIo).toContain('plan: one');
+
+			writeExec('oldrecord', minimal('oldrecord'));
+			const old = renderExecutionDetail(resolveExecution(tmpDir, 'oldrecord'), {
+				tail: 10,
+				full: false,
+				io: true,
+			});
+			expect(old).toContain('not recorded for this run');
+		});
+
 		it('lists sub-step relaunches under the step with the first feedback line', () => {
 			const record = minimal('relaunch');
 			Object.assign(record.steps.a, {

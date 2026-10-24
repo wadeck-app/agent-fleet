@@ -11,6 +11,7 @@ import {
 	optionalInteger,
 	optionalString,
 	readPageOffset,
+	readRetryPolicies,
 	renderExecutionDetail,
 	stripErrorsForServing,
 	stripRecordForServing,
@@ -20,6 +21,7 @@ import {
 
 import { replyWithError } from './ErrorReply.js';
 import { toExecutionDetailRow, toExecutionRow, toFlowRow } from './ExecutionDisplay.js';
+import { renderStepsIoText } from './StepIoText.js';
 
 export const MAX_EXECUTIONS_LIMIT = 500;
 export const MAX_TAIL_CHARS = 1_000_000;
@@ -125,7 +127,11 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			// Served before it is rendered: the tail of a step output is cut from the served text, never from the raw one.
 			const served = { ...resolved, record: stripRecordForServing(resolved.record) };
 			const detail = toExecutionDetail(served, renderExecutionDetail(served, { tail, full }));
-			return reply.code(200).send(toExecutionDetailRow(detail));
+			// The recorded inputs and outputs come from the served record, in their own field: the step rows stay light.
+			return reply.code(200).send({
+				...toExecutionDetailRow(detail, readRetryPolicies(served.record.flowFile)),
+				ioText: renderStepsIoText(served.record),
+			});
 		} catch (err) {
 			return replyWithError(reply, err);
 		}

@@ -15,10 +15,13 @@ export function CappedBlock({
 	title,
 	capped,
 	heightClass,
+	note,
 }: {
 	title: string;
 	capped: CappedText;
 	heightClass: string;
+	/** Shown in plain view under the title, e.g. that the text is cut. */
+	note?: string;
 }) {
 	const [expanded, setExpanded] = useState(false);
 	const { text, hiddenChars } = previewOf(capped, expanded);
@@ -31,6 +34,7 @@ export function CappedBlock({
 				<div className="text-xs font-semibold text-muted">{title}</div>
 				<CopyButton text={capped.text} what={stream} />
 			</div>
+			{note !== undefined && <div className="mb-1 text-xs font-semibold text-warning-text">{note}</div>}
 			<pre className={`${heightClass} ${BLOCK_CLASS}`} aria-label={title}>
 				{text}
 			</pre>

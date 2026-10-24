@@ -6,3 +6,5 @@ export { FlowConfigFixture } from './FlowConfigFixture.js';
 export { asReply, callRoute, collectRoutes, fakeReply, fakeReq, replied } from './HttpDoubles.js';
 export type { FakeReply } from './HttpDoubles.js';
 export { makeExec } from './makeExec.js';
+export { OWN_PROCESS_GROUP, killProcessTree } from './ProcessTree.js';
+export { removeTempDirectory } from './TempDirectory.js';

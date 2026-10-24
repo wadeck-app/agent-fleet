@@ -1,0 +1,5 @@
+# Contributed to the slot "flow:execution-row-links" of the flow module (expanded row of the executions table), which
+# renders BEFORE the flow module's own Logs button. The row is the context: $ctx.row.flowId (whole-string expressions only).
+$type: flow-chart:FlowChartLink
+target: flow
+flowId: $ctx.row.flowId
