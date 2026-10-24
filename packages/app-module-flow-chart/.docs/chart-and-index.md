@@ -32,7 +32,7 @@ The record keeps per step: status, start of the latest attempt, completion, atte
 
 ## Flows index (A/B)
 
-`flows-page.yaml` declares two independent experiments. The viewing shell needs dsl-ui >= 2026.10.19-110 (`manifest.json` keeps `>=2026.10.3-0` on purpose: app-core checks the range against the server's build-info.json, which can be older than the shell, and refuses the whole module then). Dock and `?ab.<id>=<variant>` work only in a development shell; production and the `app-core-cli dev` bundle show `initial`.
+`flows-page.yaml` declares two independent experiments. The shell needs dsl-ui >= 2026.10.23-136, declared in `manifest.json` (`dslLib.shared`): app-core checks the range against the server build-info.json and refuses the module when it is older. A test pins that the range accepts the current server build and refuses older ones. Dock and `?ab.<id>=<variant>` work only in a development shell; production and the `app-core-cli dev` bundle show `initial`.
 
 | Test id                    | Variants (first = initial)               | Where                                         |
 | -------------------------- | ---------------------------------------- | --------------------------------------------- |
@@ -75,6 +75,6 @@ Two independent tests, declared in code (`StepPanelExperiment.ts`, dsl-ui `useAb
 | `tabs`      | Summary / Error / Inputs / Links / Outputs, one at a time; opens on Error for a failed step        |
 | `accordion` | Collapsible sections, only Error open (Summary when none)                                          |
 
-Not built: a bottom dock (steals height from a 420 px chart; the drawer covers the resizable case). Needs a shell dsl-ui that exports `useAbTest`, `useRegisterAbTests` and `useAbExperiments`; `manifest.json` still declares `>=2026.10.3-0` (see the index section for why it is not raised).
+Not built: a bottom dock (steals height from a 420 px chart; the drawer covers the resizable case). Needs a shell dsl-ui that exports `useAbTest`, `useRegisterAbTests` and `useAbExperiments`; `manifest.json` declares `>=2026.10.23-136` for dsl-ui and dsl-renderer.
 
 Keep one: fix `layout` / `density` in `useStepPanelExperiment`, delete `StepPanelExperiment.ts`, the unused layouts (`StepPanelTabs`, `StepPanelAccordion`, `DrawerResizeHandle`, the drawer branch of `StepPanelDock`) and their tests.

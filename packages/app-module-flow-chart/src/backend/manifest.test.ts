@@ -73,12 +73,17 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 		]);
 	});
 
-	// app-core checks this range against the build-info.json of its SERVER, which was 2026.10.18-101 when the
-	// range was raised to >=2026.10.19-110 and the whole module was refused ("built for ... but the shell provides").
-	it('accepts the dsl-ui of the app-core server build the user runs (raise the range only once that build is newer)', () => {
-		const range = manifest.dslLib?.shared?.['@wadeck-app/dsl-ui'] ?? '';
-		expect(satisfies('2026.10.18-101-b2ef217e', range, { includePrerelease: true })).toBe(true);
-	});
+	// app-core checks these ranges against the build-info.json of its SERVER and refuses the whole module when it is
+	// older ("built for ... but the shell provides"). Raise them only once that server build is newer: 2026.10.23-136
+	// is what the user's server served when the components needed the A/B hooks and the DataTable column options.
+	it.each(['@wadeck-app/dsl-ui', '@wadeck-app/dsl-renderer'])(
+		'%s accepts the server build and refuses older shells',
+		name => {
+			const range = manifest.dslLib?.shared?.[name] ?? '';
+			expect(satisfies('2026.10.23-136-d5f44a0f', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.10.18-101-b2ef217e', range, { includePrerelease: true })).toBe(false);
+		}
+	);
 });
 
 describe('requirement on the flow module', () => {
