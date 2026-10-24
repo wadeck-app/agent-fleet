@@ -1,4 +1,4 @@
-# Run path, step I/O, chart header, sub-step tree, flows index (A/B)
+# Run path, step I/O, chart header, sub-step tree, flows index
 
 ## Run path (flow-core `RunPath.ts`, `RunGraphAnnotation.ts`)
 
@@ -30,32 +30,15 @@ The record keeps per step: status, start of the latest attempt, completion, atte
 - A chevron and "N sub-steps" on the parent fold its sub-steps; parents with more than 8 start folded. Edges to hidden steps are redrawn on the folded parent. Folding keeps the layout direction.
 - Edges: along the spine the usual in/out sides; in a vertical chart a parent with visible sub-steps is left by its left side, and non-neighbour dependencies among sub-steps go around the left side.
 
-## Flows index (A/B)
+## Flows index
 
-`flows-page.yaml` declares two independent experiments. The shell needs dsl-ui >= 2026.10.24-153, declared in `manifest.json` (`dslLib.shared`): app-core checks the range against the server build-info.json and refuses the module when it is older. A test pins that the range accepts the current server build and refuses older ones. Dock and `?ab.<id>=<variant>` work only in a development shell; production and the `app-core-cli dev` bundle show `initial`.
-
-| Test id                    | Variants (first = initial)               | Where                                         |
-| -------------------------- | ---------------------------------------- | --------------------------------------------- |
-| `flow-chart-index-design`  | `table`, `cards`, `list`, `health-board` | page level (layout)                           |
-| `flow-chart-index-filters` | `bar`, `inline`, `chips`                 | the whole view of the `table` layout (nested) |
-
-Composition: the filters test is nested in the `table` layout, so its dock row appears only while `table` is chosen (`?ab.flow-chart-index-design=table&ab.flow-chart-index-filters=chips`). `cards` and `list` reuse the `bar` filter bar and bottom row through YAML anchors (`&filterBar`, `&pager`); `health-board` keeps only a search box (it groups by health). No density test: dsl-ui has no row height or padding prop (`DataTable` and the stacks read `gap` only).
-
-Filter variants (look of the queue History page: filter bar, table, bottom row with `Pagination` and `PageSizeSelect`; every control has `resetUrlParams: [page]`, dsl-ui >= 2026.10.22-124):
-
-| Variant         | What                                                                               |
-| --------------- | ---------------------------------------------------------------------------------- |
-| `bar` (initial) | `SearchBar ?q=` + `CompactSelect ?health=` above the table                         |
-| `inline`        | The same controls in the header row of the table (`DataTable filtersTop`)          |
-| `chips`         | `SearchBar` + four `ButtonLink` chips (Any, Failing, Running, Healthy) with counts |
+`flows-page.yaml` is a plain page (the A/B tests `flow-chart-index-design` and `flow-chart-index-filters` were retired; the choice stored in browsers is ignored): header, `SearchBar ?q=` + four `ButtonLink` health chips (Any, Failing, Running, Healthy, with counts), table, bottom row with `Pagination` and `PageSizeSelect`. Look of the queue History page; every control has `resetUrlParams: [page]` (dsl-ui >= 2026.10.22-124).
 
 Click targets (a cell cannot hold a link, a row action cannot navigate): a row click opens the flow chart; the chevron opens a row panel (`expansion`) with `ButtonLink` "Open chart" and "Latest run chart". Their paths are row fields built by the route from flow-core `chartPathOfFlow` / `chartPathOfExecution`.
 
 `GET /flows` also sends `emptyMessage` ("No flows on this page" / "No flow matches the filters" / "No flow has run yet: ...") and `chips`. Chips are four named objects (`any`, `failing`, `running`, `healthy`) with `label` ("Failing (12)", counts follow `q` only), `to` (index page keeping `q` and the page size, no page) and `variant` (`primary` when active): the DSL has no URL-bound toggle, no conditional and cannot repeat a node. `health=any` or empty means no filter.
 
 Limits: at 800 px the table scrolls sideways (same as the executions page) and chip labels wrap; a chip click reloads the page (`ButtonLink` is a router link, the page size is kept only because the route echoes it).
-
-Keep one: replace each AbTest by the chosen `view`, resolve the YAML anchors, update `views.test.ts` (ids are pinned). Keep ids and keys stable meanwhile (browsers store the choice).
 
 ## Step panel (A/B)
 

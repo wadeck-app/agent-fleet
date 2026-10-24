@@ -16,12 +16,10 @@ import {
 	countByHealth,
 	filterFlowSummaries,
 	flowHealth,
-	groupByHealth,
 	optionalInteger,
 	optionalString,
 	readFlowIndexFilter,
 	readPageOffset,
-	shortStarted,
 } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
@@ -45,15 +43,11 @@ function readTarget(query: QueryParams): FlowGraphTarget {
 	throw new InvalidQueryError("Give 'executionId' (a run, with its step states) or 'flowId' (the definition alone).");
 }
 
-/** One flow of the index: the raw summary plus what the variants of the page read (dates stay ISO: the shell formats them). */
+/** One flow of the index: the raw summary plus what the page reads (dates stay ISO: the shell formats them). */
 function toIndexRow(flow: FlowSummary) {
 	const { lastExecutionId, ...rest } = flow;
 	return {
 		...rest,
-		runCount: flow.executionCount,
-		lastRunId: lastExecutionId,
-		lastRunAt: flow.lastStartedAt,
-		lastStartedLabel: shortStarted(flow.lastStartedAt),
 		health: flowHealth(flow),
 		// The DSL cannot concatenate an id into a path.
 		chartPath: chartPathOfFlow(flow.flowId),
@@ -122,21 +116,12 @@ function healthChips(
 	};
 }
 
-function titleOf(health: string, count: number): string {
-	return `${capitalized(health)} (${count})`;
-}
-
 /**
  * `GET /graph?executionId=` or `?flowId=` (the graph flow-core builds from the flow file, with the step
  * states of the run when there is one), `GET /flows?page&limit&q&health` (a page of the flows that ran, to pick one to
- * draw; q = text in the flow id, health = failing | running | healthy) and `GET /flows/health?q` (the same flows grouped
- * by health, worst first). Read-only.
+ * draw; q = text in the flow id, health = failing | running | healthy). Read-only.
  */
-export function registerGraphRoutes(
-	ctx: ModuleContext,
-	service: FlowQueryService,
-	maxBoardFlows: number = MAX_FLOWS_LIMIT
-): void {
+export function registerGraphRoutes(ctx: ModuleContext, service: FlowQueryService): void {
 	ctx.registerRoute('GET', '/graph', (req, reply) => {
 		const query = (req as { query?: QueryParams }).query ?? {};
 		try {
@@ -166,32 +151,6 @@ export function registerGraphRoutes(
 				// Counts follow the text filter only: a chip says how many flows it would show if clicked.
 				chips: healthChips(filterFlowSummaries(everything, { q: filter.q }), filter, sizeAsked),
 			});
-		} catch (err) {
-			return replyWithError(reply, err);
-		}
-	});
-
-	ctx.registerRoute('GET', '/flows/health', (req, reply) => {
-		const query = (req as { query?: QueryParams }).query ?? {};
-		try {
-			const matching = filterFlowSummaries(service.listFlows(), { q: readFlowIndexFilter(query).q });
-			const shown = matching.slice(0, maxBoardFlows);
-			const groups = groupByHealth(shown);
-			const counts = groups.map(group => `${group.flows.length} ${group.health}`).join(', ');
-			const truncated =
-				matching.length > shown.length ? ` (showing the first ${shown.length} of ${matching.length})` : '';
-			const summary =
-				matching.length === 0
-					? 'No flow matches'
-					: `${shown.length} ${shown.length === 1 ? 'flow' : 'flows'}: ${counts}${truncated}`;
-			const body: Record<string, unknown> = { total: matching.length, summary };
-			for (const group of groups) {
-				body[group.health] = {
-					title: titleOf(group.health, group.flows.length),
-					flows: group.flows.map(toIndexRow),
-				};
-			}
-			return reply.code(200).send(body);
 		} catch (err) {
 			return replyWithError(reply, err);
 		}

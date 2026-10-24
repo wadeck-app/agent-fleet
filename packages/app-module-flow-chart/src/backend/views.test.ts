@@ -188,42 +188,9 @@ function collectNodes(node: unknown, type: string, found: Record<string, unknown
 	return found;
 }
 
-interface Variant {
-	label?: string;
-	hint?: string;
-	view: Record<string, unknown>;
-}
-
-interface Experiment {
-	id: string;
-	label?: string;
-	initial: string;
-	variants: Record<string, Variant>;
-}
-
-function experimentsOf(node: unknown): Experiment[] {
-	return collectNodes(node, 'AbTest') as unknown as Experiment[];
-}
-
 function flowsPage(): Record<string, unknown> {
 	return parseView('flows-page.yaml').document;
 }
-
-/** The layout experiment is the page's only top-level AbTest; the filters experiment is nested in its table variant. */
-function layoutExperiment(): Experiment {
-	const layout = experimentsOf(flowsPage()['sections']).find(test => test.id === 'flow-chart-index-design');
-	if (layout === undefined) throw new Error('flows-page.yaml declares no AbTest flow-chart-index-design');
-	return layout;
-}
-
-function filtersExperiment(): Experiment {
-	const filters = experimentsOf(layoutExperiment().variants['table']!.view);
-	expect(filters, 'the table layout variant nests exactly one experiment: the filters').toHaveLength(1);
-	return filters[0]!;
-}
-
-const FILTER_VARIANTS = ['bar', 'inline', 'chips'];
-const NOT_TABLE_LAYOUTS = ['cards', 'list'];
 
 function only(node: unknown, type: string, where: string): Record<string, unknown> {
 	const found = collectNodes(node, type);
@@ -239,41 +206,16 @@ function typesOf(nodes: Record<string, unknown>[]): unknown[] {
 	return nodes.map(node => node['$type']);
 }
 
-describe('flows page experiments', () => {
-	it('declares the layout experiment with stable ids: renaming one drops the choice stored in browsers', () => {
-		const test = layoutExperiment();
-		expect(test.initial).toBe('table');
-		expect(Object.keys(test.variants)).toEqual(['table', 'cards', 'list', 'health-board']);
-	});
+/** The page body: the only section is the VerticalStack that holds the whole index. */
+function pageStack(): Record<string, unknown> {
+	const sections = flowsPage()['sections'] as Record<string, unknown>[];
+	expect(sections, 'the flows page has one section').toHaveLength(1);
+	return sections[0]!;
+}
 
-	it('declares the filters experiment inside the table layout, first variant bar = initial', () => {
-		const test = filtersExperiment();
-		expect(test.id).toBe('flow-chart-index-filters');
-		expect(test.initial).toBe('bar');
-		expect(Object.keys(test.variants)).toEqual(FILTER_VARIANTS);
-	});
-
-	it('declares these two experiments and no other (no density dimension: dsl-ui has no row size or padding prop)', () => {
-		expect(experimentsOf(flowsPage()).map(test => test.id)).toEqual([
-			'flow-chart-index-design',
-			'flow-chart-index-filters',
-		]);
-	});
-
-	it('gives every variant a label and a hint (the dock refuses a variant without them), and every test a label', () => {
-		for (const test of [layoutExperiment(), filtersExperiment()]) {
-			expect(test.label, test.id).toEqual(expect.any(String));
-			for (const [key, variant] of Object.entries(test.variants)) {
-				expect(variant.label, `${test.id} ${key}`).toEqual(expect.any(String));
-				expect(variant.hint, `${test.id} ${key}`).toEqual(expect.any(String));
-			}
-		}
-	});
-
-	it('sets initial to a declared variant of each test (AbTest refuses a dangling initial)', () => {
-		for (const test of [layoutExperiment(), filtersExperiment()]) {
-			expect(Object.keys(test.variants), test.id).toContain(test.initial);
-		}
+describe('flows page has no A/B test left', () => {
+	it('declares no AbTest: the table with health chips is the plain page', () => {
+		expect(collectNodes(flowsPage(), 'AbTest')).toEqual([]);
 	});
 });
 
@@ -325,12 +267,11 @@ describe('flows page data', () => {
 	});
 });
 
-describe('flows page: the table of every filters variant', () => {
-	const tableOf = (key: string) => only(filtersExperiment().variants[key]!.view, 'DataTable', key);
+describe('flows page: the table', () => {
+	const table = () => only(flowsPage(), 'DataTable', 'flows page');
 
-	it.each(FILTER_VARIANTS)('%s: columns carry the shell formats and the empty message comes from the route', key => {
-		const table = tableOf(key);
-		const columns = table['columns'] as Record<string, unknown>[];
+	it('columns carry the shell formats and the empty message comes from the route', () => {
+		const columns = table()['columns'] as Record<string, unknown>[];
 		expect(columns.map(column => column['key'])).toEqual([
 			'flowId',
 			'health',
@@ -342,148 +283,73 @@ describe('flows page: the table of every filters variant', () => {
 		expect(columns.find(column => column['key'] === 'health')).toMatchObject({
 			badge: { failing: 'danger', running: 'info', healthy: 'success' },
 		});
-		expect(table['emptyMessage']).toBe('$sources.flows.emptyMessage');
-		expect(table['rows']).toBe('$sources.flows.flows');
+		expect(table()['emptyMessage']).toBe('$sources.flows.emptyMessage');
+		expect(table()['rows']).toBe('$sources.flows.flows');
 	});
 
-	it.each(FILTER_VARIANTS)(
-		'%s: a row opens the flow chart, and its panel has the two explicit links (Open chart, Latest run chart)',
-		key => {
-			const table = tableOf(key);
-			expect(table['navigateTo']).toBe('/modules/flow-chart/flows/{flowId}');
-			const links = collectNodes(table['expansion'], 'ButtonLink');
-			expect(links.map(link => [link['label'], link['to']])).toEqual([
-				['Open chart', '$ctx.row.chartPath'],
-				['Latest run chart', '$ctx.row.lastRunChartPath'],
-			]);
-			// One style for every chart button next to a flow or an execution: no primary beside a secondary.
-			for (const link of links) {
-				expect(link, String(link['label'])).toMatchObject(FLOW_ACTION_BUTTON_STYLE);
-			}
+	it('a row opens the flow chart, and its panel has the two explicit links (Open chart, Latest run chart)', () => {
+		expect(table()['navigateTo']).toBe('/modules/flow-chart/flows/{flowId}');
+		const links = collectNodes(table()['expansion'], 'ButtonLink');
+		expect(links.map(link => [link['label'], link['to']])).toEqual([
+			['Open chart', '$ctx.row.chartPath'],
+			['Latest run chart', '$ctx.row.lastRunChartPath'],
+		]);
+		// One style for every chart button next to a flow or an execution: no primary beside a secondary.
+		for (const link of links) {
+			expect(link, String(link['label'])).toMatchObject(FLOW_ACTION_BUTTON_STYLE);
 		}
-	);
+	});
 });
 
-describe('flows page: filters experiment', () => {
-	const variants = () => filtersExperiment().variants;
-
-	const SEARCH = { urlParam: 'q', placeholder: 'Flow name', resetUrlParams: ['page'] };
-	const HEALTH = {
-		urlParam: 'health',
-		ariaLabel: 'Health',
-		placeholder: 'Any health',
-		resetUrlParams: ['page'],
-	};
+describe('flows page: layout', () => {
 	const BOTTOM_ROW = { justify: 'justify-between', align: 'items-center', gap: 'gap-3' };
 
-	it('bar (initial) is the queue pattern: filter bar, table, bottom row', () => {
-		const items = itemsOf(variants()['bar']!.view);
+	it('is the queue pattern: header, filter row (search and health chips), table, bottom row', () => {
+		const items = itemsOf(pageStack());
 		expect(typesOf(items)).toEqual(['PageHeader', 'HorizontalStack', 'DataTable', 'HorizontalStack']);
-		const [, bar, , bottom] = items;
-		expect(bar).toMatchObject({ gap: 'gap-3', align: 'items-center' });
-		expect(typesOf(itemsOf(bar!))).toEqual(['SearchBar', 'CompactSelect']);
-		expect(only(bar, 'SearchBar', 'bar')).toMatchObject(SEARCH);
-		expect(only(bar, 'CompactSelect', 'bar')).toMatchObject(HEALTH);
-		expect(only(bar, 'CompactSelect', 'bar')['options']).toEqual([
-			{ value: 'failing', label: 'Failing' },
-			{ value: 'running', label: 'Running' },
-			{ value: 'healthy', label: 'Healthy' },
-		]);
-		expect(bottom).toMatchObject(BOTTOM_ROW);
-		expect(typesOf(itemsOf(bottom!))).toEqual(['Pagination', 'PageSizeSelect']);
+		expect(items[3]).toMatchObject(BOTTOM_ROW);
+		expect(typesOf(itemsOf(items[3]!))).toEqual(['Pagination', 'PageSizeSelect']);
 	});
 
-	it('inline puts the same two controls in the header row of the table, with no filter bar around it', () => {
-		const items = itemsOf(variants()['inline']!.view);
-		expect(typesOf(items)).toEqual(['PageHeader', 'DataTable', 'HorizontalStack']);
-		const toolbar = items[1]!['filtersTop'] as Record<string, unknown>[];
-		expect(typesOf(toolbar)).toEqual(['SearchBar', 'CompactSelect']);
-		expect(toolbar[0]).toMatchObject(SEARCH);
-		expect(toolbar[1]).toMatchObject(HEALTH);
-		expect(items[2]).toMatchObject(BOTTOM_ROW);
-	});
-
-	it('chips shows the health as four toggle links with counts from the route, and one search box', () => {
-		const items = itemsOf(variants()['chips']!.view);
-		expect(typesOf(items)).toEqual(['PageHeader', 'HorizontalStack', 'DataTable', 'HorizontalStack']);
-		const bar = items[1]!;
-		expect(only(bar, 'SearchBar', 'chips')).toMatchObject(SEARCH);
+	it('shows the health as four toggle links with counts from the route, and one search box', () => {
+		const bar = itemsOf(pageStack())[1]!;
+		expect(only(bar, 'SearchBar', 'filter row')).toMatchObject({
+			urlParam: 'q',
+			placeholder: 'Flow name',
+			resetUrlParams: ['page'],
+		});
 		expect(collectNodes(bar, 'CompactSelect'), 'the chips replace the select').toEqual([]);
 		const chips = collectNodes(bar, 'ButtonLink');
 		const names = ['any', 'failing', 'running', 'healthy'];
 		expect(chips.map(chip => chip['label'])).toEqual(names.map(name => `$sources.flows.chips.${name}.label`));
 		expect(chips.map(chip => chip['to'])).toEqual(names.map(name => `$sources.flows.chips.${name}.to`));
 		expect(chips.map(chip => chip['variant'])).toEqual(names.map(name => `$sources.flows.chips.${name}.variant`));
-		expect(items[3]).toMatchObject(BOTTOM_ROW);
 	});
 
-	it.each(FILTER_VARIANTS)(
-		'%s: Pagination reads the route total and limit, PageSizeSelect starts at the default',
-		key => {
-			const view = variants()[key]!.view;
-			expect(only(view, 'Pagination', key)).toMatchObject({
-				urlParam: 'page',
-				total: '$sources.flows.total',
-				size: '$sources.flows.limit',
-			});
-			// PageSizeSelect shows options[0] while ?size= is absent: it must be the backend default page size.
-			expect(only(view, 'PageSizeSelect', key)).toMatchObject({
-				urlParam: 'size',
-				resetUrlParams: ['page'],
-				options: [DEFAULT_HISTORY_LIMIT, 50, 100],
-			});
-		}
-	);
-});
-
-describe('flows page: the other layouts', () => {
-	it('cards and list share the bar pattern above the list and the bottom row below it', () => {
-		const { variants } = layoutExperiment();
-		const bar = itemsOf(filtersExperiment().variants['bar']!.view);
-		for (const key of NOT_TABLE_LAYOUTS) {
-			const items = itemsOf(variants[key]!.view);
-			expect(typesOf(items), key).toEqual([
-				'PageHeader',
-				'HorizontalStack',
-				'flow-chart:FlowIndexList',
-				'HorizontalStack',
-			]);
-			expect(items[1], key).toEqual(bar[1]);
-			expect(items[3], key).toEqual(bar[3]);
-			expect(items[2], key).toMatchObject({
-				flows: '$sources.flows.flows',
-				emptyMessage: '$sources.flows.emptyMessage',
-			});
-		}
+	it('Pagination reads the route total and limit, PageSizeSelect starts at the default', () => {
+		const view = flowsPage();
+		expect(only(view, 'Pagination', 'flows page')).toMatchObject({
+			urlParam: 'page',
+			total: '$sources.flows.total',
+			size: '$sources.flows.limit',
+		});
+		// PageSizeSelect shows options[0] while ?size= is absent: it must be the backend default page size.
+		expect(only(view, 'PageSizeSelect', 'flows page')).toMatchObject({
+			urlParam: 'size',
+			resetUrlParams: ['page'],
+			options: [DEFAULT_HISTORY_LIMIT, 50, 100],
+		});
 	});
 
-	it('health-board searches by name only (it groups by health already) and has no pagination', () => {
-		const view = layoutExperiment().variants['health-board']!.view;
-		expect(only(view, 'SearchBar', 'health-board')).toMatchObject({ urlParam: 'q', placeholder: 'Flow name' });
-		expect(collectNodes(view, 'CompactSelect')).toEqual([]);
-		expect(collectNodes(view, 'Pagination')).toEqual([]);
-	});
-
-	it('draws flows with FlowIndexList in cards, list and the board, with a layout it accepts', () => {
-		const { variants } = layoutExperiment();
-		for (const key of ['cards', 'list', 'health-board']) {
-			const lists = collectNodes(variants[key]!.view, 'flow-chart:FlowIndexList');
-			expect(lists.length, key).toBeGreaterThan(0);
-			for (const list of lists) {
-				expect(['cards', 'list'], key).toContain(list['layout']);
-				expect(list['flows'], key).toMatch(/^\$sources\.(flows|board)\./);
-			}
-		}
+	it('reads only the flows source (no health-board source left)', () => {
+		const names = sourcesOf(parseView('flows-page.yaml')).map(source => source.name);
+		expect(names).toEqual(['flows']);
 	});
 });
 
 describe('every view holds only keys the installed dsl-ui knows', () => {
-	it.each(viewFiles)('%s, in every variant', async file => {
+	it.each(viewFiles)('%s', async file => {
 		const { findUnknownKeys, knownKeys } = await loadDslKeyCheck();
-		expect(
-			knownKeys,
-			'the installed dsl-ui predates AbTest (release 2026.10.19-110): update @wadeck-app/dsl-ui, or set DSL_PACKAGES_DIR'
-		).toHaveProperty('AbTest');
 		// The module's own components (flow-chart:...) are registered by its bundle, not by dsl-ui: their props are checked
 		// by their own tests (RegisteredComponents.test.ts), everything else of the view is checked here.
 		const errors = findUnknownKeys(parseView(file).document, knownKeys).filter(

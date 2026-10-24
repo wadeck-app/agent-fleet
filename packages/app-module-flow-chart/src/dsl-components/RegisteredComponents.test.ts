@@ -30,11 +30,7 @@ describe('custom components used by the views', () => {
 				.flatMap(file => collectTypes(load(readFileSync(join(viewsDir, file), 'utf8'))))
 				.filter(type => type.includes(':'))
 		);
-		expect([...used].sort()).toEqual([
-			'flow-chart:FlowChartLink',
-			'flow-chart:FlowGraph',
-			'flow-chart:FlowIndexList',
-		]);
+		expect([...used].sort()).toEqual(['flow-chart:FlowChartLink', 'flow-chart:FlowGraph']);
 		for (const type of used) expect(registered, `${type} is used in a view but not registered`).toContain(type);
 	});
 

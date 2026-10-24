@@ -47,7 +47,7 @@ describe('registry entries', () => {
 		render(<MemoryRouter>{byName(name).render({ node, registry: {}, ctx })}</MemoryRouter>);
 
 	it('registers FlowGraph and FlowChartLink (app-core prefixes them with flow-chart:; FlowChartLink has its own test file)', () => {
-		expect(entries.map(e => e.name).sort()).toEqual(['FlowChartLink', 'FlowGraph', 'FlowIndexList']);
+		expect(entries.map(e => e.name).sort()).toEqual(['FlowChartLink', 'FlowGraph']);
 	});
 
 	it('FlowGraph without any id says what to set', () => {

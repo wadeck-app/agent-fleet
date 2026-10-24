@@ -7,7 +7,6 @@ import { FlowChartLink } from './FlowChartLink.js';
 import { FLOW_CHART_LINK_KEYS, readFlowChartLinkProps } from './FlowChartLinkProps.js';
 import { FlowGraph } from './FlowGraph.js';
 import type { GraphTarget } from './FlowGraphLoader.js';
-import { FlowIndexList } from './FlowIndexList.js';
 
 function targetOf(node: Record<string, unknown>, ctx: Record<string, unknown>): GraphTarget | undefined {
 	const executionId = resolveExpressionValue(node['executionId'], ctx);
@@ -21,7 +20,7 @@ function targetOf(node: Record<string, unknown>, ctx: Record<string, unknown>): 
 	return undefined;
 }
 
-// Registered by app-core as `flow-chart:FlowGraph`, `flow-chart:FlowChartLink` and `flow-chart:FlowIndexList`.
+// Registered by app-core as `flow-chart:FlowGraph` and `flow-chart:FlowChartLink`.
 const entries: ComponentRegistryEntry[] = [
 	{
 		name: 'FlowGraph',
@@ -50,18 +49,6 @@ const entries: ComponentRegistryEntry[] = [
 		tags: ['flow', 'chart', 'link'],
 		knownKeys: [...FLOW_CHART_LINK_KEYS],
 		render: ({ node, ctx }) => createElement(FlowChartLink, readFlowChartLinkProps(node, ctx)),
-	},
-	{
-		name: 'FlowIndexList',
-		category: 'composite',
-		tags: ['flow', 'chart', 'list'],
-		knownKeys: ['flows', 'layout', 'emptyMessage'],
-		render: ({ node, ctx }) =>
-			createElement(FlowIndexList, {
-				flows: resolveExpressionValue(node['flows'], ctx),
-				layout: resolveExpressionValue(node['layout'], ctx),
-				emptyMessage: resolveExpressionValue(node['emptyMessage'], ctx),
-			}),
 	},
 ];
 
