@@ -184,9 +184,9 @@ Keeping them separate means the worker owns its own admission policy and the flo
 
 A worker attaches to one or more projects; by default, the project it was launched in. The registry is global in the flow config, and each run registers itself so active projects can be listed.
 
-**Open (Question #21):** is project attachment a distinct field, or a reserved label such as `project:foo`? A reserved label reuses the matching machinery for free, but conflates routing with scoping and makes the "attach to my launch directory" default awkward to express. Leaning toward a distinct field.
+**Resolved (D#13):** project attachment is a distinct field, not a reserved label -- labels route, they do not scope.
 
-**Open (Question #20):** what identifies a project -- an absolute path, a declared name, or a generated id? Nothing in flow-cli carries a project identity today.
+**Open (identity of a project):** today a project is its absolute root path, compared by exact string (`StepRouter`: no case, symlink or trailing-slash normalisation). A declared name or generated id is undecided. Not the `_index.md` Q#20, which asked about the marker and is resolved (D#47, D#50).
 
 ## Terminal display requirement (Question #16)
 

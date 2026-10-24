@@ -20,7 +20,7 @@ fleet-task "Fix bug in authentication" --flow debug-local
 fleet-task --help
 ```
 
-The worker reads flows from `.agent-fleet/flows.yml` in the project root.
+The worker reads flows from `.flow/flows.yml` at the project root (the nearest ancestor holding `.flow/config.yml`, else the git root).
 
 ## Starting the stack
 

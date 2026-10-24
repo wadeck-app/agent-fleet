@@ -11,7 +11,7 @@
 
 - Basic YAML knowledge
 - Understanding of the task you want to automate
-- Access to `.agent-fleet/flows.yml` file
+- Access to `.flow/flows.yml` file
 
 **Estimated Time**: 15 minutes
 
@@ -53,9 +53,9 @@ Use this decision tree to select the right pattern:
 
 ## Step 2: Copy Template from flows.yml
 
-**Location**: `.agent-fleet/flows.yml`
+**Location**: `.flow/flows.yml`
 
-1. Open `.agent-fleet/flows.yml`
+1. Open `.flow/flows.yml`
 2. Find your chosen pattern (e.g., `simple-implement`, `test-diamond`)
 3. Copy the entire flow definition (including the flow ID)
 

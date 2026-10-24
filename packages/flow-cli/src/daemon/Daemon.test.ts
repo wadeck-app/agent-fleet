@@ -132,6 +132,19 @@ describe('loadFlowHooks', () => {
 		expect(loadFlowHooks(tmpDir)).toEqual({});
 	});
 
+	// A run from outside any project is legitimate: no hooks, not an error.
+	it('returns no hooks when the directory belongs to no project', async () => {
+		expect(loadFlowHooks(tmpDir)).toEqual({});
+	});
+
+	// D#49: a legacy layout must not read as "no hooks configured".
+	it('throws on a legacy project layout instead of running without its hooks', async () => {
+		fs.mkdirSync(path.join(tmpDir, '.flows'), { recursive: true });
+		fs.writeFileSync(path.join(tmpDir, '.flows', 'config.yml'), 'hooks: {}\n', 'utf8');
+
+		expect(() => loadFlowHooks(tmpDir)).toThrow(/legacy/i);
+	});
+
 	it('throws on malformed YAML instead of silently dropping every hook', async () => {
 		fs.mkdirSync(path.join(tmpDir, '.flow'), { recursive: true });
 		fs.writeFileSync(path.join(tmpDir, '.flow', 'config.yml'), 'hooks:\n  onFlowEnd: [unclosed\n', 'utf8');

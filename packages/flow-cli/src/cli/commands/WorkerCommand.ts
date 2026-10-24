@@ -22,10 +22,10 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
-import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { FlowConfigLoader } from '../../config/FlowConfig';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { PluginResolver } from '../../config/PluginResolver';
+import { ProjectResolverFactory } from '../../config/ProjectResolverFactory';
 import type {
 	AssignmentScopedMessage,
 	DaemonToWorker,
@@ -458,7 +458,7 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	// inherits the daemon's env via ForkWorkerSource.ts. It must set its own defaults the same way,
 	// at the same point in startup, before any step can run.
 	FlowConfigLoader.applyOpenCodeEnvDefaults(config);
-	const { projectRoot } = new DefaultProjectResolver().resolve(process.cwd());
+	const { projectRoot } = ProjectResolverFactory.create().resolve(process.cwd());
 
 	// Built here, in the process with the human in front of it (D#34): the CLI approval
 	// plugin reads its own stdin, so a daemon-side instance could never reach anybody. A

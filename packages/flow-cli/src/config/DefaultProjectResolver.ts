@@ -59,6 +59,25 @@ export class LegacyProjectLayoutError extends Error {
  * to the working directory.
  */
 export class DefaultProjectResolver implements ProjectResolutionProvider {
+	/**
+	 * Like {@link resolve}, but answers null when the directory belongs to no project.
+	 *
+	 * For callers where running outside any project is legitimate (a flow run by path
+	 * from anywhere). Only {@link ProjectRootNotFoundError} is absorbed: a legacy layout
+	 * (D#49) or an unexpected filesystem failure still throws, because they mean a project
+	 * exists and cannot be read, which is not the same as having none.
+	 */
+	tryResolve(startDir: string): ProjectResolution | null {
+		try {
+			return this.resolve(startDir);
+		} catch (err) {
+			if (err instanceof ProjectRootNotFoundError) {
+				return null;
+			}
+			throw err;
+		}
+	}
+
 	resolve(startDir: string): ProjectResolution {
 		const start = resolve(startDir);
 
@@ -111,10 +130,14 @@ function* ancestors(dir: string): Generator<string> {
 	let current = dir;
 	while (true) {
 		yield current;
-		if (current === root) return;
+		if (current === root) {
+			return;
+		}
 		const parent = dirname(current);
 		// Defensive: dirname() is a fixpoint at the root on every platform.
-		if (parent === current) return;
+		if (parent === current) {
+			return;
+		}
 		current = parent;
 	}
 }

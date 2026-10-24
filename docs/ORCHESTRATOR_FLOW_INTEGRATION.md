@@ -48,7 +48,7 @@ This starts:
 - TaskManager: Manages tasks and their lifecycle
 - WebSocket Server: Port for worker connections
 - REST API: Port for task creation and queries
-- FlowRegistry: Loads flows from `.agent-fleet/flows.yaml`
+- FlowRegistry: Loads flows from `.flow/flows.yml`
 
 . Launch a FlowWorker
 
@@ -164,7 +164,7 @@ Default Flows
 
 Creating Custom Flows
 
-Create `.agent-fleet/flows.yaml` in your project:
+Create `.flow/flows.yml` in your project:
 
 ```yaml
 my-custom-flow:
@@ -325,7 +325,7 @@ FlowWorker not picking up tasks
 Flow not found
 
 - List available flows: `GET /flows`
-- Check `.agent-fleet/flows.yaml` exists and is valid
+- Check `.flow/flows.yml` exists and is valid
 - Restart orchestrator to reload flows
 
 Workspace allocation fails

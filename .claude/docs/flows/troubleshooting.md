@@ -456,7 +456,7 @@ steps:
           echo "Build number ${{ steps.get-version.outputs.build }}"  # ✓ Now defined
 ```
 
-**See also**: [validation-error-undefined-output](../../../.agent-fleet/flows.yml) in flows.yml
+**See also**: [validation-error-undefined-output](../../../.flow/flows.yml) in flows.yml
 
 ---
 
@@ -1055,7 +1055,7 @@ Frequently encountered problems with solutions.
   script: 'echo "Result: ${{ steps.fetch.outputs.result }}"' # ← Correct path
 ```
 
-**See also**: [validation-error-undefined-output](../../../.agent-fleet/flows.yml) in flows.yml
+**See also**: [validation-error-undefined-output](../../../.flow/flows.yml) in flows.yml
 
 ---
 
@@ -1331,7 +1331,7 @@ test-step-isolation:
 **Compare your flow with working examples**:
 
 1. Check [Pattern Catalog](./pattern-catalog.md) for similar use cases
-2. Review [flows.yml](../../../.agent-fleet/flows.yml) for examples
+2. Review [flows.yml](../../../.flow/flows.yml) for examples
 3. Look for validation-error-\* flows showing fixes
 
 ---
@@ -1620,7 +1620,7 @@ steps:
 - **[Schema Reference](./schema-reference.md)** - Complete field documentation
 - **[Pattern Catalog](./pattern-catalog.md)** - Annotated examples
 - **[Best Practices](./best-practices.md)** - Optimization and design patterns
-- **[flows.yml](../../../.agent-fleet/flows.yml)** - All example flows
+- **[flows.yml](../../../.flow/flows.yml)** - All example flows
 
 ---
 

@@ -1953,7 +1953,7 @@ Validation rule configuration.
 
 This reference covers all fields in the Flow schema based on TypeScript types. For practical examples, see:
 
-- **Quick Start**: `.agent-fleet/flows.yml` for real-world flow examples
+- **Quick Start**: `.flow/flows.yml` for real-world flow examples
 - **Validation Examples**: Search for `validation-error-*` and `validation-correct-*` flows in `flows.yml`
 - **Pattern Examples**: Search for `test-diamond`, `test-fork`, `test-loop`, `data-*` flows
 

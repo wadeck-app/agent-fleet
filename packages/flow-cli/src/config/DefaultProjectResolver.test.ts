@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DefaultProjectResolver } from './DefaultProjectResolver.js';
+import { DefaultProjectResolver, LegacyProjectLayoutError } from './DefaultProjectResolver.js';
 
 // realpathSync resolves the macOS/Windows tmpdir symlink so returned absolute
 // paths compare equal to the ones the resolver produces.
@@ -173,5 +173,30 @@ describe('DefaultProjectResolver - loud failure (D#40, P-4)', () => {
 	it('never silently returns the start directory', () => {
 		const orphan = makeDir('orphan2');
 		expect(() => new DefaultProjectResolver().resolve(orphan)).toThrow();
+	});
+});
+
+describe('DefaultProjectResolver.tryResolve', () => {
+	it('returns the resolution when a project exists', () => {
+		const root = makeDir('tr-proj');
+		writeFile(root, '.flow', 'config.yml');
+
+		expect(new DefaultProjectResolver().tryResolve(root)).toEqual({
+			projectRoot: root,
+			via: join('.flow', 'config.yml'),
+		});
+	});
+
+	// "Not a project" is a legitimate answer for a run started outside any project.
+	it('returns null only when no project exists', () => {
+		expect(new DefaultProjectResolver().tryResolve(makeDir('tr-orphan'))).toBeNull();
+	});
+
+	// A project that needs migrating is NOT "no project": swallowing it hides D#49.
+	it('still throws LegacyProjectLayoutError for a legacy layout', () => {
+		const root = makeDir('tr-legacy');
+		writeFile(root, '.agent-fleet', 'flows.yml');
+
+		expect(() => new DefaultProjectResolver().tryResolve(root)).toThrow(LegacyProjectLayoutError);
 	});
 });

@@ -16,10 +16,11 @@ import type { WebSocket } from 'ws';
 
 import { FLOW_BUNDLE_NAME } from '../cli/FlowBundleName.js';
 import { VERSION } from '../cli/version.js';
-import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
+import { LegacyProjectLayoutError } from '../config/DefaultProjectResolver.js';
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { PluginResolver } from '../config/PluginResolver.js';
+import { ProjectResolverFactory } from '../config/ProjectResolverFactory.js';
 import type { ClientCommand, SourceReady, UpdateWorkerRequest, WorkerToDaemon } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { ExecutionStore } from '../storage/ExecutionStore';
@@ -32,6 +33,7 @@ import { DaemonSecrets } from './DaemonSecrets.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { injectedStepState } from './InjectedStepState.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
+import { ProjectResolutionRefusal } from './ProjectResolutionRefusal.js';
 import { RelayRegistry } from './RelayRegistry.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WebSocketServer } from './WebSocketServer';
@@ -107,15 +109,14 @@ function resolveClaudePath(): string {
  * launch directory would prune an unrelated project's workspaces (Q#22).
  */
 function pruneProjectWorkspaces(cwd: string, config: FlowConfig): void {
-	let projectRoot: string;
-	try {
-		projectRoot = new DefaultProjectResolver().resolve(cwd).projectRoot;
-	} catch (err) {
-		process.stderr.write(`[daemon] Skipped workspace pruning: ${getErrorMessage(err)}\n`);
+	// Throws for a project that cannot be read (legacy layout); only "no project" skips.
+	const resolution = ProjectResolverFactory.create().tryResolve(cwd);
+	if (resolution === null) {
+		process.stderr.write(`[daemon] Skipped workspace pruning: "${cwd}" belongs to no project.\n`);
 		return;
 	}
 	WorkspaceManager.pruneOldWorkspaceDir(
-		path.join(projectRoot, '.flow', 'workspaces'),
+		path.join(resolution.projectRoot, '.flow', 'workspaces'),
 		config.workspace.retainDays,
 		config.workspace.maxWorkspaces
 	);
@@ -128,14 +129,14 @@ function pruneProjectWorkspaces(cwd: string, config: FlowConfig): void {
  * directly, so a run started from a subdirectory still picks up the project's hooks.
  */
 export function loadFlowHooks(cwd: string): Record<string, HookConfig[]> {
-	let projectRoot: string;
-	try {
-		projectRoot = new DefaultProjectResolver().resolve(cwd).projectRoot;
-	} catch (err) {
-		process.stderr.write(`[daemon] No flow hooks loaded: ${getErrorMessage(err)}\n`);
+	// Throws for a project that cannot be read (legacy layout): running without its hooks
+	// would look like "no hooks configured". Only "no project" yields no hooks.
+	const resolution = ProjectResolverFactory.create().tryResolve(cwd);
+	if (resolution === null) {
+		process.stderr.write(`[daemon] No flow hooks loaded: "${cwd}" belongs to no project.\n`);
 		return {};
 	}
-	const configPath = path.join(projectRoot, '.flow', 'config.yml');
+	const configPath = path.join(resolution.projectRoot, '.flow', 'config.yml');
 	if (!fs.existsSync(configPath)) {
 		return {};
 	}
@@ -237,10 +238,17 @@ async function tryResolvePlugins(): Promise<{
 	// literally; absence is not an error here because a global config alone is enough.
 	let projectConfigPath: string | null = null;
 	try {
-		const { projectRoot } = new DefaultProjectResolver().resolve(process.cwd());
-		projectConfigPath = path.join(projectRoot, '.flow', 'config.yml');
-	} catch {
-		// No project at the launch directory -- global config still applies.
+		const resolution = ProjectResolverFactory.create().tryResolve(process.cwd());
+		// null: no project at the launch directory -- global config still applies.
+		if (resolution !== null) {
+			projectConfigPath = path.join(resolution.projectRoot, '.flow', 'config.yml');
+		}
+	} catch (err) {
+		// Not absorbed: the launch directory is arbitrary (Q#22), so refusing to start would
+		// punish an unrelated project, but the project config it hides must not vanish unseen.
+		process.stderr.write(
+			`[daemon] Project plugin config at the launch directory not loaded: ${getErrorMessage(err)}\n`
+		);
 	}
 
 	if (
@@ -336,8 +344,17 @@ async function startDaemon(
 		commands: {
 			run: async (payload: unknown): Promise<unknown> => {
 				const cmd = payload as Extract<ClientCommand, { type: 'run' }>;
-				pruneProjectWorkspaces(cmd.cwd, config);
-				const flowHooks = loadFlowHooks(cmd.cwd);
+				let flowHooks: Record<string, HookConfig[]>;
+				try {
+					pruneProjectWorkspaces(cmd.cwd, config);
+					flowHooks = loadFlowHooks(cmd.cwd);
+				} catch (err) {
+					// Refused as a typed response, like handleRun does for the same cause.
+					if (err instanceof LegacyProjectLayoutError) {
+						return ProjectResolutionRefusal.toResponse(cmd.cwd, err);
+					}
+					throw err;
+				}
 				return commandHandler.handleRun(cmd, new HookDispatcher(flowHooks));
 			},
 			// Resumes an execution kept alive after a `user_intervention` step timed out

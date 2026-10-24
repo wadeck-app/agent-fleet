@@ -12,9 +12,9 @@ import { fileURLToPath } from 'node:url';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
-import { DefaultProjectResolver } from '../../config/DefaultProjectResolver';
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
+import { ProjectResolverFactory } from '../../config/ProjectResolverFactory';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
@@ -152,7 +152,7 @@ function resolveFlowFile(flowRef: string, cwd: string): FlowResolution {
 	// Treat as registry ID -- use .flow/flows.yml lookup
 	let projectRoot: string;
 	try {
-		projectRoot = new DefaultProjectResolver().resolve(cwd).projectRoot;
+		projectRoot = ProjectResolverFactory.create().resolve(cwd).projectRoot;
 	} catch (err) {
 		// The resolver's message already names the markers it looked for, or the
 		// legacy files to move -- surface it rather than replacing it.

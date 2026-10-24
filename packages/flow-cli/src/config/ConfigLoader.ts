@@ -5,7 +5,6 @@ import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMessage';
 
-import { DefaultProjectResolver } from './DefaultProjectResolver.js';
 import { flowConfigDir } from './FlowConfigDir.js';
 import type {
 	GlobalConfig,
@@ -14,6 +13,7 @@ import type {
 	ResolvedFeature,
 	ResolvedPluginsConfig,
 } from './PluginConfig.js';
+import { ProjectResolverFactory } from './ProjectResolverFactory.js';
 
 const SENSITIVE_FIELD_SET = new Set(SENSITIVE_FIELDS);
 
@@ -132,7 +132,7 @@ export class ConfigLoader {
 			return this.projectConfigPathOverride;
 		}
 		try {
-			const { projectRoot } = new DefaultProjectResolver().resolve(process.cwd());
+			const { projectRoot } = ProjectResolverFactory.create().resolve(process.cwd());
 			return join(projectRoot, '.flow', 'config.yml');
 		} catch (err) {
 			// Not a silent fallback: no project means no project config, but the

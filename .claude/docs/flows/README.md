@@ -74,7 +74,7 @@ This directory contains comprehensive documentation for creating and managing fl
 
 - **[FLOW_ENGINE_USAGE.md](../../../docs/FLOW_ENGINE_USAGE.md)** - Programmatic usage guide
 - **[WORKFLOW_SYSTEM_DESIGN.md](../../../docs/WORKFLOW_SYSTEM_DESIGN.md)** - Architecture details
-- **[flows.yml](../../../.agent-fleet/flows.yml)** - Source of truth for all example flows
+- **[flows.yml](../../../.flow/flows.yml)** - Source of truth for all example flows
 
 ## Quick Reference
 

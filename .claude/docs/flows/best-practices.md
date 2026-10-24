@@ -1124,7 +1124,7 @@ workspace:
 
 **Run validation** (automatic when saving flows.yml):
 
-1. Edit `.agent-fleet/flows.yml`
+1. Edit `.flow/flows.yml`
 2. Save file
 3. Check UI for validation errors
 

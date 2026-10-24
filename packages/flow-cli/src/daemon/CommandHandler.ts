@@ -20,7 +20,7 @@ import * as path from 'node:path';
 import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
-import { DefaultProjectResolver } from '../config/DefaultProjectResolver.js';
+import { ProjectResolverFactory } from '../config/ProjectResolverFactory.js';
 import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext, InjectedStep } from '../ipc/Protocol';
 import type { ExecutionSecrets } from '../secrets/ExecutionSecrets';
@@ -32,6 +32,7 @@ import { writeDaemonLog } from './DaemonLog.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
 import { assertStepLabels } from './LabelMatcher.js';
+import { ProjectResolutionRefusal } from './ProjectResolutionRefusal.js';
 import { StalledStepWatch } from './StalledStepWatch.js';
 import { StepRouter } from './StepRouter.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
@@ -409,6 +410,25 @@ export class CommandHandler {
 			}
 		}
 
+		// The project is resolved before anything is allocated, so a refusal leaves nothing
+		// behind. Running outside any project is legitimate (null: forked workers serve it, see
+		// DefaultWorkerAcceptance); a project that exists but cannot be read, such as the
+		// legacy layout (D#49), is refused rather than quietly run unattributed.
+		let projectRoot: string | undefined;
+		try {
+			projectRoot = ProjectResolverFactory.create().tryResolve(cmd.cwd)?.projectRoot;
+		} catch (err) {
+			this.logWriter.writeExecution('__project', `PROJECT_RESOLUTION_FAILED: ${getErrorMessage(err)}`, 'error');
+			return ProjectResolutionRefusal.toResponse(cmd.cwd, err);
+		}
+		if (projectRoot === undefined) {
+			this.logWriter.writeExecution(
+				'__project',
+				`Run not attributed to a project: "${cmd.cwd}" is in none`,
+				'info'
+			);
+		}
+
 		// Declared secrets are resolved before an execution id, a workspace or a record exists:
 		// a secret that cannot be resolved must leave nothing behind and start no step.
 		let secrets: ExecutionSecrets;
@@ -507,19 +527,8 @@ export class CommandHandler {
 
 		const stepIds = flow.steps.map((s: FlowStep) => s.id);
 		try {
-			// Each run records its project so the projects with active runs can be listed
-			// (D#10). Not fatal when the run comes from outside any project: the run itself
-			// is still valid, it simply cannot be attributed to one.
-			let projectRoot: string | undefined;
-			try {
-				projectRoot = new DefaultProjectResolver().resolve(cmd.cwd).projectRoot;
-			} catch (err) {
-				this.logWriter.writeExecution(
-					executionId,
-					`Run not attributed to a project: ${getErrorMessage(err)}`,
-					'info'
-				);
-			}
+			// Each run records its project (resolved above) so the projects with active runs
+			// can be listed (D#10).
 			// Also kept in memory: routing consults it per dispatch, and a worker the daemon
 			// did not create only serves the projects it declared (D#9).
 			if (projectRoot !== undefined) {

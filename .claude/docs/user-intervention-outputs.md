@@ -215,7 +215,7 @@ The FlowBuilder UI should:
 
 ## Testing
 
-The flow `test-user-intervention` in `.agent-fleet/flows.yml` demonstrates this pattern in action.
+The flow `test-user-intervention` in `.flow/flows.yml` demonstrates this pattern in action.
 
 To test:
 

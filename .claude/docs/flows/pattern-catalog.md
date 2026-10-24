@@ -2542,7 +2542,7 @@ Patterns can be combined to create sophisticated workflows:
 
 ### Configuration Files
 
-- Primary definition: `.agent-fleet/flows.yml`
+- Primary definition: `.flow/flows.yml`
 - Schema validation: `packages/flow-engine/src/validation/`
 
 ### Related Documentation

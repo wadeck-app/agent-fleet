@@ -104,7 +104,7 @@ All validations from FlowWorker:
 
 **DEPRECATED**: Use `validate-flows-complete.js` instead.
 
-Performs **basic structure validation only** on flows in `.agent-fleet/flows.yml`.
+Performs **basic structure validation only** on flows in `.flow/flows.yml`.
 
 By default validates only example flows (flows with `example-` prefix). Use `--all` flag to validate all flows.
 
