@@ -30,13 +30,18 @@ describe('custom components used by the views', () => {
 				.flatMap(file => collectTypes(load(readFileSync(join(viewsDir, file), 'utf8'))))
 				.filter(type => type.includes(':'))
 		);
-		expect([...used].sort()).toEqual(['flow:MarkdownText', 'flow:RunList']);
+		expect([...used].sort()).toEqual(['flow:LogStream', 'flow:MarkdownText', 'flow:RunList']);
 		for (const type of used) expect(registered, `${type} is used in a view but not registered`).toContain(type);
 	});
 
 	it('declares the props of MarkdownText as known keys, so the DSL validator accepts them', () => {
 		const entry = entries.find(candidate => candidate.name === 'MarkdownText');
 		expect(entry?.knownKeys).toEqual(['text', 'maxHeight']);
+	});
+
+	it('declares the props of LogStream as known keys', () => {
+		const entry = entries.find(candidate => candidate.name === 'LogStream');
+		expect(entry?.knownKeys).toEqual(['entries', 'steps', 'runDurationMs', 'emptyMessage']);
 	});
 
 	it('declares the props of RunList as known keys', () => {

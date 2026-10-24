@@ -273,6 +273,82 @@ describe('FlowQueryService', () => {
 			expect(result.recordedOutput).toBe('[compile] error: exit 2\n[compile] stderr:\noops\n');
 		});
 
+		it('hands over the run times, the steps of the record and the attempt data', () => {
+			writeExec('def12345', {
+				flowId: 'build',
+				status: 'running',
+				startedAt: '2026-10-18T10:00:00.000Z',
+				completedAt: null,
+				steps: {
+					plan: { status: 'running', startedAt: '2026-10-18T10:00:01.000Z', attempts: 2 },
+					sub: {
+						status: 'completed',
+						startedAt: '2026-10-18T10:00:02.000Z',
+						completedAt: '2026-10-18T10:00:03.000Z',
+						parent: 'plan',
+					},
+					waiting: { status: 'pending' },
+				},
+			});
+			const result = service.readExecutionLogs('def1', { limit: 10 });
+			expect(result.startedAt).toBe('2026-10-18T10:00:00.000Z');
+			expect(result.completedAt).toBeNull();
+			expect(result.attemptStarts).toEqual({});
+			expect(result.stepLineCounts).toEqual({});
+			expect(result.steps).toEqual([
+				{ stepId: 'plan', status: 'running', startedAt: '2026-10-18T10:00:01.000Z', attempts: 2 },
+				{
+					stepId: 'sub',
+					status: 'completed',
+					startedAt: '2026-10-18T10:00:02.000Z',
+					completedAt: '2026-10-18T10:00:03.000Z',
+					parent: 'plan',
+				},
+				{ stepId: 'waiting', status: 'pending' },
+			]);
+		});
+
+		it('takes the sub-step nesting from the flow definition when the record holds none (declared parents are not recorded)', () => {
+			const flowFile = path.join(root, 'nested.yml');
+			fs.writeFileSync(
+				flowFile,
+				[
+					'id: nested',
+					"version: '1.0.0'",
+					'name: nested',
+					'steps:',
+					'  - id: top',
+					'    type: script',
+					'    script: echo top',
+					'  - id: kid',
+					'    type: script',
+					'    parent: top',
+					'    script: echo kid',
+				].join(String.fromCharCode(10)) + String.fromCharCode(10)
+			);
+			writeExec('nest1234', {
+				flowId: 'nested',
+				flowFile,
+				steps: { top: { status: 'completed' }, kid: { status: 'completed' } },
+			});
+			const result = service.readExecutionLogs('nest1', { limit: 10 });
+			expect(result.steps.map(step => [step.stepId, step.parent])).toEqual([
+				['top', undefined],
+				['kid', 'top'],
+			]);
+			expect(result.nestingError).toBeUndefined();
+		});
+
+		it('says why the nesting is unknown when the flow definition cannot be read, and still serves the record parents', () => {
+			writeExec('lost1234', {
+				flowFile: path.join(root, 'gone.yml'),
+				steps: { top: { status: 'completed' }, kid: { status: 'completed', parent: 'top' } },
+			});
+			const result = service.readExecutionLogs('lost1', { limit: 10 });
+			expect(result.nestingError).toMatch(/gone.yml/);
+			expect(result.steps.find(step => step.stepId === 'kid')?.parent).toBe('top');
+		});
+
 		it('throws the lookup error of an unknown execution', () => {
 			expect(() => service.readExecutionLogs('nope', { limit: 10 })).toThrow(ExecutionLookupError);
 		});

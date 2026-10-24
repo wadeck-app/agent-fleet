@@ -29,6 +29,24 @@
 - The time column is `format: time` (no seconds: a dsl-ui limit).
 - Masking: these lines, like `GET /logs`, are served as stored (ANSI-stripped only). The daemon masks declared secrets at write time; older lines may hold secrets (see served-text.md).
 
+### Log view experiments (`flow-logs-*`)
+
+Problem: a line named its step only as a text prefix, with no order, no attempt, no sub-step nesting; the steps' start/complete lines sat under `__execution`, away from the step.
+
+Route additions (`LogTimeline`, flow-core `attemptOf`): per line `stepOrder` (1-based, by record `startedAt`), `stepDepth`, `attempt`/`attempts` (count of `Step <id> started executing` events up to the line), `offsetMs` (from run start), `deltaMs` (previous line of the page), `subjectStepId` (a run event "Step X started|completed|failed|not run" belongs to X: its order, depth and attempt); top level `steps` (tree + execution order: status, attempts, `lineCount` over the whole run for the level/text filters, time bar offsets) and `runDurationMs`. Declared sub-steps (`parent:` in the flow file) are not in the record: nesting is read from the run's recorded definition (`FlowQueryService.declaredParents`); when it cannot be read the `notice` says so and only recorded parents (injected steps) nest.
+
+`flow-logs-design` (`execution-logs-page.yaml`, AbTest node): `stream` (initial, `flow:LogStream`) or `table` (the previous DataTable). The stream declares five more rows with `useAbTest` + `useRegisterAbTests` (`LogStreamChoices.ts`; ids in `src/commons/LogStreamAbIds.ts`), shown in the dock only while `stream` is chosen. Outside a dev shell (`AbExperiments` off or absent) the defaults apply and stored choices are ignored.
+
+| Id                     | Options (first = default is `LOG_STREAM_DEFAULTS`, not the first)                                                                                                                   | Default       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `flow-logs-identity`   | `plain`, `badge` (#order + name), `tree` (badge, indent, try n/m), `stripe`                                                                                                         | `tree`        |
+| `flow-logs-grouping`   | `flat`, `step`, `attempt` (collapsible sections, execution order)                                                                                                                   | `flat`        |
+| `flow-logs-navigation` | `none`, `chips` (sticky step + level chips, click filters via `?step=`/`?level=`), `rail` (sticky index with time bars, click scrolls, or filters when the step is not on the page) | `chips`       |
+| `flow-logs-time`       | `absolute` (clock with ms), `offset` (+12.3s), `delta`                                                                                                                              | `offset`      |
+| `flow-logs-density`    | `comfortable`, `compact`, `folded` (3+ quiet info lines of one step fold)                                                                                                           | `comfortable` |
+
+Force one for a page load with `?ab.flow-logs-identity=badge`. Limits: grouping, deltas and folds apply to the 100-line page only; the step filter matches `stepId`, so it hides the run events about that step (they carry `__execution`).
+
 ## Times and table columns
 
 - Timestamps are ISO 8601 (`startedAt`, `completedAt`, `lastStartedAt`, `timing`), validated by flow-core `requireTimestamp` (an invalid date fails loudly). No server-side label, no "5m" age.
@@ -40,7 +58,7 @@
 
 ## Designs and the dashboard widget
 
-No view is an A/B experiment any more: `views.test.ts` asserts the executions page (`table`), the detail page (`steps-table`) and the widget hold no `AbTest`.
+Only the logs page has A/B experiments (above). `views.test.ts` asserts the executions page (`table`), the detail page (`steps-table`) and the widget hold no `AbTest`.
 
 Widget (`executions-widget.yaml`), one source `GET /widgets/executions` (flow-core `RunDigest`, served as is: `total`, `running`, `failed`, `daily`, `latest`):
 

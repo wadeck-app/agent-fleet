@@ -19,6 +19,7 @@ import {
 	readExecutionLogs,
 } from '../logs/ExecutionLogs.js';
 import { type LogReadResult, type ReadLogsOptions, readLogs } from '../logs/LogReader.js';
+import type { LogRecordStep } from '../logs/LogRecordStep.js';
 import {
 	type PluginCatalogSource,
 	type PluginDescription,
@@ -69,6 +70,17 @@ export interface ExecutionLogsView extends ExecutionLogs {
 	flowId: string;
 	/** Error, stdout and stderr the execution record kept for failed steps (the selected step only): what is left once the daily logs rotated away. */
 	recordedOutput: string;
+	/** The steps of the record (record order) with their status, times, attempts and parent. */
+	steps: LogRecordStep[];
+	/**
+	 * Why the declared sub-step nesting is unknown (the flow definition of the run cannot be read), undefined when it was
+	 * read. The record keeps `parent` only for injected steps; the nesting of declared sub-steps lives in the definition.
+	 */
+	nestingError?: string;
+	/** ISO 8601 start of the run. */
+	startedAt: string;
+	/** ISO 8601 end of the run; null while it goes on. */
+	completedAt: string | null;
 }
 
 /** The text `flow history` prints and the execution files it had to skip. */
@@ -104,6 +116,10 @@ function assertDirectory(name: keyof FlowQueryDirectories, value: string): void 
  * the `flow` CLI and any other host. All locations are injected; nothing here reads the process
  * environment, prints, or exits.
  */
+function parentField(parent: string | undefined): { parent?: string } {
+	return parent === undefined ? {} : { parent };
+}
+
 export class FlowQueryService {
 	/** All flow locations hang off the config dir (`executions/`, `logs/`, daemon files at its root). */
 	static forConfigDir(configDir: string, pluginManifests?: Record<string, PluginCatalogSource>): FlowQueryService {
@@ -231,6 +247,7 @@ export class FlowQueryService {
 			query,
 			new Date(this.now())
 		);
+		const nesting = this.declaredParents(record.executionId);
 		const recordedIds = Object.keys(record.steps);
 		return {
 			...logs,
@@ -238,7 +255,34 @@ export class FlowQueryService {
 			executionId: record.executionId,
 			flowId: record.flowId,
 			recordedOutput: formatRecordedStepOutput(record.steps, query.stepId),
+			steps: Object.entries(record.steps).map(([stepId, step]) => ({
+				stepId,
+				status: step.status,
+				...(step.startedAt !== undefined ? { startedAt: step.startedAt } : {}),
+				...(step.completedAt !== undefined ? { completedAt: step.completedAt } : {}),
+				...(step.attempts !== undefined ? { attempts: step.attempts } : {}),
+				...parentField(step.parent ?? nesting.parents[stepId]),
+			})),
+			...(nesting.error === undefined ? {} : { nestingError: nesting.error }),
+			startedAt: record.startedAt,
+			completedAt: record.completedAt ?? null,
 		};
+	}
+
+	// Child -> parent of the `parent:` steps of the definition the run used; the reason when it cannot be read.
+	private declaredParents(executionId: string): { parents: Record<string, string>; error?: string } {
+		try {
+			const { graph } = this.getFlowGraph({ executionId });
+			const parents: Record<string, string> = {};
+			for (const edge of graph.edges) {
+				if (edge.kind === 'substep') {
+					parents[edge.from] = edge.to;
+				}
+			}
+			return { parents };
+		} catch (err) {
+			return { parents: {}, error: errorMessage(err) };
+		}
 	}
 
 	listPlugins(): PluginEntry[] {

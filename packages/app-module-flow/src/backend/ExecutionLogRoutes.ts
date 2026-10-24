@@ -10,6 +10,7 @@ import {
 
 import { replyWithError } from './ErrorReply.js';
 import { displayLogMessage } from './LogMessageDisplay.js';
+import { buildLogTimeline } from './LogTimeline.js';
 
 export const DEFAULT_EXECUTION_LOG_LIMIT = 100;
 export const MAX_EXECUTION_LOG_LIMIT = 1000;
@@ -32,6 +33,9 @@ function noticeOf(logs: ExecutionLogsView, filtered: boolean): string {
 		sentences.push('No log line matches the filters: clear the step, level or text to see the run again.');
 	} else if (logs.total === 0) {
 		sentences.push(`The daemon logged nothing for this run in ${logs.logsDir}.`);
+	}
+	if (logs.nestingError !== undefined) {
+		sentences.push(`Sub-steps are not nested under their parent step: ${logs.nestingError}`);
 	}
 	if (logs.unreadableLines > 0) {
 		sentences.push(
@@ -63,14 +67,24 @@ export function registerExecutionLogRoutes(ctx: ModuleContext, service: FlowQuer
 			const search = optionalString(query, 'q');
 			const logs = service.readExecutionLogs(id, { limit, page, stepId, level, search });
 			const notice = noticeOf(logs, stepId !== undefined || level !== undefined || search !== undefined);
-			const entries = logs.entries.map(entry => {
-				const message = stripForServing(entry.message);
-				return { ...entry, message, ...displayLogMessage(message) };
+			const timeline = buildLogTimeline({
+				runStartedAt: logs.startedAt,
+				runCompletedAt: logs.completedAt,
+				now: Date.now(),
+				recordSteps: logs.steps,
+				attemptStarts: logs.attemptStarts,
+				stepLineCounts: logs.stepLineCounts,
+				entries: logs.entries.map(entry => {
+					const message = stripForServing(entry.message);
+					return { ...entry, message, ...displayLogMessage(message) };
+				}),
 			});
 			const recordedOutput = stripForServing(logs.recordedOutput);
 			return reply.code(200).send({
 				...logs,
-				entries,
+				entries: timeline.entries,
+				steps: timeline.steps,
+				runDurationMs: timeline.runDurationMs,
 				recordedOutput,
 				limit,
 				offset: page * limit,

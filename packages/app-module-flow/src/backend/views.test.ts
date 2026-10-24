@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { LOG_STREAM_AB_IDS } from '../commons/LogStreamAbIds.js';
 import { DEFAULT_EXECUTION_LOG_LIMIT, MAX_EXECUTION_LOG_LIMIT } from './ExecutionLogRoutes.js';
 import backend from './index.js';
 
@@ -398,6 +399,69 @@ describe('execution logs page', () => {
 
 	it('shows no "values hidden" badge: the route serves what is stored', () => {
 		expect(JSON.stringify(parseView(file).document)).not.toMatch(/edactions/);
+	});
+
+	describe('log view experiment', () => {
+		const [design, ...others] = collectNodes(parseView(file).document, 'AbTest');
+
+		it('declares one flow-logs-design experiment: the stream first (initial), the previous table as the other option', () => {
+			expect(others).toEqual([]);
+			expect(design).toMatchObject({ id: 'flow-logs-design', initial: 'stream' });
+			expect(Object.keys(design!['variants'] as object)).toEqual(['stream', 'table']);
+		});
+
+		it('renders every variant: the stream is a flow:LogStream, the table a DataTable with the markdown panel', () => {
+			const types = alternativesOf(file).map(({ variant, document }) => ({
+				variant,
+				stream: collectNodes(document, 'flow:LogStream').length,
+				table: collectNodes(document, 'DataTable').length,
+			}));
+			expect(types).toEqual([
+				{ variant: 'stream', stream: 1, table: 0 },
+				{ variant: 'table', stream: 0, table: 1 },
+			]);
+		});
+
+		it('gives the stream exactly the closed props, read from fields the route sends, and waits for the route', async () => {
+			const [stream] = collectNodes(parseView(file).document, 'flow:LogStream');
+			expect(stream).toMatchObject({
+				entries: '$sources.logs.entries',
+				steps: '$sources.logs.steps',
+				runDurationMs: '$sources.logs.runDurationMs',
+				emptyMessage: '$sources.logs.notice',
+				// A property the route answers only once it has run: the node is not drawn (and does not refuse) while it loads.
+				$if: '$sources.logs.executionId',
+			});
+			expect(Object.keys(stream!).filter(key => !key.startsWith('$'))).toEqual([
+				'entries',
+				'steps',
+				'runDurationMs',
+				'emptyMessage',
+			]);
+			const fixture = new FlowConfigFixture();
+			fixture.addExecution({
+				executionId: 'run1',
+				startedAt: '2026-08-16T10:00:00.000Z',
+				completedAt: '2026-08-16T10:05:00.000Z',
+				steps: { a: { status: 'completed' } },
+			});
+			configDirectory.get.mockReturnValue(fixture.configDir);
+			const { routes, ctx } = collectRoutes<ModuleContext>();
+			backend(ctx);
+			const body = (await callRoute(routes, 'GET /executions/:id/logs', { params: { id: 'run1' }, query: {} }))
+				.body as Record<string, unknown>;
+			fixture.dispose();
+			for (const field of ['entries', 'steps', 'runDurationMs', 'notice', 'executionId']) {
+				expect(body, field).toHaveProperty(field);
+			}
+			expect(body['steps']).toBeInstanceOf(Array);
+			expect(body['runDurationMs']).toEqual(expect.any(Number));
+		});
+
+		it('keeps the experiments of the stream in code under the flow-logs- prefix', () => {
+			for (const id of Object.values(LOG_STREAM_AB_IDS)) expect(id).toMatch(/^flow-logs-[a-z]+$/);
+			expect(Object.values(LOG_STREAM_AB_IDS)).not.toContain('flow-logs-design');
+		});
 	});
 });
 

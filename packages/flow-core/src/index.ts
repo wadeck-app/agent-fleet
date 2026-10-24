@@ -116,7 +116,8 @@ export type { DeclaredWorkerSource, WorkerSourceEntry, WorkerSourceRegistryFile 
 export type { WorkerSummary } from './worker/WorkerSummary.js';
 
 export { formatLogContent, formatLogLine, tailLines } from './logs/LogFormat.js';
-export { LOG_LEVELS, formatRecordedStepOutput, readExecutionLogs } from './logs/ExecutionLogs.js';
+export { LOG_LEVELS, attemptOf, formatRecordedStepOutput, readExecutionLogs } from './logs/ExecutionLogs.js';
+export type { LogRecordStep } from './logs/LogRecordStep.js';
 export type { ExecutionLogEntry, ExecutionLogQuery, ExecutionLogTarget, ExecutionLogs } from './logs/ExecutionLogs.js';
 export { isLogFileName, logFileName, logFilePath, readAppendedLog, readLogs, todayLogDate } from './logs/LogReader.js';
 export type { LogReadResult, ReadLogsOptions } from './logs/LogReader.js';

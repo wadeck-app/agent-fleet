@@ -1,6 +1,8 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { FlowQueryService } from 'flow-core';
 import { FlowConfigFixture, callRoute, collectRoutes } from 'flow-core/testing';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -26,7 +28,15 @@ interface LogsBody {
 		preview: string;
 		expandable: boolean;
 		markdown: string;
+		stepOrder: number | null;
+		stepDepth: number;
+		attempt: number;
+		attempts: number;
+		offsetMs: number;
+		deltaMs: number | null;
 	}[];
+	steps: { stepId: string; label: string; order: number | null; depth: number; lineCount: number; status: string }[];
+	runDurationMs: number;
 	total: number;
 	limit: number;
 	offset: number;
@@ -45,9 +55,24 @@ beforeEach(() => {
 	const collected = collectRoutes<ModuleContext>();
 	routes = collected.routes;
 	registerExecutionLogRoutes(collected.ctx, FlowQueryService.forConfigDir(fixture.configDir));
+	// The definition the run used: the nesting of sub-steps is read from it.
+	const flowFile = join(fixture.configDir, 'build.yml');
+	writeFileSync(
+		flowFile,
+		[
+			'id: build',
+			"version: '1.0.0'",
+			'name: build',
+			'steps:',
+			'  - id: compile',
+			'    type: script',
+			'    script: echo',
+		].join(String.fromCharCode(10))
+	);
 	fixture.addExecution({
 		executionId: 'run1',
 		flowId: 'build',
+		flowFile,
 		startedAt: '2026-08-16T10:00:00.000Z',
 		completedAt: '2026-08-16T10:05:00.000Z',
 		steps: { compile: { status: 'completed' }, test: { status: 'failed', error: 'exit 1' } },
@@ -93,7 +118,57 @@ describe('GET /executions/:id/logs', () => {
 			preview: 'compiling',
 			expandable: false,
 			markdown: '',
+			stepOrder: null,
+			subjectStepId: null,
+			stepDepth: 0,
+			attempt: 0,
+			attempts: 0,
+			offsetMs: 60000,
+			deltaMs: null,
 		});
+		expect(logs.runDurationMs).toBe(300000);
+		expect(logs.entries[1]).toMatchObject({ offsetMs: 120000, deltaMs: 60000 });
+	});
+
+	it('tells which step each line belongs to: rows of the steps with their line counts, and the attempt of a retried step', async () => {
+		fixture.addExecution({
+			executionId: 'run3',
+			flowId: 'build',
+			startedAt: '2026-08-17T10:00:00.000Z',
+			completedAt: '2026-08-17T10:05:00.000Z',
+			steps: {
+				plan: {
+					status: 'completed',
+					startedAt: '2026-08-17T10:00:10.000Z',
+					completedAt: '2026-08-17T10:01:00.000Z',
+				},
+				work: {
+					status: 'failed',
+					startedAt: '2026-08-17T10:00:20.000Z',
+					completedAt: '2026-08-17T10:03:00.000Z',
+					attempts: 2,
+					parent: 'plan',
+				},
+			},
+		});
+		fixture.addLog('2026-08-17', [
+			line('__execution', 'info', 'Step work started executing', '2026-08-17T10:00:20.000Z', 'run3'),
+			line('work', 'info', 'first try', '2026-08-17T10:00:30.000Z', 'run3'),
+			line('__execution', 'info', 'Step work started executing', '2026-08-17T10:01:30.000Z', 'run3'),
+			line('work', 'info', 'second try', '2026-08-17T10:02:00.000Z', 'run3'),
+			line('plan', 'info', 'planning', '2026-08-17T10:00:40.000Z', 'run3'),
+		]);
+		const logs = (await call({ step: 'work' }, 'run3')).body as LogsBody;
+		expect(logs.entries.map(e => [e.message, e.stepOrder, e.stepDepth, e.attempt, e.attempts])).toEqual([
+			['first try', 2, 1, 1, 2],
+			['second try', 2, 1, 2, 2],
+		]);
+		expect(logs.steps.map(s => [s.stepId, s.order, s.depth, s.lineCount])).toEqual([
+			['__execution', null, 0, 2],
+			['plan', 1, 0, 1],
+			['work', 2, 1, 2],
+		]);
+		expect(logs.steps[0]!.label).toBe('Run events');
 	});
 
 	it('gives a rendered prompt a one-line preview and the markdown its expansion panel shows', async () => {
@@ -143,6 +218,17 @@ describe('GET /executions/:id/logs', () => {
 		expect(logs.hasRecordedOutput).toBe(true);
 		const compileOnly = (await call({ step: 'compile' })).body as LogsBody;
 		expect(compileOnly).toMatchObject({ recordedOutput: '', hasRecordedOutput: false });
+	});
+
+	it('explains that sub-steps are not nested when the flow definition of the run cannot be read', async () => {
+		fixture.addExecution({
+			executionId: 'lost1',
+			flowFile: join(fixture.configDir, 'gone.yml'),
+			steps: { a: { status: 'completed' } },
+		});
+		const logs = (await call({}, 'lost1')).body as LogsBody;
+		expect(logs.notice).toMatch(/Sub-steps are not nested.*gone.yml/);
+		expect(logs.hasNotice).toBe(true);
 	});
 
 	it('says nothing when there is nothing to explain', async () => {

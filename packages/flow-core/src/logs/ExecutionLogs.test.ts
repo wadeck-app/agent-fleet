@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { InvalidQueryError } from '../errors.js';
 import { makeExec } from '../testing/makeExec.js';
-import { LOG_LEVELS, formatRecordedStepOutput, readExecutionLogs } from './ExecutionLogs.js';
+import { LOG_LEVELS, attemptOf, formatRecordedStepOutput, readExecutionLogs } from './ExecutionLogs.js';
 import { logFilePath } from './LogReader.js';
 
 const EXEC = 'abc12345';
@@ -185,5 +185,78 @@ describe('formatRecordedStepOutput', () => {
 		expect(formatRecordedStepOutput(record.steps, 'lint')).toBe('[lint] error: lint failed\n');
 		expect(formatRecordedStepOutput(record.steps, 'test')).toBe('');
 		expect(formatRecordedStepOutput(record.steps, 'unknown')).toBe('');
+	});
+});
+
+describe('readExecutionLogs attempts and per-step counts', () => {
+	let configDir: string;
+
+	beforeEach(() => {
+		configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-core-exec-attempts-'));
+		fs.mkdirSync(path.join(configDir, 'logs'));
+		fs.writeFileSync(
+			logFilePath(configDir, '2026-10-18'),
+			[
+				line(EXEC, '__execution', 'info', 'Execution started for flow X', '2026-10-18T22:00:00.000Z'),
+				line(EXEC, '__execution', 'info', 'Step build started executing', '2026-10-18T22:01:00.000Z'),
+				line(EXEC, 'build', 'error', 'boom', '2026-10-18T22:02:00.000Z'),
+				line(EXEC, '__execution', 'info', 'Step build started executing', '2026-10-18T22:03:00.000Z'),
+				line(EXEC, 'build', 'info', 'again', '2026-10-18T22:04:00.000Z'),
+				line(EXEC, '__execution', 'info', 'Step test started executing', '2026-10-18T22:05:00.000Z'),
+				line('other999', '__execution', 'info', 'Step zzz started executing', '2026-10-18T22:05:00.000Z'),
+			].join('\n') + '\n'
+		);
+	});
+
+	afterEach(() => {
+		fs.rmSync(configDir, { recursive: true, force: true });
+	});
+
+	it('collects the start events of every step whatever the filters', () => {
+		const result = readExecutionLogs(configDir, target, { limit: 50, stepId: 'test', level: 'error' });
+		expect(result.attemptStarts).toEqual({
+			build: ['2026-10-18T22:01:00.000Z', '2026-10-18T22:03:00.000Z'],
+			test: ['2026-10-18T22:05:00.000Z'],
+		});
+	});
+
+	it('counts the lines per step with the level and text filters but not the step filter', () => {
+		expect(readExecutionLogs(configDir, target, { limit: 50, stepId: 'test' }).stepLineCounts).toEqual({
+			__execution: 4,
+			build: 2,
+		});
+		expect(
+			readExecutionLogs(configDir, target, { limit: 50, stepId: 'test', level: 'error' }).stepLineCounts
+		).toEqual({
+			build: 1,
+		});
+		expect(readExecutionLogs(configDir, target, { limit: 50, search: 'again' }).stepLineCounts).toEqual({
+			build: 1,
+		});
+	});
+});
+
+describe('attemptOf', () => {
+	const starts = ['2026-10-18T22:01:00.000Z', '2026-10-18T22:03:00.000Z'];
+
+	it('counts the starts at or before the timestamp', () => {
+		expect(attemptOf(starts, '2026-10-18T22:00:59.999Z')).toBe(0);
+		expect(attemptOf(starts, '2026-10-18T22:01:00.000Z')).toBe(1);
+		expect(attemptOf(starts, '2026-10-18T22:02:00.000Z')).toBe(1);
+		expect(attemptOf(starts, '2026-10-18T22:09:00.000Z')).toBe(2);
+	});
+
+	it('compares instants, not strings', () => {
+		expect(attemptOf(starts, '2026-10-19T00:02:00.000+02:00')).toBe(1);
+	});
+
+	it('is 0 for a step without start events', () => {
+		expect(attemptOf(undefined, '2026-10-18T22:00:00.000Z')).toBe(0);
+		expect(attemptOf([], '2026-10-18T22:00:00.000Z')).toBe(0);
+	});
+
+	it('fails on an unreadable timestamp', () => {
+		expect(() => attemptOf(starts, 'later')).toThrow(/'later'/);
+		expect(() => attemptOf(['soon'], '2026-10-18T22:00:00.000Z')).toThrow(/'soon'/);
 	});
 });

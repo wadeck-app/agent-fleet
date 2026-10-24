@@ -10,7 +10,7 @@ Components: `src/dsl-components` makes this a dslLib module; `flow:MarkdownText`
 
 Slots other modules fill: `flow:execution-links` / `flow:execution-actions` (detail header, before / after Logs), `flow:execution-row-links` / `flow:execution-row-actions` (row panel, before / after Logs), `flow:executions-actions` (list page). See `FlowModuleContract` in flow-core.
 
-Details: [.docs/pages-and-variants.md](.docs/pages-and-variants.md) covers the executions page, execution logs, times and columns, and the dashboard widget (no A/B experiment is left: every view has one design).
+Details: [.docs/pages-and-variants.md](.docs/pages-and-variants.md) covers the executions page, execution logs, times and columns, and the dashboard widget (the logs page is the only view with A/B experiments, `flow-logs-*`, see "Log view experiments" there).
 
 Served text (run output, errors, log lines) is ANSI-stripped only: no secret detection, what is stored is what is served. Declared secrets (`type: password` inputs) are masked by the daemon at write time; records written before that, and undeclared secrets, may contain secrets. Grep recipe: [.docs/served-text.md](.docs/served-text.md).
 

@@ -3,12 +3,14 @@ import { createElement } from 'react';
 
 import type { ComponentRegistryEntry } from '@wadeck-app/dsl-renderer';
 
+import { LogStream } from './LogStream.js';
+import { LOG_STREAM_KEYS, readLogStreamProps } from './LogStreamProps.js';
 import { MarkdownText } from './MarkdownText.js';
 import { MARKDOWN_TEXT_KEYS, readMarkdownTextProps } from './MarkdownTextProps.js';
 import { RunList } from './RunList.js';
 import { RUN_LIST_KEYS, readRunListProps } from './RunListProps.js';
 
-// Registered by app-core as `flow:MarkdownText` and `flow:RunList`.
+// Registered by app-core as `flow:MarkdownText`, `flow:RunList` and `flow:LogStream`.
 const entries: ComponentRegistryEntry[] = [
 	{
 		name: 'MarkdownText',
@@ -16,6 +18,13 @@ const entries: ComponentRegistryEntry[] = [
 		tags: ['flow', 'markdown', 'text'],
 		knownKeys: [...MARKDOWN_TEXT_KEYS],
 		render: ({ node, ctx }) => createElement(MarkdownText, readMarkdownTextProps(node, ctx)),
+	},
+	{
+		name: 'LogStream',
+		category: 'composite',
+		tags: ['flow', 'logs', 'list'],
+		knownKeys: [...LOG_STREAM_KEYS],
+		render: ({ node, ctx }) => createElement(LogStream, readLogStreamProps(node, ctx)),
 	},
 	{
 		name: 'RunList',

@@ -59,22 +59,44 @@ sections:
 
     - { $type: Badge, $if: $sources.logs.hasNotice, label: $sources.logs.notice, variant: warning, tone: subtle }
 
-    - $type: DataTable
-      rows: $sources.logs.entries
-      emptyMessage: $sources.logs.notice
-      expansionCondition: expandable
-      expansion:
-          $type: flow:MarkdownText
-          text: $ctx.row.markdown
-          maxHeight: 30rem
-      columns:
-          - { key: 'timestamp', label: 'Time', format: time, nowrap: true }
-          - key: level
-            label: Level
-            nowrap: true
-            badge: { debug: default, info: info, warning: warning, error: danger }
-          - { key: 'stepId', label: 'Step', truncate: true, mono: true }
-          - { key: 'preview', label: 'Message', mono: true }
+    # The lines. Design experiment flow-logs-design: `stream` (initial) is flow:LogStream, `table` the DataTable this page
+    # had before. The stream owns five more experiments (flow-logs-identity, -grouping, -navigation, -time, -density), declared
+    # in code with useAbTest, so they show in the dock only while `stream` is chosen.
+    - $type: AbTest
+      id: flow-logs-design
+      label: Log view
+      initial: stream
+      variants:
+          stream:
+              label: Stream
+              hint: 'Step identity, execution order, optional sections per step or attempt, step index and relative times. Five more dock rows tune it.'
+              view:
+                  $type: flow:LogStream
+                  $if: $sources.logs.executionId
+                  entries: $sources.logs.entries
+                  steps: $sources.logs.steps
+                  runDurationMs: $sources.logs.runDurationMs
+                  emptyMessage: $sources.logs.notice
+          table:
+              label: Table
+              hint: 'The previous view: one DataTable row per line (time, level, step id, message), no order, no grouping.'
+              view:
+                  $type: DataTable
+                  rows: $sources.logs.entries
+                  emptyMessage: $sources.logs.notice
+                  expansionCondition: expandable
+                  expansion:
+                      $type: flow:MarkdownText
+                      text: $ctx.row.markdown
+                      maxHeight: 30rem
+                  columns:
+                      - { key: 'timestamp', label: 'Time', format: time, nowrap: true }
+                      - key: level
+                        label: Level
+                        nowrap: true
+                        badge: { debug: default, info: info, warning: warning, error: danger }
+                      - { key: 'stepId', label: 'Step', truncate: true, mono: true }
+                      - { key: 'preview', label: 'Message', mono: true }
 
     - $type: HorizontalStack
       justify: justify-between

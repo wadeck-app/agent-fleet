@@ -54,9 +54,42 @@ export interface ExecutionLogs {
 	/** Lines of those files that mention the execution but could not be parsed, so the list may be incomplete by this many. */
 	unreadableLines: number;
 	logsDir: string;
+	/** Per step, the ISO timestamps of its `Step <id> started executing` run events (one per attempt), in file order; read from ALL lines of the run, whatever the filters. */
+	attemptStarts: Record<string, string[]>;
+	/** Per step, the lines matching the level and text filters but NOT the step filter, so a UI can show a count for every step. */
+	stepLineCounts: Record<string, number>;
 }
 
 const PREFIX_RE = /^\[([^|\]]+)\|(.*)\]$/;
+const RUN_EVENTS_STEP_ID = '__execution';
+const ATTEMPT_START_RE = /^Step (.+) started executing$/;
+
+/**
+ * The attempt a line belongs to: how many of the step's start events happened at or before `timestamp` (0 before the first).
+ * Throws when a timestamp cannot be read, as the numbers would be wrong silently.
+ */
+export function attemptOf(starts: string[] | undefined, timestamp: string): number {
+	if (starts === undefined || starts.length === 0) {
+		return 0;
+	}
+	const at = new Date(timestamp).getTime();
+	if (Number.isNaN(at)) {
+		throw new Error(`Cannot compute the attempt of a log line: timestamp '${timestamp}' is not a valid date.`);
+	}
+	let count = 0;
+	for (const start of starts) {
+		const startTime = new Date(start).getTime();
+		if (Number.isNaN(startTime)) {
+			throw new Error(
+				`Cannot compute the attempt of a log line: start timestamp '${start}' is not a valid date.`
+			);
+		}
+		if (startTime <= at) {
+			count += 1;
+		}
+	}
+	return count;
+}
 
 function assertInteger(name: string, value: number, min: number): void {
 	if (!Number.isInteger(value) || value < min) {
@@ -162,6 +195,8 @@ export function readExecutionLogs(
 	const needle = query.search?.toLowerCase();
 	const stepIds = new Set<string>();
 	const matching: ExecutionLogEntry[] = [];
+	const attemptStarts: Record<string, string[]> = {};
+	const stepLineCounts: Record<string, number> = {};
 	let unreadableLines = 0;
 	for (const day of daysRead) {
 		const content = fs.readFileSync(path.join(logsDir, `${day}.ndjson`), 'utf8');
@@ -176,12 +211,20 @@ export function readExecutionLogs(
 			}
 			stepIds.add(parsed.stepId);
 			const { entry } = parsed;
+			if (entry.stepId === RUN_EVENTS_STEP_ID) {
+				const started = ATTEMPT_START_RE.exec(entry.message);
+				if (started !== null) {
+					(attemptStarts[started[1]!] ??= []).push(entry.timestamp);
+				}
+			}
 			if (
-				(query.stepId === undefined || entry.stepId === query.stepId) &&
 				(query.level === undefined || entry.level === query.level) &&
 				(needle === undefined || entry.message.toLowerCase().includes(needle))
 			) {
-				matching.push(entry);
+				stepLineCounts[entry.stepId] = (stepLineCounts[entry.stepId] ?? 0) + 1;
+				if (query.stepId === undefined || entry.stepId === query.stepId) {
+					matching.push(entry);
+				}
 			}
 		}
 	}
@@ -195,6 +238,8 @@ export function readExecutionLogs(
 		daysRead,
 		unreadableLines,
 		logsDir,
+		attemptStarts,
+		stepLineCounts,
 	};
 }
 

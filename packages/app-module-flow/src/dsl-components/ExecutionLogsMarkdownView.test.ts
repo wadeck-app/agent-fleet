@@ -9,7 +9,9 @@ import entries from './index.js';
 const view = load(
 	readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../dsl-views/execution-logs-page.yaml'), 'utf8')
 ) as { sections: Record<string, unknown>[] };
-const table = view.sections.find(section => section['$type'] === 'DataTable')!;
+// The table is the `table` option of the flow-logs-design experiment (the stream is the other one).
+const design = view.sections.find(section => section['id'] === 'flow-logs-design')!;
+const table = (design['variants'] as Record<string, { view: Record<string, unknown> }>)['table']!.view;
 
 describe('execution logs page: messages rendered as markdown', () => {
 	it('opens a row panel with the markdown the route serves, only for rows the route marks expandable', () => {
