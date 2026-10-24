@@ -6,7 +6,6 @@ import {
 	type StepRetryPolicy,
 	type StepView,
 	executionLogsPath,
-	executionPagePath,
 	outcomeLabel,
 	requireTimestamp,
 	retryLabel,
@@ -29,7 +28,7 @@ const STATUS_VARIANTS: Record<ExecutionStatus, BadgeVariant> = {
 
 /**
  * A history row plus the short ASCII status the table shows as it is ("ok, recovered") and the links of the run
- * (detailHref and logsHref: a DSL string cannot be concatenated, so the paths are built here from flow-core's contract). The flow name and the
+ * (logsHref: a DSL string cannot be concatenated, so the path is built here from flow-core's contract). The flow name and the
  * id are sent whole: the table column truncates with an ellipsis when the viewport needs it.
  * Timestamps stay ISO 8601 (startedAt): the shell formats them (DataTable `format: datetime`), like everywhere in app-core.
  */
@@ -38,7 +37,6 @@ export function toExecutionRow(summary: ExecutionSummary) {
 		...summary,
 		startedAt: requireTimestamp(summary.startedAt),
 		statusLabel: outcomeLabel(statusTag(summary.status), { recovered: summary.lastErrorRecovered }),
-		detailHref: executionPagePath(summary.executionId),
 		logsHref: executionLogsPath(summary.executionId),
 	};
 }

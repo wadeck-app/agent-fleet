@@ -7,6 +7,7 @@ import {
 	LOG_LEVELS,
 	RETRY_BADGE_VARIANTS,
 	buildRunDigest,
+	executionPagePath,
 	statusTag,
 } from 'flow-core';
 import { FlowConfigFixture, callRoute, collectRoutes, makeExec } from 'flow-core/testing';
@@ -187,12 +188,12 @@ describe('action buttons next to an execution', () => {
 			expect(tables.length, String(variant)).toBeGreaterThan(0);
 			for (const table of tables) {
 				expect(collectNodes(table['expansion'], 'Link'), String(variant)).toEqual([]);
-				// The own buttons: Details (the rows are not clickable) and Logs, both in the contract style.
+				// The own button: Logs, in the contract style (the detail link is an icon column of the table).
 				const own = collectNodes(table['expansion'], 'ButtonLink');
 				expect(
 					own.map(link => link['label']),
 					String(variant)
-				).toEqual(['Details', 'Logs']);
+				).toEqual(['Logs']);
 				for (const link of own) expect(link, String(variant)).toMatchObject(FLOW_ACTION_BUTTON_STYLE);
 			}
 		}
@@ -283,23 +284,34 @@ describe('executions table row panel (links of the run, and the per-row extensio
 			expect(
 				collectNodes(panel, 'ButtonLink').map(link => [link['label'], link['to']]),
 				String(variant)
-			).toEqual([
-				['Details', '$ctx.row.detailHref'],
-				['Logs', '$ctx.row.logsHref'],
-			]);
-			// Left to right: Details, the links slot (before Logs), Logs, the actions slot (after Logs).
+			).toEqual([['Logs', '$ctx.row.logsHref']]);
+			// Left to right: the links slot (before Logs), Logs, the actions slot (after Logs).
 			const order = ((panel as Record<string, unknown>)['items'] as Record<string, unknown>[]).map(item =>
 				item['$type'] === 'ExtensionSlot' ? item['items'] : item['label']
 			);
-			expect(order, String(variant)).toEqual(['Details', '$sources.rowLinks', 'Logs', '$sources.rowActions']);
+			expect(order, String(variant)).toEqual(['$sources.rowLinks', 'Logs', '$sources.rowActions']);
 		}
 	});
 
-	it('does not make the rows of the executions table clickable: the panel holds the link to the detail', () => {
+	it('does not make the rows of the executions table clickable: an icon link column right after the chevron opens the detail', () => {
 		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
 			const table = executionsTableOf(document);
 			expect(table, String(variant)).not.toHaveProperty('navigateTo');
 			expect(table, String(variant)).not.toHaveProperty('onRowClick');
+			const links = (table['columns'] as Record<string, unknown>[]).filter(column => column['type'] === 'link');
+			expect(links, String(variant)).toHaveLength(1);
+			expect(links[0], String(variant)).toMatchObject({
+				position: 'start',
+				icon: 'eye',
+				label: 'Open details',
+			});
+			// The renderer fills {executionId} from the row, percent-encoded like the contract's page path.
+			const template = String(links[0]!['to']);
+			for (const sample of ['abc-123', 'a b/c']) {
+				expect(template.replace('{executionId}', encodeURIComponent(sample)), String(variant)).toBe(
+					executionPagePath(sample)
+				);
+			}
 		}
 	});
 
@@ -417,11 +429,31 @@ describe('DataTable columns', () => {
 	];
 	const BADGE_VARIANTS = ['default', 'primary', 'success', 'warning', 'danger', 'info'];
 
-	function columnsOf(file: string): Record<string, unknown>[] {
+	// Keys dsl-ui 2026.10.24-153 accepts on a `type: link` column (icon-only router link, one per row).
+	const LINK_COLUMN_KEYS = ['type', 'to', 'label', 'icon', 'position', 'external', 'width'];
+
+	function allColumnsOf(file: string): Record<string, unknown>[] {
 		return collectNodes(parseView(file).document, 'DataTable').flatMap(
 			table => table['columns'] as Record<string, unknown>[]
 		);
 	}
+
+	function columnsOf(file: string): Record<string, unknown>[] {
+		return allColumnsOf(file).filter(column => column['type'] !== 'link');
+	}
+
+	it.each(viewFiles)(
+		'%s sets only keys the dsl-ui link column reads, with a label (its tooltip and aria-label)',
+		file => {
+			for (const column of allColumnsOf(file).filter(candidate => candidate['type'] === 'link')) {
+				for (const name of Object.keys(column)) {
+					expect(LINK_COLUMN_KEYS, `${file}: column ${JSON.stringify(column)}`).toContain(name);
+				}
+				expect(column, `${file}: column ${JSON.stringify(column)}`).toHaveProperty('label');
+				expect(column, `${file}: column ${JSON.stringify(column)}`).toHaveProperty('to');
+			}
+		}
+	);
 
 	it.each(viewFiles)('%s sets only keys the dsl-ui DataTable reads (any other is a compile error)', file => {
 		for (const column of columnsOf(file)) {
@@ -512,7 +544,9 @@ describe('executions page layout', () => {
 
 	it('has five columns, the full flow name truncated by the column (ellipsis and tooltip), the version on one line and the run id kept visible', () => {
 		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
-			const columns = executionsTableOf(document)['columns'] as Record<string, unknown>[];
+			const columns = (executionsTableOf(document)['columns'] as Record<string, unknown>[]).filter(
+				column => column['type'] !== 'link'
+			);
 			expect(
 				columns.map(column => column['key']),
 				String(variant)
@@ -782,9 +816,7 @@ describe('links read from a row or from the detail resolve to a page of the mani
 				}
 			}
 		}
-		expect(new Set(resolved)).toEqual(
-			new Set(['$ctx.row.detailHref', '$ctx.row.logsHref', '$sources.execution.logsHref'])
-		);
+		expect(new Set(resolved)).toEqual(new Set(['$ctx.row.logsHref', '$sources.execution.logsHref']));
 	});
 });
 

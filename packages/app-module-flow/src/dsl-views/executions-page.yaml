@@ -13,10 +13,11 @@
 # is a bare word. The error of a run is on its detail page: a cell cannot hold a second line.
 # The empty message comes from the route (emptyMessage): a page past the end, a filter without match and an install
 # where nothing ran need different words.
-# The rows of the executions table are NOT clickable (no navigateTo): the chevron of a row opens a panel (DataTable
-# `expansion`) with the links of the run, because a DataTable cell cannot hold a link and a row action can only call an
-# $actions handler (an HTTP request), not navigate. The panel reads: Details (this module, the detail page), then the
-# slot "flow:execution-row-links" (flow-chart adds "Flow definition"), Logs (this module), then the slot
+# The rows of the executions table are NOT clickable (no navigateTo). The first column is an icon-only router link
+# (`type: link`, `position: start`: right after the expansion chevron, dsl-ui >= 2026.10.24-153) to the detail page; its
+# `label` is the aria-label and tooltip, `{executionId}` is filled from the row (percent-encoded). views.test.ts pins that
+# the template equals flow-core's executionPagePath. The chevron of a row opens a panel (DataTable `expansion`) that
+# reads: the slot "flow:execution-row-links" (flow-chart adds "Flow definition"), Logs (this module), then the slot
 # "flow:execution-row-actions" (flow-chart adds "Flow chart"). The panel gets the row as $ctx.row (whole-string
 # expressions only, so a contribution reads $ctx.row.executionId and the like).
 # Slot "flow:executions-actions" (manifest expose.slots): other modules add page-level buttons next to the filters.
@@ -44,7 +45,7 @@ sections:
       items:
           - $type: PageHeader
             title: Flow executions
-            subtitle: 'Search a flow or pick a status; click a flow below to see only its executions, open a row (chevron) for its details, logs and charts'
+            subtitle: 'Search a flow or pick a status; click a flow below to see only its executions, open a run with the icon at the start of its row, or its chevron for logs and charts'
 
           - $type: HorizontalStack
             gap: gap-3
@@ -84,7 +85,6 @@ sections:
                 gap: gap-2
                 align: items-center
                 items:
-                    - { $type: ButtonLink, label: Details, to: $ctx.row.detailHref, variant: secondary, size: sm }
                     # Each slot renders nothing while no module contributes.
                     - $type: ExtensionSlot
                       items: $sources.rowLinks
@@ -92,6 +92,13 @@ sections:
                     - $type: ExtensionSlot
                       items: $sources.rowActions
             columns:
+                - {
+                      type: link,
+                      to: '/modules/flow/executions/{executionId}',
+                      icon: eye,
+                      label: Open details,
+                      position: start,
+                  }
                 - { key: 'startedAt', label: 'When', format: datetime, nowrap: true }
                 - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
                 - { key: 'versionLabel', label: 'Version', nowrap: true, mono: true }

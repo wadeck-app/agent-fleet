@@ -1,6 +1,6 @@
 # Action buttons next to an execution
 
-One look everywhere: a small secondary navigating button (`ButtonLink`, `variant: secondary`, `size: sm`). Detail header, executions page, expanded row panel and chart header all use it. Order next to an execution: [Flow definition] [Logs] [Flow chart] (and Details first in the row panel).
+One look everywhere: a small secondary navigating button (`ButtonLink`, `variant: secondary`, `size: sm`). Detail header, executions page, expanded row panel and chart header all use it. Order next to an execution: [Flow definition] [Logs] [Flow chart].
 
 | Rule                           | Defined in                                                                                 | Enforced by                                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |

@@ -43,13 +43,14 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 	});
 
 	// app-core checks these ranges against the build-info.json of its SERVER and refuses the whole module when it is
-	// older ("built for ... but the shell provides"). Raise them only once that server build is newer: 2026.10.23-136
+	// older ("built for ... but the shell provides"). Raise them only once that server build is newer: 2026.10.24-153
 	// is what the user's server served when this component was added.
 	it.each(['@wadeck-app/dsl-ui', '@wadeck-app/dsl-renderer'])(
 		'%s accepts the server build and refuses older shells',
 		name => {
 			const range = manifest.dslLib?.shared?.[name] ?? '';
-			expect(satisfies('2026.10.23-136-d5f44a0f', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.10.24-153-308eef77', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.10.23-136-d5f44a0f', range, { includePrerelease: true })).toBe(false);
 			expect(satisfies('2026.10.18-101-b2ef217e', range, { includePrerelease: true })).toBe(false);
 		}
 	);

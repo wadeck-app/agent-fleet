@@ -350,8 +350,9 @@ ${'word '.repeat(40)}`,
 			executionId: 'bad1',
 			statusLabel: 'FAILED',
 			logsHref: '/modules/flow/executions/bad1/logs',
-			detailHref: '/modules/flow/executions/bad1',
 		});
+		// The detail link is a table column built from the row's executionId (executions-page.yaml): no path is sent for it.
+		expect(bad).not.toHaveProperty('detailHref');
 		expect(bad).not.toHaveProperty('runLabel');
 		// The shell formats the ISO startedAt itself (DataTable format: datetime): no server-side label.
 		expect(bad).not.toHaveProperty('startedLabel');
