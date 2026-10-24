@@ -50,7 +50,7 @@ export interface ShutdownMessage extends O2WBaseMessage {
 
 export interface AckMessage extends O2WBaseMessage {
 	type: O2WMessageType.ACK;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 export interface ErrorMessage extends O2WBaseMessage {
@@ -67,7 +67,7 @@ export interface RequestFlowDefinitionMessage extends O2WBaseMessage {
 export interface SaveFlowDefinitionMessage extends O2WBaseMessage {
 	type: O2WMessageType.SAVE_FLOW_DEFINITION;
 	flowId: string;
-	flowDefinition: any; // Full flow definition with steps
+	flowDefinition: unknown; // Full flow definition with steps
 	requestId: string; // For matching request with response
 }
 
@@ -76,7 +76,7 @@ export interface InterventionResponseMessage extends O2WBaseMessage {
 	taskId: string;
 	interventionId: string;
 	response: {
-		value: any;
+		value: unknown;
 		comment?: string;
 		answeredAt: string;
 		answeredBy: string;

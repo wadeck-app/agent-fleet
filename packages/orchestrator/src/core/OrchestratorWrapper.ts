@@ -17,15 +17,28 @@
  *
  * ===========================================================================================
  */
+import type { FlowDefinition } from 'flow-engine/types';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Orchestrator } from 'orchestrator/core/Orchestrator';
 import { createLogger } from 'shared-common/logger';
 import { StateEvent } from 'shared-orch-worker/StateManager';
-import type { OrchestratorStats, Task, WorkerInfo } from 'shared-orch-worker/domain-types';
+import type {
+	Intervention,
+	InterventionResponse,
+	OrchestratorStats,
+	Task,
+	WorkerInfo,
+} from 'shared-orch-worker/domain-types';
 import type { O2BEventData, O2BEventType } from 'shared-orch-worker/orchestrator-events';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
+import {
+	type W2OFlowDefinitionResponseMessage,
+	type W2OFlowSavedResponseMessage,
+	type W2OMessage,
+	W2OMessageType,
+} from 'shared-orch-worker/worker-messages';
 
 const log = createLogger('OrchestratorWrapper');
 
@@ -64,7 +77,7 @@ export interface WorkerFilters {
  * Library Mode Adapter - Direct access to orchestrator
  */
 export class OrchestratorWrapper {
-	private flowRequestPromises: Map<string, { resolve: (data: any) => void; reject: (error: Error) => void }> =
+	private flowRequestPromises: Map<string, { resolve: (data: unknown) => void; reject: (error: Error) => void }> =
 		new Map();
 
 	constructor(private readonly orchestrator: Orchestrator) {
@@ -80,22 +93,23 @@ export class OrchestratorWrapper {
 	 */
 	private setupFlowResponseHandlers(): void {
 		const wsServer = this.orchestrator.getWsServer();
-		if (!wsServer) return;
+		if (!wsServer) {
+			return;
+		}
 
-		const connectionManager = wsServer.getConnectionManager();
 		const stateManager = this.orchestrator.getTaskManager().getStateManager();
 
 		// Listen to state events for flow responses
-		stateManager.on('worker.message', (data: any) => {
-			if (data.type === 'w2o:flow:definition_response') {
+		stateManager.on('worker.message', (data: W2OMessage) => {
+			if (data.type === W2OMessageType.FLOW_DEFINITION_RESPONSE) {
 				this.handleFlowDefinitionResponse(data);
-			} else if (data.type === 'w2o:flow:saved_response') {
+			} else if (data.type === W2OMessageType.FLOW_SAVED_RESPONSE) {
 				this.handleFlowSavedResponse(data);
 			}
 		});
 	}
 
-	private handleFlowDefinitionResponse(message: any): void {
+	private handleFlowDefinitionResponse(message: W2OFlowDefinitionResponseMessage): void {
 		const { requestId, flowDefinition, error } = message;
 		const pending = this.flowRequestPromises.get(requestId);
 
@@ -109,7 +123,7 @@ export class OrchestratorWrapper {
 		}
 	}
 
-	private handleFlowSavedResponse(message: any): void {
+	private handleFlowSavedResponse(message: W2OFlowSavedResponseMessage): void {
 		const { requestId, success, error } = message;
 		const pending = this.flowRequestPromises.get(requestId);
 
@@ -218,12 +232,8 @@ export class OrchestratorWrapper {
 	 */
 	async respondToIntervention(
 		interventionId: string,
-		response: {
-			value: any;
-			answeredBy: string;
-			comment?: string;
-		}
-	): Promise<any> {
+		response: Omit<InterventionResponse, 'answeredAt'>
+	): Promise<Intervention> {
 		const interventionManager = this.orchestrator.getInterventionManager();
 		if (!interventionManager) {
 			throw new Error('InterventionManager not available');
@@ -412,7 +422,7 @@ export class OrchestratorWrapper {
 	/**
 	 * Request full flow definition from a worker
 	 */
-	async requestFlowDefinition(projectId: string, flowId: string): Promise<any> {
+	async requestFlowDefinition(projectId: string, flowId: string): Promise<FlowDefinition> {
 		const wsServer = this.orchestrator.getWsServer();
 		if (!wsServer) {
 			throw new Error('WebSocket server not available');
@@ -437,8 +447,9 @@ export class OrchestratorWrapper {
 		const requestId = `flow-req-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
 		// Create promise for response
-		const responsePromise = new Promise<any>((resolve, reject) => {
-			this.flowRequestPromises.set(requestId, { resolve, reject });
+		const responsePromise = new Promise<FlowDefinition>((resolve, reject) => {
+			// The definition is produced by a flow-engine worker; the wire type (shared-orch-worker) cannot name it
+			this.flowRequestPromises.set(requestId, { resolve: data => resolve(data as FlowDefinition), reject });
 
 			// Timeout after 10 seconds
 			setTimeout(() => {
@@ -467,7 +478,7 @@ export class OrchestratorWrapper {
 	/**
 	 * Request worker to save flow definition
 	 */
-	async saveFlowDefinition(projectId: string, flowId: string, flowDefinition: any): Promise<void> {
+	async saveFlowDefinition(projectId: string, flowId: string, flowDefinition: unknown): Promise<void> {
 		const wsServer = this.orchestrator.getWsServer();
 		if (!wsServer) {
 			throw new Error('WebSocket server not available');
@@ -493,7 +504,7 @@ export class OrchestratorWrapper {
 
 		// Create promise for response
 		const responsePromise = new Promise<void>((resolve, reject) => {
-			this.flowRequestPromises.set(requestId, { resolve, reject });
+			this.flowRequestPromises.set(requestId, { resolve: () => resolve(), reject });
 
 			// Timeout after 10 seconds
 			setTimeout(() => {

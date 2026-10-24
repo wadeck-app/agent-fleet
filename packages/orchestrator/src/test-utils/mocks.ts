@@ -89,28 +89,36 @@ export class MockWebSocket {
 	constructor(public url?: string) {}
 
 	// Simulate receiving a message
-	simulateMessage(data: any): void {
+	simulateMessage(data: unknown): void {
 		const event = { data: typeof data === 'string' ? data : JSON.stringify(data) };
-		const handler = this.on.mock.calls.find((call: any) => call[0] === 'message')?.[1];
-		if (handler) handler(event);
+		const handler = this.on.mock.calls.find((call: unknown[]) => call[0] === 'message')?.[1];
+		if (handler) {
+			handler(event);
+		}
 	}
 
 	// Simulate connection
 	simulateOpen(): void {
-		const handler = this.on.mock.calls.find((call: any) => call[0] === 'open')?.[1];
-		if (handler) handler();
+		const handler = this.on.mock.calls.find((call: unknown[]) => call[0] === 'open')?.[1];
+		if (handler) {
+			handler();
+		}
 	}
 
 	// Simulate close
 	simulateClose(): void {
-		const handler = this.on.mock.calls.find((call: any) => call[0] === 'close')?.[1];
-		if (handler) handler();
+		const handler = this.on.mock.calls.find((call: unknown[]) => call[0] === 'close')?.[1];
+		if (handler) {
+			handler();
+		}
 	}
 
 	// Simulate error
 	simulateError(error: Error): void {
-		const handler = this.on.mock.calls.find((call: any) => call[0] === 'error')?.[1];
-		if (handler) handler(error);
+		const handler = this.on.mock.calls.find((call: unknown[]) => call[0] === 'error')?.[1];
+		if (handler) {
+			handler(error);
+		}
 	}
 }
 

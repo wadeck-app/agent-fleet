@@ -9,7 +9,7 @@
  *   code: string;            // Machine-readable code (e.g., "RESOURCE_NOT_FOUND")
  *   timestamp: string;       // ISO 8601 timestamp
  *   statusCode: number;      // HTTP status code
- *   details?: any;           // Optional additional context
+ *   details?: object;           // Optional additional context
  * }
  *
  * ===========================================================================================
@@ -24,7 +24,7 @@ export class HttpException extends Error {
 		public readonly statusCode: number,
 		message: string,
 		public readonly code: string,
-		public readonly details?: any
+		public readonly details?: object
 	) {
 		super(message);
 		this.name = this.constructor.name;
@@ -56,7 +56,7 @@ export interface ErrorResponse {
 	code: string;
 	statusCode: number;
 	timestamp: string;
-	details?: any;
+	details?: object;
 }
 
 /**
@@ -115,7 +115,7 @@ export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
  * Client sent invalid data
  */
 export class BadRequestException extends HttpException {
-	constructor(message: string, code: ErrorCode = ERROR_CODES.BAD_REQUEST, details?: any) {
+	constructor(message: string, code: ErrorCode = ERROR_CODES.BAD_REQUEST, details?: object) {
 		super(400, message, code, details);
 	}
 }
@@ -125,7 +125,7 @@ export class BadRequestException extends HttpException {
  * Authentication required or failed
  */
 export class UnauthorizedException extends HttpException {
-	constructor(message = 'Unauthorized', code: ErrorCode = ERROR_CODES.UNAUTHORIZED, details?: any) {
+	constructor(message = 'Unauthorized', code: ErrorCode = ERROR_CODES.UNAUTHORIZED, details?: object) {
 		super(401, message, code, details);
 	}
 }
@@ -135,7 +135,7 @@ export class UnauthorizedException extends HttpException {
  * Client doesn't have permission
  */
 export class ForbiddenException extends HttpException {
-	constructor(message = 'Forbidden', code: ErrorCode = ERROR_CODES.FORBIDDEN, details?: any) {
+	constructor(message = 'Forbidden', code: ErrorCode = ERROR_CODES.FORBIDDEN, details?: object) {
 		super(403, message, code, details);
 	}
 }
@@ -145,7 +145,7 @@ export class ForbiddenException extends HttpException {
  * Resource doesn't exist
  */
 export class NotFoundException extends HttpException {
-	constructor(message: string, code: ErrorCode = ERROR_CODES.RESOURCE_NOT_FOUND, details?: any) {
+	constructor(message: string, code: ErrorCode = ERROR_CODES.RESOURCE_NOT_FOUND, details?: object) {
 		super(404, message, code, details);
 	}
 }
@@ -155,7 +155,7 @@ export class NotFoundException extends HttpException {
  * Resource conflict (e.g., version mismatch, duplicate)
  */
 export class ConflictException extends HttpException {
-	constructor(message: string, code: ErrorCode = ERROR_CODES.RESOURCE_CONFLICT, details?: any) {
+	constructor(message: string, code: ErrorCode = ERROR_CODES.RESOURCE_CONFLICT, details?: object) {
 		super(409, message, code, details);
 	}
 }
@@ -165,7 +165,7 @@ export class ConflictException extends HttpException {
  * Validation failed (semantic errors)
  */
 export class UnprocessableEntityException extends HttpException {
-	constructor(message: string, code: ErrorCode = ERROR_CODES.UNPROCESSABLE_ENTITY, details?: any) {
+	constructor(message: string, code: ErrorCode = ERROR_CODES.UNPROCESSABLE_ENTITY, details?: object) {
 		super(422, message, code, details);
 	}
 }
@@ -175,7 +175,11 @@ export class UnprocessableEntityException extends HttpException {
  * Unexpected server error
  */
 export class InternalServerErrorException extends HttpException {
-	constructor(message = 'Internal Server Error', code: ErrorCode = ERROR_CODES.INTERNAL_SERVER_ERROR, details?: any) {
+	constructor(
+		message = 'Internal Server Error',
+		code: ErrorCode = ERROR_CODES.INTERNAL_SERVER_ERROR,
+		details?: object
+	) {
 		super(500, message, code, details);
 	}
 }

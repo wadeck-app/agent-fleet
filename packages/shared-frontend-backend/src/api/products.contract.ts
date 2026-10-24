@@ -19,7 +19,7 @@ import { BaseEntitySchema, IdParamSchema } from '../common/base-entity';
  */
 import { defineRoutes } from '../route-builder';
 import { assertValidRoutes } from '../utils/validate-routes';
-import { optionalSanitizedString, sanitizedString, sanitizedText, urlSchema } from '../validation/sanitization';
+import { sanitizedString, sanitizedText, urlSchema } from '../validation/sanitization';
 
 /**
  * ===========================================================================================

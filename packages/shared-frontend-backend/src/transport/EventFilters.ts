@@ -259,7 +259,7 @@ type AnyEventFilter = TaskFilter | WorkerFilter | WorkspaceFilter | Intervention
 export function matchesFilter<T extends B2FEvent>(
 	event: T,
 	filter: B2FEventFilters[T] | undefined,
-	payload: any
+	payload: Readonly<Record<string, unknown>>
 ): boolean {
 	// No filter = match all
 	if (!filter || filter === undefined) {

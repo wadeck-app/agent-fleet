@@ -2,7 +2,7 @@
 import type { ProtocolMessage, createMessageInternal_Timestamp } from 'shared-common/protocol';
 import { createMessageInternal } from 'shared-common/protocol';
 
-import type { FlowMetadata, TaskStatus, TicketStatus } from './domain-types';
+import type { FlowMetadata, InterventionTimeout, TaskStatus, TicketStatus } from './domain-types';
 
 export enum W2OMessageType {
 	// W2O Messages (Worker -> Orchestrator)
@@ -79,7 +79,7 @@ export interface W2OTaskCompletedMessage extends W2OBaseMessage {
 	workerId: string;
 	taskId: string;
 	newStatus?: TaskStatus;
-	result?: any;
+	result?: unknown;
 	ticketId?: string;
 	ticketStatus?: TicketStatus;
 }
@@ -98,7 +98,7 @@ export interface W2OTaskTraceUpdateMessage extends W2OBaseMessage {
 	type: W2OMessageType.TASK_TRACE_UPDATE;
 	workerId: string;
 	taskId: string;
-	trace: any; // FlowTrace from flow-engine
+	trace: unknown; // FlowTrace from flow-engine
 }
 
 export interface W2OTaskQuestionMessage extends W2OBaseMessage {
@@ -121,7 +121,7 @@ export interface W2OFlowStepCompletedMessage extends W2OBaseMessage {
 	workerId: string;
 	taskId: string;
 	stepId: string;
-	outputs?: Record<string, any>;
+	outputs?: Record<string, unknown>;
 }
 
 export interface W2OFlowStepFailedMessage extends W2OBaseMessage {
@@ -164,7 +164,7 @@ export interface W2OFlowDefinitionResponseMessage extends W2OBaseMessage {
 	workerId: string;
 	requestId: string;
 	flowId: string;
-	flowDefinition: any | null; // Full flow definition with steps, or null if not found
+	flowDefinition: unknown; // Full flow definition with steps, or null if not found
 	error?: string;
 }
 
@@ -186,12 +186,9 @@ export interface W2OInterventionRequestedMessage extends W2OBaseMessage {
 	stepId: string;
 	interventionType: 'approval' | 'question' | 'choice';
 	blocking: boolean;
-	config: any; // InterventionConfig from the step
-	timeout?: {
-		minutes: number;
-		onTimeout: 'fail' | 'continue' | 'default';
-		defaultValue?: any;
-	};
+	// InterventionConfig from the step (flow-engine shape, not named by this package)
+	config: unknown;
+	timeout?: InterventionTimeout;
 }
 
 // Deprecated messages (TODO: Remove?)
@@ -206,12 +203,12 @@ export interface W2OHookEventMessage extends W2OBaseMessage {
 	type: W2OMessageType.HOOK_EVENT;
 	workerId: string;
 	hookName: string;
-	data: any;
+	data: unknown;
 }
 
 export interface W2OAckMessage extends W2OBaseMessage {
 	type: W2OMessageType.ACK;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 export interface W2OErrorMessage extends W2OBaseMessage {

@@ -1,11 +1,6 @@
 import { z } from 'zod';
 
-import {
-	type BulkDeleteRequest,
-	BulkDeleteRequestSchema,
-	type BulkDeleteResponse,
-	BulkDeleteResponseSchema,
-} from '../common/api-helpers';
+import { BulkDeleteRequestSchema, BulkDeleteResponseSchema } from '../common/api-helpers';
 import { defineRoutes } from '../route-builder';
 
 /**

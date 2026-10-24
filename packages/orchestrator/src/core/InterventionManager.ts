@@ -3,8 +3,8 @@ import { createLogger } from 'shared-common/logger';
 import type {
 	Intervention,
 	InterventionConfig,
+	InterventionResponse,
 	InterventionSource,
-	InterventionStatus,
 	InterventionTimeout,
 	InterventionType,
 } from 'shared-orch-worker/domain-types';
@@ -32,12 +32,7 @@ export class InterventionManager {
 	private sendResponseCallback?: (
 		taskId: string,
 		interventionId: string,
-		response: {
-			value: any;
-			comment?: string;
-			answeredAt: string;
-			answeredBy: string;
-		} | null,
+		response: InterventionResponse | null,
 		timedOut?: boolean,
 		cancelled?: boolean
 	) => boolean;
@@ -54,12 +49,7 @@ export class InterventionManager {
 		callback: (
 			taskId: string,
 			interventionId: string,
-			response: {
-				value: any;
-				comment?: string;
-				answeredAt: string;
-				answeredBy: string;
-			} | null,
+			response: InterventionResponse | null,
 			timedOut?: boolean,
 			cancelled?: boolean
 		) => boolean
@@ -161,11 +151,7 @@ export class InterventionManager {
 	 */
 	async respondToIntervention(
 		interventionId: string,
-		response: {
-			value: any;
-			answeredBy: string;
-			comment?: string;
-		}
+		response: Omit<InterventionResponse, 'answeredAt'>
 	): Promise<Intervention> {
 		const intervention = await this.getIntervention(interventionId);
 		if (!intervention) {

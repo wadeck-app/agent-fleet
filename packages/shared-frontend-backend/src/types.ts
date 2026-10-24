@@ -108,8 +108,13 @@ const ALL_CONTRACTS = [
 	MONITORING_API_ROUTES,
 ] as const;
 
+// A contract as returned by defineRoutes. Only the computed `__baseUrl` marker is common to all of them.
+export interface RoutesWithBaseUrl {
+	__baseUrl: string;
+}
+
 // Merge routes with the same baseUrl
-export const ROUTES_BY_BASE_URL: Record<string, any> = ALL_CONTRACTS.reduce(
+export const ROUTES_BY_BASE_URL: Record<string, RoutesWithBaseUrl> = ALL_CONTRACTS.reduce(
 	(acc, contract) => {
 		const baseUrl = contract.__baseUrl;
 		if (acc[baseUrl]) {
@@ -122,7 +127,7 @@ export const ROUTES_BY_BASE_URL: Record<string, any> = ALL_CONTRACTS.reduce(
 		}
 		return acc;
 	},
-	{} as Record<string, any>
+	{} as Record<string, RoutesWithBaseUrl>
 );
 
 /**
@@ -152,7 +157,7 @@ export type PathsForMethod<M extends HttpMethod, Routes = typeof ALL_API_ROUTES>
 export type RouteParams<M extends HttpMethod, P extends string, Routes = typeof ALL_API_ROUTES> = P extends keyof Routes
 	? M extends keyof Routes[P]
 		? Routes[P][M] extends { params: infer Params }
-			? Params extends { parse: (data: any) => infer T }
+			? Params extends { parse: (data: unknown) => infer T }
 				? T
 				: never
 			: Record<string, never>
@@ -165,7 +170,7 @@ export type RouteParams<M extends HttpMethod, P extends string, Routes = typeof 
 export type RouteQuery<M extends HttpMethod, P extends string, Routes = typeof ALL_API_ROUTES> = P extends keyof Routes
 	? M extends keyof Routes[P]
 		? Routes[P][M] extends { query: infer Query }
-			? Query extends { parse: (data: any) => infer T }
+			? Query extends { parse: (data: unknown) => infer T }
 				? T
 				: never
 			: Record<string, never>
@@ -178,7 +183,7 @@ export type RouteQuery<M extends HttpMethod, P extends string, Routes = typeof A
 export type RouteBody<M extends HttpMethod, P extends string, Routes = typeof ALL_API_ROUTES> = P extends keyof Routes
 	? M extends keyof Routes[P]
 		? Routes[P][M] extends { body: infer Body }
-			? Body extends { parse: (data: any) => infer T }
+			? Body extends { parse: (data: unknown) => infer T }
 				? T
 				: never
 			: Record<string, never>
@@ -195,7 +200,7 @@ export type RouteResponse<
 > = P extends keyof Routes
 	? M extends keyof Routes[P]
 		? Routes[P][M] extends { response: infer Response }
-			? Response extends { parse: (data: any) => infer T }
+			? Response extends { parse: (data: unknown) => infer T }
 				? T
 				: never
 			: never

@@ -10,7 +10,7 @@ export interface TransportError {
 	/** Human-readable error message */
 	message: string;
 	/** Additional error details */
-	details?: Record<string, any>;
+	details?: Record<string, unknown>;
 }
 
 /**
@@ -27,7 +27,7 @@ export interface TransportRequest<TBody = unknown> {
 	/** API path (e.g., '/api/tasks') */
 	path: string;
 	/** Query parameters */
-	query?: Record<string, any>;
+	query?: Record<string, unknown>;
 	/** Path parameters (e.g., { id: '123' } for /api/tasks/:id) */
 	params?: Record<string, string>;
 	/** Request body */

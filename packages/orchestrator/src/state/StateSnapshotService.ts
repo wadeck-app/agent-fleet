@@ -1,5 +1,5 @@
 import type { MetricsData } from 'shared-orch-worker/StateManager';
-import type { Task } from 'shared-orch-worker/domain-types';
+import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 import { TaskStatus } from 'shared-orch-worker/domain-types';
 
 import type { TaskManager } from '../core/TaskManager';
@@ -64,7 +64,7 @@ export class StateSnapshotService {
 	/**
 	 * Calculate metrics from current tasks and workers
 	 */
-	private calculateMetrics(tasks: Task[], workers: any[]): MetricsData {
+	private calculateMetrics(tasks: Task[], workers: WorkerInfo[]): MetricsData {
 		// Task throughput
 		const completed = tasks.filter(t => t.status === TaskStatus.MERGED || t.status === TaskStatus.APPROVED).length;
 

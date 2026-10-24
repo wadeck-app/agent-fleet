@@ -1,7 +1,7 @@
 import express, { type Express, type Request, type RequestHandler, type Response } from 'express';
 import type { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { readFileSync } from 'node:fs';
-import type { Server as HttpServer, IncomingMessage } from 'node:http';
+import type { Server as HttpServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLogger } from 'shared-common/logger';
@@ -289,7 +289,7 @@ export class RestAPI {
 				const flowDiscoveryRegistry = this.wsServer.getConnectionManager().getFlowDiscoveryRegistry();
 				const allProjects = flowDiscoveryRegistry.getAllProjects();
 
-				const flowsByProject: Record<string, any> = {};
+				const flowsByProject: Record<string, Record<string, unknown>> = {};
 				for (const projectId of allProjects) {
 					const projectFlows = flowDiscoveryRegistry.getProjectFlows(projectId);
 					if (projectFlows) {

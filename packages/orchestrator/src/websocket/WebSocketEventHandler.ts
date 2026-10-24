@@ -1,8 +1,9 @@
 import { createLogger } from 'shared-common/logger';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { StateManager } from 'shared-orch-worker/StateManager';
-import { TaskStatus } from 'shared-orch-worker/domain-types';
+import type { InterventionConfig } from 'shared-orch-worker/domain-types';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
+import { countTraceSteps } from 'shared-orch-worker/trace-utils';
 import type {
 	REMOVE_W2OStopRequestedMessage,
 	W2OFlowStepCompletedMessage,
@@ -10,6 +11,7 @@ import type {
 	W2OFlowStepStartedMessage,
 	W2OHookEventMessage,
 	W2OInterventionRequestedMessage,
+	W2OMessage,
 	W2OTaskCompletedMessage,
 	W2OTaskFailedMessage,
 	W2OTaskProgressMessage,
@@ -122,7 +124,7 @@ export class WebSocketEventHandler {
 	 */
 	async handleTaskTraceUpdate(message: W2OTaskTraceUpdateMessage): Promise<void> {
 		const { workerId, taskId, trace } = message;
-		log.debug(`[WS] Worker ${workerId} sent trace update for task ${taskId} (${trace?.steps?.length || 0} steps)`);
+		log.debug(`[WS] Worker ${workerId} sent trace update for task ${taskId} (${countTraceSteps(trace)} steps)`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
 		// Backend handles trace storage
@@ -134,7 +136,7 @@ export class WebSocketEventHandler {
 	 * Delegates to WorkerCoordinator which forwards to backend
 	 */
 	handleTaskQuestion(message: W2OTaskQuestionMessage): void {
-		const { workerId, taskId, question } = message;
+		const { workerId, taskId } = message;
 		log.info(`[WS] Worker ${workerId} has a question on task ${taskId}`);
 
 		// Delegate to WorkerCoordinator which forwards to backend via BackendEventBridge
@@ -223,7 +225,7 @@ export class WebSocketEventHandler {
 	 * Handle HOOK_EVENT message
 	 */
 	handleHookEvent(message: W2OHookEventMessage): void {
-		const { workerId, hookName, data } = message;
+		const { workerId, hookName } = message;
 		log.info(`[WS] Hook event ${hookName} from worker ${workerId}`);
 
 		// TODO: Log to knowledge base if relevant
@@ -261,7 +263,8 @@ export class WebSocketEventHandler {
 					type: 'flow_step',
 					stepId,
 				},
-				config,
+				// The config is produced by a flow-engine worker; the wire type cannot name it
+				config: config as InterventionConfig,
 				blocking,
 				timeout,
 			});
@@ -305,7 +308,7 @@ export class WebSocketEventHandler {
 	 * Handle generic worker messages (for OrchestratorWrapper)
 	 * Emits messages as worker.message events for custom handlers
 	 */
-	handleGenericWorkerMessage(message: any): void {
+	handleGenericWorkerMessage(message: W2OMessage): void {
 		// Emit generic worker message event for OrchestratorWrapper to handle
 		this.stateManager.emit('worker.message', message);
 	}

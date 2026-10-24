@@ -17,7 +17,7 @@ import type {
 	InterventionResponse,
 } from 'flow-engine/executor/InterventionHandler';
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
-import type { FlowMetadata, Workspace } from 'flow-engine/types';
+import type { FlowMetadata, FlowTrace, Workspace } from 'flow-engine/types';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import * as yaml from 'js-yaml';
 import type { ChildProcess } from 'node:child_process';
@@ -32,6 +32,7 @@ import { type Logger, createLogger } from 'shared-common/logger';
 import { parseMessage, serializeMessage } from 'shared-common/protocol';
 // normalizeError(...).message yields the bare message; String(error) would prefix it with "Error: ".
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
+import { isRecord } from 'shared-common/utils/isRecord';
 import { type Task, TaskStatus } from 'shared-orch-worker/domain-types';
 import {
 	type AssignTaskMessage,
@@ -44,10 +45,11 @@ import {
 	type SaveFlowDefinitionMessage,
 	type WorkerWelcomeMessage,
 } from 'shared-orch-worker/orchestrator-messages';
+import { countTraceSteps } from 'shared-orch-worker/trace-utils';
 import { type W2OMessage, W2OMessageType, createW2OMessage } from 'shared-orch-worker/worker-messages';
 import WebSocket from 'ws';
 
-import { ClaudeLifecycleManager } from './ClaudeLifecycleManager';
+import { ClaudeLifecycleManager, type ClaudeMessage } from './ClaudeLifecycleManager';
 
 // import { FlowExecutionMonitor } from './FlowExecutionMonitor';
 
@@ -208,7 +210,7 @@ export class FlowWorker implements Shutdownable {
 				this.logger.info(` Detected project ID from package.json: ${packageJson.name}`);
 				return packageJson.name;
 			}
-		} catch (error) {
+		} catch {
 			// package.json not found or doesn't have name, try git
 		}
 
@@ -219,7 +221,7 @@ export class FlowWorker implements Shutdownable {
 				this.logger.info(` Detected project ID from git remote: ${gitRemote}`);
 				return gitRemote;
 			}
-		} catch (error) {
+		} catch {
 			// git command failed
 		}
 
@@ -250,7 +252,7 @@ export class FlowWorker implements Shutdownable {
 			}
 
 			return null;
-		} catch (error) {
+		} catch {
 			return null;
 		}
 	}
@@ -491,7 +493,7 @@ export class FlowWorker implements Shutdownable {
 	 * Handle INTERVENTION_RESPONSE message
 	 */
 	private handleInterventionResponse(message: InterventionResponseMessage): void {
-		const { taskId, interventionId, response, timedOut, cancelled } = message;
+		const { interventionId, response, timedOut, cancelled } = message;
 
 		this.logger.info(` Received intervention response for ${interventionId}`);
 
@@ -605,10 +607,17 @@ export class FlowWorker implements Shutdownable {
 			}
 
 			const fileContents = readFileSync(flowsFilePath, 'utf8');
-			const flows = yaml.load(fileContents) as Record<string, any>;
+			const flows = yaml.load(fileContents);
+			if (!isRecord(flows)) {
+				throw new Error(`Invalid flows file ${flowsFilePath}: expected a mapping of flow id to definition`);
+			}
+
+			if (!isRecord(flowDefinition)) {
+				throw new Error(`Invalid flow definition for ${flowId}: expected an object`);
+			}
 
 			// Remove the id field as it's the key
-			const { id, ...flowData } = flowDefinition;
+			const { id: _id, ...flowData } = flowDefinition;
 
 			// Update the flow
 			flows[flowId] = flowData;
@@ -667,7 +676,7 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Handle messages from Claude processes (via hooks)
 	 */
-	private handleClaudeMessage(message: any): void {
+	private handleClaudeMessage(message: ClaudeMessage): void {
 		switch (message.type) {
 			case 'STOP_REQUESTED':
 				this.logger.info(` Stop requested by Claude, killing process...`);
@@ -776,7 +785,10 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Send FLOWS_UPDATED message
 	 */
-	private sendFlowsUpdated(flows: any[], changes?: { added: string[]; removed: string[]; updated: string[] }): void {
+	private sendFlowsUpdated(
+		flows: FlowMetadata[],
+		changes?: { added: string[]; removed: string[]; updated: string[] }
+	): void {
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.FLOWS_UPDATED, {
 				workerId: this.workerId,
@@ -795,13 +807,13 @@ export class FlowWorker implements Shutdownable {
 	public buildFlowMetadata(): FlowMetadata[] {
 		const flows = this.flowRegistry.getAllFlows();
 
-		return flows.map((flow: any) => {
+		return flows.map(flow => {
 			const hash = this.flowRegistry.computeFlowHash(flow);
 			const validationResult = this.flowRegistry.getFlowValidationResult(flow.id);
 
 			// Extract errors and warnings separately
-			const errors = validationResult?.issues.filter((i: any) => i.severity === 'error') || [];
-			const warnings = validationResult?.issues.filter((i: any) => i.severity === 'warning') || [];
+			const errors = validationResult?.issues.filter(i => i.severity === 'error') || [];
+			const warnings = validationResult?.issues.filter(i => i.severity === 'warning') || [];
 
 			return {
 				id: flow.id,
@@ -827,7 +839,7 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Start monitoring execution trace and update UI
 	 */
-	private startTraceMonitoring(taskId: string): NodeJS.Timeout {
+	private startTraceMonitoring(): NodeJS.Timeout {
 		// const stateManager = this.workerUIManager.getStateManager();
 		// if (!stateManager) {
 		// No UI, return dummy interval
@@ -873,8 +885,8 @@ export class FlowWorker implements Shutdownable {
 		const validationResult = this.flowRegistry.getFlowValidationResult(task.flowId);
 		if (validationResult && !validationResult.valid) {
 			const errorMessages = validationResult.issues
-				.filter((i: any) => i.severity === 'error')
-				.map((i: any) => `  - ${i.message}${i.location?.stepId ? ` (at step: ${i.location.stepId})` : ''}`)
+				.filter(i => i.severity === 'error')
+				.map(i => `  - ${i.message}${i.location?.stepId ? ` (at step: ${i.location.stepId})` : ''}`)
 				.join('\n');
 
 			const error = `Cannot execute flow '${task.flowId}': Flow has validation errors:\n${errorMessages}`;
@@ -980,13 +992,13 @@ export class FlowWorker implements Shutdownable {
 				// Intervention handler for user_intervention steps
 				interventionHandler: this.createInterventionHandler(),
 				// Real-time trace update callback (called after each step completion)
-				onTraceUpdate: (trace: any) => {
-					this.logger.debug(`[TRACE] onTraceUpdate called - steps=${trace?.steps?.length || 0}`);
+				onTraceUpdate: (trace: FlowTrace) => {
+					this.logger.debug(`[TRACE] onTraceUpdate called - steps=${countTraceSteps(trace)}`);
 					// Update the task's trace in-place so the 500ms timer can access it
 					if (this.currentTask?.flowResult) {
 						this.currentTask.flowResult.trace = trace;
 						this.logger.debug(
-							`[TRACE] Updated currentTask.flowResult.trace - steps=${this.currentTask.flowResult.trace?.steps?.length || 0}`
+							`[TRACE] Updated currentTask.flowResult.trace - steps=${countTraceSteps(this.currentTask.flowResult.trace)}`
 						);
 					} else {
 						this.logger.warn(` [TRACE] WARNING: No currentTask or flowResult to update!`);
@@ -1014,7 +1026,7 @@ export class FlowWorker implements Shutdownable {
 			// Start monitoring execution trace if UI is enabled
 			const monitorInterval: NodeJS.Timeout | null = null;
 			// if (this.workerUIManager.isEnabled()) {
-			// 	monitorInterval = this.startTraceMonitoring(task.id);
+			// 	monitorInterval = this.startTraceMonitoring();
 			// }
 
 			// Start periodic trace updates (every 500ms)
@@ -1028,7 +1040,7 @@ export class FlowWorker implements Shutdownable {
 			// Send final trace update after execution completes
 			if (this.currentTask?.flowResult?.trace) {
 				this.logger.info(
-					` [TRACE] Sending FINAL trace update after execution - steps=${this.currentTask.flowResult.trace.steps?.length || 0}`
+					` [TRACE] Sending FINAL trace update after execution - steps=${countTraceSteps(this.currentTask.flowResult.trace)}`
 				);
 				this.sendTraceUpdate(this.currentTask.flowResult.trace);
 			}
@@ -1178,7 +1190,7 @@ export class FlowWorker implements Shutdownable {
 	 * Send trace update to orchestrator
 	 * Only sends if trace has changed since last update to avoid spam
 	 */
-	private sendTraceUpdate(trace: any): void {
+	private sendTraceUpdate(trace: unknown): void {
 		if (!this.currentTask) {
 			this.logger.info(` [TRACE] sendTraceUpdate called but no current task`);
 			return;
@@ -1190,7 +1202,7 @@ export class FlowWorker implements Shutdownable {
 		// Skip if trace hasn't changed since last send
 		if (traceHash === this.lastSentTraceHash) {
 			this.logger.debug(
-				`[TRACE] Trace unchanged (hash match) - task=${this.currentTask.id}, steps=${trace?.steps?.length || 0}`
+				`[TRACE] Trace unchanged (hash match) - task=${this.currentTask.id}, steps=${countTraceSteps(trace)}`
 			);
 			return;
 		}
@@ -1199,7 +1211,7 @@ export class FlowWorker implements Shutdownable {
 		this.lastSentTraceHash = traceHash;
 
 		this.logger.debug(
-			`[TRACE] Sending trace update - task=${this.currentTask.id}, steps=${trace?.steps?.length || 0}, ws.readyState=${this.ws?.readyState} (1=OPEN)`
+			`[TRACE] Sending trace update - task=${this.currentTask.id}, steps=${countTraceSteps(trace)}, ws.readyState=${this.ws?.readyState} (1=OPEN)`
 		);
 
 		// Send update to orchestrator
@@ -1216,7 +1228,7 @@ export class FlowWorker implements Shutdownable {
 	 * Send task completed notification
 	 */
 	protected sendTaskCompleted(
-		result?: any,
+		result?: unknown,
 		newStatus?: TaskStatus,
 		ticketId?: string,
 		ticketStatus?: import('shared-orch-worker/domain-types').TicketStatus
@@ -1309,7 +1321,7 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Send hook event
 	 */
-	protected sendHookEvent(hookName: string, data: any): void {
+	protected sendHookEvent(hookName: string, data: unknown): void {
 		this.sendMessage(
 			createW2OMessage(W2OMessageType.HOOK_EVENT, {
 				workerId: this.workerId,
@@ -1348,18 +1360,19 @@ export class FlowWorker implements Shutdownable {
 	/**
 	 * Format connection errors in a concise single-line format
 	 */
-	private formatConnectionError(error: any): string {
-		if (error.code === 'ECONNREFUSED') {
+	private formatConnectionError(error: unknown): string {
+		const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+		if (code === 'ECONNREFUSED') {
 			return 'Connection refused - orchestrator not running?';
 		}
-		if (error.code === 'ETIMEDOUT') {
+		if (code === 'ETIMEDOUT') {
 			return 'Connection timeout';
 		}
-		if (error.code === 'ENOTFOUND') {
+		if (code === 'ENOTFOUND') {
 			return 'Host not found';
 		}
 		// For other errors, show just the message
-		return String(error) || String(error);
+		return String(error);
 	}
 
 	/**

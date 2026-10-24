@@ -34,7 +34,7 @@ export interface ValidationResult {
  * @param name - Name of the API for error messages
  * @returns Validation result with any errors found
  */
-export function validateRoutes(routes: Record<string, any>, _name: string = 'API'): ValidationResult {
+export function validateRoutes(routes: Record<string, unknown>, _name: string = 'API'): ValidationResult {
 	const errors: ValidationError[] = [];
 	const routePaths = Object.keys(routes);
 
@@ -77,7 +77,7 @@ export function validateRoutes(routes: Record<string, any>, _name: string = 'API
  * @param name - Name of the API for error messages
  * @throws Error if validation fails
  */
-export function assertValidRoutes(routes: Record<string, any>, name: string = 'API'): void {
+export function assertValidRoutes(routes: Record<string, unknown>, name: string = 'API'): void {
 	const result = validateRoutes(routes, name);
 
 	if (!result.valid) {
@@ -86,8 +86,8 @@ export function assertValidRoutes(routes: Record<string, any>, name: string = 'A
 		throw new Error(
 			`\n Route validation failed for ${name}:\n${errorMessages}\n\n` +
 				`Routes must follow the trailing slash convention:\n` +
-				`  • Collection routes (no params): /api/books/\n` +
-				`  • Item routes (with params): /api/books/:id\n`
+				`  - Collection routes (no params): /api/books/\n` +
+				`  - Item routes (with params): /api/books/:id\n`
 		);
 	}
 }
@@ -98,7 +98,7 @@ export function assertValidRoutes(routes: Record<string, any>, name: string = 'A
  * @param routes - The route definitions object
  * @param name - Name of the API for error messages
  */
-export function warnInvalidRoutes(routes: Record<string, any>, name: string = 'API'): void {
+export function warnInvalidRoutes(routes: Record<string, unknown>, name: string = 'API'): void {
 	const result = validateRoutes(routes, name);
 
 	if (!result.valid) {

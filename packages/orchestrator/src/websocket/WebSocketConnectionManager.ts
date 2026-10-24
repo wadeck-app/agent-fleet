@@ -1,9 +1,14 @@
+import type { FlowMetadata } from 'flow-engine/types';
 import { createLogger } from 'shared-common/logger';
 import { serializeMessage } from 'shared-common/protocol';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import { StateEvent } from 'shared-orch-worker/StateManager';
-import type { WorkerInfo } from 'shared-orch-worker/domain-types';
+import type {
+	InterventionResponse,
+	FlowMetadata as WireFlowMetadata,
+	WorkerInfo,
+} from 'shared-orch-worker/domain-types';
 import type { O2WMessage } from 'shared-orch-worker/orchestrator-messages';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
 import type {
@@ -11,7 +16,6 @@ import type {
 	W2ORequestTaskMessage,
 	W2OWorkerReadyMessage,
 } from 'shared-orch-worker/worker-messages';
-import type { W2OMessage } from 'shared-orch-worker/worker-messages';
 import { WebSocket } from 'ws';
 
 import type { WorkerCoordinator } from '../core/WorkerCoordinator';
@@ -19,6 +23,14 @@ import type { EventSubscriptionRegistry } from '../registry/EventSubscriptionReg
 import { FlowDiscoveryRegistry, FlowVersionMismatchError } from '../registry/FlowDiscoveryRegistry';
 
 const log = createLogger('WebSocketConnectionManager');
+
+/**
+ * Workers are flow-engine processes: the wire type (shared-orch-worker) is a loose view of the flow-engine
+ * FlowMetadata they produce, so this is the single place where the engine shape is restored.
+ */
+function toEngineFlowMetadata(flows: WireFlowMetadata[]): FlowMetadata[] {
+	return flows as FlowMetadata[];
+}
 
 interface WorkerConnection extends WorkerInfo {
 	socket: WebSocket;
@@ -95,7 +107,12 @@ export class WebSocketConnectionManager {
 
 		// Register worker flows in discovery registry
 		try {
-			this.flowDiscoveryRegistry.registerWorker(workerId, projectId, workspacePath, availableFlows);
+			this.flowDiscoveryRegistry.registerWorker(
+				workerId,
+				projectId,
+				workspacePath,
+				toEngineFlowMetadata(availableFlows)
+			);
 			log.info(`[WS] Registered ${availableFlows.length} flows for worker ${workerId} (project: ${projectId})`);
 		} catch (error) {
 			if (error instanceof FlowVersionMismatchError) {
@@ -257,12 +274,7 @@ export class WebSocketConnectionManager {
 	sendInterventionResponse(
 		taskId: string,
 		interventionId: string,
-		response: {
-			value: any;
-			comment?: string;
-			answeredAt: string;
-			answeredBy: string;
-		} | null,
+		response: InterventionResponse | null,
 		timedOut?: boolean,
 		cancelled?: boolean
 	): boolean {
@@ -337,7 +349,7 @@ export class WebSocketConnectionManager {
 		log.info(`[WS] Worker ${workerId} updating flows (project: ${projectId})`);
 
 		try {
-			this.flowDiscoveryRegistry.updateWorkerFlows(workerId, flows);
+			this.flowDiscoveryRegistry.updateWorkerFlows(workerId, toEngineFlowMetadata(flows));
 
 			if (changes) {
 				const changeDesc = [];

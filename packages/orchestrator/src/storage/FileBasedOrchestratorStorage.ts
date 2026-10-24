@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLogger } from 'shared-common/logger';
-import { normalizeError } from 'shared-common/utils/getErrorMessage';
+import { isFileNotFoundError, normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { Intervention, InterventionStatus, Task } from 'shared-orch-worker/domain-types';
 
 import type { IOrchestratorStorage } from './IOrchestratorStorage';
@@ -42,8 +42,8 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 			const filePath = path.join(TASKS_DIR, `${taskId}.json`);
 			const data = await fs.promises.readFile(filePath, 'utf8');
 			return JSON.parse(data) as Task;
-		} catch (error: any) {
-			if (error.code === 'ENOENT') {
+		} catch (error: unknown) {
+			if (isFileNotFoundError(error)) {
 				return null;
 			}
 			log.error(`Failed to load task ${taskId}:`, error);
@@ -73,8 +73,8 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 		try {
 			const filePath = path.join(TASKS_DIR, `${taskId}.json`);
 			await fs.promises.unlink(filePath);
-		} catch (error: any) {
-			if (error.code === 'ENOENT') {
+		} catch (error: unknown) {
+			if (isFileNotFoundError(error)) {
 				return;
 			}
 			log.error(`Failed to delete task ${taskId}:`, error);
@@ -120,8 +120,8 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 			const filePath = path.join(INTERVENTIONS_DIR, `${id}.json`);
 			const data = await fs.promises.readFile(filePath, 'utf8');
 			return JSON.parse(data) as Intervention;
-		} catch (error: any) {
-			if (error.code === 'ENOENT') {
+		} catch (error: unknown) {
+			if (isFileNotFoundError(error)) {
 				return null;
 			}
 			log.error(`Failed to load intervention ${id}:`, error);
@@ -151,8 +151,8 @@ export class FileBasedOrchestratorStorage implements IOrchestratorStorage {
 		try {
 			const filePath = path.join(INTERVENTIONS_DIR, `${id}.json`);
 			await fs.promises.unlink(filePath);
-		} catch (error: any) {
-			if (error.code === 'ENOENT') {
+		} catch (error: unknown) {
+			if (isFileNotFoundError(error)) {
 				return;
 			}
 			log.error(`Failed to delete intervention ${id}:`, error);

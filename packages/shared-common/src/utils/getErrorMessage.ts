@@ -44,3 +44,10 @@ export function normalizeError(err: unknown): Error {
 	}
 	return new Error('An unknown error occurred');
 }
+
+/**
+ * Type guard for the Node.js "no such file or directory" error (code ENOENT)
+ */
+export function isFileNotFoundError(err: unknown): boolean {
+	return typeof err === 'object' && err !== null && 'code' in err && err.code === 'ENOENT';
+}

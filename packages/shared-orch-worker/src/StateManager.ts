@@ -76,8 +76,8 @@ export interface FlowExecutionEventData {
 	taskId: string;
 	flowId?: string;
 	stepId?: string;
-	progress?: any;
-	result?: any;
+	progress?: unknown;
+	result?: unknown;
 	error?: string;
 	timestamp: string;
 }
@@ -158,7 +158,7 @@ export class StateManager extends EventEmitter {
 		} as FlowExecutionEventData);
 	}
 
-	emitFlowExecutionProgress(taskId: string, stepId: string, progress: any): void {
+	emitFlowExecutionProgress(taskId: string, stepId: string, progress: unknown): void {
 		this.emit(StateEvent.FLOW_EXECUTION_PROGRESS, {
 			taskId,
 			stepId,
@@ -167,7 +167,7 @@ export class StateManager extends EventEmitter {
 		} as FlowExecutionEventData);
 	}
 
-	emitFlowExecutionCompleted(taskId: string, result: any): void {
+	emitFlowExecutionCompleted(taskId: string, result: unknown): void {
 		this.emit(StateEvent.FLOW_EXECUTION_COMPLETED, {
 			taskId,
 			result,

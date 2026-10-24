@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { BaseEntitySchema, IdParamSchema } from '../common/base-entity';
+import { BaseEntitySchema } from '../common/base-entity';
 import { defineRoutes } from '../route-builder';
 
 /**

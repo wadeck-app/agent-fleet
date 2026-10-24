@@ -162,8 +162,7 @@ describe('TraceChunkStorage', () => {
 			// Verify liveLogEntries were updated
 			chunk = await storage.loadChunk(taskId, 0);
 			expect(chunk?.entries[0].liveLogEntries).toHaveLength(2);
-			expect(chunk?.entries[0].liveLogEntries[0].message).toBe('Log 1');
-			expect(chunk?.entries[0].liveLogEntries[1].message).toBe('Log 2');
+			expect(chunk?.entries[0].liveLogEntries).toMatchObject([{ message: 'Log 1' }, { message: 'Log 2' }]);
 		});
 
 		it('should update last step when endTime is added (step completion)', async () => {
@@ -355,7 +354,7 @@ describe('TraceChunkStorage', () => {
 			expect(chunk?.entries).toHaveLength(2);
 			expect(chunk?.entries[0].liveLogEntries).toEqual([]);
 			expect(chunk?.entries[1].liveLogEntries).toHaveLength(1);
-			expect(chunk?.entries[1].liveLogEntries[0].message).toBe('Processing...');
+			expect(chunk?.entries[1].liveLogEntries).toMatchObject([{ message: 'Processing...' }]);
 		});
 	});
 

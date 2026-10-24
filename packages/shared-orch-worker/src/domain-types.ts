@@ -4,6 +4,19 @@ import { z } from 'zod';
 
 export { TaskStatus };
 
+// Validation issue as reported by flow-engine. `code` is the string value of flow-engine's ValidationCode enum.
+export interface FlowValidationIssue {
+	severity: 'error' | 'warning' | 'info';
+	code: string;
+	message: string;
+	location?: {
+		stepId?: string;
+		field?: string;
+		path?: string;
+	};
+	suggestion?: string;
+}
+
 // TODO: This is a simplified version. Full FlowMetadata is in flow-engine package
 export interface FlowMetadata {
 	id: string;
@@ -11,31 +24,11 @@ export interface FlowMetadata {
 	hash: string;
 	name: string;
 	description: string;
-	inputs: Record<string, any>;
-	workspace: any;
+	inputs: Record<string, unknown>;
+	workspace: unknown;
 	isValid: boolean;
-	validationErrors?: Array<{
-		severity: 'error' | 'warning' | 'info';
-		code: any; // ValidationCode from flow-engine, using any for compatibility
-		message: string;
-		location?: {
-			stepId?: string;
-			field?: string;
-			path?: string;
-		};
-		suggestion?: string;
-	}>;
-	validationWarnings?: Array<{
-		severity: 'error' | 'warning' | 'info';
-		code: any; // ValidationCode from flow-engine, using any for compatibility
-		message: string;
-		location?: {
-			stepId?: string;
-			field?: string;
-			path?: string;
-		};
-		suggestion?: string;
-	}>;
+	validationErrors?: FlowValidationIssue[];
+	validationWarnings?: FlowValidationIssue[];
 	trigger?: FlowTrigger;
 }
 
@@ -50,7 +43,7 @@ export interface Task {
 		workerId: string;
 	} | null;
 	comments: TaskComment[];
-	metadata: Record<string, any>;
+	metadata: TaskMetadata;
 	history: TaskHistoryEntry[];
 
 	// Duration tracking
@@ -59,12 +52,12 @@ export interface Task {
 
 	// Flow Engine integration
 	flowId?: string;
-	flowInputs?: Record<string, any>;
+	flowInputs?: Record<string, unknown>;
 	flowResult?: {
 		status: 'completed' | 'failed';
-		outputs?: Record<string, any>;
+		outputs?: Record<string, unknown>;
 		error?: string;
-		trace?: any;
+		trace?: unknown;
 	};
 
 	// Workspace configuration
@@ -84,10 +77,17 @@ export interface TaskComment {
 	content: string;
 }
 
+// Free-form task metadata; the keys below are the ones the orchestrator and worker read.
+export interface TaskMetadata {
+	flowId?: string;
+	workspaceId?: string;
+	[key: string]: unknown;
+}
+
 export interface TaskHistoryEntry {
 	timestamp: string;
 	event: string;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 export interface WorkerInfo {
@@ -143,11 +143,11 @@ export interface InterventionConfig {
 export interface InterventionTimeout {
 	minutes: number;
 	onTimeout: 'fail' | 'continue' | 'default';
-	defaultValue?: any;
+	defaultValue?: unknown;
 }
 
 export interface InterventionResponse {
-	value: any;
+	value: unknown;
 	answeredBy: string;
 	answeredAt: string;
 	comment?: string;

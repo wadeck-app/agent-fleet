@@ -6,7 +6,7 @@
  *
  * Key principle: Strong typing for reusability in the backend UI server.
  */
-import type { MetricsData, OrchestratorStatusData } from 'shared-orch-worker/StateManager';
+import type { MetricsData } from 'shared-orch-worker/StateManager';
 import type { Task, WorkerInfo } from 'shared-orch-worker/domain-types';
 
 /**
@@ -143,7 +143,7 @@ export interface UIRequestSnapshotMessage extends BaseUIMessage {
 export interface UIStartFlowMessage extends BaseUIMessage {
 	type: UIMessageType.START_FLOW;
 	flowId: string;
-	inputs?: Record<string, any>;
+	inputs?: Record<string, unknown>;
 	workerId?: string; // Optional: target specific worker
 	priority?: 'low' | 'medium' | 'high' | 'urgent';
 }
@@ -195,7 +195,7 @@ export interface UIDisconnectWorkerMessage extends BaseUIMessage {
  */
 export interface UIUpdateConfigMessage extends BaseUIMessage {
 	type: UIMessageType.UPDATE_CONFIG;
-	config: Record<string, any>;
+	config: Record<string, unknown>;
 }
 
 /**
@@ -233,7 +233,7 @@ export interface UISnapshotMessage extends BaseUIMessage {
 export interface UIStateUpdateMessage extends BaseUIMessage {
 	type: UIMessageType.STATE_UPDATE;
 	event: string; // StateEvent enum value
-	data: any; // Event-specific data
+	data: unknown; // Event-specific data
 }
 
 /**
@@ -243,7 +243,7 @@ export interface UICommandResultMessage extends BaseUIMessage {
 	type: UIMessageType.COMMAND_RESULT;
 	requestId: string;
 	success: boolean;
-	data?: any;
+	data?: unknown;
 	error?: string;
 }
 
@@ -253,7 +253,7 @@ export interface UICommandResultMessage extends BaseUIMessage {
 export interface UIErrorMessage extends BaseUIMessage {
 	type: UIMessageType.ERROR;
 	error: string;
-	details?: any;
+	details?: unknown;
 	requestId?: string; // If error is related to a specific request
 }
 
@@ -333,7 +333,10 @@ export interface OrchestratorSnapshot {
  * Create a UI message with automatic timestamp
  */
 //FIXME like in protocol.ts
-export function createUIMessage<T extends UIMessage>(type: T['type'], data: Omit<T, 'type' | 'timestamp'> | any): T {
+export function createUIMessage<T extends UIMessage>(
+	type: T['type'],
+	data: Omit<T, 'type' | 'timestamp'> | Record<string, unknown>
+): T {
 	return {
 		type,
 		timestamp: new Date().toISOString(),

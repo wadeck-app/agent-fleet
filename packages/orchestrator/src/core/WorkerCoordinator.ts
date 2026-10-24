@@ -3,6 +3,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { StateManager } from 'shared-orch-worker/StateManager';
 import type { Task } from 'shared-orch-worker/domain-types';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
+import { countTraceSteps } from 'shared-orch-worker/trace-utils';
 import type { W2OMessage } from 'shared-orch-worker/worker-messages';
 import { W2OMessageType } from 'shared-orch-worker/worker-messages';
 import type { WebSocket } from 'ws';
@@ -185,7 +186,7 @@ export class WorkerCoordinator {
 
 			case W2OMessageType.TASK_TRACE_UPDATE:
 				log.debug(
-					`[TRACE] Received TASK_TRACE_UPDATE from worker ${workerId} - task=${message.taskId}, steps=${message.trace?.steps?.length || 0}`
+					`[TRACE] Received TASK_TRACE_UPDATE from worker ${workerId} - task=${message.taskId}, steps=${countTraceSteps(message.trace)}`
 				);
 
 				// Send trace to backend for storage
@@ -195,7 +196,7 @@ export class WorkerCoordinator {
 				});
 
 				// Emit state event for real-time frontend updates
-				this.stateManager.emitTaskTraceUpdated(message.taskId, message.trace?.steps?.length || 0);
+				this.stateManager.emitTaskTraceUpdated(message.taskId, countTraceSteps(message.trace));
 				break;
 
 			case W2OMessageType.INTERVENTION_REQUESTED:

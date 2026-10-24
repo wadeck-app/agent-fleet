@@ -1,11 +1,9 @@
 import { createLogger } from 'shared-common/logger';
 import { parseMessage } from 'shared-common/protocol';
 import type { StateManager } from 'shared-orch-worker/StateManager';
-import type { WorkerInfo } from 'shared-orch-worker/domain-types';
-import type { O2WMessage } from 'shared-orch-worker/orchestrator-messages';
+import type { InterventionResponse, WorkerInfo } from 'shared-orch-worker/domain-types';
 import { O2WMessageType, createO2WMessage } from 'shared-orch-worker/orchestrator-messages';
 import type { W2OMessage } from 'shared-orch-worker/worker-messages';
-import { W2OMessageType } from 'shared-orch-worker/worker-messages';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 
@@ -156,12 +154,7 @@ export class WorkerWebSocketServer {
 	sendInterventionResponse(
 		taskId: string,
 		interventionId: string,
-		response: {
-			value: any;
-			comment?: string;
-			answeredAt: string;
-			answeredBy: string;
-		} | null,
+		response: InterventionResponse | null,
 		timedOut?: boolean,
 		cancelled?: boolean
 	): boolean {

@@ -19,16 +19,27 @@ export interface TraceMetadata {
 	chunks: ChunkMetadata[];
 }
 
-export interface TraceChunk {
+// Trace payload as received from a worker (opaque until persisted): only the step list is read here.
+export interface TraceWithSteps {
+	steps?: unknown[];
+}
+
+export interface TraceChunk<TEntry> {
 	chunkIndex: number;
-	entries: any[]; // StepTrace from flow-engine
+	entries: TEntry[];
 }
 
 /**
  * Manages trace storage in chunks for efficient pagination
  * Chunks are stored as separate files to allow efficient partial reads
  */
-export class TraceChunkStorage {
+/**
+ * Entries are typed by `TEntry`. The default stays `any` only because web-backend's ScriptLogsStorage extends this class
+ * without a type argument while overriding `readLogsPaginated` with another entry type, and TasksService reads task
+ * trace steps as its own interface. Both can name their entry type explicitly once web-backend is migrated.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- see above: default kept for web-backend subclasses
+export class TraceChunkStorage<TEntry = any> {
 	private readonly CHUNK_SIZE = 500; // 500 log entries per chunk
 	private readonly baseDir: string;
 
@@ -58,14 +69,21 @@ export class TraceChunkStorage {
 	}
 
 	/**
+	 * The entries are produced by workers (flow-engine StepTrace for task traces): they are persisted without re-validation.
+	 */
+	private stepsOf(trace: TraceWithSteps): TEntry[] {
+		return (trace.steps || []) as TEntry[];
+	}
+
+	/**
 	 * Write trace incrementally (called by handleTaskTraceUpdate)
 	 * Appends new entries to chunks
 	 */
-	async writeTraceIncremental(taskId: string, trace: any): Promise<void> {
+	async writeTraceIncremental(taskId: string, trace: TraceWithSteps): Promise<void> {
 		const traceDir = this.getTraceDir(taskId);
 		await fs.mkdir(traceDir, { recursive: true });
 
-		const steps = trace.steps || [];
+		const steps = this.stepsOf(trace);
 
 		// Load existing metadata or create new
 		const metadata = await this.loadMetadata(taskId);
@@ -86,7 +104,7 @@ export class TraceChunkStorage {
 		// Calculate chunks for new steps
 		const startIndex = existingCount;
 		let currentChunkIndex = Math.floor(startIndex / this.CHUNK_SIZE);
-		let currentChunkEntries: any[] = [];
+		let currentChunkEntries: TEntry[] = [];
 
 		// Load partial chunk if exists
 		if (existingCount % this.CHUNK_SIZE !== 0) {
@@ -113,11 +131,11 @@ export class TraceChunkStorage {
 	/**
 	 * Write a complete trace (called by handleTaskCompleted)
 	 */
-	async writeTraceFull(taskId: string, trace: any): Promise<void> {
+	async writeTraceFull(taskId: string, trace: TraceWithSteps): Promise<void> {
 		const traceDir = this.getTraceDir(taskId);
 		await fs.mkdir(traceDir, { recursive: true });
 
-		const steps = trace.steps || [];
+		const steps = this.stepsOf(trace);
 
 		// Write all chunks
 		const totalChunks = Math.ceil(steps.length / this.CHUNK_SIZE);
@@ -136,9 +154,9 @@ export class TraceChunkStorage {
 	/**
 	 * Write a single chunk
 	 */
-	private async writeChunk(taskId: string, chunkIndex: number, steps: any[]): Promise<void> {
+	private async writeChunk(taskId: string, chunkIndex: number, steps: TEntry[]): Promise<void> {
 		const chunkPath = this.getChunkPath(taskId, chunkIndex);
-		const chunk: TraceChunk = {
+		const chunk: TraceChunk<TEntry> = {
 			chunkIndex,
 			entries: steps,
 		};
@@ -147,10 +165,24 @@ export class TraceChunkStorage {
 	}
 
 	/**
+	 * The fields that tell whether an in-progress step changed: number of live log entries and end time.
+	 */
+	private static progressMarker(entry: unknown): { liveCount: number; endTime: unknown } {
+		if (typeof entry !== 'object' || entry === null) {
+			return { liveCount: 0, endTime: undefined };
+		}
+		const liveLogEntries = 'liveLogEntries' in entry ? entry.liveLogEntries : undefined;
+		return {
+			liveCount: Array.isArray(liveLogEntries) ? liveLogEntries.length : 0,
+			endTime: 'endTime' in entry ? entry.endTime : undefined,
+		};
+	}
+
+	/**
 	 * Update the last step in storage if its content has changed.
 	 * This handles in-progress steps where liveLogEntries grow over time.
 	 */
-	private async updateLastStepIfChanged(taskId: string, steps: any[]): Promise<void> {
+	private async updateLastStepIfChanged(taskId: string, steps: TEntry[]): Promise<void> {
 		const lastStepIndex = steps.length - 1;
 		const chunkIndex = Math.floor(lastStepIndex / this.CHUNK_SIZE);
 		const positionInChunk = lastStepIndex % this.CHUNK_SIZE;
@@ -164,11 +196,11 @@ export class TraceChunkStorage {
 		const incomingStep = steps[lastStepIndex];
 
 		// Quick comparison: check if liveLogEntries count differs
-		const storedLiveCount = Array.isArray(storedStep.liveLogEntries) ? storedStep.liveLogEntries.length : 0;
-		const incomingLiveCount = Array.isArray(incomingStep.liveLogEntries) ? incomingStep.liveLogEntries.length : 0;
+		const stored = TraceChunkStorage.progressMarker(storedStep);
+		const incoming = TraceChunkStorage.progressMarker(incomingStep);
 
 		// Also compare endTime to detect step completion
-		const hasChanged = storedLiveCount !== incomingLiveCount || storedStep.endTime !== incomingStep.endTime;
+		const hasChanged = stored.liveCount !== incoming.liveCount || stored.endTime !== incoming.endTime;
 
 		if (hasChanged) {
 			chunk.entries[positionInChunk] = incomingStep;
@@ -179,13 +211,13 @@ export class TraceChunkStorage {
 	/**
 	 * Load a single chunk
 	 */
-	async loadChunk(taskId: string, chunkIndex: number): Promise<TraceChunk | null> {
+	async loadChunk(taskId: string, chunkIndex: number): Promise<TraceChunk<TEntry> | null> {
 		const chunkPath = this.getChunkPath(taskId, chunkIndex);
 
 		try {
 			const content = await fs.readFile(chunkPath, 'utf-8');
 			return JSON.parse(content);
-		} catch (error) {
+		} catch {
 			return null;
 		}
 	}
@@ -199,7 +231,7 @@ export class TraceChunkStorage {
 		try {
 			const content = await fs.readFile(metadataPath, 'utf-8');
 			return JSON.parse(content);
-		} catch (error) {
+		} catch {
 			return null;
 		}
 	}
@@ -248,7 +280,7 @@ export class TraceChunkStorage {
 		taskId: string,
 		cursor: number = 0,
 		limit: number = 500
-	): Promise<{ logs: any[]; nextCursor: number | null; total: number }> {
+	): Promise<{ logs: TEntry[]; nextCursor: number | null; total: number }> {
 		const metadata = await this.loadMetadata(taskId);
 
 		if (!metadata) {
@@ -282,7 +314,7 @@ export class TraceChunkStorage {
 		const startChunk = Math.floor(cursor / this.CHUNK_SIZE);
 		const endChunk = Math.floor((cursor + limit - 1) / this.CHUNK_SIZE);
 
-		let logs: any[] = [];
+		let logs: TEntry[] = [];
 
 		for (let i = startChunk; i <= endChunk; i++) {
 			const chunk = await this.loadChunk(taskId, i);
@@ -312,7 +344,7 @@ export class TraceChunkStorage {
 
 		try {
 			await fs.rm(traceDir, { recursive: true, force: true });
-		} catch (error) {
+		} catch {
 			// Ignore if doesn't exist
 		}
 	}

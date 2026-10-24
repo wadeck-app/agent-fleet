@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLogger } from 'shared-common/logger';
-import { normalizeError } from 'shared-common/utils/getErrorMessage';
+import { isFileNotFoundError, normalizeError } from 'shared-common/utils/getErrorMessage';
 
 const log = createLogger('KnowledgeStorage');
 
@@ -16,7 +16,7 @@ const KNOWLEDGE_DIR = path.join(DATA_DIR, 'knowledge');
 export interface KnowledgeEntry {
 	timestamp: string;
 	category: string;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 export class KnowledgeStorage {
@@ -63,8 +63,8 @@ export class KnowledgeStorage {
 				.split('\n')
 				.filter(line => line.trim())
 				.map(line => JSON.parse(line) as KnowledgeEntry);
-		} catch (error: any) {
-			if (error.code === 'ENOENT') {
+		} catch (error: unknown) {
+			if (isFileNotFoundError(error)) {
 				return [];
 			}
 			log.error(`Failed to read knowledge from ${category}:`, error);

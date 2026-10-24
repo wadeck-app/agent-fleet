@@ -7,16 +7,17 @@
 import type { ChildProcess } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { type Logger, createLogger } from 'shared-common/logger';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 
 /**
  * Message types received from Claude processes
  */
-interface ClaudeMessage {
+export interface ClaudeMessage {
 	type: string;
 	hookName?: string;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 /**
@@ -152,9 +153,10 @@ export class ClaudeLifecycleManager {
 							windowsHide: true,
 						});
 						this.logger.info(` Process killed successfully`);
-					} catch (killError: any) {
-						if (!killError.message?.includes('not found')) {
-							this.logger.error(`} Kill error:`, killError.message);
+					} catch (killError: unknown) {
+						const killErrorMessage = normalizeError(killError).message;
+						if (!killErrorMessage.includes('not found')) {
+							this.logger.error(`} Kill error:`, killErrorMessage);
 						}
 					}
 				} else if (this.claudeProcess) {
