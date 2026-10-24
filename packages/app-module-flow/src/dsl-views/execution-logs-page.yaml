@@ -7,6 +7,10 @@
 # a page are oldest first. A changed filter or page size goes back to page 1 (resetUrlParams, dsl-ui >= 2026.10.22-124).
 # Times are ISO 8601 and the column is `format: time`: the shell prints it like every table of app-core.
 # The notice (hasNotice/notice) explains an empty table or a damaged log; it is also the table's empty message.
+# The Message column is a one-line plain preview (a cell cannot hold markdown). A rendered prompt and any multi-line or
+# over-long message also get the row chevron (expansionCondition: expandable, set by the route) and, once opened, the whole
+# message rendered as markdown by flow:MarkdownText (this module's dsl-lib component: a stand-in for a dsl-ui Markdown
+# node, swap the $type when it ships). The route serves `markdown`: a prompt as is, other messages as a code block.
 # The recorded failure text is what the execution record kept of failed steps (error, stdout, stderr): it outlives the
 # daily files, which rotate away.
 $sources:
@@ -58,6 +62,11 @@ sections:
     - $type: DataTable
       rows: $sources.logs.entries
       emptyMessage: $sources.logs.notice
+      expansionCondition: expandable
+      expansion:
+          $type: flow:MarkdownText
+          text: $ctx.row.markdown
+          maxHeight: 30rem
       columns:
           - { key: 'timestamp', label: 'Time', format: time, nowrap: true }
           - key: level
@@ -65,7 +74,7 @@ sections:
             nowrap: true
             badge: { debug: default, info: info, warning: warning, error: danger }
           - { key: 'stepId', label: 'Step', truncate: true, mono: true }
-          - { key: 'message', label: 'Message', mono: true }
+          - { key: 'preview', label: 'Message', mono: true }
 
     - $type: HorizontalStack
       justify: justify-between

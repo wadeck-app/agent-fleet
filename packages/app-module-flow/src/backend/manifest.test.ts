@@ -2,6 +2,7 @@ import { FLOW_ACTION_SLOT_ACCEPTS, FLOW_APP_MODULE_ID, FLOW_EXPOSED_SLOTS, FLOW_
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { satisfies } from 'semver';
 import { describe, expect, it } from 'vitest';
 
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -10,6 +11,7 @@ const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf
 	version?: unknown;
 	backendEntryPath?: unknown;
 	requires?: unknown;
+	dslLib?: { shared?: Record<string, string> };
 	expose?: { slots?: Record<string, { accepts: string[] }> };
 	extensionPoints: {
 		kind: string;
@@ -29,6 +31,28 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 		expect(manifest).not.toHaveProperty('version');
 		expect(manifest).not.toHaveProperty('backendEntryPath');
 	});
+
+	it('declares a dslLib (the MarkdownText component) with the shared ranges it was built against', () => {
+		expect(Object.keys(manifest.dslLib?.shared ?? {}).sort()).toEqual([
+			'@wadeck-app/dsl-renderer',
+			'@wadeck-app/dsl-ui',
+			'react',
+			'react-router-dom',
+		]);
+		expect(existsSync(join(packageDir, 'src/dsl-components/index.ts'))).toBe(true);
+	});
+
+	// app-core checks these ranges against the build-info.json of its SERVER and refuses the whole module when it is
+	// older ("built for ... but the shell provides"). Raise them only once that server build is newer: 2026.10.23-136
+	// is what the user's server served when this component was added.
+	it.each(['@wadeck-app/dsl-ui', '@wadeck-app/dsl-renderer'])(
+		'%s accepts the server build and refuses older shells',
+		name => {
+			const range = manifest.dslLib?.shared?.[name] ?? '';
+			expect(satisfies('2026.10.23-136-d5f44a0f', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.10.18-101-b2ef217e', range, { includePrerelease: true })).toBe(false);
+		}
+	);
 
 	it('references every view as ./src/dsl-views/<file> and each of them exists', () => {
 		const paths = manifest.extensionPoints.map(point => point.view.value);

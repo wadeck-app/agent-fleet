@@ -3,14 +3,15 @@
 		"target": "ES2022",
 		"module": "ESNext",
 		"moduleResolution": "bundler",
-		"lib": ["ES2022"],
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"jsx": "react-jsx",
 		"strict": true,
 		"skipLibCheck": true,
 		"useDefineForClassFields": true,
 		"verbatimModuleSyntax": true,
 		"forceConsistentCasingInFileNames": true,
 		"noEmit": true,
-		"types": ["vitest/globals", "node"],
+		"types": ["vitest/globals", "node", "@testing-library/jest-dom"],
 		// Sources, not flow-core's build output: `npm run build --workspaces` visits this package before flow-core.
 		"paths": {
 			"flow-core": ["../flow-core/src/index"],
@@ -22,5 +23,5 @@
 			"shared-common/*": ["../shared-common/src/*"]
 		}
 	},
-	"include": ["src"]
+	"include": ["src", "tailwind.config.ts"]
 }

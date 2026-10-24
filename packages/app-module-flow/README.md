@@ -6,6 +6,8 @@ Routes (`/api/modules/flow/...`): `GET /executions`, `/executions/:id`, `/execut
 
 Pages: `src/dsl-views/*.yaml`, referenced by `manifest.json`. `views.test.ts` checks that every `$sources` url has a route and every link lands on a manifest page.
 
+Components: `src/dsl-components` makes this a dslLib module; `flow:MarkdownText` renders log messages (the prompt of a model step) as safe markdown, see [.docs/markdown-text.md](.docs/markdown-text.md).
+
 Slots other modules fill: `flow:execution-links` / `flow:execution-actions` (detail header, before / after Logs), `flow:execution-row-links` / `flow:execution-row-actions` (row panel, before / after Logs), `flow:executions-actions` (list page). See `FlowModuleContract` in flow-core.
 
 Details: [.docs/pages-and-variants.md](.docs/pages-and-variants.md) covers the executions page, execution logs, times and columns, and the dashboard widget (no A/B experiment is left: every view has one design).

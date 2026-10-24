@@ -18,7 +18,15 @@ const line = (stepId: string, level: string, message: string, timestamp: string,
 interface LogsBody {
 	executionId: string;
 	flowId: string;
-	entries: { timestamp: string; level: string; stepId: string; message: string }[];
+	entries: {
+		timestamp: string;
+		level: string;
+		stepId: string;
+		message: string;
+		preview: string;
+		expandable: boolean;
+		markdown: string;
+	}[];
 	total: number;
 	limit: number;
 	offset: number;
@@ -82,6 +90,23 @@ describe('GET /executions/:id/logs', () => {
 			level: 'info',
 			stepId: 'compile',
 			message: 'compiling',
+			preview: 'compiling',
+			expandable: false,
+			markdown: '',
+		});
+	});
+
+	it('gives a rendered prompt a one-line preview and the markdown its expansion panel shows', async () => {
+		fixture.addLog('2026-08-16', [
+			line('compile', 'info', '[rendered prompt]\n# Plan\n\n- first', '2026-08-16T10:01:10.000Z'),
+		]);
+		const logs = (await call({ q: 'rendered prompt' })).body as LogsBody;
+		expect(logs.entries).toHaveLength(1);
+		expect(logs.entries[0]).toMatchObject({
+			message: '[rendered prompt]\n# Plan\n\n- first',
+			preview: '[rendered prompt] # Plan - first',
+			expandable: true,
+			markdown: '[rendered prompt]\n# Plan\n\n- first',
 		});
 	});
 

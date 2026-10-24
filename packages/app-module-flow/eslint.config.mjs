@@ -1,5 +1,6 @@
 import eslint from '@eslint/js';
 import prettierConfig from 'eslint-config-prettier';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +15,7 @@ export default tseslint.config(
 	eslint.configs.recommended,
 	...tseslint.configs.recommended,
 	{
-		files: ['src/**/*.ts'],
+		files: ['src/**/*.ts', 'src/**/*.tsx'],
 		languageOptions: {
 			parser: tseslint.parser,
 			parserOptions: {
@@ -24,12 +25,18 @@ export default tseslint.config(
 			},
 			globals: {
 				...globals.node,
+				...globals.browser,
 			},
 		},
-		rules: baseRules,
+		plugins: { 'react-hooks': reactHooksPlugin },
+		rules: {
+			...baseRules,
+			'react-hooks/rules-of-hooks': 'error',
+			'react-hooks/exhaustive-deps': 'error',
+		},
 	},
 	{
-		files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+		files: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/*.spec.ts'],
 		rules: testFileRules,
 	},
 	typeAwareConfig(__dirname),

@@ -66,6 +66,9 @@ beforeAll(() => {
 	cpSync(join(packageDir, 'package.json'), join(providerDir, 'package.json'));
 	cpSync(join(packageDir, 'src/dsl-views'), join(providerDir, 'src/dsl-views'), { recursive: true });
 	writeFileSync(join(providerDir, 'src/backend/index.ts'), 'export default function () {}\n');
+	// The manifest declares a dslLib, so the check wants the entry; an empty registry keeps the copy free of the markdown dependencies.
+	mkdirSync(join(providerDir, 'src/dsl-components'), { recursive: true });
+	writeFileSync(join(providerDir, 'src/dsl-components/index.ts'), 'export default [];\n');
 	writeFileSync(join(providerDir, '.gitignore'), 'dist-module\n');
 	const packaged = runCli(['package', '.'], providerDir);
 	if (packaged.status !== 0) {

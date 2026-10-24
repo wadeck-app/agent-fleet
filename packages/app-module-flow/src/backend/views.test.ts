@@ -358,7 +358,7 @@ describe('execution logs page', () => {
 		const table = collectNodes(parseView(file).document, 'DataTable')[0]!;
 		expect(table['rows']).toBe('$sources.logs.entries');
 		const columns = table['columns'] as Record<string, unknown>[];
-		expect(columns.map(column => column['key'])).toEqual(['timestamp', 'level', 'stepId', 'message']);
+		expect(columns.map(column => column['key'])).toEqual(['timestamp', 'level', 'stepId', 'preview']);
 		expect(columns[0]).toMatchObject({ format: 'time', nowrap: true });
 		expect(Object.keys(columns[1]!['badge'] as object)).toEqual(expect.arrayContaining([...LOG_LEVELS]));
 		expect(table['emptyMessage']).toBe('$sources.logs.notice');

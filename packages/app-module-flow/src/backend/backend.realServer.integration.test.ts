@@ -91,6 +91,24 @@ function packageModule(out: string): void {
 	}
 }
 
+/**
+ * The app-core-cli in node_modules lags the server build the manifest ranges name (dsl-ui >=2026.10.23-136): its shell
+ * refuses a dslLib built for a newer one. This test calls the routes, not the components, and manifest.test.ts pins the
+ * ranges, so the packaged copy asks for any shell. Fails loudly when the packaged manifest has no dslLib ranges to relax.
+ */
+function acceptAnyShellVersion(builtModule: string): void {
+	const manifestPath = join(builtModule, 'manifest.json');
+	const packaged = JSON.parse(readFileSync(manifestPath, 'utf8')) as { dslLib?: { shared?: Record<string, string> } };
+	const shared = packaged.dslLib?.shared;
+	if (shared === undefined) {
+		throw new Error(`${manifestPath} has no dslLib.shared: the module no longer declares its component ranges.`);
+	}
+	for (const name of ['@wadeck-app/dsl-ui', '@wadeck-app/dsl-renderer']) {
+		shared[name] = '>=0.0.0';
+	}
+	writeFileSync(manifestPath, JSON.stringify(packaged, null, 2));
+}
+
 function startServer(builtModule: string, xdgConfigHome: string): Promise<string> {
 	return new Promise((resolve, reject) => {
 		let output = '';
@@ -139,6 +157,7 @@ describe('the packaged module through a real app-core server', () => {
 			writeFlowConfig(join(workDir, 'xdg', 'flow'));
 			const builtModule = join(workDir, 'module');
 			packageModule(builtModule);
+			acceptAnyShellVersion(builtModule);
 			baseUrl = await startServer(builtModule, join(workDir, 'xdg'));
 		},
 		SERVER_START_TIMEOUT_MS + PACKAGE_TIMEOUT_MS + 5_000

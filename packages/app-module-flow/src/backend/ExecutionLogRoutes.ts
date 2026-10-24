@@ -9,6 +9,7 @@ import {
 } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
+import { displayLogMessage } from './LogMessageDisplay.js';
 
 export const DEFAULT_EXECUTION_LOG_LIMIT = 100;
 export const MAX_EXECUTION_LOG_LIMIT = 1000;
@@ -62,7 +63,10 @@ export function registerExecutionLogRoutes(ctx: ModuleContext, service: FlowQuer
 			const search = optionalString(query, 'q');
 			const logs = service.readExecutionLogs(id, { limit, page, stepId, level, search });
 			const notice = noticeOf(logs, stepId !== undefined || level !== undefined || search !== undefined);
-			const entries = logs.entries.map(entry => ({ ...entry, message: stripForServing(entry.message) }));
+			const entries = logs.entries.map(entry => {
+				const message = stripForServing(entry.message);
+				return { ...entry, message, ...displayLogMessage(message) };
+			});
 			const recordedOutput = stripForServing(logs.recordedOutput);
 			return reply.code(200).send({
 				...logs,

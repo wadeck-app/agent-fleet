@@ -9,6 +9,8 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json --noEmit",
 		"check": "app-core-cli check .",
+		"css": "tailwindcss -c tailwind.config.ts -i src/dsl-components/tailwind.input.css -o src/dsl-components/style.css",
+		"prebundle": "npm run css",
 		"bundle": "app-core-cli package .",
 		"test": "vitest run --bail=1",
 		"test:watch": "vitest",
@@ -19,14 +21,32 @@
 	},
 	"dependencies": {
 		"@wadeck-app/shared-cli": "latest",
-		"flow-core": "file:../flow-core"
+		"flow-core": "file:../flow-core",
+		"react-markdown": "^10.1.0",
+		"remark-gfm": "^4.0.1"
 	},
 	"devDependencies": {
+		"@testing-library/dom": "^10.0.0",
+		"@testing-library/jest-dom": "^6.1.5",
+		"@testing-library/react": "^16.3.1",
 		"@types/js-yaml": "^4.0.9",
 		"@types/node": "^24.0.0",
+		"@types/react": "^19.0.0",
+		"@types/react-dom": "^19.0.0",
+		"@types/semver": "^7.5.8",
 		"@wadeck-app/app-core-cli": "latest",
 		"@wadeck-app/app-core-sdk": "latest",
+		"@wadeck-app/dsl-renderer": "latest",
+		"@wadeck-app/dsl-ui": "latest",
+		"autoprefixer": "^10.0.0",
 		"js-yaml": "^4.1.1",
+		"jsdom": "^23.0.1",
+		"postcss": "^8.0.0",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"react-router-dom": "^7.0.0",
+		"semver": "^7.6.0",
+		"tailwindcss": "^3.4.0",
 		"typescript": "^7.0.0",
 		"vitest": "^4.0.14"
 	},

@@ -1,0 +1,3 @@
+/* Source of style.css. No `@tailwind base` (the shell has Tailwind's base layer and the dsl-ui palette). */
+@tailwind components;
+@tailwind utilities;
