@@ -184,6 +184,13 @@ async function startDaemon(
 				);
 				const logWriter = new LogWriter(logsDir, config.logs.retainDays, daemonSecrets.masks);
 				executionStore.pruneOldExecutions();
+				// Nothing can be live yet: a record still queued/running belongs to a previous daemon.
+				const interrupted = executionStore.reconcileInterruptedExecutions();
+				writeDaemonLog(
+					logsDir,
+					'info',
+					`Reconciled ${String(interrupted)} execution(s) interrupted by a previous daemon stop (marked failed; re-run with flow run)`
+				);
 				// Workspace pruning is per-project and so runs per request, not here:
 				// this daemon is shared across projects and its launch directory says
 				// nothing about whose workspaces should be pruned.

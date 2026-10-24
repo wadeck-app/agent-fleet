@@ -296,12 +296,84 @@ export class ExecutionStore {
 			status,
 			completedAt: new Date().toISOString(),
 			currentSteps: [],
+			steps: this.withRunningStepsFailed(
+				current.steps,
+				current.lastError ?? 'the execution ended while this step was still running'
+			),
 		};
 		const written = this.write(finished);
 		if (current.status !== status) {
 			this.notify({ kind: status === 'completed' ? 'execution-completed' : 'execution-failed', state: written });
 		}
 		return finished;
+	}
+
+	/** A finished execution has no step in progress: any step still `running` is failed with `error`. */
+	private withRunningStepsFailed(steps: ExecutionState['steps'], error: string): ExecutionState['steps'] {
+		const completedAt = new Date().toISOString();
+		return Object.fromEntries(
+			Object.entries(steps).map(([id, step]) => [
+				id,
+				step.status === 'running'
+					? { ...step, status: 'failed' as StepStatus, error: step.error ?? error, completedAt }
+					: step,
+			])
+		);
+	}
+
+	/**
+	 * Called once when the daemon starts, before it accepts work: all execution state lives in the
+	 * daemon's memory, so a record still `queued`/`running` now belongs to a previous daemon and can
+	 * never finish. Fails it (running steps failed, pending steps settled as not run) with the reason
+	 * and how to re-run, and publishes the usual execution-failed transition. Idempotent.
+	 * An unreadable record is reported on stderr and skipped. Returns how many were reconciled.
+	 */
+	reconcileInterruptedExecutions(): number {
+		let names: string[];
+		try {
+			names = fs.readdirSync(this.executionsDir).filter(name => name.endsWith('.json'));
+		} catch (err) {
+			process.stderr.write(
+				`[ExecutionStore] cannot list ${this.executionsDir} to reconcile interrupted executions: ${String(err)}\n`
+			);
+			return 0;
+		}
+		let reconciled = 0;
+		for (const name of names) {
+			try {
+				const current = this.read(path.basename(name, '.json'));
+				if (current.status !== 'queued' && current.status !== 'running') {
+					continue;
+				}
+				this.interrupt(current);
+				reconciled++;
+			} catch (err) {
+				process.stderr.write(
+					`[ExecutionStore] could not reconcile ${name} (left untouched): ${String(err)}. Inspect or delete ${path.join(this.executionsDir, name)}.\n`
+				);
+			}
+		}
+		return reconciled;
+	}
+
+	private interrupt(current: ExecutionState): void {
+		const reason = `interrupted: the daemon restarted while this execution was running; re-run it with flow run ${current.flowFile}`;
+		const completedAt = new Date().toISOString();
+		const steps = this.withRunningStepsFailed(current.steps, reason);
+		for (const [id, step] of Object.entries(steps)) {
+			if (step.status === 'pending') {
+				steps[id] = { ...step, status: 'completed', completedAt, skippedReason: `not run (${reason})` };
+			}
+		}
+		const written = this.write({
+			...current,
+			status: 'failed',
+			completedAt,
+			currentSteps: [],
+			lastError: reason,
+			steps,
+		});
+		this.notify({ kind: 'execution-failed', state: written });
 	}
 
 	/**
