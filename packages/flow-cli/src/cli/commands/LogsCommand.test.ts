@@ -1,9 +1,10 @@
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type FollowRuntime, logsCommand } from './LogsCommand';
+import { type FollowRuntime, createSystemFollowRuntime, logsCommand } from './LogsCommand';
 
 // Reading, tailing and formatting are covered in flow-core (logs/*.test.ts); this file covers what the
 // command adds: the "no log file" message, the stdout writes and the follow loop ended by SIGINT.
@@ -26,6 +27,7 @@ describe('logsCommand', () => {
 	});
 
 	afterEach(() => {
+		vi.useRealTimers();
 		fs.rmSync(configDir, { recursive: true, force: true });
 	});
 
@@ -110,13 +112,24 @@ describe('logsCommand', () => {
 		await done;
 	});
 
-	it('default runtime: follows with a real timer until SIGINT and leaves no SIGINT listener behind', async () => {
-		const sigintBefore = process.listenerCount('SIGINT');
-		const done = logsCommand(configDir, { follow: true, lines: 50, human: false }, write);
+	// Fake timer and a private emitter: nothing real is waited for and nothing is emitted on the shared process.
+	it('system runtime: polls on its timer until SIGINT arrives on its signal source, leaving no timer nor listener', async () => {
+		vi.useFakeTimers();
+		const signals = new EventEmitter();
+		const done = logsCommand(
+			configDir,
+			{ follow: true, lines: 50, human: false },
+			write,
+			createSystemFollowRuntime(signals)
+		);
 		fs.writeFileSync(logFile, 'late line\n');
-		await vi.waitFor(() => expect(out.join('')).toContain('late line\n'), { timeout: 10_000, interval: 50 });
-		process.emit('SIGINT');
+		expect(out.join('')).not.toContain('late line');
+		vi.advanceTimersByTime(250);
+		expect(out.join('')).toContain('late line\n');
+
+		signals.emit('SIGINT');
 		await done;
-		expect(process.listenerCount('SIGINT')).toBe(sigintBefore);
+		expect(signals.listenerCount('SIGINT')).toBe(0);
+		expect(vi.getTimerCount()).toBe(0);
 	});
 });

@@ -1,15 +1,15 @@
 // Integration tests for flow CLI entry point.
-// These tests build the bundle with a fixed test version and execute it via node directly.
+// These tests execute the bundle built by the bundling project global setup, via node directly.
 // They verify:
 //   1. `flow cli self-check` does NOT produce duplicate lines in combined stdout+stderr
 //   2. `flow cli update` produces at least one line of output (not silent)
 //   3. `flow logs` (unknown command) exits with code 1 and reports "Unknown command"
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // agent-fleet root (4 levels up from src/cli/: src/cli -> src -> flow-cli -> packages -> agent-fleet)
@@ -17,34 +17,7 @@ const agentFleetRoot = path.resolve(__dirname, '../../../..');
 const bundlePath = path.resolve(agentFleetRoot, 'packages/flow-cli/dist-bundle/flow.cjs');
 const updaterBundlePath = path.resolve(agentFleetRoot, 'packages/flow-cli/dist-bundle/flow-updater.cjs');
 
-const TEST_VERSION = '0.0.0-test-integration';
-
-beforeAll(() => {
-	// `bundle` runs esbuild over dist/, so src must be compiled first or the bundle under test is
-	// whatever stale dist/ happens to be on disk.
-	// Use shell: true so npm resolves correctly on Windows (npm.cmd)
-	for (const script of ['build', 'bundle']) {
-		execFileSync('npm', ['run', script, '--workspace', 'packages/flow-cli'], {
-			cwd: agentFleetRoot,
-			encoding: 'utf-8',
-			timeout: 120000,
-			env: { ...process.env, BUNDLE_VERSION: TEST_VERSION },
-			shell: true,
-		});
-	}
-}, 180000);
-
-afterAll(() => {
-	// Clean up the test bundle to avoid stale artifacts
-	for (const p of [bundlePath, updaterBundlePath]) {
-		try {
-			if (fs.existsSync(p)) fs.unlinkSync(p);
-		} catch {
-			// ignore cleanup errors
-		}
-	}
-});
-
+// The bundle is built once, before any test file, by the bundling project global setup (src/test-utils/BundleGlobalSetup.ts).
 function runFlow(args: string[], extraEnv: Record<string, string> = {}): ReturnType<typeof spawnSync> {
 	return spawnSync(process.execPath, [bundlePath, ...args], {
 		env: {

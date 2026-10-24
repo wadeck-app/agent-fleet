@@ -19,15 +19,18 @@ export interface FollowRuntime {
 	onInterrupt(handler: () => void): void;
 }
 
-const systemFollowRuntime: FollowRuntime = {
-	every: (ms, tick) => {
-		const timer = setInterval(tick, ms);
-		return () => clearInterval(timer);
-	},
-	onInterrupt: handler => {
-		process.once('SIGINT', handler);
-	},
-};
+/** Real timer plus SIGINT from `signals` (the process by default; tests pass their own emitter). */
+export function createSystemFollowRuntime(signals: Pick<NodeJS.EventEmitter, 'once'> = process): FollowRuntime {
+	return {
+		every: (ms, tick) => {
+			const timer = setInterval(tick, ms);
+			return () => clearInterval(timer);
+		},
+		onInterrupt: handler => {
+			signals.once('SIGINT', handler);
+		},
+	};
+}
 
 /**
  * `flow cli logs`: prints the tail of today's daemon log, then optionally follows it.
@@ -42,7 +45,7 @@ export async function logsCommand(
 	configDir: string,
 	options: LogsCommandOptions,
 	write: (text: string) => void = text => void process.stdout.write(text),
-	runtime: FollowRuntime = systemFollowRuntime
+	runtime: FollowRuntime = createSystemFollowRuntime()
 ): Promise<void> {
 	const initial = FlowQueryService.forConfigDir(configDir).readLogs({ lines: options.lines, human: options.human });
 	if (!initial.exists) {

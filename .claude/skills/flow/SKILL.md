@@ -118,6 +118,32 @@ Validate a flow file against the schema and engine rules. Exits 0 on valid (warn
 flow validate my-flow.yml
 ```
 
+### Secrets
+
+A secret is an input declared `type: password`. The flow file never holds the value: at run time you pass a reference, and the daemon resolves it before any step starts.
+
+```yaml
+inputs:
+  API_TOKEN:
+    type: password
+    required: true
+steps:
+  - id: call-api
+    type: script
+    secrets: [API_TOKEN] # the step gets env var API_TOKEN; other steps never see it
+    script: curl -s -H "Authorization: Bearer $API_TOKEN" https://example.invalid/api/status
+```
+
+```bash
+flow run my-flow.yml --inputs API_TOKEN=env://MY_API_TOKEN   # read from the DAEMON environment
+flow run my-flow.yml --inputs API_TOKEN=file://./secrets/api-token   # relative path, no traversal
+```
+
+- Only `env://` and `file://` references are accepted (no literal, no `input://`, no `value://`). A secret needs at least 8 characters.
+- Use it in a `script` step through `secrets: [NAME]` or `${{ inputs.NAME }}`. `flow validate` refuses a secret in a model, `user_intervention` or `subflow` step and in flow-level `env`.
+- The exact value (also JSON-escaped, URL-encoded, base64, hex) is replaced by `[secret:NAME]` in records, logs, CLI output and HTTP pages. No pattern or name guessing: an env var that is not a declared secret is NOT masked, so declare every secret you use.
+- `flow show <file>` lists each secret (name, source kind, steps), never a value. Full reference: `flow docs`, section Secrets.
+
 ### flow run
 
 Run a flow by file path or registered flow ID. **Non-interactive only** — any step of type `user_intervention` (shown as `(!)` in `flow show`) will cause the command to throw immediately.

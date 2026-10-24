@@ -1,10 +1,15 @@
+import { UpdateManager } from '@wadeck-app/shared-cli';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FlowConfigLoader } from '../config/FlowConfig.js';
 import { observeFor } from '../test-utils/WaitHelpers';
+import { Daemon, declaresPlugins, loadFlowHooks, writeDaemonLog } from './Daemon.js';
 
+// Daemon.js is imported statically: dynamic imports inside the tests put the cold load of the daemon module graph
+// (1.7 s idle, more under load) inside the first test's 5 s timeout.
 // Test the writeDaemonLog helper (exported from Daemon.ts)
 describe('writeDaemonLog', () => {
 	let tmpDir: string;
@@ -18,7 +23,6 @@ describe('writeDaemonLog', () => {
 	});
 
 	it('creates NDJSON log file with daemon-started entry', async () => {
-		const { writeDaemonLog } = await import('./Daemon.js');
 		writeDaemonLog(tmpDir, 'info', 'Daemon started');
 
 		const today = new Date().toISOString().slice(0, 10);
@@ -33,7 +37,6 @@ describe('writeDaemonLog', () => {
 	});
 
 	it('appends multiple entries to the same file', async () => {
-		const { writeDaemonLog } = await import('./Daemon.js');
 		writeDaemonLog(tmpDir, 'info', 'Daemon started');
 		writeDaemonLog(tmpDir, 'info', 'Daemon stopped');
 
@@ -57,7 +60,6 @@ describe('declaresPlugins', () => {
 	});
 
 	it('returns false when the config file does not exist', async () => {
-		const { declaresPlugins } = await import('./Daemon.js');
 		expect(declaresPlugins(path.join(tmpDir, 'config.yml'))).toBe(false);
 	});
 
@@ -65,7 +67,6 @@ describe('declaresPlugins', () => {
 	// shares a file with daemon settings, so file existence alone must not imply
 	// "plugins are configured" -- that forced a spurious "No workspace provider".
 	it('returns false for a daemon-only config carrying no plugins section', async () => {
-		const { declaresPlugins } = await import('./Daemon.js');
 		const configPath = path.join(tmpDir, 'config.yml');
 		fs.writeFileSync(configPath, 'autoUpdate: false\nqueue:\n  concurrency: 3\n', 'utf8');
 
@@ -73,7 +74,6 @@ describe('declaresPlugins', () => {
 	});
 
 	it('returns true when a plugins section is present', async () => {
-		const { declaresPlugins } = await import('./Daemon.js');
 		const configPath = path.join(tmpDir, 'config.yml');
 		fs.writeFileSync(configPath, 'plugins:\n  workspace:\n    use: wt\n', 'utf8');
 
@@ -81,7 +81,6 @@ describe('declaresPlugins', () => {
 	});
 
 	it('throws on malformed YAML rather than guessing', async () => {
-		const { declaresPlugins } = await import('./Daemon.js');
 		const configPath = path.join(tmpDir, 'config.yml');
 		fs.writeFileSync(configPath, 'plugins:\n  workspace: [unclosed\n', 'utf8');
 
@@ -102,7 +101,6 @@ describe('loadFlowHooks', () => {
 	});
 
 	it('reads the hooks section from the project .flow/config.yml', async () => {
-		const { loadFlowHooks } = await import('./Daemon.js');
 		fs.mkdirSync(path.join(tmpDir, '.flow'), { recursive: true });
 		fs.writeFileSync(
 			path.join(tmpDir, '.flow', 'config.yml'),
@@ -115,7 +113,6 @@ describe('loadFlowHooks', () => {
 
 	// Walk-up behaviour: a run started in a subdirectory must still find the hooks.
 	it('resolves hooks from a subdirectory of the project', async () => {
-		const { loadFlowHooks } = await import('./Daemon.js');
 		fs.mkdirSync(path.join(tmpDir, '.flow'), { recursive: true });
 		fs.writeFileSync(
 			path.join(tmpDir, '.flow', 'config.yml'),
@@ -129,7 +126,6 @@ describe('loadFlowHooks', () => {
 	});
 
 	it('returns no hooks when the project has no config file', async () => {
-		const { loadFlowHooks } = await import('./Daemon.js');
 		// A .git root makes this a project without giving it a .flow/config.yml.
 		fs.mkdirSync(path.join(tmpDir, '.git'), { recursive: true });
 
@@ -137,7 +133,6 @@ describe('loadFlowHooks', () => {
 	});
 
 	it('throws on malformed YAML instead of silently dropping every hook', async () => {
-		const { loadFlowHooks } = await import('./Daemon.js');
 		fs.mkdirSync(path.join(tmpDir, '.flow'), { recursive: true });
 		fs.writeFileSync(path.join(tmpDir, '.flow', 'config.yml'), 'hooks:\n  onFlowEnd: [unclosed\n', 'utf8');
 
@@ -162,11 +157,7 @@ describe('periodic update check', () => {
 		// Real spawn is replaced with a spy: scheduleBackgroundUpdate otherwise launches the
 		// real flow-updater.cjs child process against the real user config dir (D#TBD).
 		fs.writeFileSync(path.join(tmpDir, 'config.yml'), 'checkInterval: 20ms\n', 'utf8');
-		const { UpdateManager } = await import('@wadeck-app/shared-cli');
 		const scheduleSpy = vi.spyOn(UpdateManager.prototype, 'scheduleBackgroundUpdate').mockImplementation(() => {});
-
-		const { Daemon } = await import('./Daemon.js');
-		const { FlowConfigLoader } = await import('../config/FlowConfig.js');
 		const handle = await Daemon.start(
 			{ ...FlowConfigLoader.DEFAULT, worker: { ...FlowConfigLoader.DEFAULT.worker, wsPort: 0 } },
 			tmpDir,
@@ -199,11 +190,7 @@ describe('periodic update check', () => {
 	it('tells the spawned updater to skip its own throttle, since the daemon already owns the schedule', async () => {
 		const previousEnv = process.env['UPDATER_SKIP_THROTTLE'];
 		delete process.env['UPDATER_SKIP_THROTTLE'];
-		const { UpdateManager } = await import('@wadeck-app/shared-cli');
 		const scheduleSpy = vi.spyOn(UpdateManager.prototype, 'scheduleBackgroundUpdate').mockImplementation(() => {});
-
-		const { Daemon } = await import('./Daemon.js');
-		const { FlowConfigLoader } = await import('../config/FlowConfig.js');
 		const handle = await Daemon.start(
 			{ ...FlowConfigLoader.DEFAULT, worker: { ...FlowConfigLoader.DEFAULT.worker, wsPort: 0 } },
 			tmpDir,

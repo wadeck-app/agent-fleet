@@ -3,6 +3,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FlowConfigLoader } from '../config/FlowConfig.js';
+import { Daemon } from './Daemon.js';
+
 const registration = vi.hoisted(() => ({ registerWithAppCore: vi.fn() }));
 vi.mock('./AppCoreRegistration.js', () => registration);
 
@@ -25,9 +28,9 @@ function readDaemonLog(): { level: string; msg: string }[] {
 		.map(line => JSON.parse(line) as { level: string; msg: string });
 }
 
-async function startDaemon(options: { appCoreModules?: { id: string; manifestPath: string }[] }) {
-	const { Daemon } = await import('./Daemon.js');
-	const { FlowConfigLoader } = await import('../config/FlowConfig.js');
+// Daemon is imported statically: a dynamic import inside the first test put the cold load of the whole daemon module
+// graph (2 s on an idle machine) inside that test's 5 s timeout.
+function startDaemon(options: { appCoreModules?: { id: string; manifestPath: string }[] }) {
 	return Daemon.start(
 		{ ...FlowConfigLoader.DEFAULT, worker: { ...FlowConfigLoader.DEFAULT.worker, wsPort: 0 } },
 		tmpDir,

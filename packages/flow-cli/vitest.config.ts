@@ -21,8 +21,8 @@ function resolveJsToTs(): Plugin {
 	};
 }
 
-// These two files rebuild and delete packages/flow-cli/dist-bundle in beforeAll/afterAll. Run in parallel, one
-// removes the folder under the other (ENOENT on flow-updater.cjs), so they share a project that runs files one by one.
+// These two files execute dist-bundle/, built once by the globalSetup of the `bundling` project (a rebuild per file
+// rewrote dist/ and deleted bundles under the other file and under the unit tests).
 const BUNDLING_TESTS = ['src/__tests__/CliSmoke.integration.test.ts', 'src/cli/FlowIndex.integration.test.ts'];
 
 export default defineConfig({
@@ -44,7 +44,14 @@ export default defineConfig({
 					exclude: ['**/node_modules/**', '**/dist/**', ...BUNDLING_TESTS],
 				},
 			},
-			{ extends: true, test: { name: 'bundling', include: BUNDLING_TESTS, fileParallelism: false } },
+			{
+				extends: true,
+				test: {
+					name: 'bundling',
+					include: BUNDLING_TESTS,
+					globalSetup: ['src/test-utils/BundleGlobalSetup.ts'],
+				},
+			},
 		],
 		mockReset: true,
 		restoreMocks: true,

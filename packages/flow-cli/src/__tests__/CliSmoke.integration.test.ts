@@ -13,13 +13,14 @@
  * are used: `--help` alone imports the whole command graph, which is where a resolution or
  * module-level error surfaces.
  */
-import { type ChildProcess, execFileSync, spawn, spawnSync } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
+import { OWN_PROCESS_GROUP, killProcessTree } from '../test-utils/ProcessTree';
 import { pollUntil } from '../test-utils/WaitHelpers';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -129,9 +130,6 @@ describe('flow CLI starts', () => {
 const agentFleetRoot = resolve(__dirname, '..', '..', '..', '..');
 const bundlePath = resolve(agentFleetRoot, 'packages', 'flow-cli', 'dist-bundle', 'flow.cjs');
 
-/** The bundler refuses to run without a version, so one is supplied here (see ci/scripts/bundle.ts). */
-const TEST_BUNDLE_VERSION = '0.0.0-test-daemon-plugins';
-
 /**
  * Both `plugins.workspace` and `plugins.approval`: each is resolved through PluginLoader, and the
  * registry lookup that broke happens per extension point, so one section alone would leave half
@@ -189,6 +187,8 @@ function spawnBundledDaemon(installedFlow: string, projectDir: string, configHom
 		cwd: projectDir,
 		env,
 		stdio: ['ignore', 'pipe', 'pipe'],
+		// Own process group on POSIX so the whole daemon tree can be killed (see killProcessTree).
+		detached: OWN_PROCESS_GROUP,
 	});
 
 	let output = '';
@@ -200,36 +200,13 @@ function spawnBundledDaemon(installedFlow: string, projectDir: string, configHom
 	return { child, output: () => output, exit: () => exit };
 }
 
-async function stopDaemon(daemon: SpawnedDaemon): Promise<void> {
-	if (daemon.exit() !== undefined) return;
-	daemon.child.kill();
-	if (await pollUntil(() => daemon.exit() !== undefined, { timeoutMs: 5_000, intervalMs: 100 })) return;
-	// Only ever this one child: nothing else is signalled.
-	daemon.child.kill('SIGKILL');
-}
-
 describe('the standalone bundle in daemon mode', () => {
-	beforeAll(() => {
-		// `bundle` runs esbuild over dist/, so src must be compiled first or the bundle under test
-		// is whatever stale dist/ happens to be on disk. shell: true so npm resolves on Windows.
-		for (const script of ['build', 'bundle']) {
-			execFileSync('npm', ['run', script, '--workspace', 'packages/flow-cli'], {
-				cwd: agentFleetRoot,
-				encoding: 'utf-8',
-				timeout: 300_000,
-				env: { ...process.env, BUNDLE_VERSION: TEST_BUNDLE_VERSION },
-				shell: true,
-			});
-		}
-	}, 360_000);
-
 	it('starts and publishes its port for a project that declares plugins', async () => {
 		// Fails loudly rather than skipping: a missing bundle means this test proves nothing.
 		if (!existsSync(bundlePath)) {
 			throw new Error(
 				`The standalone bundle is missing at "${bundlePath}". ` +
-					`Build it with: BUNDLE_VERSION=${TEST_BUNDLE_VERSION} npm run build --workspace packages/flow-cli && ` +
-					`BUNDLE_VERSION=${TEST_BUNDLE_VERSION} npm run bundle --workspace packages/flow-cli`
+					'It is built once by the bundling project global setup (src/test-utils/BundleGlobalSetup.ts); run the test through vitest.'
 			);
 		}
 
@@ -259,9 +236,12 @@ describe('the standalone bundle in daemon mode', () => {
 				`the daemon never wrote "${portFile}", so no client could reach it.\nIts output:\n${daemon.output() || '(nothing at all)'}`
 			).toBe(true);
 		} finally {
-			await stopDaemon(daemon);
+			// The daemon runs with projectDir as working directory: on Windows that locks the directory, and so does any
+			// process the daemon started. Kill the whole tree and wait for it, then remove. rmSync's own bounded retry
+			// (5 x 100 ms) only covers the OS releasing the handle a moment after the process is gone; it still throws.
+			await killProcessTree(daemon.child);
 			for (const dir of [installDir, projectDir, configHome]) {
-				rmSync(dir, { recursive: true, force: true });
+				rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 			}
 		}
 	}, 90_000);

@@ -120,6 +120,14 @@ vi.mock('@wadeck-app/shared-cli', async importOriginal => {
 	};
 });
 
+// Several tests doMock '@wadeck-app/singleton-daemon-kit' and then import WorkerCommand again. A doMock only reaches
+// modules evaluated AFTER it, so the first such import must not be served from the module cache filled by this file's
+// static import above. Without this reset, a test running before any other reset (alone, or first after a shuffle)
+// got the real kit and talked to the REAL daemon of the machine running the tests.
+beforeEach(() => {
+	vi.resetModules();
+});
+
 describe('WorkerCommand verbose startup banner', () => {
 	let consoleLogSpy: ReturnType<typeof vi.spyOn>;
 

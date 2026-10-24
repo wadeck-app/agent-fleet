@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Hoisted state shared between the mocked modules and the tests below.
@@ -178,6 +178,12 @@ async function surviveHealthCheck(): Promise<void> {
 
 describe('WorkerCommand -- self re-exec on version bump', () => {
 	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	// Every test re-imports WorkerCommand after resetModules (fresh module state). The first import transforms the whole
+	// module graph (1.4 s idle): done here, it is not charged to the first test's 5 s timeout.
+	beforeAll(async () => {
+		await import('./WorkerCommand');
+	});
 
 	beforeEach(async () => {
 		vi.resetModules();
