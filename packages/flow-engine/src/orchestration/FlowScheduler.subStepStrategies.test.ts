@@ -389,3 +389,134 @@ describe('FlowScheduler -- sub-step depending on a failed sibling', () => {
 		expect(scheduler.takeSkippedSteps()).toEqual([]);
 	});
 });
+
+// --- transitive settling: nested sub-steps and dependents of nested sub-steps ---------
+
+describe('FlowScheduler -- wait-all settles not-run steps transitively (parent: and depends:)', () => {
+	/**
+	 * Shape of the "waves" repro: parent P (wait-all); wave 1 = W1 (fails); W2 depends on W1 and owns
+	 * the nested sub-step V (`parent: W2`); G is a child of P that depends on V; X depends on W1;
+	 * E2E depends on G and X.
+	 */
+	function setupWaves(extraChildren: SchedulerStep[] = []): FlowScheduler {
+		const scheduler = new FlowScheduler(makeContext());
+		scheduler.start([makeStep('P', [], { subStepStrategy: 'wait-all' })], new Map([['P', []]]));
+		scheduler.acknowledge('P');
+		scheduler.inject([
+			makeStep('W1', [], { parent: 'P' }),
+			makeStep('W2', ['W1'], { parent: 'P' }),
+			makeStep('V', [], { parent: 'W2' }),
+			makeStep('G', ['V'], { parent: 'P' }),
+			makeStep('X', ['W1'], { parent: 'P' }),
+			makeStep('E2E', ['G', 'X'], { parent: 'P' }),
+			...extraChildren,
+		]);
+		succeed(scheduler, 'P');
+		scheduler.acknowledge('W1');
+		return scheduler;
+	}
+
+	const skippedIds = (scheduler: FlowScheduler): string[] =>
+		scheduler
+			.takeSkippedSteps()
+			.map(s => s.stepId)
+			.sort();
+
+	it('settles a nested child of a not-run step and fires the parent', () => {
+		const scheduler = new FlowScheduler(makeContext());
+		scheduler.start([makeStep('P', [], { subStepStrategy: 'wait-all' })], new Map([['P', []]]));
+		scheduler.acknowledge('P');
+		scheduler.inject([
+			makeStep('W1', [], { parent: 'P' }),
+			makeStep('W2', ['W1'], { parent: 'P' }),
+			makeStep('V', [], { parent: 'W2' }),
+		]);
+		succeed(scheduler, 'P');
+		scheduler.acknowledge('W1');
+
+		const ready = fail(scheduler, 'W1', 'error-w1');
+
+		expect(ready.some(r => r.stepId === 'P')).toBe(true);
+		expect(scheduler.takeSkippedSteps()).toEqual([
+			{ stepId: 'W2', reason: "not run: sub-step 'W1' it depends on did not succeed, so 'W2' could not start" },
+			{ stepId: 'V', reason: "not run: its parent 'W2' was not run" },
+		]);
+	});
+
+	it('settles a dependent of a nested child of a not-run step', () => {
+		const scheduler = new FlowScheduler(makeContext());
+		scheduler.start([makeStep('P', [], { subStepStrategy: 'wait-all' })], new Map([['P', []]]));
+		scheduler.acknowledge('P');
+		scheduler.inject([
+			makeStep('W1', [], { parent: 'P' }),
+			makeStep('W2', ['W1'], { parent: 'P' }),
+			makeStep('V', [], { parent: 'W2' }),
+			makeStep('G', ['V'], { parent: 'P' }),
+		]);
+		succeed(scheduler, 'P');
+		scheduler.acknowledge('W1');
+
+		const ready = fail(scheduler, 'W1', 'error-w1');
+
+		expect(ready.some(r => r.stepId === 'P')).toBe(true);
+		const skipped = scheduler.takeSkippedSteps();
+		expect(skipped.map(s => s.stepId).sort()).toEqual(['G', 'V', 'W2']);
+		expect(skipped.find(s => s.stepId === 'G')!.reason).toBe(
+			"not run: sub-step 'V' it depends on did not succeed, so 'G' could not start"
+		);
+	});
+
+	it('settles the full waves chain (parent-of and depends-on mixed) and relaunches P with only the failed wave feedback', () => {
+		const scheduler = setupWaves();
+
+		const ready = fail(scheduler, 'W1', 'error-w1');
+
+		expect(ready.some(r => r.stepId === 'P')).toBe(true);
+		expect(scheduler.hasFailed()).toBe(false);
+		expect(skippedIds(scheduler)).toEqual(['E2E', 'G', 'V', 'W2', 'X']);
+		expect(scheduler.getSubStepErrors('P')).toEqual(['error-w1']);
+	});
+
+	it('still waits for an unrelated running sibling, then fires the parent', () => {
+		const scheduler = setupWaves([makeStep('U', [], { parent: 'P' })]);
+		scheduler.acknowledge('U');
+
+		expect(fail(scheduler, 'W1', 'error-w1').some(r => r.stepId === 'P')).toBe(false);
+		expect(succeed(scheduler, 'U').some(r => r.stepId === 'P')).toBe(true);
+	});
+
+	it('terminates on a dependency cycle between not-run steps', () => {
+		const scheduler = new FlowScheduler(makeContext());
+		scheduler.start([makeStep('P', [], { subStepStrategy: 'wait-all' })], new Map([['P', []]]));
+		scheduler.acknowledge('P');
+		scheduler.inject([
+			makeStep('W1', [], { parent: 'P' }),
+			makeStep('A', ['W1', 'B'], { parent: 'P' }),
+			makeStep('B', ['A'], { parent: 'P' }),
+		]);
+		succeed(scheduler, 'P');
+		scheduler.acknowledge('W1');
+
+		fail(scheduler, 'W1', 'error-w1');
+
+		expect(skippedIds(scheduler)).toEqual(['A', 'B']);
+	});
+
+	it('restart-on-first-failure: unchanged, parent restarts at once and nothing is reported skipped', () => {
+		const scheduler = new FlowScheduler(makeContext());
+		scheduler.start([makeStep('P', [])], new Map([['P', []]]));
+		scheduler.acknowledge('P');
+		scheduler.inject([
+			makeStep('W1', [], { parent: 'P' }),
+			makeStep('W2', ['W1'], { parent: 'P' }),
+			makeStep('V', [], { parent: 'W2' }),
+		]);
+		succeed(scheduler, 'P');
+		scheduler.acknowledge('W1');
+
+		const ready = fail(scheduler, 'W1', 'error-w1');
+
+		expect(ready.some(r => r.stepId === 'P')).toBe(true);
+		expect(scheduler.takeSkippedSteps()).toEqual([]);
+	});
+});

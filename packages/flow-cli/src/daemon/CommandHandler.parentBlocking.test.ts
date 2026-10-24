@@ -336,6 +336,30 @@ describe('CommandHandler — engine-side sub-step failures (stall watchdog, lost
 		expect(handler.hasActiveExecutions()).toBe(true);
 	});
 
+	// Sub-steps nested under a not-run sub-step, and their dependents, are not run either: all are
+	// recorded with their reason so `flow show` explains every step that never ran.
+	it('records nested sub-steps of a not-run sub-step and their dependents as not run, with reasons', async () => {
+		const handler = makeHandler();
+		const executionId = await startWaitAllFlow(handler);
+		handler.injectSteps(executionId, [
+			child('a'),
+			child('b', ['a']),
+			{ ...(child('v') as object), parent: 'b' } as never,
+			child('g', ['v']),
+		]);
+		handler.onStepCompleted(executionId, 'parent', {});
+
+		handler.onStepFailed(executionId, 'a', 'Script exited with code 1');
+
+		const recorded = new Map(mockExecStore.markStepSkipped.mock.calls.map(c => [c[1] as string, c[2] as string]));
+		expect([...recorded.keys()].sort()).toEqual(['b', 'g', 'v']);
+		expect(recorded.get('b')).toContain("sub-step 'a' it depends on did not succeed");
+		expect(recorded.get('v')).toContain("its parent 'b' was not run");
+		expect(recorded.get('g')).toContain("sub-step 'v' it depends on did not succeed");
+		expect(mockExecStore.markExecutionFailed).not.toHaveBeenCalled();
+		expect(handler.hasActiveExecutions()).toBe(true);
+	});
+
 	// What the stall watchdog and the lost-worker path call. Reached through the private outcomes
 	// collaborator because driving a real stall needs a full worker/assignment harness.
 	const failStepByEngine = (handler: CommandHandler, executionId: string, stepId: string, reason: string): void =>

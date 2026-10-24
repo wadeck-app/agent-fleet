@@ -613,31 +613,51 @@ export class FlowScheduler {
 	}
 
 	/**
-	 * Settles, as superseded, every not-yet-started sibling sub-step that (transitively) depends on a
-	 * child that will not succeed in this run. Only siblings under the same parent are touched.
+	 * Settles, as superseded, every not-yet-started step under `parentId` that can no longer run because
+	 * `childId` will not succeed in this run. The closure follows both relations until nothing new is
+	 * reached: a step that depends on a settled step, and a sub-step (`parent:`) of a settled step. Only
+	 * descendants of `parentId` are touched and a step is settled at most once, so cycles terminate.
 	 */
 	private settleDependentsOfUnsuccessfulChild(childId: string, parentId: string): void {
-		const siblings = this.parentToChildren.get(parentId) ?? new Set<string>();
-		const queue = [childId];
-		while (queue.length > 0) {
-			const current = queue.shift()!;
+		const scope = this.descendantsOf(parentId);
+		const worklist = [childId];
+		const settle = (stepId: string, reason: string): void => {
+			if (!scope.has(stepId) || !this.pendingDeps.has(stepId) || this.supersededSteps.has(stepId)) {
+				return;
+			}
+			this.pendingDeps.delete(stepId);
+			this.supersededSteps.add(stepId);
+			this.skippedReasons.set(stepId, reason);
+			worklist.push(stepId);
+		};
+		while (worklist.length > 0) {
+			const current = worklist.shift()!;
+			// Nested sub-steps first: they also depend implicitly on their parent, and "its parent was not run" is the accurate reason.
+			for (const nested of this.parentToChildren.get(current) ?? new Set<string>()) {
+				settle(nested, `not run: its parent '${current}' was not run`);
+			}
 			for (const dependent of this.reverseDeps.get(current) ?? new Set<string>()) {
-				if (
-					!siblings.has(dependent) ||
-					!this.pendingDeps.has(dependent) ||
-					this.supersededSteps.has(dependent)
-				) {
-					continue;
-				}
-				this.pendingDeps.delete(dependent);
-				this.supersededSteps.add(dependent);
-				this.skippedReasons.set(
+				settle(
 					dependent,
 					`not run: sub-step '${current}' it depends on did not succeed, so '${dependent}' could not start`
 				);
-				queue.push(dependent);
 			}
 		}
+	}
+
+	/** Every step nested, at any depth, under `rootId` through `parent:`. */
+	private descendantsOf(rootId: string): Set<string> {
+		const found = new Set<string>();
+		const worklist = [rootId];
+		while (worklist.length > 0) {
+			for (const child of this.parentToChildren.get(worklist.shift()!) ?? new Set<string>()) {
+				if (!found.has(child)) {
+					found.add(child);
+					worklist.push(child);
+				}
+			}
+		}
+		return found;
 	}
 
 	private ensureSubStepErrors(): Map<string, string[]> {
