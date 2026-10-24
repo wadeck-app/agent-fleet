@@ -79,6 +79,7 @@ export default defineConfig({
 			'shared-common': path.resolve(__dirname, '../shared-common/src'),
 			'shared-orch-worker': path.resolve(__dirname, '../shared-orch-worker/src'),
 			orchestrator: path.resolve(__dirname, '../orchestrator/src'),
+			'flow-core': path.resolve(__dirname, '../flow-core/src/index.ts'),
 			'flow-engine': path.resolve(__dirname, '../flow-engine/src'),
 			'test-utils': path.resolve(__dirname, '../test-utils/src'),
 			'@': path.resolve(__dirname, './src'),

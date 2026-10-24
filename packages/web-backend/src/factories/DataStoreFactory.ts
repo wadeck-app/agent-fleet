@@ -1,3 +1,5 @@
+import { ConfigDir } from '@wadeck-app/shared-cli';
+import { BUILTIN_PLUGIN_CATALOG, FLOW_CONFIG_DIR_NAME, FlowQueryService } from 'flow-core';
 import { FlowRegistry } from 'flow-engine';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -98,6 +100,7 @@ export class DataStoreFactory {
 	private workersService?: WorkersService;
 	private flowsService?: FlowsService;
 	private flowRegistry?: FlowRegistry;
+	private flowQueryService?: FlowQueryService;
 	private tasksService?: TasksService;
 	private ticketsService?: TicketsService;
 	private flowFeedbackService?: FlowFeedbackService;
@@ -250,6 +253,20 @@ export class DataStoreFactory {
 		}
 
 		return this.workersService;
+	}
+
+	/**
+	 * Get or create the read-only flow query service (executions, workers, logs, plugins).
+	 * Reads the same directory as the flow CLI and daemon: ConfigDir.get(FLOW_CONFIG_DIR_NAME).
+	 */
+	getFlowQueryService(): FlowQueryService {
+		if (!this.flowQueryService) {
+			this.flowQueryService = FlowQueryService.forConfigDir(
+				ConfigDir.get(FLOW_CONFIG_DIR_NAME),
+				BUILTIN_PLUGIN_CATALOG
+			);
+		}
+		return this.flowQueryService;
 	}
 
 	/**

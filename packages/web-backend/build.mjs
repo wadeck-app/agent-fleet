@@ -84,6 +84,11 @@ const aliasPlugin = {
 			};
 		});
 
+		// Resolve flow-core from sources (its dist may be stale or unbuilt)
+		build.onResolve({ filter: /^flow-core$/ }, () => {
+			return { path: path.resolve(__dirname, '../flow-core/src/index.ts') };
+		});
+
 		// Resolve shared-orch-worker (monorepo package without compiled exports)
 		build.onResolve({ filter: /^shared-orch-worker(\/|$)/ }, args => {
 			const subpath = args.path.replace(/^shared-orch-worker\/?/, '');

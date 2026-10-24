@@ -9,6 +9,7 @@
 			"@app/shared/*": ["../shared-frontend-backend/src/*"],
 			//			"shared-frontend-backend": ["../shared-frontend-backend/src"],
 			//			"shared-frontend-backend/*": ["../shared-frontend-backend/src/*"],
+			"flow-core": ["../flow-core/src/index"],
 			"flow-engine": ["../flow-engine/src"],
 			"flow-engine/*": ["../flow-engine/src/*"],
 			"orchestrator": ["../orchestrator/src"],
@@ -29,6 +30,7 @@
 		{ "path": "../shared-frontend-backend" },
 		{ "path": "../shared-orch-worker" },
 		{ "path": "../flow-engine" },
+		{ "path": "../flow-core" },
 		{ "path": "../shared-common" },
 		{ "path": "../extension-points" }
 	]

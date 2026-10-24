@@ -19,7 +19,14 @@ const dependencyMatrix = {
 	'shared-orch-backend': ['shared-common'],
 	'shared-orch-worker': [],
 	'test-utils': ['shared-common'],
-	'web-backend': ['shared-frontend-backend', 'shared-common', 'flow-engine', 'test-utils', 'orchestrator'],
+	'web-backend': [
+		'shared-frontend-backend',
+		'shared-common',
+		'flow-core',
+		'flow-engine',
+		'test-utils',
+		'orchestrator',
+	],
 	'web-frontend': ['shared-frontend-backend'],
 	worker: ['shared-orch-worker', 'shared-common', 'flow-engine', 'test-utils'],
 };
