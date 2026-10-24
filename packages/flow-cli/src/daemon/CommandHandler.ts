@@ -7,13 +7,19 @@ import type {
 	WorkspaceProvider,
 } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
-import { executionsDirOf, generateExecutionId, logsDirOf } from 'flow-core';
-import { FlowValidator, WorkspaceManager } from 'flow-engine';
+import {
+	DefinitionSnapshotStore,
+	FlowDefinitionResolver,
+	definitionsDirOf,
+	executionsDirOf,
+	generateExecutionId,
+	logsDirOf,
+} from 'flow-core';
+import { WorkspaceManager } from 'flow-engine';
 import { FlowScheduler, buildSubStepFeedback } from 'flow-engine';
 import type { ReadyItem, SchedulerContext, SchedulerStep } from 'flow-engine';
 import { TemplateRenderer } from 'flow-engine';
 import type { FlowDefinition, FlowPluginOverrides, FlowStep } from 'flow-engine';
-import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -33,6 +39,7 @@ import { DaemonSecrets } from './DaemonSecrets.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
 import { assertStepLabels } from './LabelMatcher.js';
 import { ProjectResolutionRefusal } from './ProjectResolutionRefusal.js';
+import { RunDefinitionLoader } from './RunDefinitionLoader.js';
 import { StalledStepWatch } from './StalledStepWatch.js';
 import { StepRouter } from './StepRouter.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
@@ -104,6 +111,8 @@ interface ReadyStep {
 export class CommandHandler {
 	private readonly executionStore: ExecutionStore;
 	private readonly logWriter: LogWriter;
+	/** Parses, validates and version-resolves the flow of a run request. */
+	private readonly definitionLoader: RunDefinitionLoader;
 	/** Per-execution FlowScheduler instances */
 	private readonly schedulers = new Map<string, FlowScheduler>();
 	/** Per-execution ExecutionContext */
@@ -212,7 +221,14 @@ export class CommandHandler {
 		 * writer built here share its masks; ones injected by the caller must be built with the same
 		 * `ExecutionMasks` (the daemon does), or their output is not masked.
 		 */
-		private readonly daemonSecrets: DaemonSecrets = new DaemonSecrets()
+		private readonly daemonSecrets: DaemonSecrets = new DaemonSecrets(),
+		/**
+		 * Chooses the flow version a run follows and keeps its immutable snapshot under `<daemonDir>/definitions`.
+		 * Injected so a test can use its own snapshot directory.
+		 */
+		definitionResolver: FlowDefinitionResolver = new FlowDefinitionResolver(
+			new DefinitionSnapshotStore(definitionsDirOf(daemonDir))
+		)
 	) {
 		if (interactivityPolicy !== undefined) {
 			this.interactivityPolicy = interactivityPolicy;
@@ -221,6 +237,7 @@ export class CommandHandler {
 		this.executionStore =
 			executionStore ?? new ExecutionStore(executionsDirOf(daemonDir), undefined, daemonSecrets.masks);
 		this.logWriter = logWriter ?? new LogWriter(logsDirOf(daemonDir), undefined, daemonSecrets.masks);
+		this.definitionLoader = new RunDefinitionLoader(definitionResolver, this.logWriter);
 	}
 
 	dispatchHook(
@@ -347,37 +364,14 @@ export class CommandHandler {
 			}
 		}
 
-		if (!fs.existsSync(flowFile)) {
-			this.logWriter.writeExecution('__parse', `FLOW_NOT_FOUND: ${flowFile}`, 'info');
-			return { type: 'error', code: 'FLOW_NOT_FOUND', message: 'Flow file not found.' };
+		// A registered id is resolved (latest or pinned version) and a flow file is parsed as it is; either way the
+		// result is validated and nothing is written yet (the snapshot is committed once the run is accepted, below).
+		const loaded = this.definitionLoader.load(cmd, flowFile);
+		if (!loaded.ok) {
+			return loaded.response;
 		}
-
-		let flow: FlowDefinition;
-		try {
-			const content = fs.readFileSync(flowFile, 'utf8');
-			flow = yaml.load(content, { schema: yaml.JSON_SCHEMA }) as FlowDefinition;
-		} catch (err) {
-			this.logWriter.writeExecution('__parse', `PARSE_ERROR detail: ${String(err)}`, 'error');
-			return {
-				type: 'error',
-				code: 'PARSE_ERROR',
-				message: "Flow file has a YAML syntax error. Run 'flow validate' for details.",
-			};
-		}
-
-		if (!flow || typeof flow !== 'object') {
-			return { type: 'error', code: 'PARSE_ERROR', message: 'Flow file is empty or not a YAML object' };
-		}
-
-		const validator = new FlowValidator(undefined);
-		const result = validator.validate(flow);
-		if (!result.valid) {
-			return {
-				type: 'error',
-				code: 'VALIDATION_FAILED',
-				message: JSON.stringify(result.issues.filter((i: { severity: string }) => i.severity === 'error')),
-			};
-		}
+		const resolved = loaded.resolved;
+		const flow = resolved.flow;
 
 		// `user_intervention` used to be refused here alongside `subflow`. It is supported now
 		// (D#37): a worker with a terminal owns an approval provider and can put the question
@@ -447,7 +441,7 @@ export class CommandHandler {
 			return { type: 'error', code: 'SECRET_RESOLUTION_FAILED', message: normalizeError(err).message };
 		}
 
-		const flowId = cmd.flowId ?? flow.id;
+		const flowId = resolved.flowId;
 		const executionId = generateExecutionId();
 		// From here on every line written for this execution is masked.
 		this.daemonSecrets.activate(executionId, flow, secrets, cmd.cwd);
@@ -534,7 +528,24 @@ export class CommandHandler {
 			if (projectRoot !== undefined) {
 				this.executionProjects.set(executionId, projectRoot);
 			}
-			this.executionStore.create({ executionId, flowFile, flowId, stepIds, projectRoot });
+			// The definition is frozen only now that the run is accepted: a refused run must not claim its version.
+			resolved.commit();
+			for (const warning of resolved.warnings) {
+				this.logWriter.writeExecution(executionId, warning, 'warning');
+			}
+			this.executionStore.create({
+				executionId,
+				flowFile,
+				flowId,
+				stepIds,
+				projectRoot,
+				definition: {
+					flowVersion: resolved.version,
+					definitionHash: resolved.hash,
+					definitionSnapshot: resolved.definitionSnapshot,
+					versionChoice: resolved.choice,
+				},
+			});
 		} catch (err) {
 			// Execution setup failed after workspace was allocated - release before propagating
 			if (pluginHandleEntry) {

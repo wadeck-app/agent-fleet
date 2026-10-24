@@ -1,10 +1,12 @@
 // CLI-specific flow file validator. Wraps the flow-engine FlowValidator with
 // file I/O, YAML parsing, and CLI-friendly exit codes.
+import { type DefinitionSnapshotStore, FlowCoreError, assessFileVersion } from 'flow-core';
 import { FlowValidator as EngineFlowValidator, ValidationCode } from 'flow-engine';
 import type { ValidationIssue } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
+import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 export interface CliValidationError {
 	type: string;
@@ -13,12 +15,16 @@ export interface CliValidationError {
 }
 
 export type ValidateResult =
-	| { exit: 0 }
+	| { exit: 0; version: string; warnings: string[] }
 	| { exit: 1; errors: CliValidationError[] }
 	| { exit: 2; message: string }
 	| { exit: 3; errors: CliValidationError[] };
 
-export function validateFlowFile(filePath: string): ValidateResult {
+/**
+ * `versions` is where the snapshots of earlier runs live: it lets the validation say what a run would do with the
+ * flow's version (refuse a changed content under the same version, run an older version as new...).
+ */
+export function validateFlowFile(filePath: string, versions: DefinitionSnapshotStore): ValidateResult {
 	if (!fs.existsSync(filePath)) {
 		return { exit: 2, message: `File not found: ${filePath}` };
 	}
@@ -70,7 +76,22 @@ export function validateFlowFile(filePath: string): ValidateResult {
 		return { exit: 1, errors };
 	}
 
-	return { exit: 0 };
+	let assessment;
+	try {
+		assessment = assessFileVersion(versions, flow.id, flow, filePath);
+	} catch (err) {
+		if (err instanceof FlowCoreError) {
+			return { exit: 1, errors: [{ type: 'version', message: getErrorMessage(err), path: 'version' }] };
+		}
+		throw err;
+	}
+	if (assessment.errors.length > 0) {
+		return {
+			exit: 1,
+			errors: assessment.errors.map(message => ({ type: 'version', message, path: 'version' })),
+		};
+	}
+	return { exit: 0, version: assessment.version, warnings: assessment.warnings };
 }
 
 function issueToCliError(issue: ValidationIssue): CliValidationError {

@@ -46,7 +46,23 @@ describe('toExecutionSummary', () => {
 			projectRoot: '/work/app',
 			stepCount: 2,
 			failedStepCount: 1,
+			versionLabel: '-',
 		});
+	});
+
+	it('exposes the recorded version, and a dash for a record written before versions existed', () => {
+		const versioned = toExecutionSummary(
+			record({
+				flowVersion: '1.4.0',
+				definitionHash: 'c'.repeat(64),
+				definitionSnapshot: 'deploy/1.4.0-cccccccccccc.yml',
+				versionChoice: 'latest',
+			})
+		);
+		expect(versioned).toMatchObject({ flowVersion: '1.4.0', versionLabel: '1.4.0' });
+		const legacy = toExecutionSummary(record());
+		expect(legacy).not.toHaveProperty('flowVersion');
+		expect(legacy.versionLabel).toBe('-');
 	});
 
 	it('reports a running execution as running and a failed one with its error as not recovered', () => {
@@ -65,6 +81,20 @@ describe('toExecutionSummary', () => {
 
 describe('toExecutionDetail', () => {
 	const resolved = { record: record(), filePath: '/cfg/executions/abc123.json' };
+
+	it('describes how the version was chosen, or says it was not recorded', () => {
+		expect(toExecutionDetail(resolved, 'T').versionNote).toBe('run started before flow versions existed');
+		const versioned = {
+			...resolved,
+			record: record({
+				flowVersion: '1.4.0',
+				definitionHash: 'c'.repeat(64),
+				definitionSnapshot: 'deploy/1.4.0-cccccccccccc.yml',
+				versionChoice: 'pinned',
+			}),
+		};
+		expect(toExecutionDetail(versioned, 'T').versionNote).toBe('pinned by the request, definition cccccccccccc');
+	});
 
 	it('lists steps in order with a duration, and the rendered text', () => {
 		const detail = toExecutionDetail(resolved, 'RENDERED');

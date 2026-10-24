@@ -56,12 +56,18 @@ export interface FlowGraph {
 /** What a graph request is about: one run (definition + step states), or a definition alone. */
 export type FlowGraphTarget = { executionId: string } | { flowId: string } | { flowFile: string };
 
+/** Where the drawn definition came from. */
+export type FlowGraphDefinitionSource =
+	{ source: 'recorded'; version: string; snapshot: string } | { source: 'flow-file' };
+
 export interface FlowGraphResult {
 	graph: FlowGraph;
 	flowId: string;
 	flowName: string;
-	/** The flow file the definition was read from. */
+	/** The flow file of the request (or of the run). The drawn definition is the recorded snapshot when `definition.source` is 'recorded'. */
 	flowFile: string;
+	/** Where the drawn definition was read from: the snapshot recorded with the run, or the flow file as it is now. */
+	definition: FlowGraphDefinitionSource;
 	/** Set when the graph carries step states. */
 	execution?: { executionId: string; status: string; startedAt: string; completedAt: string | null };
 }

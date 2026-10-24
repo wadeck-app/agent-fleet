@@ -1,25 +1,31 @@
 import type { Command } from 'commander';
+import { DefinitionSnapshotStore, definitionsDirOf } from 'flow-core';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { validateFlowFile } from '../../validation/FlowFileValidator';
 
-export function registerValidateCommand(program: Command): void {
+export function registerValidateCommand(program: Command, getConfigDir: () => string = flowConfigDir): void {
 	program
 		.command('validate <file>')
 		.description(
 			'Validate a flow YAML file (schema + step references, no daemon needed)\n' +
-				'  --json   Machine-readable: { valid: bool, errors?: [...] }'
+				'  Also checks the flow version against the versions already run (errors: invalid version, same version with different content)\n' +
+				'  --json   Machine-readable: { valid: bool, version?, warnings?, errors?: [...] }'
 		)
 		.option('--json', 'Output JSON (machine-readable, exit codes 0/1/2/3)')
 		.option('--human', 'Force human-readable output')
 		.action((file: string, options: { json?: boolean; human?: boolean }) => {
-			const result = validateFlowFile(file);
+			const result = validateFlowFile(file, new DefinitionSnapshotStore(definitionsDirOf(getConfigDir())));
 
 			if (options.json && !options.human) {
 				// Machine-readable: Repo B contract
 				switch (result.exit) {
 					case 0:
-						process.stdout.write(JSON.stringify({ valid: true }) + '\n');
+						process.stdout.write(
+							JSON.stringify({ valid: true, version: result.version, warnings: result.warnings }) + '\n'
+						);
 						process.exit(0);
 						break;
 					case 1:
@@ -70,7 +76,10 @@ export function registerValidateCommand(program: Command): void {
 				}
 				process.exit(1);
 			}
-			console.log('[ok] Flow is valid');
+			for (const warning of result.warnings) {
+				console.error(`[warn] ${warning}`);
+			}
+			console.log(`[ok] Flow is valid (version ${result.version})`);
 			process.exit(0);
 		});
 }

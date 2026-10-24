@@ -1,5 +1,7 @@
 import { Command } from 'commander';
+import { DefinitionSnapshotStore, hashDefinition } from 'flow-core';
 import { SECRET_EXAMPLE_FLOW_YAML } from 'flow-engine/secrets/SecretFlowExample';
+import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -224,5 +226,78 @@ describe('ShowCommand: --io', () => {
 		expect(out).toContain('plan (truncated, 4 of 9000 chars kept):');
 		expect(out).toContain('stdout:');
 		expect(out).toContain('inputs/outputs: not recorded for this run');
+	});
+});
+
+describe('ShowCommand: flow version of a file', () => {
+	let configDir: string;
+	let file: string;
+
+	const flowText = (version: string | undefined, script = 'echo hi'): string =>
+		yaml.dump({
+			id: 'shown',
+			...(version === undefined ? {} : { version }),
+			name: 'Shown',
+			description: 'd',
+			workspace: { mode: 'manual', gitStrategy: 'any', reusePolicy: 'if-available' },
+			steps: [{ id: 's', name: 'S', type: 'script', script }],
+		});
+	const show = (): string => {
+		const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+		const program = new Command();
+		program.exitOverride();
+		registerShowCommand(program, () => configDir);
+		program.parse(['node', 'test', 'show', file]);
+		return log.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+	};
+
+	beforeEach(() => {
+		configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'show-version-'));
+		file = path.join(configDir, 'shown.yml');
+	});
+	afterEach(() => {
+		vi.restoreAllMocks();
+		fs.rmSync(configDir, { recursive: true, force: true });
+	});
+
+	it('says a never-run version is new content', () => {
+		fs.writeFileSync(file, flowText('1.0.0'));
+
+		expect(show()).toContain('Version:   1.0.0 (new content, never run)');
+	});
+
+	it('warns when the version is not above the latest known one but the content differs', () => {
+		const store = new DefinitionSnapshotStore(path.join(configDir, 'definitions'));
+		store.save({
+			flowId: 'shown',
+			version: '2.0.0',
+			hash: hashDefinition(yaml.load(flowText('2.0.0'))),
+			text: 'x',
+		});
+		fs.writeFileSync(file, flowText('1.0.0', 'echo changed'));
+
+		const out = show();
+
+		expect(out).toContain('Version:   1.0.0 (new content, latest known: 2.0.0)');
+		expect(out).toMatch(/warning: Version 1\.0\.0 is lower than the latest known version 2\.0\.0/);
+	});
+
+	it('reports a changed content under an existing version as an error line', () => {
+		const store = new DefinitionSnapshotStore(path.join(configDir, 'definitions'));
+		store.save({
+			flowId: 'shown',
+			version: '1.0.0',
+			hash: hashDefinition(yaml.load(flowText('1.0.0'))),
+			text: 'x',
+		});
+		fs.writeFileSync(file, flowText('1.0.0', 'echo changed'));
+
+		expect(show()).toMatch(/Version: {3}1\.0\.0 \(conflict\)\n {2}error: .*bump the version/);
+	});
+
+	it('warns that a flow without a version counts as 0.0.0', () => {
+		fs.writeFileSync(file, flowText(undefined));
+
+		expect(show()).toMatch(/warning: Flow 'shown' has no version/);
 	});
 });

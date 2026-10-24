@@ -1,8 +1,12 @@
+import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { definitionsDirOf } from '../config/FlowConfigLayout.js';
+import { hashDefinition } from '../definitions/DefinitionHash.js';
+import { DefinitionSnapshotStore } from '../definitions/DefinitionSnapshotStore.js';
 import type { ExecutionState } from '../execution/ExecutionState.js';
 import { FlowQueryService } from '../query/FlowQueryService.js';
 import { ExecutionLookupError } from '../show/ExecutionDetail.js';
@@ -130,5 +134,91 @@ describe('FlowQueryService.getFlowGraph', () => {
 		);
 
 		expect(() => service.getFlowGraph({ flowFile })).toThrow(/depends on 'ghost'/);
+	});
+});
+
+describe('FlowQueryService.getFlowGraph with a recorded definition', () => {
+	let root: string;
+	let service: FlowQueryService;
+	let flowFile: string;
+
+	const hash = hashDefinition(yaml.load(FLOW_YAML));
+	const snapshot = (): string => {
+		const store = new DefinitionSnapshotStore(definitionsDirOf(root));
+		return store.save({ flowId: 'build_task', version: '1.0.0', hash, text: FLOW_YAML }).ref;
+	};
+	const writeExec = (id: string, overrides: Partial<ExecutionState>) => {
+		fs.writeFileSync(
+			path.join(root, 'executions', `${id}.json`),
+			JSON.stringify(
+				makeExec({
+					executionId: id,
+					flowId: 'build_task',
+					flowFile,
+					flowVersion: '1.0.0',
+					definitionHash: hash,
+					versionChoice: 'file',
+					steps: {
+						plan: { status: 'completed' },
+						test: { status: 'completed' },
+					},
+					...overrides,
+				})
+			)
+		);
+	};
+
+	beforeEach(() => {
+		root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-core-graph-snap-'));
+		fs.mkdirSync(path.join(root, 'executions'));
+		flowFile = path.join(root, 'build_task.yml');
+		fs.writeFileSync(flowFile, FLOW_YAML);
+		service = FlowQueryService.forConfigDir(root);
+	});
+	afterEach(() => {
+		fs.rmSync(root, { recursive: true, force: true });
+	});
+
+	it('draws the recorded definition, not the edited file: real edges and no "flow file changed" warning', () => {
+		writeExec('snap0001', { definitionSnapshot: snapshot() });
+		fs.writeFileSync(
+			flowFile,
+			'id: build_task\nversion: "2.0.0"\nname: Other\nsteps:\n  - id: only\n    name: Only\n    type: script\n    script: x\n'
+		);
+
+		const result = service.getFlowGraph({ executionId: 'snap0001' });
+
+		expect(result.graph.nodes.map(node => node.id)).toEqual(['plan', 'test']);
+		expect(
+			result.graph.edges.some(edge => edge.from === 'plan' && edge.to === 'test' && edge.kind === 'dependency')
+		).toBe(true);
+		expect(result.graph.warnings ?? []).toEqual([]);
+		expect(result).toMatchObject({
+			flowName: 'Build a task',
+			definition: {
+				source: 'recorded',
+				version: '1.0.0',
+				snapshot: 'build_task/1.0.0-' + hash.slice(0, 12) + '.yml',
+			},
+		});
+	});
+
+	it('still works after the flow file was deleted', () => {
+		writeExec('snap0002', { definitionSnapshot: snapshot() });
+		fs.rmSync(flowFile);
+
+		expect(service.getFlowGraph({ executionId: 'snap0002' }).graph.nodes).toHaveLength(2);
+	});
+
+	it('tells that the flow file is used when the record has no snapshot (old record)', () => {
+		writeExec('old00002', { flowVersion: undefined, definitionHash: undefined, versionChoice: undefined });
+
+		expect(service.getFlowGraph({ executionId: 'old00002' }).definition).toEqual({ source: 'flow-file' });
+	});
+
+	it('fails loudly when the recorded snapshot is gone instead of drawing the current file', () => {
+		writeExec('snap0003', { definitionSnapshot: 'build_task/1.0.0-' + hash.slice(0, 12) + '.yml' });
+
+		expect(() => service.getFlowGraph({ executionId: 'snap0003' })).toThrow(/Cannot read definition snapshot/);
 	});
 });

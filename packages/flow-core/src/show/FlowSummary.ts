@@ -1,5 +1,7 @@
 import type { FlowDefinition, FlowStep, ModelFlowStep, SubFlowStep, UserInterventionStep } from 'flow-engine/types';
 
+import { UNVERSIONED } from '../definitions/FlowVersion.js';
+
 /** Left-aligned column that is never truncated (unlike the history table's fixed-width columns). */
 function pad(s: string, width: number): string {
 	return s.length >= width ? s : s + ' '.repeat(width - s.length);
@@ -134,7 +136,7 @@ export function renderFlowSummary(flow: FlowDefinition): string {
 
 	// --- Header ---
 	out.push('');
-	out.push(`${flow.id}  v${flow.version}`);
+	out.push(`${flow.id}  v${flow.version ?? UNVERSIONED}`);
 	out.push(flow.name);
 	if (flow.description && flow.description !== flow.name) {
 		out.push(flow.description);

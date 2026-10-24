@@ -41,11 +41,20 @@ describe('ValidateCommand', () => {
 
 	describe('human-readable output (default)', () => {
 		it('prints [ok] Flow is valid and exits 0 for a valid flow', () => {
-			mockValidateFlowFile.mockReturnValue({ exit: 0 });
+			mockValidateFlowFile.mockReturnValue({ exit: 0, version: '1.2.0', warnings: [] });
 
 			runValidate(['/some/flow.yml']);
 
-			expect(consoleLogMock).toHaveBeenCalledWith('[ok] Flow is valid');
+			expect(consoleLogMock).toHaveBeenCalledWith('[ok] Flow is valid (version 1.2.0)');
+			expect(exitMock).toHaveBeenCalledWith(0);
+		});
+
+		it('prints each version warning and still exits 0', () => {
+			mockValidateFlowFile.mockReturnValue({ exit: 0, version: '0.0.0', warnings: ['Flow has no version'] });
+
+			runValidate(['/some/flow.yml']);
+
+			expect(consoleErrorMock).toHaveBeenCalledWith('[warn] Flow has no version');
 			expect(exitMock).toHaveBeenCalledWith(0);
 		});
 
@@ -77,13 +86,15 @@ describe('ValidateCommand', () => {
 	});
 
 	describe('--json flag', () => {
-		it('writes { valid: true } to stdout and exits 0 for a valid flow', () => {
-			mockValidateFlowFile.mockReturnValue({ exit: 0 });
+		it('writes { valid: true, version, warnings } to stdout and exits 0 for a valid flow', () => {
+			mockValidateFlowFile.mockReturnValue({ exit: 0, version: '0.0.0', warnings: ['no version'] });
 
 			runValidate(['/some/flow.yml', '--json']);
 
 			expect(exitMock).toHaveBeenCalledWith(0);
-			expect(stdoutWriteMock).toHaveBeenCalledWith(expect.stringContaining('"valid":true'));
+			expect(stdoutWriteMock).toHaveBeenCalledWith(
+				JSON.stringify({ valid: true, version: '0.0.0', warnings: ['no version'] }) + '\n'
+			);
 		});
 
 		it('writes JSON and exits 1 for an invalid flow', () => {

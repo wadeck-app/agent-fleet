@@ -41,6 +41,31 @@ describe('ExecutionStore', () => {
 		});
 	});
 
+	describe('create() with a definition', () => {
+		it('records version, hash, snapshot and choice, which survive later updates', () => {
+			const definition = {
+				flowVersion: '1.2.0',
+				definitionHash: 'a'.repeat(64),
+				definitionSnapshot: 'my-flow/1.2.0-aaaaaaaaaaaa.yml',
+				versionChoice: 'pinned' as const,
+			};
+
+			store.create({ executionId: EXEC_ID, flowFile: 'f.yml', flowId: 'my-flow', stepIds: ['a'], definition });
+			store.markStepRunning(EXEC_ID, 'a');
+
+			expect(store.read(EXEC_ID)).toMatchObject(definition);
+		});
+
+		it('writes none of the version fields when no definition is given (record shape of older daemons)', () => {
+			store.create({ executionId: EXEC_ID, flowFile: 'f.yml', flowId: 'my-flow', stepIds: ['a'] });
+
+			const record = store.read(EXEC_ID);
+			for (const field of ['flowVersion', 'definitionHash', 'definitionSnapshot', 'versionChoice']) {
+				expect(record).not.toHaveProperty(field);
+			}
+		});
+	});
+
 	describe('read()', () => {
 		it('reads back the created state', () => {
 			store.create({

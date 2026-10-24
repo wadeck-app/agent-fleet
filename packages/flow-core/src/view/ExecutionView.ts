@@ -1,3 +1,4 @@
+import { versionColumnOf, versionNoteOf } from '../definitions/RecordedVersion.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
 import { formatDuration } from '../history/ExecutionFormat.js';
 import type { ResolvedExecution } from '../show/ExecutionDetail.js';
@@ -16,6 +17,10 @@ export interface ExecutionSummary {
 	/** True when `lastError` belongs to a retry that later succeeded: the run completed. */
 	lastErrorRecovered: boolean;
 	projectRoot?: string;
+	/** Version of the definition that ran; absent on records written before flow versions existed. */
+	flowVersion?: string;
+	/** `flowVersion`, or `-` when it was not recorded: the text of a table cell. */
+	versionLabel: string;
 	stepCount: number;
 	failedStepCount: number;
 }
@@ -41,6 +46,8 @@ export interface ExecutionDetailView extends ExecutionSummary {
 	currentSteps: string[];
 	steps: StepView[];
 	totalCostUsd?: number;
+	/** How the version was chosen and which definition ran (or that it was not recorded). */
+	versionNote: string;
 	/** The text `flow show` prints for this execution (failed steps carry the tail of their output). */
 	text: string;
 }
@@ -58,6 +65,8 @@ export function toExecutionSummary(record: ExecutionState): ExecutionSummary {
 		...(record.lastError !== undefined ? { lastError: record.lastError } : {}),
 		lastErrorRecovered: record.lastError !== undefined && record.status === 'completed',
 		...(record.projectRoot !== undefined ? { projectRoot: record.projectRoot } : {}),
+		...(record.flowVersion !== undefined ? { flowVersion: record.flowVersion } : {}),
+		versionLabel: versionColumnOf(record),
 		stepCount: steps.length,
 		failedStepCount: steps.filter(step => step.status === 'failed').length,
 	};
@@ -92,6 +101,7 @@ export function toExecutionDetail({ record, filePath }: ResolvedExecution, text:
 		currentSteps: record.currentSteps,
 		steps,
 		...(costs.length > 0 ? { totalCostUsd: costs.reduce((sum, usd) => sum + usd, 0) } : {}),
+		versionNote: versionNoteOf(record),
 		text,
 	};
 }

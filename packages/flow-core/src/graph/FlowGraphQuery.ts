@@ -1,9 +1,10 @@
 import * as fs from 'node:fs';
 
+import { DefinitionSnapshotStore } from '../definitions/DefinitionSnapshotStore.js';
 import { FlowCoreError } from '../errors.js';
 import { loadExecutions } from '../history/ExecutionLoader.js';
 import { resolveExecution } from '../show/ExecutionDetail.js';
-import { FlowDefinitionError, loadFlowDefinition } from './FlowDefinitionLoader.js';
+import { FlowDefinitionError, loadFlowDefinition, parseFlowDefinition } from './FlowDefinitionLoader.js';
 import type { FlowGraphResult, FlowGraphTarget } from './FlowGraph.js';
 import { buildFlowGraph } from './FlowGraphBuilder.js';
 import { annotateGraph } from './RunGraphAnnotation.js';
@@ -16,16 +17,30 @@ import { annotateGraph } from './RunGraphAnnotation.js';
  * The graph is annotated (annotateGraph): inputs/outputs and data flow, plus the path of the run when there is one.
  * Throws ExecutionLookupError, FlowDefinitionError or FlowCoreError('invalid-flow-graph'), all with actionable messages.
  */
-export function queryFlowGraph(executionsDir: string, target: FlowGraphTarget): FlowGraphResult {
+export function queryFlowGraph(
+	executionsDir: string,
+	target: FlowGraphTarget,
+	definitionsDir: string
+): FlowGraphResult {
 	if ('executionId' in target) {
 		const { record } = resolveExecution(executionsDir, target.executionId);
-		const flow = loadFlowDefinition(record.flowFile);
+		// A run that recorded its definition is drawn from that snapshot: the file may have changed since. Only records
+		// written before flow versions existed fall back to the flow file (and its inferred edges).
+		const recorded = record.definitionSnapshot;
+		const flow =
+			recorded === undefined
+				? loadFlowDefinition(record.flowFile)
+				: parseFlowDefinition(new DefinitionSnapshotStore(definitionsDir).read(recorded), recorded);
 		const graph = annotateGraph(buildFlowGraph(flow, record), flow, record);
 		return {
 			graph,
 			flowId: flow.id,
 			flowName: flow.name || flow.id,
 			flowFile: record.flowFile,
+			definition:
+				recorded === undefined
+					? { source: 'flow-file' }
+					: { source: 'recorded', version: record.flowVersion ?? flow.version, snapshot: recorded },
 			execution: {
 				executionId: record.executionId,
 				status: record.status,
@@ -41,6 +56,7 @@ export function queryFlowGraph(executionsDir: string, target: FlowGraphTarget): 
 		flowId: flow.id,
 		flowName: flow.name || flow.id,
 		flowFile,
+		definition: { source: 'flow-file' },
 	};
 }
 

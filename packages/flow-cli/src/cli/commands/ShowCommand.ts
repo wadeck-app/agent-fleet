@@ -1,10 +1,14 @@
 import type { Command } from 'commander';
 import {
 	DEFAULT_TAIL_CHARS,
+	DefinitionSnapshotStore,
 	ExecutionLookupError,
 	FlowQueryService,
+	assessFileVersion,
+	definitionsDirOf,
 	looksLikeExecutionId,
 	renderFlowSummary,
+	renderVersionLines,
 } from 'flow-core';
 import type { FlowDefinition } from 'flow-engine/types';
 import * as fs from 'node:fs';
@@ -24,7 +28,7 @@ function isExistingFile(target: string): boolean {
 	}
 }
 
-function showFlowFile(file: string, opts: { json?: boolean }): void {
+function showFlowFile(file: string, opts: { json?: boolean }, versions: DefinitionSnapshotStore): void {
 	const raw = loadYaml(file);
 
 	const flow = raw as FlowDefinition;
@@ -39,6 +43,7 @@ function showFlowFile(file: string, opts: { json?: boolean }): void {
 	}
 
 	console.log(renderFlowSummary(flow));
+	console.log(renderVersionLines(assessFileVersion(versions, flow.id, flow, file)).join('\n') + '\n');
 	const secrets = renderSecretsSummary(flow);
 	if (secrets !== '') {
 		console.log(secrets + '\n');
@@ -97,7 +102,7 @@ export function registerShowCommand(program: Command, getConfigDir: () => string
 		.option('--io', 'Execution only: print the recorded inputs, outputs and stdout/stderr tails of each step')
 		.action((target: string, opts: { json?: boolean; tail?: number; full?: boolean; io?: boolean }) => {
 			if (isExistingFile(target)) {
-				showFlowFile(target, opts);
+				showFlowFile(target, opts, new DefinitionSnapshotStore(definitionsDirOf(getConfigDir())));
 				return;
 			}
 			if (looksLikeExecutionId(target)) {

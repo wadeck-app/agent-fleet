@@ -90,6 +90,16 @@ export type ClientCommand =
 			type: 'run';
 			flowFile: string;
 			flowId?: string;
+			/**
+			 * `flow run <id>@<version>`: run exactly this version of the registered flow `flowId`. Absent = the
+			 * latest known version at the time of the run. Refused together with a flow file (`registered` absent).
+			 */
+			flowVersion?: string;
+			/**
+			 * True when `flowFile` is a flow registry (`.flow/flows.yml`) and `flowId` names the flow to run;
+			 * absent when `flowFile` is the flow itself.
+			 */
+			registered?: boolean;
 			inputs?: Record<string, string>;
 			quiet?: boolean;
 			cwd: string;

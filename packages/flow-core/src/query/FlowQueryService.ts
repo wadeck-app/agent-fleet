@@ -1,4 +1,4 @@
-import { executionsDirOf } from '../config/FlowConfigLayout.js';
+import { definitionsDirOf, executionsDirOf } from '../config/FlowConfigLayout.js';
 import { FlowCoreError, errorMessage } from '../errors.js';
 import type { FlowGraphResult, FlowGraphTarget } from '../graph/FlowGraph.js';
 import { queryFlowGraph } from '../graph/FlowGraphQuery.js';
@@ -180,7 +180,7 @@ export class FlowQueryService {
 	 * nodes carry that run's step states. Throws ExecutionLookupError, FlowDefinitionError or FlowCoreError.
 	 */
 	getFlowGraph(target: FlowGraphTarget): FlowGraphResult {
-		return queryFlowGraph(this.directories.executionsDir, target);
+		return queryFlowGraph(this.directories.executionsDir, target, definitionsDirOf(this.directories.configDir));
 	}
 
 	/** The text `flow show <executionId>` prints. Throws ExecutionLookupError. */

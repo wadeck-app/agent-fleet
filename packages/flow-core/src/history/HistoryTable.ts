@@ -1,3 +1,4 @@
+import { versionColumnOf, versionDetailLineOf } from '../definitions/RecordedVersion.js';
 import type { ExecutionState } from '../execution/ExecutionState.js';
 import { type ExecutionFilterOptions, filterExecutions } from './ExecutionFilter.js';
 import { formatDuration, formatModelCost, formatStarted, padTruncate } from './ExecutionFormat.js';
@@ -14,6 +15,7 @@ export function renderDetailView(exec: ExecutionState): string {
 	const lines: string[] = [];
 	lines.push(`Execution: ${exec.executionId}`);
 	lines.push(`Flow:      ${exec.flowId}`);
+	lines.push(`Version:   ${versionDetailLineOf(exec)}`);
 	lines.push(`File:      ${exec.flowFile}`);
 	lines.push(`Status:    ${exec.status}`);
 	lines.push(`Started:   ${formatStarted(exec.startedAt)}`);
@@ -106,22 +108,25 @@ export function buildHistoryTable(execs: ExecutionState[], opts: ExecutionFilter
 
 	const COL_ID = 12;
 	const COL_FLOW = 32;
+	const COL_VERSION = 12;
 	const COL_STATUS = 12;
 	const COL_STARTED = 22;
 	const lines: string[] = [];
 	lines.push(
 		padTruncate('EXECUTION', COL_ID) +
 			padTruncate('FLOW', COL_FLOW) +
+			padTruncate('VERSION', COL_VERSION) +
 			padTruncate('STATUS', COL_STATUS) +
 			padTruncate('STARTED', COL_STARTED) +
 			'DURATION'
 	);
-	lines.push('-'.repeat(COL_ID + COL_FLOW + COL_STATUS + COL_STARTED + 12));
+	lines.push('-'.repeat(COL_ID + COL_FLOW + COL_VERSION + COL_STATUS + COL_STARTED + 12));
 
 	for (const e of items) {
 		lines.push(
 			padTruncate(e.executionId, COL_ID) +
 				padTruncate(e.flowId, COL_FLOW) +
+				padTruncate(versionColumnOf(e), COL_VERSION) +
 				padTruncate(e.status, COL_STATUS) +
 				padTruncate(formatStarted(e.startedAt), COL_STARTED) +
 				formatDuration(e.startedAt, e.completedAt)

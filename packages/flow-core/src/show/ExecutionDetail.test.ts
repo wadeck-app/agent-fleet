@@ -228,3 +228,39 @@ describe('ExecutionDetail', () => {
 		});
 	});
 });
+
+describe('renderExecutionDetail version line', () => {
+	const base = {
+		executionId: 'abcd1234',
+		flowFile: 'f.yml',
+		flowId: 'f',
+		status: 'completed' as const,
+		currentSteps: [],
+		startedAt: '2026-10-04T14:00:00.000Z',
+		completedAt: '2026-10-04T14:00:05.000Z',
+		steps: {},
+	};
+	const options = { tail: DEFAULT_TAIL_CHARS, full: false };
+
+	it('prints the version, how it was chosen and the definition hash', () => {
+		const text = renderExecutionDetail(
+			{
+				record: {
+					...base,
+					flowVersion: '2.0.0',
+					definitionHash: 'b'.repeat(64),
+					definitionSnapshot: 'f/2.0.0-bbbbbbbbbbbb.yml',
+					versionChoice: 'latest',
+				},
+				filePath: '/e/abcd1234.json',
+			},
+			options
+		);
+		expect(text).toContain('Version:   2.0.0 (latest at run start, definition bbbbbbbbbbbb)');
+	});
+
+	it('says the version was not recorded for an old record', () => {
+		const text = renderExecutionDetail({ record: base, filePath: '/e/abcd1234.json' }, options);
+		expect(text).toContain('Version:   not recorded');
+	});
+});

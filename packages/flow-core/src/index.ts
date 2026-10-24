@@ -17,7 +17,37 @@ export {
 } from './appModule/FlowModuleContract.js';
 export { FLOW_LOGS_STEP_PARAM, executionStepLogsPath } from './appModule/FlowExecutionLogsLink.js';
 export { FLOW_CHART_INDEX_PATH, chartPathOfExecution, chartPathOfFlow } from './appModule/FlowChartPaths.js';
-export { FLOW_CONFIG_DIR_NAME, executionsDirOf, logsDirOf } from './config/FlowConfigLayout.js';
+export {
+	FLOW_CONFIG_DIR_NAME,
+	definitionSnapshotPathOf,
+	definitionSnapshotRefOf,
+	definitionsDirOf,
+	executionsDirOf,
+	logsDirOf,
+} from './config/FlowConfigLayout.js';
+export { hashDefinition, shortHashOf } from './definitions/DefinitionHash.js';
+export {
+	DefinitionSnapshotStore,
+	type KnownVersion,
+	type SavedSnapshot,
+} from './definitions/DefinitionSnapshotStore.js';
+export {
+	type FileVersionAssessment,
+	type FileVersionStatus,
+	assessFileVersion,
+	renderVersionLines,
+} from './definitions/FileVersionAssessment.js';
+export {
+	FlowDefinitionResolver,
+	type FileRequest,
+	type RegisteredRequest,
+	type ResolvedDefinition,
+} from './definitions/FlowDefinitionResolver.js';
+export { UNVERSIONED, missingVersionWarning, readFlowVersion } from './definitions/FlowVersion.js';
+export { FlowVersionError, type FlowVersionErrorKind } from './definitions/FlowVersionError.js';
+export { type VersionRow, listFlowVersions, renderVersionTable } from './definitions/FlowVersionListing.js';
+export { versionColumnOf, versionDetailLineOf } from './definitions/RecordedVersion.js';
+export { compareSemanticVersions, highestSemanticVersion, isSemanticVersion } from './definitions/SemanticVersion.js';
 export {
 	EXECUTION_ID_LENGTH,
 	generateExecutionId,
@@ -27,6 +57,7 @@ export {
 
 export type {
 	ExecutionState,
+	VersionChoice,
 	ExecutionStatus,
 	RecordedValue,
 	StepIoRecord,
@@ -149,7 +180,7 @@ export {
 	retryPoliciesOf,
 } from './view/RetryBadge.js';
 export type { StepRetryFacts, StepRetryPolicy } from './view/RetryBadge.js';
-export { readRetryPolicies } from './view/RetryPolicyFile.js';
+export { readRecordedRetryPolicies, readRetryPolicies } from './view/RetryPolicyFile.js';
 export { toExecutionDetail, toExecutionSummary } from './view/ExecutionView.js';
 export type { ExecutionDetailView, ExecutionSummary, StepView } from './view/ExecutionView.js';
 

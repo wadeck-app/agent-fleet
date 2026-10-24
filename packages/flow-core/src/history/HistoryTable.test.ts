@@ -308,3 +308,28 @@ describe('buildHistoryTable pagination', () => {
 		expect(buildHistoryTable(many, { offset: 10 })).toBe('No more executions (showing 10+).');
 	});
 });
+
+describe('buildHistoryTable versions', () => {
+	const versioned = makeExec({
+		executionId: 'v1',
+		flowVersion: '1.2.0',
+		definitionHash: 'a'.repeat(64),
+		definitionSnapshot: 'test-flow/1.2.0-aaaaaaaaaaaa.yml',
+		versionChoice: 'pinned',
+	});
+	const legacy = makeExec({ executionId: 'old1' });
+
+	it('adds a VERSION column: the recorded version, or a dash for a record without one', () => {
+		const lines = buildHistoryTable([versioned, legacy], {}).split('\n');
+		expect(lines[0]).toMatch(/FLOW\s+VERSION\s+STATUS/);
+		expect(lines.find(line => line.startsWith('v1'))).toMatch(/test-flow\s+1\.2\.0\s+completed/);
+		expect(lines.find(line => line.startsWith('old1'))).toMatch(/test-flow\s+-\s+completed/);
+	});
+
+	it('shows how the version was chosen in the detail view, and says when it was not recorded', () => {
+		expect(buildHistoryTable([versioned], { id: 'v1' })).toContain(
+			'Version:   1.2.0 (pinned by the request, definition aaaaaaaaaaaa)'
+		);
+		expect(buildHistoryTable([legacy], { id: 'old1' })).toContain('Version:   not recorded');
+	});
+});

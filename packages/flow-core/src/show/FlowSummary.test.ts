@@ -23,6 +23,12 @@ const flow = {
 } as unknown as FlowDefinition;
 
 describe('renderFlowSummary', () => {
+	it('shows v0.0.0 for a flow without a version instead of vundefined', () => {
+		const { version: _version, ...unversioned } = flow as unknown as Record<string, unknown>;
+
+		expect(renderFlowSummary(unversioned as unknown as FlowDefinition)).toContain('simple-flow  v0.0.0');
+	});
+
 	it('returns the table as a string without printing', () => {
 		const out = renderFlowSummary(flow);
 		expect(typeof out).toBe('string');

@@ -1,4 +1,7 @@
-import { FlowDefinitionError, loadFlowDefinition } from '../graph/FlowDefinitionLoader.js';
+import { DefinitionSnapshotStore } from '../definitions/DefinitionSnapshotStore.js';
+import { FlowCoreError } from '../errors.js';
+import type { ExecutionState } from '../execution/ExecutionState.js';
+import { FlowDefinitionError, loadFlowDefinition, parseFlowDefinition } from '../graph/FlowDefinitionLoader.js';
 import { type StepRetryPolicy, retryPoliciesOf } from './RetryBadge.js';
 
 /**
@@ -11,6 +14,29 @@ export function readRetryPolicies(flowFile: string): Record<string, StepRetryPol
 		return retryPoliciesOf(loadFlowDefinition(flowFile));
 	} catch (err) {
 		if (err instanceof FlowDefinitionError) {
+			return undefined;
+		}
+		throw err;
+	}
+}
+
+/**
+ * The retry budgets of the definition a run actually used: its recorded snapshot when it has one (the flow file may
+ * have been edited since), the flow file for a record written before versions existed. A snapshot that cannot be read
+ * gives undefined ("retry policy unknown"); it never falls back to the current file, which could show another policy.
+ */
+export function readRecordedRetryPolicies(
+	record: Pick<ExecutionState, 'flowFile' | 'definitionSnapshot'>,
+	definitionsDir: string
+): Record<string, StepRetryPolicy> | undefined {
+	if (record.definitionSnapshot === undefined) {
+		return readRetryPolicies(record.flowFile);
+	}
+	try {
+		const text = new DefinitionSnapshotStore(definitionsDir).read(record.definitionSnapshot);
+		return retryPoliciesOf(parseFlowDefinition(text, record.definitionSnapshot));
+	} catch (err) {
+		if (err instanceof FlowDefinitionError || err instanceof FlowCoreError) {
 			return undefined;
 		}
 		throw err;

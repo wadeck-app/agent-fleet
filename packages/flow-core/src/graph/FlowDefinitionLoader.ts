@@ -29,19 +29,24 @@ export function loadFlowDefinition(flowFile: string): FlowDefinition {
 			'flow-file-missing'
 		);
 	}
+	return parseFlowDefinition(fs.readFileSync(flowFile, 'utf8'), flowFile);
+}
+
+/** Parses the text of a flow (a file or a recorded snapshot) with the checks of {@link loadFlowDefinition}; `label` names it in errors. */
+export function parseFlowDefinition(text: string, label: string): FlowDefinition {
 	let raw: unknown;
 	try {
-		raw = yaml.load(fs.readFileSync(flowFile, 'utf8'), { schema: yaml.JSON_SCHEMA });
+		raw = yaml.load(text, { schema: yaml.JSON_SCHEMA });
 	} catch (err) {
 		throw new FlowDefinitionError(
-			`Cannot read flow file ${flowFile}: ${errorMessage(err)}. Fix the file (check it with \`flow validate\`).`,
+			`Cannot read flow file ${label}: ${errorMessage(err)}. Fix the file (check it with \`flow validate\`).`,
 			'flow-file-unreadable'
 		);
 	}
 	const flow = raw as Partial<FlowDefinition> | null;
 	if (!flow || typeof flow !== 'object' || Array.isArray(flow) || !Array.isArray(flow.steps) || !flow.id) {
 		throw new FlowDefinitionError(
-			`Flow file ${flowFile} is not a flow definition (expected an object with 'id' and a 'steps' list). ` +
+			`Flow file ${label} is not a flow definition (expected an object with 'id' and a 'steps' list). ` +
 				'Check it with `flow validate`.',
 			'flow-file-invalid'
 		);

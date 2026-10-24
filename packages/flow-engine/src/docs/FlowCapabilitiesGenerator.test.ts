@@ -147,6 +147,21 @@ describe('FlowCapabilitiesGenerator - secrets', () => {
 		expect(result).toContain('exact event names');
 	});
 
+	it('has a Section 11 explaining versions: semver, bump rule, latest, id@version, snapshots, the unversioned case', () => {
+		expect(result).toContain('## Section 11: Flow versions');
+		expect(result).toContain("version: '1.2.0'");
+		expect(result).toContain('MAJOR.MINOR.PATCH');
+		expect(result).toContain('bump');
+		expect(result).toContain('same version');
+		expect(result).toContain('flow run my-flow@1.2.0');
+		expect(result).toContain('flow versions my-flow');
+		expect(result).toContain('latest');
+		expect(result).toContain('highest');
+		expect(result).toContain('0.0.0');
+		expect(result).toContain('definitions/');
+		expect(result).toContain('flow show <execution-id>');
+	});
+
 	it('has a Section 10 telling that inputs and outputs are recorded, with the caps, and that undeclared secrets are not masked', () => {
 		expect(result).toContain('## Section 10: What an execution records');
 		expect(result).toContain('execution record');

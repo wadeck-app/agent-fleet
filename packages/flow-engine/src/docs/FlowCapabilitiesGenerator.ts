@@ -1,6 +1,7 @@
 import { EventsDocumentation } from '../events/EventsDocumentation';
 import { StepRecordDocumentation } from '../record/StepRecordDocumentation';
 import { SecretsDocumentation } from '../secrets/SecretsDocumentation';
+import { VersionsDocumentation } from '../versions/VersionsDocumentation';
 
 /**
  * Flow Capabilities Generator
@@ -15,6 +16,7 @@ export class FlowCapabilitiesGenerator {
 	private readonly secretsDocumentation = new SecretsDocumentation();
 	private readonly eventsDocumentation = new EventsDocumentation();
 	private readonly stepRecordDocumentation = new StepRecordDocumentation();
+	private readonly versionsDocumentation = new VersionsDocumentation();
 
 	/**
 	 * Generate a structured Markdown document describing all flow engine capabilities.
@@ -34,6 +36,7 @@ export class FlowCapabilitiesGenerator {
 			this.secretsDocumentation.generate(),
 			this.eventsDocumentation.generate(),
 			this.stepRecordDocumentation.generate(),
+			this.versionsDocumentation.generate(),
 		].join('\n\n');
 	}
 

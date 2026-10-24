@@ -14,11 +14,11 @@ import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { type FlowConfig, FlowConfigLoader } from '../../config/FlowConfig';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
-import { ProjectResolverFactory } from '../../config/ProjectResolverFactory';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
+import { resolveFlowReference } from './FlowReference';
 import { checkSecretInputs } from './SecretInputCheck';
 
 // violations-suppress-end: ts/no-deep-relative
@@ -138,34 +138,6 @@ async function waitForCompletion(
 		}
 	}
 	throw new ExecutionTimeoutError(`Execution ${executionId} did not complete within ${timeoutMs}ms`);
-}
-
-// Result type for flow file resolution -- either found with an optional inferred flow ID,
-// or not found with an error message for the caller to surface.
-type FlowResolution = { found: true; flowFile: string; inferredFlowId?: string } | { found: false; error: string };
-
-function resolveFlowFile(flowRef: string, cwd: string): FlowResolution {
-	const resolvedPath = path.isAbsolute(flowRef) ? flowRef : path.resolve(cwd, flowRef);
-	if (fs.existsSync(resolvedPath)) {
-		return { found: true, flowFile: resolvedPath };
-	}
-	// Treat as registry ID -- use .flow/flows.yml lookup
-	let projectRoot: string;
-	try {
-		projectRoot = ProjectResolverFactory.create().resolve(cwd).projectRoot;
-	} catch (err) {
-		// The resolver's message already names the markers it looked for, or the
-		// legacy files to move -- surface it rather than replacing it.
-		return { found: false, error: `Flow '${flowRef}' not found as a file.\n${getErrorMessage(err)}` };
-	}
-	const flowsFile = path.join(projectRoot, '.flow', 'flows.yml');
-	if (!fs.existsSync(flowsFile)) {
-		return {
-			found: false,
-			error: `Flow '${flowRef}' not found as a file, and the flow registry "${flowsFile}" does not exist.`,
-		};
-	}
-	return { found: true, flowFile: flowsFile, inferredFlowId: flowRef };
 }
 
 /**
@@ -372,7 +344,7 @@ export function registerRunCommand(program: Command): void {
 		.command('run <flowRef>')
 		.description(
 			'Run a flow by file path or flow ID (requires daemon)\n' +
-				'  <flowRef>  Path to .yaml file or flow ID\n' +
+				'  <flowRef>  Path to a .yaml file (runs as it is), or a flow ID: the latest known version, or <id>@<version> to pin one\n' +
 				'  -i key=value  Pass input (repeatable); e.g. -i name=Alice -i count=3\n' +
 				'  --wait        Block until execution completes (default: fire-and-forget)\n' +
 				'  --timeout     Timeout for --wait, e.g. 30s, 5m, 1h (default: 10m)\n' +
@@ -425,17 +397,32 @@ export function registerRunCommand(program: Command): void {
 				const cwd = process.cwd();
 				const daemonDir = flowConfigDir();
 
-				const resolution = resolveFlowFile(flowRef, cwd);
-				if (!resolution.found) {
+				const resolution = resolveFlowReference(flowRef, cwd);
+				if (resolution.kind === 'error') {
 					console.error(resolution.error);
 					process.exit(1);
 				}
-				const { flowFile, inferredFlowId } = resolution;
-				const flowId = options.flowId ?? inferredFlowId;
+				const { flowFile } = resolution;
+				const registered = resolution.kind === 'registered';
+				if (registered && options.flowId !== undefined) {
+					console.error(
+						`Error:--flow-id cannot be combined with a flow id reference ('${flowRef}'): the id is already given. ` +
+							'Use --flow-id only with a flow file.'
+					);
+					process.exit(2);
+				}
+				if (registered && options.mockConfig !== undefined) {
+					console.error(
+						`Error:--mock-config needs a flow file to check its step ids; '${flowRef}' is a flow id. ` +
+							'Run the flow file by its path instead.'
+					);
+					process.exit(2);
+				}
+				const flowId = registered ? resolution.flowId : options.flowId;
 
 				// D27: Validate secret inputs before sending to daemon
 				// Only check if we resolved a specific file (not a registry ID)
-				if (fs.existsSync(flowFile)) {
+				if (!registered) {
 					const secretError = checkSecretInputs(flowFile, inputs);
 					if (secretError) {
 						console.error(`Error:${secretError}`);
@@ -459,6 +446,7 @@ export function registerRunCommand(program: Command): void {
 					type: 'run',
 					flowFile,
 					flowId,
+					...(registered ? { registered: true, flowVersion: resolution.flowVersion } : {}),
 					inputs,
 					quiet: options.quiet,
 					cwd,
@@ -479,7 +467,9 @@ export function registerRunCommand(program: Command): void {
 					} else {
 						console.error(`Error:${response.message}`);
 					}
-					process.exit(response.code === 'VALIDATION_FAILED' ? 2 : 1);
+					process.exit(
+						response.code === 'VALIDATION_FAILED' || response.code.startsWith('FLOW_VERSION_') ? 2 : 1
+					);
 				}
 
 				const { executionId } = response as { type: 'execution_started'; executionId: string };
@@ -511,17 +501,18 @@ export function registerRunCommand(program: Command): void {
 						: undefined;
 
 				// Use fast 50ms poll when any model step has log:streaming or log:polling
-				const flowYaml = fs.existsSync(flowFile)
-					? (() => {
-							try {
-								return yaml.load(fs.readFileSync(flowFile, 'utf8'), {
-									schema: yaml.JSON_SCHEMA,
-								}) as { steps?: { log?: string }[] };
-							} catch {
-								return null;
-							}
-						})()
-					: null;
+				const flowYaml =
+					!registered && fs.existsSync(flowFile)
+						? (() => {
+								try {
+									return yaml.load(fs.readFileSync(flowFile, 'utf8'), {
+										schema: yaml.JSON_SCHEMA,
+									}) as { steps?: { log?: string }[] };
+								} catch {
+									return null;
+								}
+							})()
+						: null;
 				const fastPoll = flowYaml?.steps?.some(s => s.log === 'streaming' || s.log === 'polling') ?? false;
 
 				let finalState: ExecutionState;

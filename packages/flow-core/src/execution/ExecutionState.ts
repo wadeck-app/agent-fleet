@@ -89,4 +89,19 @@ export interface ExecutionState {
 	 * where" -- the daemon's own cwd says nothing.
 	 */
 	projectRoot?: string;
+	/**
+	 * Which definition ran (format note: additive, absent on records written before flow versions existed;
+	 * readers must treat absence as "version not recorded"). The four fields below are written together, once, when
+	 * the run starts, and never change afterwards (a `flow resume` keeps them).
+	 * Semantic version of the definition; `0.0.0` when the flow declared none.
+	 */
+	flowVersion?: string;
+	/** Full sha256 of the canonical definition: two runs with the same hash ran identical content. */
+	definitionHash?: string;
+	/** Immutable copy of the definition that ran: `<flowId>/<version>-<hash12>.yml` under the definitions directory. */
+	definitionSnapshot?: string;
+	/** How the version was chosen: `latest` known at run start, `pinned` by `flow run <id>@<version>`, or `file` (run by path, as is). */
+	versionChoice?: VersionChoice;
 }
+
+export type VersionChoice = 'latest' | 'pinned' | 'file';

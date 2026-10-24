@@ -28,6 +28,7 @@ import { registerResumeCommand } from './commands/ResumeCommand';
 import { registerRunCommand } from './commands/RunCommand';
 import { registerShowCommand } from './commands/ShowCommand';
 import { registerValidateCommand } from './commands/ValidateCommand';
+import { registerVersionsCommand } from './commands/VersionsCommand';
 import { registerWorkerCommand } from './commands/WorkerCommand';
 import { registerWorkerSourceCommand } from './commands/WorkerSourceCommand';
 import { VERSION } from './version.js';
@@ -36,6 +37,7 @@ const CONCEPTS_TEXT = `
 Concepts:
   flow      A YAML file defining a sequence of steps (model, script, subflow, user_intervention)
   flow ID   The "id:" field at the top of a flow YAML file; used to run/show/history a flow
+  version   The "version:" field (semver) of a flow; a run records the version it ran. "flow run <id>" runs the latest, "flow run <id>@1.2.0" a given one
   daemon    Background service that executes flows; required for "run", "start", "stop", "status"
   config    ~/.config/flow/config.yaml  (XDG_CONFIG_HOME overrides ~/.config)
 `;
@@ -55,7 +57,7 @@ Environment variables:
   FLOW_DAEMON_MODE  Internal - set to "1" by "flow start" to launch daemon mode
 
 Daemon-required commands: run, start, stop, status
-Standalone commands:      show, validate, history, docs, logs, cli`;
+Standalone commands:      show, validate, history, versions, docs, logs, cli`;
 
 const DAEMON_DIR = flowConfigDir();
 
@@ -274,6 +276,7 @@ async function main(): Promise<void> {
 	registerRunCommand(program);
 	registerResumeCommand(program);
 	registerHistoryCommand(program);
+	registerVersionsCommand(program);
 	registerWorkerCommand(registerWorkerSourceCommand(program));
 	registerPluginsCommand(program);
 	program.addCommand(buildCliCommand());

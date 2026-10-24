@@ -84,6 +84,8 @@ export class ExecutionStore {
 		stepIds: string[];
 		/** Project this run belongs to, so active projects can be listed (D#10). */
 		projectRoot?: string;
+		/** Which definition ran: version, content hash, snapshot and how the version was chosen. Written once, never changed. */
+		definition?: Pick<ExecutionState, 'flowVersion' | 'definitionHash' | 'definitionSnapshot' | 'versionChoice'>;
 	}): ExecutionState {
 		assertExecutionIdSafe(params.executionId);
 		const state: ExecutionState = {
@@ -91,6 +93,7 @@ export class ExecutionStore {
 			flowFile: params.flowFile,
 			flowId: params.flowId,
 			...(params.projectRoot !== undefined ? { projectRoot: params.projectRoot } : {}),
+			...params.definition,
 			status: 'queued',
 			currentSteps: [],
 			startedAt: new Date().toISOString(),

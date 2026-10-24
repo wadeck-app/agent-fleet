@@ -3,7 +3,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { readRetryPolicies } from './RetryPolicyFile.js';
+import { definitionsDirOf } from '../config/FlowConfigLayout.js';
+import { hashDefinition } from '../definitions/DefinitionHash.js';
+import { DefinitionSnapshotStore } from '../definitions/DefinitionSnapshotStore.js';
+import { makeExec } from '../testing/makeExec.js';
+import { readRecordedRetryPolicies, readRetryPolicies } from './RetryPolicyFile.js';
 
 let directory: string;
 
@@ -31,5 +35,48 @@ describe('readRetryPolicies', () => {
 		const file = path.join(directory, 'bad.yml');
 		fs.writeFileSync(file, 'just: a mapping');
 		expect(readRetryPolicies(file)).toBeUndefined();
+	});
+});
+
+describe('readRecordedRetryPolicies', () => {
+	const definition = { id: 'f', steps: [{ id: 'a', retry: { maxAttempts: 3, backoff: 'linear' } }] };
+
+	it('reads the budget from the definition the run recorded, not from the edited flow file', () => {
+		const file = path.join(directory, 'flow.yml');
+		fs.writeFileSync(file, 'id: f\nsteps:\n  - { id: a }\n');
+		const ref = new DefinitionSnapshotStore(definitionsDirOf(directory)).save({
+			flowId: 'f',
+			version: '1.0.0',
+			hash: hashDefinition(definition),
+			text: JSON.stringify(definition),
+		}).ref;
+
+		const policies = readRecordedRetryPolicies(
+			makeExec({ executionId: 'a', flowId: 'f', flowFile: file, definitionSnapshot: ref }),
+			definitionsDirOf(directory)
+		);
+
+		expect(policies).toEqual({ a: { retryBudget: 3 } });
+	});
+
+	it('answers undefined, not the current file, when the recorded snapshot is gone', () => {
+		const file = path.join(directory, 'flow.yml');
+		fs.writeFileSync(file, 'id: f\nsteps:\n  - { id: a }\n');
+
+		expect(
+			readRecordedRetryPolicies(
+				makeExec({ executionId: 'a', flowFile: file, definitionSnapshot: 'f/1.0.0-abcdef012345.yml' }),
+				definitionsDirOf(directory)
+			)
+		).toBeUndefined();
+	});
+
+	it('uses the flow file for a record written before versions existed', () => {
+		const file = path.join(directory, 'flow.yml');
+		fs.writeFileSync(file, 'id: f\nsteps:\n  - { id: a, retry: { maxAttempts: 1 } }\n');
+
+		expect(readRecordedRetryPolicies(makeExec({ executionId: 'a', flowFile: file }), directory)).toEqual({
+			a: { retryBudget: 1 },
+		});
 	});
 });

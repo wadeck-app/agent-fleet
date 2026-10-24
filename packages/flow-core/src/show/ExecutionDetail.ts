@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { versionDetailLineOf } from '../definitions/RecordedVersion.js';
 import { FlowCoreError, errorMessage } from '../errors.js';
 import { looksLikeExecutionId } from '../execution/ExecutionId.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
@@ -130,6 +131,7 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	const lines: string[] = [];
 	lines.push(`Execution: ${record.executionId}`);
 	lines.push(`Flow:      ${record.flowId}`);
+	lines.push(`Version:   ${versionDetailLineOf(record)}`);
 	lines.push(`File:      ${record.flowFile}`);
 	lines.push(`Status:    ${record.status}`);
 	lines.push(`Started:   ${formatStarted(record.startedAt)}`);
