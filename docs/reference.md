@@ -50,7 +50,7 @@ npm install -g @wadeck-app/flow-cli
 
 flow start                              # start background daemon
 flow run ./my-flow.yml                  # run a flow
-flow show <execution-id>                # inspect an execution
+flow show <execution-id>                # inspect an execution (--io: what each step received and produced)
 flow logs                               # tail today's daemon log
 flow cli update                         # manual update
 ```
