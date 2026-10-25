@@ -20,6 +20,7 @@ import { writeDaemonLog } from '../daemon/DaemonLog.js';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
 import { resolveDaemonPort } from '../daemon/resolveDaemonPort.js';
 import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
+import { scheduleBackgroundUpdateForRelease } from '../updater/DevBuildGuard.js';
 import { describeCommandLine } from './CommandLineLog';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { buildCliCommand } from './commands/CliCommand.js';
@@ -33,7 +34,6 @@ import { registerValidateCommand } from './commands/ValidateCommand';
 import { registerVersionsCommand } from './commands/VersionsCommand';
 import { registerWorkerCommand } from './commands/WorkerCommand';
 import { registerWorkerSourceCommand } from './commands/WorkerSourceCommand';
-import { scheduleBackgroundUpdateForRelease } from '../updater/DevBuildGuard.js';
 import { VERSION } from './version.js';
 
 const CONCEPTS_TEXT = `
@@ -233,6 +233,9 @@ async function main(): Promise<void> {
 		);
 		const port = resolveDaemonPort(process.env);
 		await Daemon.start(config, DAEMON_DIR, {
+			// Started by `flow run` / `flow start` because none answered: if one answers by now (concurrent runs each
+			// start one), it stays, with its executions.
+			existingDaemon: 'yield',
 			appCoreModules,
 			eventPublisher,
 			...(port === undefined ? {} : { port }),

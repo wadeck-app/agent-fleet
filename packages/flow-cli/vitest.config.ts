@@ -21,9 +21,13 @@ function resolveJsToTs(): Plugin {
 	};
 }
 
-// These two files execute dist-bundle/, built once by the globalSetup of the `bundling` project (a rebuild per file
+// These files execute dist-bundle/, built once by the globalSetup of the `bundling` project (a rebuild per file
 // rewrote dist/ and deleted bundles under the other file and under the unit tests).
-const BUNDLING_TESTS = ['src/__tests__/CliSmoke.integration.test.ts', 'src/cli/FlowIndex.integration.test.ts'];
+const BUNDLING_TESTS = [
+	'src/__tests__/CliSmoke.integration.test.ts',
+	'src/__tests__/DaemonSingleton.integration.test.ts',
+	'src/cli/FlowIndex.integration.test.ts',
+];
 
 export default defineConfig({
 	plugins: [resolveJsToTs()],

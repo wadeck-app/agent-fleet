@@ -121,7 +121,11 @@ export class DaemonIdleShutdown {
 		// The update-check timer is cleared by the onShutdown hook, which fires for every stop()
 		// path -- including the stop('idle') call just below.
 		wsServer.close();
-		writeDaemonLog(this.logsDir, 'info', `Daemon stopped (idle) (${this.diagnosticSnapshot()})`);
+		writeDaemonLog(
+			this.logsDir,
+			'info',
+			`Daemon stopped (idle) (pid ${String(process.pid)}) (${this.diagnosticSnapshot()})`
+		);
 		void this.stopDaemon();
 	}
 }

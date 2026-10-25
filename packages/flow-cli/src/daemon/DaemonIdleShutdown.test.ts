@@ -66,7 +66,7 @@ describe('DaemonIdleShutdown', () => {
 		expect(stopPeriodicWork).toHaveBeenCalledTimes(1);
 		expect(wsClose).toHaveBeenCalledTimes(1);
 		expect(logLines().filter(msg => msg.startsWith('Idle detected'))).toHaveLength(1);
-		expect(logLines().some(msg => msg.startsWith('Daemon stopped (idle)'))).toBe(true);
+		expect(logLines().some(msg => msg.startsWith(`Daemon stopped (idle) (pid ${String(process.pid)})`))).toBe(true);
 	});
 
 	it('cancels the schedule when work arrives before the grace period ends', () => {

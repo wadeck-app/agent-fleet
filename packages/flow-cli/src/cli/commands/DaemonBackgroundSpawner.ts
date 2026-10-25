@@ -6,16 +6,40 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { ExclusiveFileLock } from '../../daemon/ExclusiveFileLock';
+import { findLiveDaemon } from '../../daemon/LiveDaemonProbe';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
 
 // violations-suppress-end: ts/no-deep-relative
 
 /**
- * Spawn the daemon as a detached background process (like `flow start` does) and wait
+ * Makes sure a daemon is up: spawns one as a detached background process (like `flow start` does) and waits
  * for its port file to appear -- avoids the WebSocket race condition of the in-process path.
+ *
+ * Concurrent callers (several `flow run` on a cold machine) are serialised: the first spawns, the others find
+ * the daemon it started and return. Without that each one spawned its own daemon and deleted the port file of the
+ * one that was already up, so the daemons evicted each other while executions were being accepted.
  */
 export async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Promise<void> {
+	fs.mkdirSync(daemonDir, { recursive: true, mode: 0o700 });
+	// A different file from the daemon's own start lock: the daemon being started takes that one while this lock is
+	// still held waiting for it.
+	const release = await ExclusiveFileLock.acquire(path.join(daemonDir, 'daemon-spawn.lock'), {
+		timeoutMs: timeoutMs + 5000,
+		purpose: 'start the flow daemon (another flow command is starting it)',
+	});
+	try {
+		if ((await findLiveDaemon(daemonDir)) !== null) {
+			return;
+		}
+		await launchDaemon(daemonDir, timeoutMs);
+	} finally {
+		release();
+	}
+}
+
+async function launchDaemon(daemonDir: string, timeoutMs: number): Promise<void> {
 	// Resolve the .cjs bundle from the launcher override or the installed bundle location
 	const resolvedBundle = (() => {
 		// In the installed binary, __filename points to the flow.cjs bundle.
@@ -51,7 +75,8 @@ export async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_00
 		}
 	}
 
-	// Remove stale port file before spawning so the poll below only resolves on a fresh write
+	// Reached only when no daemon answers on the published port, so the file is stale. Removed so the poll below only
+	// resolves on a fresh write.
 	const portFile = path.join(daemonDir, 'config.port');
 	try {
 		fs.unlinkSync(portFile);

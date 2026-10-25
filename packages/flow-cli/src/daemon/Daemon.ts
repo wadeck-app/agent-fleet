@@ -1,6 +1,7 @@
 import { type DaemonHandle, createDaemon } from '@wadeck-app/singleton-daemon-kit';
 import { executionsDirOf, logsDirOf } from 'flow-core';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 import { VERSION } from '../cli/version.js';
@@ -22,8 +23,10 @@ import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DaemonSourceContact } from './DaemonSourceContact.js';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler.js';
+import { ExclusiveFileLock } from './ExclusiveFileLock.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
+import { findLiveDaemon } from './LiveDaemonProbe.js';
 import { RelayRegistry } from './RelayRegistry.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { WebSocketServer } from './WebSocketServer';
@@ -66,14 +69,60 @@ export interface StartDaemonOptions {
 	 * which is what tests and embedders want; the CLI entry passes the queue-backed one.
 	 */
 	eventPublisher?: FlowEventPublisher;
+	/**
+	 * What to do when another daemon already owns the config dir. Omitted means `takeover`: the kit evicts it and this
+	 * one replaces it, which is what a deliberate restart wants.
+	 *
+	 * `yield` is for daemons nobody asked to replace anything (every `flow run` auto-starts one, so concurrent runs
+	 * start several): the late one logs a single line and leaves, WITHOUT touching state. A takeover there evicted
+	 * the live daemon and its start-up reconciliation then marked the executions that daemon had just accepted as
+	 * interrupted.
+	 */
+	existingDaemon?: 'takeover' | 'yield';
 }
 
+/** How long a starting daemon waits for another one that is mid-start before giving up. */
+const START_LOCK_TIMEOUT_MS = 60_000;
+
+/**
+ * Decides, before any side effect (plugins, reconciliation, listeners, log line, registration), whether this
+ * process may become the daemon. The check and the start run under one lock, so two starting daemons cannot both
+ * see "nobody is up".
+ */
 async function startDaemon(
 	config: FlowConfig = FlowConfigLoader.DEFAULT,
 	daemonDir?: string,
 	options: StartDaemonOptions = {}
 ): Promise<DaemonHandle> {
 	const resolvedDaemonDir = daemonDir ?? flowConfigDir();
+	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });
+	const release = await ExclusiveFileLock.acquire(path.join(resolvedDaemonDir, 'daemon-start.lock'), {
+		timeoutMs: START_LOCK_TIMEOUT_MS,
+		purpose: 'start the flow daemon (another daemon is starting)',
+	});
+	try {
+		if ((options.existingDaemon ?? 'takeover') === 'yield') {
+			const incumbent = await findLiveDaemon(resolvedDaemonDir);
+			if (incumbent !== null) {
+				writeDaemonLog(
+					logsDirOf(resolvedDaemonDir),
+					'info',
+					`Daemon (pid ${String(process.pid)}) not started: another daemon (pid ${String(incumbent.pid)}, port ${String(incumbent.port)}) already owns ${resolvedDaemonDir}; exiting without touching its state`
+				);
+				return { port: incumbent.port, stop: () => Promise.resolve() };
+			}
+		}
+		return await startOwningDaemon(config, resolvedDaemonDir, options);
+	} finally {
+		release();
+	}
+}
+
+async function startOwningDaemon(
+	config: FlowConfig,
+	resolvedDaemonDir: string,
+	options: StartDaemonOptions
+): Promise<DaemonHandle> {
 	const executionsDir = executionsDirOf(resolvedDaemonDir);
 	const logsDir = logsDirOf(resolvedDaemonDir);
 	const eventPublisher =
@@ -141,7 +190,11 @@ async function startDaemon(
 			// shutdown costs nothing once the process actually exits -- but a daemon stopped
 			// in-process (tests, or `flow daemon stop` reusing the same process) must not keep
 			// firing it against a torn-down daemon.
-			onShutdown: () => {
+			onShutdown: reason => {
+				// Idle stops log their own line (with a snapshot); the others used to leave no trace of who stopped what.
+				if (reason !== 'idle') {
+					writeDaemonLog(logsDir, 'info', `Daemon stopped (${reason}) (pid ${String(process.pid)})`);
+				}
 				if (updateCheckTimer !== undefined) {
 					clearInterval(updateCheckTimer);
 				}
