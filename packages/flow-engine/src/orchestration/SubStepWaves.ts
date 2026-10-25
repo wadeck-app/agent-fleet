@@ -1,4 +1,4 @@
-import type { SchedulerStep } from './FlowScheduler';
+import type { SchedulerStep } from './SchedulerTypes';
 import { WAVES_SUB_STEP_STRATEGY } from './SubStepStrategyNames';
 
 /**
