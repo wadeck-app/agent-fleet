@@ -721,6 +721,7 @@ export class FlowRegistry {
 				env: data.env,
 				shell: data.shell,
 				strict: data.strict,
+				timeout: data.timeout,
 				captureOutput: data.captureOutput !== false, // Default to true
 			};
 		} else if (stepType === 'subflow') {

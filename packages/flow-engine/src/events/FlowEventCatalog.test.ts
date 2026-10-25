@@ -96,3 +96,15 @@ describe('EventsDocumentation vs the catalog', () => {
 		}
 	});
 });
+
+describe('FLOW_EVENT_CATALOG projectId', () => {
+	it.each(FLOW_EVENT_CATALOG.map(event => [event.name, event] as const))(
+		'%s declares an optional string projectId next to projectRoot, and shows it in its example',
+		(_name, event) => {
+			const schema = event.schema as { properties: Record<string, { type?: string }>; required: string[] };
+			expect(schema.properties['projectId']?.type).toBe('string');
+			expect(schema.required).not.toContain('projectId');
+			expect(event.example).toHaveProperty('projectId');
+		}
+	);
+});

@@ -802,6 +802,13 @@ export interface ScriptFlowStep extends BaseFlowStep {
 	strict?: boolean;
 
 	/**
+	 * Wall-clock limit in SECONDS (note: model steps use minutes). When it elapses the script and every
+	 * process it started are killed and the step fails. Omit for no limit (the default): a long script is
+	 * then bounded only by the daemon's silence watchdog, which output keeps quiet.
+	 */
+	timeout?: number;
+
+	/**
 	 * Names of `type: password` inputs this step receives as environment variables (env var NAME = secret value).
 	 * Only script steps may use secrets. Values are supplied by the executing worker and never logged.
 	 */

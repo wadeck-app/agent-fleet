@@ -6,6 +6,7 @@ export { FlowRegistry } from './registry/FlowRegistry';
 export { FlowExecutor } from './executor/FlowExecutor';
 export type { FlowExecutionOptions } from './executor/FlowExecutor';
 export { StepRunner } from './executor/StepRunner';
+export { killAllRunningScripts } from './executor/ScriptProcessSupervisor';
 export type { StepRunnerConfig } from './executor/StepRunner';
 export { FlowValidator } from './validation/FlowValidator';
 export type { ValidationIssue, ValidationResult } from './validation/FlowValidator';

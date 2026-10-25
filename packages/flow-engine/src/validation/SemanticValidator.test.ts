@@ -795,3 +795,77 @@ describe('SemanticValidator', () => {
 		});
 	});
 });
+
+describe('SemanticValidator opencode shell warning (Windows)', () => {
+	let issueCollector: MockIssueCollector;
+
+	function validate(
+		probe: { platform: NodeJS.Platform; findGitBash: () => string | null },
+		overrides: { provider?: string; stepEnv?: Record<string, string>; flowEnv?: Record<string, string> } = {}
+	): void {
+		issueCollector = new MockIssueCollector();
+		const validator = new SemanticValidator(
+			issueCollector,
+			new GraphValidator(issueCollector, undefined as unknown as FlowRegistry),
+			undefined,
+			probe
+		);
+		const flow = {
+			id: 'f',
+			version: '1.0.0',
+			name: 'F',
+			description: 'F',
+			workspace: { mode: 'manual', gitStrategy: 'main-only', reusePolicy: 'never' },
+			inputs: {},
+			env: overrides.flowEnv,
+			steps: [
+				{
+					type: 'model',
+					id: 's1',
+					name: 'S1',
+					provider: overrides.provider ?? 'opencode',
+					prompt: 'x',
+					env: overrides.stepEnv,
+				},
+			],
+		} as unknown as FlowDefinition;
+		validator.validateSemantics(flow, new Set(['s1']));
+	}
+
+	const notFound = { platform: 'win32' as const, findGitBash: () => null };
+
+	test('warns (not errors) with an actionable message when Git Bash is missing on win32', () => {
+		validate(notFound);
+		expect(issueCollector.issues).toHaveLength(1);
+		const issue = issueCollector.issues[0]!;
+		expect(issue.severity).toBe('warning');
+		expect(issue.code).toBe(ValidationCode.OPENCODE_SHELL_NOT_FOUND);
+		expect(issue.location?.stepId).toBe('s1');
+		expect(issue.suggestion).toContain('FLOW_BASH_PATH');
+	});
+
+	test('is silent when the step env sets SHELL', () => {
+		validate(notFound, { stepEnv: { SHELL: 'C:/Tools/bash.exe' } });
+		expect(issueCollector.issues).toHaveLength(0);
+	});
+
+	test('is silent when the flow env sets SHELL', () => {
+		validate(notFound, { flowEnv: { SHELL: 'C:/Tools/bash.exe' } });
+		expect(issueCollector.issues).toHaveLength(0);
+	});
+
+	test('is silent when Git Bash is found', () => {
+		validate({ platform: 'win32', findGitBash: () => 'C:/Tools/bash.exe' });
+		expect(issueCollector.issues).toHaveLength(0);
+	});
+
+	test('is silent on non-win32', () => {
+		validate({ platform: 'linux', findGitBash: () => null });
+		expect(issueCollector.issues).toHaveLength(0);
+	});
+
+	test('is silent for the claude provider', () => {
+		validate(notFound, { provider: 'claude' });
+		expect(issueCollector.issues).toHaveLength(0);
+	});
+});

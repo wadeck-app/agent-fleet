@@ -72,7 +72,9 @@ export async function executeScriptStep(
 		scriptExecutor: ScriptExecutor;
 		outputExtractor: OutputExtractor;
 	},
-	failureMessageBuilder: ScriptFailureMessageBuilder = new ScriptFailureMessageBuilder()
+	failureMessageBuilder: ScriptFailureMessageBuilder = new ScriptFailureMessageBuilder(),
+	/** Called whenever the script prints; lets the worker tell the daemon the step is alive. */
+	onActivity?: () => void
 ): Promise<StepTrace> {
 	const { templateRenderer, scriptExecutor, outputExtractor } = services;
 
@@ -96,6 +98,9 @@ export async function executeScriptStep(
 		isolateEnv: false,
 		strict: step.strict,
 		shellKind: step.shell,
+		// Seconds in the flow file, milliseconds for the executor. No default limit: see ScriptFlowStep.timeout.
+		timeout: step.timeout === undefined ? undefined : step.timeout * 1000,
+		onActivity,
 	});
 
 	stepTrace.exitCode = result.exitCode;
@@ -120,7 +125,11 @@ export async function executeScriptStep(
 	};
 	stepTrace.meta = scriptMeta;
 
-	if (!result.success) {
+	if (result.timedOut) {
+		stepTrace.error =
+			`Script timed out after ${String((result.timeoutMs ?? 0) / 1000)}s (the step's \`timeout\`): the script's process tree was killed. ` +
+			`If the script legitimately needs longer, raise \`timeout\` on step '${step.id}'; otherwise look for what hangs (output captured so far is in the step's stdout/stderr).`;
+	} else if (!result.success) {
 		stepTrace.error = await failureMessageBuilder.build({ ...result, script: renderedScript });
 	}
 

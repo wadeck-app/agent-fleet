@@ -35,6 +35,10 @@ const PROPERTIES = {
 	completedAt: { type: 'string', description: 'ISO timestamp of the end; only once finished' },
 	durationMs: { type: 'integer', minimum: 0, description: 'Milliseconds between start and end; only once finished' },
 	projectRoot: { type: 'string', description: 'Project the execution belongs to, when it has one' },
+	projectId: {
+		type: 'string',
+		description: 'Registry id of the project the execution belongs to, when it has one',
+	},
 	error: {
 		type: 'string',
 		maxLength: 200,
@@ -66,11 +70,18 @@ const EXECUTION_ENDED_AT = '2026-10-24T09:04:12.500Z';
 const STEP_STARTED_AT = '2026-10-24T09:00:03.000Z';
 const STEP_ENDED_AT = '2026-10-24T09:01:30.250Z';
 const PROJECT = '/work/my-project';
+const PROJECT_ID = 'a1b2c3d4';
 
-const EXECUTION_OPTIONAL: PropertyName[] = ['startedAt', 'projectRoot'];
-const EXECUTION_FINISHED_OPTIONAL: PropertyName[] = ['startedAt', 'completedAt', 'durationMs', 'projectRoot'];
-const STEP_OPTIONAL: PropertyName[] = ['startedAt', 'projectRoot'];
-const STEP_FINISHED_OPTIONAL: PropertyName[] = ['startedAt', 'completedAt', 'durationMs', 'projectRoot'];
+const EXECUTION_OPTIONAL: PropertyName[] = ['startedAt', 'projectRoot', 'projectId'];
+const EXECUTION_FINISHED_OPTIONAL: PropertyName[] = [
+	'startedAt',
+	'completedAt',
+	'durationMs',
+	'projectRoot',
+	'projectId',
+];
+const STEP_OPTIONAL: PropertyName[] = ['startedAt', 'projectRoot', 'projectId'];
+const STEP_FINISHED_OPTIONAL: PropertyName[] = ['startedAt', 'completedAt', 'durationMs', 'projectRoot', 'projectId'];
 
 /**
  * The single definition of the events flow publishes. It feeds the queue declaration (flow-cli) and
@@ -88,6 +99,7 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			status: 'running',
 			startedAt: EXECUTION_STARTED_AT,
 			projectRoot: PROJECT,
+			projectId: PROJECT_ID,
 		},
 		correlationKey: EXECUTION_KEY,
 		terminal: false,
@@ -106,6 +118,7 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			completedAt: EXECUTION_ENDED_AT,
 			durationMs: 252500,
 			projectRoot: PROJECT,
+			projectId: PROJECT_ID,
 		},
 		correlationKey: EXECUTION_KEY,
 		terminal: true,
@@ -124,6 +137,7 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			completedAt: EXECUTION_ENDED_AT,
 			durationMs: 252500,
 			projectRoot: PROJECT,
+			projectId: PROJECT_ID,
 			error: 'Step "build" failed: exit code 1',
 		},
 		correlationKey: EXECUTION_KEY,
@@ -143,6 +157,7 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			attempt: 1,
 			startedAt: STEP_STARTED_AT,
 			projectRoot: PROJECT,
+			projectId: PROJECT_ID,
 		},
 		correlationKey: STEP_KEY,
 		terminal: false,
@@ -162,6 +177,7 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			completedAt: STEP_ENDED_AT,
 			durationMs: 87250,
 			projectRoot: PROJECT,
+			projectId: PROJECT_ID,
 		},
 		correlationKey: STEP_KEY,
 		terminal: true,
@@ -186,6 +202,7 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			completedAt: STEP_ENDED_AT,
 			durationMs: 87250,
 			projectRoot: PROJECT,
+			projectId: PROJECT_ID,
 			error: 'exit code 1',
 		},
 		correlationKey: STEP_KEY,

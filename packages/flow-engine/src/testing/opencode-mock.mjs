@@ -244,6 +244,9 @@ if (process.env['OPENCODE_MOCK_RESPONSE']) {
 } else if (prompt.includes('echo_xdg')) {
 	// Include XDG_CONFIG_HOME value so isolation tests can verify each spawn is unique
 	responseText = `XDG_CONFIG_HOME:${process.env['XDG_CONFIG_HOME'] ?? 'not-set'}`;
+} else if (prompt.includes('echo_shell')) {
+	// Include SHELL so tests can verify what the bash tool's shell selection was given
+	responseText = `SHELL:${process.env['SHELL'] ?? 'not-set'}`;
 } else if (prompt.includes('echo_config')) {
 	// Output the OpenCode config JSON so plugin injection tests can verify it
 	const configContent = process.env['OPENCODE_CONFIG_CONTENT'] ?? 'no-config';

@@ -1357,3 +1357,73 @@ describe('OpenCodeModelProvider', () => {
 		});
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Windows shell for opencode's bash tool (see OpenCodeWindowsShell.ts)
+// ---------------------------------------------------------------------------
+
+describe('OpenCodeModelProvider SHELL for the bash tool', () => {
+	const GIT_BASH = 'C:\\Program Files\\Git\\usr\\bin\\bash.exe';
+	let mockProcess: child_process.ChildProcess;
+
+	beforeEach(() => {
+		mockProcess = makeMockProcess();
+		vi.clearAllMocks();
+		vi.mocked(child_process.spawn).mockReturnValue(mockProcess);
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllEnvs();
+	});
+
+	async function spawnedEnv(
+		probe: { platform: NodeJS.Platform; findGitBash: () => string | null },
+		stepEnv?: Record<string, string>
+	): Promise<Record<string, string>> {
+		const provider = new OpenCodeModelProvider({ shellProbe: probe });
+		const resultPromise = provider.launchBackground(makeBaseOptions({ env: stepEnv }));
+		setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+		await resultPromise;
+		return (vi.mocked(child_process.spawn).mock.calls[0][2] as { env: Record<string, string> }).env;
+	}
+
+	it('sets SHELL to the Git Bash path on win32 when found', async () => {
+		const env = await spawnedEnv({ platform: 'win32', findGitBash: () => GIT_BASH });
+		expect(env['SHELL']).toBe(GIT_BASH);
+	});
+
+	it('lets the step env SHELL win over Git Bash', async () => {
+		const env = await spawnedEnv(
+			{ platform: 'win32', findGitBash: () => GIT_BASH },
+			{ SHELL: 'C:\\Tools\\pwsh.exe' }
+		);
+		expect(env['SHELL']).toBe('C:\\Tools\\pwsh.exe');
+	});
+
+	it('does not touch SHELL on non-win32', async () => {
+		vi.stubEnv('SHELL', '/bin/zsh');
+		const env = await spawnedEnv({ platform: 'linux', findGitBash: () => GIT_BASH });
+		expect(env['SHELL']).toBeUndefined();
+	});
+
+	it('never forwards the daemon SHELL on win32', async () => {
+		vi.stubEnv('SHELL', '/bin/bash.exe');
+		const env = await spawnedEnv({ platform: 'win32', findGitBash: () => GIT_BASH });
+		expect(env['SHELL']).toBe(GIT_BASH);
+	});
+
+	it('sets no SHELL and warns with an actionable message when Git Bash is not found', async () => {
+		vi.stubEnv('SHELL', '/bin/bash.exe');
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		const env = await spawnedEnv({ platform: 'win32', findGitBash: () => null });
+		expect(env['SHELL']).toBeUndefined();
+		expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Git Bash was not found.*FLOW_BASH_PATH/s));
+	});
+
+	it('keeps forwarding no credentials from the daemon env', async () => {
+		vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'hunter2');
+		const env = await spawnedEnv({ platform: 'win32', findGitBash: () => GIT_BASH });
+		expect(env['AWS_SECRET_ACCESS_KEY']).toBeUndefined();
+	});
+});

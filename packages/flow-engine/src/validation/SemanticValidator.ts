@@ -14,6 +14,12 @@
  * so basic structure (step IDs, types) is guaranteed to be valid.
  */
 import { checkProviderModelCompatibility } from '../processing/ModelAliases';
+import {
+	OPENCODE_SHELL_NOT_FOUND_ADVICE,
+	type OpenCodeShellProbe,
+	defaultOpenCodeShellProbe,
+	resolveOpenCodeShell,
+} from '../processing/OpenCodeWindowsShell';
 import type { FlowRegistry } from '../registry/FlowRegistry';
 import type { FlowDefinition, FlowStep, ModelFlowStep, SubFlowStep, WorkspaceStrategy } from '../types';
 import type { GraphValidator } from './GraphValidator';
@@ -33,7 +39,8 @@ export class SemanticValidator {
 	constructor(
 		private issueCollector: IssueCollector,
 		private graphValidator: GraphValidator,
-		private flowRegistry?: FlowRegistry
+		private flowRegistry?: FlowRegistry,
+		private shellProbe: OpenCodeShellProbe = defaultOpenCodeShellProbe
 	) {}
 
 	/**
@@ -47,11 +54,41 @@ export class SemanticValidator {
 		// Validate step references (next, conditions, previousOutputs)
 		this.validateStepReferences(flow.steps, stepIds);
 
+		this.validateOpenCodeShell(flow);
+
 		// Validate subflow references and configuration
 		for (const step of flow.steps) {
 			if (step.type === 'subflow') {
 				this.validateSubFlowReferences(step as SubFlowStep, flow.id);
 			}
+		}
+	}
+
+	/**
+	 * Warn (never fail) when an opencode model step would run its bash tool under PowerShell:
+	 * Windows, no SHELL in the flow/step env, and Git Bash cannot be found.
+	 */
+	private validateOpenCodeShell(flow: FlowDefinition): void {
+		for (const step of flow.steps) {
+			if (step.type !== 'model') {
+				continue;
+			}
+			const modelStep = step as ModelFlowStep;
+			if (modelStep.provider !== 'opencode') {
+				continue;
+			}
+			const decision = resolveOpenCodeShell({ ...(flow.env ?? {}), ...(modelStep.env ?? {}) }, this.shellProbe);
+			if (decision.kind !== 'not-found') {
+				continue;
+			}
+			this.issueCollector.addIssue({
+				severity: 'warning',
+				code: ValidationCode.OPENCODE_SHELL_NOT_FOUND,
+				message: `Step '${step.id}': ${OPENCODE_SHELL_NOT_FOUND_ADVICE}`,
+				location: { stepId: step.id, field: 'env' },
+				suggestion:
+					'Install Git for Windows, or set FLOW_BASH_PATH / env.SHELL to the full path of a bash.exe.',
+			});
 		}
 	}
 

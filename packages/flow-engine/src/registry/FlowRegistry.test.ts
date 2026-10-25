@@ -409,6 +409,24 @@ custom-flow:
 			expect(steps[1].strict).toBeUndefined();
 		});
 
+		it('should carry the script step timeout to the loaded step (not drop it)', async () => {
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+			vi.mocked(yaml.load).mockReturnValue({
+				'timeout-flow': {
+					version: '1.0.0',
+					name: 'Timeout Flow',
+					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					steps: [{ id: 'a', name: 'A', type: 'script', script: 'sleep 1', shell: 'bash', timeout: 90 }],
+				},
+			});
+
+			await registry.loadProjectFlows();
+
+			const steps = registry.getFlow('timeout-flow')?.steps as any[];
+			expect(steps[0].timeout).toBe(90);
+		});
+
 		it('should not load flow when step is missing required type field', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('yaml');

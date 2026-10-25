@@ -831,6 +831,37 @@ export class SchemaValidator {
 		}
 
 		this.validateScriptStrict(step);
+		this.validateScriptTimeout(step);
+	}
+
+	/**
+	 * `timeout` is a number of seconds. Omit it for no limit: 0 is rejected rather than read as "none".
+	 * The ceiling is what a Node timer can hold (2^31-1 ms); above it the timer fires after 1 ms.
+	 */
+	private validateScriptTimeout(step: ScriptFlowStep): void {
+		if (step.timeout === undefined) {
+			return;
+		}
+		const maxSeconds = 2_147_483;
+		if (typeof step.timeout !== 'number' || !Number.isFinite(step.timeout) || step.timeout <= 0) {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_VALUE,
+				message: `Script step '${step.id}' timeout must be a positive number of seconds`,
+				location: { stepId: step.id, field: 'timeout' },
+				suggestion: 'Set a positive number of seconds (e.g. timeout: 300), or omit the field for no timeout',
+				context: { actual: step.timeout === null ? 'null' : step.timeout },
+			});
+		} else if (step.timeout > maxSeconds) {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_VALUE,
+				message: `Script step '${step.id}' timeout of ${step.timeout} seconds is too large; the maximum is ${maxSeconds} seconds (about 24 days)`,
+				location: { stepId: step.id, field: 'timeout' },
+				suggestion: `Use at most ${maxSeconds} seconds, or omit the field for no timeout. Note: script timeouts are in seconds, model timeouts in minutes`,
+				context: { actual: step.timeout },
+			});
+		}
 	}
 
 	/**

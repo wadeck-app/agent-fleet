@@ -46,6 +46,13 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).toContain('set -o pipefail');
 	});
 
+	it('documents the script step timeout: seconds, no default, tree kill, and the liveness rule', () => {
+		expect(result).toMatch(/`timeout` \(number of seconds/);
+		expect(result).toMatch(/no default/i);
+		expect(result).toMatch(/process tree|every process it started/i);
+		expect(result).toMatch(/output counts as a sign of life|keeps the step alive/i);
+	});
+
 	it('documents that an engine failure bypasses retry, onFailure and the sub-step relaunch', () => {
 		expect(result).toContain('engine failure');
 		expect(result).toContain('stepSilenceLimitSeconds');
@@ -141,7 +148,16 @@ describe('FlowCapabilitiesGenerator - secrets', () => {
 		]) {
 			expect(result).toContain('`' + name + '`');
 		}
-		for (const field of ['executionId', 'flowId', 'stepId', 'attempt', 'durationMs', 'projectRoot', 'error']) {
+		for (const field of [
+			'executionId',
+			'flowId',
+			'stepId',
+			'attempt',
+			'durationMs',
+			'projectRoot',
+			'projectId',
+			'error',
+		]) {
 			expect(result).toContain('`' + field + '`');
 		}
 		expect(result).toContain(
@@ -199,6 +215,14 @@ describe('FlowCapabilitiesGenerator - secrets', () => {
 			expect(result).toContain(encoding);
 		}
 		expect(result).toContain('NOT covered');
+	});
+
+	it('has a Section 12 on projects: registration, resolution order, projectId on executions and events', () => {
+		expect(result).toContain('## Section 12: Projects');
+		expect(result).toContain('project add');
+		expect(result).toContain('FLOW_PROJECT');
+		expect(result).toContain('--project');
+		expect(result).toContain('projectId');
 	});
 
 	it('embeds the shared example flow', () => {

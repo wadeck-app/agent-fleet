@@ -535,6 +535,38 @@ describe('Flow-level feature tests (mock providers)', () => {
 	);
 
 	it(
+		'bash-tool shell: the spawned CLI receives SHELL set to the discovered Git Bash on win32, never the daemon SHELL',
+		async () => {
+			const prevMockPath = process.env['OPENCODE_MOCK_PATH'];
+			const prevShell = process.env['SHELL'];
+			process.env['OPENCODE_MOCK_PATH'] = MOCK_PATH;
+			process.env['SHELL'] = '/bin/bash.exe';
+			const gitBash = 'C:\\Program Files\\Git\\usr\\bin\\bash.exe';
+
+			try {
+				const provider = new OpenCodeModelProvider({
+					shellProbe: { platform: 'win32', findGitBash: () => gitBash },
+				});
+				const events: StreamJsonEvent[] = [];
+				await provider.launchBackground({
+					workingDir: process.cwd(),
+					prompt: 'please echo_shell here',
+					stepId: 'shell-test',
+					onStreamEvent: e => events.push(e),
+				});
+				const result = events.find(e => e.type === 'result');
+				expect(result?.data['result']).toBe(`SHELL:${gitBash}`);
+			} finally {
+				if (prevMockPath === undefined) delete process.env['OPENCODE_MOCK_PATH'];
+				else process.env['OPENCODE_MOCK_PATH'] = prevMockPath;
+				if (prevShell === undefined) delete process.env['SHELL'];
+				else process.env['SHELL'] = prevShell;
+			}
+		},
+		FLOW_TEST_TIMEOUT
+	);
+
+	it(
 		'XDG_CONFIG_HOME isolation: each spawn receives a unique temp dir path in its env',
 		async () => {
 			// The mock echoes XDG_CONFIG_HOME back in the response when "echo_xdg" is in prompt.

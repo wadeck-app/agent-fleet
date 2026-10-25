@@ -14,6 +14,7 @@
  *               config_codex.json -- see defaultOpenCodeConfigPath) is used when it exists on
  *               disk, so a flow author never has to know this mechanism exists at all.
  * Env isolation: only options.env is forwarded; process.env is never inherited.
+ * Bash tool shell: on win32 SHELL is set to the discovered Git Bash (see OpenCodeWindowsShell.ts).
  * Prompt limit: 32KB -- throws PromptTooLargeError if exceeded.
  * XDG isolation: each subprocess gets a unique XDG_CONFIG_HOME so it never reads ~/.config/opencode/.
  */
@@ -35,6 +36,12 @@ import type {
 import { PromptTooLargeError, validateLaunchOptions } from './ModelProvider';
 import { OpenCodeHookTranslator } from './OpenCodeHookTranslator';
 import type { OpenCodePermissionOverrides } from './OpenCodePermissions';
+import {
+	OPENCODE_SHELL_NOT_FOUND_ADVICE,
+	type OpenCodeShellProbe,
+	defaultOpenCodeShellProbe,
+	resolveOpenCodeShell,
+} from './OpenCodeWindowsShell';
 import type { StreamJsonEvent } from './StreamJsonParser';
 import { buildOpenCodeToolsConfig } from './ToolAccess';
 
@@ -215,7 +222,8 @@ function buildSpawnParams(
 	commandParts: string[],
 	needsShell: boolean,
 	maxInlineConfigBytes: number,
-	pluginPath?: string
+	pluginPath?: string,
+	shellProbe: OpenCodeShellProbe = defaultOpenCodeShellProbe
 ): SpawnParams {
 	const command = commandParts[0]!;
 	// commandParts[1..] are prefix args (e.g. ['node', '/path/mock.mjs'] -> command='node', prefix=['mock.mjs'])
@@ -278,6 +286,14 @@ function buildSpawnParams(
 	// root-caused live, see .claude/kb/lessons-learned.md.
 	if (process.env['PATHEXT']) infraEnv['PATHEXT'] = process.env['PATHEXT']!;
 	const env: Record<string, string> = { ...infraEnv, ...(options.env ?? {}) };
+	// opencode's bash tool defaults to PowerShell 5.1 on Windows (claude's is real bash). SHELL is
+	// the only knob it honours first; the daemon's own SHELL is deliberately never forwarded.
+	const shellDecision = resolveOpenCodeShell(options.env ?? {}, shellProbe);
+	if (shellDecision.kind === 'set') {
+		env['SHELL'] = shellDecision.shell;
+	} else if (shellDecision.kind === 'not-found') {
+		console.warn(`[OpenCodeModelProvider] ${OPENCODE_SHELL_NOT_FOUND_ADVICE}`);
+	}
 	// Consumed already: copyGlobalConfig merged those files into the isolated XDG config below.
 	// Handing the variable to the CLI as well makes it re-read the paths itself, and any path form
 	// it cannot resolve leaves it with no config -- which opencode reports as an unexplained
@@ -319,6 +335,8 @@ function buildSpawnParams(
 
 export interface OpenCodeModelProviderOptions {
 	maxInlineConfigBytes?: number;
+	/** Test seam: platform and Git Bash lookup for the Windows bash-tool SHELL. */
+	shellProbe?: OpenCodeShellProbe;
 }
 
 export class OpenCodeModelProvider implements ModelProvider {
@@ -326,9 +344,11 @@ export class OpenCodeModelProvider implements ModelProvider {
 	readonly supportsSessionResume = true;
 	private currentProcess: ChildProcess | null = null;
 	private readonly maxInlineConfigBytes: number;
+	private readonly shellProbe: OpenCodeShellProbe;
 
 	constructor(options: OpenCodeModelProviderOptions = {}) {
 		this.maxInlineConfigBytes = options.maxInlineConfigBytes ?? DEFAULT_MAX_INLINE_CONFIG_BYTES;
+		this.shellProbe = options.shellProbe ?? defaultOpenCodeShellProbe;
 	}
 
 	/**
@@ -369,7 +389,8 @@ export class OpenCodeModelProvider implements ModelProvider {
 			parts,
 			needsShell,
 			this.maxInlineConfigBytes,
-			pluginPath
+			pluginPath,
+			this.shellProbe
 		);
 
 		env['XDG_CONFIG_HOME'] = tempDir;
@@ -430,7 +451,8 @@ export class OpenCodeModelProvider implements ModelProvider {
 			parts,
 			needsShell,
 			this.maxInlineConfigBytes,
-			pluginPath
+			pluginPath,
+			this.shellProbe
 		);
 
 		// Isolate subprocess config from host ~/.config/opencode/

@@ -2,6 +2,7 @@ import { EventsDocumentation } from '../events/EventsDocumentation';
 import { StepRecordDocumentation } from '../record/StepRecordDocumentation';
 import { SecretsDocumentation } from '../secrets/SecretsDocumentation';
 import { VersionsDocumentation } from '../versions/VersionsDocumentation';
+import { ProjectsDocumentation } from './ProjectsDocumentation';
 import { SubStepWavesDocumentation } from './SubStepWavesDocumentation';
 
 /**
@@ -19,6 +20,7 @@ export class FlowCapabilitiesGenerator {
 	private readonly eventsDocumentation = new EventsDocumentation();
 	private readonly stepRecordDocumentation = new StepRecordDocumentation();
 	private readonly versionsDocumentation = new VersionsDocumentation();
+	private readonly projectsDocumentation = new ProjectsDocumentation();
 
 	/**
 	 * Generate a structured Markdown document describing all flow engine capabilities.
@@ -40,6 +42,7 @@ export class FlowCapabilitiesGenerator {
 			this.eventsDocumentation.generate(),
 			this.stepRecordDocumentation.generate(),
 			this.versionsDocumentation.generate(),
+			this.projectsDocumentation.generate(),
 		].join('\n\n');
 	}
 
@@ -89,6 +92,8 @@ Key fields:
 - \`subStepStrategy\` (\`restart-on-first-failure\` (default) | \`wait-all\` | \`waves\`, optional) -- how this step reacts to failing \`parent:\` sub-steps (\`waves\`: see "Sub-step waves" below). \`flow validate\` warns (exit 0) when a \`wait-all\` parent has a sub-step that \`depends\` on a sibling sub-step: if the sibling fails, the dependent is settled as not run
 - \`onCompact\` (\`{ command, timeout? }\`, optional, claude only) -- shell command run on each compaction (success, failed, thrashing). Gets the event as JSON on stdin and \`FLOW_COMPACT_*\` env vars. Observer only: a non-zero exit or a timeout (seconds, default 30) warns and never fails the step
 
+Shell of the \`bash\` tool (\`opencode\`, Windows): the claude provider's bash tool is real bash, but opencode defaults to PowerShell 5.1 (\`curl\` is \`Invoke-WebRequest\`, \`VAR=1 cmd &\` is rejected, files written through PowerShell get a UTF-8 BOM). On Windows flow therefore sets \`SHELL\` to the Git Bash it finds (\`FLOW_BASH_PATH\`, else the standard Git for Windows locations) for opencode model steps; a \`SHELL\` in the flow or step \`env\` wins, and the daemon's own \`SHELL\` is never forwarded. When Git Bash is not found nothing is guessed: the step stays on PowerShell, a warning is logged, and \`flow validate\` warns (exit 0) -- install Git for Windows or set \`FLOW_BASH_PATH\` / \`env.SHELL\`. Not applicable on Linux/macOS.
+
 ### script
 
 Executes a shell command or script in the workspace.
@@ -111,6 +116,7 @@ Key fields:
 - \`captureOutput\` (boolean, optional) -- whether to capture stdout/stderr
 - \`shell\` (\`bash\` | \`cmd\` | \`pwsh\`, recommended) -- execution shell; omitting it makes the shell depend on the platform and line count
 - \`strict\` (boolean, optional, default \`true\`, bash only) -- bash steps run with \`bash -e -u\`: a failing command mid-script or an unset variable fails the step (BEHAVIOUR CHANGE: before, only the last command's exit code counted). Set \`strict: false\` to restore the old behaviour. \`pipefail\` is not enabled; add \`set -o pipefail\` in the script to opt in. Setting \`strict\` on \`shell: cmd|pwsh\` is a validation error
+- \`timeout\` (number of seconds, optional, no default) -- wall-clock limit for the script. When it elapses the script and every process it started (its whole process tree: a test server, a browser) are killed (SIGTERM, 5 s grace, then SIGKILL; on Windows always immediate) and the step fails with a message naming the limit; it is a normal step failure, so \`retry\` and \`onFailure\` apply. Without \`timeout\` there is no limit: a script that prints keeps the step alive (output counts as a sign of life for the daemon's \`stepSilenceLimitSeconds\` watchdog), a silent one is failed as stalled by that watchdog. Note: model steps use minutes, script steps seconds. A process the script started that holds its output open after the script ended does not delay the step (it resolves about 2 s after the script exits, with a note in stderr)
 
 ### subflow
 

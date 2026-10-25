@@ -279,9 +279,11 @@ describe('ScriptExecutor', () => {
 			// Simulate close after kill
 			mockChild.emit('close', null);
 
-			await expect(executePromise).rejects.toThrow(ScriptExecutionError);
-			await expect(executePromise).rejects.toMatchObject({
-				message: 'Script execution timed out after 1000ms',
+			// A timeout resolves (with the output captured so far) so the step can report it.
+			await expect(executePromise).resolves.toMatchObject({
+				success: false,
+				timedOut: true,
+				timeoutMs: 1000,
 				exitCode: -1,
 				stdout: 'Started',
 			});
@@ -309,7 +311,7 @@ describe('ScriptExecutor', () => {
 			// Close the process
 			mockChild.emit('close', null);
 
-			await expect(executePromise).rejects.toThrow('timed out');
+			await expect(executePromise).resolves.toMatchObject({ timedOut: true });
 		});
 
 		it('should not timeout when timeout is 0', async () => {

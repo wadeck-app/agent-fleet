@@ -157,7 +157,16 @@ export class StepRunner {
 			};
 
 			if (step.type === 'script') {
-				return await executeScriptStep(step as ScriptFlowStep, workspace.path, context, stepTrace, services);
+				return await executeScriptStep(
+					step as ScriptFlowStep,
+					workspace.path,
+					context,
+					stepTrace,
+					services,
+					undefined,
+					// A script printing is a plain heartbeat (nothing changed about tool calls).
+					onActivity === undefined ? undefined : () => onActivity({ activity: null, changed: false })
+				);
 			} else if (step.type === 'model') {
 				const modelStep = step as ModelFlowStep;
 				const providerName = modelStep.provider ?? 'claude';

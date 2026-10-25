@@ -4,12 +4,14 @@
  * Executes shell scripts/commands and captures output.
  * Simple wrapper around child_process for flow steps.
  */
+import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { NtStatusDescriber } from './NtStatusDescriber';
+import { killAllRunningScripts, superviseScriptProcess } from './ScriptProcessSupervisor';
 import { BashInvocation } from './shell/BashInvocation';
 import { BashShellStrategy } from './shell/BashShellStrategy';
 import { CmdShellStrategy } from './shell/CmdShellStrategy';
@@ -17,7 +19,7 @@ import { PwshShellStrategy } from './shell/PwshShellStrategy';
 import type { ShellStrategy } from './shell/ShellStrategy';
 import { ensureGitCoreutilsOnPath, normalizePathKey, resolveBashOnWindows } from './shell/WindowsBashEnvironment';
 
-export { normalizePathKey };
+export { normalizePathKey, killAllRunningScripts };
 
 /**
  * Result of script execution
@@ -46,6 +48,12 @@ export interface ScriptExecutionResult {
 
 	/** True when the script ran under bash `-e -u` (strict mode). Drives the failure hint. */
 	strictApplied?: boolean;
+
+	/** True when `timeout` elapsed: the process and everything it started were killed (success is false). */
+	timedOut?: boolean;
+
+	/** The timeout that elapsed, in milliseconds. Set with `timedOut`. */
+	timeoutMs?: number;
 }
 
 /**
@@ -61,8 +69,17 @@ export interface ScriptExecutionOptions {
 	/** Environment variables (merged with process.env) */
 	env?: Record<string, string>;
 
-	/** Timeout in milliseconds (0 = no timeout) */
+	/**
+	 * Timeout in milliseconds (0 or absent = no timeout). On expiry the process tree is ended (SIGTERM,
+	 * a grace period, then SIGKILL) and the result has `timedOut: true`.
+	 */
 	timeout?: number;
+
+	/**
+	 * Called whenever the script prints to stdout or stderr. The caller decides how to throttle it; it
+	 * is how a running step tells the daemon it is alive.
+	 */
+	onActivity?: () => void;
 
 	/** Shell to use (defaults to platform default) */
 	shell?: string | boolean;
@@ -253,159 +270,122 @@ export class ScriptExecutor {
 			}
 		}
 
-		return new Promise((resolve, reject) => {
-			let stdout = '';
-			let stderr = '';
-			let killed = false;
-			// shell: true means cmd.exe (via ComSpec) on Windows, /bin/sh elsewhere
-			const genericShellPath =
-				typeof shell === 'string'
-					? shell
-					: shell
-						? process.platform === 'win32'
-							? (process.env['ComSpec'] ?? 'cmd.exe')
-							: '/bin/sh'
-						: undefined;
+		// shell: true means cmd.exe (via ComSpec) on Windows, /bin/sh elsewhere
+		const genericShellPath =
+			typeof shell === 'string'
+				? shell
+				: shell
+					? process.platform === 'win32'
+						? (process.env['ComSpec'] ?? 'cmd.exe')
+						: '/bin/sh'
+					: undefined;
 
-			// Helper to clean up temp file
-			const cleanupTempFile = () => {
-				if (tempFilePath && fs.existsSync(tempFilePath)) {
-					try {
-						fs.unlinkSync(tempFilePath);
-					} catch {
-						// Ignore cleanup errors
-					}
-				}
-			};
-
-			// Spawn process
-			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; the script must inherit the daemon's hidden console (d032e7e). Guarded by ScriptExecutor.windows-console.test.ts
-			const child = spawn(scriptToExecute, [], {
-				cwd: workingDir,
-				env: cleanEnv,
-				shell,
-				stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, capture stdout/stderr
-			});
-
-			// Helper to format timestamp
-			const getTimestamp = () => {
-				const now = new Date();
-				return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`;
-			};
-
-			// Capture stdout
-			child.stdout?.on('data', data => {
-				const text = data.toString();
-				stdout += text;
-
-				// Stream output in real-time if enabled
-				if (options.streaming) {
-					const lines = text.split('\n');
-					lines.forEach((line: string, index: number) => {
-						// Skip empty last line from split
-						if (index === lines.length - 1 && line === '') {
-							return;
-						}
-						const timestamp = getTimestamp();
-						const prefix = options.stepId ? `[${options.stepId}]` : '';
-						console.log(`      ${prefix} [${timestamp}] ${line}`);
-					});
-				}
-			});
-
-			// Capture stderr
-			child.stderr?.on('data', data => {
-				const text = data.toString();
-				stderr += text;
-
-				// Stream output in real-time if enabled
-				if (options.streaming) {
-					const lines = text.split('\n');
-					lines.forEach((line: string, index: number) => {
-						// Skip empty last line from split
-						if (index === lines.length - 1 && line === '') {
-							return;
-						}
-						const timestamp = getTimestamp();
-						const prefix = options.stepId ? `[${options.stepId}]` : '';
-						console.error(`      ${prefix} [${timestamp}] ${line}`);
-					});
-				}
-			});
-
-			// Handle timeout
-			let timeoutId: NodeJS.Timeout | undefined;
-			if (options.timeout && options.timeout > 0) {
-				timeoutId = setTimeout(() => {
-					killed = true;
-					child.kill('SIGTERM');
-
-					// Force kill after 5s if still running
-					setTimeout(() => {
-						if (!child.killed) {
-							child.kill('SIGKILL');
-						}
-					}, 5000);
-				}, options.timeout);
-			}
-
-			// Handle exit
-			child.on('close', code => {
-				if (timeoutId) {
-					clearTimeout(timeoutId);
-				}
-
-				const durationMs = Date.now() - startTime;
-				const exitCode = killed ? -1 : (code ?? -1);
-
-				const result: ScriptExecutionResult = {
-					exitCode,
-					stdout: stdout.trim(),
-					stderr: stderr.trim(),
-					durationMs,
-					success: exitCode === 0,
-					shellPath: genericShellPath,
-					workingDir,
-				};
-
-				// Clean up temp file if created
-				cleanupTempFile();
-
-				if (killed) {
-					reject(
-						new ScriptExecutionError(
-							`Script execution timed out after ${options.timeout}ms`,
-							-1,
-							stdout,
-							stderr
-						)
-					);
-				} else {
-					resolve(result);
-				}
-			});
-
-			// Handle errors
-			child.on('error', error => {
-				if (timeoutId) {
-					clearTimeout(timeoutId);
-				}
-
-				// Clean up temp file if created
-				cleanupTempFile();
-
-				reject(new ScriptExecutionError(`Failed to execute script: ${String(error)}`, -1, stdout, stderr));
-			});
+		// Spawn process
+		// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; the script must inherit the daemon's hidden console (d032e7e). Guarded by ScriptExecutor.windows-console.test.ts
+		const child = spawn(scriptToExecute, [], {
+			cwd: workingDir,
+			env: cleanEnv,
+			shell,
+			stdio: ['ignore', 'pipe', 'pipe'], // stdin ignored, capture stdout/stderr
 		});
+
+		try {
+			const run = await this.runChild(child, options);
+			return {
+				exitCode: run.timedOut ? -1 : (run.code ?? -1),
+				stdout: run.stdout.trim(),
+				stderr: run.stderr.trim(),
+				durationMs: Date.now() - startTime,
+				success: !run.timedOut && run.code === 0,
+				shellPath: genericShellPath,
+				workingDir,
+				...this.timeoutFields(run.timedOut, options),
+			};
+		} finally {
+			// Clean up temp file if created
+			if (tempFilePath && fs.existsSync(tempFilePath)) {
+				try {
+					fs.unlinkSync(tempFilePath);
+				} catch {
+					// Ignore cleanup errors
+				}
+			}
+		}
+	}
+
+	/** `timedOut`/`timeoutMs` for a result, or nothing when the script did not time out. */
+	private timeoutFields(timedOut: boolean, options: ScriptExecutionOptions): { timedOut?: true; timeoutMs?: number } {
+		return timedOut ? { timedOut: true, timeoutMs: options.timeout } : {};
+	}
+
+	/**
+	 * Captures a spawned script's output (streamed to the console when asked), reports it as activity and
+	 * waits for the process to be over: normally, timed out (tree killed) or shut down. Notices from the
+	 * supervisor are appended to stderr so they reach the step's recorded output.
+	 */
+	private async runChild(
+		child: ChildProcess,
+		options: ScriptExecutionOptions
+	): Promise<{ stdout: string; stderr: string; code: number | null; timedOut: boolean }> {
+		let stdout = '';
+		let stderr = '';
+		const prefix = options.stepId ? `[${options.stepId}] ` : '';
+
+		const stream = (text: string, write: (line: string) => void): void => {
+			const lines = text.split('\n');
+			lines.forEach((line: string, index: number) => {
+				// Skip empty last line from split
+				if (index === lines.length - 1 && line === '') {
+					return;
+				}
+				const now = new Date();
+				const timestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`;
+				write(`      ${prefix}[${timestamp}] ${line}`);
+			});
+		};
+
+		child.stdout?.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stdout += text;
+			if (options.streaming) {
+				stream(text, line => console.log(line));
+			}
+			options.onActivity?.();
+		});
+		child.stderr?.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stderr += text;
+			if (options.streaming) {
+				stream(text, line => console.error(line));
+			}
+			options.onActivity?.();
+		});
+
+		const notice = (message: string): void => {
+			const line = `[flow] ${message}`;
+			stderr += `${stderr === '' || stderr.endsWith('\n') ? '' : '\n'}${line}\n`;
+			if (options.streaming) {
+				console.error(`      ${prefix}${line}`);
+			}
+		};
+
+		try {
+			const outcome = await superviseScriptProcess(child, {
+				timeoutMs: options.timeout,
+				onNotice: notice,
+			});
+			return { stdout, stderr, code: outcome.code, timedOut: outcome.timedOut };
+		} catch (error) {
+			throw new ScriptExecutionError(`Failed to execute script: ${String(error)}`, -1, stdout, stderr);
+		}
 	}
 
 	/**
 	 * Spawns a resolved shell binary against a temp script file for an explicit `shellKind`
-	 * dispatch. Mirrors the existing implicit-bash branch's capture/cleanup/timeout contract
-	 * (trim stdout/stderr, exitCode `code ?? 1`, reject on spawn `error`) so behavior is
-	 * consistent across all explicit shell kinds.
+	 * dispatch. Same capture/cleanup/timeout contract as the generic path (trim stdout/stderr,
+	 * exitCode `code ?? 1`) so behavior is consistent across all explicit shell kinds.
 	 */
-	private runViaTempFileBinary(
+	private async runViaTempFileBinary(
 		binary: string,
 		args: string[],
 		tempFilePath: string,
@@ -415,66 +395,33 @@ export class ScriptExecutor {
 		cleanEnv: Record<string, string>,
 		strictApplied: boolean
 	): Promise<ScriptExecutionResult> {
-		return new Promise<ScriptExecutionResult>((resolve, reject) => {
-			let stdout = '';
-			let stderr = '';
-			let killed = false;
-			const cleanup = () => {
-				try {
-					fs.unlinkSync(tempFilePath);
-				} catch {
-					/* ignore */
-				}
-			};
+		try {
 			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
 			const child = spawn(binary, args, {
 				cwd: workingDir,
 				env: cleanEnv,
 				stdio: ['ignore', 'pipe', 'pipe'],
 			});
-			child.stdout?.on('data', (d: Buffer) => {
-				stdout += d.toString();
-			});
-			child.stderr?.on('data', (d: Buffer) => {
-				stderr += d.toString();
-			});
-			child.on('close', (code: number | null) => {
-				cleanup();
-				const exitCode = code ?? 1;
-				const durationMs = Date.now() - startTime;
-				resolve({
-					stdout: stdout.trim(),
-					stderr: stderr.trim(),
-					exitCode,
-					durationMs,
-					success: exitCode === 0,
-					strictApplied,
-					shellPath: binary,
-					workingDir,
-				});
-			});
-			child.on('error', (err: Error) => {
-				cleanup();
-				reject(err);
-			});
-			if (options.timeout) {
-				setTimeout(() => {
-					killed = true;
-					child.kill();
-					cleanup();
-					resolve({
-						stdout,
-						stderr,
-						exitCode: -1,
-						durationMs: Date.now() - startTime,
-						success: false,
-						shellPath: binary,
-						workingDir,
-					});
-				}, options.timeout);
+			const run = await this.runChild(child, options);
+			const exitCode = run.timedOut ? -1 : (run.code ?? 1);
+			return {
+				stdout: run.stdout.trim(),
+				stderr: run.stderr.trim(),
+				exitCode,
+				durationMs: Date.now() - startTime,
+				success: !run.timedOut && exitCode === 0,
+				strictApplied,
+				shellPath: binary,
+				workingDir,
+				...this.timeoutFields(run.timedOut, options),
+			};
+		} finally {
+			try {
+				fs.unlinkSync(tempFilePath);
+			} catch {
+				/* ignore */
 			}
-			void killed; // suppress unused warning
-		});
+		}
 	}
 
 	/**
@@ -487,6 +434,14 @@ export class ScriptExecutor {
 	public async executeOrThrow(options: ScriptExecutionOptions): Promise<ScriptExecutionResult> {
 		const result = await this.execute(options);
 
+		if (result.timedOut) {
+			throw new ScriptExecutionError(
+				`Script execution timed out after ${result.timeoutMs}ms`,
+				result.exitCode,
+				result.stdout,
+				result.stderr
+			);
+		}
 		if (!result.success) {
 			const ntStatus = NtStatusDescriber.isNtStatus(result.exitCode);
 			const hint = ntStatus ? NtStatusDescriber.hint(result.exitCode) : null;

@@ -520,6 +520,14 @@ Executes a shell script or command in the workspace.
           echo done
     ```
 
+#### `timeout`
+
+- **Type**: positive number of **seconds** (optional, script steps; model steps use minutes). Max 2147483.
+- **Default**: none. Without it a script that keeps printing is never failed by time; a silent one is failed by the daemon's `stepSilenceLimitSeconds` watchdog. Output counts as a sign of life (throttled `step_progress`, 5 s).
+- **On expiry**: the script and its whole process tree are killed (SIGTERM, 5 s grace, SIGKILL; immediate on Windows). The step fails with a normal step failure naming the limit (`retry`/`onFailure` apply), not an engine failure.
+- **Also**: a process started by the script that keeps its output open does not delay the step; it resolves ~2 s after the script exits, with a `[flow]` note in stderr. Such a process is left running unless the step timed out or the worker stopped.
+- **Example**: `timeout: 300`
+
 #### `secrets`
 
 - **Type**: `string[]` (optional, script steps only)
