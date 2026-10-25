@@ -146,6 +146,8 @@ A step with `parent: <id>` children is re-run when a child fails. `subStepStrate
 
 Waves: children of the same wave run in parallel and are all awaited; the next wave starts only if the previous one fully passed. A failed wave restarts the parent with only that wave's feedback, then every wave runs again from wave 1. Each failed wave consumes one of `maxSubStepIterations` (default 3). A nested sub-step runs in its ancestor's wave and must not declare `wave`. `flow validate` errors on a direct child without `wave`, `wave` outside a waves parent, a non-integer wave, an unknown strategy, or `depends` on a later wave; it warns on fewer than 2 waves. Full example: `flow docs`, section Sub-step waves.
 
+A `script` step takes an optional `timeout:` (seconds, no default): on expiry the script and its whole process tree are killed and the step fails normally (`retry`/`onFailure` apply). On Windows, opencode model steps run their bash tool under Git Bash (`SHELL` set from `FLOW_BASH_PATH` or the standard locations; a `SHELL` in flow/step `env` wins); if Git Bash is missing the step stays on PowerShell and `flow validate` warns `OPENCODE_SHELL_NOT_FOUND` (exit 0).
+
 Engine-origin failures (watchdog silence past `queue.stepSilenceLimitSeconds`, lost worker) are terminal: no `retry`, `onFailure` or parent re-run, because the step may already have had an effect. The execution and its parent fail with the real error.
 
 ### Events
@@ -188,7 +190,7 @@ By default `flow run` is fire-and-forget: it submits the execution to the daemon
 # Run by file path (works from any directory)
 flow run my-flow.yml --inputs description="fix the login bug"
 
-# Run by registered flow ID (loaded from .flow/flows.yml of the project containing the current directory)
+# Run by registered flow ID (loaded from .flow/flows.yml of the resolved project, see Project layout)
 flow run my-flow-id --inputs key=value
 
 # Multiple inputs
@@ -201,6 +203,8 @@ Options:
 - `--flow-id <id>` — select a flow inside a multi-flow YAML
 - `--wait` / `--timeout <duration>` — block until the execution ends (default is fire-and-forget; timeout default 10m)
 
-**Project layout:** the project root is the nearest parent directory holding `.flow/config.yml` (else the git root). Registered flow IDs come from `.flow/flows.yml` (and `.flow/flows-custom.yml`) there. A legacy `.agent-fleet/flows.yml` or `.flows/config.yml` without `.flow/config.yml` is refused with the list of files to move into `.flow/`. Running by file path has no such requirement.
+**Project layout:** a project is a folder registered once with the `project` CLI: `project add "<folder>"` (`project list` shows them). `.git`, `.flow/config.yml` and `.flows` no longer make a folder a project. The project is resolved from `-p/--project <name|alias|id>`, then `FLOW_PROJECT`, then the registered folder containing the current directory (deepest wins); there is no fallback. Outside a registered project the run is refused, including `flow run <file>`, with the registry's "no project" message followed by `flow no longer detects a project from .git, .flow/config.yml or .flows: register the folder once with: project add "<cwd>"`. `-p` exists on `flow run`, `flow versions`, `flow history` (filter, applied only when `-p`/`FLOW_PROJECT` is set) and `flow worker --project` (repeatable; takes names, aliases or ids, never paths). `flow show`, `flow validate` and `flow logs` take no project. Registered flow IDs come from `.flow/flows.yml` and `.flow/flows-custom.yml`, which stay in the project folder. Each execution records `projectId`; `flow history` and `flow show <execution-id>` display `name (id)`. Reference: `flow docs`, section Projects.
+
+**Processes:** `flow cli processes [--json]` lists the flow daemons, workers and clients on the machine (age, ports, whether the parent is alive) to spot leaked ones. It is read-only and never kills anything.
 
 **Daemon port:** `FLOW_DAEMON_PORT` sets the daemon command port (`0` lets the OS pick one; default range 47823-47833).
