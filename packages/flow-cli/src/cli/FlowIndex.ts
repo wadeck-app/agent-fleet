@@ -33,6 +33,7 @@ import { registerValidateCommand } from './commands/ValidateCommand';
 import { registerVersionsCommand } from './commands/VersionsCommand';
 import { registerWorkerCommand } from './commands/WorkerCommand';
 import { registerWorkerSourceCommand } from './commands/WorkerSourceCommand';
+import { scheduleBackgroundUpdateForRelease } from '../updater/DevBuildGuard.js';
 import { VERSION } from './version.js';
 
 const CONCEPTS_TEXT = `
@@ -312,7 +313,8 @@ async function main(): Promise<void> {
 	try {
 		await program.parseAsync(process.argv);
 	} finally {
-		updateManager.scheduleBackgroundUpdate(bundlePath, 'flow-updater.cjs');
+		// A dev build must never spawn a mutating `npm install -g` updater (incident 2026-10-25).
+		scheduleBackgroundUpdateForRelease(updateManager, bundlePath, 'flow-updater.cjs', VERSION);
 	}
 }
 

@@ -2,6 +2,7 @@
 // Must NOT import any flow runtime modules.
 import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
 import {
+	appendLog,
 	cacheFilePath,
 	execNpm,
 	readCache,
@@ -19,12 +20,30 @@ import { join } from 'node:path';
 import { registerWithAppCore } from '../daemon/AppCoreRegistration';
 import { APP_MODULES } from '../daemon/AppModules';
 import { trackAppModuleUpdate } from './RegisterAfterUpdate';
+import { devBuildRefusalMessage, isCalVer } from './DevBuildGuard';
 import { decideUpdate } from './UpdateDeferral';
 
 declare const __FLOW_CLI_VERSION__: string;
 
 const PKG_NAME = '@wadeck-app/flow-cli';
 const baseConfigDir = process.env['FLOW_CONFIG_DIR'] ?? ConfigDir.get(FLOW_CONFIG_DIR_NAME);
+const currentVersion = typeof __FLOW_CLI_VERSION__ !== 'undefined' ? __FLOW_CLI_VERSION__ : '0.0.0-dev';
+
+// A repo-built bundle (version not CalVer) must never modify the global install: an interrupted
+// `npm install -g` leaves the CLI uninstalled (incident 2026-10-25). Runs before anything with a side
+// effect (including the temp config copy below). Exit 1 when the user explicitly asked (`cli update`
+// sets UPDATER_FORCE=1) so the refusal is not mistaken for "already up to date"; exit 0 for a
+// background invocation.
+if (!isCalVer(currentVersion)) {
+	const refusal = devBuildRefusalMessage('flow', currentVersion);
+	process.stderr.write(`[flow-updater] ${refusal}\n`);
+	try {
+		appendLog(baseConfigDir, 'warn', refusal);
+	} catch {
+		// The message above is already visible.
+	}
+	process.exit(process.env['UPDATER_FORCE'] === '1' ? 1 : 0);
+}
 
 // When UPDATER_MANUAL=1 (explicit `flow cli update`), bypass autoUpdate:false by
 // running the updater against a temp config copy with the flag removed.
@@ -47,8 +66,6 @@ const configDir = (() => {
 		return baseConfigDir;
 	}
 })();
-
-const currentVersion = typeof __FLOW_CLI_VERSION__ !== 'undefined' ? __FLOW_CLI_VERSION__ : '0.0.0-dev';
 
 let npmRoot: string | undefined;
 try {

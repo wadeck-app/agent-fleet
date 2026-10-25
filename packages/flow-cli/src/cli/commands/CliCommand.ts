@@ -24,6 +24,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
+import { devBuildRefusalMessage, isCalVer } from '../../updater/DevBuildGuard.js';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 // violations-suppress-end: ts/no-deep-relative
 import { logsCommand } from './LogsCommand.js';
@@ -137,6 +138,13 @@ export function buildCliCommand(): Command {
 				const current = getCurrentVersion();
 				const channel = readChannelFromConfig(flowConfigDir());
 				await cliVersionCommand(PKG_NAME, current, channel);
+				return;
+			}
+			// Before anything with a side effect (drain, spawn): a repo-built bundle must never touch the global install.
+			const currentVersion = getCurrentVersion();
+			if (!isCalVer(currentVersion)) {
+				process.stderr.write(`[flow] ${devBuildRefusalMessage('flow', currentVersion)}\n`);
+				process.exit(1);
 				return;
 			}
 			const updaterPath = getUpdaterPath();

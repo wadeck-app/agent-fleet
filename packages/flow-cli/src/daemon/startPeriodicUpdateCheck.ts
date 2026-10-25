@@ -4,6 +4,8 @@ import { readUpdateConfig } from '@wadeck-app/shared-updater';
 import { fileURLToPath } from 'node:url';
 
 import { FLOW_BUNDLE_NAME } from '../cli/FlowBundleName.js';
+import { VERSION } from '../cli/version.js';
+import { scheduleBackgroundUpdateForRelease } from '../updater/DevBuildGuard.js';
 
 /**
  * Keeps this daemon's own updater cache fresh (`readUpdateConfig`/`readCache`, see `UpdateManager`).
@@ -28,7 +30,8 @@ export function startPeriodicUpdateCheck(daemonDir: string): ReturnType<typeof s
 	const updateManager = new UpdateManager('@wadeck-app/flow-cli');
 	const bundlePath = resolveOwnBundlePath(FLOW_BUNDLE_NAME, fileURLToPath(import.meta.url));
 	const scheduleUpdateCheck = (): void => {
-		updateManager.scheduleBackgroundUpdate(bundlePath, 'flow-updater.cjs');
+		// A dev build must never spawn a mutating `npm install -g` updater (incident 2026-10-25).
+		scheduleBackgroundUpdateForRelease(updateManager, bundlePath, 'flow-updater.cjs', VERSION);
 	};
 	scheduleUpdateCheck();
 	const timer = setInterval(scheduleUpdateCheck, readUpdateConfig(daemonDir).checkIntervalMs);

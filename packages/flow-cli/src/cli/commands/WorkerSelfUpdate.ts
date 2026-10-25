@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
+import { scheduleBackgroundUpdateForRelease } from '../../updater/DevBuildGuard.js';
 import { VERSION } from '../version.js';
 // violations-suppress-end: ts/no-deep-relative
 import { report } from './WorkerReport';
@@ -150,7 +151,8 @@ export class WorkerSelfUpdate {
 		this.timer = setInterval(() => {
 			// Has its own locking; safe to call on every tick even if a previous download is
 			// still in flight or just finished.
-			updateManager.scheduleBackgroundUpdate(bundlePath, 'flow-updater.cjs');
+			// A dev build must never spawn a mutating `npm install -g` updater (incident 2026-10-25).
+			scheduleBackgroundUpdateForRelease(updateManager, bundlePath, 'flow-updater.cjs', VERSION);
 			this.checkForNewerVersion();
 		}, updateConfig.checkIntervalMs);
 		// Never the sole reason this process stays alive: the WS connection, nudge server, and (for
