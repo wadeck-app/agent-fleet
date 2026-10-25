@@ -290,6 +290,8 @@ export class WorkerAdapter {
 						stepId: step.id,
 						// A heartbeat leaves out `activity`, which tells the daemon to keep what it knows.
 						...(progress.changed && { activity: toStepToolActivity(progress.activity, masker) }),
+						// null tells the daemon a follow-up turn cleared the final result it was told about.
+						...(progress.changed && { finalResultAt: progress.finalResultAt ?? null }),
 						...(progress.lastCompletedTool !== undefined && {
 							lastCompletedTool: progress.lastCompletedTool,
 						}),

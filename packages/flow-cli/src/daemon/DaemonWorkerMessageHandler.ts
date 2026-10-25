@@ -4,6 +4,7 @@ import type { SourceReady, WorkerToDaemon } from '../ipc/Protocol';
 import { writeDaemonLog } from './DaemonLog.js';
 import type { DaemonRuntime } from './DaemonRuntime.js';
 import { injectedStepState } from './InjectedStepState.js';
+import { WorkerConnectionTracker } from './WorkerConnectionTracker.js';
 
 /** Reacts to what connected workers and relays say, and to their sockets closing. */
 export class DaemonWorkerMessageHandler {
@@ -11,10 +12,13 @@ export class DaemonWorkerMessageHandler {
 		private readonly logsDir: string,
 		private readonly runtime: () => DaemonRuntime,
 		/** Called after anything that may have left the daemon with nothing to do. */
-		private readonly checkShutdown: () => void
+		private readonly checkShutdown: () => void,
+		/** Remembers what each connection last said, so a disconnect can be explained. */
+		private readonly connections: WorkerConnectionTracker = new WorkerConnectionTracker()
 	) {}
 
 	handleMessage(ws: WebSocket, message: WorkerToDaemon): void {
+		this.connections.noteMessage(ws, message as { type: string; executionId?: string; stepId?: string });
 		// A relay registering as a source arrives on the same listener but is not a worker: it
 		// presents a different credential and is never dispatched to (T-04, T-11).
 		if ((message as { type?: string }).type === 'source_ready') {
@@ -56,7 +60,7 @@ export class DaemonWorkerMessageHandler {
 				// Carries no content -- unlike 'log', this is never written to the execution log,
 				// only used to reset the silence clock and to remember which tool call the step is in
 				// (see Protocol.ts for why this exists).
-				const { assignmentId, executionId, stepId, activity, lastCompletedTool } = message;
+				const { assignmentId, executionId, stepId, activity, lastCompletedTool, finalResultAt } = message;
 				const { commandHandler } = this.runtime();
 				if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
 					break;
@@ -65,6 +69,7 @@ export class DaemonWorkerMessageHandler {
 				commandHandler.noteAssignmentActivity(assignmentId, {
 					...(activity !== undefined && { activity }),
 					...(lastCompletedTool !== undefined && { lastCompletedTool }),
+					...(finalResultAt !== undefined && { finalResultAt }),
 				});
 				break;
 			}
@@ -79,12 +84,21 @@ export class DaemonWorkerMessageHandler {
 		}
 	}
 
-	handleClose(ws: WebSocket): void {
+	/** @param code Close code the connection ended with (1006 when no close frame arrived). */
+	handleClose(ws: WebSocket, code: number, reason: string): void {
 		const { commandHandler, workerRegistry, relayRegistry } = this.runtime();
+		// Read before the registry forgets the socket: the id is what ties this line to the worker's other log lines.
+		const registered = workerRegistry.describe(ws);
+		const report = this.connections.describeClose(ws, {
+			code,
+			reason,
+			...(registered !== undefined && { workerId: registered.workerId, pid: registered.pid }),
+		});
+		writeDaemonLog(this.logsDir, report.lostStartedStep ? 'error' : 'info', report.logLine);
 		// A disconnected worker can no longer report on its assignments; leaving them
 		// outstanding would let a reconnecting socket be matched against stale work.
 		// Classifies each interrupted step and re-queues the ones that never started (D#65).
-		commandHandler.handleWorkerDisconnect(ws);
+		commandHandler.handleWorkerDisconnect(ws, report.noteForStep);
 		// Only dispatch once this socket is out of the registry, or a re-queued step could
 		// go straight back to the worker that just vanished.
 		workerRegistry.remove(ws);

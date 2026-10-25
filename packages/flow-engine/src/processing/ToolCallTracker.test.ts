@@ -104,3 +104,45 @@ describe('ToolCallTracker', () => {
 		expect(tracker.observe(event)).toBe(false);
 	});
 });
+
+describe('ToolCallTracker -- final result', () => {
+	const resultEvent: StreamJsonEvent = { type: 'result', subtype: 'result', data: { result: 'done' } };
+
+	it('remembers when the final result was seen and reports it as a change (a stall report names it)', () => {
+		const tracker = new ToolCallTracker(() => 5_000);
+
+		expect(tracker.observe(resultEvent)).toBe(true);
+		expect(tracker.state()).toEqual({ activity: null, finalResultAt: 5_000 });
+	});
+
+	it('forgets it when a follow-up turn starts (assistant or user event)', () => {
+		let now = 5_000;
+		const tracker = new ToolCallTracker(() => now);
+		tracker.observe(resultEvent);
+
+		now = 9_000;
+		expect(tracker.observe(claudeToolUse('t1', 'Bash', { command: 'ls' }))).toBe(true);
+		expect(tracker.state().finalResultAt).toBeUndefined();
+	});
+
+	it('keeps it across other events such as system hook events', () => {
+		const tracker = new ToolCallTracker(() => 5_000);
+		tracker.observe(resultEvent);
+
+		expect(tracker.observe({ type: 'system', subtype: 'hook_response', data: {} })).toBe(false);
+		expect(tracker.state().finalResultAt).toBe(5_000);
+	});
+
+	it('the latest result wins', () => {
+		let now = 5_000;
+		const tracker = new ToolCallTracker(() => now);
+		tracker.observe(resultEvent);
+		now = 8_000;
+		tracker.observe(claudeToolUse('t1', 'Bash', { command: 'ls' }));
+		tracker.observe(claudeToolResult('t1'));
+		now = 12_000;
+		tracker.observe(resultEvent);
+
+		expect(tracker.state().finalResultAt).toBe(12_000);
+	});
+});

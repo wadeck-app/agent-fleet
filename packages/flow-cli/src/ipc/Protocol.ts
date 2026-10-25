@@ -311,6 +311,13 @@ export interface StepProgressDetail {
 	activity?: StepToolActivity | null;
 	/** Name of the last tool call seen to return. Only ever a name, never its arguments. */
 	lastCompletedTool?: string;
+	/**
+	 * Epoch milliseconds (worker clock) at which the model produced its final `result`.
+	 * `undefined` = says nothing about it; a number = the final result was seen; `null` = a follow-up
+	 * turn started since, so there is no final result to speak of. Lets a stall report say the process
+	 * outlived a finished turn instead of blaming the last tool call.
+	 */
+	finalResultAt?: number | null;
 }
 
 export type WorkerToDaemon =

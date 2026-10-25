@@ -84,7 +84,8 @@ describe('Daemon registration of the app-module with app-core', () => {
 		const handle = await startDaemon({ appCoreModules: [{ id: 'flow', manifestPath: '/abs/manifest.json' }] });
 		try {
 			await vi.waitFor(() => expect(registration.registerWithAppCore).toHaveBeenCalled(), { timeout: 2000 });
-			expect(readDaemonLog().map(e => e.msg)).toContain('Daemon started');
+			// The pid is what ties the daemon log to the process list when a daemon was replaced or crashed.
+			expect(readDaemonLog().map(e => e.msg)).toContain(`Daemon started (pid ${String(process.pid)})`);
 			await vi.waitFor(() =>
 				expect(
 					readDaemonLog().some(
@@ -156,7 +157,8 @@ describe('Daemon registration of the app-module with app-core', () => {
 	it('does not touch app-core when the caller passes no app-module (tests and embedders opt in explicitly)', async () => {
 		const handle = await startDaemon({});
 		try {
-			expect(readDaemonLog().map(e => e.msg)).toContain('Daemon started');
+			// The pid is what ties the daemon log to the process list when a daemon was replaced or crashed.
+			expect(readDaemonLog().map(e => e.msg)).toContain(`Daemon started (pid ${String(process.pid)})`);
 			expect(registration.registerWithAppCore).not.toHaveBeenCalled();
 		} finally {
 			await handle.stop('idle');

@@ -3,6 +3,29 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { MASKING_FAILED, MIN_SECRET_LENGTH, SecretMasker } from '../secrets/SecretMasker.js';
+import { BoundedLineBuffer } from './BoundedLineBuffer.js';
+
+/** What is kept of a worker's stderr to explain its death: the tail, in lines and in bytes. */
+const STDERR_TAIL_LINES = 40;
+const STDERR_TAIL_BYTES = 8 * 1024;
+/** After 'exit', how long to wait for the stderr pipe to close before logging with what was read. */
+const STDERR_DRAIN_GRACE_MS = 250;
+
+export type WorkerLog = (level: 'info' | 'error', message: string) => void;
+
+export interface ForkWorkerSourceOptions {
+	/** Where worker lifecycle lines go. The daemon passes its log: its own stderr is ignored when detached. */
+	log?: WorkerLog;
+	/** Hides secrets in the stderr tail before it is logged (the daemon passes the executions' maskers). */
+	maskText?: (text: string) => string;
+}
+
+function stderrLog(level: 'info' | 'error', message: string): void {
+	process.stderr.write(`[ForkWorkerSource] ${level}: ${message}
+`);
+}
+
 /** Workers that do not connect back within this window are killed as orphans. */
 const WORKER_CONNECT_TIMEOUT_MS = 10_000;
 
@@ -27,14 +50,19 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 	readonly workerPath: string;
 	readonly tsxLoaderPath: string | null;
 	private readonly claudePath: string;
+	private readonly log: WorkerLog;
+	private readonly maskText: (text: string) => string;
 
 	constructor(
 		private readonly httpPort: number,
 		/** Port or lazy getter -- evaluated at spawn time so an async port retry resolves first. */
 		private readonly wsPortOrGetter: number | (() => number),
-		claudePath?: string
+		claudePath?: string,
+		options: ForkWorkerSourceOptions = {}
 	) {
 		this.claudePath = claudePath ?? '';
+		this.log = options.log ?? stderrLog;
+		this.maskText = options.maskText ?? ((text: string) => text);
 
 		// Dev mode: compiled Worker.js plus the tsx loader for extension-less ESM imports.
 		const devWorkerPath = fileURLToPath(new URL('../../dist/worker/Worker.js', import.meta.url));
@@ -96,22 +124,74 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 		const connectTimeout = setTimeout(() => {
 			this.pendingConnects.delete(pid);
 			if (!child.killed) {
-				process.stderr.write(
-					`[ForkWorkerSource] pid ${String(pid)} did not connect within ${WORKER_CONNECT_TIMEOUT_MS}ms -- killing\n`
+				this.log(
+					'error',
+					`worker pid ${String(pid)} did not connect within ${WORKER_CONNECT_TIMEOUT_MS}ms -- killing`
 				);
 				child.kill('SIGKILL');
 			}
 		}, WORKER_CONNECT_TIMEOUT_MS);
 		this.pendingConnects.set(pid, connectTimeout);
 
-		child.on('exit', () => {
+		const stderrTail = new BoundedLineBuffer(STDERR_TAIL_LINES, STDERR_TAIL_BYTES);
+		let reported = false;
+		const report = (code: number | null, signal: NodeJS.Signals | null): void => {
+			if (reported) {
+				return;
+			}
+			reported = true;
+			this.reportExit(pid, code, signal, stderrTail.snapshot());
+		};
+
+		// Without a handler a launch failure (e.g. ENOENT) is an unhandled 'error' event that kills the daemon.
+		child.on('error', (err: Error) => {
+			this.log('error', `worker pid ${String(pid)} process error: ${String(err)}`);
+		});
+		child.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
 			clearTimeout(connectTimeout);
 			this.pendingConnects.delete(pid);
 			this.spawnedPids.delete(pid);
+			// 'close' follows once stderr is drained; a grandchild holding the pipe could delay it forever.
+			setTimeout(() => report(code, signal), STDERR_DRAIN_GRACE_MS).unref();
 		});
+		child.on('close', (code: number | null, signal: NodeJS.Signals | null) => report(code, signal));
 		child.stderr?.on('data', (data: Buffer) => {
-			process.stderr.write(`[worker] ${data.toString()}`);
+			const text = data.toString();
+			stderrTail.append(text);
+			process.stderr.write(`[worker] ${text}`);
 		});
+	}
+
+	/** Writes how the worker ended and the tail of its stderr, masked: the only record of why it died. */
+	private reportExit(pid: number, code: number | null, signal: NodeJS.Signals | null, stderrTail: string): void {
+		const abnormal = signal !== null || code !== 0;
+		const how = signal !== null ? `signal ${signal}` : `code ${String(code)}`;
+		this.log(abnormal ? 'error' : 'info', `worker pid ${String(pid)} exited with ${how}`);
+		if (stderrTail !== '') {
+			this.log(
+				abnormal ? 'error' : 'info',
+				`worker pid ${String(pid)} last stderr (up to ${String(STDERR_TAIL_LINES)} lines):
+${this.mask(stderrTail)}`
+			);
+		}
+	}
+
+	/** Never logs raw text: a masker that throws replaces the whole tail. */
+	private mask(text: string): string {
+		try {
+			return this.maskText(this.maskForwardedKey(text));
+		} catch {
+			return MASKING_FAILED;
+		}
+	}
+
+	/** The one credential this source puts in the worker's environment itself (see buildEnv). */
+	private maskForwardedKey(text: string): string {
+		const key = process.env['ANTHROPIC_API_KEY'];
+		if (key === undefined || key.length < MIN_SECRET_LENGTH) {
+			return text;
+		}
+		return new SecretMasker(new Map([['ANTHROPIC_API_KEY', key]])).mask(text);
 	}
 
 	/** Deliberately allow-listed: the worker inherits only what it needs. */

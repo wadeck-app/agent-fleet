@@ -1,7 +1,11 @@
+import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler';
+import { WorkerConnectionTracker } from './WorkerConnectionTracker';
 
 function makeHandler(verified: boolean) {
 	const commandHandler = {
@@ -43,6 +47,19 @@ describe('DaemonWorkerMessageHandler -- step_progress', () => {
 		expect(commandHandler.noteAssignmentActivity).toHaveBeenNthCalledWith(2, 'a1', {});
 	});
 
+	// Without it the stall message cannot say the model had already produced its final result.
+	it('passes finalResultAt to the supervisor, including the null that clears it', () => {
+		const { handler, commandHandler } = makeHandler(true);
+
+		handler.handleMessage(ws, { type: 'step_progress', ...base, finalResultAt: 1234 });
+		handler.handleMessage(ws, { type: 'step_progress', ...base, finalResultAt: null });
+		handler.handleMessage(ws, { type: 'step_progress', ...base });
+
+		expect(commandHandler.noteAssignmentActivity).toHaveBeenNthCalledWith(1, 'a1', { finalResultAt: 1234 });
+		expect(commandHandler.noteAssignmentActivity).toHaveBeenNthCalledWith(2, 'a1', { finalResultAt: null });
+		expect(commandHandler.noteAssignmentActivity).toHaveBeenNthCalledWith(3, 'a1', {});
+	});
+
 	it('ignores a report that cannot be bound to an assignment this worker holds', () => {
 		const { handler, commandHandler } = makeHandler(false);
 
@@ -53,5 +70,87 @@ describe('DaemonWorkerMessageHandler -- step_progress', () => {
 		});
 
 		expect(commandHandler.noteAssignmentActivity).not.toHaveBeenCalled();
+	});
+});
+
+describe('DaemonWorkerMessageHandler -- handleClose diagnostics', () => {
+	function makeClosingHandler() {
+		const logsDir = mkdtempSync(path.join(tmpdir(), 'dwmh-'));
+		const clock = { now: 1_000 };
+		const commandHandler = {
+			handleWorkerDisconnect: vi.fn(),
+			verifyAssignment: vi.fn().mockReturnValue(true),
+			noteAssignmentActivity: vi.fn(),
+			tryDispatch: vi.fn(),
+			onStepStarted: vi.fn(),
+		};
+		const workerRegistry = {
+			describe: vi.fn().mockReturnValue({ workerId: 'w-9', pid: 321 }),
+			remove: vi.fn(),
+		};
+		const relayRegistry = { remove: vi.fn() };
+		const handler = new DaemonWorkerMessageHandler(
+			logsDir,
+			() => ({ commandHandler, workerRegistry, relayRegistry }) as unknown as DaemonRuntime,
+			() => {},
+			new WorkerConnectionTracker(() => clock.now)
+		);
+		const readLog = (): Array<{ level: string; msg: string }> =>
+			readdirSync(logsDir).flatMap(f =>
+				readFileSync(path.join(logsDir, f), 'utf8')
+					.split('\n')
+					.filter(Boolean)
+					.map(l => JSON.parse(l) as { level: string; msg: string })
+			);
+		return { handler, commandHandler, workerRegistry, clock, readLog, logsDir };
+	}
+
+	it('logs worker id, pid, close code, last message and assignment age at error level when a started step is lost', () => {
+		const { handler, clock, readLog } = makeClosingHandler();
+		handler.handleMessage(ws, { type: 'step_started', ...base });
+		handler.handleMessage(ws, { type: 'step_progress', ...base });
+		clock.now = 13_300;
+
+		handler.handleClose(ws, 1006, '');
+
+		const entry = readLog().find(e => e.msg.includes('w-9'));
+		expect(entry?.level).toBe('error');
+		expect(entry?.msg).toContain('321');
+		expect(entry?.msg).toContain('1006');
+		expect(entry?.msg).toContain('step_progress');
+		expect(entry?.msg).toContain('e1/s1 running for 12.3 s');
+	});
+
+	it('hands the lost step a note naming the worker and pointing at the daemon log', () => {
+		const { handler, commandHandler } = makeClosingHandler();
+		handler.handleMessage(ws, { type: 'step_started', ...base });
+
+		handler.handleClose(ws, 1006, '');
+
+		const describeLostStep = commandHandler.handleWorkerDisconnect.mock.calls[0]?.[1] as (
+			e: string,
+			s: string
+		) => string | undefined;
+		expect(describeLostStep('e1', 's1')).toMatch(/w-9.*daemon log/s);
+		expect(describeLostStep('e1', 'other')).toBeUndefined();
+	});
+
+	it('logs an idle worker leaving at info level', () => {
+		const { handler, readLog } = makeClosingHandler();
+		handler.handleMessage(ws, { type: 'step_progress', ...base });
+
+		handler.handleClose(ws, 1000, '');
+
+		expect(readLog().find(e => e.msg.includes('w-9'))?.level).toBe('info');
+	});
+
+	it('reads the worker id before removing it from the registry', () => {
+		const { handler, workerRegistry } = makeClosingHandler();
+
+		handler.handleClose(ws, 1000, '');
+
+		expect(workerRegistry.describe.mock.invocationCallOrder[0]).toBeLessThan(
+			workerRegistry.remove.mock.invocationCallOrder[0]!
+		);
 	});
 });

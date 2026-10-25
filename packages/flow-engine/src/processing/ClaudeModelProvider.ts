@@ -117,6 +117,7 @@ export class ClaudeModelProvider implements ModelProvider {
 				options.onProcessStarted?.(proc);
 			},
 			onStreamEvent: options.onStreamEvent,
+			resultGraceMs: options.resultGraceMs,
 			isolateEnv: true,
 		};
 	}

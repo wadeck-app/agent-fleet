@@ -43,6 +43,11 @@ export interface ModelStepConfig {
 	 * Absent means "use `step.model` as written", which is what every existing caller does.
 	 */
 	resolvedModel?: string;
+	/**
+	 * Milliseconds a claude process may keep running after its final `result` event before it is
+	 * ended (default {@link DEFAULT_RESULT_GRACE_MS}). Only read by the claude launcher.
+	 */
+	resultGraceMs?: number;
 }
 
 /**
@@ -196,7 +201,8 @@ export async function executeModelStep(
 	let capturedOutputTokens = 0;
 	let capturedCacheReadTokens = 0;
 	let capturedCacheWriteTokens = 0;
-	let capturedTtftMs = 0;
+	// Time from launch to the first assistant content; undefined until one is seen.
+	let capturedTtftMs: number | undefined;
 	// True when the provider's own result event flags the turn as an error (e.g. Claude's
 	// `is_error: true`) despite exiting 0 with a `subtype: "success"` -- auto-compact
 	// thrashing (`terminal_reason: "rapid_refill_breaker"`) is the known case. Neither the
@@ -268,6 +274,7 @@ export async function executeModelStep(
 		tools: step.tools,
 		permission: step.permission,
 		onProcessStarted: config.onClaudeProcessStarted,
+		resultGraceMs: config.resultGraceMs,
 		streamJson: streamJson && !config.interactive,
 		verbose: verbose && !config.interactive,
 		skipPermissions,
@@ -301,12 +308,18 @@ export async function executeModelStep(
 								);
 							}
 						}
+						// TTFT = time from launch to the FIRST assistant content ('assistant' for claude,
+						// 'text' for opencode/codex). It used to be set by every system event carrying a
+						// session_id (claude emits several: init, hook events, ...), so it ended up near
+						// the step duration. Never taken from 'system' events: init precedes any output.
+						if (capturedTtftMs === undefined && (event.type === 'assistant' || event.type === 'text')) {
+							capturedTtftMs = Date.now() - modelStartTime;
+						}
 						if (event.type === 'result' && event.data.result !== undefined && event.data.result !== null) {
 							finalResultText = event.data.result;
 						}
 						if (event.type === 'system' && event.data.session_id) {
 							capturedSessionId = event.data.session_id as string;
-							capturedTtftMs = Date.now() - modelStartTime;
 							const memoryPathAuto = (event.data.memory_paths as Record<string, string> | undefined)
 								?.auto;
 							if (memoryPathAuto) {
@@ -342,6 +355,14 @@ export async function executeModelStep(
 										}
 								  >
 								| undefined;
+							// A later result (follow-up turn after a background-task notification) replaces
+							// the earlier one: its figures describe the whole process so far, so adding
+							// them to the first result's would count that turn twice. Unverified against a
+							// real claude: only the mock's follow-up turn has been observed.
+							capturedInputTokens = 0;
+							capturedOutputTokens = 0;
+							capturedCacheReadTokens = 0;
+							capturedCacheWriteTokens = 0;
 							if (usage) {
 								for (const u of Object.values(usage)) {
 									capturedInputTokens += u.inputTokens ?? 0;
@@ -366,7 +387,7 @@ export async function executeModelStep(
 		model: effectiveModel ?? '',
 		session_id: capturedSessionId,
 		session_file: capturedSessionFile,
-		ttft_ms: capturedTtftMs,
+		ttft_ms: capturedTtftMs ?? 0,
 		duration_ms: stepTrace.durationMs || Math.max(1, (stepTrace.endTime ?? Date.now()) - stepTrace.startTime),
 		cost: {
 			input_tokens: capturedInputTokens,
@@ -417,6 +438,23 @@ export async function executeModelStep(
 				clearInterval(pollingInterval);
 				const remaining = pollingBuffer.splice(0);
 				if (onLogEntry) for (const e of remaining) onLogEntry(e);
+			}
+
+			if (result.endedAfterResult !== undefined) {
+				const message = `${providerLabel} process was ended after the final result because it kept running ${String(result.endedAfterResult.graceMs)} ms after it (likely held by a background task or child process); the step completes from that result.`;
+				process.stderr.write(`[warn] step ${step.id}: ${message}\n`);
+				if (logMode !== 'none') {
+					const entry: LiveLogEntry = {
+						id: `${step.id}-live-ended-after-result`,
+						timestamp: Date.now(),
+						level: 'warning',
+						message,
+						eventType: 'system',
+					};
+					liveLogEntries.push(entry);
+					// The polling buffer was already flushed and its timer stopped above
+					if (logMode !== 'end' && onLogEntry) onLogEntry(entry);
+				}
 			}
 
 			const responseText = streamJson && finalResultText != null ? finalResultText : result.stdout;

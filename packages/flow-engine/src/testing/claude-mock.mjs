@@ -105,6 +105,13 @@ if (streamingDelay > 0) {
 	});
 }
 
+// CLAUDE_MOCK_NO_RESULT_DELAY_MS: stay alive that long after the assistant output, then exit 0 WITHOUT any
+// `result` event (a CLI that never reaches the end of a turn).
+if (process.env.CLAUDE_MOCK_NO_RESULT_DELAY_MS) {
+	await sleep(parseInt(process.env.CLAUDE_MOCK_NO_RESULT_DELAY_MS, 10));
+	process.exit(0);
+}
+
 // result:success
 emit({
 	type: 'result',
@@ -138,4 +145,72 @@ emit({
 	stop_reason: 'end_turn',
 });
 
-process.exit(0);
+// CLAUDE_MOCK_AFTER_RESULT simulates a CLI that outlives its final `result` event (the real CLI waits for
+// background tasks, e.g. a Bash call moved to the background, after the final answer):
+//   hang     -> a grandchild inherits the stdio pipes (so `close` never fires) and the mock never exits
+//   followup -> after CLAUDE_MOCK_FOLLOWUP_DELAY_MS (default 200) a second turn is emitted with its own
+//               `result` (text "<response> (follow-up)"), then the mock exits, or hangs when
+//               CLAUDE_MOCK_AFTER_FOLLOWUP=hang
+// CLAUDE_MOCK_PIDFILE receives the grandchild pid so a test can prove nothing was orphaned.
+const afterResult = process.env.CLAUDE_MOCK_AFTER_RESULT ?? '';
+
+async function hangLikeBackgroundTask() {
+	const { spawn } = await import('node:child_process');
+	const { writeFileSync } = await import('node:fs');
+	const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'inherit' });
+	if (process.env.CLAUDE_MOCK_PIDFILE) {
+		writeFileSync(process.env.CLAUDE_MOCK_PIDFILE, String(grandchild.pid));
+	}
+	setInterval(() => {}, 1000);
+}
+
+if (afterResult === 'hang') {
+	await hangLikeBackgroundTask();
+} else if (afterResult === 'followup') {
+	await sleep(parseInt(process.env.CLAUDE_MOCK_FOLLOWUP_DELAY_MS ?? '200', 10));
+	const followupText = responseText + ' (follow-up)';
+	emit({
+		type: 'assistant',
+		message: {
+			id: 'msg_mock_followup',
+			type: 'message',
+			role: 'assistant',
+			content: [{ type: 'text', text: followupText }],
+			model: 'claude-haiku-mock',
+			stop_reason: 'end_turn',
+			usage: { input_tokens: 5, output_tokens: 2 },
+		},
+		session_id: sessionId,
+	});
+	emit({
+		type: 'result',
+		subtype: 'success',
+		is_error: false,
+		result: followupText,
+		session_id: sessionId,
+		total_cost_usd: 0.0002,
+		duration_ms: 100,
+		duration_api_ms: 80,
+		modelUsage: {
+			'claude-haiku-mock': {
+				inputTokens: 15,
+				outputTokens: 4,
+				cacheReadInputTokens: 0,
+				cacheCreationInputTokens: 0,
+				webSearchRequests: 0,
+				costUSD: 0.0002,
+			},
+		},
+		num_turns: 2,
+		stop_reason: 'end_turn',
+	});
+	if (process.env.CLAUDE_MOCK_AFTER_FOLLOWUP === 'hang') {
+		await hangLikeBackgroundTask();
+	} else {
+		process.exit(0);
+	}
+} else if (afterResult !== '') {
+	throw new Error(`claude-mock: unknown CLAUDE_MOCK_AFTER_RESULT '${afterResult}' (expected hang | followup)`);
+} else {
+	process.exit(0);
+}

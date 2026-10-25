@@ -61,6 +61,8 @@ export class CommandHandler {
 	 * Not persisted: the restart that ends a drain also clears it.
 	 */
 	private draining = false;
+	/** Text added to the failure of a step lost with a disconnecting worker; set only during that disconnect. */
+	private disconnectDetails: ((executionId: string, stepId: string) => string | undefined) | undefined;
 
 	constructor(
 		daemonDir: string,
@@ -133,7 +135,11 @@ export class CommandHandler {
 			this.logWriter,
 			this.queue,
 			this.executions,
-			(executionId, stepId, reason) => this.outcomes.failStep(executionId, stepId, reason),
+			(executionId, stepId, reason) => {
+				// Only set while a disconnect is being processed (see handleWorkerDisconnect).
+				const details = this.disconnectDetails?.(executionId, stepId);
+				this.outcomes.failStep(executionId, stepId, details === undefined ? reason : `${reason} ${details}`);
+			},
 			stalledStepLimitMs
 		);
 		this.dispatcher = new StepDispatcher(
@@ -310,8 +316,17 @@ export class CommandHandler {
 	 *
 	 * Deliberately does **not** dispatch: `Daemon` calls `tryDispatch()` once the worker is removed.
 	 */
-	handleWorkerDisconnect(worker: WebSocket): void {
-		this.supervisor.handleWorkerDisconnect(worker);
+	handleWorkerDisconnect(
+		worker: WebSocket,
+		describeLostStep?: (executionId: string, stepId: string) => string | undefined
+	): void {
+		// Scoped to this synchronous call, so details never attach to an unrelated failure.
+		this.disconnectDetails = describeLostStep;
+		try {
+			this.supervisor.handleWorkerDisconnect(worker);
+		} finally {
+			this.disconnectDetails = undefined;
+		}
 	}
 
 	/** Called by Daemon when a worker reports step_completed. */

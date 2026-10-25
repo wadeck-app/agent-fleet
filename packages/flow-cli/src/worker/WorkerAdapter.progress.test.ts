@@ -44,6 +44,7 @@ type Progress = {
 	changed: boolean;
 	summary?: string;
 	lastCompletedTool?: string;
+	finalResultAt?: number;
 	advanceMs?: number;
 };
 
@@ -78,6 +79,7 @@ describe('WorkerAdapter -- step_progress tool activity', () => {
 					onActivity({
 						activity: p.tool === null ? null : { tool: p.tool, summary: p.summary ?? '', startedAt: now },
 						...(p.lastCompletedTool !== undefined && { lastCompletedTool: p.lastCompletedTool }),
+						...(p.finalResultAt !== undefined && { finalResultAt: p.finalResultAt }),
 						changed: p.changed,
 					});
 				}
@@ -112,6 +114,29 @@ describe('WorkerAdapter -- step_progress tool activity', () => {
 			activity: { tool: 'Bash', summary: 'npm test', startedAt: now },
 		});
 		expect(messages[2]).toMatchObject({ activity: null, lastCompletedTool: 'Bash' });
+	});
+
+	// The final result is what lets the stall report say "the process did not exit" instead of blaming
+	// the last tool call; a follow-up turn must clear it (null), a plain heartbeat must leave it alone.
+	it('sends the time of the final result at once, and null once a follow-up turn cleared it', async () => {
+		report([
+			{ tool: null, lastCompletedTool: 'Write', finalResultAt: 777, changed: true },
+			{ tool: 'Bash', summary: 'ls', changed: true },
+		]);
+
+		await adapter.execute(step, context(), sendMessage);
+
+		const messages = progressMessages();
+		expect(messages[0]).toMatchObject({ activity: null, finalResultAt: 777 });
+		expect(messages[1]).toMatchObject({ activity: { tool: 'Bash' }, finalResultAt: null });
+	});
+
+	it('leaves finalResultAt out of plain heartbeats', async () => {
+		report([{ tool: null, changed: false }]);
+
+		await adapter.execute(step, context(), sendMessage);
+
+		expect(progressMessages()[0]).not.toHaveProperty('finalResultAt');
 	});
 
 	it('keeps throttling plain heartbeats, which say nothing about the call', async () => {

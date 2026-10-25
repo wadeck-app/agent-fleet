@@ -162,7 +162,7 @@ async function startDaemon(
 			onStart: (port: number) => {
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
 				fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
-				writeDaemonLog(logsDir, 'info', 'Daemon started');
+				writeDaemonLog(logsDir, 'info', `Daemon started (pid ${String(process.pid)})`);
 				// One line, once: whether events will reach the queue, whether the queue documents them, and how to
 				// fix it if not. The events are declared only when the queue is reachable.
 				void (async () => {
@@ -220,10 +220,14 @@ async function startDaemon(
 					(ws, message) => {
 						workerMessages.handleMessage(ws, message);
 					},
-					ws => {
-						workerMessages.handleClose(ws);
+					(ws, code, reason) => {
+						workerMessages.handleClose(ws, code, reason);
 					},
 					{
+						// Closes and errors of worker connections: stderr is ignored for a detached daemon.
+						log: (level, message) => {
+							writeDaemonLog(logsDir, level, message);
+						},
 						bindAddress: config.worker.bindAddress,
 						tls: config.worker.tls,
 					}
@@ -267,7 +271,13 @@ async function startDaemon(
 				// forked worker handed a port the listener moved away from can never register.
 				// It falls back to the getter only if a fork somehow precedes the bind, where
 				// the old behaviour is still the best guess available.
-				const forkSource = new ForkWorkerSource(port, () => workerListenerPort ?? wsServer.port, claudePath);
+				const forkSource = new ForkWorkerSource(port, () => workerListenerPort ?? wsServer.port, claudePath, {
+					// A forked worker's exit and last stderr lines: the only trace of why it died.
+					log: (level, message) => {
+						writeDaemonLog(logsDir, level, message);
+					},
+					maskText: text => daemonSecrets.masks.maskAll(text),
+				});
 				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir);
 				// Relays are tracked apart from workers because the two roles carry different
 				// credentials and neither may stand in for the other (T-04, T-11).

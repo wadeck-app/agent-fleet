@@ -44,6 +44,23 @@ export class ExecutionMasks {
 		}
 	}
 
+	/**
+	 * Masks text that belongs to no execution (a worker's stderr) with every registered masker,
+	 * so a secret of any execution is hidden. A failing masker turns the whole text into the placeholder.
+	 */
+	maskAll(text: string): string {
+		let masked = text;
+		for (const [executionId, masker] of this.maskers) {
+			try {
+				masked = masker.mask(masked);
+			} catch (error) {
+				this.reportFailure(executionId, error);
+				return MASKING_FAILED;
+			}
+		}
+		return masked;
+	}
+
 	/** Masks every string of a JSON-like value; a leaf that fails becomes the placeholder. */
 	maskDeep<T>(executionId: string, value: T): T {
 		if (!this.maskers.has(executionId)) {

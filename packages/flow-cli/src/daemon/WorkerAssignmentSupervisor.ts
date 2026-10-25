@@ -28,6 +28,8 @@ export const DEFAULT_STEP_SILENCE_LIMIT_MS = 30 * 60 * 1000;
 interface ToolActivityKnowledge {
 	activity: StepToolActivity | null;
 	lastCompletedTool: string | undefined;
+	/** Epoch ms (worker clock) of the model's final result, while no follow-up turn has started */
+	finalResultAt: number | null;
 }
 
 /**
@@ -131,11 +133,16 @@ export class WorkerAssignmentSupervisor {
 		if (detail === undefined) {
 			return;
 		}
-		const known = this.toolActivity.get(assignmentId) ?? { activity: null, lastCompletedTool: undefined };
+		const known = this.toolActivity.get(assignmentId) ?? {
+			activity: null,
+			lastCompletedTool: undefined,
+			finalResultAt: null,
+		};
 		// `undefined` means "this report says nothing about it", unlike `null` which means "none".
 		const next: ToolActivityKnowledge = {
 			activity: detail.activity === undefined ? known.activity : detail.activity,
 			lastCompletedTool: detail.lastCompletedTool ?? known.lastCompletedTool,
+			finalResultAt: detail.finalResultAt === undefined ? known.finalResultAt : detail.finalResultAt,
 		};
 		this.toolActivity.set(assignmentId, next);
 	}
@@ -155,6 +162,11 @@ export class WorkerAssignmentSupervisor {
 		}
 		if (known === undefined && step?.stepConfig.type !== 'model') {
 			return '';
+		}
+		if (known?.finalResultAt !== null && known?.finalResultAt !== undefined) {
+			// Local time of the daemon, which is where the user reads this
+			const at = new Date(known.finalResultAt).toTimeString().slice(0, 8);
+			return `The model had already produced its final result at ${at}; the process did not exit, likely held by a background task or child process. `;
 		}
 		const last = known?.lastCompletedTool;
 		return `No tool call in progress was observed${last === undefined ? '' : ` (last completed tool call: ${last})`}. `;

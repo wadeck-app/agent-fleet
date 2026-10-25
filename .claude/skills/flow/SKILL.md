@@ -108,6 +108,12 @@ flow show a6wug7bh --full        # no truncation
 flow show a6wug7bh --json        # raw execution record
 ```
 
+Add `--io` to also print what each step received and produced: flow inputs it reads, rendered script `env`, rendered model `prompt`, outputs, and stdout/stderr tails. Caps: 4096 characters per value, 32768 per step, 1048576 per execution; a cut value is marked `truncated` with its original length. Declared secrets are masked; anything else (plain inputs, inherited env vars, printed output) is stored as is. Older records say "not recorded for this run".
+
+```bash
+flow show a6wug7bh --io
+```
+
 An existing file path wins over an id. A truncated stream ends with `(N more chars, see <path>)` pointing at the raw `~/.config/flow/executions/<id>.json`.
 
 ### flow validate
@@ -117,6 +123,34 @@ Validate a flow file against the schema and engine rules. Exits 0 on valid (warn
 ```bash
 flow validate my-flow.yml
 ```
+
+A registry file (`flows.yml`, with `includes:` or listing flows) is refused with exit 4: "<file> is a flow registry (...), not a single flow definition. Validate a flow with: flow validate <path-to-flow-file>". It also reports the version status (see Versions).
+
+### Versions
+
+- Every flow file declares `version: '1.2.0'`: a quoted semver (optional prerelease like `'1.3.0-rc.1'`, no `+build`). Unquoted `1.0` is refused. Without `version` the flow is `0.0.0`, runs, warns, and cannot be pinned.
+- The first run stores an immutable snapshot of the definition; each execution records `flowVersion`, `definitionHash` and how it was chosen (`latest`, `pinned`, `file`). `flow resume` keeps the run's definition.
+- The same version never holds two different contents: running a changed file under an already-run version is refused ("same version X but different content: bump the version"). Comments, formatting and key order do not count. After ANY change you want to run, raise the version (patch fix, minor compatible addition, major for inputs or behaviour); use a prerelease (`1.2.1-dev.1`) while iterating.
+- `flow run my-flow.yml` runs that file as is. `flow run my-flow` runs the highest semver among the registry entry and snapshots, fixed at run start. `flow run my-flow@1.2.0` pins that version from its snapshot.
+- `flow versions <flowId>` lists known versions with hash and first-seen date (`*` = latest). `flow validate` and `flow show <file>` say beforehand whether the version is new, already run, in conflict, or lower than the latest.
+
+### Sub-steps
+
+A step with `parent: <id>` children is re-run when a child fails. `subStepStrategy` on the parent picks the reaction:
+
+| Strategy | Behaviour |
+| --- | --- |
+| `restart-on-first-failure` (default) | The parent restarts at the first failed child. |
+| `wait-all` | All children run to the end, then the parent gets all failures. `flow validate` warns (exit 0) when a child `depends` on a sibling: if the sibling fails, the dependent is settled as not run. |
+| `waves` | Each direct child declares an integer `wave` (ordering only; gaps like 10, 20, 30 are fine). |
+
+Waves: children of the same wave run in parallel and are all awaited; the next wave starts only if the previous one fully passed. A failed wave restarts the parent with only that wave's feedback, then every wave runs again from wave 1. Each failed wave consumes one of `maxSubStepIterations` (default 3). A nested sub-step runs in its ancestor's wave and must not declare `wave`. `flow validate` errors on a direct child without `wave`, `wave` outside a waves parent, a non-integer wave, an unknown strategy, or `depends` on a later wave; it warns on fewer than 2 waves. Full example: `flow docs`, section Sub-step waves.
+
+Engine-origin failures (watchdog silence past `queue.stepSilenceLimitSeconds`, lost worker) are terminal: no `retry`, `onFailure` or parent re-run, because the step may already have had an effect. The execution and its parent fail with the real error.
+
+### Events
+
+The flow daemon publishes `flow.execution.{started,completed,failed}` and `flow.step.{started,completed,failed}` to the queue. Payload carries ids, status, timing and a short masked `error`, never inputs or outputs. `queue wait` matches exact names, so waiting for completed OR failed takes two waits, filtered with `--when "payload.executionId=<id>"`. `flow.step.failed` is not final when the step is retried. In `subscribers.yml`, `flow.>` matches all flow events and `flow.step.*` all step events. `FLOW_QUEUE_EVENTS=0` in the daemon environment disables them. Reference: `flow docs`, section Events.
 
 ### Secrets
 
@@ -148,15 +182,14 @@ flow run my-flow.yml --inputs API_TOKEN=file://./secrets/api-token   # relative 
 
 Run a flow by file path or registered flow ID. **Non-interactive only** — any step of type `user_intervention` (shown as `(!)` in `flow show`) will cause the command to throw immediately.
 
-On success: prints `✓ Flow '<id>' completed` and step outputs (key: value per output). Exits 0.
-On failure: prints the error message. Exits 1.
+By default `flow run` is fire-and-forget: it submits the execution to the daemon and returns; follow it with `flow history` / `flow show <execution-id>`, or pass `--wait` to block until it ends. Exit code 0 on success, non-zero on failure (124 when `--wait` hits its `--timeout`).
 
 ```bash
 # Run by file path (works from any directory)
 flow run my-flow.yml --inputs description="fix the login bug"
 
-# Run by registered flow ID (loaded from .agent-fleet/flows.yml in the current directory)
-flow run my-flow-id --inputs key=value --cwd /path/to/agent-fleet-project
+# Run by registered flow ID (loaded from .flow/flows.yml of the project containing the current directory)
+flow run my-flow-id --inputs key=value
 
 # Multiple inputs
 flow run my-flow.yml --inputs foo=bar --inputs baz=qux
@@ -165,6 +198,9 @@ flow run my-flow.yml --inputs foo=bar --inputs baz=qux
 Options:
 
 - `--inputs key=value` (repeatable) — input pairs passed to the flow
-- `--cwd <dir>` — working directory for execution and flow ID resolution (defaults to current directory)
+- `--flow-id <id>` — select a flow inside a multi-flow YAML
+- `--wait` / `--timeout <duration>` — block until the execution ends (default is fire-and-forget; timeout default 10m)
 
-**Registered flow IDs** are resolved from `.agent-fleet/flows.yml` and `.agent-fleet/flows-custom.yml` relative to `--cwd`. Running by file path has no such requirement.
+**Project layout:** the project root is the nearest parent directory holding `.flow/config.yml` (else the git root). Registered flow IDs come from `.flow/flows.yml` (and `.flow/flows-custom.yml`) there. A legacy `.agent-fleet/flows.yml` or `.flows/config.yml` without `.flow/config.yml` is refused with the list of files to move into `.flow/`. Running by file path has no such requirement.
+
+**Daemon port:** `FLOW_DAEMON_PORT` sets the daemon command port (`0` lets the OS pick one; default range 47823-47833).

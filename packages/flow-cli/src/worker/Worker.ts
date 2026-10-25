@@ -7,7 +7,16 @@ import { WebSocket } from 'ws';
 import type { AssignmentScopedMessage, DaemonToWorker, StepIoCapture, WorkerToDaemon } from '../ipc/Protocol';
 import type { McpServerConfig } from './McpServer';
 import { WorkerAdapter } from './WorkerAdapter';
+import { installWorkerCrashHandlers } from './WorkerCrashHandlers';
+import { serializeWorkerFrame } from './WorkerFrame';
 import { buildForkedWorkerReady } from './WorkerLaunch';
+
+// Before anything can throw: the daemon only learns why a worker died from the last lines of its stderr.
+installWorkerCrashHandlers(
+	process,
+	text => process.stderr.write(text),
+	code => process.exit(code)
+);
 
 const wsPort = process.env['FLOW_WS_PORT'];
 if (!wsPort) {
@@ -19,7 +28,9 @@ const ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
 
 function send(message: WorkerToDaemon): void {
 	if (ws.readyState === ws.OPEN) {
-		ws.send(JSON.stringify(message));
+		// Throws on a frame the daemon would answer by closing the socket (see WorkerFrame). A too-large
+		// step_completed is thrown inside the assign handler's try, so it is reported as a step_failed.
+		ws.send(serializeWorkerFrame(message));
 	}
 }
 
@@ -54,7 +65,10 @@ ws.on('error', (err: Error) => {
 	process.stderr.write(`WebSocket error: ${String(err)}\n`);
 	process.exit(1);
 });
-ws.on('close', () => {
+ws.on('close', (code: number, reason: Buffer) => {
+	process.stderr.write(
+		`[worker] daemon connection closed (code ${String(code)}, reason "${reason.toString()}"), exiting\n`
+	);
 	process.exit(0);
 });
 

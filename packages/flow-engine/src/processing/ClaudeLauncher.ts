@@ -7,8 +7,17 @@
  */
 import { execSync, spawn } from 'node:child_process';
 
-import { type StreamJsonEventCallback, StreamJsonParser } from './StreamJsonParser';
+import { killProcessTree } from './ProcessTreeKiller';
+import { type StreamJsonEvent, type StreamJsonEventCallback, StreamJsonParser } from './StreamJsonParser';
 import { type ToolName, buildClaudeToolsArg } from './ToolAccess';
+
+/**
+ * How long a claude process may keep running after its final `result` event before it is ended.
+ *
+ * The real CLI waits for pending background tasks after the final answer and can stay alive far longer
+ * than the turn; 30 s leaves room for a follow-up turn announced by such a task before giving up.
+ */
+export const DEFAULT_RESULT_GRACE_MS = 30_000;
 
 /**
  * Result from launching Claude in interactive mode
@@ -25,6 +34,12 @@ export interface ClaudeBackgroundResult {
 	stdout: string;
 	stderr: string;
 	exitCode: number;
+	/**
+	 * Present when the process was still running `graceMs` after its final `result` event and was
+	 * terminated by the launcher; `exitCode` is then 0 (1 when that result was an error), not the
+	 * exit code of the killed process.
+	 */
+	endedAfterResult?: { graceMs: number };
 }
 
 /**
@@ -75,6 +90,13 @@ export interface ClaudeLaunchOptions {
 
 	/** Callback for stream-json events (requires streamJson=true) */
 	onStreamEvent?: StreamJsonEventCallback;
+
+	/**
+	 * Background mode with streamJson only: milliseconds a process may keep running after its `result`
+	 * event (and after any later event) before it is terminated with its whole process tree.
+	 * Default {@link DEFAULT_RESULT_GRACE_MS}. Must be positive.
+	 */
+	resultGraceMs?: number;
 
 	/**
 	 * When true (default), claude subprocess only receives PATH, ANTHROPIC_API_KEY,
@@ -141,6 +163,11 @@ export class ClaudeLauncher {
 	 * Launch Claude in background mode
 	 */
 	public async launchBackground(options: ClaudeLaunchOptions): Promise<ClaudeBackgroundResult> {
+		if (options.resultGraceMs !== undefined && !(options.resultGraceMs > 0)) {
+			throw new Error(
+				`Invalid resultGraceMs ${String(options.resultGraceMs)} for step ${options.stepId}: it must be a positive number of milliseconds (default ${String(DEFAULT_RESULT_GRACE_MS)}).`
+			);
+		}
 		const claudePath = this.findClaudePath({ ...process.env, ...(options.env ?? {}) });
 
 		const { command, args } = this.buildCommand(
@@ -369,9 +396,71 @@ export class ClaudeLauncher {
 			let stdout = '';
 			let stderr = '';
 
-			// When stream-json is enabled and a callback is provided, parse NDJSON in real-time
-			const parser =
-				options.streamJson && options.onStreamEvent ? new StreamJsonParser(options.onStreamEvent) : null;
+			const graceMs = options.resultGraceMs ?? DEFAULT_RESULT_GRACE_MS;
+			let settled = false;
+			let graceTimer: ReturnType<typeof setTimeout> | undefined;
+			let lastResultIsError = false;
+
+			const settle = (result: ClaudeBackgroundResult): void => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				clearTimeout(graceTimer);
+				resolve(result);
+			};
+
+			// The turn is over once `result` was seen, yet the CLI may keep running (it waits for background
+			// tasks, e.g. a Bash call moved to the background). A child holding the stdio pipes then keeps
+			// `close` from ever firing, so the process is ended here instead of leaving the step to the
+			// daemon's silence watchdog.
+			const endProcessAfterResult = (): void => {
+				if (settled) {
+					return;
+				}
+				const pid = claudeProcess.pid;
+				const message = `Claude process ${pid === undefined ? '(no pid)' : String(pid)} (step ${options.stepId}) was ended after the final result because it kept running ${String(graceMs)} ms after it and emitted nothing more (likely held by a background task or child process).`;
+				console.warn(`[Claude] ${message}`);
+				if (pid !== undefined) {
+					killProcessTree(pid);
+				}
+				// A grandchild that outlived the kill must not keep this launch pending through the pipes.
+				claudeProcess.stdout?.destroy();
+				claudeProcess.stderr?.destroy();
+				parser?.flush();
+				settle({
+					stdout,
+					stderr,
+					// The turn completed; the exit code of a process we killed says nothing about it.
+					exitCode: lastResultIsError ? 1 : 0,
+					endedAfterResult: { graceMs },
+				});
+			};
+
+			// Armed by `result`. Real turn activity (assistant/user) means a follow-up turn started: the
+			// wait is cancelled until its own `result`. Any other event only restarts the wait.
+			const observeForEndOfTurn = (event: StreamJsonEvent): void => {
+				if (event.type === 'result') {
+					lastResultIsError = event.data['is_error'] === true;
+					clearTimeout(graceTimer);
+					graceTimer = setTimeout(endProcessAfterResult, graceMs);
+				} else if (graceTimer !== undefined) {
+					clearTimeout(graceTimer);
+					graceTimer = undefined;
+					if (event.type !== 'assistant' && event.type !== 'user') {
+						graceTimer = setTimeout(endProcessAfterResult, graceMs);
+					}
+				}
+			};
+
+			// Parse NDJSON in real-time when stream-json is enabled: the end of the turn is detected from it
+			// even when the caller wants no events.
+			const parser = options.streamJson
+				? new StreamJsonParser(event => {
+						observeForEndOfTurn(event);
+						options.onStreamEvent?.(event);
+					})
+				: null;
 
 			claudeProcess.stdout?.on('data', data => {
 				const output = data.toString();
@@ -379,7 +468,8 @@ export class ClaudeLauncher {
 
 				if (parser) {
 					parser.feed(output);
-				} else {
+				}
+				if (!(parser && options.onStreamEvent)) {
 					console.log(`[Claude] ${output.trim()}`);
 				}
 			});
@@ -395,7 +485,7 @@ export class ClaudeLauncher {
 					parser.flush();
 				}
 
-				resolve({
+				settle({
 					stdout,
 					stderr,
 					exitCode: code ?? -1,

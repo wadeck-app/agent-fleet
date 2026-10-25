@@ -17,6 +17,32 @@ describe('ExecutionMasks', () => {
 		expect(masks.mask('exec-2', `a ${TOKEN}`)).toBe(`a ${TOKEN}`);
 	});
 
+	// For text that belongs to no execution (a worker's stderr): every registered secret is hidden.
+	it('maskAll hides the secrets of every registered execution', () => {
+		const masks = registered();
+		const other = ['sk', '_Zz8yX7wV'].join('');
+		masks.register('exec-2', new SecretMasker(new Map([['OTHER', other]])));
+
+		expect(masks.maskAll(`a ${TOKEN} b ${other}`)).toBe('a [secret:API_TOKEN] b [secret:OTHER]');
+	});
+
+	it('maskAll leaves text alone when nothing is registered', () => {
+		expect(new ExecutionMasks().maskAll('plain')).toBe('plain');
+	});
+
+	it('maskAll writes a placeholder, never the raw text, when a masker throws', () => {
+		const failures: unknown[] = [];
+		const masks = new ExecutionMasks((executionId, error) => failures.push([executionId, String(error)]));
+		const broken = new SecretMasker(new Map());
+		broken.mask = (): string => {
+			throw new Error('boom');
+		};
+		masks.register('exec-1', broken);
+
+		expect(masks.maskAll(`raw ${TOKEN}`)).toBe(MASKING_FAILED);
+		expect(failures).toHaveLength(1);
+	});
+
 	it('masks every string leaf of a structure', () => {
 		const masks = registered();
 		expect(masks.maskDeep('exec-1', { a: [TOKEN], b: 1 })).toEqual({ a: ['[secret:API_TOKEN]'], b: 1 });

@@ -326,6 +326,30 @@ describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
 		expect(reason).toMatch(/re-run the flow/i);
 	});
 
+	// The daemon log holds the cause of a disconnect; the failure the user reads must say where to look.
+	it('appends the supplied disconnect details to the failure of a step lost mid-execution', async () => {
+		const { handler, worker, sent, executionId } = await dispatchOneStep();
+		handler.onStepStarted(worker, sent[0]!.assignmentId, executionId, 's1');
+
+		handler.handleWorkerDisconnect(worker, (_executionId, stepId) => `DETAILS for ${stepId}`);
+
+		const reason = String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
+		expect(reason).toMatch(/disconnected while it was executing/i);
+		expect(reason).toContain('DETAILS for s1');
+	});
+
+	it('does not leak disconnect details into a later, unrelated failure', async () => {
+		const { handler, worker, sent, executionId } = await dispatchOneStep();
+		handler.handleWorkerDisconnect(worker, () => 'STALE DETAILS');
+		mockExecStore.markStepFailed.mockClear();
+		handler.onStepStarted(worker, sent[0]!.assignmentId, executionId, 's1');
+
+		handler.handleWorkerDisconnect(worker);
+
+		const reason = String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
+		expect(reason).not.toContain('STALE DETAILS');
+	});
+
 	it('ignores a step_started that names an assignment issued to another worker', async () => {
 		const { handler, sent, executionId } = await dispatchOneStep();
 
@@ -587,6 +611,46 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 
 			expect(reason).toMatch(/no tool call in progress was observed/i);
 			expect(reason).not.toContain('last completed');
+		});
+
+		describe('after the model already produced its final result', () => {
+			const finalResultAt = new Date(2026, 9, 25, 14, 3, 7).getTime();
+
+			it('says the final result had been produced, when, and that the process did not exit', async () => {
+				const reason = await stallReason((handler, assignmentId) =>
+					handler.noteAssignmentActivity(assignmentId, {
+						activity: null,
+						lastCompletedTool: 'Write',
+						finalResultAt,
+					})
+				);
+
+				expect(reason).toContain(
+					'The model had already produced its final result at 14:03:07; the process did not exit, likely held by a background task or child process'
+				);
+				expect(reason).not.toContain('last completed tool call');
+				// The existing explanation and remedy must survive.
+				expect(reason).toContain('queue.stepSilenceLimitSeconds');
+			});
+
+			it('forgets it once the worker reports a follow-up turn (null)', async () => {
+				const reason = await stallReason((handler, assignmentId) => {
+					handler.noteAssignmentActivity(assignmentId, { finalResultAt });
+					handler.noteAssignmentActivity(assignmentId, { activity: null, finalResultAt: null });
+				});
+
+				expect(reason).not.toContain('final result');
+				expect(reason).toMatch(/no tool call in progress was observed/i);
+			});
+
+			it('keeps it across a report that says nothing about it', async () => {
+				const reason = await stallReason((handler, assignmentId) => {
+					handler.noteAssignmentActivity(assignmentId, { finalResultAt });
+					handler.noteAssignmentActivity(assignmentId, {});
+				});
+
+				expect(reason).toContain('final result at 14:03:07');
+			});
 		});
 
 		it('does not talk about tool calls for a script step', async () => {

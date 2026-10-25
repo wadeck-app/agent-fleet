@@ -14,6 +14,12 @@ export interface ToolActivityState {
 	activity: ToolCallInFlight | null;
 	/** Name of the last call seen to return, when there was one. */
 	lastCompletedTool?: string;
+	/**
+	 * Epoch milliseconds at which the model's final `result` event was seen. Absent before any result and
+	 * again once a follow-up turn started. A step silent after this point is a process that did not exit,
+	 * not a model that stopped answering.
+	 */
+	finalResultAt?: number;
 }
 
 /** What an activity callback learns from one stream event. */
@@ -36,6 +42,7 @@ const SUMMARY_KEYS = ['command', 'file_path', 'path', 'pattern', 'url', 'query',
 export class ToolCallTracker {
 	private readonly inFlight = new Map<string, ToolCallInFlight>();
 	private lastCompletedTool: string | undefined;
+	private finalResultAt: number | undefined;
 
 	constructor(private readonly now: () => number = Date.now) {}
 
@@ -44,10 +51,16 @@ export class ToolCallTracker {
 		const before = this.signature();
 		switch (event.type) {
 			case 'assistant':
+				// A new turn after a result: the model is working again
+				this.finalResultAt = undefined;
 				this.observeBlocks(event, block => this.start(block));
 				break;
 			case 'user':
+				this.finalResultAt = undefined;
 				this.observeBlocks(event, block => this.finish(block));
+				break;
+			case 'result':
+				this.finalResultAt = this.now();
 				break;
 			case 'tool_use': {
 				const tool = event.data['tool'];
@@ -67,6 +80,9 @@ export class ToolCallTracker {
 		const state: ToolActivityState = { activity: this.oldest() };
 		if (this.lastCompletedTool !== undefined) {
 			state.lastCompletedTool = this.lastCompletedTool;
+		}
+		if (this.finalResultAt !== undefined) {
+			state.finalResultAt = this.finalResultAt;
 		}
 		return state;
 	}
@@ -118,7 +134,14 @@ export class ToolCallTracker {
 
 	private signature(): string {
 		const call = this.oldest();
-		return JSON.stringify([call?.tool, call?.summary, call?.startedAt, this.inFlight.size, this.lastCompletedTool]);
+		return JSON.stringify([
+			call?.tool,
+			call?.summary,
+			call?.startedAt,
+			this.inFlight.size,
+			this.lastCompletedTool,
+			this.finalResultAt,
+		]);
 	}
 }
 

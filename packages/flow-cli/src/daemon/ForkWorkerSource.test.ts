@@ -1,4 +1,5 @@
 import type { ChildProcess } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const spawnMock = vi.fn();
@@ -157,5 +158,167 @@ describe('ForkWorkerSource - pending workers', () => {
 	it('acknowledging an unknown pid is harmless', () => {
 		const source = new ForkWorkerSource(100, 200);
 		expect(() => source.acknowledgeConnection(999)).not.toThrow();
+	});
+});
+
+describe('ForkWorkerSource - exit diagnostics', () => {
+	type Entry = { level: 'info' | 'error'; msg: string };
+
+	function emittingChild(pid: number) {
+		const child = new EventEmitter() as EventEmitter & {
+			pid: number;
+			killed: boolean;
+			kill: ReturnType<typeof vi.fn>;
+			stderr: EventEmitter;
+		};
+		child.pid = pid;
+		child.killed = false;
+		child.kill = vi.fn();
+		child.stderr = new EventEmitter();
+		return child;
+	}
+
+	async function spawnWatched(options: { maskText?: (text: string) => string } = {}) {
+		const entries: Entry[] = [];
+		const child = emittingChild(77);
+		spawnMock.mockReturnValue(child);
+		const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		const source = new ForkWorkerSource(100, 200, undefined, {
+			log: (level, msg) => entries.push({ level, msg }),
+			...options,
+		});
+		await source.obtainWorker(request);
+		return { child, entries, source, stderrWrite };
+	}
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('logs a crash with pid, code and the last stderr lines at error level', async () => {
+		const { child, entries } = await spawnWatched();
+		child.stderr.emit('data', Buffer.from('line one\n[worker] fatal: uncaughtException: kaboom\n'));
+
+		child.emit('exit', 1, null);
+		child.emit('close', 1, null);
+
+		const text = entries.map(e => e.msg).join('\n');
+		expect(entries.every(e => e.level === 'error')).toBe(true);
+		expect(text).toContain('pid 77');
+		expect(text).toContain('code 1');
+		expect(text).toContain('kaboom');
+		expect(text).toContain('line one');
+	});
+
+	it('logs a kill by signal at error level, naming the signal', async () => {
+		const { child, entries } = await spawnWatched();
+
+		child.emit('exit', null, 'SIGKILL');
+		child.emit('close', null, 'SIGKILL');
+
+		const first = entries[0]!;
+		expect(first.level).toBe('error');
+		expect(first.msg).toContain('SIGKILL');
+		expect(first.msg).toContain('pid 77');
+	});
+
+	it('logs a clean exit at info level', async () => {
+		const { child, entries } = await spawnWatched();
+
+		child.emit('exit', 0, null);
+		child.emit('close', 0, null);
+
+		expect(entries[0]).toMatchObject({ level: 'info' });
+		expect(entries[0]!.msg).toContain('code 0');
+	});
+
+	it('logs once even when exit and close both fire', async () => {
+		const { child, entries } = await spawnWatched();
+		child.stderr.emit('data', Buffer.from('tail\n'));
+
+		child.emit('exit', 2, null);
+		child.emit('close', 2, null);
+
+		expect(entries.filter(e => e.msg.includes('exited'))).toHaveLength(1);
+	});
+
+	// A grandchild that inherited the stderr pipe keeps it open, so 'close' may never come.
+	it('still logs shortly after exit when the stderr pipe never closes', async () => {
+		vi.useFakeTimers();
+		const { child, entries } = await spawnWatched();
+		child.stderr.emit('data', Buffer.from('last words\n'));
+
+		child.emit('exit', 1, null);
+		expect(entries).toHaveLength(0);
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		expect(entries.map(e => e.msg).join('\n')).toContain('last words');
+	});
+
+	it('masks secrets in the stderr tail with the injected masker', async () => {
+		const { child, entries } = await spawnWatched({
+			maskText: text => text.replaceAll('hunter2-secret', '[secret:X]'),
+		});
+		child.stderr.emit('data', Buffer.from('token=hunter2-secret failed\n'));
+
+		child.emit('exit', 1, null);
+		child.emit('close', 1, null);
+
+		const text = entries.map(e => e.msg).join('\n');
+		expect(text).not.toContain('hunter2-secret');
+		expect(text).toContain('[secret:X]');
+	});
+
+	it('masks the ANTHROPIC_API_KEY it hands to the worker', async () => {
+		const previous = process.env['ANTHROPIC_API_KEY'];
+		process.env['ANTHROPIC_API_KEY'] = 'sk-ant-abcdefghijkl';
+		try {
+			const { child, entries } = await spawnWatched();
+			child.stderr.emit('data', Buffer.from('auth failed for sk-ant-abcdefghijkl\n'));
+
+			child.emit('exit', 1, null);
+			child.emit('close', 1, null);
+
+			expect(entries.map(e => e.msg).join('\n')).not.toContain('sk-ant-abcdefghijkl');
+		} finally {
+			if (previous === undefined) delete process.env['ANTHROPIC_API_KEY'];
+			else process.env['ANTHROPIC_API_KEY'] = previous;
+		}
+	});
+
+	it('bounds the logged tail to the last 40 lines', async () => {
+		const { child, entries } = await spawnWatched();
+		child.stderr.emit(
+			'data',
+			Buffer.from(Array.from({ length: 100 }, (_, i) => `row-${String(i)}`).join('\n') + '\n')
+		);
+
+		child.emit('exit', 1, null);
+		child.emit('close', 1, null);
+
+		const text = entries.map(e => e.msg).join('\n');
+		expect(text).toContain('row-99');
+		expect(text).toContain('row-60');
+		expect(text).not.toContain('row-59\n');
+	});
+
+	it('logs the orphan kill of a worker that never connected through the injected log', async () => {
+		vi.useFakeTimers();
+		const { child, entries } = await spawnWatched();
+
+		await vi.advanceTimersByTimeAsync(10_000);
+
+		expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+		expect(entries[0]).toMatchObject({ level: 'error' });
+		expect(entries[0]!.msg).toContain('pid 77');
+		expect(entries[0]!.msg).toMatch(/did not connect/);
+	});
+
+	it('does not log the worker output to the daemon log while it runs', async () => {
+		const { child, entries } = await spawnWatched();
+
+		child.stderr.emit('data', Buffer.from('chatter\n'));
+
+		expect(entries).toHaveLength(0);
 	});
 });

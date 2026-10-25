@@ -2,6 +2,7 @@ import { networkInterfaces } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
+import { MAX_WORKER_FRAME_BYTES } from '../ipc/WorkerFrameLimit';
 import { WebSocketServer } from './WebSocketServer.js';
 
 let server: WebSocketServer | undefined;
@@ -183,5 +184,120 @@ describe('WebSocketServer - crowded port range', () => {
 			occupant.close();
 			for (const neighbour of neighbours) neighbour.close();
 		}
+	});
+});
+
+describe('WebSocketServer - diagnostics reach the injected log', () => {
+	type Entry = { level: string; msg: string };
+
+	async function connect(port: number): Promise<WebSocket> {
+		const client = new WebSocket(`ws://127.0.0.1:${String(port)}`);
+		await new Promise<void>((resolve, reject) => {
+			client.once('open', () => resolve());
+			client.once('error', reject);
+		});
+		return client;
+	}
+
+	// A detached daemon has no stderr: a close that is only on stderr is lost.
+	it('logs the close code and reason of a connection, and hands them to the close handler', async () => {
+		const entries: Entry[] = [];
+		const closes: Array<{ code: unknown; reason: unknown }> = [];
+		server = new WebSocketServer(
+			45_320,
+			() => {},
+			(_ws, code, reason) => closes.push({ code, reason }),
+			{ log: (level, msg) => entries.push({ level, msg }) }
+		);
+		const client = await connect(await server.start());
+
+		client.close(4001, 'bye');
+		await vi.waitFor(() => expect(closes).toHaveLength(1));
+
+		expect(closes[0]).toEqual({ code: 4001, reason: 'bye' });
+		const line = entries.find(e => e.msg.includes('closed'));
+		expect(line?.msg).toContain('4001');
+		expect(line?.msg).toContain('bye');
+	});
+
+	it('logs an abnormal close at error level', async () => {
+		const entries: Entry[] = [];
+		server = new WebSocketServer(
+			45_321,
+			() => {},
+			() => {},
+			{ log: (level, msg) => entries.push({ level, msg }) }
+		);
+		const client = await connect(await server.start());
+
+		client.terminate();
+		await vi.waitFor(() => expect(entries.some(e => e.msg.includes('closed'))).toBe(true));
+
+		expect(entries.find(e => e.msg.includes('closed'))?.level).toBe('error');
+		expect(entries.find(e => e.msg.includes('closed'))?.msg).toContain('1006');
+	});
+
+	it('names a frame over the shared limit in the log, with the limit', async () => {
+		const entries: Entry[] = [];
+		server = new WebSocketServer(
+			45_322,
+			() => {},
+			() => {},
+			{ log: (level, msg) => entries.push({ level, msg }) }
+		);
+		const client = await connect(await server.start());
+
+		client.send('x'.repeat(MAX_WORKER_FRAME_BYTES + 1));
+		await vi.waitFor(() => expect(entries.some(e => e.msg.includes('connection error'))).toBe(true));
+
+		const text = entries.map(e => e.msg).join('\n');
+		expect(text).toContain(String(MAX_WORKER_FRAME_BYTES));
+	});
+
+	it('logs a connection error through the injected log, not stderr', async () => {
+		const entries: Entry[] = [];
+		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		server = new WebSocketServer(
+			45_323,
+			() => {},
+			() => {},
+			{ log: (level, msg) => entries.push({ level, msg }) }
+		);
+		await server.start();
+		const handlers = new Map<string, (...args: unknown[]) => void>();
+		const fakeWs = {
+			_socket: { remoteAddress: '127.0.0.1', encrypted: false },
+			terminate: vi.fn(),
+			on: (event: string, handler: (...args: unknown[]) => void) => handlers.set(event, handler),
+		};
+		(server as unknown as { handleConnection: (ws: unknown) => void }).handleConnection(fakeWs);
+
+		handlers.get('error')?.(new Error('socket exploded'));
+
+		const stderrText = write.mock.calls.map(c => String(c[0])).join('');
+		write.mockRestore();
+		expect(entries).toEqual([{ level: 'error', msg: expect.stringContaining('socket exploded') }]);
+		expect(stderrText).not.toContain('socket exploded');
+		expect(fakeWs.terminate).toHaveBeenCalled();
+	});
+
+	it('logs a refused transport through the injected log', async () => {
+		const entries: Entry[] = [];
+		server = new WebSocketServer(
+			45_324,
+			() => {},
+			() => {},
+			{ log: (level, msg) => entries.push({ level, msg }) }
+		);
+		await server.start();
+
+		(server as unknown as { handleConnection: (ws: unknown) => void }).handleConnection({
+			_socket: { remoteAddress: '10.1.2.3', encrypted: false },
+			terminate: vi.fn(),
+			on: vi.fn(),
+		});
+
+		expect(entries[0]?.level).toBe('error');
+		expect(entries[0]?.msg).toContain('10.1.2.3');
 	});
 });

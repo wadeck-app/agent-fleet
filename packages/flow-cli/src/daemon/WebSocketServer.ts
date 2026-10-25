@@ -4,12 +4,26 @@ import * as https from 'node:https';
 import { type WebSocket, WebSocketServer as WsServer } from 'ws';
 
 import type { WorkerToDaemon } from '../ipc/Protocol';
+import { MAX_WORKER_FRAME_BYTES } from '../ipc/WorkerFrameLimit';
 import { admitTransport, resolveBindAddress } from './TransportPolicy.js';
 
 export type MessageHandler = (ws: WebSocket, message: WorkerToDaemon) => void;
-export type CloseHandler = (ws: WebSocket) => void;
+/** `code` and `reason` are what the peer (or the transport) closed with; 1006 means no close frame arrived. */
+export type CloseHandler = (ws: WebSocket, code: number, reason: string) => void;
+
+/** Where connection diagnostics go. The daemon is detached with stdio ignored, so stderr is not enough. */
+export type ConnectionLog = (level: 'info' | 'error', message: string) => void;
+
+const NORMAL_CLOSE_CODES = new Set([1000, 1001]);
+const CLOSE_CODE_MESSAGE_TOO_BIG = 1009;
+
+function stderrLog(level: 'info' | 'error', message: string): void {
+	process.stderr.write(`[WebSocketServer] ${level}: ${message}\n`);
+}
 
 export interface WebSocketServerOptions {
+	/** Receives connection errors, closes and refusals. Stderr when omitted (tests); the daemon passes its log. */
+	log?: ConnectionLog;
 	/** Address to bind. Loopback when omitted. */
 	bindAddress?: string;
 	/** Paths to the PEM certificate and key that make this listener TLS. */
@@ -29,6 +43,7 @@ export class WebSocketServer {
 	private readonly bindAddress: string;
 	private _port: number;
 	private closed = false;
+	private readonly log: ConnectionLog;
 
 	constructor(
 		port: number,
@@ -51,7 +66,8 @@ export class WebSocketServer {
 				: http.createServer();
 		// maxPayload: 1 MiB -- consistent with McpServer.readBody() cap.
 		// The ws default (100 MiB) would allow a rogue local process to exhaust daemon memory.
-		this.wss = new WsServer({ server: this.httpServer, maxPayload: 1024 * 1024 });
+		this.log = options.log ?? stderrLog;
+		this.wss = new WsServer({ server: this.httpServer, maxPayload: MAX_WORKER_FRAME_BYTES });
 		this.wss.on('connection', (ws: WebSocket) => this.handleConnection(ws));
 		// ws re-emits httpServer errors; without a handler Node.js throws unhandled 'error'
 		// and crashes the daemon. EADDRINUSE during port scan is handled by tryBind -- suppress here.
@@ -105,7 +121,7 @@ export class WebSocketServer {
 			encrypted: socket?.encrypted === true,
 		});
 		if (!decision.ok) {
-			process.stderr.write(`[WebSocketServer] ${decision.reason}\n`);
+			this.log('error', decision.reason);
 			ws.terminate();
 			return;
 		}
@@ -119,9 +135,24 @@ export class WebSocketServer {
 			}
 			this.onMessage(ws, message);
 		});
-		ws.on('close', () => this.onClose(ws));
+		ws.on('close', (code: number, reason: Buffer) => {
+			const reasonText = reason.toString();
+			const hint =
+				code === CLOSE_CODE_MESSAGE_TOO_BIG
+					? `; a frame exceeded the ${String(MAX_WORKER_FRAME_BYTES)}-byte limit`
+					: '';
+			this.log(
+				NORMAL_CLOSE_CODES.has(code) ? 'info' : 'error',
+				`worker connection closed (code ${String(code)}, reason "${reasonText}")${hint}`
+			);
+			this.onClose(ws, code, reasonText);
+		});
 		ws.on('error', (err: Error) => {
-			process.stderr.write(`[WebSocketServer] connection error: ${String(err)}\n`);
+			const tooBig = (err as NodeJS.ErrnoException).code === 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH';
+			this.log(
+				'error',
+				`connection error: ${String(err)}${tooBig ? ` (a frame exceeded the ${String(MAX_WORKER_FRAME_BYTES)}-byte limit; the worker sent too much data in one message)` : ''}`
+			);
 			ws.terminate();
 		});
 	}

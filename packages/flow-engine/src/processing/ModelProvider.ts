@@ -39,6 +39,11 @@ export interface LaunchOptions {
 	onProcessStarted?: (process: ChildProcess) => void;
 	onStreamEvent?: StreamJsonEventCallback;
 	/**
+	 * Claude only: milliseconds the process may keep running after its final `result` event before it
+	 * is terminated with its process tree. Omit for the launcher default (30 s). Other providers ignore it.
+	 */
+	resultGraceMs?: number;
+	/**
 	 * Unified tool hooks -- provider-agnostic declarations of what should happen
 	 * before/after tool calls. Each provider translates these into its native format
 	 * (OpenCode ESM plugin JS, Claude settings JSON, Codex command-hook script).
@@ -64,6 +69,8 @@ export interface ModelBackgroundResult {
 	stdout: string;
 	stderr: string;
 	exitCode: number;
+	/** Set when the provider ended a process that kept running after its final result. @see ClaudeBackgroundResult */
+	endedAfterResult?: { graceMs: number };
 }
 
 export interface ModelProvider {
