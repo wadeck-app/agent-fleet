@@ -32,6 +32,8 @@
 			"kind": "widget",
 			"slot": "dashboard",
 			"label": "Flow Executions",
+			"width": 3,
+			"height": 4,
 			"view": { "type": "path", "value": "./src/dsl-views/executions-widget.yaml" }
 		},
 		{

@@ -1,4 +1,4 @@
-# Dashboard widget for a narrow card (240-360px): three counters on one row, the daily bars of the last 7 days, the 5
+# Dashboard widget for a card of 3 x 4 grid cells (332 x 448px, declared in manifest.json): three counters on one row, the daily bars of the last 7 days, the 5
 # latest runs and a row of buttons. One source feeds all of it:
 #   recent: GET /api/modules/flow/widgets/executions, the digest of the runs (flow-core RunDigest, served as is)
 # Times are ISO 8601, formatted by flow:RunList (a StatTile or a composed string would show the raw text).
@@ -21,18 +21,11 @@ items:
           - { $type: StatTile, label: Failed, value: $sources.recent.failed }
           - { $type: StatTile, label: Total, value: $sources.recent.total }
 
-    # Runs of the last 7 days, one green (completed) and one red (failed) bar per day. Hover a bar for the date.
-    - $type: Chart
-      data: $sources.recent.daily
-      xAxisKey: dayStart
-      xAxisType: time
-      xFormat: date
-      yFormat: number
-      variant: sparkline
-      height: 64
-      series:
-          - { key: completed, name: completed, color: 'var(--color-success)', type: bar, yAxisId: left }
-          - { key: failed, name: failed, color: 'var(--color-danger)', type: bar, yAxisId: left }
+    # Runs of the last 7 days, one green (completed) and one red (failed) bar per day, one equal column per day over the
+    # whole width of the tile. Hover a day for the date. Not the dsl-ui Chart: it draws nothing for a day without run, so a
+    # quiet week showed two bars squeezed against the right edge and the rest of the tile empty.
+    - $type: flow:RunBars
+      days: $sources.recent.daily
 
     # The 5 newest runs, one line each (status, flow name, start time), a line opens the run. A DataTable cannot shrink under
     # its content, so in a narrow card it scrolled sideways and hid the time: flow:RunList (this module) gives the flow name

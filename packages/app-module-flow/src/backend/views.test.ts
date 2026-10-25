@@ -34,6 +34,8 @@ interface ManifestPoint {
 	kind: string;
 	slot: string;
 	path?: string;
+	width?: number;
+	height?: number;
 	view: { type: string; value: string };
 }
 const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf8')) as {
@@ -983,7 +985,9 @@ describe('dashboard widget', () => {
 		);
 		expect(rows).toHaveLength(1);
 		expect(rows[0]!['items']).toHaveLength(3);
-		expect(collectNodes(widget.document, 'Chart')).toHaveLength(1);
+		expect(collectNodes(widget.document, 'flow:RunBars')).toHaveLength(1);
+		// The dsl-ui Chart draws nothing for a day without run: two busy days left five seventh of the tile empty.
+		expect(collectNodes(widget.document, 'Chart')).toEqual([]);
 		expect(collectNodes(widget.document, 'flow:RunList').map(list => list['runs'])).toEqual([
 			'$sources.recent.latest',
 		]);
@@ -1026,12 +1030,18 @@ describe('dashboard widget', () => {
 		}
 	});
 
-	it('draws the chart as a sparkline with a height, so it stays small in a narrow card', () => {
-		const [chart] = collectNodes(widget.document, 'Chart');
-		expect(chart).toMatchObject({ variant: 'sparkline', xAxisType: 'time', xFormat: 'date' });
-		expect(chart!['height'], 'chart height').toBeLessThanOrEqual(120);
-		expect(readSource(String(chart!['data'])).value).toBeInstanceOf(Array);
-		expect((chart!['series'] as { key: string }[]).map(series => series.key)).toEqual(['completed', 'failed']);
+	it('gives the daily bars the 7 days of the digest and no style key', () => {
+		const [bars] = collectNodes(widget.document, 'flow:RunBars');
+		expect(Object.keys(bars!).filter(key => !key.startsWith('$'))).toEqual(['days']);
+		const days = readSource(String(bars!['days'])).value as Record<string, unknown>[];
+		expect(days).toHaveLength(7);
+		for (const field of ['dayStart', 'completed', 'failed']) expect(Object.keys(days[0]!), field).toContain(field);
+	});
+
+	// app-core grid: square cells of 100px, 1 to 12 cells. Without a width the card takes 2 cells and widens itself when its
+	// content overflows, which is how it became 3 cells wide: declared, the layout no longer depends on that.
+	it('declares the size of its card in grid cells (3 wide, 4 high: the content at 332px takes 4 rows)', () => {
+		expect(widgetPoint).toMatchObject({ width: 3, height: 4 });
 	});
 
 	it('draws the time and the status itself in flow:RunList, not with a stray RelativeDate or Badge', () => {

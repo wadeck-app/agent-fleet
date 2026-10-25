@@ -7,10 +7,12 @@ import { LogStream } from './LogStream.js';
 import { LOG_STREAM_KEYS, readLogStreamProps } from './LogStreamProps.js';
 import { MarkdownText } from './MarkdownText.js';
 import { MARKDOWN_TEXT_KEYS, readMarkdownTextProps } from './MarkdownTextProps.js';
+import { RunBars } from './RunBars.js';
+import { RUN_BARS_KEYS, readRunBarsProps } from './RunBarsProps.js';
 import { RunList } from './RunList.js';
 import { RUN_LIST_KEYS, readRunListProps } from './RunListProps.js';
 
-// Registered by app-core as `flow:MarkdownText`, `flow:RunList` and `flow:LogStream`.
+// Registered by app-core as `flow:MarkdownText`, `flow:RunList`, `flow:RunBars` and `flow:LogStream`.
 const entries: ComponentRegistryEntry[] = [
 	{
 		name: 'MarkdownText',
@@ -32,6 +34,13 @@ const entries: ComponentRegistryEntry[] = [
 		tags: ['flow', 'runs', 'list'],
 		knownKeys: [...RUN_LIST_KEYS],
 		render: ({ node, ctx }) => createElement(RunList, readRunListProps(node, ctx)),
+	},
+	{
+		name: 'RunBars',
+		category: 'composite',
+		tags: ['flow', 'runs', 'chart'],
+		knownKeys: [...RUN_BARS_KEYS],
+		render: ({ node, ctx }) => createElement(RunBars, readRunBarsProps(node, ctx)),
 	},
 ];
 
