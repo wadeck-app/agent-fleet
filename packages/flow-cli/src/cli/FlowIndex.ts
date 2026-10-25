@@ -20,7 +20,6 @@ import { writeDaemonLog } from '../daemon/DaemonLog.js';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
 import { resolveDaemonPort } from '../daemon/resolveDaemonPort.js';
 import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
-import { scheduleBackgroundUpdateForRelease } from '../updater/DevBuildGuard.js';
 import { describeCommandLine } from './CommandLineLog';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { buildCliCommand } from './commands/CliCommand.js';
@@ -316,8 +315,8 @@ async function main(): Promise<void> {
 	try {
 		await program.parseAsync(process.argv);
 	} finally {
-		// A dev build must never spawn a mutating `npm install -g` updater (incident 2026-10-25).
-		scheduleBackgroundUpdateForRelease(updateManager, bundlePath, 'flow-updater.cjs', VERSION);
+		// VERSION lets shared-cli refuse to spawn for a dev build (no mutating npm install -g from a repo checkout; incident 2026-10-25).
+		updateManager.scheduleBackgroundUpdate(bundlePath, 'flow-updater.cjs', VERSION);
 	}
 }
 

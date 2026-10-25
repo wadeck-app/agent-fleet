@@ -1,6 +1,7 @@
 // flow-updater entry point -- bundled separately as flow-updater.cjs.
 // Must NOT import any flow runtime modules.
 import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
+import { devBuildRefusalMessage, isReleaseVersion } from '@wadeck-app/shared-cli/ReleaseVersion';
 import {
 	appendLog,
 	cacheFilePath,
@@ -20,8 +21,8 @@ import { join } from 'node:path';
 import { registerWithAppCore } from '../daemon/AppCoreRegistration';
 import { APP_MODULES } from '../daemon/AppModules';
 import { trackAppModuleUpdate } from './RegisterAfterUpdate';
-import { devBuildRefusalMessage, isCalVer } from './DevBuildGuard';
 import { decideUpdate } from './UpdateDeferral';
+import { describeUpdateState } from './UpdateStateStatus';
 
 declare const __FLOW_CLI_VERSION__: string;
 
@@ -34,7 +35,7 @@ const currentVersion = typeof __FLOW_CLI_VERSION__ !== 'undefined' ? __FLOW_CLI_
 // effect (including the temp config copy below). Exit 1 when the user explicitly asked (`cli update`
 // sets UPDATER_FORCE=1) so the refusal is not mistaken for "already up to date"; exit 0 for a
 // background invocation.
-if (!isCalVer(currentVersion)) {
+if (!isReleaseVersion(currentVersion)) {
 	const refusal = devBuildRefusalMessage('flow', currentVersion);
 	process.stderr.write(`[flow-updater] ${refusal}\n`);
 	try {
@@ -203,26 +204,7 @@ function reportOutcome(startedAt: number, logEntries: LogEntry[]): void {
 	} else if (state && state.timestamp >= startedAt) {
 		// This run wrote a terminal state -- it is authoritative over any older state file left
 		// over from a previous run.
-		switch (state.status) {
-			case 'success':
-				status = `updated to ${state.targetVersion}`;
-				break;
-			case 'deferred': {
-				const retryInMinutes = Math.round(((state.retryAt ?? state.timestamp) - state.timestamp) / 60_000);
-				status = `deferred -- a flow execution is active on the daemon; will retry automatically in ${retryInMinutes} minute${retryInMinutes === 1 ? '' : 's'}`;
-				break;
-			}
-			case 'failed':
-				status = `update failed -- ${state.error}`;
-				break;
-			case 'rolled-back':
-				status = `update rolled back to ${state.previousVersion} -- new version failed its self-check`;
-				break;
-			default:
-				// 'update-available' exists on UpdateState but is only written by the
-				// 'with-daemon' strategy -- this entry point always uses 'without-daemon'.
-				throw new Error(`[flow-updater] unrecognized state status: ${state.status}`);
-		}
+		status = describeUpdateState(state);
 	} else if (cache && cache.lastCheckedAt >= startedAt) {
 		// Cache was refreshed this run but no state was written: the only code path that does
 		// that is "latest version is not newer than current".

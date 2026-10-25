@@ -13,7 +13,7 @@ const TEST_BUNDLES = ['flow.cjs', 'flow-updater.cjs'].map(name => resolve(distBu
 const TEST_BUNDLE_VERSION = '0.0.0-test-bundling';
 
 /**
- * flow.cjs is deliberately NOT a CalVer release, so `flow cli update` and its background scheduler refuse (DevBuildGuard).
+ * flow.cjs is deliberately NOT a CalVer release, so `flow cli update` and its background scheduler refuse (shared-cli ReleaseVersion).
  * The updater alone is stamped CalVer so its offline outcome reporting can be exercised; its tests run it only under
  * createIsolatedCliEnv (temp config dir, temp npm prefix, unreachable registry), never against the real machine.
  */

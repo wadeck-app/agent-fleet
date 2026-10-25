@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { VERSION } from '../version.js';
+
 // ---------------------------------------------------------------------------
 // Hoisted state shared between the mocked modules and the tests below.
 // ---------------------------------------------------------------------------
@@ -262,6 +264,8 @@ describe('WorkerCommand -- self re-exec on version bump', () => {
 		await flushMicrotasks();
 
 		expect(scheduleBackgroundUpdateMock).toHaveBeenCalledTimes(1);
+		// The CLI version is the 3rd argument: shared-cli itself refuses to spawn for a dev build.
+		expect(scheduleBackgroundUpdateMock).toHaveBeenCalledWith(expect.any(String), 'flow-updater.cjs', VERSION);
 		expect(spawnMock).not.toHaveBeenCalled();
 		expect(exitSpy).not.toHaveBeenCalled();
 	});

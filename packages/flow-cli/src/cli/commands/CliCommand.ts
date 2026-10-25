@@ -7,6 +7,7 @@ import {
 	cliVersionCommand,
 	warnUnknownArgs,
 } from '@wadeck-app/shared-cli/CliMetaCommands';
+import { devBuildRefusalMessage, isReleaseVersion } from '@wadeck-app/shared-cli/ReleaseVersion';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
 import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
@@ -24,7 +25,6 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { FlowConfigLoader } from '../../config/FlowConfig.js';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
-import { devBuildRefusalMessage, isCalVer } from '../../updater/DevBuildGuard.js';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 // violations-suppress-end: ts/no-deep-relative
 import { logsCommand } from './LogsCommand.js';
@@ -142,7 +142,7 @@ export function buildCliCommand(): Command {
 			}
 			// Before anything with a side effect (drain, spawn): a repo-built bundle must never touch the global install.
 			const currentVersion = getCurrentVersion();
-			if (!isCalVer(currentVersion)) {
+			if (!isReleaseVersion(currentVersion)) {
 				process.stderr.write(`[flow] ${devBuildRefusalMessage('flow', currentVersion)}\n`);
 				process.exit(1);
 				return;

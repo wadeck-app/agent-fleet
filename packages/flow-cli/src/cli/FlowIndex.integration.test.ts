@@ -8,6 +8,7 @@
 // Every spawn runs under createIsolatedCliEnv (temp config dir / home / npm prefix, unreachable registry,
 // UPDATER_* / LAUNCHER_* / npm_config_* stripped): incident 2026-10-25, a test run of the real `cli update`
 // against the real global npm left the global CLI uninstalled.
+import { devBuildRefusalMessage } from '@wadeck-app/shared-cli/ReleaseVersion';
 import { removeTempDirectory } from 'flow-core/testing';
 import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -89,7 +90,8 @@ describe('flow cli update from a dev build', () => {
 		expect(result.status).toBe(1);
 		expect(combined).toContain('refusing to update the global install of flow');
 		expect(combined).toContain('0.0.0-test-bundling');
-		expect(combined).toContain('`flow cli update`');
+		// Exact shared message (shared-cli ReleaseVersion), not a local copy.
+		expect(combined).toContain(devBuildRefusalMessage('flow', '0.0.0-test-bundling'));
 		// "Running updater" is printed right before the updater is spawned.
 		expect(combined).not.toContain('Running updater');
 	});

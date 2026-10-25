@@ -32,7 +32,7 @@ const BUNDLING_TESTS = [
 export default defineConfig({
 	plugins: [resolveJsToTs()],
 	// Replace the esbuild bundle-time constant so updater tests see a real CalVer release version (a
-	// non-CalVer one makes the dev-build guard refuse every update, see src/updater/DevBuildGuard.ts).
+	// non-CalVer one makes the dev-build guard refuse every update, see @wadeck-app/shared-cli/ReleaseVersion).
 	define: {
 		__FLOW_CLI_VERSION__: '"2026.01.01-001-0123abcd"',
 	},

@@ -25,7 +25,7 @@ if (!version) {
 }
 
 // Test-only: the integration tests exercise the updater's offline outcomes, which a dev-version updater
-// refuses before reaching (see src/updater/DevBuildGuard.ts). They stamp ONLY the updater with a CalVer
+// refuses before reaching (see @wadeck-app/shared-cli/ReleaseVersion). They stamp ONLY the updater with a CalVer
 // version, and run it solely under an isolated env (src/test-utils/IsolatedCliEnv.ts). flow.cjs keeps `version`,
 // so `flow cli update` and the background scheduler of the same build still refuse. CI never sets this.
 const updaterVersion = process.env['BUNDLE_UPDATER_VERSION'] ?? version;
