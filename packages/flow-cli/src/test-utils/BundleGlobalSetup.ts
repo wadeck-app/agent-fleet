@@ -13,6 +13,13 @@ const TEST_BUNDLES = ['flow.cjs', 'flow-updater.cjs'].map(name => resolve(distBu
 const TEST_BUNDLE_VERSION = '0.0.0-test-bundling';
 
 /**
+ * flow.cjs is deliberately NOT a CalVer release, so `flow cli update` and its background scheduler refuse (DevBuildGuard).
+ * The updater alone is stamped CalVer so its offline outcome reporting can be exercised; its tests run it only under
+ * createIsolatedCliEnv (temp config dir, temp npm prefix, unreachable registry), never against the real machine.
+ */
+const TEST_UPDATER_BUNDLE_VERSION = '2026.01.01-001-0123abcd';
+
+/**
  * Vitest globalSetup of the `bundling` project: builds dist/ and dist-bundle/ ONCE, before any test file runs.
  *
  * Each bundling test file used to rebuild in its own beforeAll. A rebuild rewrites dist/ (which the workspace
@@ -30,7 +37,11 @@ export default function setup(): void {
 				cwd: agentFleetRoot,
 				encoding: 'utf-8',
 				timeout: 300_000,
-				env: { ...process.env, BUNDLE_VERSION: TEST_BUNDLE_VERSION },
+				env: {
+					...process.env,
+					BUNDLE_VERSION: TEST_BUNDLE_VERSION,
+					BUNDLE_UPDATER_VERSION: TEST_UPDATER_BUNDLE_VERSION,
+				},
 				shell: true,
 			});
 		} catch (error) {

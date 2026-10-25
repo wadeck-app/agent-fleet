@@ -24,6 +24,12 @@ if (!version) {
 	process.exit(1);
 }
 
+// Test-only: the integration tests exercise the updater's offline outcomes, which a dev-version updater
+// refuses before reaching (see src/updater/DevBuildGuard.ts). They stamp ONLY the updater with a CalVer
+// version, and run it solely under an isolated env (src/test-utils/IsolatedCliEnv.ts). flow.cjs keeps `version`,
+// so `flow cli update` and the background scheduler of the same build still refuse. CI never sets this.
+const updaterVersion = process.env['BUNDLE_UPDATER_VERSION'] ?? version;
+
 const sharedDefine = {
 	'import.meta.url': '__importMetaUrl',
 	__FLOW_CLI_VERSION__: JSON.stringify(version),
@@ -86,7 +92,7 @@ await Promise.all([
 		external: [],
 		// top-level await in ESM -> wrapped in async IIFE for CJS
 		supported: { 'top-level-await': false },
-		define: sharedDefine,
+		define: { ...sharedDefine, __FLOW_CLI_VERSION__: JSON.stringify(updaterVersion) },
 		banner: sharedBanner,
 		logLevel: 'warning',
 	}),

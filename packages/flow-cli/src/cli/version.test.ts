@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { VERSION, readBaseVersion } from './version.js';
 
-const CALVER = /^\d{4}\.\d{2}\.\d{2}-\d{6}-\d+-[0-9a-zA-Z]+/;
+// Dev fallback (HHmmss-count-hash) or the CI stamp (BBB-hash), which is what the vitest define injects.
+const CALVER = /^\d{4}\.\d{2}\.\d{2}-(\d{6}-\d+|\d{3,})-[0-9a-zA-Z]+/;
 
 describe('VERSION', () => {
 	it('matches CalVer format YYYY.MM.DD-HHmmss-count-hash', () => {

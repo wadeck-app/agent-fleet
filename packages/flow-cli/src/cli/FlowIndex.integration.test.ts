@@ -2,15 +2,20 @@
 // These tests execute the bundle built by the bundling project global setup, via node directly.
 // They verify:
 //   1. `flow cli self-check` does NOT produce duplicate lines in combined stdout+stderr
-//   2. `flow cli update` produces at least one line of output (not silent)
+//   2. the updater produces at least one line of output (not silent), and a dev build refuses to update
 //   3. `flow logs` (unknown command) exits with code 1 and reports "Unknown command"
+//
+// Every spawn runs under createIsolatedCliEnv (temp config dir / home / npm prefix, unreachable registry,
+// UPDATER_* / LAUNCHER_* / npm_config_* stripped): incident 2026-10-25, a test run of the real `cli update`
+// against the real global npm left the global CLI uninstalled.
 import { removeTempDirectory } from 'flow-core/testing';
-import { spawnSync } from 'node:child_process';
+import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+
+import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // agent-fleet root (4 levels up from src/cli/: src/cli -> src -> flow-cli -> packages -> agent-fleet)
@@ -18,17 +23,38 @@ const agentFleetRoot = path.resolve(__dirname, '../../../..');
 const bundlePath = path.resolve(agentFleetRoot, 'packages/flow-cli/dist-bundle/flow.cjs');
 const updaterBundlePath = path.resolve(agentFleetRoot, 'packages/flow-cli/dist-bundle/flow-updater.cjs');
 
+/** Runs `script` under a fresh isolated environment, removed afterwards. `prepare` may seed the config dir. */
+function runIsolated(
+	script: string,
+	args: string[],
+	opts: { extraEnv?: NodeJS.ProcessEnv; prepare?: (configDir: string) => void } = {}
+): { result: SpawnSyncReturns<string>; configDir: string } {
+	const isolation = createIsolatedCliEnv({ extra: opts.extraEnv });
+	try {
+		opts.prepare?.(isolation.configDir);
+		const result = spawnSync(process.execPath, [script, ...args], {
+			env: isolation.env,
+			timeout: 30000,
+			encoding: 'utf-8',
+		});
+		return { result, configDir: isolation.configDir };
+	} finally {
+		removeTempDirectory(isolation.root);
+	}
+}
+
 // The bundle is built once, before any test file, by the bundling project global setup (src/test-utils/BundleGlobalSetup.ts).
-function runFlow(args: string[], extraEnv: Record<string, string> = {}): ReturnType<typeof spawnSync> {
-	return spawnSync(process.execPath, [bundlePath, ...args], {
-		env: {
-			...process.env,
-			LAUNCHER_BUNDLE_OVERRIDE: bundlePath,
-			...extraEnv,
-		},
-		timeout: 30000,
-		encoding: 'utf-8',
+function runFlow(args: string[], extraEnv: NodeJS.ProcessEnv = {}): SpawnSyncReturns<string> {
+	return runIsolated(bundlePath, args, { extraEnv: { LAUNCHER_BUNDLE_OVERRIDE: bundlePath, ...extraEnv } }).result;
+}
+
+/** The updater bundle is stamped with a CalVer test version (see BundleGlobalSetup), so it reaches the offline outcome reporting. */
+function runUpdater(prepare?: (configDir: string) => void): string {
+	const { result } = runIsolated(updaterBundlePath, [], {
+		extraEnv: { UPDATER_FORCE: '1', UPDATER_PKG_NAME: '@wadeck-app/flow-cli' },
+		prepare,
 	});
+	return String(result.stdout ?? '') + String(result.stderr ?? '');
 }
 
 describe('flow cli self-check -- no duplicate output', () => {
@@ -53,113 +79,52 @@ describe('flow cli self-check -- no duplicate output', () => {
 	});
 });
 
-describe('flow cli update -- produces output', () => {
+describe('flow cli update from a dev build', () => {
+	it('refuses with an actionable message and a non-zero exit, before spawning any updater', () => {
+		// The bundle is stamped 0.0.0-test-bundling: not a CalVer release.
+		const { result } = runIsolated(bundlePath, ['cli', 'update'], {
+			extraEnv: { LAUNCHER_BUNDLE_OVERRIDE: bundlePath },
+		});
+		const combined = String(result.stdout ?? '') + String(result.stderr ?? '');
+		expect(result.status).toBe(1);
+		expect(combined).toContain('refusing to update the global install of flow');
+		expect(combined).toContain('0.0.0-test-bundling');
+		expect(combined).toContain('`flow cli update`');
+		// "Running updater" is printed right before the updater is spawned.
+		expect(combined).not.toContain('Running updater');
+	});
+});
+
+describe('flow-updater -- produces output', () => {
 	it('writes at least one line to stdout when UPDATER_FORCE=1', () => {
-		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-update-test-'));
-		try {
-			// FLOW_CONFIG_DIR is the only env var the updater honours for its config dir: ConfigDir.get
-			// reads XDG_CONFIG_HOME or os.homedir(), and os.homedir() ignores $HOME on Windows, so
-			// overriding HOME/APPDATA/XDG_DATA_HOME would leak into the developer's real ~/.config/flow.
-			//
-			// NPM_CONFIG_USERCONFIG replaces ~/.npmrc so the developer's `@wadeck-app:registry` and auth
-			// token cannot apply. Both the default and the scoped registry point at a closed port, so
-			// `npm view` fails fast: the run is offline, deterministic, and installs nothing globally.
-			const npmrcPath = path.join(tmpDir, 'npmrc');
-			const deadRegistry = 'http://127.0.0.1:1/';
-			fs.writeFileSync(
-				npmrcPath,
-				`registry=${deadRegistry}\n@wadeck-app:registry=${deadRegistry}\nfetch-retries=0\n`
-			);
-
-			// Running under npm/npx exports NPM_CONFIG_USERCONFIG pointing at the real ~/.npmrc.
-			// Windows env vars are case-insensitive while JS object keys are not, so adding a
-			// lowercase `npm_config_userconfig` would leave a duplicate that the real path wins.
-			// Drop every case variant first, then set exactly one canonical key.
-			const childEnv: Record<string, string | undefined> = {};
-			for (const [key, value] of Object.entries(process.env)) {
-				if (!/^npm_config_userconfig$/i.test(key)) childEnv[key] = value;
-			}
-
-			const result = spawnSync(process.execPath, [updaterBundlePath], {
-				env: {
-					...childEnv,
-					UPDATER_FORCE: '1',
-					UPDATER_PKG_NAME: '@wadeck-app/flow-cli',
-					FLOW_CONFIG_DIR: tmpDir,
-					NPM_CONFIG_USERCONFIG: npmrcPath,
-				},
-				timeout: 30000,
-				encoding: 'utf-8',
-			});
-			const combined = (result.stdout ?? '') + (result.stderr ?? '');
-			// Must produce at least one line of output
-			expect(
-				combined.trim().length,
-				`Expected output from updater but got none. stdout: "${result.stdout}" stderr: "${result.stderr}"`
-			).toBeGreaterThan(0);
-			// The outcome must be attributed to the updater and name the failure, not just be non-empty.
-			expect(combined).toContain('[flow-updater]');
-			expect(combined).toContain('version fetch failed');
-			// The status block is always printed, and never the old vague "unexpected" message.
-			expect(combined).toContain('[flow-updater] current:');
-			expect(combined).toContain('[flow-updater] latest:');
-			expect(combined).toContain('[flow-updater] status:  update check failed --');
-			expect(combined).not.toContain('unexpected');
-		} finally {
-			try {
-				fs.rmSync(tmpDir, { recursive: true, force: true });
-			} catch {
-				// ignore
-			}
-		}
+		const combined = runUpdater();
+		// Must produce at least one line of output
+		expect(combined.trim().length, `Expected output from updater but got none.`).toBeGreaterThan(0);
+		// The outcome must be attributed to the updater and name the failure, not just be non-empty.
+		expect(combined).toContain('[flow-updater]');
+		expect(combined).toContain('version fetch failed');
+		// The status block is always printed, and never the old vague "unexpected" message.
+		expect(combined).toContain('[flow-updater] current:');
+		expect(combined).toContain('[flow-updater] latest:');
+		expect(combined).toContain('[flow-updater] status:  update check failed --');
+		expect(combined).not.toContain('unexpected');
 	});
 
 	it('reports autoUpdate disabled explicitly, not a silent/vague message', () => {
-		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-update-test-'));
-		try {
-			fs.writeFileSync(path.join(tmpDir, 'config.yml'), 'autoUpdate: false\n');
-			const npmrcPath = path.join(tmpDir, 'npmrc');
-			const deadRegistry = 'http://127.0.0.1:1/';
-			fs.writeFileSync(
-				npmrcPath,
-				`registry=${deadRegistry}\n@wadeck-app:registry=${deadRegistry}\nfetch-retries=0\n`
-			);
-			const childEnv: Record<string, string | undefined> = {};
-			for (const [key, value] of Object.entries(process.env)) {
-				if (!/^npm_config_userconfig$/i.test(key)) childEnv[key] = value;
-			}
-
-			// UPDATER_FORCE without UPDATER_MANUAL: force bypasses the check-interval, but the
-			// autoUpdate:false flag in config.yml is only bypassed by UPDATER_MANUAL.
-			const result = spawnSync(process.execPath, [updaterBundlePath], {
-				env: {
-					...childEnv,
-					UPDATER_FORCE: '1',
-					UPDATER_PKG_NAME: '@wadeck-app/flow-cli',
-					FLOW_CONFIG_DIR: tmpDir,
-					NPM_CONFIG_USERCONFIG: npmrcPath,
-				},
-				timeout: 30000,
-				encoding: 'utf-8',
-			});
-			const combined = (result.stdout ?? '') + (result.stderr ?? '');
-			expect(combined).toContain('[flow-updater] status:  skipped -- autoUpdate is disabled in');
-			expect(combined).not.toContain('unexpected');
-		} finally {
-			try {
-				fs.rmSync(tmpDir, { recursive: true, force: true });
-			} catch {
-				// ignore
-			}
-		}
+		// UPDATER_FORCE without UPDATER_MANUAL: force bypasses the check-interval, but the
+		// autoUpdate:false flag in config.yml is only bypassed by UPDATER_MANUAL.
+		const combined = runUpdater(configDir => {
+			fs.writeFileSync(path.join(configDir, 'config.yml'), 'autoUpdate: false\n');
+		});
+		expect(combined).toContain('[flow-updater] status:  skipped -- autoUpdate is disabled in');
+		expect(combined).not.toContain('unexpected');
 	});
 
 	it('ignores a stale state file left over from a previous run', () => {
-		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-update-test-'));
-		try {
+		const combined = runUpdater(configDir => {
 			// Simulate a prior run that successfully updated, long before this run starts.
 			fs.writeFileSync(
-				path.join(tmpDir, 'update-state.json'),
+				path.join(configDir, 'update-state.json'),
 				JSON.stringify({
 					status: 'success',
 					currentVersion: '0.0.0-ancient',
@@ -167,41 +132,12 @@ describe('flow cli update -- produces output', () => {
 					timestamp: Date.now() - 60 * 60 * 1000,
 				})
 			);
-			const npmrcPath = path.join(tmpDir, 'npmrc');
-			const deadRegistry = 'http://127.0.0.1:1/';
-			fs.writeFileSync(
-				npmrcPath,
-				`registry=${deadRegistry}\n@wadeck-app:registry=${deadRegistry}\nfetch-retries=0\n`
-			);
-			const childEnv: Record<string, string | undefined> = {};
-			for (const [key, value] of Object.entries(process.env)) {
-				if (!/^npm_config_userconfig$/i.test(key)) childEnv[key] = value;
-			}
-
-			const result = spawnSync(process.execPath, [updaterBundlePath], {
-				env: {
-					...childEnv,
-					UPDATER_FORCE: '1',
-					UPDATER_PKG_NAME: '@wadeck-app/flow-cli',
-					FLOW_CONFIG_DIR: tmpDir,
-					NPM_CONFIG_USERCONFIG: npmrcPath,
-				},
-				timeout: 30000,
-				encoding: 'utf-8',
-			});
-			const combined = (result.stdout ?? '') + (result.stderr ?? '');
-			// This run's own outcome (fetch failed, since the registry is unreachable) must win
-			// over the stale leftover 'success' state -- never report a success that didn't happen.
-			expect(combined).toContain('[flow-updater] status:  update check failed --');
-			expect(combined).not.toContain('status:  updated to');
-			expect(combined).not.toContain('unexpected');
-		} finally {
-			try {
-				fs.rmSync(tmpDir, { recursive: true, force: true });
-			} catch {
-				// ignore
-			}
-		}
+		});
+		// This run's own outcome (fetch failed, since the registry is unreachable) must win
+		// over the stale leftover 'success' state -- never report a success that didn't happen.
+		expect(combined).toContain('[flow-updater] status:  update check failed --');
+		expect(combined).not.toContain('status:  updated to');
+		expect(combined).not.toContain('unexpected');
 	});
 });
 
@@ -209,14 +145,8 @@ describe('flow logs -- alias for cli logs', () => {
 	it('exits 0 and reports log file status on stdout (no longer unknown command)', () => {
 		// 'flow logs' is now a registered top-level alias for 'flow cli logs'.
 		// It exits 0 regardless of whether a log file exists.
-		// A private config home: the machine's real log of the day can exceed spawnSync's 1 MiB output limit, which kills the child (status null).
-		const configHome = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-logs-test-'));
-		let result: ReturnType<typeof runFlow>;
-		try {
-			result = runFlow(['logs'], { XDG_CONFIG_HOME: configHome });
-		} finally {
-			removeTempDirectory(configHome);
-		}
+		// A private config home (the isolated one): the machine's real log of the day can exceed spawnSync's 1 MiB output limit, which kills the child (status null).
+		const result = runFlow(['logs']);
 		expect(result.status).toBe(0);
 		const stdoutOutput = String(result.stdout ?? '');
 		// Either shows log content or "No log file for today" message

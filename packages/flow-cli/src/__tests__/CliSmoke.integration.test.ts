@@ -15,13 +15,14 @@
  */
 import { readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { OWN_PROCESS_GROUP, killProcessTree, removeTempDirectory } from 'flow-core/testing';
-import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
+import { type ChildProcess, type SpawnSyncReturns, spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
 import { pollUntil } from '../test-utils/WaitHelpers';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -46,22 +47,29 @@ function runFlow(args: string[]): { output: string; status: number | null } {
 	// resolves specifiers a plain `node` refuses -- an exports map with no runtime entry
 	// among them. Inheriting it would make this test agree with vitest instead of with the
 	// user's shell, which is the opposite of the point.
-	const env = { ...process.env };
+	// Isolated from the real machine too: every invocation logs to the config dir and may schedule an updater.
+	const isolation = createIsolatedCliEnv();
+	const env = { ...isolation.env };
 	delete env['NODE_OPTIONS'];
 	delete env['VITEST'];
 	delete env['VITEST_WORKER_ID'];
 
-	const result = spawnSync(process.execPath, [flowBin, ...args], {
-		encoding: 'utf8',
-		timeout: 60_000,
-		env,
+	let result: SpawnSyncReturns<string>;
+	try {
+		result = spawnSync(process.execPath, [flowBin, ...args], {
+			encoding: 'utf8',
+			timeout: 60_000,
+			env,
 		// Deliberately not the package directory, which is where the test runner happens to
 		// sit. Module resolution turned out to depend on the working directory: the same
 		// command that worked from `packages/flow-cli` died from the repo root. Since a user
 		// runs `flow` from their own project, anywhere but here is the honest cwd -- and it is
-		// the only reason this test can see the failure at all.
-		cwd: tmpdir(),
-	});
+			// the only reason this test can see the failure at all.
+			cwd: tmpdir(),
+		});
+	} finally {
+		removeTempDirectory(isolation.root);
+	}
 	if (result.error) throw result.error;
 	return { output: (result.stdout ?? '') + (result.stderr ?? ''), status: result.status };
 }
@@ -156,6 +164,8 @@ interface SpawnedDaemon {
 	child: ChildProcess;
 	output: () => string;
 	exit: () => { code: number | null; signal: NodeJS.Signals | null } | undefined;
+	/** Throwaway home / npm tree of the isolated environment, to remove once the daemon is dead. */
+	isolationRoot: string;
 }
 
 /**
@@ -171,7 +181,9 @@ function installBundle(installDir: string): string {
 }
 
 function spawnBundledDaemon(installedFlow: string, projectDir: string, configHome: string): SpawnedDaemon {
-	const env = { ...process.env };
+	// Isolated from the real machine (home, npm, UPDATER_*/LAUNCHER_* leaks); the daemon dir is set below.
+	const isolation = createIsolatedCliEnv();
+	const env = { ...isolation.env };
 	// Same reason as runFlow above: vitest's own loader resolves specifiers plain node refuses,
 	// which is precisely the difference this test exists to catch.
 	delete env['NODE_OPTIONS'];
@@ -205,7 +217,7 @@ function spawnBundledDaemon(installedFlow: string, projectDir: string, configHom
 	let exit: { code: number | null; signal: NodeJS.Signals | null } | undefined;
 	child.on('exit', (code, signal) => (exit = { code, signal }));
 
-	return { child, output: () => output, exit: () => exit };
+	return { child, output: () => output, exit: () => exit, isolationRoot: isolation.root };
 }
 
 describe('the standalone bundle in daemon mode', () => {
@@ -256,6 +268,7 @@ describe('the standalone bundle in daemon mode', () => {
 			// process the daemon started. Kill the whole tree and wait for it, then remove (removeTempDirectory states what it tolerates, loudly,
 			// when something outside the tree still holds a handle).
 			await killProcessTree(daemon.child);
+			removeTempDirectory(daemon.isolationRoot);
 			for (const dir of [installDir, projectDir, configHome]) {
 				removeTempDirectory(dir);
 			}
