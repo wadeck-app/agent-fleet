@@ -9,12 +9,14 @@
  * daemon commits to stopping.
  */
 import { createTempDirectory } from 'flow-core/testing';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 
+import { WORKER_FEATURE_PROJECT_ID } from '../ipc/Protocol';
 import type { DaemonToWorker, ExecutionState } from '../ipc/Protocol';
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
 import { observeFor, waitUntil } from '../test-utils/WaitHelpers';
 
@@ -37,12 +39,15 @@ steps:
 
 let ctx: TestDaemonContext;
 let projectRoot: string;
+let projectId: string;
+let registry: RegisteredProjectFixture;
 let socket: WebSocket | undefined;
 
 beforeEach(async () => {
+	// The daemon resolves the project of each run from the registry in this process's environment.
+	registry = new RegisteredProjectFixture().useAsProcessEnv();
 	projectRoot = createTempDirectory('shutdown-race-project-');
-	mkdirSync(join(projectRoot, '.flow'), { recursive: true });
-	writeFileSync(join(projectRoot, '.flow', 'config.yml'), 'version: 1\n', 'utf8');
+	projectId = (await registry.register('shutdown-race', { folder: projectRoot })).id;
 	writeFileSync(join(projectRoot, 'flow.yml'), FLOW_YAML, 'utf8');
 
 	// Concurrency 0: nothing this daemon forks can mask the race -- only the registered
@@ -55,6 +60,7 @@ afterEach(async () => {
 	socket?.close();
 	socket = undefined;
 	await ctx[Symbol.asyncDispose]();
+	registry.dispose();
 });
 
 async function waitForFile(path: string): Promise<void> {
@@ -90,7 +96,9 @@ async function connectIdleRegisteredWorker(): Promise<{ assigned: string[] }> {
 		type: 'ready',
 		pid: 991_101,
 		authToken: token,
+		attachedProjectIds: [projectId],
 		attachedProjects: [projectRoot],
+		features: [WORKER_FEATURE_PROJECT_ID],
 		hasUserInterface: false,
 	};
 

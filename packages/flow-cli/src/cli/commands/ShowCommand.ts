@@ -1,3 +1,4 @@
+import { defaultRegistryDir } from '@wadeck-app/project-sdk';
 import type { Command } from 'commander';
 import {
 	DEFAULT_TAIL_CHARS,
@@ -5,6 +6,7 @@ import {
 	ExecutionLookupError,
 	FlowQueryService,
 	assessFileVersion,
+	createRegistryProjectLookup,
 	definitionsDirOf,
 	looksLikeExecutionId,
 	renderFlowSummary,
@@ -106,7 +108,15 @@ export function registerShowCommand(program: Command, getConfigDir: () => string
 				return;
 			}
 			if (looksLikeExecutionId(target)) {
-				showExecution(target, FlowQueryService.forConfigDir(getConfigDir()), opts);
+				showExecution(
+					target,
+					FlowQueryService.forConfigDir(
+						getConfigDir(),
+						undefined,
+						createRegistryProjectLookup(defaultRegistryDir(process.env))
+					),
+					opts
+				);
 				return;
 			}
 			console.error(

@@ -6,6 +6,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { RegisteredProjectFixture } from '../../test-utils/RegisteredProjectFixture';
 import { registerShowCommand } from './ShowCommand';
 
 const FIXTURES_DIR = path.resolve(__dirname, '../../test-utils/fixtures');
@@ -299,5 +301,48 @@ describe('ShowCommand: flow version of a file', () => {
 		fs.writeFileSync(file, flowText(undefined));
 
 		expect(show()).toMatch(/warning: Flow 'shown' has no version/);
+	});
+});
+
+describe('ShowCommand project line', () => {
+	it('names the project of an execution as name (id) from the registry, and flags a removed one', async () => {
+		const fixture = new RegisteredProjectFixture().useAsProcessEnv();
+		const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-show-project-'));
+		try {
+			const alpha = await fixture.register('alpha');
+			fs.mkdirSync(path.join(configDir, 'executions'));
+			for (const [id, projectId] of [
+				['pr000001', alpha.id],
+				['pr000002', 'ffffffff'],
+			] as const) {
+				fs.writeFileSync(
+					path.join(configDir, 'executions', `${id}.json`),
+					JSON.stringify({
+						executionId: id,
+						flowId: 'f',
+						flowFile: 'f.yml',
+						status: 'completed',
+						currentSteps: [],
+						startedAt: '2026-08-16T12:00:00.000Z',
+						completedAt: '2026-08-16T12:00:01.000Z',
+						steps: {},
+						projectId,
+					})
+				);
+			}
+			const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+			for (const id of ['pr000001', 'pr000002']) {
+				const program = new Command();
+				program.exitOverride();
+				registerShowCommand(program, () => configDir);
+				program.parse(['node', 'test', 'show', id]);
+			}
+			const out = log.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+			expect(out).toContain(`Project:   alpha (${alpha.id})`);
+			expect(out).toContain('Project:   ffffffff (removed)');
+		} finally {
+			fs.rmSync(configDir, { recursive: true, force: true });
+			fixture.dispose();
+		}
 	});
 });

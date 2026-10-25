@@ -17,7 +17,7 @@ import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
 import { buildDaemonHealth } from './DaemonHealth';
-import { DaemonIdleShutdown } from './DaemonIdleShutdown.js';
+import { DaemonIdleShutdown, IDLE_WATCHDOG_INTERVAL_MS } from './DaemonIdleShutdown.js';
 import { writeDaemonLog } from './DaemonLog.js';
 import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
@@ -29,16 +29,23 @@ import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { findLiveDaemon } from './LiveDaemonProbe.js';
 import { RelayRegistry } from './RelayRegistry.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
-import { WebSocketServer } from './WebSocketServer';
+import { removeStaleDaemonFiles } from './StaleDaemonFiles.js';
+import { WebSocketServer, WebSocketServerClosedError } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 import { createDaemonCommands } from './createDaemonCommands.js';
-import { publishWorkerPort } from './publishWorkerPort.js';
+import { publishWorkerPort, removeWorkerPort } from './publishWorkerPort.js';
 import { registerAppCoreModules } from './registerAppCoreModules.js';
 import { resolveClaudePath } from './resolveClaudePath.js';
 import { startPeriodicUpdateCheck } from './startPeriodicUpdateCheck.js';
 import { tryResolvePlugins } from './tryResolvePlugins.js';
+
+/**
+ * How long forked workers get to exit after the daemon told them to (and closed their sockets) before being killed.
+ * Longer than the grace WebSocketServer gives its peers, so a worker that merely closes slowly is not killed.
+ */
+const FORKED_WORKER_EXIT_GRACE_MS = 5_000;
 
 /** How often the daemon looks for a step whose worker went quiet. */
 const STALLED_SWEEP_INTERVAL_MS = 60_000;
@@ -59,6 +66,11 @@ export interface StartDaemonOptions {
 	 * daemon, so a second run sent after the first ended raced the idle timer and met a dead server.
 	 */
 	stopWhenIdle?: boolean;
+	/**
+	 * How often an idle-stopping daemon checks, on its own, whether it has nothing left to do (milliseconds). Omitted
+	 * means {@link IDLE_WATCHDOG_INTERVAL_MS}. Ignored when `stopWhenIdle` is false. Tests lower it.
+	 */
+	idleCheckIntervalMs?: number;
 	/**
 	 * The packaged app-module to register with app-core on start. Omitted means the daemon does not
 	 * talk to app-core at all (tests and embedders); the CLI entry always passes it.
@@ -95,6 +107,15 @@ async function startDaemon(
 	options: StartDaemonOptions = {}
 ): Promise<DaemonHandle> {
 	const resolvedDaemonDir = daemonDir ?? flowConfigDir();
+	// Before the lock and any side effect: a zero or NaN interval would silently mean "never check".
+	if (
+		options.idleCheckIntervalMs !== undefined &&
+		!(Number.isFinite(options.idleCheckIntervalMs) && options.idleCheckIntervalMs > 0)
+	) {
+		throw new Error(
+			`idleCheckIntervalMs must be a positive number of milliseconds, got ${String(options.idleCheckIntervalMs)}.`
+		);
+	}
 	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });
 	const release = await ExclusiveFileLock.acquire(path.join(resolvedDaemonDir, 'daemon-start.lock'), {
 		timeoutMs: START_LOCK_TIMEOUT_MS,
@@ -111,6 +132,15 @@ async function startDaemon(
 				);
 				return { port: incumbent.port, stop: () => Promise.resolve() };
 			}
+		}
+		// Under the same lock as the decision to start: what a dead daemon left must not be mistaken for ours.
+		const stale = await removeStaleDaemonFiles(resolvedDaemonDir);
+		if (stale.length > 0) {
+			writeDaemonLog(
+				logsDirOf(resolvedDaemonDir),
+				'info',
+				`Removed ${stale.join(', ')} left in ${resolvedDaemonDir} by a previous daemon that did not clean up`
+			);
 		}
 		return await startOwningDaemon(config, resolvedDaemonDir, options);
 	} finally {
@@ -145,6 +175,8 @@ async function startOwningDaemon(
 	};
 	/** The port workers must dial, known only once the listener has bound. */
 	let workerListenerPort: number | undefined;
+	/** Ends forked workers that ignored the request to exit; set once the fork source exists. */
+	let terminateForkedWorkers: ((graceMs: number) => void) | undefined;
 	/** Held so shutdown can stop it: an unref'd timer still fires while the daemon tears down. */
 	let stalledSweep: ReturnType<typeof setInterval> | undefined;
 	/**
@@ -198,6 +230,13 @@ async function startOwningDaemon(
 				if (updateCheckTimer !== undefined) {
 					clearInterval(updateCheckTimer);
 				}
+				// Every stop path, not only the idle one: a pending debounced stop, the watchdog and the background
+				// work must not outlive the decision to stop (they would run against a torn-down daemon).
+				idleShutdown.dispose();
+				if (stalledSweep !== undefined) {
+					clearInterval(stalledSweep);
+				}
+				runtime?.commandHandler.stopBackgroundWork();
 				// Every stop path releases the worker listener, not only the idle one. An open listener and
 				// connected workers keep the process alive after its command server is gone: an orphan holding a
 				// worker port that the next daemon then has to scan past, until none is left.
@@ -205,6 +244,14 @@ async function startOwningDaemon(
 					runtime.workerRegistry.broadcastToEphemeral({ type: 'done' });
 					runtime.workerRegistry.disconnectExternal();
 					runtime.wsServer.close();
+				}
+				// After the polite request above (done + closed sockets): one that still runs after the grace is wedged.
+				terminateForkedWorkers?.(FORKED_WORKER_EXIT_GRACE_MS);
+				// The file tells workers where to dial; left behind it names a port nobody serves (or, later,
+				// something unrelated). Only removed if it still names OURS: a daemon that replaced this one may
+				// already have published its own.
+				if (workerListenerPort !== undefined) {
+					removeWorkerPort(resolvedDaemonDir, workerListenerPort);
 				}
 				// The hook is synchronous: the flush runs on, and stop() below waits for it. Pushes in flight
 				// also keep the process alive until they settle.
@@ -317,6 +364,11 @@ async function startOwningDaemon(
 						sourceContact.pruneDeadSources();
 					})
 					.catch((err: Error) => {
+						if (err instanceof WebSocketServerClosedError) {
+							// Stopped while still scanning for a port: nothing was bound, nothing to publish.
+							writeDaemonLog(logsDir, 'info', 'Worker listener not bound: the daemon stopped first');
+							return;
+						}
 						process.stderr.write(`[daemon] WebSocket server failed to start: ${String(err)}\n`);
 					});
 				const workerRegistry = new WorkerRegistry();
@@ -331,6 +383,7 @@ async function startOwningDaemon(
 					},
 					maskText: text => daemonSecrets.masks.maskAll(text),
 				});
+				terminateForkedWorkers = graceMs => forkSource.terminateRemaining(graceMs);
 				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir);
 				// Relays are tracked apart from workers because the two roles carry different
 				// credentials and neither may stand in for the other (T-04, T-11).
@@ -408,6 +461,11 @@ async function startOwningDaemon(
 				stalledSweep.unref();
 
 				updateCheckTimer = startPeriodicUpdateCheck(resolvedDaemonDir);
+
+				// Worker messages are not the only moment a daemon can become idle (see IDLE_WATCHDOG_INTERVAL_MS).
+				if (stopWhenIdle) {
+					idleShutdown.startWatchdog(options.idleCheckIntervalMs ?? IDLE_WATCHDOG_INTERVAL_MS);
+				}
 			},
 		},
 	});

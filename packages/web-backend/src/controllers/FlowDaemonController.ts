@@ -73,7 +73,9 @@ export default class FlowDaemonController implements LazyController<typeof FLOW_
 					id: query.id,
 				});
 				return {
-					items: result.items.map(record => toExecutionSummary(stripErrorsForServing(record))),
+					items: result.items.map(record =>
+						toExecutionSummary(stripErrorsForServing(record), this.service.projectLookup)
+					),
 					total: result.total,
 					limit,
 					offset: offset ?? 0,
@@ -92,8 +94,9 @@ export default class FlowDaemonController implements LazyController<typeof FLOW_
 					const text = renderExecutionDetail(resolved, {
 						tail: query.tail ?? DEFAULT_TAIL_CHARS,
 						full: query.full ?? false,
+						...(this.service.projectLookup ? { projectLookup: this.service.projectLookup } : {}),
 					});
-					return toExecutionDetail(resolved, text);
+					return toExecutionDetail(resolved, text, this.service.projectLookup);
 				})
 		);
 

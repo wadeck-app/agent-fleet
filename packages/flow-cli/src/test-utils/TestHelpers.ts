@@ -13,6 +13,7 @@ import type { FlowEventPublisher } from '../events/FlowEventPublisher';
 import type { DaemonResponse, ExecutionState } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { probeShellCapabilities } from '../worker/WorkerLaunch';
+import { processLeakGuard } from './ProcessLeakGuard';
 
 type FlowTestCommands = {
 	run: (payload: unknown) => Promise<DaemonResponse>;
@@ -85,6 +86,8 @@ async function removeDaemonDirectory(daemonDir: string, quietMs: number): Promis
 }
 
 export async function startTestDaemon(options: TestDaemonOptions = {}): Promise<TestDaemonContext> {
+	// The daemon forks real workers: the file fails if one outlives its teardown.
+	processLeakGuard.arm();
 	const daemonDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-e2e-'));
 	const stopWhenIdle = options.stopWhenIdle ?? false;
 	let handle: DaemonHandle;

@@ -1,11 +1,10 @@
 import type { ApprovalProvider, WorkspaceProvider } from 'extension-points';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 import { flowConfigDir } from '../config/FlowConfigDir.js';
+import { launchProjectConfigPath } from '../config/LaunchProjectConfig.js';
 import { PluginResolver } from '../config/PluginResolver.js';
-import { ProjectResolverFactory } from '../config/ProjectResolverFactory.js';
 import { declaresPlugins } from './declaresPlugins.js';
 import { parseFlowConfigFile } from './parseFlowConfigFile.js';
 
@@ -58,23 +57,10 @@ export async function tryResolvePlugins(): Promise<{
 	const globalConfigPath = path.join(flowConfigDir(), 'config.yml');
 	const envOverride = process.env['FLOW_CONFIG'];
 
-	// The daemon is a per-user machine-wide singleton, so it has no single project.
-	// Resolve the project from the launching cwd instead of reading `<cwd>/.flow/`
-	// literally; absence is not an error here because a global config alone is enough.
-	let projectConfigPath: string | null = null;
-	try {
-		const resolution = ProjectResolverFactory.create().tryResolve(process.cwd());
-		// null: no project at the launch directory -- global config still applies.
-		if (resolution !== null) {
-			projectConfigPath = path.join(resolution.projectRoot, '.flow', 'config.yml');
-		}
-	} catch (err) {
-		// Not absorbed: the launch directory is arbitrary (Q#22), so refusing to start would
-		// punish an unrelated project, but the project config it hides must not vanish unseen.
-		process.stderr.write(
-			`[daemon] Project plugin config at the launch directory not loaded: ${getErrorMessage(err)}\n`
-		);
-	}
+	// The daemon is a per-user machine-wide singleton, so it has no single project. The project config of its launch
+	// directory (registered project only) still applies; a launch directory in no project means the global config alone,
+	// reported on stderr, and an unregistered folder whose config declares plugins is an explicit error.
+	const projectConfigPath = launchProjectConfigPath(process.cwd());
 
 	if (
 		!envOverride &&

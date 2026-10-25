@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
@@ -46,6 +47,10 @@ steps:
 
 describe.skipIf(!workerRunnable)('EndToEnd (requires built worker)', () => {
 	it('runs a simple script flow via daemon', async () => {
+		// The in-process daemon resolves the project of the run from this process's registry.
+		const registry = new RegisteredProjectFixture().useAsProcessEnv();
+		const projectFolder = registry.makeFolder('e2e-echo');
+		await registry.register('e2e-echo', { folder: projectFolder });
 		const flowYml = path.join(os.tmpdir(), `e2e-test-flow-${Date.now()}.yml`);
 		fs.writeFileSync(flowYml, SIMPLE_SCRIPT_FLOW, 'utf8');
 
@@ -55,7 +60,7 @@ describe.skipIf(!workerRunnable)('EndToEnd (requires built worker)', () => {
 			const response = await ctx.client.send('run', {
 				type: 'run',
 				flowFile: flowYml,
-				cwd: os.tmpdir(),
+				cwd: projectFolder,
 				inputs: {},
 			});
 
@@ -68,6 +73,7 @@ describe.skipIf(!workerRunnable)('EndToEnd (requires built worker)', () => {
 			expect(finalState.steps['echo-step']?.status).toBe('completed');
 		} finally {
 			fs.rmSync(flowYml, { force: true });
+			registry.dispose();
 		}
 	}, 35000);
 });

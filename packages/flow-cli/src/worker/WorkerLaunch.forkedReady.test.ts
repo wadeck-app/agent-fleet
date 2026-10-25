@@ -2,7 +2,11 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol.js';
+import {
+	WORKER_FEATURE_PROJECT_ID,
+	WORKER_FEATURE_SECRETS,
+	WORKER_FEATURE_SUB_STEP_SESSION_RESUME,
+} from '../ipc/Protocol.js';
 import { buildForkedWorkerReady } from './WorkerLaunch.js';
 
 vi.mock('node:fs');
@@ -43,7 +47,11 @@ describe('buildForkedWorkerReady', () => {
 
 		const ready = buildForkedWorkerReady({}, 1);
 
-		expect(ready.features).toEqual([WORKER_FEATURE_SUB_STEP_SESSION_RESUME, WORKER_FEATURE_SECRETS]);
+		expect(ready.features).toEqual([
+			WORKER_FEATURE_SUB_STEP_SESSION_RESUME,
+			WORKER_FEATURE_SECRETS,
+			WORKER_FEATURE_PROJECT_ID,
+		]);
 		expect(ready.shellCapabilities).toEqual([]);
 	});
 });

@@ -1,5 +1,10 @@
 import { ConfigDir } from '@wadeck-app/shared-cli';
-import { BUILTIN_PLUGIN_CATALOG, FLOW_CONFIG_DIR_NAME, FlowQueryService } from 'flow-core';
+import {
+	BUILTIN_PLUGIN_CATALOG,
+	FLOW_CONFIG_DIR_NAME,
+	FlowQueryService,
+	createRegistryProjectLookupFromEnv,
+} from 'flow-core';
 import { FlowRegistry } from 'flow-engine';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -263,7 +268,8 @@ export class DataStoreFactory {
 		if (!this.flowQueryService) {
 			this.flowQueryService = FlowQueryService.forConfigDir(
 				ConfigDir.get(FLOW_CONFIG_DIR_NAME),
-				BUILTIN_PLUGIN_CATALOG
+				BUILTIN_PLUGIN_CATALOG,
+				createRegistryProjectLookupFromEnv(process.env)
 			);
 		}
 		return this.flowQueryService;

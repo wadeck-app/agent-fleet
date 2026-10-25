@@ -111,3 +111,19 @@ Status: proposal, no code written. flow is the last CLI with its own project log
 - Phase 3 (optional, owner decision): per-project execution dirs, parent-chain inheritance of `plugins`, extension point deletion.
 
 Not partial-by-accident: phase 1 leaves `.flow/config.yml` read from `<project path>/.flow/`; that is intentional and stated in the release note.
+
+## Decisions taken (phase 1 implementation, 2026-10-25)
+
+Open questions took their recommended default: Q1 no legacy fallback; Q2 executions stay global; Q3 runs outside a project (file path included) refused; Q4 plugins `local` (phase 2); Q5 extension point deprecated now, deleted later; Q6 legacy-layout detector dropped; Q7 `flow worker --project` takes refs only; Q8 no `-p` conflict (checked).
+
+Choices made while implementing:
+
+- SDK `2026.10.25-010` (latest) lacks `extractProjectOption`/`resolveProjectFromArgs` and `findProjectIncludingDeleted` (unpublished in the project repo). Flags are plain commander `-p, --project <ref>` options; soft-delete lookup is hand-rolled (`loadRegistry` + `loadDeleted`) in flow-core `ProjectLabel.ts`. Follow-up: swap both once published.
+- `-p` only on commands that use a project: `run`, `versions`, `history` (filter, flag/`FLOW_PROJECT` only, never the cwd), `worker`. `show`, `validate`, `logs` take none (a no-op flag would be silent).
+- `versions` with no named project and an unregistered cwd lists snapshots only and prints why on stderr; a named project that fails is an error.
+- Run cwd: the client's cwd when inside the project, else the project folder (workspace, secrets, context cwd).
+- Client sends `registryDir`; the daemon refuses with both paths when it differs (`PROJECT_REGISTRY_MISMATCH`). Error code stays `PROJECT_RESOLUTION_FAILED`, with `detail` = resolver code.
+- Daemon launch cwd plugin config: read only if that folder is a registered project; an unregistered folder whose `.flow/config.yml` declares `plugins:` is an explicit startup error.
+- Workers: attach by `attachedProjectIds` (+ feature `project-id`); `attachedProjects` paths kept for display only. An external worker without the feature is refused (daemon log says `flow cli update`; the old worker only sees a closed connection). Own project = `FLOW_PROJECT` > cwd; skipped only when other projects are named. Registry id is what the self-declaration stores.
+- Test safety net: flow-cli vitest sets a throwaway `XDG_CONFIG_HOME` per file; fixtures use `RegisteredProjectFixture`.
+- `project-resolution` extension point: `@deprecated`, json description says so; no status change (schema has no `deprecated`).

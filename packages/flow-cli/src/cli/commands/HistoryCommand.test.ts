@@ -4,6 +4,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { RegisteredProjectFixture } from '../../test-utils/RegisteredProjectFixture';
 import { registerHistoryCommand } from './HistoryCommand';
 
 // Filtering, pagination and rendering are covered in flow-core (history/*.test.ts); this file only
@@ -144,5 +146,107 @@ describe('flow history command', () => {
 		} finally {
 			fs.rmSync(empty, { recursive: true, force: true });
 		}
+	});
+});
+
+describe('flow history command and projects', () => {
+	let configDir: string;
+	let fixture: RegisteredProjectFixture;
+	let alphaId: string;
+	let betaId: string;
+	let logSpy: ReturnType<typeof vi.spyOn>;
+	let errorSpy: ReturnType<typeof vi.spyOn>;
+	let writeSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(async () => {
+		fixture = new RegisteredProjectFixture().useAsProcessEnv();
+		alphaId = (await fixture.register('alpha', { aliases: ['al'] })).id;
+		betaId = (await fixture.register('beta')).id;
+		configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-history-project-'));
+		fs.mkdirSync(path.join(configDir, 'executions'));
+		const records: Record<string, unknown>[] = [
+			{ ...exec('aaa11111', 'flow-a', 'completed', '2026-08-16T10:00:00.000Z'), projectId: alphaId },
+			{ ...exec('bbb22222', 'flow-a', 'completed', '2026-08-16T11:00:00.000Z'), projectId: betaId },
+			{ ...exec('old33333', 'flow-a', 'completed', '2026-08-16T12:00:00.000Z'), projectRoot: '/old/root' },
+		];
+		for (const record of records) {
+			fs.writeFileSync(
+				path.join(configDir, 'executions', `${String(record['executionId'])}.json`),
+				JSON.stringify(record)
+			);
+		}
+		logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+		vi.spyOn(process, 'exit').mockImplementation(() => {
+			throw new Error('exit');
+		});
+	});
+
+	afterEach(() => {
+		fs.rmSync(configDir, { recursive: true, force: true });
+		fixture.dispose();
+	});
+
+	const run = (...args: string[]): void => {
+		const program = new Command();
+		program.exitOverride();
+		registerHistoryCommand(program, () => configDir);
+		program.parse(['node', 'test', 'history', ...args]);
+	};
+	const printed = (): string => logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+	const errors = (): string => errorSpy.mock.calls.flat().join(' ');
+
+	it('-p filters on the project given by name, alias or id', () => {
+		for (const ref of ['alpha', 'al', alphaId]) {
+			logSpy.mockClear();
+			run('-p', ref);
+			expect(printed()).toContain('aaa11111');
+			expect(printed()).not.toContain('bbb22222');
+			expect(printed()).not.toContain('old33333');
+		}
+	});
+
+	it('FLOW_PROJECT filters like --project, and the flag wins over it', () => {
+		process.env['FLOW_PROJECT'] = 'beta';
+		run();
+		expect(printed()).toContain('bbb22222');
+		expect(printed()).not.toContain('aaa11111');
+		logSpy.mockClear();
+		run('--project', 'alpha');
+		expect(printed()).toContain('aaa11111');
+		expect(printed()).not.toContain('bbb22222');
+	});
+
+	it('does not filter by the cwd: without flag or variable every execution is listed', () => {
+		run();
+		expect(printed()).toContain('aaa11111');
+		expect(printed()).toContain('bbb22222');
+		expect(printed()).toContain('old33333');
+	});
+
+	it('exits 1 naming the flag and the value for a project that is not registered', () => {
+		expect(() => run('-p', 'nope')).toThrow('exit');
+		expect(errors()).toContain('--project "nope":');
+	});
+
+	it('names FLOW_PROJECT when the variable is the one that does not resolve', () => {
+		process.env['FLOW_PROJECT'] = 'nope';
+		expect(() => run()).toThrow('exit');
+		expect(errors()).toContain('FLOW_PROJECT="nope":');
+	});
+
+	it('--id shows the project as name (id), and the bare root with a dash for an old record', () => {
+		run('--id', 'aaa');
+		expect(printed()).toContain(`Project:   alpha (${alphaId})`);
+		logSpy.mockClear();
+		run('--id', 'old');
+		expect(printed()).toContain('Project:   /old/root (-)');
+	});
+
+	it('--json prints projectId in the raw record', () => {
+		run('--json', '-p', 'alpha');
+		const records = JSON.parse(String(writeSpy.mock.calls[0]![0])) as Record<string, unknown>[];
+		expect(records).toEqual([expect.objectContaining({ executionId: 'aaa11111', projectId: alphaId })]);
 	});
 });

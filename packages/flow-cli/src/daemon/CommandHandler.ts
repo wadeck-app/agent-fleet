@@ -22,6 +22,7 @@ import { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
 import { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
 import { ReadyStepQueue } from './ReadyStepQueue.js';
 import { RunDefinitionLoader } from './RunDefinitionLoader.js';
+import type { RunProject } from './RunProjectResolver.js';
 import { RunRequestHandler } from './RunRequestHandler.js';
 import { RunStepPreparer } from './RunStepPreparer.js';
 import { StepDispatcher } from './StepDispatcher.js';
@@ -267,7 +268,8 @@ export class CommandHandler {
 
 	async handleRun(
 		cmd: Extract<ClientCommand, { type: 'run' }>,
-		hookDispatcher?: HookDispatcher
+		hookDispatcher?: HookDispatcher,
+		resolvedProject?: RunProject
 	): Promise<DaemonResponse> {
 		if (this.draining) {
 			return {
@@ -278,7 +280,7 @@ export class CommandHandler {
 					'Retry once the update has been applied, or cancel the drain with: flow cli update --cancel-drain',
 			};
 		}
-		return this.runRequests.handleRun(cmd, hookDispatcher);
+		return this.runRequests.handleRun(cmd, hookDispatcher, resolvedProject);
 	}
 
 	/** See {@link WorkerAssignmentSupervisor.verifyAssignment}. */

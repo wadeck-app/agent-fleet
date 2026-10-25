@@ -24,9 +24,11 @@ export interface StepPlacement {
 	/** True for a step that needs a human at a terminal, i.e. `user_intervention` (D#60). */
 	requiresUserInterface: boolean;
 	/**
-	 * Project this step's execution belongs to, or undefined when the run could not be
-	 * attributed to one (D#10) -- a `flow run` from outside any project.
+	 * Registry id of the project this step's execution belongs to (what workers attach to). Every run started by this
+	 * flow-cli belongs to a registered project; undefined only for an execution the daemon cannot attribute.
 	 */
+	projectId?: string;
+	/** Folder of that project when the run started (informational: matching is by `projectId`). */
 	projectRoot?: string;
 	/**
 	 * Interpreter a `type: script` step declared via its `shell:` field, or undefined when
@@ -41,7 +43,9 @@ export interface WorkerCandidate {
 	workerId: string;
 	/** Routing labels the worker advertises. */
 	labels: string[];
-	/** Projects this worker serves. Attachment beyond its launch directory is opt-in (D#9). */
+	/** Registry ids of the projects this worker serves. Attachment beyond its own project is opt-in (D#9). */
+	attachedProjectIds: string[];
+	/** Folders of those projects as the worker reported them (informational: routing uses `attachedProjectIds`). */
 	attachedProjects: string[];
 	/** Whether a human can interact with it. The worker alone decides this (D#33, D#36). */
 	hasUserInterface: boolean;

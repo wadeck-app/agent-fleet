@@ -2,12 +2,13 @@ import { Command } from 'commander';
 import { DefinitionSnapshotStore, hashDefinition } from 'flow-core';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { RegisteredProjectFixture } from '../../test-utils/RegisteredProjectFixture';
 import { registerVersionsCommand } from './VersionsCommand';
 
 describe('VersionsCommand', () => {
+	let fixture: RegisteredProjectFixture;
 	let root: string;
 	let configDir: string;
 	let logged: string[];
@@ -23,22 +24,23 @@ describe('VersionsCommand', () => {
 			text: yaml.dump(definition),
 		});
 	};
+	let cwd: string | undefined;
 	const run = (...args: string[]): void => {
 		const program = new Command();
 		program.exitOverride();
 		registerVersionsCommand(
 			program,
 			() => configDir,
-			() => root
+			() => cwd ?? root
 		);
 		program.parse(['node', 'test', 'versions', ...args]);
 	};
 
-	beforeEach(() => {
-		root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'versions-cmd-')));
-		configDir = path.join(root, 'config');
+	beforeEach(async () => {
+		fixture = new RegisteredProjectFixture().useAsProcessEnv();
+		root = (await fixture.register('versions-project')).folder!;
+		configDir = path.join(fixture.root, 'config');
 		fs.mkdirSync(path.join(root, '.flow'));
-		fs.writeFileSync(path.join(root, '.flow', 'config.yml'), '');
 		logged = [];
 		errored = [];
 		vi.spyOn(console, 'log').mockImplementation((...parts: unknown[]) => void logged.push(parts.join(' ')));
@@ -49,7 +51,7 @@ describe('VersionsCommand', () => {
 	});
 	afterEach(() => {
 		vi.restoreAllMocks();
-		fs.rmSync(root, { recursive: true, force: true });
+		fixture.dispose();
 	});
 
 	it('lists the snapshotted versions and the registry version that never ran', () => {
@@ -83,5 +85,48 @@ describe('VersionsCommand', () => {
 		expect(() => run('../escape')).toThrow('exit');
 
 		expect(errored.join('\n')).toContain('cannot be versioned');
+	});
+
+	it('reads the registry of the project named with --project, whatever the working directory', async () => {
+		const other = await fixture.register('other');
+		fs.mkdirSync(path.join(other.folder!, '.flow'));
+		fs.writeFileSync(
+			path.join(other.folder!, '.flow', 'flows.yml'),
+			yaml.dump({ listed: entry('2.0.0', 'other') })
+		);
+		cwd = fixture.makeFolder('elsewhere');
+
+		run('listed', '--project', 'other');
+
+		expect(logged.join('\n')).toMatch(/2\.0\.0 \*.*registry \(not run yet\)/);
+	});
+
+	it('follows FLOW_PROJECT like --project', async () => {
+		const other = await fixture.register('other');
+		fs.mkdirSync(path.join(other.folder!, '.flow'));
+		fs.writeFileSync(path.join(other.folder!, '.flow', 'flows.yml'), yaml.dump({ listed: entry('3.0.0', 'env') }));
+		cwd = fixture.makeFolder('elsewhere');
+		vi.stubEnv('FLOW_PROJECT', 'other');
+
+		run('listed');
+
+		expect(logged.join('\n')).toMatch(/3\.0\.0 \*.*registry \(not run yet\)/);
+	});
+
+	it('refuses a project reference that does not resolve, naming the flag', () => {
+		expect(() => run('listed', '-p', 'nope')).toThrow('exit');
+
+		expect(errored.join('\n')).toContain('--project "nope"');
+	});
+
+	it('lists the snapshots alone, and says why the registry is skipped, when the working directory is in no project', () => {
+		snapshot('1.0.0');
+		cwd = fixture.makeFolder('unregistered');
+
+		run('listed');
+
+		expect(logged.join('\n')).toMatch(/1\.0\.0 \*\s+[0-9a-f]{12}.*snapshot/);
+		expect(errored.join('\n')).toContain('registry of the project was not read');
+		expect(errored.join('\n')).toContain(`project add "${cwd}"`);
 	});
 });

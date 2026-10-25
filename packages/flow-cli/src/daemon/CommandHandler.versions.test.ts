@@ -5,6 +5,7 @@ import * as path from 'node:path';
 
 import type { ExecutionState } from '../ipc/Protocol';
 import { CommandHandler } from './CommandHandler';
+import { registerFolderAsProject } from './CommandHandlerTestHarness';
 
 const { mockAllocate } = vi.hoisted(() => ({
 	mockAllocate: vi.fn(),
@@ -33,6 +34,7 @@ function flowBody(version: string | undefined, script = 'echo hi'): Record<strin
 
 describe('CommandHandler flow versions', () => {
 	let tmpDir: string;
+	let disposeProject: () => void;
 	let daemonDir: string;
 	let flowFile: string;
 	let registryFile: string;
@@ -79,9 +81,10 @@ describe('CommandHandler flow versions', () => {
 	const snapshotText = (record: ExecutionState): string =>
 		fs.readFileSync(path.join(daemonDir, 'definitions', ...record.definitionSnapshot!.split('/')), 'utf8');
 
-	beforeEach(() => {
+	beforeEach(async () => {
 		tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-versions-')));
 		daemonDir = path.join(tmpDir, 'daemon');
+		({ dispose: disposeProject } = await registerFolderAsProject(tmpDir));
 		fs.mkdirSync(path.join(daemonDir, 'executions'), { recursive: true });
 		fs.mkdirSync(path.join(daemonDir, 'logs'), { recursive: true });
 		flowFile = path.join(tmpDir, 'flow.yml');
@@ -96,6 +99,7 @@ describe('CommandHandler flow versions', () => {
 	});
 
 	afterEach(() => {
+		disposeProject();
 		for (const handler of handlers) {
 			handler.stopBackgroundWork();
 		}
@@ -246,6 +250,7 @@ No decision was made -- this step is unanswered, not denied.`;
 							pid: 1,
 							labels: [],
 							attachedProjects: [],
+							attachedProjectIds: [],
 							hasUserInterface: true,
 							ephemeral: true,
 							shellCapabilities: [],

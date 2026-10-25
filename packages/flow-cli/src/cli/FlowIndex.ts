@@ -19,6 +19,7 @@ import { Daemon } from '../daemon/Daemon.js';
 import { writeDaemonLog } from '../daemon/DaemonLog.js';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
 import { resolveDaemonPort } from '../daemon/resolveDaemonPort.js';
+import { resolveIdleCheckInterval } from '../daemon/resolveIdleCheckInterval.js';
 import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
 import { describeCommandLine } from './CommandLineLog';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
@@ -56,8 +57,10 @@ Status --json fields (flow status --json):
 
 Environment variables:
   XDG_CONFIG_HOME   Override base config directory (default: ~/.config)
+  FLOW_PROJECT      Project (name, alias or id) used when -p/--project is not given; default: the registered project containing the cwd (see: project add)
   FLOW_DAEMON_MODE  Internal - set to "1" by "flow start" to launch daemon mode
   FLOW_DAEMON_PORT  Daemon command port, 0 to let the OS pick one (default: standard range 47823-47833)
+  FLOW_DAEMON_IDLE_CHECK_MS  Internal - how often the daemon checks whether it is idle and can stop (default: 30000)
 
 Daemon-required commands: run, start, stop, status
 Standalone commands:      show, validate, history, versions, docs, logs, cli`;
@@ -231,6 +234,7 @@ async function main(): Promise<void> {
 			writeDaemonLog(logsDirOf(DAEMON_DIR), level, message)
 		);
 		const port = resolveDaemonPort(process.env);
+		const idleCheckIntervalMs = resolveIdleCheckInterval(process.env);
 		await Daemon.start(config, DAEMON_DIR, {
 			// Started by `flow run` / `flow start` because none answered: if one answers by now (concurrent runs each
 			// start one), it stays, with its executions.
@@ -238,6 +242,7 @@ async function main(): Promise<void> {
 			appCoreModules,
 			eventPublisher,
 			...(port === undefined ? {} : { port }),
+			...(idleCheckIntervalMs === undefined ? {} : { idleCheckIntervalMs }),
 		});
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).
 		return;

@@ -1,7 +1,12 @@
 // violations-suppress: ts/no-barrel-index app-core requires the backend entry of an app-module to be src/backend/index.ts (app-core-cli check)
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
-import { BUILTIN_PLUGIN_CATALOG, FLOW_CONFIG_DIR_NAME, FlowQueryService } from 'flow-core';
+import {
+	BUILTIN_PLUGIN_CATALOG,
+	FLOW_CONFIG_DIR_NAME,
+	FlowQueryService,
+	createRegistryProjectLookupFromEnv,
+} from 'flow-core';
 
 import { registerExecutionLogRoutes } from './ExecutionLogRoutes.js';
 import { registerExecutionRoutes } from './ExecutionRoutes.js';
@@ -17,7 +22,12 @@ import { registerWorkerRoutes } from './WorkerRoutes.js';
  */
 export default function (ctx: ModuleContext): void {
 	// Same location as the flow CLI and daemon (ConfigDir.get(FLOW_CONFIG_DIR_NAME), XDG_CONFIG_HOME honoured), resolved once.
-	const service = FlowQueryService.forConfigDir(ConfigDir.get(FLOW_CONFIG_DIR_NAME), BUILTIN_PLUGIN_CATALOG);
+	// Project names come from the shared project registry (XDG_CONFIG_HOME of this process), read on every request.
+	const service = FlowQueryService.forConfigDir(
+		ConfigDir.get(FLOW_CONFIG_DIR_NAME),
+		BUILTIN_PLUGIN_CATALOG,
+		createRegistryProjectLookupFromEnv(process.env)
+	);
 
 	registerExecutionRoutes(ctx, service);
 	registerExecutionLogRoutes(ctx, service);

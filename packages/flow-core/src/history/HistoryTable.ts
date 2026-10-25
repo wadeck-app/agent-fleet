@@ -1,5 +1,6 @@
 import { versionColumnOf, versionDetailLineOf } from '../definitions/RecordedVersion.js';
 import type { ExecutionState } from '../execution/ExecutionState.js';
+import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { type ExecutionFilterOptions, filterExecutions } from './ExecutionFilter.js';
 import { formatDuration, formatModelCost, formatStarted, padTruncate } from './ExecutionFormat.js';
 
@@ -11,10 +12,14 @@ function indentBlock(text: string): string {
 }
 
 /** Step-by-step view of one execution (the `flow history --id` output). */
-export function renderDetailView(exec: ExecutionState): string {
+export function renderDetailView(exec: ExecutionState, projectLookup?: ProjectLookup): string {
 	const lines: string[] = [];
 	lines.push(`Execution: ${exec.executionId}`);
 	lines.push(`Flow:      ${exec.flowId}`);
+	const projectLabel = projectLabelOf(exec, projectLookup);
+	if (projectLabel !== undefined) {
+		lines.push(`Project:   ${projectLabel}`);
+	}
 	lines.push(`Version:   ${versionDetailLineOf(exec)}`);
 	lines.push(`File:      ${exec.flowFile}`);
 	lines.push(`Status:    ${exec.status}`);
@@ -86,7 +91,11 @@ export function renderDetailView(exec: ExecutionState): string {
 }
 
 /** The text `flow history` prints: a paginated table, or the detail view when `opts.id` is set. */
-export function buildHistoryTable(execs: ExecutionState[], opts: ExecutionFilterOptions): string {
+export function buildHistoryTable(
+	execs: ExecutionState[],
+	opts: ExecutionFilterOptions,
+	projectLookup?: ProjectLookup
+): string {
 	const { items, total } = filterExecutions(execs, opts);
 
 	if (opts.id) {
@@ -97,7 +106,7 @@ export function buildHistoryTable(execs: ExecutionState[], opts: ExecutionFilter
 		if (!exec) {
 			return `Execution '${opts.id}' not found.`;
 		}
-		return renderDetailView(exec);
+		return renderDetailView(exec, projectLookup);
 	}
 
 	const limit = opts.limit ?? 20;

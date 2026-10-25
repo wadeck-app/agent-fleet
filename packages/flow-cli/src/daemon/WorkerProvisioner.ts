@@ -1,6 +1,7 @@
 import type { AuthenticationProvider, ProvisioningDecision, ProvisioningProvider } from 'extension-points';
 import type { WebSocket } from 'ws';
 
+import { WORKER_FEATURE_PROJECT_ID } from '../ipc/Protocol';
 import type { WorkerReady } from '../ipc/Protocol';
 import { DefaultProvisioning } from './DefaultProvisioning.js';
 import type { ForkWorkerSource } from './ForkWorkerSource.js';
@@ -143,6 +144,18 @@ export class WorkerProvisioner {
 		});
 		if (!auth.ok) {
 			return this.refuse(ws, `refused a ${describeWorker}: ${auth.reason}`);
+		}
+
+		// Steps are routed to workers by project id. A worker that does not declare it attached itself by folder
+		// paths: it would connect, look healthy in `flow worker list`, and never be given a step. The daemon cannot
+		// tell it so over the protocol it speaks, hence the instruction in the daemon log.
+		if (registration.features?.includes(WORKER_FEATURE_PROJECT_ID) !== true) {
+			return this.refuse(
+				ws,
+				`refused a ${describeWorker} (pid ${String(registration.pid)}, flow-cli ${registration.version ?? 'unknown version'}): ` +
+					'it attaches to projects by folder path, and this daemon routes steps by project id. ' +
+					'Update flow-cli on that worker (flow cli update) and restart it.'
+			);
 		}
 
 		// A worker naming no source is the zero-config path: `flow worker` in a terminal,

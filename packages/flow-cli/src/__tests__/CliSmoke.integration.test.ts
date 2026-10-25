@@ -13,6 +13,7 @@
  * are used: `--help` alone imports the whole command graph, which is where a resolution or
  * module-level error surfaces.
  */
+import { addProject, defaultRegistryDir } from '@wadeck-app/project-sdk';
 import { readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { OWN_PROCESS_GROUP, killProcessTree, removeTempDirectory } from 'flow-core/testing';
 import { type ChildProcess, type SpawnSyncReturns, spawn, spawnSync } from 'node:child_process';
@@ -23,7 +24,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
+import { processLeakGuard } from '../test-utils/ProcessLeakGuard';
 import { pollUntil } from '../test-utils/WaitHelpers';
+
+// Every CLI/daemon process this file starts must be gone when it ends (see ProcessLeakGuard).
+processLeakGuard.arm();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const flowBin = resolve(__dirname, '..', '..', 'bin', 'flow.js');
@@ -60,10 +65,10 @@ function runFlow(args: string[]): { output: string; status: number | null } {
 			encoding: 'utf8',
 			timeout: 60_000,
 			env,
-		// Deliberately not the package directory, which is where the test runner happens to
-		// sit. Module resolution turned out to depend on the working directory: the same
-		// command that worked from `packages/flow-cli` died from the repo root. Since a user
-		// runs `flow` from their own project, anywhere but here is the honest cwd -- and it is
+			// Deliberately not the package directory, which is where the test runner happens to
+			// sit. Module resolution turned out to depend on the working directory: the same
+			// command that worked from `packages/flow-cli` died from the repo root. Since a user
+			// runs `flow` from their own project, anywhere but here is the honest cwd -- and it is
 			// the only reason this test can see the failure at all.
 			cwd: tmpdir(),
 		});
@@ -88,6 +93,8 @@ describe('flow CLI starts', { timeout: 60_000 }, () => {
 
 		expectStarted(output);
 		expect(output).toContain('flow');
+		// The environment variables list, not the per-command option descriptions that already mention it.
+		expect(output).toMatch(/^ {2}FLOW_PROJECT {2,}\S/m);
 		expect(status).toBe(0);
 	});
 
@@ -231,10 +238,17 @@ describe('the standalone bundle in daemon mode', () => {
 		}
 
 		const installDir = mkdtempSync(join(tmpdir(), 'flow-bundle-daemon-install-'));
+		// A daemon or worker of this directory that outlives the test fails the file (and is killed).
+		processLeakGuard.watch(installDir);
 		const projectDir = mkdtempSync(join(tmpdir(), 'flow-bundle-daemon-project-'));
 		const configHome = mkdtempSync(join(tmpdir(), 'flow-bundle-daemon-config-'));
 		mkdirSync(join(projectDir, '.flow'), { recursive: true });
 		writeFileSync(join(projectDir, '.flow', 'config.yml'), PROJECT_CONFIG_YAML, 'utf8');
+		// A project is what the registry says: the daemon (XDG_CONFIG_HOME = configHome) only loads this config for a registered folder.
+		await addProject(defaultRegistryDir({ XDG_CONFIG_HOME: configHome }), {
+			name: 'bundle-daemon-project',
+			path: projectDir,
+		});
 
 		const daemon = spawnBundledDaemon(installBundle(installDir), projectDir, configHome);
 		try {

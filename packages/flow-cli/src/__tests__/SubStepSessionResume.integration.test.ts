@@ -10,13 +10,14 @@
 import { createTempDirectory } from 'flow-core/testing';
 import { StepRunner } from 'flow-engine';
 import type { LaunchOptions, ModelProvider } from 'flow-engine/processing/ModelProvider';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
-import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
+import { WORKER_FEATURE_PROJECT_ID, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { DaemonToWorker, ExecutionState, WorkerToDaemon } from '../ipc/Protocol';
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
 import { waitUntil } from '../test-utils/WaitHelpers';
 import { WorkerAdapter } from '../worker/WorkerAdapter';
@@ -46,12 +47,15 @@ steps:
 
 let ctx: TestDaemonContext;
 let projectRoot: string;
+let projectId: string;
+let registry: RegisteredProjectFixture;
 let socket: WebSocket | undefined;
 
 beforeEach(async () => {
+	// The daemon resolves the project of each run from the registry in this process's environment.
+	registry = new RegisteredProjectFixture().useAsProcessEnv();
 	projectRoot = createTempDirectory('substep-resume-project-');
-	mkdirSync(join(projectRoot, '.flow'), { recursive: true });
-	writeFileSync(join(projectRoot, '.flow', 'config.yml'), 'version: 1\n', 'utf8');
+	projectId = (await registry.register('substep-resume', { folder: projectRoot })).id;
 	writeFileSync(join(projectRoot, 'flow.yml'), FLOW_YAML, 'utf8');
 	ctx = await startTestDaemon({ concurrency: 0 });
 	await waitUntil(() => existsSync(join(ctx.daemonDir, 'config.port')), {
@@ -64,6 +68,7 @@ afterEach(async () => {
 	socket?.close();
 	socket = undefined;
 	await ctx[Symbol.asyncDispose]();
+	registry.dispose();
 });
 
 interface Scenario {
@@ -108,9 +113,12 @@ async function connectWorker(declareFeatures: boolean): Promise<Scenario> {
 		type: 'ready',
 		pid: 992_001,
 		authToken: token,
+		attachedProjectIds: [projectId],
 		attachedProjects: [projectRoot],
 		hasUserInterface: false,
-		...(declareFeatures ? { features: [WORKER_FEATURE_SUB_STEP_SESSION_RESUME] } : {}),
+		features: declareFeatures
+			? [WORKER_FEATURE_PROJECT_ID, WORKER_FEATURE_SUB_STEP_SESSION_RESUME]
+			: [WORKER_FEATURE_PROJECT_ID],
 	};
 	const send = (message: object): void => ws.send(JSON.stringify(message));
 	let verifyRuns = 0;

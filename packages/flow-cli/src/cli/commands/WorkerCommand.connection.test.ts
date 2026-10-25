@@ -25,12 +25,8 @@ vi.mock('../../config/FlowConfig', () => ({
 	},
 }));
 
-vi.mock('../../config/DefaultProjectResolver', () => ({
-	DefaultProjectResolver: class {
-		resolve(): { projectRoot: string } {
-			return { projectRoot: '/fake/project' };
-		}
-	},
+vi.mock('../../worker/WorkerProjects', () => ({
+	resolveWorkerProjects: () => [{ id: 'fake0001', name: 'fake', path: '/fake/project' }],
 }));
 
 vi.mock('../../config/PluginResolver', () => ({
@@ -45,10 +41,11 @@ vi.mock('../../config/PluginResolver', () => ({
 vi.mock('../../worker/WorkerLaunch', () => ({
 	resolveSourceId: () => undefined,
 	resolveWorkerToken: () => 'fake-token',
-	resolveExtraProjects: () => ['/extra/project'],
+	resolveExtraProjects: () => ['extra-project'],
 	buildRegistration: () => ({
 		pid: 1234,
 		labels: ['label-a'],
+		attachedProjectIds: ['fake0001'],
 		attachedProjects: ['/fake/project'],
 		hasUserInterface: hoisted.hasUserInterface,
 		shellCapabilities: [],
@@ -389,7 +386,7 @@ describe('WorkerCommand -- connection, messages and banner (characterization)', 
 		await startWorker(['--interactive']);
 
 		expect(logged()).toContain('labels     : label-a');
-		expect(logged()).toContain('projects   : /fake/project');
+		expect(logged()).toContain('projects   : fake (fake0001)');
 		expect(logged()).toContain('model-step-interactive: true');
 		expect(logged()).toContain('Run with --verbose to also see the raw output each step produces.');
 	});

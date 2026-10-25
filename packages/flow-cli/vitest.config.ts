@@ -26,6 +26,7 @@ function resolveJsToTs(): Plugin {
 const BUNDLING_TESTS = [
 	'src/__tests__/CliSmoke.integration.test.ts',
 	'src/__tests__/DaemonSingleton.integration.test.ts',
+	'src/__tests__/DaemonShutdown.integration.test.ts',
 	'src/cli/FlowIndex.integration.test.ts',
 ];
 
@@ -58,6 +59,11 @@ export default defineConfig({
 				},
 			},
 		],
+		// RegistrySafetyNet: every test file gets a throwaway XDG_CONFIG_HOME, so the project registry (and flow's config
+		// dir) of the real machine is unreachable.
+		// ProcessLeakSetup: fails a file that started a flow daemon/worker/CLI and left it running (see ProcessLeakGuard).
+		// Files that never arm the guard are not affected.
+		setupFiles: ['src/test-utils/RegistrySafetyNet.setup.ts', 'src/test-utils/ProcessLeakSetup.ts'],
 		mockReset: true,
 		restoreMocks: true,
 		// Daemons started by tests register the "flow" module with app-core on every start. Without this they

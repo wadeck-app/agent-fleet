@@ -30,6 +30,9 @@ export interface RegisteredWorker {
 	sourceId?: string;
 	/** Routing labels only -- never an authorization decision (T-07). */
 	labels: string[];
+	/** Registry ids of the projects this worker serves: what steps are routed by. */
+	attachedProjectIds: string[];
+	/** Folders of those projects as the worker reported them, for display. */
 	attachedProjects: string[];
 	hasUserInterface: boolean;
 	/** Shells this worker can actually run -- never an authorization decision, routing only. */
@@ -98,6 +101,7 @@ export class WorkerRegistry {
 			// Documented defaults rather than inference: a worker that claims nothing is
 			// unlabelled, attached to nothing, and headless until it says otherwise.
 			labels: registration.labels ?? [],
+			attachedProjectIds: registration.attachedProjectIds ?? [],
 			attachedProjects: registration.attachedProjects ?? [],
 			hasUserInterface: registration.hasUserInterface ?? false,
 			shellCapabilities: registration.shellCapabilities ?? [],
@@ -118,6 +122,7 @@ export class WorkerRegistry {
 			state: worker.state,
 			...(worker.sourceId !== undefined ? { sourceId: worker.sourceId } : {}),
 			labels: worker.labels,
+			attachedProjectIds: worker.attachedProjectIds,
 			attachedProjects: worker.attachedProjects,
 			hasUserInterface: worker.hasUserInterface,
 			ephemeral: worker.ephemeral,

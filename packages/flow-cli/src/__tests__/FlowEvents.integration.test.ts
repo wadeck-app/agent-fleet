@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { RecordingFlowEventPublisher } from '../test-utils/RecordingFlowEventPublisher';
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
@@ -41,6 +42,8 @@ ${stepScript
 describe('flow lifecycle events (end to end)', () => {
 	let workDir: string;
 	let publisher: RecordingFlowEventPublisher;
+	let registry: RegisteredProjectFixture;
+	let projectId: string;
 
 	beforeAll(() => {
 		if (!fs.existsSync(workerBinary)) {
@@ -50,13 +53,17 @@ describe('flow lifecycle events (end to end)', () => {
 		}
 	});
 
-	beforeEach(() => {
+	beforeEach(async () => {
+		// The in-process daemon resolves the project of each run from this process's registry.
+		registry = new RegisteredProjectFixture().useAsProcessEnv();
 		workDir = createTempDirectory('flow-events-e2e-');
+		projectId = (await registry.register('flow-events-e2e', { folder: workDir })).id;
 		publisher = new RecordingFlowEventPublisher();
 		process.env['FLOW_EVENTS_E2E_TOKEN'] = TOKEN;
 	});
 
 	afterEach(() => {
+		registry.dispose();
 		delete process.env['FLOW_EVENTS_E2E_TOKEN'];
 	});
 
@@ -76,9 +83,6 @@ describe('flow lifecycle events (end to end)', () => {
 
 	it('publishes started and completed events for a successful run, once each, with the project', async () => {
 		if (!requireBashOrSkip('FlowEvents')) return;
-		// A project is recognised by its config, and only a run in a project carries a projectRoot.
-		fs.mkdirSync(path.join(workDir, '.flow'));
-		fs.writeFileSync(path.join(workDir, '.flow', 'config.yml'), '');
 		await using ctx = await startTestDaemon({ eventPublisher: publisher });
 
 		const executionId = await run(ctx, flowYaml('events-ok', 'echo ok', false));
@@ -92,7 +96,7 @@ describe('flow lifecycle events (end to end)', () => {
 			'flow.execution.completed',
 		]);
 		for (const { payload } of publisher.events) {
-			expect(payload).toMatchObject({ executionId, flowId: 'events-ok' });
+			expect(payload).toMatchObject({ executionId, flowId: 'events-ok', projectId });
 			expect(fs.realpathSync(payload.projectRoot!)).toBe(fs.realpathSync(workDir));
 		}
 		expect(publisher.events[2]!.payload).toMatchObject({ stepId: 'only', status: 'completed', attempt: 1 });

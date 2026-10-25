@@ -2,6 +2,7 @@
  * Characterization of the `flow run` action: exit codes, messages and output formats, with the daemon
  * client faked and the flow config directory pointed at a throwaway directory.
  */
+import { defaultRegistryDir } from '@wadeck-app/project-sdk';
 import { Command } from 'commander';
 import { executionsDirOf, logFilePath, todayLogDate } from 'flow-core';
 import * as fs from 'node:fs';
@@ -10,6 +11,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ExecutionStore } from '../../storage/ExecutionStore';
+import { RegisteredProjectFixture } from '../../test-utils/RegisteredProjectFixture';
 import { registerRunCommand } from './RunCommand.js';
 
 const harness = vi.hoisted(() => ({
@@ -44,6 +46,7 @@ beforeEach(() => {
 	flowFile = path.join(tmpDir, 'flow.yml');
 	fs.writeFileSync(flowFile, 'steps:\n  - id: first\n    log: streaming\n  - id: second\n');
 	harness.send.mockReset();
+	vi.stubEnv('FLOW_PROJECT', '');
 	errors = [];
 	logs = [];
 	stdout = [];
@@ -70,6 +73,7 @@ beforeEach(() => {
 afterEach(() => {
 	fs.rmSync(tmpDir, { recursive: true, force: true });
 	vi.restoreAllMocks();
+	vi.unstubAllEnvs();
 });
 
 async function runCli(...args: string[]): Promise<number | undefined> {
@@ -153,8 +157,46 @@ describe('flow run: dispatch', () => {
 			cwd: process.cwd(),
 			mockEnv: { first: { X: '1' } },
 			mockConfigPath: mock,
+			registryDir: defaultRegistryDir(process.env),
 		});
 		expect(logs).toEqual(['exec0001']);
+	});
+
+	it('sends the project named with --project, and FLOW_PROJECT, for the daemon to resolve', async () => {
+		vi.stubEnv('FLOW_PROJECT', 'from-env');
+		startedResponse();
+
+		expect(await runCli(flowFile, '-p', 'alpha')).toBe(0);
+
+		expect(harness.send).toHaveBeenCalledWith(
+			'run',
+			expect.objectContaining({ projectRef: 'alpha', envProject: 'from-env' })
+		);
+	});
+
+	it('sends neither project field when none was named (a blank FLOW_PROJECT is unset)', async () => {
+		vi.stubEnv('FLOW_PROJECT', '  ');
+		startedResponse();
+
+		expect(await runCli(flowFile)).toBe(0);
+
+		const sent = harness.send.mock.calls[0]![1] as Record<string, unknown>;
+		expect(sent).not.toHaveProperty('projectRef');
+		expect(sent).not.toHaveProperty('envProject');
+	});
+
+	it('looks a registered flow id up in the project named with --project and refuses an unknown one with the flag in the message', async () => {
+		const fixture = new RegisteredProjectFixture().useAsProcessEnv();
+		try {
+			await fixture.register('alpha');
+
+			expect(await runCli('my-flow', '-p', 'nope')).toBe(1);
+
+			expect(errors[0]).toContain('--project "nope"');
+			expect(harness.send).not.toHaveBeenCalled();
+		} finally {
+			fixture.dispose();
+		}
 	});
 
 	it('prints JSON for --json and nothing for --quiet', async () => {

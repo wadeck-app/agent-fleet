@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import { tailLogFile } from '../cli/commands/ExecutionLogTail';
 import { logsCommand } from '../cli/commands/LogsCommand';
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
@@ -71,6 +72,7 @@ function expectNoSecret(label: string, text: string): void {
 
 describe('secret masking (end to end)', () => {
 	let workDir: string;
+	let registry: RegisteredProjectFixture;
 
 	beforeAll(() => {
 		if (!fs.existsSync(workerBinary)) {
@@ -80,8 +82,11 @@ describe('secret masking (end to end)', () => {
 		}
 	});
 
-	beforeEach(() => {
+	beforeEach(async () => {
+		// The in-process daemon resolves the project of each run from this process's registry.
+		registry = new RegisteredProjectFixture().useAsProcessEnv();
 		workDir = createTempDirectory('secret-e2e-work-');
+		await registry.register('secret-masking-e2e', { folder: workDir });
 		fs.writeFileSync(path.join(workDir, 'flow.yml'), FLOW_YAML, 'utf8');
 		fs.writeFileSync(path.join(workDir, 'key.pem'), KEY + '\n', 'utf8');
 		// The daemon runs in this process: env:// is read from this environment.
@@ -89,6 +94,7 @@ describe('secret masking (end to end)', () => {
 	});
 
 	afterEach(() => {
+		registry.dispose();
 		delete process.env['SECRET_E2E_TOKEN'];
 	});
 

@@ -50,13 +50,13 @@ export class DefaultWorkerAcceptance implements WorkerAcceptanceProvider {
 			return true;
 		}
 
-		// Serving a project is explicit for a worker the daemon did not create (D#9). With
-		// no project to check against there is nothing to match, so the answer is no rather
-		// than a guess -- a run from outside any project falls back to forked capacity.
-		if (step.projectRoot === undefined) {
+		// Serving a project is explicit for a worker the daemon did not create (D#9), and by registry id: a folder
+		// path is not an identity. With no project id to check against there is nothing to match, so the answer
+		// is no rather than a guess.
+		if (step.projectId === undefined) {
 			return false;
 		}
-		return worker.attachedProjects.includes(step.projectRoot);
+		return worker.attachedProjectIds.includes(step.projectId);
 	}
 }
 

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
+import { processLeakGuard } from '../test-utils/ProcessLeakGuard';
 import { observeFor, pollUntil } from '../test-utils/WaitHelpers';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -74,6 +75,8 @@ describe('concurrent cold starts of the standalone bundle', () => {
 			delete env[name];
 		}
 		const installDir = mkdtempSync(join(tmpdir(), 'flow-singleton-install-'));
+		// A daemon or worker of this directory that outlives the test fails the file (and is killed).
+		processLeakGuard.watch(installDir);
 		const projectDir = mkdtempSync(join(tmpdir(), 'flow-singleton-project-'));
 		const configHome = mkdtempSync(join(tmpdir(), 'flow-singleton-config-'));
 		mkdirSync(join(projectDir, '.flow'), { recursive: true });

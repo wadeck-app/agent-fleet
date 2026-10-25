@@ -81,7 +81,7 @@
 		{
 			"id": "project-resolution",
 			"status": "stable",
-			"description": "Resolves which project a working directory belongs to (marker file walk-up, VCS root, etc.)",
+			"description": "DEPRECATED, not consulted: flow resolves projects through the shared project registry (@wadeck-app/project-sdk). Resolves which project a working directory belongs to; kept for one release, removal pending an owner decision.",
 			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
 		},
 		{

@@ -77,3 +77,17 @@ describe('filterExecutions', () => {
 		expect(() => filterExecutions(execs, { offset: -1 })).toThrow(/offset/);
 	});
 });
+
+describe('filterExecutions by project', () => {
+	const mixed = [
+		makeExec({ executionId: 'p1', projectId: 'aaaaaaaa' }),
+		makeExec({ executionId: 'p2', projectId: 'bbbbbbbb' }),
+		makeExec({ executionId: 'old', projectRoot: '/old/root' }),
+	];
+
+	it('keeps only the executions of that project id; old records without an id never match', () => {
+		const result = filterExecutions(mixed, { projectId: 'aaaaaaaa' });
+		expect(result.items.map(e => e.executionId)).toEqual(['p1']);
+		expect(result.total).toBe(1);
+	});
+});

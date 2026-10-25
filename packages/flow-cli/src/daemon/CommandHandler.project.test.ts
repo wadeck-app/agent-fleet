@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { CommandHandler } from './CommandHandler';
 
 const { mockAllocate } = vi.hoisted(() => ({
@@ -41,6 +42,7 @@ describe('CommandHandler project resolution', () => {
 	let flowFile: string;
 	let sent: unknown[];
 	let handlers: CommandHandler[];
+	let registry: RegisteredProjectFixture;
 
 	function build(): CommandHandler {
 		const pool = {
@@ -55,6 +57,7 @@ describe('CommandHandler project resolution', () => {
 						pid: 1,
 						labels: [],
 						attachedProjects: [],
+						attachedProjectIds: [],
 						hasUserInterface: false,
 						ephemeral: true,
 						shellCapabilities: [],
@@ -76,16 +79,8 @@ describe('CommandHandler project resolution', () => {
 		return handler;
 	}
 
-	function cwdWith(...files: string[]): string {
-		const cwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-project-cwd-')));
-		for (const file of files) {
-			fs.mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true });
-			fs.writeFileSync(path.join(cwd, file), '');
-		}
-		return cwd;
-	}
-
 	beforeEach(() => {
+		registry = new RegisteredProjectFixture().useAsProcessEnv();
 		tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-project-')));
 		daemonDir = path.join(tmpDir, 'daemon');
 		fs.mkdirSync(path.join(daemonDir, 'executions'), { recursive: true });
@@ -107,61 +102,166 @@ describe('CommandHandler project resolution', () => {
 			handler.stopBackgroundWork();
 		}
 		fs.rmSync(tmpDir, { recursive: true, force: true });
+		registry.dispose();
 	});
 
-	// D#49: a legacy layout is a project that needs migrating, not "no project".
-	it('refuses a run started from a legacy-layout project, before any workspace, record or step', async () => {
-		const cwd = cwdWith(path.join('.agent-fleet', 'flows.yml'));
+	function recordFiles(): string[] {
+		return fs.readdirSync(path.join(daemonDir, 'executions'));
+	}
+
+	function readRecord(file: string): { projectId?: string; projectRoot?: string } {
+		return JSON.parse(fs.readFileSync(path.join(daemonDir, 'executions', file), 'utf8')) as {
+			projectId?: string;
+			projectRoot?: string;
+		};
+	}
+
+	function onlyRecord(): { projectId?: string; projectRoot?: string } {
+		const files = recordFiles();
+		expect(files).toHaveLength(1);
+		return readRecord(files[0]!);
+	}
+
+	function expectNothingLeftBehind(): void {
+		expect(mockAllocate).not.toHaveBeenCalled();
+		expect(recordFiles()).toEqual([]);
+		expect(sent).toEqual([]);
+	}
+
+	it('refuses a run from a folder no project contains, before any workspace, record or step', async () => {
+		await registry.register('alpha');
+		const cwd = registry.makeFolder('unregistered');
+
+		const result = await build().handleRun({ type: 'run', flowFile, cwd } as never);
+
+		expect(result).toMatchObject({
+			type: 'error',
+			code: 'PROJECT_RESOLUTION_FAILED',
+			detail: 'NO_PROJECT_IN_SCOPE',
+		});
+		const message = (result as { message: string }).message;
+		expect(message).toContain(cwd);
+		expect(message).toContain(`project add "${cwd}"`);
+		expectNothingLeftBehind();
+	});
+
+	it('still refuses a folder that only has the old markers (.git, .flow/config.yml, legacy files)', async () => {
+		const cwd = registry.makeFolder('old-markers');
+		fs.mkdirSync(path.join(cwd, '.git'));
+		fs.mkdirSync(path.join(cwd, '.flow'));
+		fs.writeFileSync(path.join(cwd, '.flow', 'config.yml'), '');
+		fs.mkdirSync(path.join(cwd, '.agent-fleet'));
+		fs.writeFileSync(path.join(cwd, '.agent-fleet', 'flows.yml'), '');
 
 		const result = await build().handleRun({ type: 'run', flowFile, cwd } as never);
 
 		expect(result).toMatchObject({ type: 'error', code: 'PROJECT_RESOLUTION_FAILED' });
-		const message = (result as { message: string }).message;
-		expect(message).toContain(cwd);
-		expect(message).toMatch(/legacy/i);
-		expect(message).toContain('.flow/config.yml');
-		expect(mockAllocate).not.toHaveBeenCalled();
-		expect(fs.readdirSync(path.join(daemonDir, 'executions'))).toEqual([]);
-		expect(sent).toEqual([]);
-
-		fs.rmSync(cwd, { recursive: true, force: true });
+		expectNothingLeftBehind();
 	});
 
-	// A flow run by absolute path from outside any project is legitimate: forked workers
-	// serve it (DefaultWorkerAcceptance), so it must not be refused.
-	it('still starts a run that belongs to no project', async () => {
-		const cwd = cwdWith();
-
-		const result = await build().handleRun({ type: 'run', flowFile, cwd } as never);
-
-		expect(result.type).toBe('execution_started');
-		const record = JSON.parse(
-			fs.readFileSync(
-				path.join(daemonDir, 'executions', fs.readdirSync(path.join(daemonDir, 'executions'))[0]!),
-				'utf8'
-			)
-		) as { projectRoot?: string };
-		expect(record.projectRoot).toBeUndefined();
-
-		fs.rmSync(cwd, { recursive: true, force: true });
-	});
-
-	it('records the project root of a run started from a project subdirectory', async () => {
-		const cwd = cwdWith(path.join('.flow', 'config.yml'));
-		const nested = path.join(cwd, 'sub');
+	it('records the project id and root of a run started from a project subdirectory', async () => {
+		const alpha = await registry.register('alpha');
+		const nested = path.join(alpha.folder!, 'sub');
 		fs.mkdirSync(nested);
 
 		const result = await build().handleRun({ type: 'run', flowFile, cwd: nested } as never);
 
 		expect(result.type).toBe('execution_started');
-		const record = JSON.parse(
-			fs.readFileSync(
-				path.join(daemonDir, 'executions', fs.readdirSync(path.join(daemonDir, 'executions'))[0]!),
-				'utf8'
-			)
-		) as { projectRoot?: string };
-		expect(record.projectRoot).toBe(cwd);
+		expect(onlyRecord()).toMatchObject({ projectId: alpha.id, projectRoot: alpha.folder });
+	});
 
-		fs.rmSync(cwd, { recursive: true, force: true });
+	it('gives two runs from two projects, in one daemon, their own project ids', async () => {
+		const alpha = await registry.register('alpha');
+		const beta = await registry.register('beta');
+		const handler = build();
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: alpha.folder } as never);
+		await handler.handleRun({ type: 'run', flowFile, cwd: beta.folder } as never);
+
+		const ids = recordFiles().map(file => readRecord(file).projectId);
+		expect(ids.sort()).toEqual([alpha.id, beta.id].sort());
+	});
+
+	it('sees a project registered between two runs, without a restart', async () => {
+		const later = registry.makeFolder('later');
+		const handler = build();
+		expect(await handler.handleRun({ type: 'run', flowFile, cwd: later } as never)).toMatchObject({
+			type: 'error',
+		});
+
+		const added = await registry.register('later', { folder: later });
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: later } as never);
+
+		expect(result.type).toBe('execution_started');
+		expect(onlyRecord().projectId).toBe(added.id);
+	});
+
+	it('honours the project the client named with --project, whatever its cwd', async () => {
+		const alpha = await registry.register('alpha');
+		const elsewhere = registry.makeFolder('elsewhere');
+
+		const result = await build().handleRun({ type: 'run', flowFile, cwd: elsewhere, projectRef: 'alpha' } as never);
+
+		expect(result.type).toBe('execution_started');
+		expect(onlyRecord()).toMatchObject({ projectId: alpha.id, projectRoot: alpha.folder });
+	});
+
+	it("honours the client's FLOW_PROJECT, which the daemon cannot read from its own environment", async () => {
+		const alpha = await registry.register('alpha');
+		const elsewhere = registry.makeFolder('elsewhere');
+
+		const result = await build().handleRun({ type: 'run', flowFile, cwd: elsewhere, envProject: 'alpha' } as never);
+
+		expect(result.type).toBe('execution_started');
+		expect(onlyRecord().projectId).toBe(alpha.id);
+	});
+
+	it('refuses an unknown --project reference with the flag in the message', async () => {
+		await registry.register('alpha');
+
+		const result = await build().handleRun({
+			type: 'run',
+			flowFile,
+			cwd: registry.root,
+			projectRef: 'nope',
+		} as never);
+
+		expect(result).toMatchObject({ type: 'error', code: 'PROJECT_RESOLUTION_FAILED', detail: 'PROJECT_NOT_FOUND' });
+		expect((result as { message: string }).message).toContain('--project "nope"');
+		expectNothingLeftBehind();
+	});
+
+	it('refuses a virtual project (no folder to run in) and says how to give it one', async () => {
+		await registry.register('docs-only', { folder: null });
+
+		const result = await build().handleRun({
+			type: 'run',
+			flowFile,
+			cwd: registry.root,
+			projectRef: 'docs-only',
+		} as never);
+
+		expect(result).toMatchObject({ type: 'error', code: 'PROJECT_RESOLUTION_FAILED', detail: 'VIRTUAL_PROJECT' });
+		expect((result as { message: string }).message).toContain('project paths add docs-only');
+		expectNothingLeftBehind();
+	});
+
+	it('refuses when the client and the daemon read different registries, naming both', async () => {
+		const alpha = await registry.register('alpha');
+		const clientRegistry = path.join(tmpDir, 'other-xdg', 'project');
+
+		const result = await build().handleRun({
+			type: 'run',
+			flowFile,
+			cwd: alpha.folder,
+			registryDir: clientRegistry,
+		} as never);
+
+		expect(result).toMatchObject({ type: 'error', code: 'PROJECT_REGISTRY_MISMATCH' });
+		const message = (result as { message: string }).message;
+		expect(message).toContain(clientRegistry);
+		expect(message).toContain(registry.registryDir);
+		expect(message).toContain('XDG_CONFIG_HOME');
+		expectNothingLeftBehind();
 	});
 });

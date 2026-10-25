@@ -111,7 +111,7 @@ Both `http://` and `https://` URLs are supported. Timeout is 10 seconds.
 
 ### Flow hooks
 
-File: `.flow/config.yml` at the project root, found by walking up from the directory where `flow run` is invoked (else the git root).
+File: `.flow/config.yml` in the folder of the registered project the run belongs to (`-p/--project`, `FLOW_PROJECT`, else the registered project containing the cwd; see `CLI_USAGE.md`). An unregistered folder is not read.
 
 ```yaml
 hooks:

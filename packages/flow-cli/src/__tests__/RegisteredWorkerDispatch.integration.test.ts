@@ -10,13 +10,14 @@
  * for `flow worker` in a terminal, and a real terminal cannot be had in a test runner.
  */
 import { createTempDirectory } from 'flow-core/testing';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
+import { WORKER_FEATURE_PROJECT_ID } from '../ipc/Protocol';
 import type { DaemonToWorker, ExecutionState } from '../ipc/Protocol';
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
 import { observeFor, waitUntil } from '../test-utils/WaitHelpers';
 
@@ -39,14 +40,18 @@ steps:
 
 let ctx: TestDaemonContext;
 let projectRoot: string;
+let projectId: string;
+let otherProjectId: string;
+let registry: RegisteredProjectFixture;
 let socket: WebSocket | undefined;
 
 beforeEach(async () => {
-	// A real project, because a non-ephemeral worker only serves the projects it declared
-	// (D#9) and the daemon resolves that from the marker file (D#50).
+	// A registered project, because a non-ephemeral worker only serves the projects it declared by id
+	// (D#9) and the daemon resolves the project of a run from the registry in its own environment.
+	registry = new RegisteredProjectFixture().useAsProcessEnv();
 	projectRoot = createTempDirectory('registered-project-');
-	mkdirSync(join(projectRoot, '.flow'), { recursive: true });
-	writeFileSync(join(projectRoot, '.flow', 'config.yml'), 'version: 1\n', 'utf8');
+	projectId = (await registry.register('registered-project', { folder: projectRoot })).id;
+	otherProjectId = (await registry.register('some-other-project')).id;
 	writeFileSync(join(projectRoot, 'flow.yml'), FLOW_YAML, 'utf8');
 
 	// Concurrency 0 so the daemon forks nothing: if a forked worker could run the step, these
@@ -69,6 +74,7 @@ afterEach(async () => {
 	socket?.close();
 	socket = undefined;
 	await ctx[Symbol.asyncDispose]();
+	registry.dispose();
 });
 
 /** Reads the port the daemon published, exactly as a worker does. */
@@ -114,7 +120,9 @@ async function connectRegisteredWorker(
 		// credential path rather than provenance.
 		pid: 991_001,
 		authToken: token,
+		attachedProjectIds: [projectId],
 		attachedProjects: [projectRoot],
+		features: [WORKER_FEATURE_PROJECT_ID],
 		hasUserInterface: false,
 	};
 
@@ -288,7 +296,9 @@ async function connectVanishingWorker(options: { reportStarted: boolean }): Prom
 			type: 'ready',
 			pid: 991_003,
 			authToken: token,
+			attachedProjectIds: [projectId],
 			attachedProjects: [projectRoot],
+			features: [WORKER_FEATURE_PROJECT_ID],
 		})
 	);
 
@@ -347,7 +357,8 @@ describe('a registered worker serving a project it never declared', () => {
 				type: 'ready',
 				pid: 991_002,
 				authToken: token,
-				attachedProjects: [join(tmpdir(), 'some-other-project')],
+				attachedProjectIds: [otherProjectId],
+				features: [WORKER_FEATURE_PROJECT_ID],
 			})
 		);
 

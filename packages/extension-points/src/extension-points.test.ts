@@ -86,6 +86,7 @@ describe('extension-points interfaces compile correctly', () => {
 		const worker: WorkerCandidate = {
 			workerId: 'w1',
 			labels: ['gpu'],
+			attachedProjectIds: ['proj0001'],
 			attachedProjects: ['C:/proj'],
 			hasUserInterface: true,
 			ephemeral: false,
@@ -104,6 +105,7 @@ describe('extension-points interfaces compile correctly', () => {
 		const candidates: WorkerCandidate[] = ['a', 'b'].map(workerId => ({
 			workerId,
 			labels: [],
+			attachedProjectIds: [],
 			attachedProjects: [],
 			hasUserInterface: false,
 			ephemeral: true,

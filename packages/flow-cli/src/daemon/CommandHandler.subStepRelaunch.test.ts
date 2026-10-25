@@ -4,6 +4,7 @@ import * as path from 'node:path';
 
 import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import { CommandHandler } from './CommandHandler';
+import { registerFolderAsProject } from './CommandHandlerTestHarness';
 
 vi.mock('flow-engine', async importOriginal => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
@@ -71,6 +72,7 @@ function createPool(features: string[]) {
 					pid: 1,
 					labels: [] as string[],
 					attachedProjects: [] as string[],
+					attachedProjectIds: [] as string[],
 					hasUserInterface: false,
 					ephemeral: true,
 					shellCapabilities: [] as string[],
@@ -93,11 +95,13 @@ function createPool(features: string[]) {
 }
 
 let tmpDir: string;
+let disposeProject: () => void;
 let daemonDir: string;
 
-beforeEach(() => {
+beforeEach(async () => {
 	tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-handler-relaunch-'));
 	daemonDir = path.join(tmpDir, 'daemon');
+	({ dispose: disposeProject } = await registerFolderAsProject(tmpDir));
 	fs.mkdirSync(daemonDir, { recursive: true });
 	vi.clearAllMocks();
 	mockExecStore.read.mockReturnValue({ steps: {} });
@@ -105,6 +109,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	disposeProject();
 	vi.restoreAllMocks();
 	fs.rmSync(tmpDir, { recursive: true, force: true });
 });

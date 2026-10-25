@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 
+import { WORKER_FEATURE_PROJECT_ID } from '../ipc/Protocol.js';
 import type { ForkWorkerSource } from './ForkWorkerSource.js';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
+
+/** A worker that attaches to projects by registry id, as every current flow-cli does. */
+const MODERN = [WORKER_FEATURE_PROJECT_ID];
 
 function fakeWorker(): WebSocket {
 	return { readyState: 1, OPEN: 1, send: vi.fn(), terminate: vi.fn() } as unknown as WebSocket;
@@ -129,7 +133,7 @@ describe('WorkerProvisioner - source labels (D#30)', () => {
 		);
 		const ws = fakeWorker();
 
-		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't' });
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't', features: MODERN });
 
 		expect(registry.describe(ws)?.labels).toEqual(['gpu', 'linux']);
 	});
@@ -147,7 +151,13 @@ describe('WorkerProvisioner - source labels (D#30)', () => {
 		);
 		const ws = fakeWorker();
 
-		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't', labels: ['fast'] });
+		provisioner.registerWorker(ws, {
+			pid: 1,
+			sourceId: 'gpu-box',
+			authToken: 't',
+			features: MODERN,
+			labels: ['fast'],
+		});
 
 		expect(registry.describe(ws)?.labels.sort()).toEqual(['fast', 'gpu']);
 	});
@@ -163,7 +173,13 @@ describe('WorkerProvisioner - source labels (D#30)', () => {
 		);
 		const ws = fakeWorker();
 
-		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't', labels: ['gpu'] });
+		provisioner.registerWorker(ws, {
+			pid: 1,
+			sourceId: 'gpu-box',
+			authToken: 't',
+			features: MODERN,
+			labels: ['gpu'],
+		});
 
 		expect(registry.describe(ws)?.labels).toEqual(['gpu']);
 	});
@@ -174,7 +190,7 @@ describe('WorkerProvisioner - source labels (D#30)', () => {
 		const provisioner = makeProvisioner(5, registry, fakeSource({ hasSpawned: () => false }));
 		const ws = fakeWorker();
 
-		provisioner.registerWorker(ws, { pid: 1, authToken: 't', labels: ['mine'] });
+		provisioner.registerWorker(ws, { pid: 1, authToken: 't', features: MODERN, labels: ['mine'] });
 
 		expect(registry.describe(ws)?.labels).toEqual(['mine']);
 	});
@@ -191,8 +207,8 @@ describe('WorkerProvisioner - source labels (D#30)', () => {
 		);
 		const ws = fakeWorker();
 
-		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't' });
-		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't' });
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't', features: MODERN });
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'gpu-box', authToken: 't', features: MODERN });
 
 		expect(registry.describe(ws)?.labels).toEqual(['gpu']);
 	});
@@ -262,7 +278,9 @@ describe('WorkerProvisioner - externally launched workers (Phase 2a)', () => {
 		);
 		const ws = fakeWorker();
 
-		expect(provisioner.registerWorker(ws, { pid: 999, sourceId: 'laptop', authToken: 't' })).toBe(true);
+		expect(provisioner.registerWorker(ws, { pid: 999, sourceId: 'laptop', authToken: 't', features: MODERN })).toBe(
+			true
+		);
 		// Not ephemeral: it must survive the daemon's idle shutdown (D#51).
 		expect(registry.describe(ws)?.ephemeral).toBe(false);
 	});
@@ -281,6 +299,58 @@ describe('WorkerProvisioner - externally launched workers (Phase 2a)', () => {
 		expect(provisioner.registerWorker(ws, { pid: 999, sourceId: 'laptop', authToken: 'wrong' })).toBe(false);
 		expect(ws.terminate).toHaveBeenCalled();
 		expect(registry.liveCount).toBe(0);
+	});
+
+	// A worker built before routing by project id attached itself by folder paths. Connecting it would look fine and
+	// then never receive a step; refusing it with the fix in the daemon log is the only honest answer.
+	it('refuses a worker on an older protocol, naming the update, instead of connecting it to receive nothing', () => {
+		const registry = new WorkerRegistry();
+		const reported: string[] = [];
+		const provisioner = new WorkerProvisioner(
+			2,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			allowAll() as never,
+			sourceCaps({ laptop: 2 }) as never,
+			undefined,
+			message => reported.push(message)
+		);
+		const ws = fakeWorker();
+
+		const admitted = provisioner.registerWorker(ws, {
+			pid: 999,
+			version: '2026.10.01-001-abcdef01',
+			sourceId: 'laptop',
+			authToken: 't',
+			attachedProjects: ['C:/proj'],
+		});
+
+		expect(admitted).toBe(false);
+		expect(ws.terminate).toHaveBeenCalled();
+		expect(registry.liveCount).toBe(0);
+		const message = reported.join('\n');
+		expect(message).toContain('2026.10.01-001-abcdef01');
+		expect(message).toContain('pid 999');
+		expect(message).toContain('flow cli update');
+		expect(message).toContain('project id');
+	});
+
+	it('authenticates before it reveals why a worker is refused: a bad credential is reported as such', () => {
+		const reported: string[] = [];
+		const provisioner = new WorkerProvisioner(
+			2,
+			new WorkerRegistry(),
+			fakeSource({ hasSpawned: () => false }),
+			denyAll('bad token') as never,
+			sourceCaps({}) as never,
+			undefined,
+			message => reported.push(message)
+		);
+
+		provisioner.registerWorker(fakeWorker(), { pid: 999, authToken: 'wrong' });
+
+		expect(reported.join('\n')).toContain('bad token');
+		expect(reported.join('\n')).not.toContain('flow cli update');
 	});
 
 	// A forked worker is recognised by provenance and needs no token.
@@ -310,9 +380,13 @@ describe('WorkerProvisioner - externally launched workers (Phase 2a)', () => {
 			sourceCaps({ laptop: 1 }) as never
 		);
 
-		expect(provisioner.registerWorker(fakeWorker(), { pid: 1, sourceId: 'laptop', authToken: 't' })).toBe(true);
+		expect(
+			provisioner.registerWorker(fakeWorker(), { pid: 1, sourceId: 'laptop', authToken: 't', features: MODERN })
+		).toBe(true);
 		const second = fakeWorker();
-		expect(provisioner.registerWorker(second, { pid: 2, sourceId: 'laptop', authToken: 't' })).toBe(false);
+		expect(
+			provisioner.registerWorker(second, { pid: 2, sourceId: 'laptop', authToken: 't', features: MODERN })
+		).toBe(false);
 		expect(second.terminate).toHaveBeenCalled();
 		expect(registry.liveCount).toBe(1);
 	});
@@ -327,8 +401,12 @@ describe('WorkerProvisioner - externally launched workers (Phase 2a)', () => {
 			sourceCaps({ laptop: 1, desktop: 1 }) as never
 		);
 
-		expect(provisioner.registerWorker(fakeWorker(), { pid: 1, sourceId: 'laptop', authToken: 't' })).toBe(true);
-		expect(provisioner.registerWorker(fakeWorker(), { pid: 2, sourceId: 'desktop', authToken: 't' })).toBe(true);
+		expect(
+			provisioner.registerWorker(fakeWorker(), { pid: 1, sourceId: 'laptop', authToken: 't', features: MODERN })
+		).toBe(true);
+		expect(
+			provisioner.registerWorker(fakeWorker(), { pid: 2, sourceId: 'desktop', authToken: 't', features: MODERN })
+		).toBe(true);
 		expect(registry.liveCount).toBe(2);
 	});
 
@@ -342,7 +420,9 @@ describe('WorkerProvisioner - externally launched workers (Phase 2a)', () => {
 			sourceCaps({}) as never
 		);
 
-		expect(provisioner.registerWorker(fakeWorker(), { pid: 1, sourceId: 'ghost', authToken: 't' })).toBe(false);
+		expect(
+			provisioner.registerWorker(fakeWorker(), { pid: 1, sourceId: 'ghost', authToken: 't', features: MODERN })
+		).toBe(false);
 	});
 });
 
@@ -360,9 +440,13 @@ describe('WorkerProvisioner - re-registration', () => {
 		);
 		const ws = fakeWorker();
 
-		expect(provisioner.registerWorker(ws, { pid: 1, sourceId: 'capped', authToken: 't' })).toBe(true);
+		expect(provisioner.registerWorker(ws, { pid: 1, sourceId: 'capped', authToken: 't', features: MODERN })).toBe(
+			true
+		);
 		// Second `ready` from the same socket, as sent after each completed step.
-		expect(provisioner.registerWorker(ws, { pid: 1, sourceId: 'capped', authToken: 't' })).toBe(true);
+		expect(provisioner.registerWorker(ws, { pid: 1, sourceId: 'capped', authToken: 't', features: MODERN })).toBe(
+			true
+		);
 		expect(ws.terminate).not.toHaveBeenCalled();
 		expect(registry.liveCount).toBe(1);
 	});
@@ -390,8 +474,8 @@ describe('WorkerProvisioner - re-registration', () => {
 		);
 		const ws = fakeWorker();
 
-		provisioner.registerWorker(ws, { pid: 1, sourceId: 'laptop', authToken: 't' });
-		provisioner.registerWorker(ws, { pid: 1, sourceId: 'laptop', authToken: 't' });
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'laptop', authToken: 't', features: MODERN });
+		provisioner.registerWorker(ws, { pid: 1, sourceId: 'laptop', authToken: 't', features: MODERN });
 
 		expect(authenticator.authenticate).toHaveBeenCalledTimes(1);
 	});
@@ -409,9 +493,11 @@ describe('WorkerProvisioner - re-registration', () => {
 		const first = fakeWorker();
 		const second = fakeWorker();
 
-		provisioner.registerWorker(first, { pid: 1, sourceId: 'capped', authToken: 't' });
+		provisioner.registerWorker(first, { pid: 1, sourceId: 'capped', authToken: 't', features: MODERN });
 
-		expect(provisioner.registerWorker(second, { pid: 2, sourceId: 'capped', authToken: 't' })).toBe(false);
+		expect(
+			provisioner.registerWorker(second, { pid: 2, sourceId: 'capped', authToken: 't', features: MODERN })
+		).toBe(false);
 		expect(second.terminate).toHaveBeenCalled();
 	});
 });
@@ -430,7 +516,7 @@ describe('WorkerProvisioner - worker naming no source', () => {
 		);
 		const ws = fakeWorker();
 
-		expect(provisioner.registerWorker(ws, { pid: 999, authToken: 'daemon-token' })).toBe(true);
+		expect(provisioner.registerWorker(ws, { pid: 999, authToken: 'daemon-token', features: MODERN })).toBe(true);
 		expect(registry.describe(ws)?.ephemeral).toBe(false);
 	});
 

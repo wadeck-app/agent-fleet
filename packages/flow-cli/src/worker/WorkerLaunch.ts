@@ -5,7 +5,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { VERSION } from '../cli/version';
-import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
+import {
+	WORKER_FEATURE_PROJECT_ID,
+	WORKER_FEATURE_SECRETS,
+	WORKER_FEATURE_SUB_STEP_SESSION_RESUME,
+} from '../ipc/Protocol';
 import type { WorkerReady } from '../ipc/Protocol';
 
 /** Longest gap between reconnection attempts, so a restarted daemon is found promptly. */
@@ -118,10 +122,11 @@ export function resolveSourceId(fromFlag: string | undefined): string | undefine
 }
 
 /**
- * Extra projects to serve: the flags if given, else what launched it said.
+ * References (name, alias or id of a registered project) of the extra projects to serve: the flags if given, else what
+ * launched it said (`FLOW_WORKER_PROJECTS`, comma separated).
  *
- * A blank environment value yields none rather than one empty path, which would attach the worker
- * to a project that does not exist.
+ * A blank environment value yields none rather than one empty reference. Resolving the references, and refusing a folder
+ * path, is {@link resolveWorkerProjects}'s job.
  */
 export function resolveExtraProjects(fromFlags: string[] | undefined): string[] {
 	if (fromFlags !== undefined && fromFlags.length > 0) {
@@ -165,7 +170,11 @@ export function probeShellCapabilities(env: NodeJS.ProcessEnv): ('bash' | 'cmd' 
 }
 
 /** Protocol features this build implements beyond the base protocol (declared by every kind of worker). */
-export const WORKER_FEATURES = [WORKER_FEATURE_SUB_STEP_SESSION_RESUME, WORKER_FEATURE_SECRETS];
+export const WORKER_FEATURES = [
+	WORKER_FEATURE_SUB_STEP_SESSION_RESUME,
+	WORKER_FEATURE_SECRETS,
+	WORKER_FEATURE_PROJECT_ID,
+];
 
 /**
  * The `ready` a daemon-forked worker sends (on connect and after every step).
@@ -183,8 +192,8 @@ export function buildForkedWorkerReady(
 
 /** Everything the worker declares about itself on registration. */
 export function buildRegistration(params: {
-	projectRoot: string;
-	extraProjects?: string[];
+	/** The registered projects this worker serves (see resolveWorkerProjects); `path` is absent for a project with no folder. */
+	projects: { id: string; path?: string }[];
 	isTty: boolean;
 	/**
 	 * Whether this worker has an approval provider, i.e. something that can actually put a
@@ -211,11 +220,16 @@ export function buildRegistration(params: {
 		}
 	}
 
-	// The launch project is always served; extras are additive and de-duplicated (D#9).
-	const attachedProjects = [params.projectRoot];
-	for (const project of params.extraProjects ?? []) {
-		if (!attachedProjects.includes(project)) {
-			attachedProjects.push(project);
+	// De-duplicated by registry id: a project is its id, the folder is only what was seen when the worker started (D#9).
+	const attachedProjectIds: string[] = [];
+	const attachedProjects: string[] = [];
+	for (const project of params.projects) {
+		if (attachedProjectIds.includes(project.id)) {
+			continue;
+		}
+		attachedProjectIds.push(project.id);
+		if (project.path !== undefined) {
+			attachedProjects.push(project.path);
 		}
 	}
 
@@ -230,6 +244,7 @@ export function buildRegistration(params: {
 		shellCapabilities: params.shellCapabilities ?? [],
 		// What this build implements beyond the base protocol; an older worker simply omits it
 		features: WORKER_FEATURES,
+		attachedProjectIds,
 		attachedProjects,
 		// Only this process can see whether anybody can be reached from here (D#33, D#36) -- and a
 		// TTY alone is not the capability. Without an approval provider the worker would attract an

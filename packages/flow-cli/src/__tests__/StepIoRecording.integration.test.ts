@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_IO_LIMITS } from '../storage/StepIoRecorder';
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
@@ -60,6 +61,7 @@ steps:
 
 describe('step input/output recording (end to end)', () => {
 	let workDir: string;
+	let registry: RegisteredProjectFixture;
 
 	beforeAll(() => {
 		if (!fs.existsSync(workerBinary)) {
@@ -69,14 +71,18 @@ describe('step input/output recording (end to end)', () => {
 		}
 	});
 
-	beforeEach(() => {
+	beforeEach(async () => {
+		// The in-process daemon resolves the project of each run from this process's registry.
+		registry = new RegisteredProjectFixture().useAsProcessEnv();
 		workDir = createTempDirectory('step-io-e2e-work-');
+		await registry.register('step-io-e2e', { folder: workDir });
 		fs.writeFileSync(path.join(workDir, 'flow.yml'), FLOW_YAML, 'utf8');
 		// The daemon runs in this process: env:// is read from this environment.
 		process.env['STEP_IO_E2E_TOKEN'] = TOKEN;
 	});
 
 	afterEach(() => {
+		registry.dispose();
 		delete process.env['STEP_IO_E2E_TOKEN'];
 	});
 

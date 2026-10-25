@@ -377,3 +377,34 @@ describe('FlowQueryService', () => {
 		});
 	});
 });
+
+describe('FlowQueryService project lookup', () => {
+	let root: string;
+
+	beforeEach(() => {
+		root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-core-service-project-'));
+		fs.mkdirSync(path.join(root, 'executions'));
+		fs.writeFileSync(
+			path.join(root, 'executions', 'pp111111.json'),
+			JSON.stringify(makeExec({ executionId: 'pp111111', projectId: 'a1b2c3d4' }))
+		);
+	});
+
+	afterEach(() => {
+		fs.rmSync(root, { recursive: true, force: true });
+	});
+
+	it('names the project in history --id and in the execution detail, and exposes the lookup to hosts', () => {
+		const lookup = () => ({ kind: 'known' as const, name: 'app' });
+		const service = FlowQueryService.forConfigDir(root, undefined, lookup);
+		expect(service.renderHistory({ id: 'pp' })).toContain('Project:   app (a1b2c3d4)');
+		expect(service.renderExecution('pp', { tail: 10, full: false })).toContain('Project:   app (a1b2c3d4)');
+		expect(service.projectLookup).toBe(lookup);
+	});
+
+	it('filters by project id', () => {
+		const service = FlowQueryService.forConfigDir(root);
+		expect(service.listExecutions({ projectId: 'a1b2c3d4' }).items).toHaveLength(1);
+		expect(service.listExecutions({ projectId: 'ffffffff' }).items).toHaveLength(0);
+	});
+});

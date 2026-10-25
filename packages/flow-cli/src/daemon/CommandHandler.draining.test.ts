@@ -228,7 +228,7 @@ describe('handleRun path restriction', () => {
 		const result = await handler.handleRun({
 			type: 'run',
 			flowFile,
-			cwd: os.tmpdir(),
+			cwd: tmpDir,
 			inputs: {},
 		} as never);
 

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
 import { MAX_WORKER_FRAME_BYTES } from '../ipc/WorkerFrameLimit';
+import { settlesWithin } from '../test-utils/WaitHelpers';
 import { type PortBinder, WebSocketServer } from './WebSocketServer.js';
 
 let server: WebSocketServer | undefined;
@@ -352,5 +353,80 @@ describe('WebSocketServer - diagnostics reach the injected log', () => {
 
 		expect(entries[0]?.level).toBe('error');
 		expect(entries[0]?.msg).toContain('10.1.2.3');
+	});
+});
+
+describe('WebSocketServer - close() leaves nothing that keeps the process alive', () => {
+	// An open WebSocket is a referenced handle: a daemon whose command server is already gone but that still has one
+	// connected peer is an invisible orphan (no port file, process alive). `ws` does not close existing connections on
+	// close(), so a peer that never registered (and so is in no registry) was never closed by anyone.
+	it('closes a connected peer that never said anything', async () => {
+		server = new WebSocketServer(
+			0,
+			() => {},
+			() => {},
+			{ closeGraceMs: 50 }
+		);
+		const port = await server.start();
+		const client = new WebSocket(`ws://127.0.0.1:${String(port)}`);
+		await new Promise<void>((resolve, reject) => {
+			client.once('open', () => resolve());
+			client.once('error', reject);
+		});
+		const closed = new Promise<void>(resolve => client.once('close', () => resolve()));
+
+		server.close();
+
+		expect(await settlesWithin(closed, 3_000), 'the peer was still connected 3 s after close()').toBe(true);
+	});
+
+	it('terminates a peer that ignores the close handshake once the grace has elapsed', async () => {
+		server = new WebSocketServer(
+			0,
+			() => {},
+			() => {},
+			{ closeGraceMs: 50 }
+		);
+		const port = await server.start();
+		// A raw socket completes the upgrade and then never answers the server's close frame.
+		const raw = net.connect(port, '127.0.0.1');
+		await new Promise<void>(resolve => raw.once('connect', () => resolve()));
+		raw.write(
+			'GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n'
+		);
+		await new Promise<void>(resolve => raw.once('data', () => resolve()));
+		const ended = new Promise<void>(resolve => raw.once('close', () => resolve()));
+
+		server.close();
+
+		expect(await settlesWithin(ended, 3_000), 'the peer was still connected 3 s after close()').toBe(true);
+	});
+
+	// The port scan retries upward on every refusal. A close() that lands between two attempts used to be forgotten by
+	// the next one, which bound a listener nobody would ever close.
+	it('does not bind a port after close() when the scan was still retrying', async () => {
+		const attempts: number[] = [];
+		const bind: PortBinder = (httpServer, port, address) => {
+			attempts.push(port);
+			if (attempts.length === 1) {
+				process.nextTick(() =>
+					httpServer.emit('error', Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' }))
+				);
+				return;
+			}
+			httpServer.listen(port, address);
+		};
+		server = new WebSocketServer(
+			45_440,
+			() => {},
+			() => {},
+			{ bind }
+		);
+
+		const started = server.start();
+		server.close();
+
+		await expect(started).rejects.toThrow(/closed before it finished binding/);
+		expect(attempts).toEqual([45_440]);
 	});
 });

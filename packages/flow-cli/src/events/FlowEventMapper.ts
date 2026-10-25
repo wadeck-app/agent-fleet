@@ -101,6 +101,7 @@ export class FlowEventMapper implements ExecutionTransitionListener {
 			startedAt: state.startedAt,
 			...(status === 'running' ? {} : finishedFields(state.startedAt, state.completedAt)),
 			...(state.projectRoot === undefined ? {} : { projectRoot: state.projectRoot }),
+			...(state.projectId === undefined ? {} : { projectId: state.projectId }),
 			...(error === undefined ? {} : { error }),
 		};
 	}
@@ -117,6 +118,7 @@ export class FlowEventMapper implements ExecutionTransitionListener {
 			...(step?.startedAt === undefined ? {} : { startedAt: step.startedAt }),
 			...(status === 'running' ? {} : finishedFields(step?.startedAt, step?.completedAt)),
 			...(state.projectRoot === undefined ? {} : { projectRoot: state.projectRoot }),
+			...(state.projectId === undefined ? {} : { projectId: state.projectId }),
 			...(error === undefined ? {} : { error }),
 		};
 	}

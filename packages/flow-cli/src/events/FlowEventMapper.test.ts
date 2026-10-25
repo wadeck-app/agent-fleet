@@ -226,3 +226,46 @@ describe('firstLineOf', () => {
 		expect(firstLineOf('abcdefghijklmnop', 10)).toBe('abcdefg...');
 	});
 });
+
+describe('FlowEventMapper projectId', () => {
+	it('puts projectId next to projectRoot in execution and step payloads, and omits it for an old record', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-events-pid-'));
+		try {
+			const publisher = new RecordingFlowEventPublisher();
+			const store = new ExecutionStore(
+				dir,
+				30,
+				new ExecutionMasks(),
+				new FlowEventMapper(publisher, err => {
+					throw err;
+				})
+			);
+			store.create({
+				executionId: 'pid00001',
+				flowFile: 'f.yml',
+				flowId: 'f',
+				stepIds: ['a'],
+				projectId: 'a1b2c3d4',
+				projectRoot: '/work/app',
+			});
+			store.create({
+				executionId: 'pid00002',
+				flowFile: 'f.yml',
+				flowId: 'f',
+				stepIds: ['a'],
+				projectRoot: '/old',
+			});
+			store.markStepRunning('pid00001', 'a');
+			store.markStepRunning('pid00002', 'a');
+			const payloads = publisher.events.map(e => e.payload);
+			expect(payloads.slice(0, 2)).toEqual([
+				expect.objectContaining({ projectId: 'a1b2c3d4', projectRoot: '/work/app' }),
+				expect.objectContaining({ stepId: 'a', projectId: 'a1b2c3d4', projectRoot: '/work/app' }),
+			]);
+			expect(payloads[2]).not.toHaveProperty('projectId');
+			expect(payloads[2]).toHaveProperty('projectRoot', '/old');
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+});

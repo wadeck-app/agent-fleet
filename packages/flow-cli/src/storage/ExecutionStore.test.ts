@@ -417,3 +417,40 @@ describe('ExecutionStore', () => {
 		});
 	});
 });
+
+describe('ExecutionStore project fields', () => {
+	let tmpDir: string;
+	let store: ExecutionStore;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'exec-store-project-'));
+		store = new ExecutionStore(tmpDir);
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('writes projectId next to projectRoot when both are given', () => {
+		const state = store.create({
+			executionId: 'pj000001',
+			flowFile: 'f.yml',
+			flowId: 'f',
+			stepIds: ['a'],
+			projectId: 'a1b2c3d4',
+			projectRoot: '/work/app',
+		});
+		expect(state).toMatchObject({ projectId: 'a1b2c3d4', projectRoot: '/work/app' });
+		const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, 'pj000001.json'), 'utf8')) as Record<
+			string,
+			unknown
+		>;
+		expect(onDisk).toMatchObject({ projectId: 'a1b2c3d4', projectRoot: '/work/app' });
+	});
+
+	it('writes neither field when no project is given', () => {
+		const state = store.create({ executionId: 'pj000002', flowFile: 'f.yml', flowId: 'f', stepIds: ['a'] });
+		expect(state).not.toHaveProperty('projectId');
+		expect(state).not.toHaveProperty('projectRoot');
+	});
+});

@@ -12,6 +12,9 @@ export interface WorkerSummary {
 	state: 'idle' | 'busy';
 	sourceId?: string;
 	labels: string[];
+	/** Registry ids of the projects the worker serves. Absent from a daemon that predates routing by project id. */
+	attachedProjectIds?: string[];
+	/** Folders of those projects as the worker reported them. */
 	attachedProjects: string[];
 	hasUserInterface: boolean;
 	/** True when this daemon created the worker, so it exits when the daemon idles down. */

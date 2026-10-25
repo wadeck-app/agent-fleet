@@ -94,6 +94,11 @@ export interface ExecutionState {
 	 */
 	projectRoot?: string;
 	/**
+	 * Registry id (project-sdk) of the project this run belongs to, written next to `projectRoot`. Additive: absent on
+	 * records written before project ids existed, which stay readable (they only have `projectRoot`).
+	 */
+	projectId?: string;
+	/**
 	 * Which definition ran (format note: additive, absent on records written before flow versions existed;
 	 * readers must treat absence as "version not recorded"). The four fields below are written together, once, when
 	 * the run starts, and never change afterwards (a `flow resume` keeps them).

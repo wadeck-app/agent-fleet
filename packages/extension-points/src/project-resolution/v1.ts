@@ -1,4 +1,9 @@
-/** Outcome of resolving the project a working directory belongs to. */
+/**
+ * Outcome of resolving the project a working directory belongs to.
+ *
+ * @deprecated flow resolves projects through the shared project registry (`@wadeck-app/project-sdk`) and no longer
+ * consults this extension point: no implementation can be selected. Kept for one release; removal is an owner decision.
+ */
 export interface ProjectResolution {
 	/** Absolute path to the project root. */
 	projectRoot: string;
@@ -12,6 +17,8 @@ export interface ProjectResolution {
 
 /**
  * Resolves which project a working directory belongs to.
+ *
+ * @deprecated not consulted any more, see {@link ProjectResolution}.
  *
  * Implementations must fail loudly when no project root can be determined
  * rather than returning a fallback such as the working directory itself: a

@@ -3,9 +3,10 @@ import { load as parseYaml } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
-import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMessage';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { flowConfigDir } from './FlowConfigDir.js';
+import { launchProjectConfigPath } from './LaunchProjectConfig.js';
 import type {
 	GlobalConfig,
 	ProjectConfig,
@@ -13,7 +14,6 @@ import type {
 	ResolvedFeature,
 	ResolvedPluginsConfig,
 } from './PluginConfig.js';
-import { ProjectResolverFactory } from './ProjectResolverFactory.js';
 
 const SENSITIVE_FIELD_SET = new Set(SENSITIVE_FIELDS);
 
@@ -131,15 +131,9 @@ export class ConfigLoader {
 		if (this.projectConfigPathOverride !== undefined) {
 			return this.projectConfigPathOverride;
 		}
-		try {
-			const { projectRoot } = ProjectResolverFactory.create().resolve(process.cwd());
-			return join(projectRoot, '.flow', 'config.yml');
-		} catch (err) {
-			// Not a silent fallback: no project means no project config, but the
-			// reason is reported instead of the config vanishing without trace.
-			process.stderr.write(`[flow] No project plugin config loaded. ${getErrorMessage(err)}\n`);
-			return null;
-		}
+		// No project means no project config; the reason is reported on stderr, and a config that declares plugins
+		// in an unregistered folder is an error (see launchProjectConfigPath), never a silent loss.
+		return launchProjectConfigPath(process.cwd());
 	}
 
 	private loadProjectConfig(): ProjectConfig {

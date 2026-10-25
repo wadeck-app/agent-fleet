@@ -6,6 +6,7 @@ import { FlowCoreError, errorMessage } from '../errors.js';
 import { looksLikeExecutionId } from '../execution/ExecutionId.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
 import { formatDuration, formatModelCost, formatStarted } from '../history/ExecutionFormat.js';
+import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { renderStepIoLines } from './StepIoLines.js';
 
 /** Default number of trailing characters printed for a failed step's stdout/stderr. */
@@ -22,6 +23,8 @@ export interface RenderOptions {
 	full: boolean;
 	/** Also print what each step received and produced (`flow show --io`). Off by default to keep the output small. */
 	io?: boolean;
+	/** Names the project of the record in a `Project:` line; without it the line shows the bare id. */
+	projectLookup?: ProjectLookup;
 }
 
 export type ExecutionLookupErrorKind = 'invalid-id' | 'not-found' | 'ambiguous' | 'corrupt' | 'invalid-record';
@@ -131,6 +134,10 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	const lines: string[] = [];
 	lines.push(`Execution: ${record.executionId}`);
 	lines.push(`Flow:      ${record.flowId}`);
+	const projectLabel = projectLabelOf(record, options.projectLookup);
+	if (projectLabel !== undefined) {
+		lines.push(`Project:   ${projectLabel}`);
+	}
 	lines.push(`Version:   ${versionDetailLineOf(record)}`);
 	lines.push(`File:      ${record.flowFile}`);
 	lines.push(`Status:    ${record.status}`);

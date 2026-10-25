@@ -15,6 +15,16 @@ import type { DaemonRuntime } from './DaemonRuntime.js';
  */
 export const SHUTDOWN_GRACE_MS = 1_000;
 
+/**
+ * How often the daemon asks itself whether it is idle, independently of any worker message.
+ *
+ * Idleness used to be examined only when a worker message arrived, so a daemon that no worker ever contacted (a run
+ * refused before dispatch, `flow start` and nothing after) was never asked and lived until someone killed it. Thirty
+ * seconds is well past the window in which the client that started the daemon sends its first command, which is what
+ * SHUTDOWN_GRACE_MS alone could not cover, and short enough that a leftover daemon is gone within the minute.
+ */
+export const IDLE_WATCHDOG_INTERVAL_MS = 30_000;
+
 /** Decides when the daemon has nothing left to do and stops it, after a grace period. */
 export class DaemonIdleShutdown {
 	/** checkShutdown() can be re-entered (e.g. a worker's own close event fires while
@@ -23,6 +33,8 @@ export class DaemonIdleShutdown {
 	private shuttingDown = false;
 	/** Pending debounced shutdown (SHUTDOWN_GRACE_MS), or none scheduled. */
 	private pendingShutdown: ReturnType<typeof setTimeout> | undefined;
+	/** Periodic idleness check, or none until startWatchdog(). */
+	private watchdog: ReturnType<typeof setInterval> | undefined;
 
 	constructor(
 		private readonly logsDir: string,
@@ -31,6 +43,34 @@ export class DaemonIdleShutdown {
 		private readonly stopPeriodicWork: () => void,
 		private readonly stopDaemon: () => Promise<void>
 	) {}
+
+	/**
+	 * Starts looking for idleness on a timer, in addition to the worker-message triggers.
+	 *
+	 * The timer is unref'd: it must never be what keeps the process alive. Silent while busy; `checkShutdown()` logs
+	 * the idle decision itself.
+	 *
+	 * @throws when already started: two timers would double every decision.
+	 */
+	startWatchdog(intervalMs: number): void {
+		if (this.watchdog !== undefined) {
+			throw new Error('The idle watchdog is already running; startWatchdog() must be called once per daemon.');
+		}
+		this.watchdog = setInterval(() => this.checkShutdown(), intervalMs);
+		this.watchdog.unref();
+	}
+
+	/** Cancels the watchdog and any shutdown already scheduled. Called from the shutdown hook, so every stop path runs it. */
+	dispose(): void {
+		if (this.watchdog !== undefined) {
+			clearInterval(this.watchdog);
+			this.watchdog = undefined;
+		}
+		if (this.pendingShutdown !== undefined) {
+			clearTimeout(this.pendingShutdown);
+			this.pendingShutdown = undefined;
+		}
+	}
 
 	isIdle(): boolean {
 		const { commandHandler, workerRegistry } = this.runtime();

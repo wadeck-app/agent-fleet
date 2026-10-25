@@ -26,7 +26,8 @@ function explainInteractivity(interactive: boolean, hasApproval: boolean): strin
 }
 
 export interface WorkerStartupBannerParams {
-	projectRoot: string;
+	/** The registered projects this worker serves, the first being its own. */
+	projects: { id: string; name: string; path?: string }[];
 	registration: Omit<WorkerReady, 'type'>;
 	hasApprovalProvider: boolean;
 	interactive: boolean;
@@ -35,15 +36,15 @@ export interface WorkerStartupBannerParams {
 
 /** Prints the operator-facing startup summary of this worker (everything before the registry line). */
 export function printWorkerStartupBanner(params: WorkerStartupBannerParams): void {
-	const { projectRoot, registration, hasApprovalProvider } = params;
-	console.log(`[ok] flow worker for ${projectRoot}`);
+	const { projects, registration, hasApprovalProvider } = params;
+	console.log(`[ok] flow worker for ${projects.map(project => project.name).join(', ')}`);
 	// So "which build served this step" is answerable from the worker's own terminal, not just
 	// by cross-referencing a daemon-side version field after the fact.
 	console.log(`     version    : ${VERSION}`);
 	if (registration.labels && registration.labels.length > 0) {
 		console.log(`     labels     : ${registration.labels.join(', ')}`);
 	}
-	console.log(`     projects   : ${(registration.attachedProjects ?? []).join(', ')}`);
+	console.log(`     projects   : ${projects.map(project => `${project.name} (${project.id})`).join(', ')}`);
 	console.log(
 		`     shells     : ${registration.shellCapabilities && registration.shellCapabilities.length > 0 ? registration.shellCapabilities.join(', ') : '(none detected)'}`
 	);

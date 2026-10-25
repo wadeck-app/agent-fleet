@@ -9,6 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
@@ -26,6 +27,7 @@ function registryEntry(version: string, marker: string): Record<string, unknown>
 describe('flow versions (end to end)', () => {
 	let workDir: string;
 	let registryFile: string;
+	let registry: RegisteredProjectFixture;
 
 	beforeAll(() => {
 		if (!fs.existsSync(workerBinary)) {
@@ -35,11 +37,18 @@ describe('flow versions (end to end)', () => {
 		}
 	});
 
-	beforeEach(() => {
+	beforeEach(async () => {
+		// The in-process daemon resolves the project of each run from this process's registry.
+		registry = new RegisteredProjectFixture().useAsProcessEnv();
 		workDir = fs.realpathSync(createTempDirectory('versions-e2e-'));
 		fs.mkdirSync(path.join(workDir, '.flow'));
 		fs.writeFileSync(path.join(workDir, '.flow', 'config.yml'), '');
 		registryFile = path.join(workDir, '.flow', 'flows.yml');
+		await registry.register('versions-e2e', { folder: workDir });
+	});
+
+	afterEach(() => {
+		registry.dispose();
 	});
 
 	it('follows the latest version, runs a pinned one from its snapshot, and keeps snapshots unchanged', async () => {

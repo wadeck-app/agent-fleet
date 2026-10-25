@@ -380,3 +380,26 @@ describe('FlowDaemonController', () => {
 		expect(error.message).toMatch(/pluginManifests/);
 	});
 });
+
+describe('FlowDaemonController project fields', () => {
+	let configDir: string;
+
+	beforeEach(() => {
+		configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-daemon-controller-project-'));
+		writeExecution(configDir, execution('pj1', { projectId: 'a1b2c3d4', projectRoot: '/work/app' }));
+	});
+	afterEach(() => {
+		fs.rmSync(configDir, { recursive: true, force: true });
+	});
+
+	it('serves projectId and projectLabel in the list and in the detail, with the name from the lookup', async () => {
+		const get = mount(
+			FlowQueryService.forConfigDir(configDir, BUILTIN_PLUGIN_CATALOG, () => ({ kind: 'known', name: 'app' }))
+		);
+		const list = await get('/api/flow-daemon/executions');
+		expect(list.items[0]).toMatchObject({ projectId: 'a1b2c3d4', projectLabel: 'app (a1b2c3d4)' });
+		const detail = await get('/api/flow-daemon/executions/:id', { params: { id: 'pj1' } });
+		expect(detail).toMatchObject({ projectId: 'a1b2c3d4', projectLabel: 'app (a1b2c3d4)' });
+		expect(detail.text).toContain('Project:   app (a1b2c3d4)');
+	});
+});

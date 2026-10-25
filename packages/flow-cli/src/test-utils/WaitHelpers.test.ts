@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { observeFor, pollUntil, waitUntil } from './WaitHelpers';
+import { observeFor, pollUntil, runAfter, settlesWithin, waitUntil } from './WaitHelpers';
 
 describe('pollUntil', () => {
 	it('returns true as soon as the predicate holds', async () => {
@@ -41,5 +41,28 @@ describe('observeFor', () => {
 
 		// Timers may fire a millisecond early, so allow a small margin.
 		expect(Date.now() - start).toBeGreaterThanOrEqual(25);
+	});
+});
+
+describe('settlesWithin', () => {
+	it('is true for a promise that resolves in time, and for one that rejects (it settled)', async () => {
+		expect(await settlesWithin(Promise.resolve(1), 1_000)).toBe(true);
+		expect(await settlesWithin(Promise.reject(new Error('x')), 1_000)).toBe(true);
+	});
+
+	it('is false for a promise that never settles', async () => {
+		expect(await settlesWithin(new Promise(() => {}), 20)).toBe(false);
+	});
+});
+
+describe('runAfter', () => {
+	it('runs the action once, later', async () => {
+		let ran = 0;
+
+		runAfter(5, () => ran++);
+		expect(ran).toBe(0);
+		await pollUntil(() => ran > 0, { timeoutMs: 1_000, intervalMs: 1 });
+
+		expect(ran).toBe(1);
 	});
 });

@@ -88,6 +88,6 @@ plugins:
 
 ## How the daemon picks plugins
 
-The daemon reads `.flow/config.yml` in the project root (resolved by walking up for that file). A worker reads the same file from its launch directory, which is why `--cwd` matters for `built-in:command` sources (see `WORKERS.md`).
+The daemon reads `.flow/config.yml` in the folder of the registered project. Plugins declared in the config of the folder the daemon was launched from apply only if that folder is a registered project; an unregistered launch folder whose config declares `plugins:` is an error. A worker serves its own project (`FLOW_PROJECT`, else the registered project containing its cwd) plus the ones named by `--project` (see `WORKERS.md`).
 
 Third-party plugins resolve from `node_modules`; built-in plugins (`none`, `cli-approval`, `file-approval`, `worktree`) are bundled inside the CLI and need no install.

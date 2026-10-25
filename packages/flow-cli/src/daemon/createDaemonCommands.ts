@@ -1,34 +1,31 @@
 import { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import type { HookConfig } from '@wadeck-app/shared-cli/HookDispatcher';
 
-import { LegacyProjectLayoutError } from '../config/DefaultProjectResolver.js';
 import type { FlowConfig } from '../config/FlowConfig';
 import type { ClientCommand, UpdateWorkerRequest } from '../ipc/Protocol';
 import type { DaemonRuntime } from './DaemonRuntime.js';
-import { ProjectResolutionRefusal } from './ProjectResolutionRefusal.js';
+import { RunProjectResolver } from './RunProjectResolver.js';
 import { loadFlowHooks } from './loadFlowHooks.js';
 import { pruneProjectWorkspaces } from './pruneProjectWorkspaces.js';
 
 /** The IPC commands the daemon answers, bound to the runtime once it exists. */
 export function createDaemonCommands(
 	config: FlowConfig,
-	runtime: () => DaemonRuntime
+	runtime: () => DaemonRuntime,
+	projectResolver: RunProjectResolver = new RunProjectResolver()
 ): Record<string, (payload: unknown) => Promise<unknown> | unknown> {
 	return {
 		run: async (payload: unknown): Promise<unknown> => {
 			const cmd = payload as Extract<ClientCommand, { type: 'run' }>;
-			let flowHooks: Record<string, HookConfig[]>;
-			try {
-				pruneProjectWorkspaces(cmd.cwd, config);
-				flowHooks = loadFlowHooks(cmd.cwd);
-			} catch (err) {
-				// Refused as a typed response, like handleRun does for the same cause.
-				if (err instanceof LegacyProjectLayoutError) {
-					return ProjectResolutionRefusal.toResponse(cmd.cwd, err);
-				}
-				throw err;
+			// The daemon serves every project: it resolves this run's from what the client sent (cwd, --project,
+			// FLOW_PROJECT), per request, and a refusal is a typed response before anything is pruned or read.
+			const project = projectResolver.resolve(cmd);
+			if (!project.ok) {
+				return project.response;
 			}
-			return runtime().commandHandler.handleRun(cmd, new HookDispatcher(flowHooks));
+			pruneProjectWorkspaces(project.projectPath, config);
+			const flowHooks: Record<string, HookConfig[]> = loadFlowHooks(project.projectPath);
+			return runtime().commandHandler.handleRun(cmd, new HookDispatcher(flowHooks), project);
 		},
 		// Resumes an execution kept alive after a `user_intervention` step timed out
 		// unanswered (see CommandHandler.handleResume). Only works against this same

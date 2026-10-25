@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
@@ -52,12 +53,16 @@ describe.skipIf(!workerRunnable)('--mock-config end-to-end (manual verification)
 	it('real run: model step actually calls the mock CLI and produces its own text', async () => {
 		const flowYml = path.join(os.tmpdir(), `mock-verify-real-${Date.now()}.yml`);
 		fs.writeFileSync(flowYml, TWO_STEP_FLOW, 'utf8');
+		// The in-process daemon resolves the project of the run from this process's registry.
+		const registry = new RegisteredProjectFixture().useAsProcessEnv();
+		const projectFolder = registry.makeFolder('mock-verify');
+		await registry.register('mock-verify', { folder: projectFolder });
 		try {
 			await using ctx = await startTestDaemon();
 			const response = await ctx.client.send('run', {
 				type: 'run',
 				flowFile: flowYml,
-				cwd: os.tmpdir(),
+				cwd: projectFolder,
 				inputs: {},
 				// Real run: no mockEnv. generate_flow uses OPENCODE_MOCK_PATH only to avoid a real
 				// API call in this verification -- the per-step override is NOT exercised here.
@@ -69,18 +74,23 @@ describe.skipIf(!workerRunnable)('--mock-config end-to-end (manual verification)
 			expect(finalState.status).toBe('completed');
 		} finally {
 			fs.rmSync(flowYml, { force: true });
+			registry.dispose();
 		}
 	}, 35000);
 
 	it('mocked run: --mock-config overrides generate_flow to a fixed string, zero real model behavior, downstream step receives exactly that string', async () => {
 		const flowYml = path.join(os.tmpdir(), `mock-verify-mocked-${Date.now()}.yml`);
 		fs.writeFileSync(flowYml, TWO_STEP_FLOW, 'utf8');
+		// The in-process daemon resolves the project of the run from this process's registry.
+		const registry = new RegisteredProjectFixture().useAsProcessEnv();
+		const projectFolder = registry.makeFolder('mock-verify');
+		await registry.register('mock-verify', { folder: projectFolder });
 		try {
 			await using ctx = await startTestDaemon();
 			const response = await ctx.client.send('run', {
 				type: 'run',
 				flowFile: flowYml,
-				cwd: os.tmpdir(),
+				cwd: projectFolder,
 				inputs: {},
 				mockEnv: {
 					generate_flow: {
@@ -107,6 +117,7 @@ describe.skipIf(!workerRunnable)('--mock-config end-to-end (manual verification)
 			expect(daemonLog).toContain('GOT:id: build_task');
 		} finally {
 			fs.rmSync(flowYml, { force: true });
+			registry.dispose();
 		}
 	}, 35000);
 });

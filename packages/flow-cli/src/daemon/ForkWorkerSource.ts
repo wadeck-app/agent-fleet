@@ -1,5 +1,5 @@
 import type { WorkerRequest, WorkerSourceProvider } from 'extension-points';
-import { spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -46,6 +46,9 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 	private readonly spawnedPids = new Set<number>();
 	/** Pid -> orphan-kill timer, cleared once the worker connects. */
 	private readonly pendingConnects = new Map<number, ReturnType<typeof setTimeout>>();
+	/** Workers spawned and not yet exited, so shutdown can end the ones that ignore the polite request. */
+	private readonly running = new Map<number, ChildProcess>();
+	private terminateTimer: ReturnType<typeof setTimeout> | undefined;
 
 	readonly workerPath: string;
 	readonly tsxLoaderPath: string | null;
@@ -100,7 +103,9 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 	/** Cancels the orphan-kill timer once the worker has registered. */
 	acknowledgeConnection(pid: number): void {
 		const timer = this.pendingConnects.get(pid);
-		if (timer === undefined) return;
+		if (timer === undefined) {
+			return;
+		}
 		clearTimeout(timer);
 		this.pendingConnects.delete(pid);
 	}
@@ -119,6 +124,7 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 		}
 		const pid = child.pid;
 		this.spawnedPids.add(pid);
+		this.running.set(pid, child);
 
 		// A worker that never connects would otherwise hold a capacity slot indefinitely.
 		const connectTimeout = setTimeout(() => {
@@ -151,6 +157,12 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 			clearTimeout(connectTimeout);
 			this.pendingConnects.delete(pid);
 			this.spawnedPids.delete(pid);
+			this.running.delete(pid);
+			// Everything the shutdown was waiting for is gone: nothing left to kill, and the timer must not hold the exit.
+			if (this.running.size === 0 && this.terminateTimer !== undefined) {
+				clearTimeout(this.terminateTimer);
+				this.terminateTimer = undefined;
+			}
 			// 'close' follows once stderr is drained; a grandchild holding the pipe could delay it forever.
 			setTimeout(() => report(code, signal), STDERR_DRAIN_GRACE_MS).unref();
 		});
@@ -160,6 +172,28 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 			stderrTail.append(text);
 			process.stderr.write(`[worker] ${text}`);
 		});
+	}
+
+	/**
+	 * For the daemon's shutdown: workers were asked to exit (`done`, and their socket is closed); any still running after
+	 * `graceMs` is killed. A worker that ignores both (wedged, its event loop blocked) would otherwise outlive the daemon
+	 * that owned it. Nothing is scheduled when no worker runs, and the timer is cancelled as soon as the last one exits, so
+	 * it never delays the daemon's own exit.
+	 */
+	terminateRemaining(graceMs: number): void {
+		if (this.running.size === 0 || this.terminateTimer !== undefined) {
+			return;
+		}
+		this.terminateTimer = setTimeout(() => {
+			this.terminateTimer = undefined;
+			for (const [pid, child] of this.running) {
+				this.log(
+					'error',
+					`worker pid ${String(pid)} was still running ${String(graceMs)}ms after the daemon stopped -- killing`
+				);
+				child.kill('SIGKILL');
+			}
+		}, graceMs);
 	}
 
 	/** Writes how the worker ended and the tail of its stderr, masked: the only record of why it died. */

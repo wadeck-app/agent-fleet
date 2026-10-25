@@ -2,6 +2,14 @@ import type { FlowScheduler } from 'flow-engine';
 
 import type { AssignableStep, ExecutionContext } from '../ipc/Protocol';
 
+/** The project an execution belongs to. */
+export interface ExecutionProject {
+	/** Registry id of the project: what workers attach to and what steps are routed by. */
+	projectId: string;
+	/** Folder of the project at the time of the run. */
+	projectRoot: string;
+}
+
 /**
  * In-memory state of every execution the daemon is running.
  *
@@ -19,12 +27,11 @@ export class ExecutionRegistry {
 	/** Step definitions by execution, consulted on failure to decide resumability. */
 	private readonly stepDefinitions = new Map<string, Map<string, AssignableStep>>();
 	/**
-	 * Project each execution belongs to, for routing (D#9).
-	 *
-	 * Absent for a run started outside any project (D#10), which is why routing treats a
-	 * missing entry as "only daemon-created workers apply" rather than defaulting.
+	 * Project each execution belongs to, for routing (D#9): its registry id (what workers attach to) and its folder.
+	 * Every run has one; an execution unknown to this registry has none, which routing treats as "only daemon-created
+	 * workers apply" rather than defaulting.
 	 */
-	private readonly projects = new Map<string, string>();
+	private readonly projects = new Map<string, ExecutionProject>();
 	/**
 	 * Executions kept alive (not cleaned up) after a `user_intervention` step timed out
 	 * unanswered, so a later `flow resume` can re-dispatch exactly that step.
@@ -86,11 +93,11 @@ export class ExecutionRegistry {
 		return this.schedulers.get(executionId)?.getStepIds() ?? new Set();
 	}
 
-	setProject(executionId: string, projectRoot: string): void {
-		this.projects.set(executionId, projectRoot);
+	setProject(executionId: string, project: ExecutionProject): void {
+		this.projects.set(executionId, project);
 	}
 
-	projectOf(executionId: string): string | undefined {
+	projectOf(executionId: string): ExecutionProject | undefined {
 		return this.projects.get(executionId);
 	}
 

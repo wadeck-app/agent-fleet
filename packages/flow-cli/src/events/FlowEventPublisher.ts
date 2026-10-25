@@ -26,6 +26,8 @@ export interface FlowEventPayload {
 	completedAt?: string;
 	durationMs?: number;
 	projectRoot?: string;
+	/** Registry id of the project (project-sdk); additive next to projectRoot. */
+	projectId?: string;
 	/** First line of the (already masked) error, truncated. Failed events only. */
 	error?: string;
 }

@@ -251,14 +251,14 @@ export class StepDispatcher {
 		// Only `type: script` steps carry `shell:` (Proposal 1); every other step type has
 		// no such field, which `workerSatisfiesShell` already treats as "no constraint".
 		const shellKind = (step.stepConfig as { shell?: 'bash' | 'cmd' | 'pwsh' }).shell;
-		const projectRoot = this.executions.projectOf(step.executionContext.executionId);
+		const project = this.executions.projectOf(step.executionContext.executionId);
 		return {
 			stepId: step.stepId,
 			labels: labels ?? [],
 			// The step type is the only signal for this: there is no step-level
 			// `interactive` field, by design (D#60).
 			requiresUserInterface: step.stepConfig.type === 'user_intervention',
-			...(projectRoot !== undefined ? { projectRoot } : {}),
+			...(project !== undefined ? { projectId: project.projectId, projectRoot: project.projectRoot } : {}),
 			...(shellKind !== undefined ? { shellKind } : {}),
 		};
 	}

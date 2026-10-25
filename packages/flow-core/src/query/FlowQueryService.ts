@@ -28,6 +28,7 @@ import {
 	formatPluginTable,
 	listPlugins,
 } from '../plugins/PluginCatalog.js';
+import type { ProjectLookup } from '../project/ProjectLabel.js';
 import {
 	type RenderOptions,
 	type ResolvedExecution,
@@ -56,6 +57,11 @@ export interface FlowQueryServiceOptions extends FlowQueryDirectories {
 	pluginManifests?: Record<string, PluginCatalogSource>;
 	/** Clock used to date daemon-derived explanations (default: the system clock); injected by tests. */
 	now?: () => number;
+	/**
+	 * Names the project of an execution (see createRegistryProjectLookup). Without it only the recorded id is shown.
+	 * Hosts that build views themselves pass `service.projectLookup` to toExecutionSummary/toExecutionDetail.
+	 */
+	projectLookup?: ProjectLookup;
 }
 
 /** A page of executions plus the execution files that could not be read, so no host has to hide them. */
@@ -122,15 +128,23 @@ function parentField(parent: string | undefined): { parent?: string } {
 
 export class FlowQueryService {
 	/** All flow locations hang off the config dir (`executions/`, `logs/`, daemon files at its root). */
-	static forConfigDir(configDir: string, pluginManifests?: Record<string, PluginCatalogSource>): FlowQueryService {
+	static forConfigDir(
+		configDir: string,
+		pluginManifests?: Record<string, PluginCatalogSource>,
+		projectLookup?: ProjectLookup
+	): FlowQueryService {
 		assertDirectory('configDir', configDir);
 		return new FlowQueryService({
 			executionsDir: executionsDirOf(configDir),
 			configDir,
 			daemonDir: configDir,
 			pluginManifests,
+			...(projectLookup === undefined ? {} : { projectLookup }),
 		});
 	}
+
+	/** The lookup that names projects, when the host gave one. */
+	readonly projectLookup: ProjectLookup | undefined;
 
 	/** Frozen: the locations are fixed for the life of the service. */
 	readonly directories: Readonly<FlowQueryDirectories>;
@@ -148,6 +162,7 @@ export class FlowQueryService {
 		});
 		this.pluginManifests = options.pluginManifests;
 		this.now = options.now ?? Date.now;
+		this.projectLookup = options.projectLookup;
 	}
 
 	/** Executions, newest first, filtered and paginated by {@link filterExecutions}. */
@@ -180,7 +195,7 @@ export class FlowQueryService {
 	renderHistoryReport(filter: ExecutionFilterOptions): RenderedHistory {
 		const { executions, skipped } = loadExecutionReport(this.directories.executionsDir);
 		return {
-			text: buildHistoryTable(executions, filter),
+			text: buildHistoryTable(executions, filter, this.projectLookup),
 			skipped,
 			skippedWarning: describeSkippedExecutions(skipped),
 		};
@@ -201,7 +216,12 @@ export class FlowQueryService {
 
 	/** The text `flow show <executionId>` prints. Throws ExecutionLookupError. */
 	renderExecution(idOrPrefix: string, options: RenderOptions): string {
-		return renderExecutionDetail(this.getExecution(idOrPrefix), options);
+		return renderExecutionDetail(this.getExecution(idOrPrefix), {
+			...options,
+			...(this.projectLookup === undefined || options.projectLookup !== undefined
+				? {}
+				: { projectLookup: this.projectLookup }),
+		});
 	}
 
 	/** Live workers as the daemon reports them. A missing daemon is an empty list; other daemon failures throw WorkerListError. */

@@ -9,6 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
@@ -33,6 +34,7 @@ ${stepLines}
 
 describe('forked worker shell routing (end to end)', () => {
 	let workDir: string;
+	let registry: RegisteredProjectFixture;
 
 	beforeAll(() => {
 		if (!fs.existsSync(workerBinary)) {
@@ -42,12 +44,16 @@ describe('forked worker shell routing (end to end)', () => {
 		}
 	});
 
-	beforeEach(() => {
+	beforeEach(async () => {
+		// The in-process daemon resolves the project of each run from this process's registry.
+		registry = new RegisteredProjectFixture().useAsProcessEnv();
 		workDir = createTempDirectory('shell-e2e-work-');
+		await registry.register('shell-e2e', { folder: workDir });
 		process.env['SHELL_E2E_TOKEN'] = 'tk_shell_e2e_value_123';
 	});
 
 	afterEach(() => {
+		registry.dispose();
 		delete process.env['SHELL_E2E_TOKEN'];
 	});
 

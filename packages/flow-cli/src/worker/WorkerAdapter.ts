@@ -187,6 +187,34 @@ export class WorkerAdapter {
 			...(context.subStepRelaunch ? { subStepRelaunch: context.subStepRelaunch } : {}),
 		};
 
+		// Keeps the daemon's stall watchdog informed regardless of log/toolLog display
+		// settings (see Protocol.ts's 'step_progress' doc for why onLogEntry alone is not
+		// enough). Throttled: the watchdog only needs "something happened recently", not
+		// one message per stream chunk.
+		const PROGRESS_THROTTLE_MS = 5000;
+		let lastProgressSentAt = 0;
+		const onActivity = (progress: ToolProgress): void => {
+			const now = Date.now();
+			// A tool call starting or returning is rare and is what a stall report later
+			// names, so unlike a plain heartbeat it is never held back by the throttle.
+			if (!progress.changed && now - lastProgressSentAt < PROGRESS_THROTTLE_MS) {
+				return;
+			}
+			lastProgressSentAt = now;
+			sendMessage({
+				type: 'step_progress',
+				executionId: context.executionId,
+				stepId: step.id,
+				// A heartbeat leaves out `activity`, which tells the daemon to keep what it knows.
+				...(progress.changed && { activity: toStepToolActivity(progress.activity, masker) }),
+				// null tells the daemon a follow-up turn cleared the final result it was told about.
+				...(progress.changed && { finalResultAt: progress.finalResultAt ?? null }),
+				...(progress.lastCompletedTool !== undefined && {
+					lastCompletedTool: progress.lastCompletedTool,
+				}),
+			});
+		};
+
 		// For model steps, wire up the MCP server for provideSteps injection
 		if (step.type === 'model') {
 			const onInjectSteps = async (steps: InjectedStep[]): Promise<void> => {
@@ -270,34 +298,6 @@ export class WorkerAdapter {
 								}
 							};
 
-				// Keeps the daemon's stall watchdog informed regardless of log/toolLog display
-				// settings (see Protocol.ts's 'step_progress' doc for why onLogEntry alone is not
-				// enough). Throttled: the watchdog only needs "something happened recently", not
-				// one message per stream chunk.
-				const PROGRESS_THROTTLE_MS = 5000;
-				let lastProgressSentAt = 0;
-				const onActivity = (progress: ToolProgress): void => {
-					const now = Date.now();
-					// A tool call starting or returning is rare and is what a stall report later
-					// names, so unlike a plain heartbeat it is never held back by the throttle.
-					if (!progress.changed && now - lastProgressSentAt < PROGRESS_THROTTLE_MS) {
-						return;
-					}
-					lastProgressSentAt = now;
-					sendMessage({
-						type: 'step_progress',
-						executionId: context.executionId,
-						stepId: step.id,
-						// A heartbeat leaves out `activity`, which tells the daemon to keep what it knows.
-						...(progress.changed && { activity: toStepToolActivity(progress.activity, masker) }),
-						// null tells the daemon a follow-up turn cleared the final result it was told about.
-						...(progress.changed && { finalResultAt: progress.finalResultAt ?? null }),
-						...(progress.lastCompletedTool !== undefined && {
-							lastCompletedTool: progress.lastCompletedTool,
-						}),
-					});
-				};
-
 				const trace = await runner.executeStep(
 					step as unknown as ModelFlowStep,
 					workspace,
@@ -333,7 +333,16 @@ export class WorkerAdapter {
 		}
 
 		const runner = this.stepRunnerFactory([]);
-		const trace = await runner.executeStep(step as unknown as ScriptFlowStep, workspace, templateContext);
+		// A script that prints is alive: reported as a throttled heartbeat so the daemon's silence watchdog
+		// does not fail a long, chatty script. A silent one still trips it.
+		const trace = await runner.executeStep(
+			step as unknown as ScriptFlowStep,
+			workspace,
+			templateContext,
+			undefined,
+			undefined,
+			onActivity
+		);
 		// Masked as a whole BEFORE being split into lines: a multi-line secret is intact here.
 		sendStdoutAsLogs(maskOptional(masker, trace.stdout), context.executionId, step.id, sendMessage);
 		const io = buildStepIoCapture(step, trace, context);

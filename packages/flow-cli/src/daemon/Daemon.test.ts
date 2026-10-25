@@ -114,38 +114,16 @@ describe('loadFlowHooks', () => {
 		expect(loadFlowHooks(tmpDir)).toHaveProperty('onFlowEnd');
 	});
 
-	// Walk-up behaviour: a run started in a subdirectory must still find the hooks.
-	it('resolves hooks from a subdirectory of the project', async () => {
-		fs.mkdirSync(path.join(tmpDir, '.flow'), { recursive: true });
-		fs.writeFileSync(
-			path.join(tmpDir, '.flow', 'config.yml'),
-			'hooks:\n  onFlowEnd:\n    - command: echo done\n',
-			'utf8'
-		);
-		const nested = path.join(tmpDir, 'packages', 'deep');
-		fs.mkdirSync(nested, { recursive: true });
-
-		expect(loadFlowHooks(nested)).toHaveProperty('onFlowEnd');
-	});
-
 	it('returns no hooks when the project has no config file', async () => {
-		// A .git root makes this a project without giving it a .flow/config.yml.
-		fs.mkdirSync(path.join(tmpDir, '.git'), { recursive: true });
-
 		expect(loadFlowHooks(tmpDir)).toEqual({});
 	});
 
-	// A run from outside any project is legitimate: no hooks, not an error.
-	it('returns no hooks when the directory belongs to no project', async () => {
-		expect(loadFlowHooks(tmpDir)).toEqual({});
-	});
-
-	// D#49: a legacy layout must not read as "no hooks configured".
-	it('throws on a legacy project layout instead of running without its hooks', async () => {
+	// The folder is the project's own: a legacy file there is not read as hooks, and not an error either.
+	it('does not read the legacy .flows/config.yml', async () => {
 		fs.mkdirSync(path.join(tmpDir, '.flows'), { recursive: true });
-		fs.writeFileSync(path.join(tmpDir, '.flows', 'config.yml'), 'hooks: {}\n', 'utf8');
+		fs.writeFileSync(path.join(tmpDir, '.flows', 'config.yml'), 'hooks:\n  onFlowEnd:\n    - command: x\n', 'utf8');
 
-		expect(() => loadFlowHooks(tmpDir)).toThrow(/legacy/i);
+		expect(loadFlowHooks(tmpDir)).toEqual({});
 	});
 
 	it('throws on malformed YAML instead of silently dropping every hook', async () => {

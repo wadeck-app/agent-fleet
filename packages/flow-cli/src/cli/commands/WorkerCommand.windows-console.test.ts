@@ -33,12 +33,8 @@ vi.mock('../../config/FlowConfig', async () => {
 	};
 });
 
-vi.mock('../../config/DefaultProjectResolver', () => ({
-	DefaultProjectResolver: class {
-		resolve(): { projectRoot: string } {
-			return { projectRoot: '/fake/project' };
-		}
-	},
+vi.mock('../../worker/WorkerProjects', () => ({
+	resolveWorkerProjects: () => [{ id: 'fake0001', name: 'fake', path: '/fake/project' }],
 }));
 
 vi.mock('../../config/PluginResolver', () => ({
@@ -57,6 +53,7 @@ vi.mock('../../worker/WorkerLaunch', () => ({
 	buildRegistration: () => ({
 		pid: 1234,
 		labels: [],
+		attachedProjectIds: ['fake0001'],
 		attachedProjects: ['/fake/project'],
 		hasUserInterface: false,
 		shellCapabilities: ['bash', 'cmd'],

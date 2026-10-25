@@ -28,9 +28,12 @@ plugin, so it always reports `interactive=false`.
 ### Terminal
 
 ```
-cd <project>
-flow worker
+cd <registered project folder>
+flow worker                       # serves that project
+flow worker --project other-app   # ...and other-app too (repeatable)
 ```
+
+The project must be registered (`project add "<folder>"`, `project list`). `--project` takes a registered name, alias or id; a folder path is refused with a hint to `project add` it.
 
 Inherits **your whole shell** -- PATH, credentials, agent sockets. That is deliberate, and is what
 makes your own tooling usable from a step, but a step dispatched here runs with the reach of that
@@ -63,8 +66,10 @@ The command needs no arguments -- everything arrives in its environment: `FLOW_D
 that launch alone and valid once. Both tokens printed by `add` are therefore discardable for a local
 source; keep the worker token only if you also intend to start that worker by hand.
 
-`--cwd` is not cosmetic: `flow worker` finds its project by walking up for `.flow/config.yml`, so
-without it the worker serves the daemon's directory instead of yours.
+`--cwd` is still the worker's working directory, and `flow worker` serves the registered project
+containing it (or `FLOW_PROJECT`). Without `--cwd` that is the daemon's directory, which is usually
+not a project: start the worker from a registered folder, or set `FLOW_WORKER_PROJECTS` /
+`--project` to name the projects it serves (it may then start outside any project).
 
 Remote works the same way with `--command "ssh host flow worker"`, with one caveat: ssh does not
 carry the environment, so the credential must be passed explicitly -- and a token on an ssh command
@@ -90,8 +95,11 @@ connection to the daemon and launches a local worker when asked.
 
 1. **Declared is not available** (D#4). A declared source with nothing attached is intent, not
    capacity, and dispatch only ever targets a live connection.
-2. **A worker serves only the projects it announces** -- its launch directory plus each `--project`.
-   A worker started in the wrong directory will never take your steps.
+2. **A worker serves only the projects it announces** -- its own registered project plus each
+   `--project`, matched by project id. A worker attached to the wrong project never takes your steps.
+   `flow worker list` still shows folder paths (informational); routing uses ids. The daemon refuses
+   a worker on an older protocol (no `project-id` feature): run `flow cli update` on the worker's
+   machine and restart it (the reason is in the daemon log).
 3. **Interactivity comes from the plugin, not the terminal.** No approval plugin means
    `interactive: false` even in a real terminal; `plugins.cli-approval` needs a TTY;
    `plugins.file-approval` does not, which is what lets a script, an agent or a remote reviewer

@@ -114,3 +114,23 @@ describe('QueueFlowEventPublisher', () => {
 		expect(JSON.stringify(declaration)).toContain('kaput');
 	});
 });
+
+describe('QueueFlowEventPublisher with projectId', () => {
+	it('still pushes with cwd = projectRoot and carries projectId in the payload', () => {
+		const client = fakeClient();
+		new QueueFlowEventPublisher(client).publish('flow.step.started', {
+			executionId: 'e1',
+			flowId: 'f',
+			status: 'running',
+			projectId: 'a1b2c3d4',
+			projectRoot: '/work/p',
+		});
+		expect(client.calls).toEqual([
+			[
+				'flow.step.started',
+				{ executionId: 'e1', flowId: 'f', status: 'running', projectId: 'a1b2c3d4', projectRoot: '/work/p' },
+				{ cwd: '/work/p' },
+			],
+		]);
+	});
+});

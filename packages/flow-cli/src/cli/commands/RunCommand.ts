@@ -1,3 +1,4 @@
+import { defaultRegistryDir } from '@wadeck-app/project-sdk';
 import type { Command } from 'commander';
 import * as path from 'node:path';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
@@ -5,6 +6,7 @@ import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FlowConfigLoader } from '../../config/FlowConfig';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
+import { FLOW_PROJECT_ENV } from '../../config/ProjectScopeResolver';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
 import { ExecutionTimeoutError, waitForCompletion } from './ExecutionCompletionWaiter';
 import { hasFastLogMode } from './FlowLogModeDetector';
@@ -25,7 +27,8 @@ export function registerRunCommand(program: Command): void {
 				'  -i key=value  Pass input (repeatable); e.g. -i name=Alice -i count=3\n' +
 				'  --wait        Block until execution completes (default: fire-and-forget)\n' +
 				'  --timeout     Timeout for --wait, e.g. 30s, 5m, 1h (default: 10m)\n' +
-				'  --flow-id     Select a specific flow ID when YAML contains multiple flows'
+				'  --flow-id     Select a specific flow ID when YAML contains multiple flows\n' +
+				'  -p, --project <ref>  Project (name, alias or id) the run belongs to. Default: FLOW_PROJECT, then the registered project containing the cwd'
 		)
 		.option(
 			'-i, --input <key=value>',
@@ -47,6 +50,10 @@ export function registerRunCommand(program: Command): void {
 		)
 		.option('--flow-id <id>', 'Flow ID within a multi-flow YAML')
 		.option(
+			'-p, --project <ref>',
+			'Project (name, alias or id) the run belongs to. Default: FLOW_PROJECT, then the registered project containing the cwd (see: project list)'
+		)
+		.option(
 			'--mock-config <path>',
 			"YAML/JSON file mapping step id to env overlay, replacing that step's real execution via the mock-CLI convention (*_MOCK_PATH/*_MOCK_RESPONSE/*_MOCK_EXIT_CODE). Daemon-dispatched runs only."
 		)
@@ -62,6 +69,7 @@ export function registerRunCommand(program: Command): void {
 					input: string[];
 					inputs: string[];
 					flowId?: string;
+					project?: string;
 					mockConfig?: string;
 					wait?: boolean;
 					timeout: string;
@@ -74,7 +82,13 @@ export function registerRunCommand(program: Command): void {
 				const cwd = process.cwd();
 				const daemonDir = flowConfigDir();
 
-				const resolution = resolveFlowReference(flowRef, cwd);
+				// FLOW_PROJECT is read here, in the client's environment: the daemon, shared by every shell, cannot see it.
+				const envProject = process.env[FLOW_PROJECT_ENV];
+				const namedEnvProject = envProject !== undefined && envProject.trim() !== '' ? envProject : undefined;
+				const resolution = resolveFlowReference(flowRef, cwd, {
+					projectRef: options.project,
+					env: process.env,
+				});
 				if (resolution.kind === 'error') {
 					console.error(resolution.error);
 					process.exit(1);
@@ -128,6 +142,9 @@ export function registerRunCommand(program: Command): void {
 					inputs,
 					quiet: options.quiet,
 					cwd,
+					...(options.project === undefined ? {} : { projectRef: options.project }),
+					...(namedEnvProject === undefined ? {} : { envProject: namedEnvProject }),
+					registryDir: defaultRegistryDir(process.env),
 					...(mockEnv ? { mockEnv, mockConfigPath: resolvedMockConfigPath } : {}),
 				};
 

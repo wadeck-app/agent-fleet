@@ -85,7 +85,9 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const id = optionalString(query, 'id');
 			const page = service.listExecutions({ limit, offset, status, flow, flowContains, id });
 			const body = {
-				items: page.items.map(record => toExecutionRow(toExecutionSummary(stripErrorsForServing(record)))),
+				items: page.items.map(record =>
+					toExecutionRow(toExecutionSummary(stripErrorsForServing(record), service.projectLookup))
+				),
 				total: page.total,
 				// Execution files that could not be read: the list is incomplete by this many, so a client can say so.
 				skipped: page.skipped.length,
@@ -127,7 +129,15 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const resolved = service.getExecution(id);
 			// Served before it is rendered: the tail of a step output is cut from the served text, never from the raw one.
 			const served = { ...resolved, record: stripRecordForServing(resolved.record) };
-			const detail = toExecutionDetail(served, renderExecutionDetail(served, { tail, full }));
+			const detail = toExecutionDetail(
+				served,
+				renderExecutionDetail(served, {
+					tail,
+					full,
+					...(service.projectLookup ? { projectLookup: service.projectLookup } : {}),
+				}),
+				service.projectLookup
+			);
 			// The recorded inputs and outputs come from the served record, in their own field: the step rows stay light.
 			return reply.code(200).send({
 				...toExecutionDetailRow(

@@ -333,3 +333,25 @@ describe('buildHistoryTable versions', () => {
 		expect(buildHistoryTable([legacy], { id: 'old1' })).toContain('Version:   not recorded');
 	});
 });
+
+describe('renderDetailView project line', () => {
+	it('prints a Project line right after Flow when the record has a project', () => {
+		const out = buildHistoryTable([makeExec({ executionId: 'p1', projectId: 'a1b2c3d4' })], { id: 'p1' });
+		const lines = out.split('\n');
+		expect(lines[1]).toMatch(/^Flow:/);
+		expect(lines[2]).toBe('Project:   a1b2c3d4');
+	});
+
+	it('uses the lookup for the name and prints no Project line for a record without a project', () => {
+		const withName = buildHistoryTable(
+			[makeExec({ executionId: 'p1', projectId: 'a1b2c3d4' })],
+			{ id: 'p1' },
+			() => ({
+				kind: 'known',
+				name: 'app',
+			})
+		);
+		expect(withName).toContain('Project:   app (a1b2c3d4)');
+		expect(buildHistoryTable([makeExec({ executionId: 'p2' })], { id: 'p2' })).not.toContain('Project:');
+	});
+});

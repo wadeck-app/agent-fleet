@@ -1,11 +1,11 @@
 import type { Command } from 'commander';
+import { killAllRunningScripts } from 'flow-engine';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { FlowConfigLoader } from '../../config/FlowConfig';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { PluginResolver } from '../../config/PluginResolver';
-import { ProjectResolverFactory } from '../../config/ProjectResolverFactory';
 import { DaemonWatchNotifier } from '../../worker/DaemonWatch';
 import { NudgeServer } from '../../worker/NudgeServer';
 import type { ReconnectNotifier } from '../../worker/ReconnectNotifier';
@@ -18,6 +18,7 @@ import {
 	resolveSourceId,
 	resolveWorkerToken,
 } from '../../worker/WorkerLaunch';
+import { resolveWorkerProjects } from '../../worker/WorkerProjects';
 import { WorkerConnection } from './WorkerConnection';
 import { registerWorkerListCommand } from './WorkerListCommand';
 import { report, ts } from './WorkerReport';
@@ -58,12 +59,15 @@ export function registerWorkerCommand(worker: Command): void {
 
 	worker
 		.command('start', { isDefault: true })
-		.description('Run a worker in this terminal, serving the current project')
+		.description(
+			'Run a worker in this terminal, serving the current project (a registered project, see: project list)'
+		)
 		.option('--source <id>', 'Worker source this worker belongs to (see "flow worker source add")')
 		.option('--token <token>', 'Registration token for the source; defaults to the daemon token over loopback')
 		.option(
-			'--project <path>',
-			'Serve an additional project beyond the launch directory (repeatable)',
+			'--project <ref>',
+			'Serve an additional registered project, by name, alias or id (repeatable; a folder path is refused, register it with: project add). ' +
+				'The worker always serves its own project too: FLOW_PROJECT, else the registered project containing the cwd',
 			(value: string, previous: string[] = []) => [...previous, value]
 		)
 		.option('--labels <labels>', 'Comma-separated labels advertised to the daemon', '')
@@ -96,7 +100,6 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	// inherits the daemon's env via ForkWorkerSource.ts. It must set its own defaults the same way,
 	// at the same point in startup, before any step can run.
 	FlowConfigLoader.applyOpenCodeEnvDefaults(config);
-	const { projectRoot } = ProjectResolverFactory.create().resolve(process.cwd());
 
 	// Built here, in the process with the human in front of it (D#34): the CLI approval
 	// plugin reads its own stdin, so a daemon-side instance could never reach anybody. A
@@ -118,9 +121,11 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	// Captured once, rather than re-resolved later from (possibly rotated/cleared) env vars:
 	// the self re-exec below must relaunch with the exact same identity this process has now.
 	const extraProjects = resolveExtraProjects(options.project);
+	// Workers attach to projects by registry identity; a folder path or an unknown reference stops the worker here, before
+	// it connects, instead of registering for a project no step will ever be routed to.
+	const projects = resolveWorkerProjects({ refs: extraProjects, cwd: process.cwd(), env: process.env });
 	const registration = buildRegistration({
-		projectRoot,
-		extraProjects,
+		projects,
 		isTty: process.stdout.isTTY === true,
 		canPrompt: approvalProvider !== undefined,
 		...(approvalProvider?.requiresTerminal !== undefined
@@ -151,7 +156,7 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	}
 
 	printWorkerStartupBanner({
-		projectRoot,
+		projects,
 		registration,
 		hasApprovalProvider: approvalProvider !== undefined,
 		interactive: options.interactive === true,
@@ -164,7 +169,8 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	const declaration =
 		sourceId === undefined
 			? new SelfDeclarationManager(daemonDir, {
-					projects: registration.attachedProjects ?? [projectRoot],
+					// Registry ids: valid references for FLOW_WORKER_PROJECTS and --project.
+					projects: registration.attachedProjectIds ?? [],
 					labels: registration.labels ?? [],
 					pid: process.pid,
 					nudgeUrl,
@@ -188,6 +194,8 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	// Named (not inline) so the self re-exec path can also run it directly, outside the
 	// process.on('exit'/SIGINT/SIGTERM) handlers releaseOnExit installs.
 	const cleanup = (): void => {
+		// A script step's process tree (a test server it started) must not outlive the worker.
+		killAllRunningScripts();
 		declaration?.release();
 		nudgeServer.stop();
 		selfUpdate.stop();

@@ -111,6 +111,8 @@ export class ExecutionStore {
 		stepWaves?: Record<string, number>;
 		/** Project this run belongs to, so active projects can be listed (D#10). */
 		projectRoot?: string;
+		/** Registry id of the project (project-sdk), written next to projectRoot. */
+		projectId?: string;
 		/** Which definition ran: version, content hash, snapshot and how the version was chosen. Written once, never changed. */
 		definition?: Pick<ExecutionState, 'flowVersion' | 'definitionHash' | 'definitionSnapshot' | 'versionChoice'>;
 	}): ExecutionState {
@@ -128,6 +130,7 @@ export class ExecutionStore {
 			flowFile: params.flowFile,
 			flowId: params.flowId,
 			...(params.projectRoot !== undefined ? { projectRoot: params.projectRoot } : {}),
+			...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
 			...params.definition,
 			status: 'queued',
 			currentSteps: [],

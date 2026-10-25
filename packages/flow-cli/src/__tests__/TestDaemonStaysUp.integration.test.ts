@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SHUTDOWN_GRACE_MS } from '../daemon/DaemonIdleShutdown';
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 import { observeFor } from '../test-utils/WaitHelpers';
 
@@ -34,6 +35,7 @@ steps:
 describe('a test daemon between two runs', () => {
 	let workDir: string;
 	let flowFile: string;
+	let registry: RegisteredProjectFixture;
 
 	beforeAll(() => {
 		if (!fs.existsSync(workerBinary)) {
@@ -43,10 +45,17 @@ describe('a test daemon between two runs', () => {
 		}
 	});
 
-	beforeEach(() => {
+	beforeEach(async () => {
+		// The in-process daemon resolves the project of each run from this process's registry.
+		registry = new RegisteredProjectFixture().useAsProcessEnv();
 		workDir = fs.realpathSync(createTempDirectory('daemon-stays-up-'));
 		flowFile = path.join(workDir, 'flow.yml');
 		fs.writeFileSync(flowFile, FLOW_YAML);
+		await registry.register('stay-up', { folder: workDir });
+	});
+
+	afterEach(() => {
+		registry.dispose();
 	});
 
 	it('still accepts a run sent after the idle grace period elapsed since the previous one ended', async () => {

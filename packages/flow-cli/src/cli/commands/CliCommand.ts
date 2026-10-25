@@ -28,6 +28,7 @@ import { PluginLoader } from '../../config/PluginLoader.js';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 // violations-suppress-end: ts/no-deep-relative
 import { logsCommand } from './LogsCommand.js';
+import { buildProcessesCommand } from './ProcessesCommand.js';
 
 // Injected by esbuild at bundle time via define; falls back to package.json in dev mode (tsx).
 declare const __FLOW_CLI_VERSION__: string;
@@ -312,6 +313,9 @@ export function buildCliCommand(): Command {
 				process.exit(1);
 			}
 		});
+
+	// flow cli processes [--json] -- read-only list of flow processes, to spot leaked daemons/workers
+	cli.addCommand(buildProcessesCommand());
 
 	return cli;
 }

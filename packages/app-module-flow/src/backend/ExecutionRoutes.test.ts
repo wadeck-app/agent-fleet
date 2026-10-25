@@ -542,3 +542,26 @@ describe('GET /executions/:id ioText', () => {
 		expect((body as { ioText: string }).ioText).toContain('not recorded for this run');
 	});
 });
+
+describe('project of an execution', () => {
+	it('serves projectId and projectLabel (name (id)) in the list and the detail, and the label in the text', async () => {
+		fixture.addExecution({ executionId: 'pj1', projectId: 'a1b2c3d4', projectRoot: '/work/app' });
+		fixture.addExecution({ executionId: 'old1', projectRoot: '/old/root', startedAt: '2026-08-15T10:00:00.000Z' });
+		const collected = collectRoutes<ModuleContext>();
+		registerExecutionRoutes(
+			collected.ctx,
+			FlowQueryService.forConfigDir(fixture.configDir, undefined, () => ({ kind: 'known', name: 'app' }))
+		);
+
+		const list = await callRoute(collected.routes, 'GET /executions', { query: {} });
+		const items = (list.body as { items: Record<string, unknown>[] }).items;
+		expect(items[0]).toMatchObject({ executionId: 'pj1', projectId: 'a1b2c3d4', projectLabel: 'app (a1b2c3d4)' });
+		// an old record: no id, the root with a dash
+		expect(items[1]).toMatchObject({ executionId: 'old1', projectLabel: '/old/root (-)' });
+		expect(items[1]).not.toHaveProperty('projectId');
+
+		const detail = await callRoute(collected.routes, 'GET /executions/:id', { params: { id: 'pj1' }, query: {} });
+		expect(detail.body).toMatchObject({ projectId: 'a1b2c3d4', projectLabel: 'app (a1b2c3d4)' });
+		expect((detail.body as { text: string }).text).toContain('Project:   app (a1b2c3d4)');
+	});
+});

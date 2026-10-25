@@ -40,7 +40,13 @@ export function FlowExecutionHeader({ execution }: FlowExecutionHeaderProps) {
 				<span className="font-mono text-xs">{execution.filePath}</span>
 			</HeaderField>
 			<HeaderField label="Project root">
-				<span className="font-mono text-xs">{execution.projectRoot ?? '-'}</span>
+				{/* The tooltip keeps the folder discoverable when the label is shown */}
+				<span
+					className="font-mono text-xs"
+					title={execution.projectLabel !== undefined ? execution.projectRoot : undefined}
+				>
+					{execution.projectLabel ?? execution.projectRoot ?? '-'}
+				</span>
 			</HeaderField>
 			<HeaderField label="Current steps">
 				{execution.currentSteps.length === 0 ? '-' : execution.currentSteps.join(', ')}

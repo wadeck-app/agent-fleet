@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VERSION } from '../cli/version.js';
-import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol.js';
+import { WORKER_FEATURE_PROJECT_ID, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol.js';
 import {
 	buildRegistration,
 	buildStepRunnerConfig,
@@ -94,17 +94,41 @@ describe('resolveWorkerToken', () => {
 	});
 });
 
-describe('buildRegistration', () => {
-	it('attaches the launch project by default (D#9)', () => {
-		const reg = buildRegistration({ projectRoot: 'C:/proj', isTty: false, canPrompt: false, pid: 7 });
+const PROJ = { id: 'proj0001', path: 'C:/proj' };
+const OTHER = { id: 'other001', path: 'C:/other' };
+const P = { id: 'p0000001', path: 'C:/p' };
 
+describe('buildRegistration', () => {
+	it('attaches the launch project by registry id, with its folder for display (D#9)', () => {
+		const reg = buildRegistration({ projects: [PROJ], isTty: false, canPrompt: false, pid: 7 });
+
+		expect(reg.attachedProjectIds).toEqual(['proj0001']);
 		expect(reg.attachedProjects).toEqual(['C:/proj']);
+	});
+
+	// The daemon refuses a worker that does not declare it (it would attach by folder path and receive nothing).
+	it('declares the project id feature', () => {
+		const reg = buildRegistration({ projects: [PROJ], isTty: false, canPrompt: false, pid: 7 });
+
+		expect(reg.features).toContain(WORKER_FEATURE_PROJECT_ID);
+	});
+
+	it('attaches a project that has no folder by id alone', () => {
+		const reg = buildRegistration({
+			projects: [{ id: 'virt0001' }],
+			isTty: false,
+			canPrompt: false,
+			pid: 7,
+		});
+
+		expect(reg.attachedProjectIds).toEqual(['virt0001']);
+		expect(reg.attachedProjects).toEqual([]);
 	});
 
 	// Part 1 of the version-reporting plan: the daemon/admin tooling needs to see which build a
 	// worker is running without inferring it from behaviour.
 	it('reports the running flow-cli version', () => {
-		const reg = buildRegistration({ projectRoot: 'C:/proj', isTty: false, canPrompt: false, pid: 7 });
+		const reg = buildRegistration({ projects: [PROJ], isTty: false, canPrompt: false, pid: 7 });
 
 		expect(reg.version).toBe(VERSION);
 	});
@@ -112,44 +136,44 @@ describe('buildRegistration', () => {
 	// The daemon names a worker that lacks this in the log when it dispatches a sub-step relaunch
 	// to it (the worker would re-render the whole parent prompt instead of resuming its session).
 	it('declares the sub-step session resume feature', () => {
-		const reg = buildRegistration({ projectRoot: 'C:/proj', isTty: false, canPrompt: false, pid: 7 });
+		const reg = buildRegistration({ projects: [PROJ], isTty: false, canPrompt: false, pid: 7 });
 
 		expect(reg.features).toContain(WORKER_FEATURE_SUB_STEP_SESSION_RESUME);
 	});
 
-	it('adds explicitly requested projects without dropping the launch one', () => {
+	it('serves every project it is given, in order', () => {
 		const reg = buildRegistration({
-			projectRoot: 'C:/proj',
-			extraProjects: ['C:/other'],
+			projects: [PROJ, OTHER],
 			isTty: false,
 			canPrompt: false,
 			pid: 7,
 		});
 
+		expect(reg.attachedProjectIds).toEqual(['proj0001', 'other001']);
 		expect(reg.attachedProjects).toEqual(['C:/proj', 'C:/other']);
 	});
 
-	it('does not duplicate the launch project if it is also passed explicitly', () => {
+	it('does not duplicate a project passed twice', () => {
 		const reg = buildRegistration({
-			projectRoot: 'C:/proj',
-			extraProjects: ['C:/proj'],
+			projects: [PROJ, PROJ],
 			isTty: false,
 			canPrompt: false,
 			pid: 7,
 		});
 
+		expect(reg.attachedProjectIds).toEqual(['proj0001']);
 		expect(reg.attachedProjects).toEqual(['C:/proj']);
 	});
 
 	// D#33/D#36: only the worker can know whether a human is attached.
 	it('reports a user interface when there is a TTY and a way to prompt', () => {
-		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: true, canPrompt: true, pid: 1 });
+		const reg = buildRegistration({ projects: [P], isTty: true, canPrompt: true, pid: 1 });
 
 		expect(reg.hasUserInterface).toBe(true);
 	});
 
 	it('reports none without a TTY when the way to prompt needs one', () => {
-		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: true, pid: 1 });
+		const reg = buildRegistration({ projects: [P], isTty: false, canPrompt: true, pid: 1 });
 
 		expect(reg.hasUserInterface).toBe(false);
 	});
@@ -159,7 +183,7 @@ describe('buildRegistration', () => {
 	// which is the only way an automated agent or a remote reviewer can answer one.
 	it('reports a user interface without a TTY when prompting does not need one', () => {
 		const reg = buildRegistration({
-			projectRoot: 'C:/p',
+			projects: [P],
 			isTty: false,
 			canPrompt: true,
 			promptNeedsTerminal: false,
@@ -172,14 +196,14 @@ describe('buildRegistration', () => {
 	// Absent means "assume a terminal is required": a third-party provider written against v1 of
 	// the contract cannot suddenly be treated as headless-capable.
 	it('still requires a TTY when the provider says nothing about needing one', () => {
-		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: true, pid: 1 });
+		const reg = buildRegistration({ projects: [P], isTty: false, canPrompt: true, pid: 1 });
 
 		expect(reg.hasUserInterface).toBe(false);
 	});
 
 	it('reports none when nothing can prompt, even if a terminal is not required', () => {
 		const reg = buildRegistration({
-			projectRoot: 'C:/p',
+			projects: [P],
 			isTty: false,
 			canPrompt: false,
 			promptNeedsTerminal: false,
@@ -193,14 +217,14 @@ describe('buildRegistration', () => {
 	// interactive step and then fail it with "No ApprovalProvider configured". Declaring a
 	// capability it cannot honour is worse than declaring none.
 	it('reports none when there is nobody to ask, even at a terminal', () => {
-		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: true, canPrompt: false, pid: 1 });
+		const reg = buildRegistration({ projects: [P], isTty: true, canPrompt: false, pid: 1 });
 
 		expect(reg.hasUserInterface).toBe(false);
 	});
 
 	it('passes labels and source through', () => {
 		const reg = buildRegistration({
-			projectRoot: 'C:/p',
+			projects: [P],
 			isTty: false,
 			canPrompt: false,
 			pid: 1,
@@ -216,19 +240,19 @@ describe('buildRegistration', () => {
 
 	it('rejects a blank label rather than sending something unmatchable', () => {
 		expect(() =>
-			buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: false, pid: 1, labels: ['  '] })
+			buildRegistration({ projects: [P], isTty: false, canPrompt: false, pid: 1, labels: ['  '] })
 		).toThrow(/empty/i);
 	});
 
 	it('defaults shellCapabilities to empty when omitted', () => {
-		const reg = buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: false, pid: 1 });
+		const reg = buildRegistration({ projects: [P], isTty: false, canPrompt: false, pid: 1 });
 
 		expect(reg.shellCapabilities).toEqual([]);
 	});
 
 	it('passes shellCapabilities through when provided', () => {
 		const reg = buildRegistration({
-			projectRoot: 'C:/p',
+			projects: [P],
 			isTty: false,
 			canPrompt: false,
 			pid: 1,
@@ -307,10 +331,10 @@ describe('worker configuration from the environment', () => {
 		expect(resolveSourceId(undefined)).toBeUndefined();
 	});
 
-	it('takes the projects to serve from the environment', () => {
-		process.env['FLOW_WORKER_PROJECTS'] = 'C:/a,C:/b';
+	it('takes the project references to serve (names, aliases or ids) from the environment', () => {
+		process.env['FLOW_WORKER_PROJECTS'] = 'alpha,beta';
 
-		expect(resolveExtraProjects(undefined)).toEqual(['C:/a', 'C:/b']);
+		expect(resolveExtraProjects(undefined)).toEqual(['alpha', 'beta']);
 	});
 
 	it('ignores an empty projects list rather than serving a blank path', () => {
@@ -320,9 +344,9 @@ describe('worker configuration from the environment', () => {
 	});
 
 	it('prefers explicit --project flags over the environment', () => {
-		process.env['FLOW_WORKER_PROJECTS'] = 'C:/a';
+		process.env['FLOW_WORKER_PROJECTS'] = 'alpha';
 
-		expect(resolveExtraProjects(['C:/explicit'])).toEqual(['C:/explicit']);
+		expect(resolveExtraProjects(['explicit'])).toEqual(['explicit']);
 	});
 
 	// A remote worker launched over ssh has no port file to read: the endpoint it must dial is
@@ -348,7 +372,7 @@ describe('withFreshToken', () => {
 	// to as well.
 	it('sends the credential as it is now, not as it was at launch', () => {
 		const registration = buildRegistration({
-			projectRoot: 'C:/p',
+			projects: [P],
 			isTty: false,
 			canPrompt: false,
 			pid: 1,
@@ -362,8 +386,7 @@ describe('withFreshToken', () => {
 
 	it('leaves the rest of the registration untouched', () => {
 		const registration = buildRegistration({
-			projectRoot: 'C:/p',
-			extraProjects: ['C:/other'],
+			projects: [P, OTHER],
 			isTty: false,
 			canPrompt: false,
 			pid: 7,
@@ -374,6 +397,7 @@ describe('withFreshToken', () => {
 
 		const refreshed = withFreshToken(registration, () => 'rotated');
 
+		expect(refreshed.attachedProjectIds).toEqual(['p0000001', 'other001']);
 		expect(refreshed.attachedProjects).toEqual(['C:/p', 'C:/other']);
 		expect(refreshed.labels).toEqual(['gpu']);
 		expect(refreshed.sourceId).toBe('laptop');
@@ -383,7 +407,7 @@ describe('withFreshToken', () => {
 	// A credential that cannot be re-read must not silently downgrade to none: registering without
 	// one is refused anyway, and the reason would be lost.
 	it('propagates the failure when the credential can no longer be resolved', () => {
-		const registration = buildRegistration({ projectRoot: 'C:/p', isTty: false, canPrompt: false, pid: 1 });
+		const registration = buildRegistration({ projects: [P], isTty: false, canPrompt: false, pid: 1 });
 
 		expect(() =>
 			withFreshToken(registration, () => {

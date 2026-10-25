@@ -19,6 +19,7 @@ function candidate(workerId: string, overrides: Partial<RegisteredWorker> = {}):
 			pid: 1,
 			labels: [],
 			attachedProjects: [],
+			attachedProjectIds: [],
 			hasUserInterface: false,
 			ephemeral: true,
 			shellCapabilities: [],
@@ -74,23 +75,46 @@ describe('DefaultWorkerAcceptance', () => {
 	// project set to check against.
 	it('accepts a daemon-created worker for any project', () => {
 		const worker = candidate('w1', { ephemeral: true }).worker;
-		expect(acceptance.accepts({ step: step({ projectRoot: 'C:/proj' }), worker })).toBe(true);
+		expect(acceptance.accepts({ step: step({ projectId: 'proj0001', projectRoot: 'C:/proj' }), worker })).toBe(
+			true
+		);
 	});
 
 	// Serving a project beyond its launch directory is explicit opt-in (D#9).
 	it('accepts a registered worker attached to the step project', () => {
-		const worker = candidate('w1', { ephemeral: false, attachedProjects: ['C:/proj', 'C:/other'] }).worker;
-		expect(acceptance.accepts({ step: step({ projectRoot: 'C:/proj' }), worker })).toBe(true);
+		const worker = candidate('w1', { ephemeral: false, attachedProjectIds: ['proj0001', 'other001'] }).worker;
+		expect(acceptance.accepts({ step: step({ projectId: 'proj0001', projectRoot: 'C:/proj' }), worker })).toBe(
+			true
+		);
 	});
 
 	it('refuses a registered worker not attached to the step project', () => {
-		const worker = candidate('w1', { ephemeral: false, attachedProjects: ['C:/other'] }).worker;
+		const worker = candidate('w1', { ephemeral: false, attachedProjectIds: ['other001'] }).worker;
+		expect(acceptance.accepts({ step: step({ projectId: 'proj0001', projectRoot: 'C:/proj' }), worker })).toBe(
+			false
+		);
+	});
+
+	// Routing is by registry id: the same folder under another id (a re-registered project) is another project.
+	it('matches the project id, not the folder: a worker attached to the same path but not the id is refused', () => {
+		const worker = candidate('w1', {
+			ephemeral: false,
+			attachedProjects: ['C:/proj'],
+			attachedProjectIds: ['other001'],
+		}).worker;
+		expect(acceptance.accepts({ step: step({ projectId: 'proj0001', projectRoot: 'C:/proj' }), worker })).toBe(
+			false
+		);
+	});
+
+	it('refuses a registered worker for a step that carries only a project root (no id to match)', () => {
+		const worker = candidate('w1', { ephemeral: false, attachedProjectIds: ['proj0001'] }).worker;
 		expect(acceptance.accepts({ step: step({ projectRoot: 'C:/proj' }), worker })).toBe(false);
 	});
 
 	// Nothing to check the attachment against, so the answer is no rather than a guess.
 	it('refuses a registered worker when the run belongs to no project', () => {
-		const worker = candidate('w1', { ephemeral: false, attachedProjects: ['C:/proj'] }).worker;
+		const worker = candidate('w1', { ephemeral: false, attachedProjectIds: ['proj0001'] }).worker;
 		expect(acceptance.accepts({ step: step(), worker })).toBe(false);
 	});
 
@@ -238,17 +262,17 @@ describe('StepRouter', () => {
 
 	it('returns nothing when no candidate accepts the step', () => {
 		const router = new StepRouter();
-		const candidates = [candidate('w1', { ephemeral: false, attachedProjects: ['C:/other'] })];
+		const candidates = [candidate('w1', { ephemeral: false, attachedProjectIds: ['other001'] })];
 
-		expect(router.select(step({ projectRoot: 'C:/proj' }), candidates)).toBeUndefined();
+		expect(router.select(step({ projectId: 'proj0001', projectRoot: 'C:/proj' }), candidates)).toBeUndefined();
 	});
 
 	it('returns the socket of the first eligible worker in distribution order', () => {
 		const router = new StepRouter();
 		const forked = candidate('forked', { ephemeral: true });
-		const registered = candidate('registered', { ephemeral: false, attachedProjects: ['C:/proj'] });
+		const registered = candidate('registered', { ephemeral: false, attachedProjectIds: ['proj0001'] });
 
-		const chosen = router.select(step({ projectRoot: 'C:/proj' }), [forked, registered]);
+		const chosen = router.select(step({ projectId: 'proj0001', projectRoot: 'C:/proj' }), [forked, registered]);
 
 		expect(chosen).toBe(registered.ws);
 	});
@@ -259,9 +283,11 @@ describe('StepRouter', () => {
 		};
 		const router = new StepRouter(acceptance);
 		const forked = candidate('forked', { ephemeral: true });
-		const registered = candidate('registered', { ephemeral: false, attachedProjects: ['C:/proj'] });
+		const registered = candidate('registered', { ephemeral: false, attachedProjectIds: ['proj0001'] });
 
-		expect(router.select(step({ projectRoot: 'C:/proj' }), [forked, registered])).toBe(forked.ws);
+		expect(router.select(step({ projectId: 'proj0001', projectRoot: 'C:/proj' }), [forked, registered])).toBe(
+			forked.ws
+		);
 	});
 
 	// A distribution plugin that drops candidates caps parallelism, which is invisible in

@@ -322,3 +322,65 @@ describe('ForkWorkerSource - exit diagnostics', () => {
 		expect(entries).toHaveLength(0);
 	});
 });
+
+describe('ForkWorkerSource - daemon shutdown', () => {
+	function emittingChild(pid: number) {
+		const child = new EventEmitter() as EventEmitter & {
+			pid: number;
+			killed: boolean;
+			kill: ReturnType<typeof vi.fn>;
+			stderr: EventEmitter;
+		};
+		child.pid = pid;
+		child.killed = false;
+		child.kill = vi.fn();
+		child.stderr = new EventEmitter();
+		return child;
+	}
+
+	async function sourceWithWorker(pid: number) {
+		const entries: string[] = [];
+		const child = emittingChild(pid);
+		spawnMock.mockReturnValue(child);
+		vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		const source = new ForkWorkerSource(100, 200, undefined, { log: (_level, msg) => entries.push(msg) });
+		await source.obtainWorker(request);
+		return { source, child, entries };
+	}
+
+	// A worker told to exit that does not (wedged in a step, event loop blocked) kept running after the daemon that owned
+	// it was gone: an orphan nobody could tell from the outside.
+	it('kills a worker that is still running once the grace has elapsed, and says which', async () => {
+		vi.useFakeTimers();
+		const { source, child, entries } = await sourceWithWorker(77);
+
+		source.terminateRemaining(2_000);
+		await vi.advanceTimersByTimeAsync(1_999);
+		expect(child.kill).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(1);
+
+		expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+		expect(entries.some(msg => msg.includes('pid 77') && msg.includes('still running'))).toBe(true);
+	});
+
+	it('leaves alone a worker that exits by itself within the grace', async () => {
+		vi.useFakeTimers();
+		const { source, child } = await sourceWithWorker(77);
+
+		source.terminateRemaining(2_000);
+		child.emit('exit', 0, null);
+		await vi.advanceTimersByTimeAsync(5_000);
+
+		expect(child.kill).not.toHaveBeenCalled();
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it('schedules nothing when no worker is running', () => {
+		vi.useFakeTimers();
+		const source = new ForkWorkerSource(100, 200);
+
+		source.terminateRemaining(2_000);
+
+		expect(vi.getTimerCount()).toBe(0);
+	});
+});

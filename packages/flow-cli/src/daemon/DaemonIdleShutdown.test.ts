@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DaemonIdleShutdown, SHUTDOWN_GRACE_MS } from './DaemonIdleShutdown.js';
+import { DaemonIdleShutdown, IDLE_WATCHDOG_INTERVAL_MS, SHUTDOWN_GRACE_MS } from './DaemonIdleShutdown.js';
 import type { DaemonRuntime } from './DaemonRuntime.js';
 
 describe('DaemonIdleShutdown', () => {
@@ -86,5 +86,68 @@ describe('DaemonIdleShutdown', () => {
 
 		expect(stopDaemon).not.toHaveBeenCalled();
 		expect(logLines().some(msg => msg.startsWith('Idle shutdown skipped on recheck'))).toBe(true);
+	});
+
+	// Idleness used to be looked at only when a worker message arrived. A daemon that no worker ever contacted (the run
+	// was refused, nothing needed a worker, `flow start` and nothing else) was never asked, and lived until killed.
+	describe('watchdog', () => {
+		it('stops a daemon no worker ever contacted, without any message arriving', () => {
+			shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS);
+
+			vi.advanceTimersByTime(IDLE_WATCHDOG_INTERVAL_MS);
+			expect(stopDaemon).not.toHaveBeenCalled();
+			vi.advanceTimersByTime(SHUTDOWN_GRACE_MS);
+
+			expect(stopDaemon).toHaveBeenCalledTimes(1);
+			expect(logLines().some(msg => msg.startsWith('Idle detected'))).toBe(true);
+		});
+
+		it('leaves a busy daemon alone and stops it on the first tick after it becomes idle', () => {
+			idle = false;
+			shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS);
+
+			vi.advanceTimersByTime(IDLE_WATCHDOG_INTERVAL_MS * 3);
+			expect(stopDaemon).not.toHaveBeenCalled();
+
+			idle = true;
+			vi.advanceTimersByTime(IDLE_WATCHDOG_INTERVAL_MS + SHUTDOWN_GRACE_MS);
+			expect(stopDaemon).toHaveBeenCalledTimes(1);
+		});
+
+		it('is silent while the daemon is busy (no log line per tick)', () => {
+			idle = false;
+			shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS);
+
+			vi.advanceTimersByTime(IDLE_WATCHDOG_INTERVAL_MS * 5);
+
+			expect(fs.readdirSync(logsDir)).toEqual([]);
+		});
+
+		it('is not what keeps the process alive', () => {
+			const spy = vi.spyOn(globalThis, 'setInterval');
+			shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS);
+
+			expect(spy).toHaveBeenCalledTimes(1);
+			const timer = spy.mock.results[0]?.value as { hasRef: () => boolean };
+			expect(timer.hasRef()).toBe(false);
+		});
+
+		it('refuses to be started twice', () => {
+			shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS);
+
+			expect(() => shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS)).toThrow(/already running/);
+		});
+	});
+
+	describe('dispose', () => {
+		it('cancels the watchdog and a shutdown already scheduled, whatever stopped the daemon', () => {
+			shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS);
+			shutdown.checkShutdown();
+
+			shutdown.dispose();
+			vi.advanceTimersByTime(IDLE_WATCHDOG_INTERVAL_MS * 3);
+
+			expect(stopDaemon).not.toHaveBeenCalled();
+		});
 	});
 });

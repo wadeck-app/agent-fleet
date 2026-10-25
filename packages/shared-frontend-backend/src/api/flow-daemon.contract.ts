@@ -72,6 +72,10 @@ export const FlowExecutionSummarySchema = z.object({
 	lastError: z.string().optional(),
 	lastErrorRecovered: z.boolean(),
 	projectRoot: z.string().optional(),
+	/** Registry id of the project (project-sdk); absent on runs recorded before project ids existed. */
+	projectId: z.string().optional(),
+	/** `name (id)`, `id (removed)` or `<root> (-)` (old runs): what to show for the project. */
+	projectLabel: z.string().optional(),
 	stepCount: z.number(),
 	failedStepCount: z.number(),
 });

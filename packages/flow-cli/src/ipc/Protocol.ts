@@ -85,6 +85,13 @@ export const WORKER_FEATURE_SUB_STEP_SESSION_RESUME = 'sub-step-session-resume';
  */
 export const WORKER_FEATURE_SECRETS = 'secrets';
 
+/**
+ * The worker attaches to projects by registry id (`WorkerReady.attachedProjectIds`). A worker that does not declare
+ * this one attached itself by folder paths, which the daemon can no longer match: it is refused at registration with a
+ * message telling the user to update the worker, instead of being connected and never receiving a step.
+ */
+export const WORKER_FEATURE_PROJECT_ID = 'project-id';
+
 export type ClientCommand =
 	| {
 			type: 'run';
@@ -112,6 +119,18 @@ export type ClientCommand =
 			mockEnv?: Record<string, Record<string, string>>;
 			/** Absolute path to the `--mock-config` file, surfaced in the "MOCK" warning banner. */
 			mockConfigPath?: string;
+			/**
+			 * `-p/--project <ref>` as the user typed it (name, alias or id). The daemon serves every project, so it
+			 * resolves the project itself, per request, from what the client sends: this, `envProject`, then `cwd`.
+			 */
+			projectRef?: string;
+			/** The client's `FLOW_PROJECT` (the daemon's own environment is never consulted for it). */
+			envProject?: string;
+			/**
+			 * The project registry directory the client resolved against. The daemon refuses the run when its own differs
+			 * (an `XDG_CONFIG_HOME` set in one shell only), rather than answering from another registry.
+			 */
+			registryDir?: string;
 	  }
 	| {
 			type: 'resume';
@@ -121,7 +140,8 @@ export type ClientCommand =
 export type DaemonResponse =
 	| { type: 'execution_started'; executionId: string }
 	| { type: 'execution_resumed'; executionId: string; stepId: string }
-	| { type: 'error'; message: string; code: string };
+	/** `detail` refines `code` when one code covers several causes (PROJECT_RESOLUTION_FAILED: NO_PROJECT_IN_SCOPE, PROJECT_NOT_FOUND, ...). */
+	| { type: 'error'; message: string; code: string; detail?: string };
 
 /**
  * Payload for the `updateWorker` admin command (`flow worker update`).
@@ -263,9 +283,11 @@ export interface WorkerReady {
 	 */
 	labels?: string[];
 	/**
-	 * Absolute project roots this worker will serve. Defaults to the single project it
-	 * was launched in; serving others is explicit opt-in (D#9).
+	 * Registry ids of the projects this worker serves: what the daemon routes steps by. Defaults to the project it was
+	 * launched in; serving others is explicit opt-in (D#9). Declared together with {@link WORKER_FEATURE_PROJECT_ID}.
 	 */
+	attachedProjectIds?: string[];
+	/** Folders of those projects as the worker saw them, for display (`flow worker list`); never used for routing. */
 	attachedProjects?: string[];
 	/**
 	 * Whether a human can interact with this worker. The worker alone decides this

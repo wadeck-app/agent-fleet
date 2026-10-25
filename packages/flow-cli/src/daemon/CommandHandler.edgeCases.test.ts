@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { CommandHandler } from './CommandHandler';
+import { registerFolderAsProject } from './CommandHandlerTestHarness';
 
 // Characterization tests written before CommandHandler was split into collaborators: they pin the
 // behaviour of paths the other CommandHandler test files do not reach.
@@ -78,6 +79,7 @@ steps:
 `;
 
 let tmpDir: string;
+let disposeProject: () => void;
 let daemonDir: string;
 
 const mockExecStore = {
@@ -115,6 +117,7 @@ function createWorkerPool(idle: boolean) {
 								pid: 1,
 								labels: [] as string[],
 								attachedProjects: [] as string[],
+								attachedProjectIds: [] as string[],
 								hasUserInterface: false,
 								ephemeral: true,
 								shellCapabilities: [] as string[],
@@ -162,9 +165,10 @@ async function startFlow(handler: CommandHandler, yaml: string): Promise<string>
 	return result.executionId;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
 	tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-handler-edge-'));
 	daemonDir = path.join(tmpDir, 'daemon');
+	({ dispose: disposeProject } = await registerFolderAsProject(tmpDir));
 	fs.mkdirSync(daemonDir, { recursive: true });
 	vi.clearAllMocks();
 	mockAllocate.mockResolvedValue({
@@ -178,6 +182,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	disposeProject();
 	for (const handler of startedHandlers.splice(0)) {
 		handler.stopBackgroundWork();
 	}

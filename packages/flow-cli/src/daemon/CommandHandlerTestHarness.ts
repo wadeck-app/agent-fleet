@@ -1,7 +1,9 @@
+import type { Project } from '@wadeck-app/project-sdk';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { CommandHandler } from './CommandHandler';
 
 // Every handler a test builds, so afterEach can cancel its pending demand re-check. That timer is a
@@ -25,6 +27,7 @@ export function forkedWorker(ws: unknown) {
 			workerId: 'w-test',
 			pid: 1,
 			labels: [] as string[],
+			attachedProjectIds: [] as string[],
 			attachedProjects: [] as string[],
 			hasUserInterface: false,
 			ephemeral: true,
@@ -169,6 +172,24 @@ steps:
 
 export let tmpDir: string;
 export let daemonDir: string;
+/** The project registered (through the SDK, in a throwaway registry) with `tmpDir` as its folder: every `handleRun({ cwd: tmpDir })` resolves to it. */
+export let registeredProject: Project;
+let projectRegistry: RegisteredProjectFixture;
+
+/**
+ * For test files that manage their own tmp dir: points this process at a throwaway project registry and registers `folder`
+ * in it, so `handleRun({ cwd: folder })` resolves to the returned project. Call `dispose()` in afterEach.
+ */
+export async function registerFolderAsProject(folder: string): Promise<{ project: Project; dispose: () => void }> {
+	const fixture = new RegisteredProjectFixture().useAsProcessEnv();
+	try {
+		const project = await fixture.register('test-project', { folder });
+		return { project, dispose: () => fixture.dispose() };
+	} catch (error) {
+		fixture.dispose();
+		throw error;
+	}
+}
 
 export const mockExecStore = {
 	create: vi.fn(),
@@ -204,10 +225,12 @@ export function registerCommandHandlerHooks({
 	mockRelease,
 	hoistedState,
 }: CommandHandlerHarnessMocks): void {
-	beforeEach(() => {
+	beforeEach(async () => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-handler-test-'));
 		daemonDir = path.join(tmpDir, 'daemon');
 		fs.mkdirSync(daemonDir, { recursive: true });
+		projectRegistry = new RegisteredProjectFixture().useAsProcessEnv();
+		registeredProject = await projectRegistry.register('harness-project', { folder: tmpDir });
 		vi.clearAllMocks();
 		vi.mocked(os.homedir).mockReturnValue(hoistedState.actualHomedir);
 		mockAllocate.mockResolvedValue({ path: '/tmp/test-workspace', id: 'ws-test-id' });
@@ -218,6 +241,7 @@ export function registerCommandHandlerHooks({
 		// Must run before the mocks are reset/restored, see startedHandlers.
 		for (const handler of startedHandlers.splice(0)) handler.stopBackgroundWork();
 		vi.restoreAllMocks();
+		projectRegistry.dispose();
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 	});
 }

@@ -33,6 +33,11 @@ export interface WebSocketServerOptions {
 	 * port scan (taken, reserved, exhausted) without depending on which ports the machine has free.
 	 */
 	bind?: PortBinder;
+	/**
+	 * How long close() lets connected peers finish the close handshake before terminating them. Short by default: the
+	 * daemon is going away and an open connection is what would keep its process alive.
+	 */
+	closeGraceMs?: number;
 }
 
 /** Starts listening; reports success through the server's 'listening' event and failure through its 'error' event. */
@@ -40,6 +45,17 @@ export type PortBinder = (server: http.Server | https.Server, port: number, addr
 
 /** Errors that mean "not this port": taken (EADDRINUSE) or inside a Windows excluded/reserved range (EACCES). */
 const SKIPPABLE_BIND_ERRORS = new Set(['EADDRINUSE', 'EACCES']);
+
+/** See {@link WebSocketServerOptions.closeGraceMs}. */
+const DEFAULT_CLOSE_GRACE_MS = 2_000;
+
+/** Thrown by start() when close() came first: no listener was (or will be) bound. */
+export class WebSocketServerClosedError extends Error {
+	constructor() {
+		super('The WebSocket server was closed before it finished binding a port; no listener was left open.');
+		this.name = 'WebSocketServerClosedError';
+	}
+}
 
 const defaultBind: PortBinder = (server, port, address) => {
 	server.listen(port, address);
@@ -60,6 +76,7 @@ export class WebSocketServer {
 	private closed = false;
 	private readonly log: ConnectionLog;
 	private readonly bind: PortBinder;
+	private readonly closeGraceMs: number;
 
 	constructor(
 		port: number,
@@ -84,6 +101,7 @@ export class WebSocketServer {
 		// The ws default (100 MiB) would allow a rogue local process to exhaust daemon memory.
 		this.log = options.log ?? stderrLog;
 		this.bind = options.bind ?? defaultBind;
+		this.closeGraceMs = options.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS;
 		this.wss = new WsServer({ server: this.httpServer, maxPayload: MAX_WORKER_FRAME_BYTES });
 		this.wss.on('connection', (ws: WebSocket) => this.handleConnection(ws));
 		// ws re-emits httpServer errors; without a handler Node.js throws unhandled 'error'
@@ -101,6 +119,11 @@ export class WebSocketServer {
 	start(): Promise<number> {
 		return new Promise((resolve, reject) => {
 			const tryBind = (p: number, attemptsLeft: number): void => {
+				// Checked before every attempt: a close() that landed between two of them must not be undone by the next one.
+				if (this.closed) {
+					reject(new WebSocketServerClosedError());
+					return;
+				}
 				this.httpServer.once('error', (err: NodeJS.ErrnoException) => {
 					const skippable = err.code !== undefined && SKIPPABLE_BIND_ERRORS.has(err.code);
 					if (skippable && attemptsLeft > 0) {
@@ -112,6 +135,10 @@ export class WebSocketServer {
 					}
 				});
 				this.httpServer.once('listening', () => {
+					if (this.closed) {
+						reject(new WebSocketServerClosedError());
+						return;
+					}
 					// Read back from the socket rather than trusting the number we asked for. With
 					// port 0 the OS picks one, and recording the request would publish "0" for every
 					// worker to dial. Any other divergence is worth inheriting rather than guessing.
@@ -175,7 +202,15 @@ export class WebSocketServer {
 		});
 	}
 
-	/** Safe to call more than once: every stop path closes the listener, and some reach it twice. */
+	/**
+	 * Stops listening AND disconnects every peer. Safe to call more than once: every stop path closes the listener, and
+	 * some reach it twice.
+	 *
+	 * Peers are closed here because nobody else can be relied on to: `ws` leaves existing connections open on close(), the
+	 * registries only know the peers that registered, and a connected socket is a referenced handle. One forgotten peer
+	 * (a worker that never sent `ready`, a relay, a wedged forked worker ignoring `done`) kept a daemon that had already
+	 * deleted its port file alive indefinitely. Peers get the close handshake first and are terminated after a short grace.
+	 */
 	close(): void {
 		if (this.closed) {
 			return;
@@ -183,5 +218,18 @@ export class WebSocketServer {
 		this.closed = true;
 		this.wss.close();
 		this.httpServer.close();
+		const peers = [...this.wss.clients];
+		for (const peer of peers) {
+			peer.close(1001, 'daemon stopping');
+		}
+		if (peers.length > 0) {
+			// Unref'd: the sockets keep the loop alive until they are gone, so the timer still fires when it matters and
+			// never delays an exit that is otherwise possible.
+			setTimeout(() => {
+				for (const peer of peers) {
+					peer.terminate();
+				}
+			}, this.closeGraceMs).unref();
+		}
 	}
 }

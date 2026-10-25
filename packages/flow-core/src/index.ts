@@ -68,6 +68,12 @@ export type {
 export { createRemoteDaemonClient, isUnknownCommandError, outdatedDaemonMessage } from './daemon/RemoteDaemonClient.js';
 export { DEFAULT_HISTORY_LIMIT, RECOVERED_STATUS, filterExecutions } from './history/ExecutionFilter.js';
 export type { ExecutionFilterOptions, FilteredExecutions } from './history/ExecutionFilter.js';
+export {
+	createRegistryProjectLookup,
+	createRegistryProjectLookupFromEnv,
+	projectLabelOf,
+} from './project/ProjectLabel.js';
+export type { ProjectLookup, ProjectLookupResult } from './project/ProjectLabel.js';
 export { countByStatus } from './history/StatusCounts.js';
 export type { StatusCounts } from './history/StatusCounts.js';
 export { summarizeFlows } from './history/FlowSummaries.js';

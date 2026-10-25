@@ -14,6 +14,8 @@ export interface ExecutionFilterOptions {
 	flowContains?: string;
 	/** Execution id prefix. A lookup, not a page: pagination is not applied. */
 	id?: string;
+	/** Exact registry id of the project; records written before project ids existed never match. */
+	projectId?: string;
 }
 
 export interface FilteredExecutions {
@@ -51,6 +53,9 @@ export function filterExecutions(execs: ExecutionState[], opts: ExecutionFilterO
 	}
 	if (opts.flow) {
 		filtered = filtered.filter(e => e.flowId === opts.flow);
+	}
+	if (opts.projectId) {
+		filtered = filtered.filter(e => e.projectId === opts.projectId);
 	}
 	if (opts.flowContains) {
 		const needle = opts.flowContains.toLowerCase();

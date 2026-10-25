@@ -44,6 +44,8 @@ describe('toExecutionSummary', () => {
 			// completed run: lastError is a recovered retry, not the outcome
 			lastErrorRecovered: true,
 			projectRoot: '/work/app',
+			// a record with only projectRoot is labelled "<root> (-)"
+			projectLabel: '/work/app (-)',
 			stepCount: 2,
 			failedStepCount: 1,
 			versionLabel: '-',
@@ -169,5 +171,31 @@ describe('toExecutionDetail', () => {
 
 	it('has no totalCostUsd when no step reports a cost', () => {
 		expect(toExecutionDetail(resolved, '')).not.toHaveProperty('totalCostUsd');
+	});
+});
+
+describe('project fields of the views', () => {
+	it('exposes projectId and projectLabel (name (id)) next to projectRoot when a lookup is given', () => {
+		const summary = toExecutionSummary(record({ projectId: 'a1b2c3d4', projectRoot: '/work/app' }), () => ({
+			kind: 'known',
+			name: 'app',
+		}));
+		expect(summary).toMatchObject({
+			projectId: 'a1b2c3d4',
+			projectRoot: '/work/app',
+			projectLabel: 'app (a1b2c3d4)',
+		});
+	});
+
+	it('labels a record with only projectRoot as "<root> (-)" and leaves projectId out', () => {
+		const summary = toExecutionSummary(record({ projectRoot: '/work/app' }));
+		expect(summary.projectLabel).toBe('/work/app (-)');
+		expect(summary).not.toHaveProperty('projectId');
+	});
+
+	it('has neither field for a record without a project', () => {
+		const summary = toExecutionSummary(record());
+		expect(summary).not.toHaveProperty('projectId');
+		expect(summary).not.toHaveProperty('projectLabel');
 	});
 });

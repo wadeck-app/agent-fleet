@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { WORKER_FEATURE_SECRETS } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { CommandHandler } from './CommandHandler';
+import { registerFolderAsProject } from './CommandHandlerTestHarness';
 import { DaemonSecrets } from './DaemonSecrets';
 
 // Built at runtime from parts: a literal would trip secret scanners on the source file.
@@ -62,6 +63,7 @@ interface Assign {
 
 describe('CommandHandler secrets', () => {
 	let tmpDir: string;
+	let disposeProject: () => void;
 	let daemonDir: string;
 	let flowFile: string;
 	let assigns: Assign[];
@@ -80,6 +82,7 @@ describe('CommandHandler secrets', () => {
 						pid: 1,
 						labels: [],
 						attachedProjects: [],
+						attachedProjectIds: [],
 						hasUserInterface: false,
 						ephemeral: true,
 						shellCapabilities: [],
@@ -121,9 +124,10 @@ describe('CommandHandler secrets', () => {
 	const run = (handler: CommandHandler, inputs: Record<string, string>) =>
 		handler.handleRun({ type: 'run', flowFile, cwd: tmpDir, inputs } as never);
 
-	beforeEach(() => {
+	beforeEach(async () => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-secrets-'));
 		daemonDir = path.join(tmpDir, 'daemon');
+		({ dispose: disposeProject } = await registerFolderAsProject(tmpDir));
 		fs.mkdirSync(path.join(daemonDir, 'executions'), { recursive: true });
 		fs.mkdirSync(path.join(daemonDir, 'logs'), { recursive: true });
 		flowFile = path.join(tmpDir, 'flow.yml');
@@ -139,6 +143,7 @@ describe('CommandHandler secrets', () => {
 	});
 
 	afterEach(() => {
+		disposeProject();
 		for (const handler of handlers) {
 			handler.stopBackgroundWork();
 		}

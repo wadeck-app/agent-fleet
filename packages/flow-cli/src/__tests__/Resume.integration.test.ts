@@ -6,6 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { startTestDaemon } from '../test-utils/TestHelpers';
 
 const SIMPLE_SCRIPT_FLOW = `\
@@ -40,6 +41,10 @@ describe('resume command (real daemon)', () => {
 	});
 
 	it('returns NOT_RESUMABLE for an execution that exists but did not fail on an unanswered intervention', async () => {
+		// The in-process daemon resolves the project of the run from this process's registry.
+		const registry = new RegisteredProjectFixture().useAsProcessEnv();
+		const projectFolder = registry.makeFolder('resume-e2e');
+		await registry.register('resume-e2e', { folder: projectFolder });
 		const flowYml = path.join(os.tmpdir(), `resume-e2e-flow-${Date.now()}.yml`);
 		fs.writeFileSync(flowYml, SIMPLE_SCRIPT_FLOW, 'utf8');
 
@@ -49,7 +54,7 @@ describe('resume command (real daemon)', () => {
 			const runResponse = await ctx.client.send('run', {
 				type: 'run',
 				flowFile: flowYml,
-				cwd: os.tmpdir(),
+				cwd: projectFolder,
 				inputs: {},
 			});
 			expect(runResponse.type).toBe('execution_started');
@@ -65,6 +70,7 @@ describe('resume command (real daemon)', () => {
 			expect(resumeResponse.code).toBe('NOT_RESUMABLE');
 		} finally {
 			fs.rmSync(flowYml, { force: true });
+			registry.dispose();
 		}
 	}, 15000);
 });

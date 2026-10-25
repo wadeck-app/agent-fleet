@@ -20,7 +20,9 @@ export async function pollUntil(predicate: () => boolean | Promise<boolean>, opt
 	const intervalMs = options.intervalMs ?? 20;
 	const deadline = Date.now() + options.timeoutMs;
 	while (Date.now() < deadline) {
-		if (await predicate()) return true;
+		if (await predicate()) {
+			return true;
+		}
 		await delay(intervalMs);
 	}
 	return predicate();
@@ -45,4 +47,26 @@ export async function waitUntil(
  */
 export async function observeFor(windowMs: number): Promise<void> {
 	await delay(windowMs);
+}
+
+/**
+ * Whether `promise` settles (resolves or rejects) within `ms`. For asserting that something HAPPENS in bounded time
+ * (a socket closes, a process exits) without a hand-rolled `Promise.race` + `setTimeout` in every test.
+ */
+export async function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
+	const cancel = new AbortController();
+	const outcome = await Promise.race([
+		promise.then(
+			() => true,
+			() => true
+		),
+		delay(ms, false, { signal: cancel.signal }),
+	]);
+	cancel.abort();
+	return outcome;
+}
+
+/** Runs `action` once, `ms` from now, to simulate something happening while the code under test is waiting. */
+export function runAfter(ms: number, action: () => void): void {
+	void delay(ms).then(action);
 }

@@ -13,6 +13,13 @@ const hoisted = vi.hoisted(() => ({
 	cache: { lastCheckedAt: 0, latestVersion: null as string | null },
 	intervalCallbacks: [] as (() => void)[],
 	spawnedChildren: [] as any[],
+	killAllRunningScripts: vi.fn(),
+}));
+
+// The worker's cleanup must end the process trees of running script steps.
+vi.mock('flow-engine', async importOriginal => ({
+	...(await importOriginal<typeof import('flow-engine')>()),
+	killAllRunningScripts: hoisted.killAllRunningScripts,
 }));
 
 /** How long reExecAndExit (WorkerCommand.ts) waits before trusting the replacement survived. */
@@ -30,12 +37,8 @@ vi.mock('../../config/FlowConfig', async () => {
 	};
 });
 
-vi.mock('../../config/DefaultProjectResolver', () => ({
-	DefaultProjectResolver: class {
-		resolve(): { projectRoot: string } {
-			return { projectRoot: '/fake/project' };
-		}
-	},
+vi.mock('../../worker/WorkerProjects', () => ({
+	resolveWorkerProjects: () => [{ id: 'fake0001', name: 'fake', path: '/fake/project' }],
 }));
 
 vi.mock('../../config/PluginResolver', () => ({
@@ -50,10 +53,11 @@ vi.mock('../../config/PluginResolver', () => ({
 vi.mock('../../worker/WorkerLaunch', () => ({
 	resolveSourceId: () => undefined,
 	resolveWorkerToken: () => 'fake-token',
-	resolveExtraProjects: () => ['/extra/project'],
+	resolveExtraProjects: () => ['extra-project'],
 	buildRegistration: () => ({
 		pid: 1234,
 		labels: ['label-a', 'label-b'],
+		attachedProjectIds: ['fake0001', 'extra001'],
 		attachedProjects: ['/fake/project', '/extra/project'],
 		hasUserInterface: false,
 		shellCapabilities: ['bash', 'cmd'],
@@ -345,7 +349,7 @@ describe('WorkerCommand -- self re-exec on version bump', () => {
 		expect(args).toContain('--token');
 		expect(args).toContain('fake-token');
 		expect(args).toContain('--project');
-		expect(args).toContain('/extra/project');
+		expect(args).toContain('extra-project');
 		expect(args).toContain('--labels');
 		expect(args).toContain('label-a,label-b');
 	});
@@ -360,6 +364,7 @@ describe('WorkerCommand -- self re-exec on version bump', () => {
 
 		expect(spawnMock).toHaveBeenCalledTimes(1);
 		expect(exitSpy).toHaveBeenCalledWith(0);
+		expect(hoisted.killAllRunningScripts).toHaveBeenCalled();
 	});
 
 	it('does not exit when the re-exec child errors before the health check elapses, and stays on the current version', async () => {
