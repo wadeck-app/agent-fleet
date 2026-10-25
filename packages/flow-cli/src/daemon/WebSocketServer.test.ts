@@ -1,9 +1,10 @@
+import * as net from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
 import { MAX_WORKER_FRAME_BYTES } from '../ipc/WorkerFrameLimit';
-import { WebSocketServer } from './WebSocketServer.js';
+import { type PortBinder, WebSocketServer } from './WebSocketServer.js';
 
 let server: WebSocketServer | undefined;
 
@@ -150,39 +151,91 @@ describe('WebSocketServer - crowded port range', () => {
 	// Orphaned daemons keep their worker listener bound, so the ports just above the requested one can all be taken.
 	// Rejecting then left the daemon with no listener: runs queued forever and every forked worker dialed a port
 	// nobody served. Any free port serves, because the bound one is published for workers to read.
-	it('binds an OS-assigned port when the requested port and the ten above it are all taken', async () => {
-		const occupant = new WebSocketServer(
-			0,
-			() => {},
-			() => {}
-		);
-		const base = await occupant.start();
-		const neighbours: WebSocketServer[] = [];
-		try {
-			for (let offset = 1; offset <= 10; offset++) {
-				const neighbour = new WebSocketServer(
-					base + offset,
-					() => {},
-					() => {}
-				);
-				// Each must bind exactly where asked, or the range is not actually crowded.
-				expect(await neighbour.start()).toBe(base + offset);
-				neighbours.push(neighbour);
+	/** Fake binder: ports in `refused` fail with the given code, any other (incl. 0) binds for real. */
+	function fakeBinder(refused: Map<number, string>, attempts: number[]): PortBinder {
+		return (httpServer, port, address) => {
+			attempts.push(port);
+			const code = refused.get(port);
+			if (code === undefined) {
+				httpServer.listen(port, address);
+				return;
 			}
+			process.nextTick(() => httpServer.emit('error', Object.assign(new Error(`listen ${code}`), { code })));
+		};
+	}
+
+	it('binds an OS-assigned port when the requested port and the ten above it are all taken', async () => {
+		const requested = 45_400;
+		const refused = new Map<number, string>();
+		for (let offset = 0; offset <= 10; offset++) refused.set(requested + offset, 'EADDRINUSE');
+		const attempts: number[] = [];
+		server = new WebSocketServer(
+			requested,
+			() => {},
+			() => {},
+			{ bind: fakeBinder(refused, attempts) }
+		);
+
+		const bound = await server.start();
+
+		expect(attempts).toEqual([...Array.from({ length: 11 }, (_, offset) => requested + offset), 0]);
+		expect(bound).toBeGreaterThan(0);
+		expect(server.port).toBe(bound);
+	});
+
+	// Windows excluded port ranges (Hyper-V, WinNAT) refuse a bind with EACCES, not EADDRINUSE.
+	it('skips a port the OS refuses with EACCES and binds the next one', async () => {
+		const requested = 45_420;
+		const attempts: number[] = [];
+		server = new WebSocketServer(
+			requested,
+			() => {},
+			() => {},
+			{ bind: fakeBinder(new Map([[requested, 'EACCES']]), attempts) }
+		);
+
+		await server.start();
+
+		expect(attempts.slice(0, 2)).toEqual([requested, requested + 1]);
+	});
+
+	it('rejects with the original error when the failure is not about the port being unavailable', async () => {
+		server = new WebSocketServer(
+			45_430,
+			() => {},
+			() => {},
+			{ bind: fakeBinder(new Map([[45_430, 'EADDRNOTAVAIL']]), []) }
+		);
+
+		await expect(server.start()).rejects.toMatchObject({ code: 'EADDRNOTAVAIL' });
+	});
+
+	// Real sockets, but no assumption about which ports are free: the occupied ports come from the OS (listen on 0)
+	// and the property asserted is only that the bound port is none of them.
+	it('with real sockets, never binds a port that is already occupied', async () => {
+		const occupants: net.Server[] = [];
+		try {
+			for (let index = 0; index < 11; index++) {
+				const occupant = net.createServer();
+				await new Promise<void>((resolve, reject) => {
+					occupant.once('error', reject);
+					occupant.listen(0, '127.0.0.1', resolve);
+				});
+				occupants.push(occupant);
+			}
+			const occupied = occupants.map(occupant => (occupant.address() as net.AddressInfo).port);
 
 			server = new WebSocketServer(
-				base,
+				occupied[0],
 				() => {},
 				() => {}
 			);
 			const bound = await server.start();
 
-			expect(bound).toBeGreaterThan(0);
-			expect(bound < base || bound > base + 10).toBe(true);
+			expect(occupied).not.toContain(bound);
 			expect(server.port).toBe(bound);
 		} finally {
-			occupant.close();
-			for (const neighbour of neighbours) neighbour.close();
+			for (const occupant of occupants) occupant.close();
 		}
 	});
 });

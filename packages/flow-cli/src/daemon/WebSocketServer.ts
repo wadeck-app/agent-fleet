@@ -28,7 +28,22 @@ export interface WebSocketServerOptions {
 	bindAddress?: string;
 	/** Paths to the PEM certificate and key that make this listener TLS. */
 	tls?: { cert: string; key: string } | null;
+	/**
+	 * Binds the listener to a port. Defaults to `server.listen(port, address)`. Injected by tests to exercise the
+	 * port scan (taken, reserved, exhausted) without depending on which ports the machine has free.
+	 */
+	bind?: PortBinder;
 }
+
+/** Starts listening; reports success through the server's 'listening' event and failure through its 'error' event. */
+export type PortBinder = (server: http.Server | https.Server, port: number, address: string) => void;
+
+/** Errors that mean "not this port": taken (EADDRINUSE) or inside a Windows excluded/reserved range (EACCES). */
+const SKIPPABLE_BIND_ERRORS = new Set(['EADDRINUSE', 'EACCES']);
+
+const defaultBind: PortBinder = (server, port, address) => {
+	server.listen(port, address);
+};
 
 /**
  * The daemon's worker listener.
@@ -44,6 +59,7 @@ export class WebSocketServer {
 	private _port: number;
 	private closed = false;
 	private readonly log: ConnectionLog;
+	private readonly bind: PortBinder;
 
 	constructor(
 		port: number,
@@ -67,6 +83,7 @@ export class WebSocketServer {
 		// maxPayload: 1 MiB -- consistent with McpServer.readBody() cap.
 		// The ws default (100 MiB) would allow a rogue local process to exhaust daemon memory.
 		this.log = options.log ?? stderrLog;
+		this.bind = options.bind ?? defaultBind;
 		this.wss = new WsServer({ server: this.httpServer, maxPayload: MAX_WORKER_FRAME_BYTES });
 		this.wss.on('connection', (ws: WebSocket) => this.handleConnection(ws));
 		// ws re-emits httpServer errors; without a handler Node.js throws unhandled 'error'
@@ -75,7 +92,7 @@ export class WebSocketServer {
 	}
 
 	/**
-	 * Bind to the requested port, retrying up to 10 increments on EADDRINUSE (e.g. TIME_WAIT).
+	 * Bind to the requested port, retrying up to 10 increments on EADDRINUSE (e.g. TIME_WAIT) or EACCES (Windows excluded port ranges).
 	 *
 	 * When the whole range is taken, an OS-assigned port is bound instead of failing: the bound port is published for
 	 * workers to read, so any free one serves, while a daemon with no listener accepts runs it can never execute.
@@ -85,9 +102,10 @@ export class WebSocketServer {
 		return new Promise((resolve, reject) => {
 			const tryBind = (p: number, attemptsLeft: number): void => {
 				this.httpServer.once('error', (err: NodeJS.ErrnoException) => {
-					if (err.code === 'EADDRINUSE' && attemptsLeft > 0) {
+					const skippable = err.code !== undefined && SKIPPABLE_BIND_ERRORS.has(err.code);
+					if (skippable && attemptsLeft > 0) {
 						tryBind(p + 1, attemptsLeft - 1);
-					} else if (err.code === 'EADDRINUSE' && p !== 0) {
+					} else if (skippable && p !== 0) {
 						tryBind(0, 0);
 					} else {
 						reject(err);
@@ -101,7 +119,7 @@ export class WebSocketServer {
 					this._port = typeof address === 'object' && address !== null ? address.port : p;
 					resolve(this._port);
 				});
-				this.httpServer.listen(p, this.bindAddress);
+				this.bind(this.httpServer, p, this.bindAddress);
 			};
 			tryBind(this._port, 10);
 		});
