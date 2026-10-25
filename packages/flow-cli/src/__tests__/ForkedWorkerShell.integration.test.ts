@@ -2,6 +2,7 @@
 // A worker the daemon forks must declare the shells it can run, otherwise a script step with
 // `shell: bash` (the form the secrets documentation uses) is never assigned and stays queued.
 import { logsDirOf } from 'flow-core';
+import { createTempDirectory } from 'flow-core/testing';
 import { SECRET_EXAMPLE_FLOW_YAML } from 'flow-engine/secrets/SecretFlowExample';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -42,13 +43,12 @@ describe('forked worker shell routing (end to end)', () => {
 	});
 
 	beforeEach(() => {
-		workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shell-e2e-work-'));
+		workDir = createTempDirectory('shell-e2e-work-');
 		process.env['SHELL_E2E_TOKEN'] = 'tk_shell_e2e_value_123';
 	});
 
 	afterEach(() => {
 		delete process.env['SHELL_E2E_TOKEN'];
-		fs.rmSync(workDir, { recursive: true, force: true });
 	});
 
 	async function runFlow(

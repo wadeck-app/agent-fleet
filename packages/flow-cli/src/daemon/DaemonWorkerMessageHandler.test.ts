@@ -1,5 +1,5 @@
-import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { createTempDirectory } from 'flow-core/testing';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -75,7 +75,7 @@ describe('DaemonWorkerMessageHandler -- step_progress', () => {
 
 describe('DaemonWorkerMessageHandler -- handleClose diagnostics', () => {
 	function makeClosingHandler() {
-		const logsDir = mkdtempSync(path.join(tmpdir(), 'dwmh-'));
+		const logsDir = createTempDirectory('dwmh-');
 		const clock = { now: 1_000 };
 		const commandHandler = {
 			handleWorkerDisconnect: vi.fn(),

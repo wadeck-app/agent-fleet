@@ -9,7 +9,8 @@
  * The worker here is a socket rather than a child process, which is the point: it stands in
  * for `flow worker` in a terminal, and a real terminal cannot be had in a test runner.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createTempDirectory } from 'flow-core/testing';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -43,7 +44,7 @@ let socket: WebSocket | undefined;
 beforeEach(async () => {
 	// A real project, because a non-ephemeral worker only serves the projects it declared
 	// (D#9) and the daemon resolves that from the marker file (D#50).
-	projectRoot = mkdtempSync(join(tmpdir(), 'registered-project-'));
+	projectRoot = createTempDirectory('registered-project-');
 	mkdirSync(join(projectRoot, '.flow'), { recursive: true });
 	writeFileSync(join(projectRoot, '.flow', 'config.yml'), 'version: 1\n', 'utf8');
 	writeFileSync(join(projectRoot, 'flow.yml'), FLOW_YAML, 'utf8');
@@ -68,7 +69,6 @@ afterEach(async () => {
 	socket?.close();
 	socket = undefined;
 	await ctx[Symbol.asyncDispose]();
-	rmSync(projectRoot, { recursive: true, force: true });
 });
 
 /** Reads the port the daemon published, exactly as a worker does. */

@@ -2,6 +2,7 @@
 // A flow registered at 1.0.0 runs, is edited to 1.1.0 and runs again: the second run follows the latest version,
 // a third run pinned to 1.0.0 runs the snapshot of the first one, and nothing rewrites that snapshot.
 import type { ExecutionState } from 'flow-core';
+import { createTempDirectory } from 'flow-core/testing';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -35,14 +36,10 @@ describe('flow versions (end to end)', () => {
 	});
 
 	beforeEach(() => {
-		workDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'versions-e2e-')));
+		workDir = fs.realpathSync(createTempDirectory('versions-e2e-'));
 		fs.mkdirSync(path.join(workDir, '.flow'));
 		fs.writeFileSync(path.join(workDir, '.flow', 'config.yml'), '');
 		registryFile = path.join(workDir, '.flow', 'flows.yml');
-	});
-
-	afterEach(() => {
-		fs.rmSync(workDir, { recursive: true, force: true });
 	});
 
 	it('follows the latest version, runs a pinned one from its snapshot, and keeps snapshots unchanged', async () => {

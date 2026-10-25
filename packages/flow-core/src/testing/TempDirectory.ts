@@ -1,4 +1,7 @@
-import { rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { onTestFinished } from 'vitest';
 
 export interface RemoveTempDirectoryDeps {
 	remove?: (directory: string) => void;
@@ -30,4 +33,42 @@ export function removeTempDirectory(directory: string, deps: RemoveTempDirectory
 				'(antivirus, search indexer or a leftover child). Remove it manually; the test result is not affected.'
 		);
 	}
+}
+
+export interface CreateTempDirectoryDeps {
+	/** Registers the removal; defaults to vitest's `onTestFinished`, which runs even when the test fails. */
+	registerCleanup?: (cleanup: () => void) => void;
+	remove?: (directory: string) => void;
+}
+
+/**
+ * Creates a temporary directory under the OS temp dir and removes it when the current test ends, whether it passed or
+ * failed. Call it from a test or a `beforeEach`; the directory belongs to that one test. The `<directory>.meta` sibling
+ * the workspace code may create next to it is removed too.
+ *
+ * The single way tests of this repository create a temp directory (enforced by TempDirectoryUsage.test.ts): a creation
+ * without a registered removal is what filled the OS temp dir with tens of thousands of leftovers.
+ *
+ * @param prefix names the directory, so a leftover can be traced to the suite that made it (e.g. `flow-validator-`)
+ * @throws when called outside a test or hook (nothing could remove the directory); the directory is removed first
+ */
+export function createTempDirectory(prefix: string, deps: CreateTempDirectoryDeps = {}): string {
+	const registerCleanup = deps.registerCleanup ?? onTestFinished;
+	const remove = deps.remove ?? removeTempDirectory;
+	const directory = mkdtempSync(join(tmpdir(), prefix));
+	try {
+		registerCleanup(() => {
+			remove(directory);
+			// The workspace code keeps its metadata next to a workspace, in `<workspace>.meta`, outside the directory itself.
+			remove(`${directory}.meta`);
+		});
+	} catch (error) {
+		rmSync(directory, { recursive: true, force: true });
+		throw new Error(
+			`createTempDirectory("${prefix}") was called outside a test or a beforeEach/afterEach hook, so nothing could remove the directory. ` +
+				`Call it inside the test (or beforeEach) that uses it. Cause: ${(error as Error).message}`,
+			{ cause: error }
+		);
+	}
+	return directory;
 }

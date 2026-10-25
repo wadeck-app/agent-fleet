@@ -1,6 +1,7 @@
 // Integration test: real daemon, real forked worker (`npm run build` first), real bash, and a recording
 // publisher in place of the queue. Proves the events a real run produces, and that none leaks a secret.
 import { logsDirOf } from 'flow-core';
+import { createTempDirectory } from 'flow-core/testing';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -50,14 +51,13 @@ describe('flow lifecycle events (end to end)', () => {
 	});
 
 	beforeEach(() => {
-		workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-events-e2e-'));
+		workDir = createTempDirectory('flow-events-e2e-');
 		publisher = new RecordingFlowEventPublisher();
 		process.env['FLOW_EVENTS_E2E_TOKEN'] = TOKEN;
 	});
 
 	afterEach(() => {
 		delete process.env['FLOW_EVENTS_E2E_TOKEN'];
-		fs.rmSync(workDir, { recursive: true, force: true });
 	});
 
 	async function run(

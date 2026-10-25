@@ -1,12 +1,14 @@
 import { createDaemonClient } from '@wadeck-app/singleton-daemon-kit';
 import type { DaemonHandle } from '@wadeck-app/singleton-daemon-kit';
 import { executionsDirOf } from 'flow-core';
+import { removeTempDirectory } from 'flow-core/testing';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { Daemon } from '../daemon/Daemon';
+import { SHUTDOWN_GRACE_MS } from '../daemon/DaemonIdleShutdown';
 import type { FlowEventPublisher } from '../events/FlowEventPublisher';
 import type { DaemonResponse, ExecutionState } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
@@ -46,8 +48,45 @@ export interface TestDaemonOptions {
 	eventPublisher?: FlowEventPublisher;
 }
 
+const LATE_WRITE_QUIET_MS = 300;
+/**
+ * A daemon allowed to stop itself when idle logs `Daemon stopped (idle)` once its debounce (SHUTDOWN_GRACE_MS) elapses,
+ * which can be after the test ended; the quiet period must outlast that debounce.
+ */
+const IDLE_STOP_QUIET_MS = SHUTDOWN_GRACE_MS + LATE_WRITE_QUIET_MS;
+const LATE_WRITE_POLL_MS = 50;
+const LATE_WRITE_MAX_MS = 6_000;
+
+/**
+ * Removes a stopped test daemon's directory, then waits until nothing recreates it.
+ *
+ * `stop()` resolves before the worker sockets it closed have been reported: each close then logs a diagnostic line
+ * (`writeDaemonLog`, which does `mkdir -p` on `logs/`), so the directory came back holding only
+ * `logs/<date>.ndjson` and stayed in the OS temp dir (one `flow-e2e-*` per daemon). The directory is therefore removed
+ * again whenever it reappears, until it has stayed absent for a quiet period. Gives up after a bound, loudly.
+ */
+async function removeDaemonDirectory(daemonDir: string, quietMs: number): Promise<void> {
+	removeTempDirectory(daemonDir);
+	const deadline = Date.now() + LATE_WRITE_MAX_MS;
+	let quietUntil = Date.now() + quietMs;
+	while (Date.now() < quietUntil) {
+		if (Date.now() > deadline) {
+			process.stderr
+				.write(`[test cleanup] "${daemonDir}" kept being recreated for ${String(LATE_WRITE_MAX_MS)} ms after the daemon stopped; remove it manually.
+`);
+			return;
+		}
+		await new Promise(resolve => setTimeout(resolve, LATE_WRITE_POLL_MS));
+		if (fs.existsSync(daemonDir)) {
+			removeTempDirectory(daemonDir);
+			quietUntil = Date.now() + quietMs;
+		}
+	}
+}
+
 export async function startTestDaemon(options: TestDaemonOptions = {}): Promise<TestDaemonContext> {
 	const daemonDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-e2e-'));
+	const stopWhenIdle = options.stopWhenIdle ?? false;
 	let handle: DaemonHandle;
 	try {
 		// An ephemeral worker port, because test files run concurrently and the default derives
@@ -66,11 +105,11 @@ export async function startTestDaemon(options: TestDaemonOptions = {}): Promise<
 		// publishes a port file nothing is listening on and every client gets ECONNREFUSED.
 		handle = await Daemon.start(config, daemonDir, {
 			port: 0,
-			stopWhenIdle: options.stopWhenIdle ?? false,
+			stopWhenIdle: stopWhenIdle,
 			...(options.eventPublisher === undefined ? {} : { eventPublisher: options.eventPublisher }),
 		});
 	} catch (err) {
-		fs.rmSync(daemonDir, { recursive: true, force: true });
+		removeTempDirectory(daemonDir);
 		throw err;
 	}
 
@@ -88,7 +127,7 @@ export async function startTestDaemon(options: TestDaemonOptions = {}): Promise<
 			} catch {
 				/* ignore cleanup errors */
 			}
-			fs.rmSync(daemonDir, { recursive: true, force: true });
+			await removeDaemonDirectory(daemonDir, stopWhenIdle ? IDLE_STOP_QUIET_MS : LATE_WRITE_QUIET_MS);
 		},
 	};
 }

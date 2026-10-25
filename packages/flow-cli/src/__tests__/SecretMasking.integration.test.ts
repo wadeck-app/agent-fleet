@@ -2,6 +2,7 @@
 // A script step prints declared secrets in several forms; nothing the daemon persists or prints
 // may contain a value, and the placeholder must show which secret was hidden.
 import { FlowQueryService, logsDirOf } from 'flow-core';
+import { createTempDirectory } from 'flow-core/testing';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -80,7 +81,7 @@ describe('secret masking (end to end)', () => {
 	});
 
 	beforeEach(() => {
-		workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'secret-e2e-work-'));
+		workDir = createTempDirectory('secret-e2e-work-');
 		fs.writeFileSync(path.join(workDir, 'flow.yml'), FLOW_YAML, 'utf8');
 		fs.writeFileSync(path.join(workDir, 'key.pem'), KEY + '\n', 'utf8');
 		// The daemon runs in this process: env:// is read from this environment.
@@ -89,7 +90,6 @@ describe('secret masking (end to end)', () => {
 
 	afterEach(() => {
 		delete process.env['SECRET_E2E_TOKEN'];
-		fs.rmSync(workDir, { recursive: true, force: true });
 	});
 
 	it('writes the placeholder, never the value, to the record, the daily log, the follow output and flow show', async () => {

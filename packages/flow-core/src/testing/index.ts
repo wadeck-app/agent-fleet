@@ -7,4 +7,4 @@ export { asReply, callRoute, collectRoutes, fakeReply, fakeReq, replied } from '
 export type { FakeReply } from './HttpDoubles.js';
 export { makeExec } from './makeExec.js';
 export { OWN_PROCESS_GROUP, killProcessTree } from './ProcessTree.js';
-export { removeTempDirectory } from './TempDirectory.js';
+export { createTempDirectory, removeTempDirectory } from './TempDirectory.js';

@@ -8,8 +8,8 @@
  * buys: a short window for the "run" command, already in flight over IPC, to land before the
  * daemon commits to stopping.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { createTempDirectory } from 'flow-core/testing';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
@@ -40,7 +40,7 @@ let projectRoot: string;
 let socket: WebSocket | undefined;
 
 beforeEach(async () => {
-	projectRoot = mkdtempSync(join(tmpdir(), 'shutdown-race-project-'));
+	projectRoot = createTempDirectory('shutdown-race-project-');
 	mkdirSync(join(projectRoot, '.flow'), { recursive: true });
 	writeFileSync(join(projectRoot, '.flow', 'config.yml'), 'version: 1\n', 'utf8');
 	writeFileSync(join(projectRoot, 'flow.yml'), FLOW_YAML, 'utf8');
@@ -55,7 +55,6 @@ afterEach(async () => {
 	socket?.close();
 	socket = undefined;
 	await ctx[Symbol.asyncDispose]();
-	rmSync(projectRoot, { recursive: true, force: true });
 });
 
 async function waitForFile(path: string): Promise<void> {

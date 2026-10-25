@@ -3,8 +3,8 @@
  */
 import { MockIssueCollector } from 'flow-engine/test-utils/mocks';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
+import { createTempDirectory } from 'test-utils/helpers';
 import { beforeEach, describe, expect, test } from 'vitest';
 
 import { FlowRegistry } from '../registry/FlowRegistry';
@@ -22,7 +22,7 @@ describe('SemanticValidator', () => {
 
 	beforeEach(() => {
 		// Create a temporary directory for test flows
-		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'semantic-validator-test-'));
+		tempDir = createTempDirectory('semantic-validator-test-');
 		const flowsDir = path.join(tempDir, '.flow');
 		fs.mkdirSync(flowsDir, { recursive: true });
 

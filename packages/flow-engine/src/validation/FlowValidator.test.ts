@@ -3,8 +3,8 @@
  */
 import { createMockFlow, createMockModelStep, createMockSubFlowStep } from 'flow-engine/test-utils/factories';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
+import { createTempDirectory } from 'test-utils/helpers';
 import { beforeEach, describe, expect, test } from 'vitest';
 
 import { FlowRegistry } from '../registry/FlowRegistry';
@@ -18,7 +18,7 @@ describe('FlowValidator - SubFlowStep Validation', () => {
 
 	beforeEach(() => {
 		// Create a temporary directory for test flows
-		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-validator-test-'));
+		tempDir = createTempDirectory('flow-validator-test-');
 		const flowsDir = path.join(tempDir, '.flow');
 		fs.mkdirSync(flowsDir, { recursive: true });
 

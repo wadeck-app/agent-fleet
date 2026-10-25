@@ -3,6 +3,7 @@
 // record must hold the inputs and outputs of both steps, the secret only as its placeholder, and the caps.
 import { FlowQueryService } from 'flow-core';
 import type { ExecutionState } from 'flow-core';
+import { createTempDirectory } from 'flow-core/testing';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -69,7 +70,7 @@ describe('step input/output recording (end to end)', () => {
 	});
 
 	beforeEach(() => {
-		workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'step-io-e2e-work-'));
+		workDir = createTempDirectory('step-io-e2e-work-');
 		fs.writeFileSync(path.join(workDir, 'flow.yml'), FLOW_YAML, 'utf8');
 		// The daemon runs in this process: env:// is read from this environment.
 		process.env['STEP_IO_E2E_TOKEN'] = TOKEN;
@@ -77,7 +78,6 @@ describe('step input/output recording (end to end)', () => {
 
 	afterEach(() => {
 		delete process.env['STEP_IO_E2E_TOKEN'];
-		fs.rmSync(workDir, { recursive: true, force: true });
 	});
 
 	it('stores what both steps received and produced, the secret only as its placeholder, within the caps', async () => {

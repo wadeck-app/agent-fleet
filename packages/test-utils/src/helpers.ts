@@ -6,7 +6,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { vi } from 'vitest';
+import { onTestFinished, vi } from 'vitest';
 
 /**
  * Setup fake timers and return cleanup function
@@ -375,4 +375,42 @@ export function setupTest(): () => void {
 		consoleMocks.restore();
 		vi.restoreAllMocks();
 	};
+}
+
+/**
+ * Creates a temporary directory under the OS temp dir and removes it when the current test ends, whether it passed or
+ * failed (vitest's `onTestFinished`). Call it from a test or a `beforeEach`.
+ *
+ * Same contract as `createTempDirectory` of `flow-core/testing`, which flow-engine cannot import (flow-core depends on
+ * flow-engine). A removal blocked by another process (EPERM/EBUSY on Windows) is reported on stderr with the path;
+ * any other error is thrown.
+ *
+ * @param prefix names the directory, so a leftover can be traced to the suite that made it
+ * @throws when called outside a test or hook, after removing the directory it just made
+ */
+export function createTempDirectory(prefix: string): string {
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+	try {
+		onTestFinished(() => {
+			try {
+				fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+			} catch (error) {
+				const code = (error as NodeJS.ErrnoException).code;
+				if (code !== 'EPERM' && code !== 'EBUSY') {
+					throw error;
+				}
+				process.stderr.write(
+					`[test cleanup] could not remove "${directory}" (${code}): another process still holds a handle on it. Remove it manually; the test result is not affected.\n`
+				);
+			}
+		});
+	} catch (error) {
+		fs.rmSync(directory, { recursive: true, force: true });
+		throw new Error(
+			`createTempDirectory("${prefix}") was called outside a test or a beforeEach/afterEach hook, so nothing could remove the directory. ` +
+				`Call it inside the test (or beforeEach) that uses it. Cause: ${(error as Error).message}`,
+			{ cause: error }
+		);
+	}
+	return directory;
 }

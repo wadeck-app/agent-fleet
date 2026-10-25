@@ -7,10 +7,10 @@
  * step it runs the REAL WorkerAdapter -> StepRunner -> ModelStepExecutor with a recording
  * ModelProvider (no model, no CLI), so what the provider receives is what a real run would send.
  */
+import { createTempDirectory } from 'flow-core/testing';
 import { StepRunner } from 'flow-engine';
 import type { LaunchOptions, ModelProvider } from 'flow-engine/processing/ModelProvider';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
@@ -49,7 +49,7 @@ let projectRoot: string;
 let socket: WebSocket | undefined;
 
 beforeEach(async () => {
-	projectRoot = mkdtempSync(join(tmpdir(), 'substep-resume-project-'));
+	projectRoot = createTempDirectory('substep-resume-project-');
 	mkdirSync(join(projectRoot, '.flow'), { recursive: true });
 	writeFileSync(join(projectRoot, '.flow', 'config.yml'), 'version: 1\n', 'utf8');
 	writeFileSync(join(projectRoot, 'flow.yml'), FLOW_YAML, 'utf8');
@@ -64,7 +64,6 @@ afterEach(async () => {
 	socket?.close();
 	socket = undefined;
 	await ctx[Symbol.asyncDispose]();
-	rmSync(projectRoot, { recursive: true, force: true });
 });
 
 interface Scenario {

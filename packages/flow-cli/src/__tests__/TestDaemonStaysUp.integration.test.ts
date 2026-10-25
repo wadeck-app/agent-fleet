@@ -3,7 +3,7 @@
 // a test client does not, so any test that sends a second run after the first finished raced that timer (it passed
 // alone and failed under load with `Daemon is not running (connection failed: connect ECONNREFUSED ...)`).
 // The test daemon therefore stays up until the test disposes it, and DaemonShutdownRace opts back in to idle stops.
-import { removeTempDirectory } from 'flow-core/testing';
+import { createTempDirectory } from 'flow-core/testing';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -44,13 +44,9 @@ describe('a test daemon between two runs', () => {
 	});
 
 	beforeEach(() => {
-		workDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'daemon-stays-up-')));
+		workDir = fs.realpathSync(createTempDirectory('daemon-stays-up-'));
 		flowFile = path.join(workDir, 'flow.yml');
 		fs.writeFileSync(flowFile, FLOW_YAML);
-	});
-
-	afterEach(() => {
-		removeTempDirectory(workDir);
 	});
 
 	it('still accepts a run sent after the idle grace period elapsed since the previous one ended', async () => {
