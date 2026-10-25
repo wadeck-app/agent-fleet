@@ -91,6 +91,8 @@ If the user is wrong, say it. If you disagree, explain why. Act as a peer, not a
 1. `git commit` + `git push` -> CI builds and publishes automatically
 2. `flow cli update` to install the new version locally
 
+**Dev builds never update.** A non-CalVer bundle (anything but `YYYY.MM.DD-BBB-xxxxxxxx`) refuses `flow cli update` (exit 1) and never spawns the background updater (`packages/flow-cli/src/updater/DevBuildGuard.ts`). Tests that spawn the CLI or updater must use `createIsolatedCliEnv` (`src/test-utils/IsolatedCliEnv.ts`).
+
 **Never patch `node_modules` manually** -- it gets overwritten on the next install.
 
 **flow-cli daemonDir:** All daemon-related code (`flow run`, `flow history`, `Daemon.startDaemon`, `DAEMON_DIR`) must use `ConfigDir.get('flow')` = `~/.config/flow/`. Using `~/.flow-daemon/` or `~/.config/.flow-daemon/` causes `EADDRINUSE` because commands can't find the running daemon and try to start a new one on an occupied port.

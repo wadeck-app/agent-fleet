@@ -3668,3 +3668,12 @@ The codex mock and `CodexModelProvider` used opencode's event format for months;
 
 - A runtime (non-type) import from flow-engine must use the package root (`from 'flow-engine'`, export it in `packages/flow-engine/src/index.ts`). A deep path (`flow-engine/record/X`) type-checks and passes vitest (alias) but the tsx-run CLI fails with ERR_MODULE_NOT_FOUND; only `CliSmoke.integration.test.ts` shows it.
 - A script step without `output:` yields outputs `rawOutput`, `stdout`, `stderr`, `exitCode`, `success`, so its stdout is recorded three times (`outputs.stdout`, `outputs.rawOutput`, `io.stdout`). `captureOutput` is not read by the engine.
+
+## A test must never reach the real `cli update` or global npm (2026-10-25)
+
+A repo-built bundle ran a real `npm install -g` (shared-updater `without-daemon`); it was killed halfway and the global CLI vanished.
+
+- Every spawned CLI/updater in a test uses `createIsolatedCliEnv` (`packages/flow-cli/src/test-utils/IsolatedCliEnv.ts`): temp config/home/npm prefix+cache, unreachable registry, `UPDATER_*`/`LAUNCHER_*`/`npm_config_*` stripped.
+- A non-CalVer bundle (`DevBuildGuard.isCalVer`) refuses `flow cli update` (exit 1) and never schedules a background updater. The test `flow.cjs` is deliberately non-CalVer; only the test `flow-updater.cjs` is stamped CalVer (`BUNDLE_UPDATER_VERSION`) and runs solely under the isolated env.
+- Unit tests get a CalVer `__FLOW_CLI_VERSION__` (vitest.config.ts); a non-CalVer one would silently skip the scheduling they assert.
+- shared-updater >= 2026.10.25-020 journals an `applying` state and repairs an interrupted install on the next run.
