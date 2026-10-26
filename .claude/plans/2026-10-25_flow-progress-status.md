@@ -55,6 +55,10 @@ Secrets, step I/O, versions, queue events, waves + transitive settling + restart
 | Old leaked temp dirs | the user runs the purge command given in chat |
 | Scratch files to delete (the delete guard blocks me): `.claude/temp/*`, `%TEMP%/flow-old-bundle-red`, `%TEMP%/leakprobe`, `flowmeasure-19222`, untracked `packages/flow-cli/src/__scratch_verify_opencode.test.ts` | the user, or a delete bypass |
 
+## Date formatting migration (waiting on app-core-owner and dsl-owner)
+
+App-core confirmed (commit d35dc19, settings dialog in the top bar): the final API is `$type: DateText` (`value`, `style: short|medium|long`, `part: datetime|date|time`, `relative: true`), DataTable `format: datetime|date|time` with `dateStyle`, and `useDateFormat()` from `@wadeck-app/dsl-ui` (`format`, `exact`, `relative`, `weekdays(style)`, `months(style)`, `intl(options)`, `locale`, `timeZone`, `firstDayOfWeek`). Until the dsl-ui release is announced, keep the English stop-gap modules `commons/DateText.ts` (one per package). Migration plan when published: replace both DateText modules by `useDateFormat()`, use `weekdays('narrow')` in RunBars (7-day chart starts at the user's first day), use `$type: DateText` / `format: datetime` everywhere (tooltip exact timestamp comes with it), keep `formatStartedUtc` for CLI/text outputs (they stay UTC and labelled). Also adopt dsl-ui `top-shell-bar` utilities (published in dsl-ui 2026.10.26-286) in place of the arbitrary values when bumping.
+
 ## Log
 
 - 2026-10-26: 939a8a7b (CI green, installed 735): attempts expansion in the steps table and one Cost row in the chart panel, verified on the user's :5173 (ajk42rid expands with 2 attempts and the reason; q8bbdk5u has no chevron; keyboard toggle works; no console errors). dsl-ui and dsl-renderer lock bumped to 2026.10.26-279 (a03074a6). Four agent test servers stopped by PID.
