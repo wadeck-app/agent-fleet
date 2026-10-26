@@ -63,7 +63,13 @@ Secrets, step I/O, versions, queue events, waves + transitive settling + restart
 - Verified live on an isolated app-core 127 (dsl-ui 290) with fr-FR, Sunday-first, narrow, ISO, UTC. Not verified in the browser: log `absolute` time mode and sticky chips (the A/B dock needs a shell started with `--ab-tests`); unit tests cover both.
 - Open for dsl-ui: `weekdayStyle` is not part of `DateFormatter.key`, so changing only the weekday style does not re-render until reload.
 
+## Open: day bucketing follows the server time zone, not the user's
+
+The 7-day bars bucket runs by the SERVER's local midnight (`countRunsPerDay`); the user can pick another time zone (UTC or an IANA zone) in the shell settings. dsl-owner: dsl-ui has no request header or settings API for the zone (it lives in app-core DateSettings, localStorage); a module backend can learn it only if app-core sends it (header on the shell fetch layer, app-core decision) or if the bucketing moves to the client with `formatter.intl({ timeZone })` / the formatter's `timeZone`. Options: (a) ask app-core-owner for a header, (b) return run timestamps for the last 8 days (bounded) from the route and bucket in the component. Recommended: (b), no cross-team dependency; cap the payload (timestamps and status only). `weekdays()` rotates by firstDayOfWeek by design and does not affect last-7-days bars. The A/B dock (dev only, z-[9999]) may cover modals: fold it when testing dialogs.
+
 ## Log
+
+- 2026-10-26 (late): installed 744-7be78572. Central date formatter live (e855bdc3), RunList exact-timestamp tooltip and weekday label fallback (7be78572), daemon fixes for orphan requeue and resumable cleanup (88f4acc6), dsl-ui/dsl-renderer 295 in the lock (a77a3528, CI green). dsl-ui 294 fixed the formatter cache key (weekdayStyle); shell on :4850 now serves 295; live check: setting change reaches the tile and the expanded modal without page reload; the in-place update of an already-open wide widget could not be tested live (modal blocks the settings button), only by unit test. flow-sbx: C0 note approved (with 7 + 2 changes), P1 and C4 groundwork done, C2a being built in the separate clone agent-fleet-sbx (branch sbx/c2a, no push); its commits in the shared tree are local with pathspecs and I push after a full-suite run.
 
 - 2026-10-26: 939a8a7b (CI green, installed 735): attempts expansion in the steps table and one Cost row in the chart panel, verified on the user's :5173 (ajk42rid expands with 2 attempts and the reason; q8bbdk5u has no chevron; keyboard toggle works; no console errors). dsl-ui and dsl-renderer lock bumped to 2026.10.26-279 (a03074a6). Four agent test servers stopped by PID.
 
