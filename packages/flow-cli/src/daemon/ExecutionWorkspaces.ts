@@ -2,20 +2,30 @@ import type { WorkspaceHandle, WorkspaceProvider } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
 import { WorkspaceManager } from 'flow-engine';
 import type { FlowDefinition, FlowPluginOverrides } from 'flow-engine';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 import type { DaemonResponse } from '../ipc/Protocol';
 import type { LogWriter } from '../storage/LogWriter';
+import { PluginMetaOwnership } from '../storage/PluginMetaOwnership';
 
 /** Where an execution runs and where its outputs are written. */
 export type AllocatedWorkspace =
-	{ ok: true; workspaceDir: string; workspaceMetaDir: string } | { ok: false; response: DaemonResponse };
+	| {
+			ok: true;
+			workspaceDir: string;
+			workspaceMetaDir: string;
+			/** Set only when the daemon created `workspaceMetaDir` itself (plugin provider): it may then be pruned with the record. */
+			pluginMetaDir?: string;
+	  }
+	| { ok: false; response: DaemonResponse };
 
 /** Allocates the workspace of an execution (plugin provider or native manager) and releases it when it is over. */
 export class ExecutionWorkspaces {
 	/** Per-execution plugin workspace handles (only when a workspace provider is used) */
-	private readonly pluginHandles = new Map<string, { handle: WorkspaceHandle; provider: WorkspaceProvider }>();
+	private readonly pluginHandles = new Map<
+		string,
+		{ handle: WorkspaceHandle; provider: WorkspaceProvider; metaDir: string }
+	>();
+	private readonly metaOwnership = new PluginMetaOwnership();
 	/** Per-execution WorkspaceManager handles for the non-plugin path */
 	private readonly nativeManagers = new Map<string, { manager: WorkspaceManager; workspaceId: string }>();
 
@@ -73,9 +83,10 @@ export class ExecutionWorkspaces {
 			};
 		}
 		const workspaceMetaDir = handle.path + '.meta';
+		let owned: boolean;
 		try {
-			fs.mkdirSync(path.join(workspaceMetaDir, 'outputs'), { recursive: true });
-			this.pluginHandles.set(executionId, { handle, provider });
+			owned = this.metaOwnership.create(workspaceMetaDir, executionId);
+			this.pluginHandles.set(executionId, { handle, provider, metaDir: workspaceMetaDir });
 		} catch (setupErr) {
 			// Meta dir creation failed - release the handle before propagating
 			void provider.release(handle).catch((releaseErr: unknown) => {
@@ -85,7 +96,17 @@ export class ExecutionWorkspaces {
 			});
 			throw setupErr;
 		}
-		return { ok: true, workspaceDir: handle.path, workspaceMetaDir };
+		return {
+			ok: true,
+			workspaceDir: handle.path,
+			workspaceMetaDir,
+			...(owned ? { pluginMetaDir: workspaceMetaDir } : {}),
+		};
+	}
+
+	/** `.meta` directories of the plugin workspaces in use now (owned or not): the record pruner must not delete them. */
+	activeMetaDirs(): string[] {
+		return [...this.pluginHandles.values()].map(entry => entry.metaDir);
 	}
 
 	private async allocateNative(cwd: string, flow: FlowDefinition, executionId: string): Promise<AllocatedWorkspace> {

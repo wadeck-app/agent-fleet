@@ -82,7 +82,12 @@ describe('ExecutionWorkspaces plugin path (characterization)', () => {
 
 		const result = await workspaces.allocate(root, { id: 'f', version: '1.0.0' } as never, 'exec-1');
 
-		expect(result).toEqual({ ok: true, workspaceDir: handlePath, workspaceMetaDir: handlePath + '.meta' });
+		expect(result).toEqual({
+			ok: true,
+			workspaceDir: handlePath,
+			workspaceMetaDir: handlePath + '.meta',
+			pluginMetaDir: handlePath + '.meta',
+		});
 		expect(fs.existsSync(path.join(handlePath + '.meta', 'outputs'))).toBe(true);
 
 		workspaces.release('exec-1');

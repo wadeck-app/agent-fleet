@@ -120,7 +120,7 @@ export class RunRequestHandler {
 		if (!allocated.ok) {
 			return allocated.response;
 		}
-		const { workspaceDir, workspaceMetaDir } = allocated;
+		const { workspaceDir, workspaceMetaDir, pluginMetaDir } = allocated;
 
 		const stepIds = flow.steps.map((s: FlowStep) => s.id);
 		const stepWaves = Object.fromEntries(
@@ -145,6 +145,7 @@ export class RunRequestHandler {
 				stepWaves,
 				projectId,
 				projectRoot,
+				pluginMetaDir,
 				definition: {
 					flowVersion: resolved.version,
 					definitionHash: resolved.hash,

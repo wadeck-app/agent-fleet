@@ -182,6 +182,12 @@ export interface ExecutionState {
 	definitionSnapshot?: string;
 	/** How the version was chosen: `latest` known at run start, `pinned` by `flow run <id>@<version>`, or `file` (run by path, as is). */
 	versionChoice?: VersionChoice;
+	/**
+	 * `.meta` directory of a plugin-provided workspace, written ONLY when the daemon itself created it (additive: absent
+	 * on older records and when the directory pre-existed). The record pruner deletes it with the record. A `.meta`
+	 * with no record naming it is never pruned.
+	 */
+	pluginMetaDir?: string;
 }
 
 export type VersionChoice = 'latest' | 'pinned' | 'file';

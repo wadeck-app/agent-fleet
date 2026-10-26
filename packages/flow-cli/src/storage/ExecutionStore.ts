@@ -54,8 +54,9 @@ export class ExecutionStore {
 		this.recorder = recorder ?? new StepIoRecorder((executionId, text) => masks.mask(executionId, text));
 	}
 
-	pruneOldExecutions(): void {
-		new ExecutionPruner(this.executionsDir, this.retainDays).prune();
+	/** `activePluginMetaDirs`: `.meta` directories of executions running now, never deleted. */
+	pruneOldExecutions(activePluginMetaDirs: () => readonly string[] = () => []): void {
+		new ExecutionPruner(this.executionsDir, this.retainDays, activePluginMetaDirs).prune();
 	}
 
 	create(params: {
@@ -69,6 +70,8 @@ export class ExecutionStore {
 		projectRoot?: string;
 		/** Registry id of the project (project-sdk), written next to projectRoot. */
 		projectId?: string;
+		/** `.meta` of a plugin workspace the daemon created for this run; deleted with the record once it expires. */
+		pluginMetaDir?: string;
 		/** Which definition ran: version, content hash, snapshot and how the version was chosen. Written once, never changed. */
 		definition?: Pick<ExecutionState, 'flowVersion' | 'definitionHash' | 'definitionSnapshot' | 'versionChoice'>;
 	}): ExecutionState {
@@ -87,6 +90,7 @@ export class ExecutionStore {
 			flowId: params.flowId,
 			...(params.projectRoot !== undefined ? { projectRoot: params.projectRoot } : {}),
 			...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+			...(params.pluginMetaDir !== undefined ? { pluginMetaDir: params.pluginMetaDir } : {}),
 			...params.definition,
 			status: 'queued',
 			currentSteps: [],
