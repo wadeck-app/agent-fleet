@@ -1,8 +1,9 @@
 import { versionColumnOf, versionDetailLineOf } from '../definitions/RecordedVersion.js';
 import type { ExecutionState } from '../execution/ExecutionState.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
+import { renderStepCostLines, renderTotalCostLine } from '../show/StepCostLines.js';
 import { type ExecutionFilterOptions, filterExecutions } from './ExecutionFilter.js';
-import { formatDuration, formatModelCost, formatStarted, padTruncate } from './ExecutionFormat.js';
+import { formatDuration, formatStarted, padTruncate } from './ExecutionFormat.js';
 
 function indentBlock(text: string): string {
 	return text
@@ -38,8 +39,6 @@ export function renderDetailView(exec: ExecutionState, projectLookup?: ProjectLo
 	lines.push('  ' + '-'.repeat(COL_STEP + COL_STATUS + COL_DURATION));
 
 	let hasInjectedStep = false;
-	let totalCostUsd = 0;
-	let hasCost = false;
 	for (const [stepId, step] of Object.entries(exec.steps)) {
 		if (step.injected) {
 			hasInjectedStep = true;
@@ -47,19 +46,13 @@ export function renderDetailView(exec: ExecutionState, projectLookup?: ProjectLo
 		const name = step.injected ? `${stepId}*` : stepId;
 		const dur = step.startedAt ? formatDuration(step.startedAt, step.completedAt ?? null) : '-';
 		lines.push('  ' + padTruncate(name, COL_STEP) + padTruncate(step.status, COL_STATUS) + dur);
-		const costLine = formatModelCost(step.meta);
-		if (costLine) {
-			lines.push('      ' + costLine);
-		}
-		if (step.meta && 'cost' in step.meta) {
-			hasCost = true;
-			totalCostUsd += (step.meta as { cost: { usd: number } }).cost.usd;
-		}
+		lines.push(...renderStepCostLines(step, '      '));
 	}
 
-	if (hasCost) {
+	const totalLine = renderTotalCostLine(Object.values(exec.steps), '  ');
+	if (totalLine !== undefined) {
 		lines.push('');
-		lines.push(`  Total cost: $${totalCostUsd.toFixed(4)}`);
+		lines.push(totalLine);
 	}
 
 	if (hasInjectedStep) {

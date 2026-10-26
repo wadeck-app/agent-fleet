@@ -1,7 +1,9 @@
 import type { FlowDefinition, FlowStep } from 'flow-engine/types';
 
 import type { StepIoRecord, StepState } from '../execution/ExecutionState.js';
+import { formatStepCost, summarizeStepCost } from '../execution/StepCost.js';
 import { stripForServing, stripIoForServing } from '../logs/ServingText.js';
+import { type StepAttemptView, toStepAttemptViews } from '../view/StepAttemptViews.js';
 
 // What a step received and produced, as far as the flow file and the execution record tell. The declaration
 // (references, not whole prompts or scripts) comes from the flow file; the resolved inputs, outputs and stdout/stderr
@@ -57,7 +59,22 @@ export interface RecordedStepIO {
 	sessionId?: string;
 	ttftMs?: number;
 	tokens?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+	/** Cost of the whole step over all its attempts (a lower bound when `costComplete` is false); see StepCost. */
 	costUsd?: number;
+	/** Cost of the last attempt alone; absent when unknown. */
+	lastAttemptCostUsd?: number;
+	/** False when some attempt cost is unknown. Absent for a step without model cost. */
+	costComplete?: boolean;
+	/** Ready-to-print cost: `$0.0075`, `$2.7900+ (2 attempts unknown)`, `unknown`. */
+	costLabel?: string;
+	/** Settled attempts, oldest first; absent on a record without an attempt log. */
+	attempts?: StepAttemptView[];
+	/** Of the last attempt. */
+	turns?: number;
+	toolCalls?: { total: number; byTool: Record<string, number> };
+	/** Files written through the provider's file tools in the last attempt; `count` is the true total when `paths` is capped. */
+	filesWritten?: { paths: string[]; count: number };
+	endReason?: string;
 	/** One per relaunch caused by a failed sub-step, feedback shortened. */
 	relaunches: { at: string; feedback: string }[];
 	/** Resolved inputs, outputs and stdout/stderr tails; absent on a record written before they were recorded. */
@@ -204,6 +221,31 @@ export function referencedInputNames(step: FlowStep): string[] {
 	return [...names];
 }
 
+/** Step total, last attempt, attempts and (per attempt, not cumulative) tokens: all from the one StepCost computation. */
+function addCost(recorded: RecordedStepIO, state: StepState): void {
+	const summary = summarizeStepCost(state);
+	const label = formatStepCost(summary);
+	if (label === undefined) {
+		return;
+	}
+	recorded.costLabel = label;
+	recorded.costComplete = summary.complete;
+	if (summary.totalUsd !== undefined) {
+		recorded.costUsd = summary.totalUsd;
+	}
+	if (summary.lastAttemptUsd !== undefined) {
+		recorded.lastAttemptCostUsd = summary.lastAttemptUsd;
+	}
+	const attempts = toStepAttemptViews(state, summary);
+	if (attempts !== undefined) {
+		recorded.attempts = attempts;
+		const lastTokens = attempts.at(-1)?.tokens;
+		if (lastTokens !== undefined) {
+			recorded.tokens = lastTokens;
+		}
+	}
+}
+
 function recordedOf(state: StepState | undefined): RecordedStepIO {
 	const recorded: RecordedStepIO = { relaunches: [] };
 	if (!state) {
@@ -231,6 +273,11 @@ function recordedOf(state: StepState | undefined): RecordedStepIO {
 					cache_write_tokens: number;
 					usd: number;
 				};
+				turns?: number;
+				tool_calls?: { total: number; by_tool: Record<string, number> };
+				files_written?: string[];
+				files_written_count?: number;
+				end_reason?: string;
 		  }
 		| undefined;
 	if (meta?.exit_code !== undefined) {
@@ -246,13 +293,28 @@ function recordedOf(state: StepState | undefined): RecordedStepIO {
 		recorded.ttftMs = meta.ttft_ms;
 	}
 	if (meta?.cost) {
-		recorded.costUsd = meta.cost.usd;
 		recorded.tokens = {
 			input: meta.cost.input_tokens,
 			output: meta.cost.output_tokens,
 			cacheRead: meta.cost.cache_read_tokens,
 			cacheWrite: meta.cost.cache_write_tokens,
 		};
+	}
+	addCost(recorded, state);
+	if (meta?.turns !== undefined) {
+		recorded.turns = meta.turns;
+	}
+	if (meta?.tool_calls !== undefined) {
+		recorded.toolCalls = { total: meta.tool_calls.total, byTool: meta.tool_calls.by_tool };
+	}
+	if (meta?.files_written !== undefined) {
+		recorded.filesWritten = {
+			paths: meta.files_written,
+			count: meta.files_written_count ?? meta.files_written.length,
+		};
+	}
+	if (meta?.end_reason !== undefined) {
+		recorded.endReason = meta.end_reason;
 	}
 	recorded.relaunches = (state.relaunches ?? []).map(relaunch => ({
 		at: relaunch.at,

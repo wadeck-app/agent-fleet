@@ -1,9 +1,9 @@
 import { SectionHeading } from './SectionHeading.js';
 import type { IOView } from './StepIODetails.js';
 
-/** Facts the record kept about the run of the step (exit code, session, tokens) and relaunch feedback. */
+/** Facts the record kept about the run of the step (exit code, session, tokens, cost, turns, tools, files), the attempts of a retried step and relaunch feedback. */
 export function RunFactsSection({ view }: { view: IOView }) {
-	if (view.run.length === 0 && view.relaunches.length === 0) {
+	if (view.run.length === 0 && view.attempts.length === 0 && view.relaunches.length === 0) {
 		return null;
 	}
 	return (
@@ -16,6 +16,18 @@ export function RunFactsSection({ view }: { view: IOView }) {
 					</div>
 				))}
 			</dl>
+			{view.attempts.length > 0 && (
+				<div>
+					<SectionHeading show>Attempts</SectionHeading>
+					<ul className="list-disc pl-4 text-xs">
+						{view.attempts.map(line => (
+							<li key={line} className="break-words">
+								{line}
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
 			{view.relaunches.length > 0 && (
 				<div>
 					<SectionHeading show>Relaunched after a failed sub-step</SectionHeading>

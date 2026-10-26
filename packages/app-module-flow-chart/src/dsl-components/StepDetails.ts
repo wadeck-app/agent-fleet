@@ -32,6 +32,8 @@ const META_LABELS: Record<string, string> = {
 	labels: 'Labels',
 	costUsd: 'Cost (USD)',
 };
+// flow-core's ready-to-print step cost (total over attempts, "unknown" or "+" when incomplete); replaces the raw costUsd.
+const COST_LABEL_KEY = 'costLabel';
 const ATTEMPT_KIND_WORDS: Record<AttemptKind, string> = {
 	retry: 'retries',
 	loop: 'loop passes',
@@ -76,7 +78,12 @@ export function describeStep(step: FlowGraphNode): StepDetail {
 	}
 
 	const meta = step.meta ?? {};
+	const costLabel = meta[COST_LABEL_KEY];
 	for (const key of Object.keys(META_LABELS)) {
+		if (key === 'costUsd' && costLabel !== undefined) {
+			rows.push({ label: 'Cost', value: String(costLabel) });
+			continue;
+		}
 		const value = meta[key];
 		if (value !== undefined) {
 			rows.push({ label: META_LABELS[key]!, value: formatValue(key, value) });

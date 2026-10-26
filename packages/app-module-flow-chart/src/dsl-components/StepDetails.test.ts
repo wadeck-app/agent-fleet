@@ -56,6 +56,16 @@ describe('describeStep', () => {
 		});
 	});
 
+	it('shows the ready-to-print cost label of the step, else the raw cost as a fallback', () => {
+		const rowsOf = (meta: Record<string, string | number | boolean>) =>
+			Object.fromEntries(describeStep(node('a', { meta })).rows.map(r => [r.label, r.value]));
+		const labelled = rowsOf({ costUsd: 2.79, costLabel: '$2.7900+ (2 attempts unknown)' });
+		expect(labelled['Cost']).toBe('$2.7900+ (2 attempts unknown)');
+		expect(labelled['Cost (USD)']).toBeUndefined();
+		expect(rowsOf({ costLabel: 'unknown' })['Cost']).toBe('unknown');
+		expect(rowsOf({ costUsd: 0.5 })['Cost (USD)']).toBe('0.5');
+	});
+
 	it('formats start and end times as dates and keeps an unparsable one as is', () => {
 		const { rows } = describeStep(
 			node('a', { meta: { startedAt: '2026-08-16T12:00:00.000Z', completedAt: 'soon' } })

@@ -91,6 +91,13 @@ export class AttemptLedger {
 
 	private static addModelFigures(entry: AttemptRecord, meta: ModelStepMeta): void {
 		entry.model = meta.model;
+		if (meta.provider !== undefined) {
+			entry.provider = meta.provider;
+		}
+		// Empty when the provider reported none (attempt refused before launch)
+		if (meta.session_id !== '') {
+			entry.sessionId = meta.session_id;
+		}
 		const cost = meta.cost;
 		// Absent `reported` is a record from before the flag existed: it was a real result, read as reported
 		const reported = cost.reported !== false;

@@ -1,4 +1,4 @@
-import type { CappedText, FlowGraphNode, RecordedValue, StepDataLink } from 'flow-core';
+import type { CappedText, FlowGraphNode, RecordedValue, StepAttemptView, StepDataLink } from 'flow-core';
 
 import type { DetailRow } from './StepDetails.js';
 
@@ -36,7 +36,44 @@ export interface IOView {
 	outputsNote: string;
 	/** Facts of the run the record holds, beyond the rows of the details panel. */
 	run: DetailRow[];
+	/** One line per attempt, only when the step ran two or more; empty otherwise (the run facts already describe it). */
+	attempts: string[];
 	relaunches: string[];
+}
+
+const TOP_TOOLS = 3;
+
+function usd(value: number): string {
+	return `$${value.toFixed(4)}`;
+}
+
+function tokensText(t: { input: number; output: number; cacheRead: number; cacheWrite: number }): string {
+	return `${t.input} in / ${t.output} out / ${t.cacheRead} cache read / ${t.cacheWrite} cache write`;
+}
+
+// The cost of an attempt is its own share (a delta for a shared claude session); an unknown one is never shown as $0.
+function attemptLine(attempt: StepAttemptView): string {
+	const cost =
+		attempt.costUsd !== undefined
+			? `+${usd(attempt.costUsd)}`
+			: `cost unknown${attempt.costUnknownReason === undefined ? '' : ` (${attempt.costUnknownReason})`}`;
+	return [
+		`#${attempt.n} ${attempt.origin}`,
+		attempt.duration,
+		cost,
+		...(attempt.tokens === undefined ? [] : [tokensText(attempt.tokens)]),
+		...(attempt.turns === undefined ? [] : [`${attempt.turns} turns`]),
+		...(attempt.toolCalls === undefined ? [] : [`${attempt.toolCalls} tool calls`]),
+		`${attempt.outcome}: ${attempt.endReason}`,
+	].join(', ');
+}
+
+function topTools(byTool: Record<string, number>): string {
+	return Object.entries(byTool)
+		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+		.slice(0, TOP_TOOLS)
+		.map(([tool, count]) => `${tool} ${count}`)
+		.join(', ');
 }
 
 function linkView(link: StepDataLink, labelOf: (stepId: string) => string): IOLinkView {
@@ -70,6 +107,34 @@ export function describeIO(step: FlowGraphNode, labelOf: (stepId: string) => str
 	}
 	const { recorded } = io;
 	const run: DetailRow[] = [];
+	if (recorded.costLabel !== undefined) {
+		const severalAttempts = (recorded.attempts?.length ?? 0) > 1;
+		const last = severalAttempts && recorded.lastAttemptCostUsd !== undefined;
+		run.push({
+			label: 'Cost',
+			value: last
+				? `${recorded.costLabel}, last attempt ${usd(recorded.lastAttemptCostUsd!)}`
+				: recorded.costLabel,
+		});
+	}
+	if (recorded.turns !== undefined) {
+		run.push({ label: 'Turns', value: String(recorded.turns) });
+	}
+	if (recorded.toolCalls !== undefined) {
+		const tools = topTools(recorded.toolCalls.byTool);
+		run.push({
+			label: 'Tool calls',
+			value: tools === '' ? String(recorded.toolCalls.total) : `${recorded.toolCalls.total} (${tools})`,
+		});
+	}
+	if (recorded.filesWritten !== undefined) {
+		const { paths, count } = recorded.filesWritten;
+		const shown = count > paths.length ? `${count} (first ${paths.length} shown)` : String(count);
+		run.push({ label: 'Files written', value: paths.length === 0 ? shown : `${shown}: ${paths.join(', ')}` });
+	}
+	if (recorded.endReason !== undefined) {
+		run.push({ label: 'End reason', value: recorded.endReason });
+	}
 	if (recorded.exitCode !== undefined) {
 		run.push({ label: 'Exit code', value: String(recorded.exitCode) });
 	}
@@ -128,6 +193,7 @@ export function describeIO(step: FlowGraphNode, labelOf: (stepId: string) => str
 		captured,
 		outputsNote: io.notes.outputs,
 		run,
+		attempts: (recorded.attempts?.length ?? 0) > 1 ? recorded.attempts!.map(attemptLine) : [],
 		relaunches: recorded.relaunches.map(relaunch => `${relaunch.at}: ${relaunch.feedback}`),
 	};
 }

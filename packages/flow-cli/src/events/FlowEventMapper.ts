@@ -1,4 +1,6 @@
-import type { ExecutionState } from '../ipc/Protocol';
+import { formatStepCost, summarizeStepCost } from 'flow-core';
+
+import type { ExecutionState, StepState } from '../ipc/Protocol';
 import type { ExecutionTransition, ExecutionTransitionListener } from '../storage/ExecutionTransition';
 import type { FlowEventName, FlowEventPayload, FlowEventPublisher } from './FlowEventPublisher';
 
@@ -120,6 +122,24 @@ export class FlowEventMapper implements ExecutionTransitionListener {
 			...(state.projectRoot === undefined ? {} : { projectRoot: state.projectRoot }),
 			...(state.projectId === undefined ? {} : { projectId: state.projectId }),
 			...(error === undefined ? {} : { error }),
+			...(status === 'running' || step === undefined ? {} : this.attemptFields(step)),
+		};
+	}
+
+	/** What the attempt that just ended cost and did, from the entry the store wrote when it settled. */
+	private attemptFields(step: StepState): Partial<FlowEventPayload> {
+		const summary = summarizeStepCost(step);
+		if (formatStepCost(summary) === undefined) {
+			return {};
+		}
+		const last = step.attemptLog?.at(-1);
+		return {
+			...(summary.lastAttemptUsd === undefined ? {} : { costUsd: summary.lastAttemptUsd }),
+			...(summary.totalUsd === undefined ? {} : { stepTotalCostUsd: summary.totalUsd }),
+			stepTotalCostComplete: summary.complete,
+			...(last?.turns === undefined ? {} : { turns: last.turns }),
+			...(last?.toolCalls === undefined ? {} : { toolCalls: last.toolCalls }),
+			...(last === undefined ? {} : { endReason: last.endReason }),
 		};
 	}
 }

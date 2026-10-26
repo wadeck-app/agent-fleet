@@ -689,9 +689,12 @@ describe('execution detail page', () => {
 			'stepId',
 			'statusLabel',
 			'duration',
+			'costLabel',
 			'retryLabel',
 			'startedAt',
 		]);
+		const cost = (steps['columns'] as Record<string, unknown>[]).find(column => column['key'] === 'costLabel');
+		expect(cost).toMatchObject({ label: 'Cost', nowrap: true });
 	});
 
 	it('shows when the run started and ended in a one-row table the shell formats, in every variant', () => {
@@ -704,6 +707,7 @@ describe('execution detail page', () => {
 				{ key: 'startedAt', label: 'Started', format: 'datetime', nowrap: true },
 				{ key: 'completedAt', label: 'Finished', format: 'datetime', nowrap: true },
 				{ key: 'version', label: 'Version', nowrap: true, mono: true },
+				{ key: 'totalCost', label: 'Total cost', nowrap: true },
 				{ key: 'definition', label: 'Definition', muted: true },
 			]);
 		}

@@ -21,6 +21,7 @@ import type {
 	ExecutionConfig,
 	LiveLogEntry,
 	ModelFlowStep,
+	ModelProviderName,
 	ModelStepMeta,
 	StepTrace,
 } from '../types';
@@ -66,12 +67,18 @@ class ModelStepTimeoutError extends Error {}
  * session). It still carries a meta, so every failed model step reports one and a missing one can only mean an
  * older worker.
  */
-function rejectedBeforeLaunch(stepTrace: StepTrace, effectiveModel: string | undefined, error: string): StepTrace {
+function rejectedBeforeLaunch(
+	stepTrace: StepTrace,
+	effectiveModel: string | undefined,
+	provider: ModelProviderName,
+	error: string
+): StepTrace {
 	stepTrace.error = error;
 	stepTrace.endTime = Date.now();
 	stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
 	stepTrace.meta = {
 		model: effectiveModel ?? '',
+		provider,
 		session_id: '',
 		session_file: '',
 		ttft_ms: 0,
@@ -171,7 +178,7 @@ export async function executeModelStep(
 			templateRenderer,
 		});
 		if ('error' in relaunch) {
-			return rejectedBeforeLaunch(stepTrace, effectiveModel, relaunch.error);
+			return rejectedBeforeLaunch(stepTrace, effectiveModel, actualProvider, relaunch.error);
 		}
 		renderedPrompt = relaunch.message;
 		relaunchSessionId = relaunch.resumeSessionId;
@@ -195,14 +202,14 @@ export async function executeModelStep(
 				sessionMode: step.session?.mode,
 			});
 		} catch (err) {
-			return rejectedBeforeLaunch(stepTrace, effectiveModel, normalizeError(err).message);
+			return rejectedBeforeLaunch(stepTrace, effectiveModel, actualProvider, normalizeError(err).message);
 		}
 	}
 	if (step.onCompact !== undefined) {
 		try {
 			validateOnCompact({ onCompact: step.onCompact, provider: actualProvider });
 		} catch (err) {
-			return rejectedBeforeLaunch(stepTrace, effectiveModel, normalizeError(err).message);
+			return rejectedBeforeLaunch(stepTrace, effectiveModel, actualProvider, normalizeError(err).message);
 		}
 	}
 	// Awaited before the step returns so no hook command outlives its step; each is bounded by its
@@ -434,6 +441,7 @@ export async function executeModelStep(
 		const observed = metrics?.snapshot();
 		return {
 			model: effectiveModel ?? '',
+			provider: actualProvider,
 			session_id: capturedSessionId,
 			session_file: capturedSessionFile,
 			ttft_ms: capturedTtftMs ?? 0,

@@ -87,6 +87,14 @@ export function formatCostUsd(cost: number | undefined): string {
 	return `$${cost.toFixed(4)}`;
 }
 
+/**
+ * Cost to print: the daemon's ready-to-print label when present (it carries the "unknown" and "+" lower-bound
+ * markers, an unknown cost must never look like $0), else the numeric format for a payload from an older daemon.
+ */
+export function formatCostWithLabel(label: string | undefined, cost: number | undefined): string {
+	return label ?? formatCostUsd(cost);
+}
+
 /** UTC day `YYYY-MM-DD` (the log files are partitioned by UTC day). */
 export function toUtcDay(now: Date): string {
 	return now.toISOString().slice(0, 10);

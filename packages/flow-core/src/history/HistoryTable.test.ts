@@ -354,4 +354,63 @@ describe('renderDetailView project line', () => {
 		expect(withName).toContain('Project:   app (a1b2c3d4)');
 		expect(buildHistoryTable([makeExec({ executionId: 'p2' })], { id: 'p2' })).not.toContain('Project:');
 	});
+
+	it('prints the attempts of a step and totals the step cost, not the cumulative session values', () => {
+		const exec = makeExec({
+			executionId: 'attempts',
+			steps: {
+				ask: {
+					status: 'completed',
+					startedAt: '2026-10-26T10:00:00.000Z',
+					completedAt: '2026-10-26T10:01:00.000Z',
+					attempts: 2,
+					meta: {
+						model: 'haiku',
+						session_id: 's1',
+						session_file: '',
+						ttft_ms: 5,
+						duration_ms: 900,
+						cost: {
+							input_tokens: 4,
+							output_tokens: 8,
+							cache_read_tokens: 45902,
+							cache_write_tokens: 56214,
+							usd: 0.00749017,
+						},
+					},
+					attemptLog: [
+						{
+							n: 1,
+							origin: 'first',
+							startedAt: '2026-10-26T10:00:00.000Z',
+							endedAt: '2026-10-26T10:00:30.000Z',
+							durationMs: 30000,
+							outcome: 'completed',
+							endReason: 'completed',
+							provider: 'claude',
+							sessionId: 's1',
+							usd: 0.00637995,
+						},
+						{
+							n: 2,
+							origin: 'relaunch',
+							startedAt: '2026-10-26T10:00:30.000Z',
+							endedAt: '2026-10-26T10:01:00.000Z',
+							durationMs: 30000,
+							outcome: 'completed',
+							endReason: 'completed',
+							provider: 'claude',
+							sessionId: 's1',
+							usd: 0.00749017,
+						},
+					],
+				},
+			} as never,
+		});
+		const out = buildHistoryTable([exec], { id: 'attempts' });
+		expect(out).toContain('attempt 1  first');
+		expect(out).toContain('attempt 2  relaunch  30.0s  $0.0011');
+		expect(out).toContain('cost: $0.0075 over 2 attempts');
+		expect(out).toContain('Total cost: $0.0075');
+	});
 });

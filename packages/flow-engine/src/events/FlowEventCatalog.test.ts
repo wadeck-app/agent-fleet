@@ -97,6 +97,37 @@ describe('EventsDocumentation vs the catalog', () => {
 	});
 });
 
+describe('FLOW_EVENT_CATALOG step cost fields', () => {
+	const COST_FIELDS = ['costUsd', 'stepTotalCostUsd', 'stepTotalCostComplete', 'turns', 'toolCalls', 'endReason'];
+
+	it.each(['flow.step.completed', 'flow.step.failed'])(
+		'%s declares the optional cost fields (additive, never required) and shows them in its example',
+		name => {
+			const event = FLOW_EVENT_CATALOG.find(candidate => candidate.name === name)!;
+			const schema = event.schema as { properties: Record<string, unknown>; required: string[] };
+			for (const field of COST_FIELDS) {
+				expect(schema.properties, field).toHaveProperty(field);
+				expect(schema.required).not.toContain(field);
+			}
+			expect(event.example).toHaveProperty('stepTotalCostUsd');
+		}
+	);
+
+	it('does not add them to the events that cannot have a cost', () => {
+		for (const name of [
+			'flow.step.started',
+			'flow.execution.started',
+			'flow.execution.completed',
+			'flow.execution.failed',
+		]) {
+			const schema = FLOW_EVENT_CATALOG.find(candidate => candidate.name === name)!.schema as {
+				properties: Record<string, unknown>;
+			};
+			expect(schema.properties).not.toHaveProperty('stepTotalCostUsd');
+		}
+	});
+});
+
 describe('FLOW_EVENT_CATALOG projectId', () => {
 	it.each(FLOW_EVENT_CATALOG.map(event => [event.name, event] as const))(
 		'%s declares an optional string projectId next to projectRoot, and shows it in its example',

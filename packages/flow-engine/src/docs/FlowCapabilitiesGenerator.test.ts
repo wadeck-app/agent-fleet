@@ -32,6 +32,15 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).toMatch(/shell/i);
 	});
 
+	it('documents the attempt log, the cumulative claude cost and that an unknown cost is never zero', () => {
+		expect(result).toContain('`provider`');
+		expect(result).toMatch(/attempt log/i);
+		expect(result).toMatch(/cumulative/i);
+		expect(result).toContain('never summed or shown as 0');
+		expect(result).toContain('2.7900+ (2 attempts unknown)');
+		expect(result).toContain('stepTotalCostUsd');
+	});
+
 	it('contains all required section headings', () => {
 		expect(result).toContain('Step Types');
 		expect(result).toContain('Variable Types');

@@ -1187,6 +1187,11 @@ export interface ModelStepMeta extends StepMetaBase {
 	model: string;
 	/** Claude session ID from system:init event -- used for session continuation */
 	session_id: string;
+	/**
+	 * Provider that ran this attempt. Needed to read `cost`: only claude's usd and tokens are verified to be cumulative
+	 * per session. Absent on records written before it existed.
+	 */
+	provider?: ModelProviderName;
 	/** Absolute path to the .jsonl session file (empty if not resolvable) */
 	session_file: string;
 	/** Time-to-first-token in ms */

@@ -174,6 +174,120 @@ describe('toExecutionDetail', () => {
 	});
 });
 
+describe('step cost in the detail view (per-attempt, session-cumulative)', () => {
+	const modelMeta = (usd: number) => ({
+		duration_ms: 1,
+		model: 'haiku',
+		session_id: 's1',
+		session_file: '',
+		ttft_ms: 1,
+		cost: { input_tokens: 4, output_tokens: 8, cache_read_tokens: 0, cache_write_tokens: 0, usd },
+	});
+	const entry = (n: number, extra: Record<string, unknown>) => ({
+		n,
+		origin: n === 1 ? 'first' : 'relaunch',
+		startedAt: '2026-08-16T12:00:00.000Z',
+		endedAt: '2026-08-16T12:00:30.000Z',
+		durationMs: 30_000,
+		outcome: 'completed',
+		endReason: 'completed',
+		provider: 'claude',
+		sessionId: 's1',
+		...extra,
+	});
+	const detailOf = (steps: ExecutionState['steps']) =>
+		toExecutionDetail({ filePath: 'f', record: record({ steps }) }, '');
+
+	it('makes costUsd the step total, adds lastAttemptCostUsd and the attempts, from the measured capture', () => {
+		const detail = detailOf({
+			ask: {
+				status: 'completed',
+				attempts: 2,
+				meta: modelMeta(0.00749017) as never,
+				attemptLog: [
+					entry(1, {
+						usd: 0.00637995,
+						turns: 2,
+						toolCalls: 3,
+						tokens: { input: 2, output: 4, cacheRead: 0, cacheWrite: 51022 },
+					}),
+					entry(2, { usd: 0.00749017, tokens: { input: 4, output: 8, cacheRead: 45902, cacheWrite: 56214 } }),
+				] as never,
+			},
+		});
+		const step = detail.steps[0]!;
+		expect(step.costUsd).toBeCloseTo(0.00749017, 10);
+		expect(step.lastAttemptCostUsd).toBeCloseTo(0.00111022, 10);
+		expect(step.costComplete).toBe(true);
+		expect(step.costLabel).toBe('$0.0075');
+		expect(step.attemptHistory).toHaveLength(2);
+		expect(step.attemptHistory![0]).toMatchObject({
+			n: 1,
+			origin: 'first',
+			duration: '30.0s',
+			endReason: 'completed',
+			turns: 2,
+			toolCalls: 3,
+		});
+		expect(step.attemptHistory![1]!.tokens).toEqual({ input: 2, output: 4, cacheRead: 45902, cacheWrite: 5192 });
+		expect(step.attemptHistory![0]!.costUsd).toBeCloseTo(0.00637995, 10);
+		expect(step.attemptHistory![1]!.costUsd).toBeCloseTo(0.00111022, 10);
+		expect(detail.totalCostUsd).toBeCloseTo(0.00749017, 10);
+		expect(detail.totalCostComplete).toBe(true);
+		expect(detail.totalCostLabel).toBe('$0.0075');
+	});
+
+	it('flags an incomplete total and never turns an unknown cost into 0', () => {
+		const detail = detailOf({
+			a: {
+				status: 'completed',
+				attempts: 2,
+				meta: modelMeta(2) as never,
+				attemptLog: [entry(1, { usd: 2 }), entry(2, { usd: undefined, outcome: 'failed' })] as never,
+			},
+			b: {
+				status: 'failed',
+				attempts: 1,
+				meta: modelMeta(0) as never,
+				attemptLog: [entry(1, { usd: undefined, outcome: 'failed' })] as never,
+			},
+		});
+		expect(detail.steps[0]).toMatchObject({
+			costUsd: 2,
+			costComplete: false,
+			costLabel: '$2.0000+ (1 attempt unknown)',
+		});
+		expect(detail.steps[0]!.attemptHistory![1]!).not.toHaveProperty('costUsd');
+		expect(detail.steps[1]).not.toHaveProperty('costUsd');
+		expect(detail.steps[1]).toMatchObject({ costComplete: false, costLabel: 'unknown' });
+		expect(detail.totalCostUsd).toBe(2);
+		expect(detail.totalCostComplete).toBe(false);
+		expect(detail.totalCostLabel).toBe('$2.0000+ (2 attempts unknown)');
+	});
+
+	it('shows an unknown total when no costed step has a known cost, and nothing for a record without cost', () => {
+		const unknown = detailOf({
+			b: {
+				status: 'failed',
+				attemptLog: [entry(1, { usd: undefined, outcome: 'failed' })] as never,
+			},
+		});
+		expect(unknown).not.toHaveProperty('totalCostUsd');
+		expect(unknown).toMatchObject({ totalCostComplete: false, totalCostLabel: 'unknown' });
+		expect(toExecutionDetail({ filePath: 'f', record: record() }, '')).not.toHaveProperty('totalCostLabel');
+	});
+
+	it('labels an old record that ran several times without a log', () => {
+		const detail = detailOf({ old: { status: 'completed', attempts: 3, meta: modelMeta(0.3) as never } });
+		expect(detail.steps[0]).toMatchObject({
+			costUsd: 0.3,
+			costComplete: false,
+			costLabel: '$0.3000 (last attempt of 3, earlier not recorded)',
+		});
+		expect(detail.steps[0]).not.toHaveProperty('attemptHistory');
+	});
+});
+
 describe('project fields of the views', () => {
 	it('exposes projectId and projectLabel (name (id)) next to projectRoot when a lookup is given', () => {
 		const summary = toExecutionSummary(record({ projectId: 'a1b2c3d4', projectRoot: '/work/app' }), () => ({

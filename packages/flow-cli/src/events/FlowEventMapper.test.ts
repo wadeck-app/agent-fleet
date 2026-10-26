@@ -90,6 +90,78 @@ describe('FlowEventMapper over ExecutionStore transitions', () => {
 		expect(execution.error).toBeUndefined();
 	});
 
+	describe('cost fields of step events', () => {
+		const model = (usd: number, extra: Record<string, unknown> = {}) =>
+			({
+				model: 'haiku',
+				provider: 'claude',
+				session_id: 'sess-1',
+				session_file: '',
+				ttft_ms: 1,
+				duration_ms: 1000,
+				cost: {
+					input_tokens: 1,
+					output_tokens: 2,
+					cache_read_tokens: 0,
+					cache_write_tokens: 0,
+					usd,
+					reported: true,
+				},
+				turns: 3,
+				tool_calls: { total: 7, by_tool: { Bash: 7 } },
+				end_reason: 'completed',
+				...extra,
+			}) as never;
+
+		it('puts this attempt share, the step total so far and the end reason on step.completed (session-cumulative cost resolved)', () => {
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markStepCompleted(EXEC_ID, 'a', model(0.00637995));
+			store.markStepRunning(EXEC_ID, 'a', undefined, undefined, 'loop');
+			store.markStepCompleted(EXEC_ID, 'a', model(0.00749017));
+
+			const second = publisher.events.filter(e => e.event === 'flow.step.completed')[1]!.payload;
+			expect(second.costUsd).toBeCloseTo(0.00111022, 10);
+			expect(second.stepTotalCostUsd).toBeCloseTo(0.00749017, 10);
+			expect(second).toMatchObject({
+				stepTotalCostComplete: true,
+				turns: 3,
+				toolCalls: 7,
+				endReason: 'completed',
+			});
+		});
+
+		it('leaves the cost out (never 0) when the attempt reported none, and marks the total incomplete', () => {
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markStepFailed(EXEC_ID, 'a', 'killed', undefined, undefined, undefined, {
+				meta: model(0, {
+					cost: {
+						input_tokens: 0,
+						output_tokens: 0,
+						cache_read_tokens: 0,
+						cache_write_tokens: 0,
+						usd: 0,
+						reported: false,
+					},
+					end_reason: 'timeout',
+				}),
+			});
+
+			const failed = publisher.events.find(e => e.event === 'flow.step.failed')!.payload;
+			expect(failed).not.toHaveProperty('costUsd');
+			expect(failed).not.toHaveProperty('stepTotalCostUsd');
+			expect(failed).toMatchObject({ stepTotalCostComplete: false, endReason: 'timeout' });
+		});
+
+		it('adds no cost field for a step without model cost (script step)', () => {
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markStepCompleted(EXEC_ID, 'a');
+
+			const completed = publisher.events.find(e => e.event === 'flow.step.completed')!.payload;
+			expect(Object.keys(completed)).not.toEqual(expect.arrayContaining(['costUsd']));
+			expect(completed).not.toHaveProperty('stepTotalCostUsd');
+		});
+	});
+
 	it('does not publish step.completed for a step that was skipped and never ran', () => {
 		store.markStepCompleted(EXEC_ID, 'b');
 		expect(publisher.events).toEqual([]);

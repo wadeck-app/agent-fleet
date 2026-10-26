@@ -1,7 +1,7 @@
 import { Badge } from '@framework/components/primitives/Badge';
 import type { FlowExecutionDetail } from '@shared/api/flow-daemon.contract';
 
-import { formatCostUsd, formatStepCounts, formatTimestamp } from '../flowDaemonFormat';
+import { formatCostWithLabel, formatStepCounts, formatTimestamp } from '../flowDaemonFormat';
 import { FlowExecutionHeaderField as HeaderField } from './FlowExecutionHeaderField';
 import { FlowExecutionStatusBadge } from './FlowExecutionStatusBadge';
 
@@ -32,7 +32,9 @@ export function FlowExecutionHeader({ execution }: FlowExecutionHeaderProps) {
 			<HeaderField label="Failed / steps">
 				{formatStepCounts(execution.failedStepCount, execution.stepCount)}
 			</HeaderField>
-			<HeaderField label="Total cost">{formatCostUsd(execution.totalCostUsd)}</HeaderField>
+			<HeaderField label="Total cost">
+				{formatCostWithLabel(execution.totalCostLabel, execution.totalCostUsd)}
+			</HeaderField>
 			<HeaderField label="Flow file">
 				<span className="font-mono text-xs">{execution.flowFile}</span>
 			</HeaderField>

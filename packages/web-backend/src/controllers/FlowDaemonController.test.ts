@@ -140,6 +140,42 @@ describe('FlowDaemonController', () => {
 			expect(JSON.stringify(body)).not.toContain('secret-session');
 		});
 
+		it('serves the step total, the attempts and the completeness, without the session ids of the attempt log', async () => {
+			const attempt = (n: number, usd: number) => ({
+				n,
+				origin: n === 1 ? 'first' : 'relaunch',
+				startedAt: '2026-08-16T12:00:00.000Z',
+				endedAt: '2026-08-16T12:00:30.000Z',
+				durationMs: 30000,
+				outcome: 'completed',
+				endReason: 'completed',
+				provider: 'claude',
+				sessionId: 'secret-attempt-session',
+				usd,
+			});
+			writeExecution(
+				configDir,
+				execution('cost123', {
+					steps: {
+						ask: {
+							status: 'completed',
+							startedAt: '2026-08-16T12:00:00.000Z',
+							completedAt: '2026-08-16T12:01:00.000Z',
+							attempts: 2,
+							meta: { model: 'haiku', cost: { usd: 0.00749017 } },
+							attemptLog: [attempt(1, 0.00637995), attempt(2, 0.00749017)],
+						},
+					},
+				})
+			);
+			const body = await get('/api/flow-daemon/executions/:id', { params: { id: 'cost123' } });
+			expect(body.steps[0].costUsd).toBeCloseTo(0.00749017, 10);
+			expect(body.steps[0]).toMatchObject({ costComplete: true, costLabel: '$0.0075' });
+			expect(body.steps[0].attemptHistory).toHaveLength(2);
+			expect(body.totalCostLabel).toBe('$0.0075');
+			expect(JSON.stringify(body)).not.toContain('secret-attempt-session');
+		});
+
 		it('reports an unknown id as a 404 that says what to do', async () => {
 			const error = await get('/api/flow-daemon/executions/:id', { params: { id: 'zzz999' } }).catch(e => e);
 			expect(error).toBeInstanceOf(HttpException);

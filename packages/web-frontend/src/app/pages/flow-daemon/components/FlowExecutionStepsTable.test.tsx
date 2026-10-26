@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildStep } from '../flowDaemonFixtures';
+import { buildIncompleteCostStep, buildStep, buildTwoAttemptStep } from '../flowDaemonFixtures';
 import { FlowExecutionStepsTable } from './FlowExecutionStepsTable';
 
 describe('FlowExecutionStepsTable', () => {
@@ -80,6 +80,62 @@ describe('FlowExecutionStepsTable', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Show logs of step deploy' }));
 
 		expect(onShowStepLogs).toHaveBeenCalledWith('deploy');
+	});
+
+	it('shows the step total label of a retried step', () => {
+		render(<FlowExecutionStepsTable steps={[buildTwoAttemptStep()]} />);
+
+		expect(screen.getByText('$0.0075')).toBeInTheDocument();
+	});
+
+	it('shows the lower-bound marker of an incomplete total', () => {
+		render(<FlowExecutionStepsTable steps={[buildIncompleteCostStep()]} />);
+
+		const label = screen.getByText('$2.7900+ (2 attempts unknown)');
+		expect(label).toBeInTheDocument();
+		expect(label.textContent).toContain('+');
+	});
+
+	it('shows unknown as text, never as $0', () => {
+		render(
+			<FlowExecutionStepsTable steps={[buildStep({ costUsd: 0, costComplete: false, costLabel: 'unknown' })]} />
+		);
+
+		expect(screen.getByText('unknown')).toBeInTheDocument();
+		expect(screen.queryByText(/\$0/)).not.toBeInTheDocument();
+	});
+
+	it('lists the attempts of a retried step with their cost share', () => {
+		render(<FlowExecutionStepsTable steps={[buildTwoAttemptStep()]} />);
+
+		expect(screen.getByText('2 attempts')).toBeInTheDocument();
+		expect(screen.getByText('#1 | initial | 12s | $0.0064 | error | 3 turns | 4 tool calls')).toBeInTheDocument();
+		expect(screen.getByText('#2 | retry | 5s | $0.0011 | completed | 1 turns | 2 tool calls')).toBeInTheDocument();
+	});
+
+	it('shows an unknown attempt cost with its reason, never as $0', () => {
+		render(<FlowExecutionStepsTable steps={[buildIncompleteCostStep()]} />);
+
+		expect(
+			screen.getByText('#1 | initial | 1m 0s | cost unknown (process crashed before reporting its cost) | crash')
+		).toBeInTheDocument();
+	});
+
+	it('offers no attempt list for a single attempt', () => {
+		render(
+			<FlowExecutionStepsTable
+				steps={[buildTwoAttemptStep({ attemptHistory: buildTwoAttemptStep().attemptHistory?.slice(0, 1) })]}
+			/>
+		);
+
+		expect(screen.queryByText(/ attempts$/)).not.toBeInTheDocument();
+	});
+
+	it('keeps the numeric cost for a payload from an older daemon without label nor history', () => {
+		render(<FlowExecutionStepsTable steps={[buildStep({ costUsd: 0.1234 })]} />);
+
+		expect(screen.getByText('$0.1234')).toBeInTheDocument();
+		expect(screen.queryByText(/ attempts$/)).not.toBeInTheDocument();
 	});
 
 	it('shows dashes for the optional metrics a step does not have', () => {

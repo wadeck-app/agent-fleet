@@ -53,8 +53,8 @@ export type AttemptOutcome = 'completed' | 'failed' | 'engine_failed' | 'abandon
  * crash are covered). Additive: absent on records written before it existed. Paths of written files are not kept here.
  *
  * Every figure is what the provider REPORTED for that attempt. `usd` absent means unknown (killed before its result,
- * codex, no metrics received), never zero. Whether a provider's reported cost is cumulative across a resumed session
- * is unverified, so these raw values must not be summed yet.
+ * codex, no metrics received), never zero. For claude the reported usd and tokens of a resumed session are
+ * CUMULATIVE per session (measured), so these raw values must never be summed: use `summarizeStepCost`.
  */
 export interface AttemptRecord {
 	/** Attempt number, as in `StepState.attempts` when it started. */
@@ -69,6 +69,10 @@ export interface AttemptRecord {
 	/** Failure message, cut to 500 characters and masked. */
 	error?: string;
 	model?: string;
+	/** Provider that ran the attempt (`claude`, `opencode`, `codex`); absent on entries written before it was recorded. */
+	provider?: string;
+	/** Provider session id from the attempt's meta; attempts sharing it share a cumulative cost. Absent when none was reported or on older entries. */
+	sessionId?: string;
 	usd?: number;
 	tokens?: { input: number; output: number; cacheRead: number; cacheWrite: number };
 	turns?: number;

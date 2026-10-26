@@ -11,6 +11,8 @@
 # a column. A shell older than dsl-ui 122 ignores `format` and shows the raw ISO text.
 # The steps table has short columns (a narrow page breaks longer cells mid-word): the status word carries recovered
 # errors ("ok, recovered"), coloured by `badge` when it is a bare word; the error text is in the output below.
+# Cost columns show the flow-core labels (step total over all attempts, "unknown" or "+" when an attempt cost is missing,
+# "-" without model cost); the per-attempt detail is in `text` (`flow show`), the DSL has no cell tooltip.
 # The Retries column is a badge too: its texts are the small fixed set of flow-core RETRY_BADGE_VARIANTS (views.test.ts
 # compares this map with it). The retries of a step are attempts - 1, shown even when 0.
 $sources:
@@ -75,6 +77,7 @@ sections:
                 - { key: 'startedAt', label: 'Started', format: datetime, nowrap: true }
                 - { key: 'completedAt', label: 'Finished', format: datetime, nowrap: true }
                 - { key: 'version', label: 'Version', nowrap: true, mono: true }
+                - { key: 'totalCost', label: 'Total cost', nowrap: true }
                 - { key: 'definition', label: 'Definition', muted: true }
 
           - $type: Section
@@ -99,6 +102,7 @@ sections:
                                 'ok, recovered': warning,
                             }
                       - { key: 'duration', label: 'Duration', nowrap: true, muted: true }
+                      - { key: 'costLabel', label: 'Cost', nowrap: true }
                       - key: retryLabel
                         label: Retries
                         nowrap: true

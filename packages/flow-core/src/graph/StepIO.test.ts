@@ -87,6 +87,67 @@ describe('describeStepIO: recorded', () => {
 		expect(JSON.stringify(io)).not.toContain('.jsonl');
 	});
 
+	it('exposes the step total cost, the last attempt, the attempts and the observed work of the last attempt', () => {
+		const entry = (n: number, extra: object) => ({
+			n,
+			origin: n === 1 ? 'first' : 'relaunch',
+			startedAt: '2026-10-26T10:00:00.000Z',
+			endedAt: '2026-10-26T10:00:30.000Z',
+			durationMs: 30000,
+			outcome: 'completed',
+			endReason: 'completed',
+			provider: 'claude',
+			sessionId: 's1',
+			...extra,
+		});
+		const { recorded } = describeStepIO(undefined, {
+			status: 'completed',
+			attempts: 2,
+			meta: {
+				model: 'haiku',
+				session_id: 's1',
+				session_file: '/x/s1.jsonl',
+				ttft_ms: 5,
+				duration_ms: 900,
+				cost: {
+					input_tokens: 4,
+					output_tokens: 8,
+					cache_read_tokens: 45902,
+					cache_write_tokens: 56214,
+					usd: 0.00749017,
+				},
+				turns: 3,
+				tool_calls: { total: 5, by_tool: { Edit: 2, Bash: 3 } },
+				files_written: ['a.ts'],
+				files_written_count: 1,
+				end_reason: 'completed',
+			},
+			attemptLog: [
+				entry(1, { usd: 0.00637995, tokens: { input: 2, output: 4, cacheRead: 0, cacheWrite: 51022 } }),
+				entry(2, { usd: 0.00749017, tokens: { input: 4, output: 8, cacheRead: 45902, cacheWrite: 56214 } }),
+			],
+		} as never);
+
+		expect(recorded.costUsd).toBeCloseTo(0.00749017, 10);
+		expect(recorded.lastAttemptCostUsd).toBeCloseTo(0.00111022, 10);
+		expect(recorded).toMatchObject({
+			costComplete: true,
+			costLabel: '$0.0075',
+			turns: 3,
+			toolCalls: { total: 5, byTool: { Edit: 2, Bash: 3 } },
+			filesWritten: { paths: ['a.ts'], count: 1 },
+			endReason: 'completed',
+			tokens: { input: 2, output: 4, cacheRead: 45902, cacheWrite: 5192 },
+		});
+		expect(recorded.attempts).toHaveLength(2);
+		expect(recorded.attempts![1]).toMatchObject({ n: 2, origin: 'relaunch' });
+	});
+
+	it('has no attempts for an old record and no cost label for a step without cost', () => {
+		expect(describeStepIO(undefined, { status: 'completed' }).recorded).not.toHaveProperty('attempts');
+		expect(describeStepIO(undefined, { status: 'completed' }).recorded).not.toHaveProperty('costLabel');
+	});
+
 	it('exposes the exit code of a script step', () => {
 		expect(describeStepIO(step('test'), COMPLETED_WITH_LOOP.steps['test']).recorded.exitCode).toBe(0);
 	});

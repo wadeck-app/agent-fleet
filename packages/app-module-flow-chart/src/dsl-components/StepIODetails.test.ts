@@ -1,4 +1,4 @@
-import type { FlowGraphNode } from 'flow-core';
+import type { FlowGraphNode, StepAttemptView } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
 import { PREVIEW_CHARS, describeIO, previewOf } from './StepIODetails.js';
@@ -18,6 +18,18 @@ function withIO(io: Partial<NonNullable<FlowGraphNode['io']>>): FlowGraphNode {
 			...io,
 		},
 	});
+}
+
+function attempt(n: number, extra: Partial<StepAttemptView> = {}): StepAttemptView {
+	return {
+		n,
+		origin: 'first',
+		outcome: 'completed',
+		endReason: 'end_turn',
+		duration: '2s',
+		durationMs: 2000,
+		...extra,
+	};
 }
 
 const labelOf = (id: string) => id.toUpperCase();
@@ -99,6 +111,80 @@ describe('describeIO', () => {
 			Tokens: '10 in, 20 out, 1 cache read, 2 cache write',
 		});
 		expect(view.relaunches).toEqual([expect.stringContaining('tests failed')]);
+	});
+});
+
+describe('describeIO cost and activity', () => {
+	const rows = (recorded: NonNullable<FlowGraphNode['io']>['recorded']) =>
+		Object.fromEntries(describeIO(withIO({ recorded }), labelOf)!.run.map(row => [row.label, row.value]));
+
+	it('shows the step cost label, with the last attempt cost when the step ran several attempts', () => {
+		expect(rows({ relaunches: [], costLabel: '$0.0075', costUsd: 0.0075 })).toEqual({ Cost: '$0.0075' });
+		expect(
+			rows({
+				relaunches: [],
+				costLabel: '$2.7900+ (2 attempts unknown)',
+				lastAttemptCostUsd: 0.5,
+				attempts: [attempt(1), attempt(2)],
+			})
+		).toEqual({ Cost: '$2.7900+ (2 attempts unknown), last attempt $0.5000' });
+	});
+
+	it('says unknown, never $0, when the cost is unknown', () => {
+		expect(rows({ relaunches: [], costLabel: 'unknown', attempts: [attempt(1), attempt(2)] })).toEqual({
+			Cost: 'unknown',
+		});
+	});
+
+	it('shows turns, tool calls (total and top tools), files written and end reason of the last attempt', () => {
+		expect(
+			rows({
+				relaunches: [],
+				turns: 7,
+				toolCalls: { total: 12, byTool: { Read: 2, Edit: 6, Bash: 3, Grep: 1 } },
+				filesWritten: { paths: ['a.ts', 'b.ts'], count: 2 },
+				endReason: 'end_turn',
+			})
+		).toEqual({
+			Turns: '7',
+			'Tool calls': '12 (Edit 6, Bash 3, Read 2)',
+			'Files written': '2: a.ts, b.ts',
+			'End reason': 'end_turn',
+		});
+	});
+
+	it('shows the true count when the written paths are capped', () => {
+		expect(rows({ relaunches: [], filesWritten: { paths: ['a.ts'], count: 40 } })['Files written']).toBe(
+			'40 (first 1 shown): a.ts'
+		);
+	});
+
+	it('lists no attempt for a single attempt, one line per attempt from two', () => {
+		expect(describeIO(withIO({ recorded: { relaunches: [], attempts: [attempt(1)] } }), labelOf)!.attempts).toEqual(
+			[]
+		);
+		const view = describeIO(
+			withIO({
+				recorded: {
+					relaunches: [],
+					attempts: [
+						attempt(1, { costUnknownReason: 'no usage reported', outcome: 'failed', endReason: 'crash' }),
+						attempt(2, {
+							origin: 'retry',
+							costUsd: 0.25,
+							tokens: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 },
+							turns: 3,
+							toolCalls: 5,
+						}),
+					],
+				},
+			}),
+			labelOf
+		)!;
+		expect(view.attempts).toEqual([
+			'#1 first, 2s, cost unknown (no usage reported), failed: crash',
+			'#2 retry, 2s, +$0.2500, 1 in / 2 out / 3 cache read / 4 cache write, 3 turns, 5 tool calls, completed: end_turn',
+		]);
 	});
 });
 

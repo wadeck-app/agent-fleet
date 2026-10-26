@@ -71,6 +71,24 @@ describe('ExecutionStore attemptLog', () => {
 		expect(log[0]!.durationMs).toBe(new Date(log[0]!.endedAt).getTime() - new Date(log[0]!.startedAt).getTime());
 	});
 
+	it('records the session id and provider of the attempt so shared-session costs can be split', () => {
+		store.markStepRunning(EXEC_ID, 'a');
+		store.markStepCompleted(EXEC_ID, 'a', modelMeta({ session_id: 'sess-9', provider: 'claude' }));
+
+		expect(stepOf().attemptLog![0]).toMatchObject({ sessionId: 'sess-9', provider: 'claude' });
+	});
+
+	it('leaves sessionId and provider out when the meta reports none (empty session id, older worker)', () => {
+		store.markStepRunning(EXEC_ID, 'a');
+		store.markStepFailed(EXEC_ID, 'a', 'refused', undefined, undefined, undefined, {
+			meta: modelMeta({ session_id: '' }),
+		});
+
+		const entry = stepOf().attemptLog![0]!;
+		expect(entry).not.toHaveProperty('sessionId');
+		expect(entry).not.toHaveProperty('provider');
+	});
+
 	it('keeps the failed attempt that the next attempt used to overwrite', () => {
 		store.markStepRunning(EXEC_ID, 'a');
 		store.markStepFailed(EXEC_ID, 'a', 'exit 1', undefined, undefined, undefined, {

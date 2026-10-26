@@ -13,6 +13,46 @@ function renderProjectValue(overrides: Parameters<typeof buildExecutionDetail>[0
 	return field;
 }
 
+function renderTotalCost(overrides: Parameters<typeof buildExecutionDetail>[0]): HTMLElement {
+	render(<FlowExecutionHeader execution={buildExecutionDetail(overrides)} />);
+	const field = screen.getByText('Total cost').parentElement;
+	if (field === null) {
+		throw new Error('Total cost field has no parent element');
+	}
+	return field;
+}
+
+describe('FlowExecutionHeader total cost field', () => {
+	it('shows the daemon label with its lower-bound marker when the total is incomplete', () => {
+		const field = renderTotalCost({
+			totalCostUsd: 2.79,
+			totalCostComplete: false,
+			totalCostLabel: '$2.7900+ (2 attempts unknown)',
+		});
+
+		expect(within(field).getByText('$2.7900+ (2 attempts unknown)')).toBeInTheDocument();
+	});
+
+	it('shows unknown as text, never as $0', () => {
+		const field = renderTotalCost({ totalCostUsd: 0, totalCostComplete: false, totalCostLabel: 'unknown' });
+
+		expect(within(field).getByText('unknown')).toBeInTheDocument();
+		expect(within(field).queryByText(/\$0/)).not.toBeInTheDocument();
+	});
+
+	it('shows the label of a complete total', () => {
+		const field = renderTotalCost({ totalCostUsd: 0.00749017, totalCostComplete: true, totalCostLabel: '$0.0075' });
+
+		expect(within(field).getByText('$0.0075')).toBeInTheDocument();
+	});
+
+	it('keeps the numeric format for a payload from an older daemon without label', () => {
+		const field = renderTotalCost({ totalCostUsd: 1.5, totalCostLabel: undefined });
+
+		expect(within(field).getByText('$1.5000')).toBeInTheDocument();
+	});
+});
+
 describe('FlowExecutionHeader project field', () => {
 	it('shows the project label and exposes the root as tooltip when both exist', () => {
 		const field = renderProjectValue({

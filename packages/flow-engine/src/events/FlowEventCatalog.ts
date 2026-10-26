@@ -39,6 +39,37 @@ const PROPERTIES = {
 		type: 'string',
 		description: 'Registry id of the project the execution belongs to, when it has one',
 	},
+	costUsd: {
+		type: 'number',
+		minimum: 0,
+		description:
+			'Step events that ended: cost in USD of THIS attempt alone; absent when unknown (never 0). A resumed claude session reports a cumulative cost, so this is the difference with its previous attempt',
+	},
+	stepTotalCostUsd: {
+		type: 'number',
+		minimum: 0,
+		description:
+			'Step events that ended: cost in USD of the step over all its attempts so far; a lower bound when stepTotalCostComplete is false; absent when nothing is known',
+	},
+	stepTotalCostComplete: {
+		type: 'boolean',
+		description: 'Step events that ended: false when the cost of some attempt of the step is unknown',
+	},
+	turns: {
+		type: 'integer',
+		minimum: 0,
+		description: 'Step events that ended: model turns of this attempt, when the provider reports them',
+	},
+	toolCalls: {
+		type: 'integer',
+		minimum: 0,
+		description: 'Step events that ended: tool calls seen during this attempt, when observed',
+	},
+	endReason: {
+		type: 'string',
+		description:
+			'Step events that ended: why this attempt ended (completed, exit_nonzero, is_error_result, empty_output, timeout, stalled, worker_lost, engine_failed, execution_ended, step_error)',
+	},
 	error: {
 		type: 'string',
 		maxLength: 200,
@@ -81,7 +112,19 @@ const EXECUTION_FINISHED_OPTIONAL: PropertyName[] = [
 	'projectId',
 ];
 const STEP_OPTIONAL: PropertyName[] = ['startedAt', 'projectRoot', 'projectId'];
-const STEP_FINISHED_OPTIONAL: PropertyName[] = ['startedAt', 'completedAt', 'durationMs', 'projectRoot', 'projectId'];
+const STEP_FINISHED_OPTIONAL: PropertyName[] = [
+	'startedAt',
+	'completedAt',
+	'durationMs',
+	'projectRoot',
+	'projectId',
+	'costUsd',
+	'stepTotalCostUsd',
+	'stepTotalCostComplete',
+	'turns',
+	'toolCalls',
+	'endReason',
+];
 
 /**
  * The single definition of the events flow publishes. It feeds the queue declaration (flow-cli) and
@@ -176,6 +219,12 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			startedAt: STEP_STARTED_AT,
 			completedAt: STEP_ENDED_AT,
 			durationMs: 87250,
+			costUsd: 0.0412,
+			stepTotalCostUsd: 0.0412,
+			stepTotalCostComplete: true,
+			turns: 6,
+			toolCalls: 14,
+			endReason: 'completed',
 			projectRoot: PROJECT,
 			projectId: PROJECT_ID,
 		},
@@ -201,6 +250,12 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			startedAt: STEP_STARTED_AT,
 			completedAt: STEP_ENDED_AT,
 			durationMs: 87250,
+			costUsd: 0.0187,
+			stepTotalCostUsd: 0.0599,
+			stepTotalCostComplete: true,
+			turns: 4,
+			toolCalls: 9,
+			endReason: 'exit_nonzero',
 			projectRoot: PROJECT,
 			projectId: PROJECT_ID,
 			error: 'exit code 1',

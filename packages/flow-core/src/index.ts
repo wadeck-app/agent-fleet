@@ -68,6 +68,16 @@ export type {
 	StepState,
 	StepStatus,
 } from './execution/ExecutionState.js';
+export {
+	type AttemptCost,
+	type CostTotal,
+	type StepCostBasis,
+	type StepCostInput,
+	type StepCostSummary,
+	formatStepCost,
+	sumStepCosts,
+	summarizeStepCost,
+} from './execution/StepCost.js';
 
 export { createRemoteDaemonClient, isUnknownCommandError, outdatedDaemonMessage } from './daemon/RemoteDaemonClient.js';
 export { DEFAULT_HISTORY_LIMIT, RECOVERED_STATUS, filterExecutions } from './history/ExecutionFilter.js';
@@ -193,7 +203,7 @@ export {
 export type { StepRetryFacts, StepRetryPolicy } from './view/RetryBadge.js';
 export { readRecordedRetryPolicies, readRetryPolicies } from './view/RetryPolicyFile.js';
 export { toExecutionDetail, toExecutionSummary } from './view/ExecutionView.js';
-export type { ExecutionDetailView, ExecutionSummary, StepView } from './view/ExecutionView.js';
+export type { ExecutionDetailView, ExecutionSummary, StepAttemptView, StepView } from './view/ExecutionView.js';
 
 export { buildFlowGraph } from './graph/FlowGraphBuilder.js';
 export { annotateGraph } from './graph/RunGraphAnnotation.js';

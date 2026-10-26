@@ -5,8 +5,9 @@ import { versionDetailLineOf } from '../definitions/RecordedVersion.js';
 import { FlowCoreError, errorMessage } from '../errors.js';
 import { looksLikeExecutionId } from '../execution/ExecutionId.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
-import { formatDuration, formatModelCost, formatStarted } from '../history/ExecutionFormat.js';
+import { formatDuration, formatStarted } from '../history/ExecutionFormat.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
+import { renderStepCostLines, renderTotalCostLine } from './StepCostLines.js';
 import { renderStepIoLines } from './StepIoLines.js';
 
 /** Default number of trailing characters printed for a failed step's stdout/stderr. */
@@ -162,8 +163,6 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	lines.push('');
 	lines.push('Steps:');
 
-	let totalCostUsd = 0;
-	let hasCost = false;
 	for (const [stepId, step] of Object.entries(record.steps)) {
 		const name = step.injected ? `${stepId}*` : stepId;
 		const model = modelOf(step);
@@ -182,14 +181,7 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 		if (step.error) {
 			lines.push(`      error: ${step.error}`);
 		}
-		const cost = formatModelCost(step.meta);
-		if (cost) {
-			lines.push(`      ${cost}`);
-		}
-		if (step.meta && 'cost' in step.meta) {
-			hasCost = true;
-			totalCostUsd += (step.meta as { cost: { usd: number } }).cost.usd;
-		}
+		lines.push(...renderStepCostLines(step, '      '));
 		if (options.io === true) {
 			lines.push(...renderStepIoLines(step));
 		}
@@ -206,9 +198,10 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 			}
 		}
 	}
-	if (hasCost) {
+	const totalLine = renderTotalCostLine(Object.values(record.steps), '  ');
+	if (totalLine !== undefined) {
 		lines.push('');
-		lines.push(`  Total cost: $${totalCostUsd.toFixed(4)}`);
+		lines.push(totalLine);
 	}
 	if (Object.values(record.steps).some(s => s.injected)) {
 		lines.push('');

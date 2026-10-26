@@ -2,6 +2,7 @@ import type { FlowDefinition, FlowStep } from 'flow-engine/types';
 
 import { FlowCoreError } from '../errors.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
+import { formatStepCost, summarizeStepCost } from '../execution/StepCost.js';
 import { formatDuration } from '../history/ExecutionFormat.js';
 import { stripForServing } from '../logs/ServingText.js';
 import type { FlowGraph, FlowGraphEdge, FlowGraphNode } from './FlowGraph.js';
@@ -41,9 +42,19 @@ function addStateMeta(meta: MetaValues, state: StepState): void {
 	if (state.sourceId) {
 		meta.sourceId = state.sourceId;
 	}
-	const stepMeta = state.meta as { cost?: { usd?: number }; model?: string } | undefined;
-	if (stepMeta?.cost?.usd !== undefined) {
-		meta.costUsd = stepMeta.cost.usd;
+	const stepMeta = state.meta as { model?: string } | undefined;
+	// The cost of the whole step (all attempts, session-cumulative values resolved), not the last meta alone
+	const cost = summarizeStepCost(state);
+	const costLabel = formatStepCost(cost);
+	if (costLabel !== undefined) {
+		meta.costLabel = costLabel;
+		meta.costComplete = cost.complete;
+	}
+	if (cost.totalUsd !== undefined) {
+		meta.costUsd = cost.totalUsd;
+	}
+	if (cost.lastAttemptUsd !== undefined) {
+		meta.lastAttemptCostUsd = cost.lastAttemptUsd;
 	}
 	if (stepMeta?.model !== undefined) {
 		meta.model = stepMeta.model;

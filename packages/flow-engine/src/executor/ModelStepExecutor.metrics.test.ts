@@ -150,6 +150,31 @@ describe('ModelStepExecutor -- attempt metrics', () => {
 		expect(meta.duration_ms).toBeGreaterThan(0);
 	});
 
+	it.each<[ModelProviderName | undefined, string]>([
+		[undefined, 'claude'],
+		['opencode', 'opencode'],
+		['codex', 'codex'],
+	])('records the provider that ran the attempt (step provider %s -> %s)', async (stepProvider, expected) => {
+		const { meta } = await run(
+			scriptedProvider([init, resultEvent()]),
+			makeStep(stepProvider === undefined ? {} : { provider: stepProvider })
+		);
+
+		expect(meta.provider).toBe(expected);
+	});
+
+	it('records the provider on a failed attempt and on one refused before launch too', async () => {
+		const failing: ModelProvider = {
+			launchInteractive: () => Promise.reject(new Error('unused')),
+			launchBackground: () => Promise.reject(new Error('spawn claude ENOENT')),
+			kill: () => {},
+		};
+		expect((await run(failing)).meta.provider).toBe('claude');
+		expect((await run(failing, makeStep({ provider: 'opencode', contextLimit: 60_000 }))).meta.provider).toBe(
+			'opencode'
+		);
+	});
+
 	it('builds a meta with end_reason step_error when the provider throws', async () => {
 		const provider: ModelProvider = {
 			launchInteractive: () => Promise.reject(new Error('unused')),

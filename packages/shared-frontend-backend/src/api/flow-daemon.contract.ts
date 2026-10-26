@@ -87,6 +87,25 @@ export const FlowExecutionsResponseSchema = z.object({
 	offset: z.number(),
 });
 
+/** One settled attempt of a step. `costUsd` is the attempt's own share (a delta for a resumed claude session), absent when unknown. */
+export const FlowStepAttemptSchema = z.object({
+	n: z.number(),
+	origin: z.string(),
+	outcome: z.string(),
+	endReason: z.string(),
+	duration: z.string(),
+	durationMs: z.number(),
+	costUsd: z.number().optional(),
+	costUnknownReason: z.string().optional(),
+	tokens: z
+		.object({ input: z.number(), output: z.number(), cacheRead: z.number(), cacheWrite: z.number() })
+		.optional(),
+	turns: z.number().optional(),
+	toolCalls: z.number().optional(),
+	filesWrittenCount: z.number().optional(),
+	error: z.string().optional(),
+});
+
 export const FlowStepSchema = z.object({
 	stepId: z.string(),
 	status: z.string(),
@@ -97,7 +116,18 @@ export const FlowStepSchema = z.object({
 	attempts: z.number().optional(),
 	error: z.string().optional(),
 	model: z.string().optional(),
+	/**
+	 * Cost of the whole step over all its attempts (a lower bound when costComplete is false). BREAKING MEANING: before
+	 * attempts were recorded this was the cost of the last attempt only, now lastAttemptCostUsd.
+	 */
 	costUsd: z.number().optional(),
+	lastAttemptCostUsd: z.number().optional(),
+	/** False when the cost of some attempt is unknown; absent for a step without model cost. */
+	costComplete: z.boolean().optional(),
+	/** Ready to print: `$0.0075`, `$2.7900+ (2 attempts unknown)`, `unknown`. */
+	costLabel: z.string().optional(),
+	/** Absent on records written before attempts were logged. */
+	attemptHistory: z.array(FlowStepAttemptSchema).optional(),
 	sourceId: z.string().optional(),
 	workerId: z.string().optional(),
 	relaunches: z.array(z.object({ at: z.string(), feedback: z.string() })),
@@ -107,7 +137,11 @@ export const FlowExecutionDetailSchema = FlowExecutionSummarySchema.extend({
 	filePath: z.string(),
 	currentSteps: z.array(z.string()),
 	steps: z.array(FlowStepSchema),
+	/** Sum of the step totals (a lower bound when totalCostComplete is false). */
 	totalCostUsd: z.number().optional(),
+	totalCostComplete: z.boolean().optional(),
+	/** Ready to print, same wording as a step's costLabel. */
+	totalCostLabel: z.string().optional(),
 	/** The text `flow show` prints (failed steps carry the tail of their output). */
 	text: z.string(),
 });

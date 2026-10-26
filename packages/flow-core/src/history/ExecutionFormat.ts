@@ -29,8 +29,11 @@ export function formatStarted(iso: string): string {
 	return iso.replace('T', ' ').slice(0, 19);
 }
 
-/** `meta.cost` only exists on ModelStepMeta -- a script step's meta has no such field. */
-export function formatModelCost(meta: StepMeta | undefined): string | undefined {
+/**
+ * `meta.cost` only exists on ModelStepMeta -- a script step's meta has no such field. `costText` replaces the raw
+ * `$usd` of the meta (the last attempt, cumulative for a resumed claude session) by the step's computed cost.
+ */
+export function formatModelCost(meta: StepMeta | undefined, costText?: string): string | undefined {
 	if (!meta || !('cost' in meta)) {
 		return undefined;
 	}
@@ -47,7 +50,7 @@ export function formatModelCost(meta: StepMeta | undefined): string | undefined 
 	// Cache tokens are an ADDITIONAL volume on top of "in" tokens, not already counted there --
 	// surfacing them separately avoids misreading "in" as the total processed input.
 	const cacheSuffix = cacheTokens > 0 ? ` + ${cacheTokens} cache` : '';
-	return `cost: $${cost.usd.toFixed(4)} (${cost.input_tokens} in / ${cost.output_tokens} out${cacheSuffix} tokens, ${meta.duration_ms}ms)`;
+	return `cost: ${costText ?? `$${cost.usd.toFixed(4)}`} (${cost.input_tokens} in / ${cost.output_tokens} out${cacheSuffix} tokens, ${meta.duration_ms}ms)`;
 }
 
 /** Fixed-width column: truncates when longer, right-pads with spaces otherwise. */

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { buildStep } from '../flowDaemonFixtures';
+import { buildIncompleteCostStep, buildStep, buildTwoAttemptStep } from '../flowDaemonFixtures';
 import { FlowExecutionStepsTable } from './FlowExecutionStepsTable';
 
 const meta = {
@@ -33,6 +33,12 @@ export const Default: Story = {
 			}),
 			buildStep({ stepId: 'notify', status: 'queued', injected: true }),
 		],
+	},
+};
+
+export const RetriedStepsWithCostBreakdown: Story = {
+	args: {
+		steps: [buildTwoAttemptStep(), buildIncompleteCostStep(), buildStep({ costUsd: 0, costLabel: 'unknown' })],
 	},
 };
 

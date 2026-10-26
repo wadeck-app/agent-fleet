@@ -30,6 +30,15 @@ export interface FlowEventPayload {
 	projectId?: string;
 	/** First line of the (already masked) error, truncated. Failed events only. */
 	error?: string;
+	/** Step events that ended, all additive: cost of THIS attempt alone (a delta for a resumed claude session); absent when unknown. */
+	costUsd?: number;
+	/** Cost of the step over all its attempts so far; a lower bound when `stepTotalCostComplete` is false. */
+	stepTotalCostUsd?: number;
+	/** False when the cost of some attempt of the step is unknown. */
+	stepTotalCostComplete?: boolean;
+	turns?: number;
+	toolCalls?: number;
+	endReason?: string;
 }
 
 export type FlowEventsStatus =

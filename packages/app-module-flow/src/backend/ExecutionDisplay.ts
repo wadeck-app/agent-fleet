@@ -42,7 +42,8 @@ export function toExecutionRow(summary: ExecutionSummary) {
 }
 
 /**
- * A step row: the short status word and the retry cell. `policy` is the retry budget the flow file declares for this step,
+ * A step row: the short status word, the cost cell (flow-core costLabel, the step total over all attempts; a dash for a step
+ * without model cost, never $0) and the retry cell. `policy` is the retry budget the flow file declares for this step,
  * undefined when it is unknown (see retryLabel).
  */
 export function toStepRow(step: StepView, policy: StepRetryPolicy | undefined) {
@@ -50,6 +51,7 @@ export function toStepRow(step: StepView, policy: StepRetryPolicy | undefined) {
 	return {
 		...step,
 		statusLabel: outcomeLabel(stepStatusTag(step.status), { recovered }),
+		costLabel: step.costLabel ?? '-',
 		retryLabel: retryLabel(step, policy),
 	};
 }
@@ -77,6 +79,7 @@ export function toExecutionDetailRow(
 				startedAt: requireTimestamp(detail.startedAt),
 				completedAt: detail.completedAt,
 				version: detail.flowVersion ?? 'not recorded',
+				totalCost: detail.totalCostLabel ?? '-',
 				definition: detail.versionNote,
 			},
 		],

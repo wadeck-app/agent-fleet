@@ -3,8 +3,9 @@ import { Button } from '@framework/components/primitives/Button';
 import { Table, type TableColumn } from '@framework/components/table/Table';
 import type { FlowExecutionDetail } from '@shared/api/flow-daemon.contract';
 
-import { formatCostUsd, formatStepRunner, formatTimestamp, shortenId } from '../flowDaemonFormat';
+import { formatCostWithLabel, formatStepRunner, formatTimestamp, shortenId } from '../flowDaemonFormat';
 import { FlowExecutionStatusBadge } from './FlowExecutionStatusBadge';
+import { StepAttemptHistory } from './StepAttemptHistory';
 
 type FlowStep = FlowExecutionDetail['steps'][number];
 
@@ -72,7 +73,14 @@ const columns: TableColumn<FlowStep>[] = [
 		key: 'costUsd',
 		label: 'Cost',
 		className: COMPACT_COLUMN_CLASS,
-		render: step => <span className="text-sm">{formatCostUsd(step.costUsd)}</span>,
+		render: step => (
+			<div className="flex flex-col gap-1">
+				<span className="text-sm">{formatCostWithLabel(step.costLabel, step.costUsd)}</span>
+				{step.attemptHistory !== undefined && step.attemptHistory.length >= 2 && (
+					<StepAttemptHistory attempts={step.attemptHistory} />
+				)}
+			</div>
+		),
 	},
 	{
 		key: 'runner',

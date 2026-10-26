@@ -5,6 +5,7 @@ import {
 	ALL_FILTER_VALUE,
 	countPages,
 	formatCostUsd,
+	formatCostWithLabel,
 	formatLogEntryLine,
 	formatLogStepLabel,
 	formatStepCounts,
@@ -86,6 +87,18 @@ describe('flowDaemonFormat', () => {
 
 		it('shows a dash when the cost is unknown', () => {
 			expect(formatCostUsd(undefined)).toBe('-');
+		});
+	});
+
+	describe('formatCostWithLabel', () => {
+		it('prints the daemon label as is, including the unknown and incomplete markers', () => {
+			expect(formatCostWithLabel('unknown', 0)).toBe('unknown');
+			expect(formatCostWithLabel('$2.7900+ (2 attempts unknown)', 2.79)).toBe('$2.7900+ (2 attempts unknown)');
+		});
+
+		it('falls back to the numeric format for a payload from an older daemon', () => {
+			expect(formatCostWithLabel(undefined, 0.5)).toBe('$0.5000');
+			expect(formatCostWithLabel(undefined, undefined)).toBe('-');
 		});
 	});
 

@@ -189,6 +189,39 @@ describe('buildFlowGraph (with an execution)', () => {
 		},
 	});
 
+	it('carries the step total cost, its label and the last attempt (not the cumulative session value)', () => {
+		const entry = (n: number, usd: number) => ({
+			n,
+			origin: n === 1 ? 'first' : 'relaunch',
+			startedAt: '2026-08-16T12:00:00.000Z',
+			endedAt: '2026-08-16T12:00:05.000Z',
+			durationMs: 5000,
+			outcome: 'completed',
+			endReason: 'completed',
+			provider: 'claude',
+			sessionId: 's1',
+			usd,
+		});
+		const run = makeExec({
+			executionId: 'c0stc0de',
+			status: 'completed',
+			steps: {
+				plan: {
+					status: 'completed',
+					startedAt: '2026-08-16T12:00:00.000Z',
+					completedAt: '2026-08-16T12:00:05.000Z',
+					attempts: 2,
+					meta: { model: 'haiku', cost: { usd: 0.00749017 } } as never,
+					attemptLog: [entry(1, 0.00637995), entry(2, 0.00749017)] as never,
+				},
+			},
+		});
+		const plan = buildFlowGraph(buildAndReview, run).nodes.find(n => n.id === 'plan')!;
+		expect(plan.meta?.costUsd).toBeCloseTo(0.00749017, 10);
+		expect(plan.meta?.lastAttemptCostUsd).toBeCloseTo(0.00111022, 10);
+		expect(plan.meta).toMatchObject({ costLabel: '$0.0075', costComplete: true });
+	});
+
 	it('decorates nodes with status, duration, attempts and error', () => {
 		const byId = Object.fromEntries(buildFlowGraph(buildAndReview, failedRun).nodes.map(n => [n.id, n]));
 
