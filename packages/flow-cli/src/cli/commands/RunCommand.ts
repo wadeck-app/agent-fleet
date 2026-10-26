@@ -91,6 +91,7 @@ export function registerRunCommand(program: Command): void {
 				const resolution = resolveFlowReference(flowRef, cwd, {
 					projectRef: options.project,
 					env: process.env,
+					configDir: daemonDir,
 				});
 				if (resolution.kind === 'error') {
 					console.error(resolution.error);

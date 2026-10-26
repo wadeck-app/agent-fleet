@@ -13,6 +13,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { FLOW_PROJECT_ENV, ProjectScopeError, ProjectScopeResolver } from '../../config/ProjectScopeResolver';
 // violations-suppress-end: ts/no-deep-relative
+import { isFileLikeReference } from './FlowReference';
 import { singleProjectValue } from './SingleProjectOption';
 
 /**
@@ -57,6 +58,13 @@ export function registerVersionsCommand(
 			singleProjectValue
 		)
 		.action((flowId: string, opts: { json?: boolean; project?: string }) => {
+			if (isFileLikeReference(flowId)) {
+				console.error(
+					`'${flowId}' looks like a file path, but flow versions takes a flow id (see the ids in the project's .flow/flows.yml). ` +
+						'A flow that has only a file gets its first version when it runs: flow run <path>.'
+				);
+				process.exit(1);
+			}
 			let rows;
 			try {
 				const registryFile = registryFileOf(opts.project, getCwd());

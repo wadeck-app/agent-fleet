@@ -82,10 +82,22 @@ describe('VersionsCommand', () => {
 	});
 
 	it('refuses a flow id that cannot name a snapshot directory, with the fix', () => {
-		expect(() => run('../escape')).toThrow('exit');
+		expect(() => run('bad id!')).toThrow('exit');
 
 		expect(errored.join('\n')).toContain('cannot be versioned');
 	});
+
+	it.each(['../escape', 'flows/my-flow.yml', 'my-flow.yaml', 'C:\\x\\flow'])(
+		'says %j is a path, not a flow id, instead of the versioning rule',
+		ref => {
+			expect(() => run(ref)).toThrow('exit');
+
+			const out = errored.join('\n');
+			expect(out).toContain(`'${ref}' looks like a file path, but flow versions takes a flow id`);
+			expect(out).toContain('flow run <path>');
+			expect(out).not.toContain('cannot be versioned');
+		}
+	);
 
 	it('reads the registry of the project named with --project, whatever the working directory', async () => {
 		const other = await fixture.register('other');

@@ -8,6 +8,9 @@ import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { describeMissingFlowFile } from '../cli/commands/FlowReference';
+
 export interface CliValidationError {
 	type: string;
 	message: string;
@@ -70,7 +73,7 @@ function describeRegistry(filePath: string, parsed: object): ValidateResult | un
  */
 export function validateFlowFile(filePath: string, versions: DefinitionSnapshotStore): ValidateResult {
 	if (!fs.existsSync(filePath)) {
-		return { exit: 2, message: `File not found: ${filePath}` };
+		return { exit: 2, message: describeMissingFlowFile(filePath, process.cwd(), 'Pass an existing .yml file.') };
 	}
 
 	let content: string;

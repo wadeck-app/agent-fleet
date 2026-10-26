@@ -39,7 +39,15 @@ describe('validateFlowFile', () => {
 		const result = validateFlowFile('/no/such/file/does-not-exist.yml', store);
 		expect(result.exit).toBe(2);
 		if (result.exit !== 2) throw new Error('Expected exit 2');
-		expect(result.message).toContain('File not found');
+		expect(result.message).toBe(
+			`Flow file not found: ${path.resolve('/no/such/file/does-not-exist.yml')} (cwd: ${process.cwd()}). Pass an existing .yml file.`
+		);
+	});
+
+	it('resolves a relative missing path against the cwd in the message', () => {
+		const result = validateFlowFile('nope/missing.yml', store);
+		if (result.exit !== 2) throw new Error('Expected exit 2');
+		expect(result.message).toContain(`Flow file not found: ${path.resolve('nope/missing.yml')} (cwd: `);
 	});
 
 	it('returns exit 3 with parse_error type for malformed YAML', () => {

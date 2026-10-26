@@ -93,11 +93,21 @@ describe('ShowCommand', () => {
 		});
 
 		it('names both interpretations when the target is neither a file nor an id', () => {
-			expect(() => runShow('missing/flow.yml')).toThrow('exit');
+			expect(() => runShow('NOT_AN_ID')).toThrow('exit');
 			expect(errored()).toContain('As a file');
 			expect(errored()).toContain('As an execution');
 			expect(errored()).toContain('flow history');
 		});
+
+		it.each(['missing/flow.yml', 'missing.yaml', 'C:\\nope\\flow'])(
+			'says the file is not found, with its resolved path and cwd, when %j looks like a path',
+			target => {
+				expect(() => runShow(target)).toThrow('exit');
+				expect(errored()).toContain(`Flow file not found: ${path.resolve(target)} (cwd: ${process.cwd()}).`);
+				expect(errored()).toContain('or an execution id (see: flow history)');
+				expect(errored()).not.toContain('As an execution');
+			}
+		);
 	});
 
 	it('renders table for valid flow (console.log called, output contains flow id)', () => {

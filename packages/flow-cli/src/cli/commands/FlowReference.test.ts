@@ -1,9 +1,12 @@
+import { DefinitionSnapshotStore, hashDefinition } from 'flow-core';
+import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { RegisteredProjectFixture } from '../../test-utils/RegisteredProjectFixture';
-import { resolveFlowReference } from './FlowReference';
+import { describeMissingFlowFile, isFileLikeReference, resolveFlowReference } from './FlowReference';
 
 describe('resolveFlowReference', () => {
 	let fixture: RegisteredProjectFixture;
@@ -112,5 +115,160 @@ describe('resolveFlowReference', () => {
 
 		expect(result.kind).toBe('error');
 		expect((result as { error: string }).error).toContain('project paths add docs-only');
+	});
+});
+
+describe.each([
+	['flow.yml', true],
+	['FLOW.YAML', true],
+	['sub/flow', true],
+	['sub\\flow', true],
+	['./flow', true],
+	['../flow', true],
+	['~', true],
+	['~/flow', true],
+	['C:\\Users\\x\\flow', true],
+	['C:/Users/x/flow', true],
+	['c:flow', true],
+	['@scope/flow@1.0.0', true],
+	['my-flow', false],
+	['my-flow@1.2.0', false],
+	['my.flow_v2', false],
+])('isFileLikeReference(%j)', (ref, expected) => {
+	it(`is ${expected}`, () => {
+		expect(isFileLikeReference(ref)).toBe(expected);
+	});
+});
+
+describe('resolveFlowReference: messages for a reference that is not a file', () => {
+	let fixture: RegisteredProjectFixture;
+	let root: string;
+	let configDir: string;
+
+	beforeEach(async () => {
+		fixture = new RegisteredProjectFixture();
+		root = (await fixture.register('alpha')).folder!;
+		configDir = path.join(fixture.root, 'config');
+	});
+	afterEach(() => {
+		fixture.dispose();
+	});
+
+	const resolve = (ref: string, cwd = root) =>
+		resolveFlowReference(ref, cwd, { env: fixture.env(), configDir }) as { kind: string; error?: string };
+	const writeRegistry = (ids: string[]) => {
+		fs.mkdirSync(path.join(root, '.flow'), { recursive: true });
+		fs.writeFileSync(
+			path.join(root, '.flow', 'flows.yml'),
+			yaml.dump(Object.fromEntries(ids.map(id => [id, { steps: [{ id: 's', script: 'echo SECRET_VALUE' }] }])))
+		);
+	};
+	const missingAbsolute = path.join(os.tmpdir(), 'nope', 'missing.yml');
+
+	it.each([
+		['a missing relative path', 'nope/missing.yml'],
+		['a missing bare .yaml name', 'missing.yaml'],
+		['a missing ./ path', './missing'],
+		['a missing absolute path', missingAbsolute],
+		['a missing absolute path with backslashes', missingAbsolute.replace(/[\\/]/g, '\\')],
+	])('%s: names the resolved path, the cwd and the alternatives', (_label, ref) => {
+		const result = resolve(ref);
+
+		expect(result.kind).toBe('error');
+		const expectedPath = path.isAbsolute(ref) ? path.resolve(ref) : path.resolve(root, ref);
+		expect(result.error).toBe(
+			`Flow file not found: ${expectedPath} (cwd: ${root}). Pass an existing .yml file, ` +
+				'or a registered flow id (see .flow/flows.yml of the project alpha).'
+		);
+		expect(result.error).not.toContain('cannot be versioned');
+	});
+
+	it('a missing file outside any registered project does not claim a project', () => {
+		const outside = fixture.makeFolder('outside');
+
+		const result = resolve('missing.yml', outside);
+
+		expect(result.error).toBe(
+			`Flow file not found: ${path.join(outside, 'missing.yml')} (cwd: ${outside}). Pass an existing .yml file, or a registered flow id.`
+		);
+	});
+
+	it('a drive-letter path is a file reference whatever the platform', () => {
+		const result = resolve('Z:\\nope\\missing.yml');
+
+		expect(result.kind).toBe('error');
+		expect(result.error).toContain('Flow file not found: ');
+		expect(result.error).not.toContain('cannot be versioned');
+	});
+
+	it('a bare id that is not registered lists the registered ids, never their content', () => {
+		writeRegistry(['b-flow', 'a-flow']);
+
+		const result = resolve('ghost');
+
+		expect(result.kind).toBe('error');
+		expect(result.error).toMatch(
+			/^No registered flow "ghost" in project alpha \([0-9a-f]{8}\)\. Registered flows: b-flow, a-flow\. To run a file pass its path\.$/
+		);
+		expect(result.error).not.toContain('SECRET_VALUE');
+	});
+
+	it('lists at most 10 ids and says there are more', () => {
+		writeRegistry(Array.from({ length: 12 }, (_, i) => `flow-${i}`));
+
+		const result = resolve('ghost');
+
+		expect(result.error).toContain('flow-9, ...');
+		expect(result.error).not.toContain('flow-10');
+	});
+
+	it('says so when the project has no registry file at all', () => {
+		expect(resolve('ghost').error).toContain('Registered flows: none (no .flow/flows.yml in the project).');
+	});
+
+	it('a bare id with characters no id may have is reported as unregistered, not as a versioning problem', () => {
+		const result = resolve('my flow');
+
+		expect(result.error).toContain('No registered flow "my flow"');
+		expect(result.error).not.toContain('cannot be versioned');
+	});
+
+	it('a registered id resolves', () => {
+		writeRegistry(['my-flow']);
+
+		expect(resolve('my-flow')).toMatchObject({ kind: 'registered', flowId: 'my-flow' });
+		expect(resolve('my-flow@1.0.0')).toMatchObject({ kind: 'registered', flowId: 'my-flow', flowVersion: '1.0.0' });
+	});
+
+	it('an id that only has snapshots of earlier runs still resolves (the daemon serves it)', () => {
+		const definition = { id: 'ran-once', version: '1.0.0', steps: [{ id: 's', script: 'x' }] };
+		new DefinitionSnapshotStore(path.join(configDir, 'definitions')).save({
+			flowId: 'ran-once',
+			version: '1.0.0',
+			hash: hashDefinition(definition),
+			text: yaml.dump(definition),
+		});
+
+		expect(resolve('ran-once').kind).toBe('registered');
+	});
+
+	it('an unreadable registry does not block the run: the daemon reports it with its own message', () => {
+		fs.mkdirSync(path.join(root, '.flow'), { recursive: true });
+		fs.writeFileSync(path.join(root, '.flow', 'flows.yml'), 'a: [unclosed');
+
+		expect(resolve('anything').kind).toBe('registered');
+	});
+
+	it('keeps the version-syntax error for a malformed id@version', () => {
+		expect(resolve('my-flow@latest').error).toContain('<flow-id>@MAJOR.MINOR.PATCH');
+	});
+});
+
+describe('describeMissingFlowFile', () => {
+	it('resolves a relative path against the cwd and appends the given hint', () => {
+		const cwd = path.resolve('/some/where');
+		expect(describeMissingFlowFile('x/y.yml', cwd, 'Pass an existing .yml file.')).toBe(
+			`Flow file not found: ${path.resolve(cwd, 'x/y.yml')} (cwd: ${cwd}). Pass an existing .yml file.`
+		);
 	});
 });

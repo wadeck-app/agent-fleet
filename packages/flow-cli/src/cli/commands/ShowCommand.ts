@@ -20,6 +20,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { loadYaml } from '../../utils/loadYaml';
+import { describeMissingFlowFile, isFileLikeReference } from './FlowReference';
 import { renderSecretsSummary } from './SecretsSummary';
 
 function isExistingFile(target: string): boolean {
@@ -118,6 +119,16 @@ export function registerShowCommand(program: Command, getConfigDir: () => string
 					opts
 				);
 				return;
+			}
+			if (isFileLikeReference(target)) {
+				console.error(
+					describeMissingFlowFile(
+						target,
+						process.cwd(),
+						'Pass an existing .yml file, or an execution id (see: flow history).'
+					)
+				);
+				process.exit(1);
 			}
 			console.error(
 				`'${target}' is neither an existing flow file nor an execution id.\n` +

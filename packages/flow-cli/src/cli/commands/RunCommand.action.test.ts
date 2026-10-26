@@ -109,8 +109,41 @@ describe('flow run: argument validation', () => {
 	});
 
 	it('rejects an unknown flow reference with the resolver message', async () => {
-		expect(await runCli(path.join(tmpDir, 'missing@nope'))).toBe(1);
+		expect(await runCli('missing@nope')).toBe(1);
 		expect(errors[0]).toContain('is not a valid <flow-id>@MAJOR.MINOR.PATCH reference');
+	});
+
+	it('a missing flow file path gets a "not found" message with the resolved path and cwd, never the versioning rule, exit 1, no daemon contact', async () => {
+		const missing = path.join(tmpDir, 'nope', 'missing.yml');
+
+		expect(await runCli(missing, '--wait')).toBe(1);
+
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toContain(
+			`Flow file not found: ${missing} (cwd: ${process.cwd()}). Pass an existing .yml file`
+		);
+		expect(errors[0]).not.toContain('cannot be versioned');
+		expect(errors[0]).not.toContain('FlowCoreError');
+		expect(harness.send).not.toHaveBeenCalled();
+	});
+
+	it('a bare unregistered id names the project and the registered ids, exit 1, no daemon contact', async () => {
+		const fixture = new RegisteredProjectFixture().useAsProcessEnv();
+		try {
+			const alpha = await fixture.register('alpha');
+			fs.mkdirSync(path.join(alpha.folder!, '.flow'));
+			fs.writeFileSync(path.join(alpha.folder!, '.flow', 'flows.yml'), 'known-flow:\n  steps: []\n');
+
+			expect(await runCli('ghost', '-p', 'alpha')).toBe(1);
+
+			expect(errors[0]).toMatch(
+				/^No registered flow "ghost" in project alpha \([0-9a-f]{8}\)\. Registered flows: known-flow\./
+			);
+			expect(errors[0]).not.toContain('cannot be versioned');
+			expect(harness.send).not.toHaveBeenCalled();
+		} finally {
+			fixture.dispose();
+		}
 	});
 
 	it('rejects a missing mock config file', async () => {
