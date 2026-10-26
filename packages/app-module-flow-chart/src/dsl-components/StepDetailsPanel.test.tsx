@@ -1,6 +1,7 @@
 import { MemoryRouter } from 'react-router-dom';
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { DEFAULT_DATE_SETTINGS, DateFormatProvider, createDateFormatter } from '@wadeck-app/dsl-ui';
 import type { FlowGraphNode } from 'flow-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -138,6 +139,44 @@ describe('StepDetailsPanel frame (baseline)', () => {
 		expect(screen.getAllByText('Cost')).toHaveLength(1);
 		expect(screen.getAllByText('$0.0064')).toHaveLength(1);
 		expect(screen.getByText('Turns')).toBeInTheDocument();
+	});
+});
+
+describe('StepDetailsPanel dates', () => {
+	const dated: FlowGraphNode = {
+		...okStep(),
+		meta: { startedAt: '2026-08-16T14:05:09.000Z', completedAt: 'soon' },
+	};
+
+	it('writes Started with the central formatter (long style) and the exact timestamp as tooltip; an unparsable Completed stays as recorded', () => {
+		renderPanel({ step: dated });
+		const formatter = createDateFormatter(DEFAULT_DATE_SETTINGS);
+		const started = document.querySelector('time[datetime="2026-08-16T14:05:09.000Z"]')!;
+		expect(started.textContent).toBe(formatter.format('2026-08-16T14:05:09.000Z', 'long'));
+		expect(started.getAttribute('title')).toBe(formatter.exact('2026-08-16T14:05:09.000Z'));
+		expect(screen.getByText('soon')).toBeInTheDocument();
+	});
+
+	it('follows the date settings of the user (UTC zone, ISO preset)', () => {
+		const formatter = createDateFormatter({ ...DEFAULT_DATE_SETTINGS, preset: 'iso', timeZone: 'UTC' });
+		render(
+			<DateFormatProvider formatter={formatter}>
+				<MemoryRouter>
+					<StepDetailsPanel
+						step={dated}
+						labelOf={id => id}
+						onSelectStep={() => undefined}
+						onClose={() => undefined}
+						logsPath="/modules/flow/executions/exec1/logs?step=plan"
+						layout="overlay"
+						density="comfortable"
+					/>
+				</MemoryRouter>
+			</DateFormatProvider>
+		);
+		const started = document.querySelector('time')!;
+		expect(started.textContent).toBe('2026-08-16 14:05:09Z');
+		expect(started.getAttribute('title')).toBe('2026-08-16T14:05:09.000Z (UTC)');
 	});
 });
 

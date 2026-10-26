@@ -384,7 +384,8 @@ describe('execution logs page', () => {
 		expect(table['rows']).toBe('$sources.logs.entries');
 		const columns = table['columns'] as Record<string, unknown>[];
 		expect(columns.map(column => column['key'])).toEqual(['timestamp', 'level', 'stepId', 'preview']);
-		expect(columns[0]).toMatchObject({ format: 'time', nowrap: true });
+		// Seconds matter on a log line: medium is HH:mm:ss, short stops at the minute.
+		expect(columns[0]).toMatchObject({ format: 'time', dateStyle: 'medium', nowrap: true });
 		expect(Object.keys(columns[1]!['badge'] as object)).toEqual(expect.arrayContaining([...LOG_LEVELS]));
 		expect(table['emptyMessage']).toBe('$sources.logs.notice');
 	});
@@ -501,6 +502,7 @@ describe('DataTable columns', () => {
 		'muted',
 		'sortable',
 		'format',
+		'dateStyle',
 		'badge',
 	];
 	const BADGE_VARIANTS = ['default', 'primary', 'success', 'warning', 'danger', 'info'];
@@ -556,8 +558,9 @@ describe('DataTable columns', () => {
 });
 
 describe('timestamps (same text as the rest of app-core: the shell DataTable formats an ISO value)', () => {
-	// dsl-ui DataTable `format: datetime` = Intl.DateTimeFormat(undefined, short date + short time), the format of the
-	// queue module tables. A view must not show a timestamp any other way: no server-side label, no raw ISO in a Badge.
+	// dsl-ui DataTable `format: datetime | date | time` is written by the central date formatter (the user's language, clock
+	// and time zone) with the exact timestamp as tooltip. A view must not show a timestamp any other way: no server-side
+	// label, no raw ISO in a Badge.
 	const TIMESTAMP_ONLY_KEY = /At$/;
 
 	function everyColumn(): { file: string; variant: string | undefined; column: Record<string, unknown> }[] {
@@ -578,6 +581,18 @@ describe('timestamps (same text as the rest of app-core: the shell DataTable for
 			expect(column, `${file} (${String(variant)}): ${JSON.stringify(column)}`).toMatchObject({
 				format: 'datetime',
 			});
+		}
+	});
+
+	it('chooses the look of every date column on purpose: dateStyle short, medium or long', () => {
+		const dated = everyColumn().filter(({ column }) =>
+			['datetime', 'date', 'time'].includes(String(column['format']))
+		);
+		expect(dated.length).toBeGreaterThanOrEqual(6);
+		for (const { file, variant, column } of dated) {
+			expect(['short', 'medium', 'long'], `${file} (${String(variant)}): ${JSON.stringify(column)}`).toContain(
+				column['dateStyle']
+			);
 		}
 	});
 
@@ -638,7 +653,7 @@ describe('executions page layout', () => {
 		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[0]!;
 		const columns = table['columns'] as Record<string, unknown>[];
 		const byKey = (key: string) => columns.find(column => column['key'] === key)!;
-		expect(byKey('startedAt')).toMatchObject({ nowrap: true, format: 'datetime' });
+		expect(byKey('startedAt')).toMatchObject({ nowrap: true, format: 'datetime', dateStyle: 'short' });
 		expect(byKey('statusLabel')).toMatchObject({ nowrap: true });
 		const badge = byKey('statusLabel')['badge'] as Record<string, string>;
 		// The cell text stays the status word (older shells show it as is); the badge only colours a cell whose text is exactly a key.
@@ -714,8 +729,8 @@ describe('execution detail page', () => {
 			);
 			expect(timing, String(variant)).toHaveLength(1);
 			expect(timing[0]!['columns'], String(variant)).toEqual([
-				{ key: 'startedAt', label: 'Started', format: 'datetime', nowrap: true },
-				{ key: 'completedAt', label: 'Finished', format: 'datetime', nowrap: true },
+				{ key: 'startedAt', label: 'Started', format: 'datetime', dateStyle: 'medium', nowrap: true },
+				{ key: 'completedAt', label: 'Finished', format: 'datetime', dateStyle: 'medium', nowrap: true },
 				{ key: 'version', label: 'Version', nowrap: true, mono: true },
 				{ key: 'totalCost', label: 'Total cost', nowrap: true },
 				{ key: 'definition', label: 'Definition', muted: true },

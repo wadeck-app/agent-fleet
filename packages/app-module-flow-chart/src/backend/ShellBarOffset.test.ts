@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 const srcDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 // The shell top bar is sticky and publishes its height here (dsl-ui AppShell); the fallback keeps a component usable outside the shell.
 const BAR_VARIABLE = '--app-shell-bar-height';
+// The dsl-ui Tailwind preset spells the same value as the spacing key `shell-bar` (top-shell-bar, scroll-mt-shell-bar, ...).
+const BAR_UTILITY = /^(?:[\w-]+:)*-?[\w-]+-shell-bar$/;
 
 const shipped = filesUnder(srcDir).filter(
 	file => /\.(ts|tsx)$/.test(file) && !/\.test\.tsx?$/.test(file) && !/[\\/]testing[\\/]/.test(file)
@@ -33,7 +35,7 @@ function offendingTokens(source: string): string[] {
 		}
 		for (const token of offsets) {
 			// inset-y-* of an absolute box is relative to its parent, not the viewport: only sticky/fixed boxes are checked above.
-			if (!token.includes(BAR_VARIABLE)) offending.push(`${token} (in "${text}")`);
+			if (!token.includes(BAR_VARIABLE) && !BAR_UTILITY.test(token)) offending.push(`${token} (in "${text}")`);
 		}
 	}
 	return offending;
@@ -44,6 +46,10 @@ describe('the guard below', () => {
 		expect(offendingTokens(`const A = 'sticky top-0 z-10';`)).toHaveLength(1);
 		expect(offendingTokens(`const A = 'lg:sticky lg:top-2';`)).toHaveLength(1);
 		expect(offendingTokens(`const A = 'fixed inset-y-0';`).length).toBeGreaterThan(0);
+	});
+
+	it('flags a look-alike utility that is not the shell bar one', () => {
+		expect(offendingTokens(`const A = 'sticky top-shell-menu z-10';`)).toHaveLength(1);
 	});
 
 	it('flags a scroll margin without the shell variable', () => {
@@ -60,6 +66,10 @@ describe('the guard below', () => {
 			offendingTokens(["const A = 'lg:sticky lg:top-[calc(var(", BAR_VARIABLE, ",0px)+0.5rem)]';"].join(''))
 		).toEqual([]);
 		expect(offendingTokens(`const A = 'absolute inset-y-2 top-0';`)).toEqual([]);
+		// The preset utilities of the same variable (dsl-ui >= 2026.10.26-286).
+		expect(offendingTokens(`const A = 'sticky top-shell-bar z-10';`)).toEqual([]);
+		expect(offendingTokens(`const A = 'lg:sticky lg:top-shell-bar';`)).toEqual([]);
+		expect(offendingTokens(`const A = 'scroll-mt-shell-bar';`)).toEqual([]);
 		expect(offendingTokens(`const A = 'Sticky strip above the lines';`)).toEqual([]);
 	});
 });
@@ -73,7 +83,7 @@ describe('every sticky, fixed or scroll-margin class clears the sticky shell top
 		const offending = offendingTokens(readFileSync(file as string, 'utf8'));
 		expect(
 			offending,
-			`use top-[var(${BAR_VARIABLE},0px)] (or calc(var(${BAR_VARIABLE},0px)+<gap>)): the shell top bar is sticky`
+			`use top-shell-bar (or top-[calc(var(${BAR_VARIABLE},0px)+<gap>)]): the shell top bar is sticky`
 		).toEqual([]);
 	});
 });

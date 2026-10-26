@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { DateText } from '@wadeck-app/dsl-ui';
 import type { FlowGraphNode } from 'flow-core';
 
 import { CopyButton } from './CopyButton.js';
@@ -78,7 +79,7 @@ export function buildPanelSections({
 							<div key={row.label} className="contents">
 								<dt className="text-muted">{row.label}</dt>
 								<dd className="break-words" title={row.title}>
-									{row.value}
+									{row.isDate === true ? <DateText value={row.value} dateStyle="long" /> : row.value}
 								</dd>
 							</div>
 						))}

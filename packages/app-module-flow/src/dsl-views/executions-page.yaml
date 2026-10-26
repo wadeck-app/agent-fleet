@@ -5,8 +5,8 @@
 # page 1. A shell older than 124 keeps the stale ?page= and may show an empty page: the table then says so.
 # Clicking a row of the flows table sets ?flow=<flowId>, which the search box shows.
 # Times are ISO 8601 (startedAt, lastStartedAt) and every column of them is `format: datetime`: the shell prints them
-# like every table of app-core (dsl-ui DataTable, e.g. "10/18/26, 4:15 PM" in en-US). A shell older than dsl-ui 122
-# ignores `format` and shows the raw ISO text.
+# like every table of app-core (dsl-ui DataTable, the user's date settings: e.g. "24/10/2026, 18:38" by default, `dateStyle: short`).
+# The module requires dsl-ui >= 2026.10.26-290 (manifest dslLib), which has the central date formatter.
 # Run columns: the route sends the full flow name and the full execution id. The flow column is `truncate`: the
 # DataTable cuts it with an ellipsis (full text as tooltip) only when the viewport needs it; the id column is nowrap and
 # mono, so the run id stays visible. statusLabel is a short ASCII word ("ok", "FAILED", "ok, recovered"), badged when it
@@ -104,7 +104,7 @@ sections:
                             label: Open details,
                             position: start,
                         }
-                      - { key: 'startedAt', label: 'When', format: datetime, nowrap: true }
+                      - { key: 'startedAt', label: 'When', format: datetime, dateStyle: short, nowrap: true }
                       - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
                       - { key: 'versionLabel', label: 'Version', nowrap: true, mono: true }
                       - { key: 'executionId', label: 'Run', nowrap: true, mono: true }
@@ -151,4 +151,4 @@ sections:
                       - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
                       - { key: 'executionCount', label: 'Runs', nowrap: true }
                       - { key: 'failedCount', label: 'Failed', nowrap: true }
-                      - { key: 'lastStartedAt', label: 'Last', format: datetime, nowrap: true }
+                      - { key: 'lastStartedAt', label: 'Last', format: datetime, dateStyle: short, nowrap: true }

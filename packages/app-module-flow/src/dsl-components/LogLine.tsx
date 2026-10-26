@@ -1,6 +1,5 @@
-import { Badge } from '@wadeck-app/dsl-ui';
+import { Badge, type DateFormatter, useDateFormat } from '@wadeck-app/dsl-ui';
 
-import { formatClock, isoTitle } from '../commons/DateText.js';
 import type { Density, Identity, TimeMode } from './LogStreamChoices.js';
 import { formatSigned, ownerOf, stepColor, stepHue } from './LogStreamModel.js';
 import { type LogLevel, type LogStreamEntry, RUN_EVENTS_STEP } from './LogStreamProps.js';
@@ -24,11 +23,19 @@ const LEVEL_CODE: Record<LogLevel, { text: string; className: string }> = {
 // @formatter:on
 const ROW_TINT: Partial<Record<LogLevel, string>> = { error: 'bg-danger-bg', warning: 'bg-warning-bg' };
 
+const CLOCK_FIELDS: Intl.DateTimeFormatOptions = {
+	hour: '2-digit',
+	minute: '2-digit',
+	second: '2-digit',
+	fractionalSecondDigits: 3,
+};
+
 /** Time cell text for the chosen mode; the first line of a page has no previous line. */
-function timeText(entry: LogStreamEntry, mode: TimeMode): string {
+function timeText(entry: LogStreamEntry, mode: TimeMode, dates: DateFormatter): string {
 	switch (mode) {
 		case 'absolute':
-			return formatClock(entry.timestamp);
+			// Clock to the millisecond, in the zone and the 12h/24h clock of the user's date settings.
+			return dates.intl(CLOCK_FIELDS).format(new Date(entry.timestamp));
 		case 'offset':
 			return formatSigned(entry.offsetMs);
 		case 'delta':
@@ -53,6 +60,7 @@ export interface LogLineProps {
 
 /** One log line: time, level, step (unless the section names it) and message, with an optional markdown panel. */
 export function LogLine({ entry, identity, time, density, showStep, open, onToggle, anchor }: LogLineProps) {
+	const dates = useDateFormat();
 	const compact = density !== 'comfortable';
 	const hue = stepHue(entry.stepOrder);
 	const isRunEvent = entry.stepId === RUN_EVENTS_STEP;
@@ -91,10 +99,10 @@ export function LogLine({ entry, identity, time, density, showStep, open, onTogg
 				)}
 				<time
 					dateTime={entry.timestamp}
-					title={isoTitle(entry.timestamp)}
+					title={dates.exact(entry.timestamp)}
 					className={`${time === 'absolute' ? 'w-28' : 'w-20'} shrink-0 whitespace-nowrap text-right font-mono tabular-nums text-muted`}
 				>
-					{timeText(entry, time)}
+					{timeText(entry, time, dates)}
 				</time>
 				<span className={compact ? 'w-8 shrink-0' : 'w-16 shrink-0'}>
 					{compact ? (

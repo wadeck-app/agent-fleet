@@ -1,12 +1,12 @@
 import type { AttemptKind, FlowGraphNode } from 'flow-core';
 
-import { formatLong, isoTitle } from '../commons/DateText.js';
-
 export interface DetailRow {
 	label: string;
 	value: string;
-	/** Tooltip of the value: the exact ISO 8601 instant of a date. */
+	/** Tooltip of the value. */
 	title?: string;
+	/** The value is an ISO 8601 date: the panel writes it with DateText (the user's date settings live in React, not here). */
+	isDate?: true;
 }
 
 export interface StepDetail {
@@ -46,12 +46,10 @@ const ATTEMPT_KIND_WORDS: Record<AttemptKind, string> = {
 };
 const DATE_KEYS = new Set(['startedAt', 'completedAt']);
 
-function formatValue(key: string, value: string | number | boolean): { value: string; title?: string } {
+function formatValue(key: string, value: string | number | boolean): { value: string; isDate?: true } {
 	if (DATE_KEYS.has(key) && typeof value === 'string') {
 		// An unparsable date is shown as it came: the panel must not hide what the run recorded.
-		return Number.isNaN(new Date(value).getTime())
-			? { value }
-			: { value: formatLong(value), title: isoTitle(value) };
+		return Number.isNaN(new Date(value).getTime()) ? { value } : { value, isDate: true };
 	}
 	return { value: String(value) };
 }

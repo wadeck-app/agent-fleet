@@ -5,7 +5,7 @@
 # "Run events" are the lines about the run, not a step).
 # Pages count from the END: page 1 of the pager (?page=0 or none) is the latest lines, the next ones are older. Rows inside
 # a page are oldest first. A changed filter or page size goes back to page 1 (resetUrlParams, dsl-ui >= 2026.10.22-124).
-# Times are ISO 8601 and the column is `format: time`: the shell prints it like every table of app-core.
+# Times are ISO 8601 and the column is `format: time` + `dateStyle: medium` (HH:mm:ss): the shell date formatter writes it.
 # The notice (hasNotice/notice) explains an empty table or a damaged log; it is also the table's empty message.
 # The Message column is a one-line plain preview (a cell cannot hold markdown). A rendered prompt and any multi-line or
 # over-long message also get the row chevron (expansionCondition: expandable, set by the route) and, once opened, the whole
@@ -90,7 +90,7 @@ sections:
                       text: $ctx.row.markdown
                       maxHeight: 30rem
                   columns:
-                      - { key: 'timestamp', label: 'Time', format: time, nowrap: true }
+                      - { key: 'timestamp', label: 'Time', format: time, dateStyle: medium, nowrap: true }
                       - key: level
                         label: Level
                         nowrap: true

@@ -8,7 +8,7 @@
 # flow (navigateTo); the chevron of a row opens a panel (DataTable `expansion`) with two ButtonLinks, "Open chart" and
 # "Latest run chart", whose paths come from the route (flow-core chartPathOfFlow / chartPathOfExecution) through
 # $ctx.row (whole-string expressions only).
-# Times are ISO 8601 and the column is `format: datetime` (dsl-ui >= 122; older shells show the raw ISO text).
+# Times are ISO 8601 and the column is `format: datetime` + `dateStyle: short`: the shell date formatter writes it (dsl-ui >= 2026.10.26-290).
 # Pagination, page size, text filter and health filter live in the URL: ?page=&size=&q=&health=failing|running|healthy
 # (empty or `any` means no filter).
 # The health chips are ButtonLinks: the DSL has no toggle bound to the URL and cannot repeat a node, so the route sends
@@ -95,7 +95,7 @@ sections:
                   badge: { failing: danger, running: info, healthy: success }
                 - { key: 'executionCount', label: 'Runs', nowrap: true }
                 - { key: 'failedCount', label: 'Failed', nowrap: true }
-                - { key: 'lastStartedAt', label: 'Last run', format: datetime, nowrap: true }
+                - { key: 'lastStartedAt', label: 'Last run', format: datetime, dateStyle: short, nowrap: true }
 
           - $type: HorizontalStack
             justify: justify-between

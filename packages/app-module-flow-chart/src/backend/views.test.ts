@@ -279,7 +279,10 @@ describe('flows page: the table', () => {
 			'failedCount',
 			'lastStartedAt',
 		]);
-		expect(columns.find(column => column['key'] === 'lastStartedAt')).toMatchObject({ format: 'datetime' });
+		expect(columns.find(column => column['key'] === 'lastStartedAt')).toMatchObject({
+			format: 'datetime',
+			dateStyle: 'short',
+		});
 		expect(columns.find(column => column['key'] === 'health')).toMatchObject({
 			badge: { failing: 'danger', running: 'info', healthy: 'success' },
 		});

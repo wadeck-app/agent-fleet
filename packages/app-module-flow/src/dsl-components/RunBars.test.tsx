@@ -1,6 +1,7 @@
 import { MemoryRouter } from 'react-router-dom';
 
 import { render, screen, within } from '@testing-library/react';
+import { DEFAULT_DATE_SETTINGS, DateFormatProvider, createDateFormatter } from '@wadeck-app/dsl-ui';
 import { describe, expect, it } from 'vitest';
 
 import { RunBars } from './RunBars.js';
@@ -14,11 +15,23 @@ const DAYS = Array.from({ length: 7 }, (_, index) => ({
 	failed: index === 5 ? 12 : index === 6 ? 4 : 0,
 }));
 
-function show(props: Partial<Parameters<typeof RunBars>[0]> = {}) {
-	return render(
+// Without a DateFormatProvider the dsl-ui default applies (en-GB, 24h, zone of the machine).
+const formatter = createDateFormatter(DEFAULT_DATE_SETTINGS);
+
+function show(props: Partial<Parameters<typeof RunBars>[0]> = {}, settings?: Partial<typeof DEFAULT_DATE_SETTINGS>) {
+	const bars = (
 		<MemoryRouter>
 			<RunBars days={DAYS} to={TO} unexpectedKeys={[]} {...props} />
 		</MemoryRouter>
+	);
+	return render(
+		settings === undefined ? (
+			bars
+		) : (
+			<DateFormatProvider formatter={createDateFormatter({ ...DEFAULT_DATE_SETTINGS, ...settings })}>
+				{bars}
+			</DateFormatProvider>
+		)
 	);
 }
 
@@ -50,23 +63,43 @@ describe('RunBars', () => {
 		expect(failed!.className).toMatch(/\bbg-danger\b/);
 	});
 
-	it('names each day with 3 English letters, whatever the language of the browser, with the exact instant as tooltip', () => {
+	it('names each day with the weekday of its own date in the style of the settings, with the exact timestamp as tooltip', () => {
 		show();
 		const columns = screen.getAllByTestId('run-bars-day');
 		expect(columns.map(column => column.textContent)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
 		const label = within(columns[5]!).getByText('Sat');
-		expect(label.getAttribute('title')).toBe(DAYS[5]!.dayStart);
+		expect(label.getAttribute('title')).toBe(formatter.exact(DAYS[5]!.dayStart));
 	});
 
-	it('names each day with its date and counts in the title', () => {
+	it('keeps the bars in the order of the data (last 7 days ending today) whatever the first day of the week of the settings', () => {
+		// Sunday-first week, narrow letters, French: the bars still start on Monday 19 and end on Sunday 25.
+		show({}, { locale: 'fr-FR', weekStart: 'sunday', weekdayStyle: 'narrow' });
+		const columns = screen.getAllByTestId('run-bars-day');
+		expect(columns.map(column => column.textContent)).toEqual(['L', 'M', 'M', 'J', 'V', 'S', 'D']);
+	});
+
+	it('follows the weekday style of the settings (long names)', () => {
+		show({}, { weekdayStyle: 'long' });
+		const columns = screen.getAllByTestId('run-bars-day');
+		expect(columns[0]!.textContent).toBe('Monday');
+		expect(columns[6]!.textContent).toBe('Sunday');
+	});
+
+	it('names each day with its date and counts in the title, the date written by the central formatter', () => {
 		show();
 		const busy = screen.getAllByTestId('run-bars-day')[5]!;
-		expect(busy.getAttribute('title')).toMatch(/^Sat, Oct 24: 20 completed, 12 failed\. /);
+		expect(busy.getAttribute('title')).toMatch(/^Sat 24 Oct 2026: 20 completed, 12 failed\. /);
+	});
+
+	it('writes the date of the title in ISO form when the settings ask for the iso preset', () => {
+		show({}, { preset: 'iso' });
+		const busy = screen.getAllByTestId('run-bars-day')[5]!;
+		expect(busy.getAttribute('title')).toMatch(/^Sat 2026-10-24: 20 completed, 12 failed\. /);
 	});
 
 	it('gives the exact instant of the day start and its zone in the title of the day and of every bar', () => {
 		show();
-		const iso = DAYS[5]!.dayStart;
+		const iso = formatter.exact(DAYS[5]!.dayStart);
 		const busy = screen.getAllByTestId('run-bars-day')[5]!;
 		expect(busy.getAttribute('title')).toContain(
 			`Day starts ${iso} (local midnight of the machine that serves this page)`
@@ -100,8 +133,8 @@ describe('RunBars', () => {
 			'/modules/flow/executions?status=completed',
 			'/modules/flow/executions?status=failed',
 		]);
-		expect(links[1]!.getAttribute('aria-label')).toBe('Show the failed executions (12 on Sat, Oct 24)');
-		expect(links[2]!.getAttribute('aria-label')).toBe('Show the completed executions (13 on Sun, Oct 25)');
+		expect(links[1]!.getAttribute('aria-label')).toBe('Show the failed executions (12 on Sat 24 Oct 2026)');
+		expect(links[2]!.getAttribute('aria-label')).toBe('Show the completed executions (13 on Sun 25 Oct 2026)');
 		// Focus and hover are visible; the link takes the whole height of the column, so a short bar is easy to hit.
 		expect(links[0]!.className).toMatch(/(^| )focus-visible:/);
 		expect(links[0]!.className).toMatch(/(^| )h-full( |$)/);

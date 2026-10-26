@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
 
-import { Badge } from '@wadeck-app/dsl-ui';
+import { Badge, DateText } from '@wadeck-app/dsl-ui';
 
-import { formatMedium, isoTitle } from '../commons/DateText.js';
 import { RUN_LIST_KEYS, type RunListProps, parseRunListRows, runLink, runStatusVariant } from './RunListProps.js';
 
 function refusal(children: string) {
@@ -65,13 +64,10 @@ export function RunList({ runs, to, emptyMessage, unexpectedKeys }: RunListProps
 						<span className="min-w-0 flex-1 truncate" title={row.flowId}>
 							{row.flowId}
 						</span>
-						<time
-							className="shrink-0 whitespace-nowrap text-xs text-muted"
-							dateTime={row.startedAt.toISOString()}
-							title={isoTitle(row.startedAt)}
-						>
-							{formatMedium(row.startedAt)}
-						</time>
+						{/* DateText writes the start the way the user's date settings say and adds the exact timestamp as tooltip. */}
+						<span className="shrink-0 whitespace-nowrap text-xs text-muted">
+							<DateText value={row.startedAt} dateStyle="short" />
+						</span>
 					</Link>
 				</li>
 			))}

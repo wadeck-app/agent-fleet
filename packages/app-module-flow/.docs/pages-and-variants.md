@@ -51,11 +51,11 @@ Force one for a page load with `?ab.flow-logs-identity=badge`. Limits: grouping,
 ## Times and table columns
 
 - Timestamps are ISO 8601 (`startedAt`, `completedAt`, `lastStartedAt`, `timing`), validated by flow-core `requireTimestamp` (an invalid date fails loudly). No server-side label, no "5m" age.
-- Views use DataTable `format: datetime`, the formatter of the other modules: `Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' })` (viewer locale, no seconds).
+- Every date goes through the central dsl-ui formatter (user's language, clock, time zone; exact timestamp as tooltip; modules need dsl-ui >= 2026.10.26-290): DataTable `format: datetime|time` + `dateStyle` (`short` lists, `medium` detail page and log times), `DateText` / `useDateFormat()` in components. `CentralDateFormatter.test.ts` fails on `Intl.DateTimeFormat` / `toLocale*String` in module sources; `formatStartedUtc` (flow-core) stays for CLI text.
 - A Badge, StatTile or composed string cannot format a timestamp: the detail page shows start and end as a one-row table (`timing`); the widget shows the start of each latest run in a `datetime` column.
 - Shells older than dsl-ui 122 ignore `format` and show the raw ISO text.
 - Durations stay readable text from the backend ("12.3s"): `format: ms` only appends "ms".
-- Column options (dsl-ui >= 122): `format`, `badge` (status words), `nowrap` (times, counts, status), `truncate` (names), `mono` (ids, versions), `muted`. `views.test.ts` pins every `*At` column to `format: datetime` in every variant.
+- Column options (dsl-ui >= 122): `format`, `badge` (status words), `nowrap` (times, counts, status), `truncate` (names), `mono` (ids, versions), `muted`. `views.test.ts` pins every `*At` column to `format: datetime` and every date column to an explicit `dateStyle`.
 
 ## Designs and the dashboard widget
 

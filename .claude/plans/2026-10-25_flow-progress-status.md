@@ -55,9 +55,13 @@ Secrets, step I/O, versions, queue events, waves + transitive settling + restart
 | Old leaked temp dirs | the user runs the purge command given in chat |
 | Scratch files to delete (the delete guard blocks me): `.claude/temp/*`, `%TEMP%/flow-old-bundle-red`, `%TEMP%/leakprobe`, `flowmeasure-19222`, untracked `packages/flow-cli/src/__scratch_verify_opencode.test.ts` | the user, or a delete bypass |
 
-## Date formatting migration (waiting on app-core-owner and dsl-owner)
+## Date formatting migration (done in the working tree, not committed; CI and install pending)
 
-App-core confirmed (commit d35dc19, settings dialog in the top bar): the final API is `$type: DateText` (`value`, `style: short|medium|long`, `part: datetime|date|time`, `relative: true`), DataTable `format: datetime|date|time` with `dateStyle`, and `useDateFormat()` from `@wadeck-app/dsl-ui` (`format`, `exact`, `relative`, `weekdays(style)`, `months(style)`, `intl(options)`, `locale`, `timeZone`, `firstDayOfWeek`). Until the dsl-ui release is announced, keep the English stop-gap modules `commons/DateText.ts` (one per package). Migration plan when published: replace both DateText modules by `useDateFormat()`, use `weekdays('narrow')` in RunBars (7-day chart starts at the user's first day), use `$type: DateText` / `format: datetime` everywhere (tooltip exact timestamp comes with it), keep `formatStartedUtc` for CLI/text outputs (they stay UTC and labelled). Also adopt dsl-ui `top-shell-bar` utilities (published in dsl-ui 2026.10.26-286) in place of the arbitrary values when bumping.
+- Lock: dsl-ui and dsl-renderer 2026.10.26-290-52b6493c (12 lines changed; 291 is already published). Manifest `dslLib.shared` ranges are `>=2026.10.26-290-0` in both modules: `^2026.10.26-290` and `>=2026.10.26-290` also accept the older `-279-...` and `-289-...` builds, because semver ranks the numeric prerelease `290` below any alphanumeric one. The modules load only on a shell >= 290.
+- Stop-gap `commons/DateText.ts` modules deleted. RunBars, RunList, LogLine and the step panel use `useDateFormat()` / `DateText`; `describeStep` hands ISO values (`isDate`) to the panel. RunBars labels each bar with the weekday of its own date (read at noon of the server-local day) in the user's weekday style; bars stay in data order.
+- Guard `CentralDateFormatter.test.ts` replaces `NoImplicitLocale.test.ts`. DSL columns carry `dateStyle` (short in lists, medium in the detail page and log time). `StepChips` uses `top-shell-bar`; the `calc(...+0.5rem)` and `max-h` arbitrary values stay (no preset utility for them).
+- Verified live on an isolated app-core 127 (dsl-ui 290) with fr-FR, Sunday-first, narrow, ISO, UTC. Not verified in the browser: log `absolute` time mode and sticky chips (the A/B dock needs a shell started with `--ab-tests`); unit tests cover both.
+- Open for dsl-ui: `weekdayStyle` is not part of `DateFormatter.key`, so changing only the weekday style does not re-render until reload.
 
 ## Log
 

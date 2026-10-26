@@ -1,6 +1,7 @@
 import { MemoryRouter } from 'react-router-dom';
 
 import { render, screen } from '@testing-library/react';
+import { DEFAULT_DATE_SETTINGS, DateFormatProvider, createDateFormatter } from '@wadeck-app/dsl-ui';
 import { describe, expect, it } from 'vitest';
 
 import { RunList } from './RunList.js';
@@ -40,8 +41,9 @@ describe('RunList', () => {
 		expect(screen.getByText('FAILED')).toBeInTheDocument();
 		const time = document.querySelector('time');
 		expect(time?.getAttribute('datetime')).toBe('2026-10-24T11:27:48.386Z');
-		expect(time?.className).toMatch(/\bshrink-0\b/);
-		expect(time?.className).toMatch(/\bwhitespace-nowrap\b/);
+		// DateText draws the <time>; its wrapper keeps the date on one line at the right edge.
+		expect(time?.parentElement?.className).toMatch(/\bshrink-0\b/);
+		expect(time?.parentElement?.className).toMatch(/\bwhitespace-nowrap\b/);
 	});
 
 	it('never lets the list scroll sideways', () => {
@@ -72,12 +74,27 @@ describe('RunList', () => {
 });
 
 describe('RunList time', () => {
-	it('prints the start in one explicit English format and keeps the exact instant as tooltip', () => {
+	it('prints the start with the central formatter (default en-GB, 24h) and keeps the exact timestamp as tooltip', () => {
 		const started = new Date(2026, 9, 24, 18, 38, 7).toISOString();
 		show({ runs: [{ ...RUNS[0]!, startedAt: started }] });
 		const time = document.querySelector('time')!;
-		expect(time.textContent).toBe('Oct 24, 18:38');
-		expect(time.getAttribute('title')).toBe(started);
+		expect(time.textContent).toBe('24/10/2026, 18:38');
+		expect(time.getAttribute('title')).toBe(createDateFormatter(DEFAULT_DATE_SETTINGS).exact(started));
 		expect(time.getAttribute('datetime')).toBe(started);
+	});
+
+	it('follows the date settings of the user (ISO preset, UTC zone)', () => {
+		const started = '2026-10-24T18:38:07.000Z';
+		const formatter = createDateFormatter({ ...DEFAULT_DATE_SETTINGS, preset: 'iso', timeZone: 'UTC' });
+		render(
+			<DateFormatProvider formatter={formatter}>
+				<MemoryRouter>
+					<RunList runs={[{ ...RUNS[0]!, startedAt: started }]} to={TO} emptyMessage="" unexpectedKeys={[]} />
+				</MemoryRouter>
+			</DateFormatProvider>
+		);
+		const time = document.querySelector('time')!;
+		expect(time.textContent).toBe('2026-10-24 18:38');
+		expect(time.getAttribute('title')).toBe('2026-10-24T18:38:07.000Z (UTC)');
 	});
 });

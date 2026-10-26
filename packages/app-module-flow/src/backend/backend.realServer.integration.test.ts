@@ -92,7 +92,7 @@ function packageModule(out: string): void {
 }
 
 /**
- * The app-core-cli in node_modules lags the server build the manifest ranges name (dsl-ui >=2026.10.24-153): its shell
+ * The app-core-cli in node_modules lags the server build the manifest ranges name (dsl-ui >=2026.10.26-290-0): its shell
  * refuses a dslLib built for a newer one. This test calls the routes, not the components, and manifest.test.ts pins the
  * ranges, so the packaged copy asks for any shell. Fails loudly when the packaged manifest has no dslLib ranges to relax.
  */

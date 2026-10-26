@@ -8,7 +8,7 @@
 # $sources.execution.<field> (whole-string expressions only).
 # Times are ISO 8601 and shown by table columns with `format: datetime`, the shell formatter of every app-core table:
 # the run start and end are a one-row table (`timing`: a Badge or a StatTile cannot format a timestamp), a step start is
-# a column. A shell older than dsl-ui 122 ignores `format` and shows the raw ISO text.
+# a column (`dateStyle: medium`, with seconds; the shell date formatter writes them in the user's language, clock and time zone).
 # The steps table has short columns (a narrow page breaks longer cells mid-word): the status word carries recovered
 # errors ("ok, recovered"), coloured by `badge` when it is a bare word; the error text is in the output below.
 # Cost columns show the flow-core labels (step total over all attempts, "unknown" or "+" when an attempt cost is missing,
@@ -74,8 +74,8 @@ sections:
           - $type: DataTable
             rows: $sources.execution.timing
             columns:
-                - { key: 'startedAt', label: 'Started', format: datetime, nowrap: true }
-                - { key: 'completedAt', label: 'Finished', format: datetime, nowrap: true }
+                - { key: 'startedAt', label: 'Started', format: datetime, dateStyle: medium, nowrap: true }
+                - { key: 'completedAt', label: 'Finished', format: datetime, dateStyle: medium, nowrap: true }
                 - { key: 'version', label: 'Version', nowrap: true, mono: true }
                 - { key: 'totalCost', label: 'Total cost', nowrap: true }
                 - { key: 'definition', label: 'Definition', muted: true }
@@ -138,7 +138,7 @@ sections:
                                 'retry policy unknown': default,
                                 'retries unknown': default,
                             }
-                      - { key: 'startedAt', label: 'Started', format: datetime, nowrap: true }
+                      - { key: 'startedAt', label: 'Started', format: datetime, dateStyle: medium, nowrap: true }
 
           # Collapsed: the values can be long. Same text as `flow show <id> --io` under each step (ioText).
           - $type: Collapsible

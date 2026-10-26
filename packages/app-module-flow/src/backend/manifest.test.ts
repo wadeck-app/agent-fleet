@@ -43,14 +43,20 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 	});
 
 	// app-core checks these ranges against the build-info.json of its SERVER and refuses the whole module when it is
-	// older ("built for ... but the shell provides"). Raise them only once that server build is newer: 2026.10.24-153
-	// is what the user's server served when this component was added.
+	// older ("built for ... but the shell provides"). 2026.10.26-290 is the first shell build with the central date
+	// formatter (DateFormatProvider, useDateFormat, DateText) these components call. The range ends in "-0" on purpose:
+	// semver ranks the numeric prerelease "290" BELOW any alphanumeric one such as "289-a8a6cc98" (CI stamps
+	// <build>-<hash>), so ">=2026.10.26-290" or "^2026.10.26-290" would accept the older builds of that day.
 	it.each(['@wadeck-app/dsl-ui', '@wadeck-app/dsl-renderer'])(
 		'%s accepts the server build and refuses older shells',
 		name => {
 			const range = manifest.dslLib?.shared?.[name] ?? '';
-			expect(satisfies('2026.10.24-153-308eef77', range, { includePrerelease: true })).toBe(true);
-			expect(satisfies('2026.10.23-136-d5f44a0f', range, { includePrerelease: true })).toBe(false);
+			expect(satisfies('2026.10.26-290-52b6493c', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.10.26-291-8cd15823', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.10.27-5-abcdef12', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.10.26-289-a8a6cc98', range, { includePrerelease: true })).toBe(false);
+			expect(satisfies('2026.10.26-279-33f64eeb', range, { includePrerelease: true })).toBe(false);
+			expect(satisfies('2026.10.24-153-308eef77', range, { includePrerelease: true })).toBe(false);
 			expect(satisfies('2026.10.18-101-b2ef217e', range, { includePrerelease: true })).toBe(false);
 		}
 	);

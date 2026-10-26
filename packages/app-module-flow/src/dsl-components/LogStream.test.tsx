@@ -1,7 +1,7 @@
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { AbExperiments } from '@wadeck-app/dsl-ui';
+import { AbExperiments, DEFAULT_DATE_SETTINGS, DateFormatProvider, createDateFormatter } from '@wadeck-app/dsl-ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LogStream } from './LogStream.js';
@@ -112,24 +112,31 @@ function Location() {
 	return <output data-testid="location">{location.pathname + location.search}</output>;
 }
 
-function show(props: Partial<LogStreamProps> = {}, choices: Record<string, string> = {}, url = '/logs') {
+function show(
+	props: Partial<LogStreamProps> = {},
+	choices: Record<string, string> = {},
+	url = '/logs',
+	dateSettings: Partial<typeof DEFAULT_DATE_SETTINGS> = {}
+) {
 	for (const [dimension, option] of Object.entries(choices)) {
 		localStorage.setItem(`ab.flow-logs-${dimension}`, option);
 	}
 	return render(
-		<AbExperiments enabled>
-			<MemoryRouter initialEntries={[url]}>
-				<LogStream
-					entries={ENTRIES}
-					steps={STEPS}
-					runDurationMs={60_000}
-					emptyMessage="Nothing logged"
-					unexpectedKeys={[]}
-					{...props}
-				/>
-				<Location />
-			</MemoryRouter>
-		</AbExperiments>
+		<DateFormatProvider formatter={createDateFormatter({ ...DEFAULT_DATE_SETTINGS, ...dateSettings })}>
+			<AbExperiments enabled>
+				<MemoryRouter initialEntries={[url]}>
+					<LogStream
+						entries={ENTRIES}
+						steps={STEPS}
+						runDurationMs={60_000}
+						emptyMessage="Nothing logged"
+						unexpectedKeys={[]}
+						{...props}
+					/>
+					<Location />
+				</MemoryRouter>
+			</AbExperiments>
+		</DateFormatProvider>
 	);
 }
 
@@ -256,10 +263,20 @@ describe('LogStream time', () => {
 		show({}, { ...BASE, time: 'absolute' });
 		const time = document.querySelector('time')!;
 		expect(time.getAttribute('datetime')).toBe('2026-10-24T10:00:08.000Z');
-		// The exact instant, not a localized rendering of it.
-		expect(time.getAttribute('title')).toBe('2026-10-24T10:00:08.000Z');
-		// Local clock with milliseconds, in English digits whatever the language of the browser.
+		// The exact timestamp of the central formatter (ISO with offset and zone), not a localized rendering.
+		expect(time.getAttribute('title')).toBe(
+			createDateFormatter(DEFAULT_DATE_SETTINGS).exact('2026-10-24T10:00:08.000Z')
+		);
+		// Clock with milliseconds, default en-GB 24h.
 		expect(time.textContent).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+	});
+
+	it('absolute: the clock follows the time zone and the clock hours of the date settings', () => {
+		show({}, { ...BASE, time: 'absolute' }, '/logs', { timeZone: 'Asia/Tokyo', hourCycle: '24h' });
+		const time = document.querySelector('time')!;
+		// 10:00:08Z is 19:00:08 in Tokyo.
+		expect(time.textContent).toBe('19:00:08.000');
+		expect(time.getAttribute('title')).toBe('2026-10-24T19:00:08.000+09:00 (Asia/Tokyo)');
 	});
 
 	it('says in a caption what the time column is', () => {
@@ -475,7 +492,7 @@ describe('LogStream under the sticky shell bar', () => {
 		show({}, { ...BASE, navigation: 'chips' });
 		const strip = screen.getByRole('navigation', { name: 'Steps' }).parentElement!;
 		expect(strip.className).toContain('sticky');
-		expect(strip.className).toContain(`top-[${BAR}]`);
+		expect(strip.className).toMatch(/(^|\s)top-shell-bar(\s|$)/);
 		expect(strip.className).not.toMatch(/(^|\s)top-0(\s|$)/);
 	});
 

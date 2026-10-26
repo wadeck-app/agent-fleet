@@ -76,14 +76,13 @@ describe('describeStep', () => {
 		expect(labels).not.toContain('Cost (USD)');
 	});
 
-	it('formats start and end times in English with the exact instant as tooltip, and keeps an unparsable one as is', () => {
-		// A local time, so the expectation holds in every time zone (Sunday 2026-08-16).
-		const started = new Date(2026, 7, 16, 14, 5, 9).toISOString();
+	it('hands the start and end times over as ISO dates for the panel to format (no React context here), and keeps an unparsable one as is', () => {
+		const started = '2026-08-16T14:05:09.000Z';
 		const { rows } = describeStep(node('a', { meta: { startedAt: started, completedAt: 'soon' } }));
 		const byLabel = Object.fromEntries(rows.map(r => [r.label, r]));
-		expect(byLabel['Started']).toMatchObject({ value: 'Sun, Aug 16, 2026, 14:05:09', title: started });
+		expect(byLabel['Started']).toMatchObject({ value: started, isDate: true });
 		expect(byLabel['Completed']!.value).toBe('soon');
-		expect(byLabel['Completed']!.title).toBeUndefined();
+		expect(byLabel['Completed']!.isDate).toBeUndefined();
 	});
 
 	it('does not dump a meta key it does not know: the panel lists curated facts only', () => {

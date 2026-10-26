@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 
-import { formatShort, formatWeekday, isoTitle } from '../commons/DateText.js';
+import { type DateFormatter, useDateFormat } from '@wadeck-app/dsl-ui';
+
 import { RUN_BARS_KEYS, type RunBarsProps, barHeights, barLink, parseRunBarsDays } from './RunBarsProps.js';
 
 function refusal(children: string) {
@@ -16,18 +17,36 @@ function refusal(children: string) {
 const LINK_CLASSES =
 	'group flex h-full w-full max-w-4 items-end rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
+const HALF_DAY_MS = 12 * 3600 * 1000;
+
+/** The weekday name of an instant in the style of the user's settings (narrow, short or long), found by its place in the user's week. */
+function weekdayLabel(dates: DateFormatter, instant: Date): string {
+	const long = dates.intl({ weekday: 'long' }).format(instant);
+	const index = dates.weekdays('long').indexOf(long);
+	if (index < 0) {
+		throw new Error(
+			`flow:RunBars cannot name the weekday "${long}" of ${instant.toISOString()} for the locale ${dates.locale}: it is not one of ${dates.weekdays('long').join(', ')}.`
+		);
+	}
+	return dates.weekdays()[index]!;
+}
+
 /**
  * The runs of the last days of the dashboard card: one equal column per day over the whole width of the tile, a green bar
  * (completed) and a red bar (failed) in it, the weekday letter under it. A day without run keeps its column and draws a
  * thin baseline, so a quiet week reads as seven days and not as two bars squeezed against the right edge (the dsl-ui Chart
  * draws nothing for a zero). The bars fill the height of the box; hover a day for the date and the counts. A bar is a link
  * to the executions page filtered on its status (the page has no date filter: it lists every run of that status).
- * The weekday is the 3 letter English one (DateText) with the exact instant of the day start as tooltip.
+ * Each bar is labelled with the weekday of ITS date (the date settings give the language and the style: letter, 3 letters
+ * or full name), not by its place in a week that starts on the first day of the user's choice; the exact timestamp of the
+ * day start is the tooltip. The days are the server's local days, so the date is read at noon of the day: a user whose time
+ * zone differs from the server's by less than 12 hours still sees the right day.
  *
  * Local stand-in for a dsl-ui bar chart that keeps empty categories: when one ships, change `$type: flow:RunBars` in the
  * view and delete this component. Props are closed (days, to): anything else renders an error, so nobody restyles it.
  */
 export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
+	const dates = useDateFormat();
 	if (unexpectedKeys.length > 0) {
 		return refusal(
 			`flow:RunBars does not accept ${unexpectedKeys.join(', ')}: its style is fixed. Keep only ${RUN_BARS_KEYS.join(', ')}.`
@@ -55,9 +74,11 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 			style={{ gridTemplateColumns: `repeat(${parsed.length}, minmax(0, 1fr))` }}
 		>
 			{parsed.map((day, index) => {
-				const date = `${formatWeekday(day.dayStart)}, ${formatShort(day.dayStart)}`;
-				// The days are the local days of the machine that serves the page: the tooltip gives the exact instant.
-				const dayStartNote = `Day starts ${isoTitle(day.dayStart)} (local midnight of the machine that serves this page).`;
+				// Noon of the day, so that the zone of the user does not move the date to a neighbouring day.
+				const noon = new Date(day.dayStart.getTime() + HALF_DAY_MS);
+				const date = `${dates.intl({ weekday: 'short' }).format(noon)} ${dates.format(noon, 'medium', 'date')}`;
+				// The days are the local days of the machine that serves the page: the tooltip gives the exact timestamp.
+				const dayStartNote = `Day starts ${dates.exact(day.dayStart)} (local midnight of the machine that serves this page).`;
 				const bars = [
 					{
 						status: 'completed',
@@ -105,8 +126,11 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 								)
 							)}
 						</div>
-						<span title={isoTitle(day.dayStart)} className="text-center text-[11px] leading-3 text-muted">
-							{formatWeekday(day.dayStart)}
+						<span
+							title={dates.exact(day.dayStart)}
+							className="truncate text-center text-[11px] leading-3 text-muted"
+						>
+							{weekdayLabel(dates, noon)}
 						</span>
 					</div>
 				);
