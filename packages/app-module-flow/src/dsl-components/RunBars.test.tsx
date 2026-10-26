@@ -1,8 +1,8 @@
 import { MemoryRouter } from 'react-router-dom';
 
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { DEFAULT_DATE_SETTINGS, DateFormatProvider, createDateFormatter } from '@wadeck-app/dsl-ui';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { RunBars } from './RunBars.js';
 
@@ -34,6 +34,86 @@ function show(props: Partial<Parameters<typeof RunBars>[0]> = {}, settings?: Par
 		)
 	);
 }
+
+// jsdom has no layout: a stub reports the width of the chart box (content width) to the ResizeObserver of the component.
+function stubChartWidth(width: number) {
+	vi.stubGlobal(
+		'ResizeObserver',
+		class {
+			constructor(private readonly callback: ResizeObserverCallback) {}
+			observe(target: Element) {
+				this.callback([{ target, contentRect: { width } } as unknown as ResizeObserverEntry], this as never);
+			}
+			unobserve() {}
+			disconnect() {}
+		}
+	);
+}
+
+function labels() {
+	return screen.getAllByTestId('run-bars-day').map(column => column.textContent);
+}
+
+describe('RunBars weekday label width', () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	it('keeps the full names when the style is long and the columns are wide enough', () => {
+		stubChartWidth(900);
+		show({}, { weekdayStyle: 'long' });
+		expect(labels()).toEqual(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
+	});
+
+	it('falls back to the 3-letter names for the visible label only when long names do not fit', () => {
+		stubChartWidth(300);
+		show({}, { weekdayStyle: 'long' });
+		expect(labels()).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+	});
+
+	it('falls back to the narrow letter when even the 3-letter names do not fit', () => {
+		stubChartWidth(120);
+		show({}, { weekdayStyle: 'long' });
+		expect(labels()).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
+		cleanup();
+		show({}, { weekdayStyle: 'short' });
+		expect(labels()).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
+	});
+
+	it('never widens a narrow or short style', () => {
+		stubChartWidth(900);
+		show({}, { weekdayStyle: 'narrow' });
+		expect(labels()).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
+		cleanup();
+		show({}, { weekdayStyle: 'short' });
+		expect(labels()).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+	});
+
+	it.each([
+		['narrow', 900],
+		['short', 300],
+		['long', 120],
+		['long', 900],
+	] as const)(
+		'always puts the full weekday in the tooltips and the link names (style %s, width %s)',
+		(weekdayStyle, width) => {
+			stubChartWidth(width);
+			show({}, { weekdayStyle });
+			const busy = screen.getAllByTestId('run-bars-day')[5]!;
+			expect(busy.getAttribute('title')).toMatch(/^Saturday 24 Oct 2026: /);
+			const label = within(busy).getByText(/^(S|Sat|Saturday)$/);
+			expect(label.getAttribute('title')).toBe(`Saturday, ${formatter.exact(DAYS[5]!.dayStart)}`);
+			for (const link of within(busy).getAllByRole('link')) {
+				expect(link.getAttribute('title')).toMatch(/^Saturday 24 Oct 2026: /);
+				expect(link.getAttribute('aria-label')).toContain('on Saturday 24 Oct 2026)');
+			}
+		}
+	);
+
+	it('uses the full name in the tooltip in the language of the settings', () => {
+		stubChartWidth(120);
+		show({}, { locale: 'fr-FR', weekdayStyle: 'long' });
+		expect(screen.getAllByTestId('run-bars-day')[5]!.getAttribute('title')).toMatch(/^samedi /);
+	});
+});
 
 describe('RunBars', () => {
 	it('gives each of the 7 days an equal column of the whole width, empty days included', () => {
@@ -68,7 +148,7 @@ describe('RunBars', () => {
 		const columns = screen.getAllByTestId('run-bars-day');
 		expect(columns.map(column => column.textContent)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
 		const label = within(columns[5]!).getByText('Sat');
-		expect(label.getAttribute('title')).toBe(formatter.exact(DAYS[5]!.dayStart));
+		expect(label.getAttribute('title')).toBe(`Saturday, ${formatter.exact(DAYS[5]!.dayStart)}`);
 	});
 
 	it('keeps the bars in the order of the data (last 7 days ending today) whatever the first day of the week of the settings', () => {
@@ -88,13 +168,13 @@ describe('RunBars', () => {
 	it('names each day with its date and counts in the title, the date written by the central formatter', () => {
 		show();
 		const busy = screen.getAllByTestId('run-bars-day')[5]!;
-		expect(busy.getAttribute('title')).toMatch(/^Sat 24 Oct 2026: 20 completed, 12 failed\. /);
+		expect(busy.getAttribute('title')).toMatch(/^Saturday 24 Oct 2026: 20 completed, 12 failed\. /);
 	});
 
 	it('writes the date of the title in ISO form when the settings ask for the iso preset', () => {
 		show({}, { preset: 'iso' });
 		const busy = screen.getAllByTestId('run-bars-day')[5]!;
-		expect(busy.getAttribute('title')).toMatch(/^Sat 2026-10-24: 20 completed, 12 failed\. /);
+		expect(busy.getAttribute('title')).toMatch(/^Saturday 2026-10-24: 20 completed, 12 failed\. /);
 	});
 
 	it('gives the exact instant of the day start and its zone in the title of the day and of every bar', () => {
@@ -133,8 +213,8 @@ describe('RunBars', () => {
 			'/modules/flow/executions?status=completed',
 			'/modules/flow/executions?status=failed',
 		]);
-		expect(links[1]!.getAttribute('aria-label')).toBe('Show the failed executions (12 on Sat 24 Oct 2026)');
-		expect(links[2]!.getAttribute('aria-label')).toBe('Show the completed executions (13 on Sun 25 Oct 2026)');
+		expect(links[1]!.getAttribute('aria-label')).toBe('Show the failed executions (12 on Saturday 24 Oct 2026)');
+		expect(links[2]!.getAttribute('aria-label')).toBe('Show the completed executions (13 on Sunday 25 Oct 2026)');
 		// Focus and hover are visible; the link takes the whole height of the column, so a short bar is easy to hit.
 		expect(links[0]!.className).toMatch(/(^| )focus-visible:/);
 		expect(links[0]!.className).toMatch(/(^| )h-full( |$)/);

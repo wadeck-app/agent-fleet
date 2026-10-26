@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { type DateFormatter, useDateFormat } from '@wadeck-app/dsl-ui';
@@ -19,8 +20,14 @@ const LINK_CLASSES =
 
 const HALF_DAY_MS = 12 * 3600 * 1000;
 
-/** The weekday name of an instant in the style of the user's settings (narrow, short or long), found by its place in the user's week. */
-function weekdayLabel(dates: DateFormatter, instant: Date): string {
+type NameStyle = 'narrow' | 'short' | 'long';
+
+// Width of one character of the 11px label, a little above the average so that a wide letter (W, m) still fits.
+const LABEL_CHAR_PX = 6.5;
+const COLUMN_GAP_PX = 4;
+
+/** The weekday name of an instant in the given style, found by its place in the user's week. */
+function weekdayLabel(dates: DateFormatter, instant: Date, style: NameStyle): string {
 	const long = dates.intl({ weekday: 'long' }).format(instant);
 	const index = dates.weekdays('long').indexOf(long);
 	if (index < 0) {
@@ -28,12 +35,67 @@ function weekdayLabel(dates: DateFormatter, instant: Date): string {
 			`flow:RunBars cannot name the weekday "${long}" of ${instant.toISOString()} for the locale ${dates.locale}: it is not one of ${dates.weekdays('long').join(', ')}.`
 		);
 	}
-	return dates.weekdays()[index]!;
+	return dates.weekdays(style)[index]!;
+}
+
+/**
+ * The style of the visible weekday labels: the user's style, or the widest narrower style that fits the column (long ->
+ * short -> narrow), decided on the longest label of the week so that all seven labels share one style. The narrow style is
+ * the last resort and is kept even if it does not fit (it then ends with an ellipsis). While the width is unknown (first
+ * render, no ResizeObserver) the user's style is kept. Only the visible label is concerned: tooltips and names always carry
+ * the full weekday.
+ */
+function fittingStyle(
+	requested: NameStyle,
+	columnWidth: number | undefined,
+	labels: (style: NameStyle) => string[]
+): NameStyle {
+	const order: NameStyle[] =
+		requested === 'long' ? ['long', 'short', 'narrow'] : requested === 'short' ? ['short', 'narrow'] : ['narrow'];
+	if (columnWidth === undefined) {
+		return requested;
+	}
+	for (const style of order) {
+		const longest = Math.max(...labels(style).map(label => label.length));
+		if (longest * LABEL_CHAR_PX <= columnWidth) {
+			return style;
+		}
+	}
+	return 'narrow';
+}
+
+/** The content width of the element given to `ref` (a callback ref: the element may appear after the first render); undefined until measured. */
+function useContentWidth() {
+	const [element, ref] = useState<HTMLDivElement | null>(null);
+	const [width, setWidth] = useState<number | undefined>(undefined);
+	useEffect(() => {
+		if (element === null || typeof ResizeObserver === 'undefined') {
+			return;
+		}
+		const observer = new ResizeObserver(entries => {
+			const measured = entries[0]?.contentRect.width;
+			if (measured !== undefined && measured > 0) {
+				setWidth(measured);
+			}
+		});
+		observer.observe(element);
+		return () => observer.disconnect();
+	}, [element]);
+	return { ref, width };
+}
+
+/** The style the user chose, read back from the formatter (it exposes the names, not the setting). */
+function requestedStyle(dates: DateFormatter): NameStyle {
+	const chosen = dates.weekdays().join('|');
+	if (chosen === dates.weekdays('long').join('|')) {
+		return 'long';
+	}
+	return chosen === dates.weekdays('short').join('|') ? 'short' : 'narrow';
 }
 
 /**
  * The runs of the last days of the dashboard card: one equal column per day over the whole width of the tile, a green bar
- * (completed) and a red bar (failed) in it, the weekday letter under it. A day without run keeps its column and draws a
+ * (completed) and a red bar (failed) in it, the weekday under it (the user's style; when the full names do not fit the column, the visible label falls back to 3 letters, then to one letter: the tooltips and link names always carry the full weekday). A day without run keeps its column and draws a
  * thin baseline, so a quiet week reads as seven days and not as two bars squeezed against the right edge (the dsl-ui Chart
  * draws nothing for a zero). The bars fill the height of the box; hover a day for the date and the counts. A bar is a link
  * to the executions page filtered on its status (the page has no date filter: it lists every run of that status).
@@ -47,6 +109,7 @@ function weekdayLabel(dates: DateFormatter, instant: Date): string {
  */
 export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 	const dates = useDateFormat();
+	const { ref, width } = useContentWidth();
 	if (unexpectedKeys.length > 0) {
 		return refusal(
 			`flow:RunBars does not accept ${unexpectedKeys.join(', ')}: its style is fixed. Keep only ${RUN_BARS_KEYS.join(', ')}.`
@@ -64,10 +127,16 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 		return <p className="px-3 py-2 text-sm text-muted">No data</p>;
 	}
 	const heights = barHeights(parsed);
+	const columnWidth = width === undefined ? undefined : (width - (parsed.length - 1) * COLUMN_GAP_PX) / parsed.length;
+	const noonOf = (day: { dayStart: Date }) => new Date(day.dayStart.getTime() + HALF_DAY_MS);
+	const labelStyle = fittingStyle(requestedStyle(dates), columnWidth, style =>
+		parsed.map(day => weekdayLabel(dates, noonOf(day), style))
+	);
 	const completed = parsed.reduce((sum, day) => sum + day.completed, 0);
 	const failed = parsed.reduce((sum, day) => sum + day.failed, 0);
 	return (
 		<div
+			ref={ref}
 			role="group"
 			aria-label={`Runs of the last ${parsed.length} days: ${completed} completed, ${failed} failed`}
 			className="grid h-[4.75rem] w-full gap-1 rounded-md border border-border px-2 pb-1 pt-2"
@@ -75,8 +144,9 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 		>
 			{parsed.map((day, index) => {
 				// Noon of the day, so that the zone of the user does not move the date to a neighbouring day.
-				const noon = new Date(day.dayStart.getTime() + HALF_DAY_MS);
-				const date = `${dates.intl({ weekday: 'short' }).format(noon)} ${dates.format(noon, 'medium', 'date')}`;
+				const noon = noonOf(day);
+				const weekday = dates.intl({ weekday: 'long' }).format(noon);
+				const date = `${weekday} ${dates.format(noon, 'medium', 'date')}`;
 				// The days are the local days of the machine that serves the page: the tooltip gives the exact timestamp.
 				const dayStartNote = `Day starts ${dates.exact(day.dayStart)} (local midnight of the machine that serves this page).`;
 				const bars = [
@@ -127,10 +197,10 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 							)}
 						</div>
 						<span
-							title={dates.exact(day.dayStart)}
+							title={`${weekday}, ${dates.exact(day.dayStart)}`}
 							className="truncate text-center text-[11px] leading-3 text-muted"
 						>
-							{weekdayLabel(dates, noon)}
+							{weekdayLabel(dates, noon, labelStyle)}
 						</span>
 					</div>
 				);

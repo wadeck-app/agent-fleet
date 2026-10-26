@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 
-import { Badge, DateText } from '@wadeck-app/dsl-ui';
+import { Badge, useDateFormat } from '@wadeck-app/dsl-ui';
 
 import { RUN_LIST_KEYS, type RunListProps, parseRunListRows, runLink, runStatusVariant } from './RunListProps.js';
 
@@ -21,6 +21,7 @@ function refusal(children: string) {
  * component. Props are closed (runs, to, emptyMessage): anything else renders an error, so nobody restyles it.
  */
 export function RunList({ runs, to, emptyMessage, unexpectedKeys }: RunListProps) {
+	const dates = useDateFormat();
 	if (unexpectedKeys.length > 0) {
 		return refusal(
 			`flow:RunList does not accept ${unexpectedKeys.join(', ')}: its style is fixed. Keep only ${RUN_LIST_KEYS.join(', ')}.`
@@ -64,9 +65,11 @@ export function RunList({ runs, to, emptyMessage, unexpectedKeys }: RunListProps
 						<span className="min-w-0 flex-1 truncate" title={row.flowId}>
 							{row.flowId}
 						</span>
-						{/* DateText writes the start the way the user's date settings say and adds the exact timestamp as tooltip. */}
+						{/* The start is written by the central formatter; the exact timestamp is the tooltip of the date text itself (set here, not left to DateText: the link must not hide it and the host's DateText may not add it). */}
 						<span className="shrink-0 whitespace-nowrap text-xs text-muted">
-							<DateText value={row.startedAt} dateStyle="short" />
+							<time dateTime={new Date(row.startedAt).toISOString()} title={dates.exact(row.startedAt)}>
+								{dates.format(row.startedAt, 'short')}
+							</time>
 						</span>
 					</Link>
 				</li>
