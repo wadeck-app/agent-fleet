@@ -12,12 +12,21 @@ function tokenText(tokens: Tokens): string {
 	return `${tokens.input} in / ${tokens.output} out${cache > 0 ? ` + ${cache} cache` : ''} tokens`;
 }
 
+function costPart(cost: AttemptCost | undefined): string[] {
+	if (cost?.notApplicable === true) {
+		return [];
+	}
+	return [
+		cost?.usd !== undefined ? `$${cost.usd.toFixed(4)}` : `cost unknown (${cost?.unknownReason ?? 'not recorded'})`,
+	];
+}
+
 function attemptLine(entry: AttemptRecord, cost: AttemptCost | undefined, indent: string): string {
 	const parts = [
 		`attempt ${entry.n}`,
 		entry.origin.padEnd(8),
 		formatDuration(entry.startedAt, entry.endedAt),
-		cost?.usd !== undefined ? `$${cost.usd.toFixed(4)}` : `cost unknown (${cost?.unknownReason ?? 'not recorded'})`,
+		...costPart(cost),
 	];
 	if (cost?.tokens !== undefined) {
 		parts.push(tokenText(cost.tokens));
@@ -39,10 +48,11 @@ function attemptLine(entry: AttemptRecord, cost: AttemptCost | undefined, indent
 export function renderStepCostLines(step: StepState, indent: string): string[] {
 	const summary = summarizeStepCost(step);
 	const label = formatStepCost(summary);
-	if (label === undefined) {
-		return [];
-	}
 	const log = step.attemptLog ?? [];
+	if (label === undefined) {
+		// Non-model step: the attempts are still listed when it ran several times, without any cost.
+		return log.length < 2 ? [] : log.map((entry, index) => attemptLine(entry, summary.attempts[index], indent));
+	}
 	if (log.length < 2) {
 		const line = formatModelCost(step.meta, label);
 		return line === undefined ? [] : [indent + line];

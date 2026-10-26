@@ -3,7 +3,11 @@ import type { FlowExecutionDetail } from '@shared/api/flow-daemon.contract';
 type FlowStep = FlowExecutionDetail['steps'][number];
 type FlowStepAttempt = NonNullable<FlowStep['attemptHistory']>[number];
 
-function formatAttemptCost(attempt: FlowStepAttempt): string {
+function formatAttemptCost(attempt: FlowStepAttempt): string | undefined {
+	// Cost does not apply to a non-model step: print nothing
+	if (attempt.costNotApplicable === true) {
+		return undefined;
+	}
 	if (attempt.costUsd !== undefined) {
 		return `$${attempt.costUsd.toFixed(4)}`;
 	}

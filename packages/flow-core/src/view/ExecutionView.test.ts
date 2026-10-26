@@ -237,6 +237,36 @@ describe('step cost in the detail view (per-attempt, session-cumulative)', () =>
 		expect(detail.totalCostLabel).toBe('$0.0075');
 	});
 
+	it('a script step has no cost fields, flags its attempts as not applicable and keeps the total complete', () => {
+		const scriptEntry = (n: number) => {
+			const { provider: _provider, sessionId: _sessionId, ...bare } = entry(n, {});
+			return bare;
+		};
+		const detail = detailOf({
+			ask: {
+				status: 'completed',
+				attempts: 1,
+				meta: modelMeta(0.00637995) as never,
+				attemptLog: [entry(1, { usd: 0.00637995 })] as never,
+			},
+			check: {
+				status: 'completed',
+				attempts: 2,
+				meta: { duration_ms: 1, exit_code: 0 } as never,
+				attemptLog: [scriptEntry(1), scriptEntry(2)] as never,
+			},
+		});
+		const check = detail.steps.find(step => step.stepId === 'check')!;
+		expect(check.costLabel).toBeUndefined();
+		expect(check.costComplete).toBeUndefined();
+		expect(check.attemptHistory).toHaveLength(2);
+		expect(
+			check.attemptHistory!.every(a => a.costNotApplicable === true && a.costUnknownReason === undefined)
+		).toBe(true);
+		expect(detail.totalCostComplete).toBe(true);
+		expect(detail.totalCostLabel).toBe('$0.0064');
+	});
+
 	it('flags an incomplete total and never turns an unknown cost into 0', () => {
 		const detail = detailOf({
 			a: {

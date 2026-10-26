@@ -267,3 +267,53 @@ describe('sumStepCosts', () => {
 		expect(formatStepCost(total)).toBe('unknown');
 	});
 });
+
+describe('non-model steps (script, user_intervention, subflow): cost is not applicable', () => {
+	// The attempt entry of a script step carries no model, provider, session, cost or tokens.
+	const scriptAttempt = (n: number): AttemptRecord => {
+		const { provider: _provider, sessionId: _sessionId, ...bare } = attempt(n);
+		return bare;
+	};
+	const scriptMeta = { duration_ms: 12, exit_code: 0 } as StepState['meta'];
+
+	it.each([
+		['one attempt (execution q8bbdk5u, step check)', [scriptAttempt(1)]],
+		['two attempts (execution ajk42rid)', [scriptAttempt(1), scriptAttempt(2)]],
+	])('a script step with %s has no cost, nothing unknown', (_name, log) => {
+		const summary = summarizeStepCost({ attemptLog: log, attempts: log.length, meta: scriptMeta });
+		expect(summary).toMatchObject({ basis: 'none', complete: true, unknownAttempts: 0 });
+		expect(summary.totalUsd).toBeUndefined();
+		expect(summary.attempts.every(a => a.notApplicable === true && a.unknownReason === undefined)).toBe(true);
+		expect(formatStepCost(summary)).toBeUndefined();
+	});
+
+	it('mixed model + script execution: the total is the model total and stays complete', () => {
+		const model = summarizeStepCost(stepWithLog([attempt(1, { usd: 0.00637995, model: 'haiku' })]));
+		const script = summarizeStepCost({ attemptLog: [scriptAttempt(1)], attempts: 1, meta: scriptMeta });
+		const total = sumStepCosts([model, script]);
+		expect(total).toMatchObject({ totalUsd: 0.00637995, complete: true, unknownAttempts: 0 });
+		expect(formatStepCost(total)).toBe('$0.0064');
+	});
+
+	it('script-only execution has no total', () => {
+		const script = summarizeStepCost({ attemptLog: [scriptAttempt(1)], attempts: 1, meta: scriptMeta });
+		expect(sumStepCosts([script, script])).toMatchObject({ basis: 'none' });
+	});
+
+	it('a model step whose provider reported no cost stays unknown and incomplete', () => {
+		const model = summarizeStepCost(stepWithLog([attempt(1, { usd: undefined, model: 'haiku' })]));
+		const script = summarizeStepCost({ attemptLog: [scriptAttempt(1)], attempts: 1, meta: scriptMeta });
+		expect(model).toMatchObject({ basis: 'log', complete: false, unknownAttempts: 1 });
+		const total = sumStepCosts([model, script]);
+		expect(total.complete).toBe(false);
+		expect(formatStepCost(total)).toBe('unknown');
+	});
+
+	it('a failed model attempt with only a model recorded is still a model attempt (unknown)', () => {
+		const { provider: _p, sessionId: _s, ...bare } = attempt(1, { model: 'haiku' });
+		expect(summarizeStepCost({ attemptLog: [bare], attempts: 1 })).toMatchObject({
+			unknownAttempts: 1,
+			complete: false,
+		});
+	});
+});

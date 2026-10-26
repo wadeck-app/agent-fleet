@@ -121,6 +121,34 @@ describe('FlowExecutionStepsTable', () => {
 		).toBeInTheDocument();
 	});
 
+	it('prints no cost for an attempt of a non-model step', () => {
+		const attempt = {
+			n: 1,
+			origin: 'initial',
+			outcome: 'completed',
+			endReason: 'completed',
+			duration: '1s',
+			durationMs: 1000,
+		};
+		render(
+			<FlowExecutionStepsTable
+				steps={[
+					buildStep({
+						stepId: 'check',
+						attempts: 2,
+						attemptHistory: [
+							{ ...attempt, costNotApplicable: true },
+							{ ...attempt, n: 2, costNotApplicable: true },
+						],
+					}),
+				]}
+			/>
+		);
+
+		expect(screen.getByText('#1 | initial | 1s | completed')).toBeInTheDocument();
+		expect(screen.queryByText(/cost unknown/)).not.toBeInTheDocument();
+	});
+
 	it('offers no attempt list for a single attempt', () => {
 		render(
 			<FlowExecutionStepsTable

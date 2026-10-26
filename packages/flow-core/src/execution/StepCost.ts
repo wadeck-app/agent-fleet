@@ -9,7 +9,12 @@ import type { AttemptRecord, StepState } from './ExecutionState.js';
 //   (the first counts in full); the step total adds the final cumulative value of each session;
 // - anything that cannot be established is UNKNOWN, never 0: no reported cost, a cumulative value that decreases, a
 //   missing session id or provider, a provider other than claude whose session is shared (semantics unverified);
-// - a total with unknown parts is a lower bound (`complete: false`).
+// - a total with unknown parts is a lower bound (`complete: false`);
+// - cost only exists for MODEL steps. A step is a model step when the record shows any model trace: an attempt log
+//   entry with model, provider, sessionId, usd or tokens, or a `meta` with model or cost. A step with none of these
+//   (script, user_intervention, subflow, or a model step that left no trace at all) is NOT APPLICABLE: it
+//   contributes nothing to any total (neither a value nor an unknown), prints no cost, and never makes a total
+//   incomplete. The record carries no step type, so this is the most reliable signal valid for old records too.
 
 type Tokens = NonNullable<AttemptRecord['tokens']>;
 
@@ -31,6 +36,8 @@ export interface AttemptCost {
 	tokens?: Tokens;
 	/** Why `usd` is unknown. */
 	unknownReason?: string;
+	/** True for an attempt of a non-model step: cost does not exist (neither a value nor an unknown). */
+	notApplicable?: true;
 }
 
 /**
@@ -139,7 +146,30 @@ function costOfAttempt(
 	);
 }
 
+function isModelAttempt(entry: AttemptRecord): boolean {
+	return (
+		entry.model !== undefined ||
+		entry.provider !== undefined ||
+		entry.sessionId !== undefined ||
+		entry.usd !== undefined ||
+		entry.tokens !== undefined
+	);
+}
+
+function hasModelMeta(meta: StepCostInput['meta']): boolean {
+	return meta !== undefined && ('model' in meta || 'cost' in meta);
+}
+
 function summarizeLog(log: AttemptRecord[], step: StepCostInput): StepCostSummary {
+	if (!log.some(isModelAttempt) && !hasModelMeta(step.meta)) {
+		return {
+			basis: 'none',
+			attempts: log.map(entry => ({ n: entry.n, notApplicable: true as const })),
+			attemptCount: log.length + (step.attemptOverflow?.count ?? 0),
+			complete: true,
+			unknownAttempts: 0,
+		};
+	}
 	const overflow = step.attemptOverflow?.count ?? 0;
 	const totalAttempts = log.length + overflow;
 	const sessions = new Map<string, SessionCursor>();

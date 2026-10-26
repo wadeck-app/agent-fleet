@@ -13,6 +13,8 @@ export interface StepAttemptView {
 	costUsd?: number;
 	/** Why `costUsd` is absent. */
 	costUnknownReason?: string;
+	/** True for an attempt of a non-model step (script, ...): cost does not apply, so it is neither a value nor unknown. */
+	costNotApplicable?: true;
 	/** Tokens of this attempt alone (a delta for a shared claude session). */
 	tokens?: { input: number; output: number; cacheRead: number; cacheWrite: number };
 	turns?: number;
@@ -37,6 +39,7 @@ export function toStepAttemptViews(step: StepState, costs: StepCostSummary): Ste
 			durationMs: entry.durationMs,
 			...(cost?.usd !== undefined ? { costUsd: cost.usd } : {}),
 			...(cost?.unknownReason !== undefined ? { costUnknownReason: cost.unknownReason } : {}),
+			...(cost?.notApplicable === true ? { costNotApplicable: true as const } : {}),
 			...(cost?.tokens !== undefined ? { tokens: cost.tokens } : {}),
 			...(entry.turns !== undefined ? { turns: entry.turns } : {}),
 			...(entry.toolCalls !== undefined ? { toolCalls: entry.toolCalls } : {}),

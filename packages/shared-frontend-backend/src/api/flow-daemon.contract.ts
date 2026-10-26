@@ -97,6 +97,8 @@ export const FlowStepAttemptSchema = z.object({
 	durationMs: z.number(),
 	costUsd: z.number().optional(),
 	costUnknownReason: z.string().optional(),
+	/** True for an attempt of a non-model step (script, ...): cost does not apply. */
+	costNotApplicable: z.boolean().optional(),
 	tokens: z
 		.object({ input: z.number(), output: z.number(), cacheRead: z.number(), cacheWrite: z.number() })
 		.optional(),

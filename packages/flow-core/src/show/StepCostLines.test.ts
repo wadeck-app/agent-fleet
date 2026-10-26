@@ -123,3 +123,38 @@ describe('renderTotalCostLine', () => {
 		expect(renderTotalCostLine([{ status: 'pending' }], '  ')).toBeUndefined();
 	});
 });
+
+describe('non-model steps in the show output', () => {
+	const bare = (n: number): AttemptRecord => {
+		const { provider: _provider, sessionId: _sessionId, ...rest } = entry(n);
+		return rest;
+	};
+	const script = (count: number): StepState => ({
+		status: 'completed',
+		attempts: count,
+		meta: { duration_ms: 12, exit_code: 0 } as StepState['meta'],
+		attemptLog: Array.from({ length: count }, (_, i) => bare(i + 1)),
+	});
+	const model: StepState = {
+		status: 'completed',
+		attempts: 1,
+		meta: meta(0.00637995),
+		attemptLog: [entry(1, { usd: 0.00637995, model: 'haiku' })],
+	};
+
+	it('prints no cost part for a script step, even with several attempts', () => {
+		expect(renderStepCostLines(script(2), '  ')).toEqual([
+			'  attempt 1  first     30.0s  completed',
+			'  attempt 2  relaunch  30.0s  completed',
+		]);
+		expect(renderStepCostLines(script(1), '  ')).toEqual([]);
+	});
+
+	it('the total of a model + script execution is complete', () => {
+		expect(renderTotalCostLine([model, script(1)], '  ')).toBe('  Total cost: $0.0064');
+	});
+
+	it('prints no total line for a script-only execution', () => {
+		expect(renderTotalCostLine([script(1), script(2)], '  ')).toBeUndefined();
+	});
+});
