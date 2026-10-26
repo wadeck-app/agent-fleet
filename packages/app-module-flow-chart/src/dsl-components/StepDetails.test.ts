@@ -66,6 +66,16 @@ describe('describeStep', () => {
 		expect(rowsOf({ costUsd: 0.5 })['Cost (USD)']).toBe('0.5');
 	});
 
+	it('leaves the cost to the metrics block (describeIO) when the node carries it there, so the panel shows it once', () => {
+		const withIo = node('m', {
+			meta: { costUsd: 0.0064, costLabel: '$0.0064' },
+			io: { inputs: [], outputs: [], recorded: { relaunches: [], costLabel: '$0.0064', costUsd: 0.0064 } },
+		} as never);
+		const labels = describeStep(withIo).rows.map(r => r.label);
+		expect(labels).not.toContain('Cost');
+		expect(labels).not.toContain('Cost (USD)');
+	});
+
 	it('formats start and end times as dates and keeps an unparsable one as is', () => {
 		const { rows } = describeStep(
 			node('a', { meta: { startedAt: '2026-08-16T12:00:00.000Z', completedAt: 'soon' } })

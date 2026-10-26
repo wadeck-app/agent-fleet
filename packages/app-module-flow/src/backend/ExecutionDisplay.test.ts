@@ -38,3 +38,66 @@ describe('toExecutionDetailRow total cost', () => {
 		expect(toExecutionDetailRow(DETAIL, undefined).timing[0]!.totalCost).toBe('-');
 	});
 });
+
+describe('toStepRow attempts expansion', () => {
+	const ATTEMPTS = [
+		{
+			n: 1,
+			origin: 'first' as const,
+			outcome: 'failed' as const,
+			endReason: 'first 8.8s',
+			duration: '8.8s',
+			durationMs: 8800,
+			costUnknownReason: 'no session',
+		},
+		{
+			n: 2,
+			origin: 'retry' as const,
+			outcome: 'completed' as const,
+			endReason: 'retry 2s',
+			duration: '2s',
+			durationMs: 2000,
+			costUnknownReason: 'no session',
+		},
+	];
+
+	it('gives a model step with unknown attempt costs its rows, the expansion flag and a self-explanatory cost cell', () => {
+		const row = toStepRow({ ...STEP, costLabel: 'unknown', attemptHistory: ATTEMPTS }, undefined);
+		expect(row.expandable).toBe(true);
+		expect(row.attemptRows).toHaveLength(2);
+		expect(row.attemptRows[1]).toMatchObject({ n: 2, origin: 'retry', cost: 'unknown' });
+		expect(row.costLabel).toBe('unknown - see attempts');
+	});
+
+	it('gives a single-attempt step with a known cost no expansion', () => {
+		const row = toStepRow(
+			{
+				...STEP,
+				costLabel: '$0.0064',
+				attemptHistory: [{ ...ATTEMPTS[0]!, costUsd: 0.0064, costUnknownReason: undefined }],
+			},
+			undefined
+		);
+		expect(row.expandable).toBe(false);
+		expect(row.attemptRows).toEqual([]);
+		expect(row.costLabel).toBe('$0.0064');
+	});
+});
+
+describe('toStepRow cost notes', () => {
+	it('sends the reason of an unknown cost once, as the text shown under the attempts table', () => {
+		const attempt = {
+			n: 1,
+			origin: 'first' as const,
+			outcome: 'completed' as const,
+			endReason: 'done',
+			duration: '1s',
+			durationMs: 1000,
+			costUnknownReason: 'no session',
+		};
+		expect(toStepRow({ ...STEP, costLabel: 'unknown', attemptHistory: [attempt] }, undefined).costNotes).toBe(
+			'Cost unknown: no session.'
+		);
+		expect(toStepRow(STEP, undefined).costNotes).toBe('');
+	});
+});

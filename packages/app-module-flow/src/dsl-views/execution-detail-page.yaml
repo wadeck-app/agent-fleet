@@ -12,7 +12,7 @@
 # The steps table has short columns (a narrow page breaks longer cells mid-word): the status word carries recovered
 # errors ("ok, recovered"), coloured by `badge` when it is a bare word; the error text is in the output below.
 # Cost columns show the flow-core labels (step total over all attempts, "unknown" or "+" when an attempt cost is missing,
-# "-" without model cost); the per-attempt detail is in `text` (`flow show`), the DSL has no cell tooltip.
+# "-" without model cost); an unknown cost is followed by "- see attempts" and the row panel lists the attempts.
 # The Retries column is a badge too: its texts are the small fixed set of flow-core RETRY_BADGE_VARIANTS (views.test.ts
 # compares this map with it). The retries of a step are attempts - 1, shown even when 0.
 $sources:
@@ -86,6 +86,28 @@ sections:
                 - $type: DataTable
                   rows: $sources.execution.steps
                   emptyMessage: This execution has no step
+                  # The chevron shows only on a step with 2+ attempts or an unknown cost (`expandable`, set by the route); the
+                  # panel lists the attempts (`attemptRows`: the route's display-ready cells, the reason of an unknown cost).
+                  expansionCondition: expandable
+                  expansion:
+                      $type: VerticalStack
+                      gap: gap-2
+                      items:
+                          - $type: DataTable
+                            rows: $ctx.row.attemptRows
+                            columns:
+                                - { key: 'n', label: '#', nowrap: true }
+                                - { key: 'origin', label: 'Origin', nowrap: true }
+                                - { key: 'duration', label: 'Duration', nowrap: true, muted: true }
+                                - { key: 'cost', label: 'Cost', nowrap: true }
+                                - { key: 'tokens', label: 'Tokens', nowrap: true, muted: true }
+                                - { key: 'turns', label: 'Turns', nowrap: true, muted: true }
+                                - { key: 'toolCalls', label: 'Tools', nowrap: true, muted: true }
+                                - { key: 'endReason', label: 'End', muted: true }
+                          # The reason of an unknown cost is a long sentence: text under the table, not a column that widens the page.
+                          - $type: flow:MarkdownText
+                            $if: $ctx.row.costNotes
+                            text: $ctx.row.costNotes
                   columns:
                       - { key: 'stepId', label: 'Step', truncate: true, mono: true }
                       - key: statusLabel

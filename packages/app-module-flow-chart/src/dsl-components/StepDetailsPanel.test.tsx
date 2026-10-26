@@ -120,6 +120,25 @@ describe('StepDetailsPanel frame (baseline)', () => {
 		expect(order.every(index => index >= 0)).toBe(true);
 		expect([...order].sort((a, b) => a - b)).toEqual(order);
 	});
+
+	it('shows the Cost row once, next to the other run metrics, when the node carries both the meta and the recorded io', () => {
+		const step: FlowGraphNode = {
+			...okStep(),
+			meta: { costUsd: 0.0064, costLabel: '$0.0064' },
+			io: {
+				declaredInputs: [],
+				declaredOutputs: [],
+				recorded: { relaunches: [], costLabel: '$0.0064', costUsd: 0.0064, turns: 3 },
+				usesOutputOf: [],
+				usedBy: [],
+				notes: { inputs: '', outputs: '' },
+			},
+		};
+		renderPanel({ step });
+		expect(screen.getAllByText('Cost')).toHaveLength(1);
+		expect(screen.getAllByText('$0.0064')).toHaveLength(1);
+		expect(screen.getByText('Turns')).toBeInTheDocument();
+	});
 });
 
 describe('StepDetailsPanel density', () => {

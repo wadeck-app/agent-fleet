@@ -79,7 +79,12 @@ export function describeStep(step: FlowGraphNode): StepDetail {
 
 	const meta = step.meta ?? {};
 	const costLabel = meta[COST_LABEL_KEY];
+	// describeIO (metrics block, with the last attempt) shows the cost when the node carries it: one Cost row in the panel.
+	const costInMetrics = step.io?.recorded.costLabel !== undefined;
 	for (const key of Object.keys(META_LABELS)) {
+		if (key === 'costUsd' && costInMetrics) {
+			continue;
+		}
 		if (key === 'costUsd' && costLabel !== undefined) {
 			rows.push({ label: 'Cost', value: String(costLabel) });
 			continue;

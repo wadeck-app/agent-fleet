@@ -16,6 +16,7 @@
 
 - Header buttons, left to right: slot `flow:execution-links` (flow-chart: **Flow definition**), **Logs** (this module), slot `flow:execution-actions` (flow-chart: **Flow chart**). A slot renders where the view puts it, so a contribution can precede an own button only through its own slot.
 - Steps table column **Retries** = `retryLabel`, a badge of attempts - 1 (0 included). Texts and colours are flow-core `RETRY_BADGE_VARIANTS` (pinned by `views.test.ts`): `0 retry` green; `1 retry`, `2 retries`, `3+ retries` orange; `no retry left` red; `retry policy unknown` and `retries unknown` grey; `-` (plain) for a step that did not start.
+- Steps table row panel (DataTable `expansionCondition: expandable` + `expansion` = nested DataTable on `$ctx.row.attemptRows`): only for a step with 2+ attempts or an unknown cost; one line per attempt (n, origin, duration, own cost or `unknown` + reason, tokens, turns, tools, end reason; a non-model step shows `-` cost). An unknown cost cell reads `unknown - see attempts`. Built by `StepAttemptRows.ts` from flow-core `attemptHistory`.
 - `no retry left` = the step is `failed` and retries (attempts - 1) >= budget, where budget = `retry.maxAttempts` + `onFailure.maxIterations` (default 3) when `onFailure.goto` is set (the scheduler never resets the retry count and adds the loop iterations on top). The budget is read from the run's flow file (`readRetryPolicies`); a deleted or invalid file, or a step the file does not declare, gives `retry policy unknown`, never red.
 
 ## Execution logs page

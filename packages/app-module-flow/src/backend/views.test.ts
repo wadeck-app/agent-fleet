@@ -729,6 +729,26 @@ describe('execution detail page', () => {
 		}
 	});
 
+	it('opens an attempts table under a step with several attempts or an unknown cost, in every variant', () => {
+		for (const { variant, document } of alternativesOf('execution-detail-page.yaml')) {
+			const steps = collectNodes(document, 'DataTable').find(
+				table => table['rows'] === '$sources.execution.steps'
+			)!;
+			expect(steps['expansionCondition'], String(variant)).toBe('expandable');
+			const nested = collectNodes(steps['expansion'], 'DataTable');
+			expect(nested, String(variant)).toHaveLength(1);
+			expect(nested[0]!['rows'], String(variant)).toBe('$ctx.row.attemptRows');
+			expect(
+				(nested[0]!['columns'] as { key: string }[]).map(column => column.key),
+				String(variant)
+			).toEqual(['n', 'origin', 'duration', 'cost', 'tokens', 'turns', 'toolCalls', 'endReason']);
+			// The reason of an unknown cost is a text under the table: a column would widen the whole steps table.
+			const notes = collectNodes(steps['expansion'], 'flow:MarkdownText');
+			expect(notes, String(variant)).toHaveLength(1);
+			expect(notes[0], String(variant)).toMatchObject({ $if: '$ctx.row.costNotes', text: '$ctx.row.costNotes' });
+		}
+	});
+
 	it('badges the step status words in every variant', () => {
 		for (const { variant, document } of alternativesOf('execution-detail-page.yaml')) {
 			const steps = collectNodes(document, 'DataTable').find(

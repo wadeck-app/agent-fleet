@@ -13,6 +13,8 @@ import {
 	stepStatusTag,
 } from 'flow-core';
 
+import { costNotes, hasAttemptRows, toAttemptRows, withCostHint } from './StepAttemptRows.js';
+
 type BadgeVariant = 'success' | 'danger' | 'info' | 'warning';
 
 // Typed against ExecutionStatus so a status added to flow-core fails the build here instead of rendering uncoloured.
@@ -48,10 +50,15 @@ export function toExecutionRow(summary: ExecutionSummary) {
  */
 export function toStepRow(step: StepView, policy: StepRetryPolicy | undefined) {
 	const recovered = step.status === 'completed' && step.error !== undefined;
+	const expandable = hasAttemptRows(step);
 	return {
 		...step,
 		statusLabel: outcomeLabel(stepStatusTag(step.status), { recovered }),
-		costLabel: step.costLabel ?? '-',
+		costLabel: withCostHint(step.costLabel ?? '-', expandable),
+		// Row panel (DataTable expansionCondition/expansion): the attempts, only for a step that ran 2+ times or has an unknown cost.
+		expandable,
+		attemptRows: expandable ? toAttemptRows(step.attemptHistory ?? []) : [],
+		costNotes: expandable ? costNotes(step.attemptHistory ?? []) : '',
 		retryLabel: retryLabel(step, policy),
 	};
 }
