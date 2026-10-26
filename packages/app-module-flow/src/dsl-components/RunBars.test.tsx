@@ -289,10 +289,9 @@ const NARROW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 describe('RunBars when the settings or the width change without a remount', () => {
 	afterEach(() => vi.unstubAllGlobals());
 
-	// Upstream bug (dsl-ui DateFormatProvider): the formatter `key` ignores weekdayStyle, so the provider keeps the OLD formatter
-	// when only that setting changes and RunBars cannot see the new style until a reload. `it.fails` turns red once dsl-ui is
-	// fixed: then make these two plain `it`.
-	it.fails('shows the full names after the style goes from short to long in a wide widget', () => {
+	// Regression guard for the dsl-ui DateFormatProvider bug (formatter key ignored weekdayStyle, fixed in 2026.10.26-294):
+	// the weekday style must apply without a remount.
+	it('shows the full names after the style goes from short to long in a wide widget', () => {
 		stubResizableChart(900);
 		const view = render(renderWith('short'));
 		expect(labels()).toEqual(SHORT);
@@ -300,7 +299,7 @@ describe('RunBars when the settings or the width change without a remount', () =
 		expect(labels()).toEqual(LONG);
 	});
 
-	it.fails('shows the short names after the style goes from long to short in a wide widget', () => {
+	it('shows the short names after the style goes from long to short in a wide widget', () => {
 		stubResizableChart(900);
 		const view = render(renderWith('long'));
 		expect(labels()).toEqual(LONG);
