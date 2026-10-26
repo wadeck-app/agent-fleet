@@ -16,9 +16,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PromptTooLargeError } from './ModelProvider';
 import type { LaunchOptions } from './ModelProvider';
 import { OpenCodeModelProvider, autoSelectOpenCodeConfig, defaultOpenCodeConfigPath } from './OpenCodeModelProvider';
+import { killProcessTree } from './ProcessTreeKiller';
 import type { StreamJsonEvent } from './StreamJsonParser';
 
 vi.mock('child_process');
+vi.mock('./ProcessTreeKiller');
 vi.mock('node:fs', async () => {
 	const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
 	return {
@@ -717,24 +719,23 @@ describe('OpenCodeModelProvider', () => {
 			expect(() => provider.kill()).not.toThrow();
 		});
 
-		it('calls kill() on current process', async () => {
+		it('kills the process tree of the current process', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 			await new Promise(resolve => setImmediate(resolve));
 
 			provider.kill();
 
-			expect((mockProcess as unknown as Record<string, ReturnType<typeof vi.fn>>)['kill']).toHaveBeenCalled();
+			expect(killProcessTree).toHaveBeenCalledWith(5678);
 
 			(mockProcess as EventEmitter).emit('exit', 1);
 			await resultPromise.catch(() => {});
 		});
 
-		it('logs warning but does not throw when kill() on process throws', async () => {
+		it('logs warning but does not throw when the process tree kill throws', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 			await new Promise(resolve => setImmediate(resolve));
 
-			const killFn = (mockProcess as unknown as Record<string, ReturnType<typeof vi.fn>>)['kill'];
-			killFn.mockImplementation(() => {
+			vi.mocked(killProcessTree).mockImplementationOnce(() => {
 				throw new Error('EPERM');
 			});
 

@@ -12,8 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CodexModelProvider } from './CodexModelProvider';
 import type { LaunchOptions } from './ModelProvider';
+import { killProcessTree } from './ProcessTreeKiller';
 
 vi.mock('child_process');
+vi.mock('./ProcessTreeKiller');
 vi.mock('node:fs', async () => {
 	const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
 	return {
@@ -561,7 +563,7 @@ describe('CodexModelProvider', () => {
 	// -------------------------------------------------------------------------
 
 	describe('kill', () => {
-		it('kills the spawned process', async () => {
+		it('kills the spawned process and its descendants', async () => {
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 
 			// Wait for spawn
@@ -569,7 +571,7 @@ describe('CodexModelProvider', () => {
 
 			provider.kill();
 
-			expect(mockProcess.kill).toHaveBeenCalled();
+			expect(killProcessTree).toHaveBeenCalledWith(1234);
 
 			// Complete the promise
 			(mockProcess as EventEmitter).emit('exit', 0);

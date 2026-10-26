@@ -43,6 +43,7 @@ import { CodexHookTranslator } from './CodexHookTranslator';
 import { CodexToolPolicy } from './CodexToolPolicy';
 import type { LaunchOptions, ModelBackgroundResult, ModelInteractiveResult, ModelProvider } from './ModelProvider';
 import { PromptTooLargeError, validateLaunchOptions } from './ModelProvider';
+import { killProcessTree } from './ProcessTreeKiller';
 
 const MAX_PROMPT_BYTES = 32 * 1024; // 32KB
 
@@ -147,8 +148,10 @@ export class CodexModelProvider implements ModelProvider {
 
 	public kill(): void {
 		try {
-			if (this.currentProcess) {
-				this.currentProcess.kill();
+			// `ChildProcess.kill()` would end only codex and leave what it started (tool calls) running.
+			const pid = this.currentProcess?.pid;
+			if (pid !== undefined) {
+				killProcessTree(pid);
 			}
 		} catch (err) {
 			console.warn('[CodexModelProvider] kill() failed:', normalizeError(err).message);

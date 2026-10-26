@@ -4,7 +4,7 @@
  *
  * Pins today's behaviour so that routing these calls through a process-launcher seam (plan
  * .claude/plans/2026-10-25_docker-sandbox-worker.md, C4) is provably behavior-preserving. Notably,
- * `kill()` ends only the opencode process itself (no tree kill) and the background spawn sets
+ * `kill()` ends the whole opencode process tree (ProcessTreeKiller, like ClaudeLauncher) and the background spawn sets
  * `windowsHide: true` while the interactive one must not (console inheritance, d032e7e).
  * Coordination: the managed-serve plan (.claude/plans/2026-10-04_01-25_opencode-managed-serve-lifecycle.md)
  * will add a second spawn (`opencode serve`) in this class; extend this file when it lands.
@@ -128,12 +128,42 @@ describe('OpenCodeModelProvider -- process call contract', () => {
 			await expect(promise).resolves.toMatchObject({ exitCode: 3 });
 		});
 
-		it('kill() while running calls child.kill() once with no signal and no tree kill', async () => {
+		it('kill() while running ends the whole process tree with taskkill /T /F on Windows, not child.kill()', async () => {
+			vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+			vi.mocked(child_process.spawnSync).mockReturnValue({
+				status: 0,
+				stdout: '',
+				stderr: '',
+			} as unknown as ReturnType<typeof child_process.spawnSync>);
 			const promise = provider.launchBackground(baseOptions());
 			provider.kill();
-			expect(child.kill).toHaveBeenCalledOnce();
-			expect(child.kill).toHaveBeenCalledWith();
-			expect(child_process.spawnSync).not.toHaveBeenCalled();
+			expect(child_process.spawnSync).toHaveBeenCalledOnce();
+			expect(child_process.spawnSync).toHaveBeenCalledWith('taskkill', ['/PID', '5678', '/T', '/F'], {
+				encoding: 'utf8',
+				windowsHide: true,
+			});
+			expect(child.kill).not.toHaveBeenCalled();
+
+			child.emit('exit', 0);
+			await promise;
+		});
+
+		it('kill() while running SIGKILLs the process and its descendants on POSIX, not child.kill()', async () => {
+			vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+			// pgrep: 5678 has the child 9001, which has none.
+			vi.mocked(child_process.spawnSync).mockImplementation(((_command: string, args: string[]) => ({
+				status: 0,
+				stdout: args[1] === '5678' ? '9001\n' : '',
+				stderr: '',
+			})) as unknown as typeof child_process.spawnSync);
+			const processKill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+			const promise = provider.launchBackground(baseOptions());
+			provider.kill();
+			expect(processKill.mock.calls).toEqual([
+				[9001, 'SIGKILL'],
+				[5678, 'SIGKILL'],
+			]);
+			expect(child.kill).not.toHaveBeenCalled();
 
 			child.emit('exit', 0);
 			await promise;

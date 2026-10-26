@@ -43,6 +43,7 @@ import {
 	defaultOpenCodeShellProbe,
 	resolveOpenCodeShell,
 } from './OpenCodeWindowsShell';
+import { killProcessTree } from './ProcessTreeKiller';
 import type { StreamJsonEvent } from './StreamJsonParser';
 import { buildOpenCodeToolsConfig } from './ToolAccess';
 
@@ -647,8 +648,10 @@ export class OpenCodeModelProvider implements ModelProvider {
 
 	public kill(): void {
 		try {
-			if (this.currentProcess) {
-				this.currentProcess.kill();
+			// `ChildProcess.kill()` would end only opencode and leave what it started (tool calls) running.
+			const pid = this.currentProcess?.pid;
+			if (pid !== undefined) {
+				killProcessTree(pid);
 			}
 		} catch (err) {
 			console.warn('[OpenCodeModelProvider] kill() failed:', normalizeError(err).message);
