@@ -1,6 +1,6 @@
 import { MemoryRouter } from 'react-router-dom';
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { DEFAULT_DATE_SETTINGS, DateFormatProvider, createDateFormatter } from '@wadeck-app/dsl-ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -241,5 +241,82 @@ describe('RunBars', () => {
 		second.unmount();
 		show({ to: undefined });
 		expect(screen.getByRole('alert').textContent).toMatch(/flow:RunBars to must be an app path/);
+	});
+});
+
+// A stub whose width can change after the first measure, like a widget resized by the user.
+function stubResizableChart(initialWidth: number) {
+	const observers = new Set<{ report: (width: number) => void }>();
+	vi.stubGlobal(
+		'ResizeObserver',
+		class {
+			private target: Element | undefined;
+			constructor(private readonly callback: ResizeObserverCallback) {}
+			report(width: number) {
+				this.callback(
+					[{ target: this.target, contentRect: { width } } as unknown as ResizeObserverEntry],
+					this as never
+				);
+			}
+			observe(target: Element) {
+				this.target = target;
+				observers.add(this);
+				this.report(initialWidth);
+			}
+			unobserve() {}
+			disconnect() {
+				observers.delete(this);
+			}
+		}
+	);
+	return (width: number) => act(() => observers.forEach(observer => observer.report(width)));
+}
+
+function renderWith(weekdayStyle: 'narrow' | 'short' | 'long') {
+	return (
+		<DateFormatProvider formatter={createDateFormatter({ ...DEFAULT_DATE_SETTINGS, weekdayStyle })}>
+			<MemoryRouter>
+				<RunBars days={DAYS} to={TO} unexpectedKeys={[]} />
+			</MemoryRouter>
+		</DateFormatProvider>
+	);
+}
+
+const LONG = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const NARROW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+describe('RunBars when the settings or the width change without a remount', () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	// Upstream bug (dsl-ui DateFormatProvider): the formatter `key` ignores weekdayStyle, so the provider keeps the OLD formatter
+	// when only that setting changes and RunBars cannot see the new style until a reload. `it.fails` turns red once dsl-ui is
+	// fixed: then make these two plain `it`.
+	it.fails('shows the full names after the style goes from short to long in a wide widget', () => {
+		stubResizableChart(900);
+		const view = render(renderWith('short'));
+		expect(labels()).toEqual(SHORT);
+		view.rerender(renderWith('long'));
+		expect(labels()).toEqual(LONG);
+	});
+
+	it.fails('shows the short names after the style goes from long to short in a wide widget', () => {
+		stubResizableChart(900);
+		const view = render(renderWith('long'));
+		expect(labels()).toEqual(LONG);
+		view.rerender(renderWith('short'));
+		expect(labels()).toEqual(SHORT);
+	});
+
+	it('falls back and recovers when the widget is resized', () => {
+		const resize = stubResizableChart(300);
+		render(renderWith('long'));
+		expect(labels()).toEqual(SHORT);
+		resize(900);
+		expect(labels()).toEqual(LONG);
+		resize(120);
+		expect(labels()).toEqual(NARROW);
+		resize(900);
+		expect(labels()).toEqual(LONG);
 	});
 });
