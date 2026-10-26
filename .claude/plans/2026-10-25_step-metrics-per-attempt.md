@@ -130,3 +130,16 @@ Open questions: 1 yes (display not touched yet), 2 no, 3 no (counts only), 4 yes
 - Raw per-attempt `usd` is stored, never summed (claude cumulative-on-resume still unverified).
 
 Not observable: shell writes, nested sub-agent writes (unverified), partial cost of killed processes, codex turns. opencode write-tool input path (`filePath`/`file_path`/`path`) is unverified; unknown shapes warn once.
+
+## Cost semantics, measured (2026-10-26)
+
+One real capture (execution ajk42rid, claude haiku, parent relaunched once with session resume; record `attemptLog` read directly):
+
+| Attempt | session_id | usd | input | output | cacheRead | cacheWrite |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 10843e72... | 0.00637995 | 2 | 4 | 0 | 51022 |
+| 2 (relaunch) | same | 0.00749017 | 4 | 8 | 45902 | 56214 |
+
+Reading: the reported usd and token counts of a resumed claude session are CUMULATIVE for the session (attempt 2 = attempt 1 + the second turn: cacheWrite 56214 = 51022 + 5192, input 4 = 2 + 2, output 8 = 4 + 4). Summing attempts would double count.
+
+Decision: for claude attempts that share a `session_id`, the cost of an attempt is the delta against the previous attempt of the same session (the first attempt of a session counts in full); a step's total is the sum of its per-session final cumulative values. `attemptLog` entries must therefore record `sessionId`. Anything unknown (other providers, missing session id, a reset where the cumulative value decreases) is shown as unknown, never summed as zero. Limits: one capture, 2 attempts, claude only; opencode and codex semantics unverified.
