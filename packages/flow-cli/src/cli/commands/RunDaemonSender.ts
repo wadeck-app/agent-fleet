@@ -1,4 +1,4 @@
-import { DaemonNotRunningError, readPortFile } from '@wadeck-app/singleton-daemon-kit';
+import { readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { createRemoteDaemonClient } from 'flow-core';
 import * as path from 'node:path';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
@@ -7,6 +7,7 @@ import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import { type ClientCommand, DAEMON_STOPPING_CODE, type DaemonResponse } from '../../ipc/Protocol';
 import { describeCliFailure } from './CliFailureText';
 import { spawnDaemonBackground } from './DaemonBackgroundSpawner';
+import { isDaemonUnavailable } from './DaemonContactFailure';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -17,9 +18,6 @@ export const DAEMON_CONTACT_ATTEMPTS = 8;
 
 /** Pause after the first failed attempt (milliseconds); it grows with each attempt. */
 const DEFAULT_BACKOFF_MS = 150;
-
-/** Socket-level failures of a daemon that is closing, or already closed, its listener. */
-const CLOSING_DAEMON_ERRNO = new Set(['ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'EPIPE']);
 
 /** The run could not be delivered to any daemon, after {@link DAEMON_CONTACT_ATTEMPTS} attempts. The message says what to do. */
 export class DaemonContactError extends Error {
@@ -32,23 +30,6 @@ export class DaemonContactError extends Error {
 export interface SendToDaemonOptions {
 	/** Base pause between attempts (milliseconds). Tests shrink it. */
 	backoffMs?: number;
-}
-
-/**
- * Whether the failure means "no daemon is serving right now" rather than "the daemon answered, and said no".
- *
- * The daemon the previous `flow run` started stops itself about a second after its last execution. A run sent while it
- * closes sees the port file still there and a listener that refuses, resets or hangs up. The client library maps only
- * errors whose MESSAGE contains ECONNREFUSED/ECONNRESET/timeout, so "socket hang up" (code ECONNRESET, a message
- * without the word) and "write EPIPE" came out raw and ended the run with a bare "Failed to contact the daemon.".
- * An error the daemon itself returned for the run (no errno code) is never one of these.
- */
-function meansNoDaemonServing(err: unknown): boolean {
-	if (err instanceof DaemonNotRunningError) {
-		return true;
-	}
-	const code = (err as NodeJS.ErrnoException | undefined)?.code;
-	return code !== undefined && CLOSING_DAEMON_ERRNO.has(code);
 }
 
 function isStoppingAnswer(response: DaemonResponse): boolean {
@@ -98,7 +79,7 @@ export async function sendToDaemon(
 			}
 			lastCause = 'the daemon answered that it is stopping';
 		} catch (err) {
-			if (!meansNoDaemonServing(err)) {
+			if (!isDaemonUnavailable(err)) {
 				throw err;
 			}
 			lastCause = getErrorMessage(err);

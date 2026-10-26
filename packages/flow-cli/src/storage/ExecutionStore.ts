@@ -5,28 +5,20 @@ import * as path from 'node:path';
 
 import type { ExecutionState, StepIoCapture, StepStatus } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
+import { AtomicRecordWriter } from './AtomicRecordWriter';
 import { AttemptLedger } from './AttemptLedger';
+import { ExecutionPruner } from './ExecutionPruner';
 import type { ExecutionTransition, ExecutionTransitionListener } from './ExecutionTransition';
+import { InterruptedExecutionReconciler } from './InterruptedExecutionReconciler';
+import { failRunningSteps } from './RunningStepsFailer';
 import { StepIoRecorder } from './StepIoRecorder';
+import { startStepEntry } from './StepStartEntry';
 
 function assertExecutionIdSafe(executionId: string): void {
 	if (!isExecutionId(executionId)) {
 		throw new Error(`Invalid executionId format: ${JSON.stringify(executionId)}`);
 	}
 }
-
-/** Marks a file as an unfinished write of a record; must never end in `.json`. */
-const TEMP_FILE_INFIX = '.json.tmp-';
-/** A leftover temporary file older than this belongs to a writer that died. */
-const STALE_TEMP_FILE_MS = 60 * 60 * 1000;
-/** Rename errors that mean "locked right now" rather than "cannot work". */
-const TRANSIENT_RENAME_CODES = ['EPERM', 'EBUSY', 'EACCES'];
-const RENAME_ATTEMPTS = 6;
-const RENAME_RETRY_DELAY_MS = 20;
-let temporaryFileCounter = 0;
-
-/** Feedback kept per relaunch in the execution record (truncated). */
-const MAX_RELAUNCH_FEEDBACK_CHARS = 2000;
 
 /** What a step received and produced, as reported with its outcome; recorded capped and masked. */
 export interface StepResultIo {
@@ -45,6 +37,7 @@ export interface FailedAttemptDetails {
 
 export class ExecutionStore {
 	private readonly recorder: StepIoRecorder;
+	private readonly atomicWriter = new AtomicRecordWriter();
 	/** Steps reopened by `markExecutionResumed` whose next start is a `resume`. Resume only exists within one daemon process. */
 	private readonly resumedSteps = new Set<string>();
 
@@ -62,55 +55,7 @@ export class ExecutionStore {
 	}
 
 	pruneOldExecutions(): void {
-		let rawFiles: string[];
-		try {
-			rawFiles = fs.readdirSync(this.executionsDir);
-		} catch (err) {
-			process.stderr.write(`[ExecutionStore] failed to read executions dir for pruning: ${String(err)}\n`);
-			return;
-		}
-		this.removeStaleTemporaryFiles(rawFiles);
-		const files = rawFiles.filter(f => f.endsWith('.json'));
-		if (files.length === 0) {
-			return;
-		}
-		const cutoffMs = Date.now() - this.retainDays * 24 * 60 * 60 * 1000;
-		for (const file of files) {
-			const filePath = path.join(this.executionsDir, file);
-			try {
-				const content = fs.readFileSync(filePath, 'utf8');
-				const state = JSON.parse(content) as ExecutionState;
-				const timestamp = state.completedAt ?? state.startedAt;
-				const ageMs = new Date(timestamp).getTime();
-				if (ageMs < cutoffMs) {
-					fs.unlinkSync(filePath);
-				}
-			} catch {
-				// fallback: delete if unreadable and old by mtime
-				try {
-					const stat = fs.statSync(filePath);
-					if (stat.mtimeMs < cutoffMs) {
-						fs.unlinkSync(filePath);
-					}
-				} catch {
-					/* ignore */
-				}
-			}
-		}
-	}
-
-	/** Deletes unfinished-write files left by a writer that died; a recent one may still be in use. */
-	private removeStaleTemporaryFiles(names: string[]): void {
-		for (const name of names.filter(n => n.includes(TEMP_FILE_INFIX))) {
-			const filePath = path.join(this.executionsDir, name);
-			try {
-				if (Date.now() - fs.statSync(filePath).mtimeMs > STALE_TEMP_FILE_MS) {
-					fs.unlinkSync(filePath);
-				}
-			} catch (err) {
-				process.stderr.write(`[ExecutionStore] could not clean leftover ${filePath}: ${String(err)}\n`);
-			}
-		}
+		new ExecutionPruner(this.executionsDir, this.retainDays).prune();
 	}
 
 	create(params: {
@@ -199,49 +144,8 @@ export class ExecutionStore {
 	): ExecutionState {
 		const state = this.read(executionId);
 		const previous = state.steps[stepId];
-		const previousMs =
-			previous?.startedAt && previous.completedAt
-				? new Date(previous.completedAt).getTime() - new Date(previous.startedAt).getTime()
-				: 0;
-		const resumeKey = `${executionId}/${stepId}`;
-		const resumed = this.resumedSteps.delete(resumeKey);
-		const relaunches =
-			relaunchFeedback === undefined
-				? previous?.relaunches
-				: [
-						...(previous?.relaunches ?? []),
-						{
-							at: new Date().toISOString(),
-							feedback: relaunchFeedback.slice(0, MAX_RELAUNCH_FEEDBACK_CHARS),
-						},
-					];
-		const attempts = (previous?.attempts ?? 0) + 1;
-		// Preserve existing fields (e.g. injected: true) when transitioning to running
-		state.steps[stepId] = {
-			...previous,
-			attempts,
-			priorAttemptsMs: (previous?.priorAttemptsMs ?? 0) + previousMs,
-			...(relaunches === undefined ? {} : { relaunches }),
-			// Moved into the attemptLog entry when this attempt settles
-			runningAttempt:
-				relaunchFeedback !== undefined
-					? { origin: 'relaunch', relaunchIndex: relaunches!.length - 1 }
-					: resumed
-						? { origin: 'resume' }
-						: { origin: attempts === 1 ? 'first' : reRunKind },
-			status: 'running',
-			startedAt: new Date().toISOString(),
-			// A new attempt: the previous one's failure must not linger on a step that may now succeed
-			error: undefined,
-			stdout: undefined,
-			stderr: undefined,
-			io: undefined,
-			completedAt: undefined,
-			// A step that now runs is no longer "not run"
-			skippedReason: undefined,
-			...(provenance?.sourceId !== undefined ? { sourceId: provenance.sourceId } : {}),
-			...(provenance?.workerId !== undefined ? { workerId: provenance.workerId } : {}),
-		};
+		const resumed = this.resumedSteps.delete(`${executionId}/${stepId}`);
+		state.steps[stepId] = startStepEntry(previous, { resumed, relaunchFeedback, reRunKind, provenance });
 		if (!state.currentSteps.includes(stepId)) {
 			state.currentSteps.push(stepId);
 		}
@@ -412,87 +316,20 @@ export class ExecutionStore {
 
 	/** A finished execution has no step in progress: any step still `running` is failed with `error`. */
 	private withRunningStepsFailed(state: ExecutionState, error: string): ExecutionState['steps'] {
-		const completedAt = new Date().toISOString();
-		const steps = Object.fromEntries(
-			Object.entries(state.steps).map(([id, step]) => [
-				id,
-				step.status === 'running'
-					? { ...step, status: 'failed' as StepStatus, error: step.error ?? error, completedAt }
-					: step,
-			])
-		);
-		// The attempt that was in flight is lost with the execution: recorded as abandoned, with no figures
-		const settling = { ...state, steps };
-		for (const [id, step] of Object.entries(state.steps)) {
-			if (step.status === 'running') {
-				AttemptLedger.settle(
-					settling,
-					id,
-					{
-						outcome: 'abandoned',
-						endReason: 'execution_ended',
-						error: this.masks.mask(state.executionId, error),
-					},
-					completedAt
-				);
-			}
-		}
-		return steps;
+		return failRunningSteps(state, error, text => this.masks.mask(state.executionId, text));
 	}
 
 	/**
-	 * Called once when the daemon starts, before it accepts work: all execution state lives in the
-	 * daemon's memory, so a record still `queued`/`running` now belongs to a previous daemon and can
-	 * never finish. Fails it (running steps failed, pending steps settled as not run) with the reason
-	 * and how to re-run, and publishes the usual execution-failed transition. Idempotent.
-	 * An unreadable record is reported on stderr and skipped. Returns how many were reconciled.
+	 * Called once when the daemon starts, before it accepts work: fails every record a previous daemon left
+	 * `queued`/`running` (see InterruptedExecutionReconciler). Idempotent. Returns how many were reconciled.
 	 */
 	reconcileInterruptedExecutions(): number {
-		let names: string[];
-		try {
-			names = fs.readdirSync(this.executionsDir).filter(name => name.endsWith('.json'));
-		} catch (err) {
-			process.stderr.write(
-				`[ExecutionStore] cannot list ${this.executionsDir} to reconcile interrupted executions: ${String(err)}\n`
-			);
-			return 0;
-		}
-		let reconciled = 0;
-		for (const name of names) {
-			try {
-				const current = this.read(path.basename(name, '.json'));
-				if (current.status !== 'queued' && current.status !== 'running') {
-					continue;
-				}
-				this.interrupt(current);
-				reconciled++;
-			} catch (err) {
-				process.stderr.write(
-					`[ExecutionStore] could not reconcile ${name} (left untouched): ${String(err)}. Inspect or delete ${path.join(this.executionsDir, name)}.\n`
-				);
-			}
-		}
-		return reconciled;
-	}
-
-	private interrupt(current: ExecutionState): void {
-		const reason = `interrupted: the daemon restarted while this execution was running; re-run it with flow run ${current.flowFile}`;
-		const completedAt = new Date().toISOString();
-		const steps = this.withRunningStepsFailed(current, reason);
-		for (const [id, step] of Object.entries(steps)) {
-			if (step.status === 'pending') {
-				steps[id] = { ...step, status: 'completed', completedAt, skippedReason: `not run (${reason})` };
-			}
-		}
-		const written = this.write({
-			...current,
-			status: 'failed',
-			completedAt,
-			currentSteps: [],
-			lastError: reason,
-			steps,
-		});
-		this.notify({ kind: 'execution-failed', state: written });
+		return new InterruptedExecutionReconciler(this.executionsDir, {
+			read: id => this.read(id),
+			write: state => this.write(state),
+			notify: transition => this.notify(transition),
+			mask: (id, text) => this.masks.mask(id, text),
+		}).reconcile();
 	}
 
 	/**
@@ -542,52 +379,8 @@ export class ExecutionStore {
 		return masked;
 	}
 
-	/**
-	 * Writes `content` to a sibling temporary file and renames it over `target`, so a concurrent
-	 * reader (`flow show`, `flow history`, the daemon) sees the old record or the new one, never half.
-	 * The temporary name does not end in `.json`, so no `*.json` listing mistakes it for an execution.
-	 */
 	private replaceFile(target: string, content: string): void {
-		const temporary = `${target}${TEMP_FILE_INFIX}${String(process.pid)}-${String(temporaryFileCounter++)}`;
-		try {
-			fs.writeFileSync(temporary, content, 'utf8');
-			this.renameWithRetry(temporary, target);
-		} catch (err) {
-			try {
-				fs.rmSync(temporary, { force: true });
-			} catch {
-				// Best effort: pruneOldExecutions removes leftovers later
-			}
-			throw err;
-		}
-	}
-
-	/**
-	 * Windows refuses to rename over a file another process has open (EPERM/EBUSY/EACCES), usually for
-	 * a few milliseconds only (a reader, an antivirus scan). Retried a bounded number of times, then
-	 * failed with what to do about it. Any other error is not transient and is thrown at once.
-	 */
-	private renameWithRetry(from: string, to: string): void {
-		for (let attempt = 1; ; attempt++) {
-			try {
-				fs.renameSync(from, to);
-				return;
-			} catch (err) {
-				const code = (err as NodeJS.ErrnoException).code;
-				if (code === undefined || !TRANSIENT_RENAME_CODES.includes(code)) {
-					throw err;
-				}
-				if (attempt >= RENAME_ATTEMPTS) {
-					throw new Error(
-						`Cannot save execution ${path.basename(to, '.json')}: ${to} stayed locked (${code}) for ${String(RENAME_ATTEMPTS)} attempts. ` +
-							'Another program (editor, antivirus, backup, a second flow process) is holding it open: close it, then re-run. ' +
-							'The previous record is untouched.',
-						{ cause: err }
-					);
-				}
-				Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, RENAME_RETRY_DELAY_MS * attempt);
-			}
-		}
+		this.atomicWriter.replaceFile(target, content);
 	}
 
 	private notify(transition: ExecutionTransition): void {

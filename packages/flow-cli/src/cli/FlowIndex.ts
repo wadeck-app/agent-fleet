@@ -2,12 +2,8 @@
 import { UpdateManager } from '@wadeck-app/shared-cli';
 import { cliLogsCommand } from '@wadeck-app/shared-cli/CliMetaCommands';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
-import { readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
-import { createRemoteDaemonClient, logsDirOf } from 'flow-core';
-import * as fs from 'node:fs';
-import * as http from 'node:http';
-import * as path from 'node:path';
+import { logsDirOf } from 'flow-core';
 import { fileURLToPath } from 'node:url';
 
 import { FlowConfigLoader } from '../config/FlowConfig.js';
@@ -15,12 +11,15 @@ import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { appCoreModuleOptions } from '../daemon/AppModuleLocator.js';
 import { Daemon } from '../daemon/Daemon.js';
 import { writeDaemonLog } from '../daemon/DaemonLog.js';
+import { clearDaemonStartError, recordDaemonStartError } from '../daemon/DaemonStartError.js';
 import { resolveDaemonPort } from '../daemon/resolveDaemonPort.js';
 import { resolveIdleCheckInterval } from '../daemon/resolveIdleCheckInterval.js';
 import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
 import { describeCommandLine } from './CommandLineLog';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { buildCliCommand } from './commands/CliCommand.js';
+import { describeCliFailure } from './commands/CliFailureText';
+import { printDaemonPid, runStatusCommand, runStopCommand } from './commands/DaemonLifecycleCommands';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
 import { registerPluginsCommand } from './commands/PluginsCommand';
@@ -48,7 +47,7 @@ Exit codes:
   0  success
   1  error
   2  daemon not running
-  3  not found
+  3  not found; also: the daemon could not be started (flow run, flow start; the cause is printed)
 
 Status --json fields (flow status --json):
   { running: boolean, version?: string, pid?: number }
@@ -83,37 +82,7 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 		.command('stop')
 		.description('Stop the running flow daemon')
 		.action(async () => {
-			const portData = await readPortFile(DAEMON_DIR);
-			if (!portData) {
-				process.stdout.write('[fail] daemon not running\n');
-				process.exit(2);
-				return;
-			}
-			const tokenPath = path.join(DAEMON_DIR, 'health_token');
-			if (!fs.existsSync(tokenPath)) {
-				process.stdout.write('[fail] daemon not running\n');
-				process.exit(2);
-				return;
-			}
-			const token = fs.readFileSync(tokenPath, 'utf8').trim();
-			await new Promise<void>((resolve, reject) => {
-				const req = http.request(
-					{
-						hostname: '127.0.0.1',
-						port: portData.port,
-						method: 'POST',
-						path: '/quit',
-						headers: { Authorization: `Bearer ${token}` },
-					},
-					res => {
-						res.resume();
-						res.on('end', resolve);
-					}
-				);
-				req.on('error', reject);
-				req.end();
-			});
-			process.stdout.write('[ok] daemon stopped\n');
+			await runStopCommand(DAEMON_DIR);
 		});
 
 	// flow status -- query daemon health, print running state/version/pid
@@ -123,53 +92,8 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 		.option('--json', 'Machine-readable JSON output')
 		.action(async (opts: { json?: boolean }) => {
 			// TTY detection disabled: always use human-readable format unless --json is passed
-			const useJson = opts.json === true; /* || !process.stdout.isTTY */
-			const client = createRemoteDaemonClient(DAEMON_DIR);
-
-			let running: boolean;
-			try {
-				running = await client.isRunning();
-			} catch {
-				running = false;
-			}
-
-			if (!running) {
-				if (useJson) {
-					process.stdout.write(JSON.stringify({ running: false }) + '\n');
-				} else {
-					process.stdout.write('[flow] stopped\n');
-				}
-				return;
-			}
-
-			try {
-				const info = await client.version();
-				if (useJson) {
-					process.stdout.write(
-						JSON.stringify({ running: true, version: info.version, pid: info.pid }) + '\n'
-					);
-				} else {
-					process.stdout.write(`[flow] running  pid=${info.pid}  version=${info.version}\n`);
-				}
-			} catch {
-				if (useJson) {
-					process.stdout.write(JSON.stringify({ running: true, version: null, pid: null }) + '\n');
-				} else {
-					process.stdout.write('[flow] running (version query failed)\n');
-				}
-			}
+			await runStatusCommand(DAEMON_DIR, opts.json === true);
 		});
-}
-
-async function printDaemonPid(): Promise<void> {
-	const client = createRemoteDaemonClient(DAEMON_DIR);
-	try {
-		const info = await client.version();
-		process.stdout.write(`pid=${info.pid}\n`);
-	} catch {
-		process.stdout.write('[fail] daemon not running\n');
-		process.exit(2);
-	}
 }
 
 async function main(): Promise<void> {
@@ -202,13 +126,15 @@ async function main(): Promise<void> {
 			...(port === undefined ? {} : { port }),
 			...(idleCheckIntervalMs === undefined ? {} : { idleCheckIntervalMs }),
 		});
+		// Up: the reason of an earlier failed start no longer describes anything.
+		clearDaemonStartError(DAEMON_DIR);
 		// Event loop drains naturally when the daemon shuts down (via /quit or SIGTERM).
 		return;
 	}
 
 	// Handle --pid before Commander parsing: exit early with daemon PID
 	if (process.argv.slice(2).includes('--pid')) {
-		await printDaemonPid();
+		await printDaemonPid(DAEMON_DIR);
 		return;
 	}
 
@@ -290,8 +216,13 @@ const isEntryPoint =
 		process.argv[1].endsWith('FlowIndex.ts'));
 
 if (isEntryPoint) {
-	main().catch(error => {
-		process.stderr.write(`Error: ${String(error)}\n`);
+	main().catch((error: unknown) => {
+		if (process.env['FLOW_DAEMON_MODE'] === '1') {
+			// A detached daemon has no terminal: the command that spawned it learns why it died from this record and the log.
+			recordDaemonStartError(DAEMON_DIR, error);
+		}
+		// violations-suppress: security/no-raw-err-in-cli describeCliFailure prints the message only (stack under FLOW_DEBUG=1)
+		process.stderr.write(`Error: ${describeCliFailure(error)}\n`);
 		process.exit(1);
 	});
 }

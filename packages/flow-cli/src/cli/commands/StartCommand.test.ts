@@ -56,3 +56,34 @@ describe('flow start', () => {
 		expect(lines).toEqual(['[ok] daemon already running\n']);
 	});
 });
+
+describe('flow start when the daemon cannot start', () => {
+	it('prints the real cause and where to look on stderr, and exits 3', async () => {
+		const stderr: string[] = [];
+		const exit = vi.spyOn(process, 'exit').mockImplementation(code => {
+			throw new Error(`exit ${String(code)}`);
+		});
+		const spawnFails = () =>
+			Promise.reject(
+				new Error('The daemon failed to start: "/p/.flow/config.yml" is no longer read.\nMove it: mv a b')
+			);
+
+		await expect(
+			startDaemonCommand(
+				dir,
+				() => undefined,
+				spawnFails,
+				text => stderr.push(text)
+			)
+		).rejects.toThrow('exit 3');
+
+		expect(exit).toHaveBeenCalledWith(3);
+		const printed = stderr.join('');
+		expect(printed).toContain('Daemon could not be started');
+		expect(printed).toContain('is no longer read');
+		expect(printed).toContain('Move it: mv a b');
+		expect(printed).toContain('flow logs');
+		expect(printed).not.toMatch(/\bat .*:\d+:\d+/);
+		exit.mockRestore();
+	});
+});

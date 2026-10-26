@@ -24,6 +24,13 @@ import type {
 } from '../types';
 import { FlowValidator } from '../validation/FlowValidator';
 import type { ValidationResult } from '../validation/FlowValidator';
+import {
+	MODEL_STEP_FIELDS,
+	SCRIPT_STEP_FIELDS,
+	SUBFLOW_STEP_FIELDS,
+	USER_INTERVENTION_STEP_FIELDS,
+	copyStepFields,
+} from './StepFieldCopier';
 
 /**
  * Raw (unvalidated) YAML mapping, as returned by the YAML parser
@@ -682,71 +689,44 @@ export class FlowRegistry {
 			);
 		}
 
-		// Common properties
-		const baseStep = {
-			id: data.id,
-			name: data.name || data.id,
-			context: data.context,
-			output: data.output,
-			depends: data.depends,
-			when: data.when,
-			skipOnLoop: data.skipOnLoop,
-			retry: data.retry,
-			onFailure: data.onFailure,
-			contract: data.contract,
-		};
+		// Every field of the step kind is carried over (see StepFieldCopier); only defaults are set here.
+		// Name defaults to the id (shared by all kinds).
+		const name = data.name || data.id;
 
 		if (stepType === 'model') {
-			// Model step
 			return {
-				...baseStep,
+				...copyStepFields(MODEL_STEP_FIELDS, data),
+				name,
 				type: 'model',
-				provider: data.provider,
 				model: data.model || 'haiku',
 				prompt: data.prompt || '',
-				env: data.env,
-				log: data.log,
-				toolLog: data.toolLog,
-				mcpServers: data.mcpServers,
-				toolHooks: data.toolHooks,
-				session: data.session,
-				timeout: data.timeout,
-			};
+			} as ModelFlowStep;
 		} else if (stepType === 'script') {
-			// Script step
 			return {
-				...baseStep,
+				...copyStepFields(SCRIPT_STEP_FIELDS, data),
+				name,
 				type: 'script',
 				script: data.script || '',
-				workingDir: data.workingDir,
-				env: data.env,
-				shell: data.shell,
-				strict: data.strict,
-				timeout: data.timeout,
-				captureOutput: data.captureOutput !== false, // Default to true
-			};
+				// Default to true
+				captureOutput: data.captureOutput !== false,
+			} as ScriptFlowStep;
 		} else if (stepType === 'subflow') {
-			// SubFlow step
 			return {
-				...baseStep,
+				...copyStepFields(SUBFLOW_STEP_FIELDS, data),
+				name,
 				type: 'subflow',
 				flowId: data.flowId || '',
 				inputs: data.inputs || {},
 				workspaceStrategy: data.workspaceStrategy || 'inherit',
-				allowRecursion: data.allowRecursion,
-			};
+			} as SubFlowStep;
 		} else if (stepType === 'user_intervention') {
-			// User Intervention step
 			return {
-				...baseStep,
+				...copyStepFields(USER_INTERVENTION_STEP_FIELDS, data),
+				name,
 				type: 'user_intervention',
-				interventionType: data.interventionType,
-				blocking: data.blocking !== false, // Default to true
-				timeout: data.timeout,
-				approval: data.approval,
-				question: data.question,
-				choice: data.choice,
-			};
+				// Default to true
+				blocking: data.blocking !== false,
+			} as UserInterventionStep;
 		} else {
 			// Unknown step type - FAIL FAST
 			throw new Error(

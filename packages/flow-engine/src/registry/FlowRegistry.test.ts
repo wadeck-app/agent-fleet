@@ -445,6 +445,66 @@ custom-flow:
 			expect(steps[0].timeout).toBe(15);
 		});
 
+		it.each([
+			['subStepFeedbackPrompt', 'Fix this: ${{ subStepFeedback }}'],
+			['tools', ['read']],
+			['skipPermissions', true],
+			['contextLimit', 60000],
+			['onCompact', { command: 'echo compacted', timeout: 5 }],
+			['permission', { external_directory: 'allow' }],
+			['labels', ['gpu']],
+			['parent', 'p'],
+			['maxSubStepIterations', 5],
+			['subStepStrategy', 'wait-all'],
+			['wave', 2],
+		])('should carry the model step field %s to the loaded step (not drop it)', async (field, value) => {
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+			vi.mocked(yaml.load).mockReturnValue({
+				'fields-flow': {
+					version: '1.0.0',
+					name: 'Fields Flow',
+					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					steps: [{ id: 'a', name: 'A', type: 'model', model: 'haiku', prompt: 'hi', [field]: value }],
+				},
+			});
+
+			await registry.loadProjectFlows();
+
+			const steps = registry.getFlow('fields-flow')?.steps as any[];
+			expect(steps[0][field]).toEqual(value);
+		});
+
+		it('should carry the script step secrets and the sub-step fields to the loaded step (not drop them)', async () => {
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+			vi.mocked(yaml.load).mockReturnValue({
+				'script-fields-flow': {
+					version: '1.0.0',
+					name: 'Script Fields Flow',
+					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					steps: [
+						{
+							id: 'a',
+							name: 'A',
+							type: 'script',
+							script: 'true',
+							secrets: ['TOKEN'],
+							labels: ['win'],
+							wave: 1,
+						},
+					],
+				},
+			});
+
+			await registry.loadProjectFlows();
+
+			const steps = registry.getFlow('script-fields-flow')?.steps as any[];
+			expect(steps[0].secrets).toEqual(['TOKEN']);
+			expect(steps[0].labels).toEqual(['win']);
+			expect(steps[0].wave).toBe(1);
+		});
+
 		it('should not load flow when step is missing required type field', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('yaml');

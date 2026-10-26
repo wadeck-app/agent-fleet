@@ -66,10 +66,30 @@ describe('flow resume command', () => {
 		expect(errorSpy.mock.calls.flat().join(' ')).toContain('The daemon is not running');
 	});
 
-	it('exits 1 when the daemon cannot be contacted for another reason', async () => {
-		daemon.send.mockRejectedValue(new Error('socket hang up'));
+	it('prints the real cause and a hint, exit 1, when the daemon fails for another reason', async () => {
+		daemon.send.mockRejectedValue(new Error('Unknown command: resume'));
 		await expect(run('abc12345')).rejects.toThrow('exit 1');
-		expect(errorSpy.mock.calls.flat().join(' ')).toContain('Failed to contact the daemon.');
+		const printed = errorSpy.mock.calls.flat().join(' ');
+		expect(printed).toContain('Unknown command: resume');
+		expect(printed).toContain('flow logs');
+		expect(printed).not.toMatch(/\bat .*:\d+:\d+/);
+	});
+
+	it.each(['ECONNRESET', 'ECONNREFUSED', 'EPIPE'])(
+		'treats a daemon that is closing (%s) as not running',
+		async code => {
+			daemon.send.mockRejectedValue(Object.assign(new Error('socket hang up'), { code }));
+			await expect(run('abc12345')).rejects.toThrow('exit 1');
+			const printed = errorSpy.mock.calls.flat().join(' ');
+			expect(printed).toContain('The daemon is not running');
+			expect(printed).toContain('nothing to resume');
+		}
+	);
+
+	it('treats a daemon that answers that it is stopping as not running', async () => {
+		daemon.send.mockResolvedValue({ type: 'error', code: 'DAEMON_STOPPING', message: 'The daemon is stopping' });
+		await expect(run('abc12345')).rejects.toThrow('exit 1');
+		expect(errorSpy.mock.calls.flat().join(' ')).toContain('nothing to resume');
 	});
 
 	it('exits 2 for an unknown execution so a script can tell it from other failures', async () => {

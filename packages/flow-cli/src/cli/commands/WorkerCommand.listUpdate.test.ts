@@ -91,6 +91,23 @@ describe('flow worker list / update (characterization)', () => {
 		expect(errored()).toContain('No daemon is running, so there is no live worker to update.');
 	});
 
+	it('update treats a daemon that hangs up (ECONNRESET) as not running', async () => {
+		await expect(
+			run(
+				{
+					createDaemonClient: () => ({
+						send: async () =>
+							Promise.reject(Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' })),
+					}),
+				},
+				['update', 'w1', '--labels', 'npm']
+			)
+		).rejects.toThrow('process.exit called');
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		expect(errored()).toContain('No daemon is running, so there is no live worker to update.');
+	});
+
 	it('update reports the outdated daemon when it does not know updateWorker', async () => {
 		await expect(
 			run(

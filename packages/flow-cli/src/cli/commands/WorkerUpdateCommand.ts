@@ -1,4 +1,3 @@
-import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import { createRemoteDaemonClient, isUnknownCommandError, outdatedDaemonMessage } from 'flow-core';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
@@ -6,6 +5,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import type { UpdateWorkerRequest, WorkerSummary } from '../../ipc/Protocol';
+import { isDaemonUnavailable } from './DaemonContactFailure';
 import { report } from './WorkerReport';
 // violations-suppress-end: ts/no-deep-relative
 import { parseWorkerLabels } from './parseWorkerLabels';
@@ -94,7 +94,7 @@ export function registerWorkerUpdateCommand(worker: Command): void {
 					`     shells : ${updated.shellCapabilities && updated.shellCapabilities.length > 0 ? updated.shellCapabilities.join(', ') : '(none)'}`
 				);
 			} catch (err) {
-				if (err instanceof DaemonNotRunningError) {
+				if (isDaemonUnavailable(err)) {
 					report(
 						'[fail]',
 						'No daemon is running, so there is no live worker to update. Start one first ("flow worker" or "flow run").'

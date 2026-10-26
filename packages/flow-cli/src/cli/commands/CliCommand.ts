@@ -9,7 +9,6 @@ import {
 } from '@wadeck-app/shared-cli/CliMetaCommands';
 import { devBuildRefusalMessage, isReleaseVersion } from '@wadeck-app/shared-cli/ReleaseVersion';
 import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePath';
-import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
 import { FLOW_CONFIG_DIR_NAME, InvalidQueryError, createRemoteDaemonClient } from 'flow-core';
 import { FlowExecutor, StepRunner } from 'flow-engine';
@@ -27,6 +26,7 @@ import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 // violations-suppress-end: ts/no-deep-relative
+import { isDaemonUnavailable } from './DaemonContactFailure';
 import { logsCommand } from './LogsCommand.js';
 import { buildProcessesCommand } from './ProcessesCommand.js';
 
@@ -46,7 +46,7 @@ async function setDaemonDraining(draining: boolean): Promise<void> {
 		);
 		await client.send('setDraining', { draining });
 	} catch (err) {
-		if (err instanceof DaemonNotRunningError) {
+		if (isDaemonUnavailable(err)) {
 			process.stdout.write(
 				draining
 					? '[ok] No daemon is running, so there is nothing to drain; updating directly.\n'

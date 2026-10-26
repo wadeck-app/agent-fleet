@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { clearDaemonStartError, readDaemonStartError } from '../../daemon/DaemonStartError';
 import { ExclusiveFileLock } from '../../daemon/ExclusiveFileLock';
 import { findLiveDaemon } from '../../daemon/LiveDaemonProbe';
 import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
@@ -86,6 +87,8 @@ async function launchDaemon(daemonDir: string, timeoutMs: number): Promise<void>
 	} catch {
 		/* file may not exist */
 	}
+	// The reason of an earlier failed start must not be taken for the reason of this one.
+	clearDaemonStartError(daemonDir);
 
 	if (process.platform === 'win32') {
 		const vbsPath = path.join(os.tmpdir(), `flow-daemon-run-${Date.now()}.vbs`);
@@ -132,7 +135,15 @@ async function launchDaemon(daemonDir: string, timeoutMs: number): Promise<void>
 		if (fs.existsSync(portFile)) {
 			return;
 		}
+		// Cleared before the spawn: whatever is there now was written by the daemon just started, which is dead.
+		const startError = readDaemonStartError(daemonDir);
+		if (startError !== null) {
+			throw new Error(`The daemon failed to start: ${startError.message}`);
+		}
 		await new Promise(r => setTimeout(r, 50));
 	}
-	throw new Error(`Daemon did not start within ${timeoutMs}ms (port file not found: ${portFile})`);
+	throw new Error(
+		`Daemon did not start within ${timeoutMs}ms (port file not found: ${portFile}) and it recorded no start-up error. ` +
+			`Check the daemon log: flow logs (files in ${path.join(daemonDir, 'logs')}).`
+	);
 }

@@ -1,13 +1,17 @@
-import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import type { Command } from 'commander';
 import { createRemoteDaemonClient } from 'flow-core';
 
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
-import type { ClientCommand, DaemonResponse } from '../../ipc/Protocol';
+import { type ClientCommand, DAEMON_STOPPING_CODE, type DaemonResponse } from '../../ipc/Protocol';
+import { describeDaemonContactFailure } from './DaemonContactFailure';
 
 // violations-suppress-end: ts/no-deep-relative
+
+// Not "start it with flow start": the execution lives in the daemon that ran it and is not restored by a new one.
+const NOT_RUNNING_TEXT =
+	'Error:The daemon is not running -- there is nothing to resume. Resume only works while the daemon that ran the execution is alive.';
 
 type FlowCommands = { resume?: (payload: unknown) => Promise<DaemonResponse> };
 
@@ -32,11 +36,13 @@ export function registerResumeCommand(program: Command): void {
 					cmd
 				)) as DaemonResponse;
 			} catch (err) {
-				if (err instanceof DaemonNotRunningError) {
-					console.error('Error:The daemon is not running -- there is nothing to resume.');
-				} else {
-					console.error('Failed to contact the daemon.');
-				}
+				const failure = describeDaemonContactFailure(err);
+				console.error(failure.notRunning ? NOT_RUNNING_TEXT : `Error:${failure.message}`);
+				process.exit(1);
+			}
+
+			if (response.type === 'error' && response.code === DAEMON_STOPPING_CODE) {
+				console.error(NOT_RUNNING_TEXT);
 				process.exit(1);
 			}
 

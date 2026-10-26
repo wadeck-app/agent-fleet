@@ -217,4 +217,16 @@ describe('cli update --drain / --cancel-drain', () => {
 
 		expect(cliUpdateCommand).toHaveBeenCalledTimes(1);
 	});
+
+	it('--drain treats a daemon that is closing (EPIPE) as not running, like a missing one', async () => {
+		sendMock.mockRejectedValue(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }));
+		const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+		const { cliUpdateCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
+		vi.mocked(cliUpdateCommand).mockClear();
+
+		await runCliArgs(['update', '--drain']);
+
+		expect(cliUpdateCommand).toHaveBeenCalledTimes(1);
+		expect(stdoutSpy.mock.calls.map(c => String(c[0])).join('')).toContain('No daemon is running');
+	});
 });
