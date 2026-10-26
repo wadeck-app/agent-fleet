@@ -40,7 +40,24 @@ Secrets, step I/O, versions, queue events, waves + transitive settling + restart
 - a90828e40c6b7f90b: step metrics phases 2-3 (attemptLog, step_failed meta, turns/tool_calls/files_written).
 - Next to launch: step metrics phases 2-3 (plan 2026-10-25_step-metrics-per-attempt.md); project-sdk phase 2; dock/legibility of logs page (low).
 
+## Remaining open (as of 2026-10-26, after 939a8a7b, installed 735)
+
+| Item | State |
+| --- | --- |
+| Steps table expands one row at a time | check whether the DataTable accordion is intended; ask dsl-owner if not |
+| POSIX paths of the script tree kill (pgrep, SIGTERM, snapshot) | untested (Windows-only machine) |
+| Real opencode step under Git Bash (bash -l PATH, curl, UTF-8) | unverified |
+| Cost semantics for opencode/codex shared sessions and more than 2 claude attempts | unverified (shown unknown) |
+| FlowExecutionSummarySchema lacks flowVersion, versionLabel, versionNote (API drops them) | todo |
+| web-frontend flow-engine.types.ts keeps its own step interfaces (drift risk) | todo |
+| Daemon start failure cause: only the legacy-config case is tested end to end | partial |
+| singleton-daemon-kit: map `socket hang up` and EPIPE; optional first-wins mode | request to the kit owner |
+| Old leaked temp dirs | the user runs the purge command given in chat |
+| Scratch files to delete (the delete guard blocks me): `.claude/temp/*`, `%TEMP%/flow-old-bundle-red`, `%TEMP%/leakprobe`, `flowmeasure-19222`, untracked `packages/flow-cli/src/__scratch_verify_opencode.test.ts` | the user, or a delete bypass |
+
 ## Log
+
+- 2026-10-26: 939a8a7b (CI green, installed 735): attempts expansion in the steps table and one Cost row in the chart panel, verified on the user's :5173 (ajk42rid expands with 2 attempts and the reason; q8bbdk5u has no chevron; keyboard toggle works; no console errors). dsl-ui and dsl-renderer lock bumped to 2026.10.26-279 (a03074a6). Four agent test servers stopped by PID.
 
 - 2026-10-25: file created after user request to track progress.
 - 2026-10-26: project-sdk 1b + phase 2: SDK helpers (findProjectIncludingDeleted), queue events carry the project id, per-project flow config in the registry (plugins/hooks, schema-validated; repo .flow/config.yml is an error with the mv command); single -p per command.
