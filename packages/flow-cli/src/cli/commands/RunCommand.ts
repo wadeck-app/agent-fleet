@@ -8,12 +8,13 @@ import { FlowConfigLoader } from '../../config/FlowConfig';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { FLOW_PROJECT_ENV } from '../../config/ProjectScopeResolver';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
+import { debugHint, describeCliFailure } from './CliFailureText';
 import { ExecutionTimeoutError, waitForCompletion } from './ExecutionCompletionWaiter';
 import { hasFastLogMode } from './FlowLogModeDetector';
 import { resolveFlowReference } from './FlowReference';
 import { loadMockConfig } from './MockConfigLoader';
 import { parseInputArgs, parseTimeout } from './RunArgumentParser';
-import { sendToDaemon } from './RunDaemonSender';
+import { DaemonContactError, sendToDaemon } from './RunDaemonSender';
 import { checkSecretInputs } from './SecretInputCheck';
 import { singleProjectValue } from './SingleProjectOption';
 
@@ -153,9 +154,15 @@ export function registerRunCommand(program: Command): void {
 				let response: DaemonResponse;
 				try {
 					response = await sendToDaemon(cmd, daemonDir);
-				} catch {
-					console.error('Failed to contact the daemon.');
-					process.exit(1);
+				} catch (err) {
+					// Either the run could not be delivered to any daemon (exit 3, the message says what was tried), or the
+					// daemon refused it with an error of its own (exit 1): its message is the answer, never a stack trace.
+					console.error(
+						err instanceof DaemonContactError
+							? describeCliFailure(err)
+							: `Error:${describeCliFailure(err)}\n${debugHint()}`
+					);
+					process.exit(err instanceof DaemonContactError ? 3 : 1);
 				}
 
 				if (response.type === 'error') {

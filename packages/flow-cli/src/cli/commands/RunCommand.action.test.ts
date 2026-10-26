@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExecutionStore } from '../../storage/ExecutionStore';
 import { RegisteredProjectFixture } from '../../test-utils/RegisteredProjectFixture';
 import { registerRunCommand } from './RunCommand.js';
+import { DaemonContactError } from './RunDaemonSender';
 
 const harness = vi.hoisted(() => ({
 	dir: '',
@@ -211,10 +212,44 @@ describe('flow run: dispatch', () => {
 		expect(logs).toEqual([]);
 	});
 
-	it('reports a daemon contact failure', async () => {
+	it('reports a failure of the daemon with its own message, never as a contact failure', async () => {
 		harness.send.mockRejectedValue(new Error('boom'));
 		expect(await runCli(flowFile)).toBe(1);
-		expect(errors).toEqual(['Failed to contact the daemon.']);
+		expect(errors).toEqual(['Error:boom\nSet FLOW_DEBUG=1 to print the stack trace.']);
+	});
+
+	it('prints the message of a run the daemon refused (legacy project config) without a stack trace', async () => {
+		const refusal = new Error(
+			'"x/.flow/config.yml" is no longer read: the flow config of project test-flow (64f4ae91) now lives in the project registry.\nMove it: mkdir -p a && mv b c'
+		);
+		harness.send.mockRejectedValue(refusal);
+
+		expect(await runCli(flowFile)).toBe(1);
+
+		const printed = errors.join('\n');
+		expect(printed).toContain('is no longer read');
+		expect(printed).toContain('Move it: mkdir -p a && mv b c');
+		expect(printed).not.toMatch(/\n\s+at /);
+		expect(printed).toContain('FLOW_DEBUG=1');
+	});
+
+	it('prints the stack of that failure only with FLOW_DEBUG=1', async () => {
+		vi.stubEnv('FLOW_DEBUG', '1');
+		harness.send.mockRejectedValue(new Error('refused by the daemon'));
+
+		expect(await runCli(flowFile)).toBe(1);
+
+		expect(errors.join('\n')).toMatch(/refused by the daemon[\s\S]*\n\s+at /);
+	});
+
+	it('exits 3 and prints the actionable text when the daemon could not be reached after the retries', async () => {
+		harness.send.mockRejectedValue(
+			new DaemonContactError('Failed to contact the daemon after 6 attempts (port 1234).\nSee: flow logs')
+		);
+
+		expect(await runCli(flowFile)).toBe(3);
+
+		expect(errors).toEqual(['Failed to contact the daemon after 6 attempts (port 1234).\nSee: flow logs']);
 	});
 
 	it('maps daemon error codes to exit codes and formats', async () => {

@@ -30,6 +30,7 @@ import { findLiveDaemon } from './LiveDaemonProbe.js';
 import { RelayRegistry } from './RelayRegistry.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { removeStaleDaemonFiles } from './StaleDaemonFiles.js';
+import { guardRunAgainstStop } from './StoppingDaemonRunGuard.js';
 import { WebSocketServer, WebSocketServerClosedError } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
@@ -209,7 +210,7 @@ async function startOwningDaemon(
 		appVersion: VERSION,
 		...(options.port !== undefined ? { port: options.port } : {}),
 		idleTimeout: null,
-		commands: createDaemonCommands(config, getRuntime),
+		commands: guardRunAgainstStop(createDaemonCommands(config, getRuntime), idleShutdown),
 		health: () =>
 			buildDaemonHealth({
 				isIdle: () => idleShutdown.isIdle(),

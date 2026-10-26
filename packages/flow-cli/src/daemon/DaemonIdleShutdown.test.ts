@@ -139,6 +139,56 @@ describe('DaemonIdleShutdown', () => {
 		});
 	});
 
+	describe('admitting commands', () => {
+		it('refuses a command once it decided to stop, without running it', async () => {
+			shutdown.checkShutdown();
+			vi.advanceTimersByTime(SHUTDOWN_GRACE_MS);
+			const work = vi.fn(() => Promise.resolve('accepted'));
+
+			const result = await shutdown.admit(work, () => 'refused');
+
+			expect(shutdown.isStopping).toBe(true);
+			expect(result).toBe('refused');
+			expect(work).not.toHaveBeenCalled();
+		});
+
+		it('admits a command while the daemon is not stopping', async () => {
+			expect(shutdown.isStopping).toBe(false);
+			expect(
+				await shutdown.admit(
+					() => Promise.resolve('accepted'),
+					() => 'refused'
+				)
+			).toBe('accepted');
+		});
+
+		it('is not idle while an admitted command has not returned, so the stop is skipped on recheck', async () => {
+			let finish: (value: string) => void = () => undefined;
+			const pending = shutdown.admit(
+				() => new Promise<string>(resolve => (finish = resolve)),
+				() => 'refused'
+			);
+			expect(shutdown.isIdle()).toBe(false);
+			shutdown.checkShutdown();
+			vi.advanceTimersByTime(SHUTDOWN_GRACE_MS);
+			expect(stopDaemon).not.toHaveBeenCalled();
+
+			finish('accepted');
+			await pending;
+			expect(shutdown.isIdle()).toBe(true);
+		});
+
+		it('stops counting a command whose work threw', async () => {
+			await expect(
+				shutdown.admit(
+					() => Promise.reject(new Error('boom')),
+					() => 'refused'
+				)
+			).rejects.toThrow('boom');
+			expect(shutdown.isIdle()).toBe(true);
+		});
+	});
+
 	describe('dispose', () => {
 		it('cancels the watchdog and a shutdown already scheduled, whatever stopped the daemon', () => {
 			shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS);

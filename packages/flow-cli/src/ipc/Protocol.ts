@@ -137,6 +137,12 @@ export type ClientCommand =
 			executionId: string;
 	  };
 
+/**
+ * `code` of the refusal a daemon gives to a command that reaches it after it decided to stop. Nothing was accepted: the
+ * client treats it as "not running", waits for that daemon to be gone and starts another one.
+ */
+export const DAEMON_STOPPING_CODE = 'DAEMON_STOPPING';
+
 export type DaemonResponse =
 	| { type: 'execution_started'; executionId: string }
 	| { type: 'execution_resumed'; executionId: string; stepId: string }

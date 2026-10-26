@@ -31,6 +31,8 @@ export class DaemonIdleShutdown {
 	 * its socket is also being torn down by this same shutdown): without this guard
 	 * the idle-stop log line and the stop would both run twice. */
 	private shuttingDown = false;
+	/** Commands admitted by {@link admit} that have not returned yet. */
+	private commandsInFlight = 0;
 	/** Pending debounced shutdown (SHUTDOWN_GRACE_MS), or none scheduled. */
 	private pendingShutdown: ReturnType<typeof setTimeout> | undefined;
 	/** Periodic idleness check, or none until startWatchdog(). */
@@ -72,9 +74,36 @@ export class DaemonIdleShutdown {
 		}
 	}
 
+	/** The daemon decided to stop: it accepts nothing new, whatever the port file still says for a moment. */
+	get isStopping(): boolean {
+		return this.shuttingDown;
+	}
+
+	/**
+	 * Runs a command the daemon must not stop under, or refuses it when the daemon already decided to stop.
+	 *
+	 * Between the stop decision and the closing of the listener a client can still connect; a run accepted then is lost
+	 * with the daemon. And while an admitted command is between "received" and "queued", nothing looks active yet: it is
+	 * counted here so {@link isIdle} says no, and the stop is skipped on recheck.
+	 *
+	 * @param refusal what to answer when stopping; `work` is not called then.
+	 */
+	async admit<T>(work: () => Promise<T> | T, refusal: () => T): Promise<T> {
+		if (this.shuttingDown) {
+			return refusal();
+		}
+		this.commandsInFlight++;
+		try {
+			return await work();
+		} finally {
+			this.commandsInFlight--;
+		}
+	}
+
 	isIdle(): boolean {
 		const { commandHandler, workerRegistry } = this.runtime();
 		return (
+			this.commandsInFlight === 0 &&
 			commandHandler.isQueueEmpty() &&
 			!commandHandler.hasActiveExecutions() &&
 			!workerRegistry.hasBusyWorkers() &&
