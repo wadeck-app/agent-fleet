@@ -5,6 +5,7 @@ import type { Density, Identity, TimeMode } from './LogStreamChoices.js';
 import { formatSigned, ownerOf, stepColor, stepHue } from './LogStreamModel.js';
 import { type LogLevel, type LogStreamEntry, RUN_EVENTS_STEP } from './LogStreamProps.js';
 import { MarkdownText } from './MarkdownText.js';
+import { SCROLL_TARGET_CLASS } from './ScrollTargetClass.js';
 import { StepLabel } from './StepLabel.js';
 
 const LEVEL_BADGE: Record<LogLevel, 'default' | 'info' | 'warning' | 'danger'> = {
@@ -62,7 +63,7 @@ export function LogLine({ entry, identity, time, density, showStep, open, onTogg
 		<li
 			data-level={entry.level}
 			data-log-step={anchor ? ownerOf(entry) : undefined}
-			className={`${ROW_TINT[entry.level] ?? ''} ${compact ? 'py-0.5 text-xs' : 'py-1.5 text-sm'} px-2`}
+			className={`${anchor ? SCROLL_TARGET_CLASS : ''} ${ROW_TINT[entry.level] ?? ''} ${compact ? 'py-0.5 text-xs' : 'py-1.5 text-sm'} px-2`}
 			style={
 				stripe
 					? {

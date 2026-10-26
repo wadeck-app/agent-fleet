@@ -5,6 +5,7 @@ import { Badge } from '@wadeck-app/dsl-ui';
 import type { Identity } from './LogStreamChoices.js';
 import { type LogGroup, formatSpan, spanBar, stepColor, stepHue } from './LogStreamModel.js';
 import { type LogStepStatus, type LogStreamStep } from './LogStreamProps.js';
+import { SCROLL_TARGET_CLASS } from './ScrollTargetClass.js';
 import { StepLabel } from './StepLabel.js';
 import { displayStepName } from './StepNames.js';
 
@@ -69,7 +70,7 @@ export function LogGroupSection({
 		<section
 			aria-label={sectionName(group, byAttempt)}
 			data-log-step={anchor ? group.stepId : undefined}
-			className="overflow-hidden rounded-md border border-border"
+			className={`${anchor ? SCROLL_TARGET_CLASS : ''} overflow-hidden rounded-md border border-border`}
 		>
 			{/* violations-suppress: react/no-raw-button a section header holds badges and counts and needs aria-expanded; ButtonAction takes a text label only */}
 			<button type="button" aria-expanded={open} onClick={onToggle} className={HEADER_CLASS}>

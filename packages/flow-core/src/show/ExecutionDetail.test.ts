@@ -183,8 +183,15 @@ describe('ExecutionDetail', () => {
 			});
 			writeExec('relaunch', record);
 			const out = renderExecutionDetail(resolveExecution(tmpDir, 'relaunch'), { tail: 10, full: false });
-			expect(out).toContain('relaunch 1 (sub-step failed) 2026-10-04 14:00:02: gate_ui failed: 2 tests red');
+			expect(out).toContain('relaunch 1 (sub-step failed) 2026-10-04 14:00:02 UTC: gate_ui failed: 2 tests red');
 			expect(out).not.toContain('more detail');
+		});
+
+		it('labels the Started and Completed times as UTC', () => {
+			writeExec('utc', minimal('utc'));
+			const out = renderExecutionDetail(resolveExecution(tmpDir, 'utc'), { tail: 10, full: false });
+			expect(out).toContain('Started:   2026-10-04 14:00:00 UTC');
+			expect(out).toContain('Completed: 2026-10-04 14:00:05 UTC');
 		});
 
 		it('shows why a step was not run', () => {

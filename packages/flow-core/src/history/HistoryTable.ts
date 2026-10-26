@@ -3,7 +3,7 @@ import type { ExecutionState } from '../execution/ExecutionState.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { renderStepCostLines, renderTotalCostLine } from '../show/StepCostLines.js';
 import { type ExecutionFilterOptions, filterExecutions } from './ExecutionFilter.js';
-import { formatDuration, formatStarted, padTruncate } from './ExecutionFormat.js';
+import { formatDuration, formatStarted, formatStartedUtc, padTruncate } from './ExecutionFormat.js';
 
 function indentBlock(text: string): string {
 	return text
@@ -24,9 +24,9 @@ export function renderDetailView(exec: ExecutionState, projectLookup?: ProjectLo
 	lines.push(`Version:   ${versionDetailLineOf(exec)}`);
 	lines.push(`File:      ${exec.flowFile}`);
 	lines.push(`Status:    ${exec.status}`);
-	lines.push(`Started:   ${formatStarted(exec.startedAt)}`);
+	lines.push(`Started:   ${formatStartedUtc(exec.startedAt)}`);
 	if (exec.completedAt) {
-		lines.push(`Completed: ${formatStarted(exec.completedAt)}`);
+		lines.push(`Completed: ${formatStartedUtc(exec.completedAt)}`);
 	}
 	lines.push(`Duration:  ${formatDuration(exec.startedAt, exec.completedAt)}`);
 	lines.push('');
@@ -119,7 +119,7 @@ export function buildHistoryTable(
 			padTruncate('FLOW', COL_FLOW) +
 			padTruncate('VERSION', COL_VERSION) +
 			padTruncate('STATUS', COL_STATUS) +
-			padTruncate('STARTED', COL_STARTED) +
+			padTruncate('STARTED (UTC)', COL_STARTED) +
 			'DURATION'
 	);
 	lines.push('-'.repeat(COL_ID + COL_FLOW + COL_VERSION + COL_STATUS + COL_STARTED + 12));

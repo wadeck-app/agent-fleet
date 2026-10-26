@@ -96,7 +96,7 @@ export type { RunDigest } from './history/RunDigest.js';
 export type { LatestRunRow } from './history/RunRows.js';
 export type { DailyRunCount } from './history/RunTrend.js';
 export type { FlowSummary } from './history/FlowSummaries.js';
-export { formatDuration, formatModelCost, formatStarted } from './history/ExecutionFormat.js';
+export { formatDuration, formatModelCost, formatStarted, formatStartedUtc } from './history/ExecutionFormat.js';
 export { describeSkippedExecutions, loadExecutionReport, loadExecutions } from './history/ExecutionLoader.js';
 export type { ExecutionReport, SkippedExecutionFile } from './history/ExecutionLoader.js';
 export { buildHistoryTable, renderDetailView } from './history/HistoryTable.js';

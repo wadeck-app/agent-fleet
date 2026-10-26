@@ -15,7 +15,7 @@ const STATUS_DOT: Record<LogStepStatus, string> = {
 // @formatter:on
 
 const RAIL_CLASS =
-	'sticky top-2 max-h-[75vh] w-64 shrink-0 self-start overflow-y-auto rounded-md border border-border bg-surface';
+	'sticky top-[calc(var(--app-shell-bar-height,0px)+0.5rem)] max-h-[75vh] w-64 shrink-0 self-start overflow-y-auto rounded-md border border-border bg-surface';
 
 function linesText(count: number): string {
 	return `${count} ${count === 1 ? 'line' : 'lines'}`;

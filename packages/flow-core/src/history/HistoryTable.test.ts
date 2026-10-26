@@ -65,6 +65,27 @@ describe('buildHistoryTable', () => {
 	});
 });
 
+describe('buildHistoryTable UTC labels', () => {
+	const exec = makeExec({
+		executionId: 'abc',
+		flowId: 'f',
+		startedAt: '2026-10-25T22:09:42.000Z',
+		completedAt: '2026-10-25T22:09:50.000Z',
+	});
+
+	it('says once in the STARTED header that the column is UTC', () => {
+		const out = buildHistoryTable([exec], {});
+		expect(out).toMatch(/STARTED \(UTC\)\s+DURATION/);
+		expect(out).toContain('2026-10-25 22:09:42 ');
+	});
+
+	it('labels the Started and Completed lines of the detail view as UTC', () => {
+		const out = buildHistoryTable([exec], { id: 'abc' });
+		expect(out).toContain('Started:   2026-10-25 22:09:42 UTC');
+		expect(out).toContain('Completed: 2026-10-25 22:09:50 UTC');
+	});
+});
+
 describe('buildHistoryTable --id detail view', () => {
 	const exec = makeExec({
 		executionId: 'abc',

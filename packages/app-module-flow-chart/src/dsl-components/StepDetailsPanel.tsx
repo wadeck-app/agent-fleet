@@ -13,13 +13,15 @@ import { StepPanelTabs } from './StepPanelTabs.js';
 
 const BADGE_BASE_CLASS = 'inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium';
 // Written out in full: Tailwind finds classes by scanning source text.
+// The sticky shell top bar publishes its height in --app-shell-bar-height (0px outside the shell): the panel sticks and sizes under it.
 // A column that clips: the header keeps its height, the body takes the rest and scrolls. The cap is the frame: on a wide window the panel sits in a slot as tall as the chart and is never taller than it nor than the window (the chart can be taller than the window), below the chart on a narrow one (70% of the window).
 const PANEL_CLASS =
-	'flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface text-content shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-solid max-h-[70vh] lg:max-h-[min(100%,calc(100vh-1rem))]';
+	'flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface text-content shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-solid max-h-[70vh] lg:max-h-[min(100%,calc(100vh-var(--app-shell-bar-height,0px)-1rem))]';
 // The drawer slot is as tall as the chart: the panel fills it, and follows the window on a chart taller than it.
-const DRAWER_FIT_CLASS = 'lg:sticky lg:top-2 lg:h-[min(100%,calc(100vh-1rem))]';
+const DRAWER_FIT_CLASS =
+	'lg:sticky lg:top-[calc(var(--app-shell-bar-height,0px)+0.5rem)] lg:h-[min(100%,calc(100vh-var(--app-shell-bar-height,0px)-1rem))]';
 // Only the panel catches the pointer where the slot lets the chart through; it follows the window on a chart taller than it.
-const FLOATING_FIT_CLASS = 'lg:pointer-events-auto lg:sticky lg:top-2';
+const FLOATING_FIT_CLASS = 'lg:pointer-events-auto lg:sticky lg:top-[calc(var(--app-shell-bar-height,0px)+0.5rem)]';
 
 interface StepDetailsPanelProps {
 	step: FlowGraphNode;

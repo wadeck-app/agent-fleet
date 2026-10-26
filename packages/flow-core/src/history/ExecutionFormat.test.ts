@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDuration, formatModelCost, formatStarted } from './ExecutionFormat.js';
+import { formatDuration, formatModelCost, formatStarted, formatStartedUtc } from './ExecutionFormat.js';
 
 describe('formatDuration', () => {
 	it('is "running" without a completion time', () => {
@@ -30,6 +30,12 @@ describe('formatDuration', () => {
 describe('formatStarted', () => {
 	it('replaces the T separator and drops milliseconds and zone', () => {
 		expect(formatStarted('2026-08-16T12:00:01.244Z')).toBe('2026-08-16 12:00:01');
+	});
+});
+
+describe('formatStartedUtc', () => {
+	it('labels the UTC time so nobody reads it as local time', () => {
+		expect(formatStartedUtc('2026-10-25T22:09:42.244Z')).toBe('2026-10-25 22:09:42 UTC');
 	});
 });
 

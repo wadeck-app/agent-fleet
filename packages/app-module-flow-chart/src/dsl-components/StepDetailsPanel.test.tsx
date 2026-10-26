@@ -68,10 +68,10 @@ describe('StepDetailsPanel frame (baseline)', () => {
 			'flex-col',
 			'overflow-hidden',
 			'max-h-[70vh]',
-			'lg:max-h-[min(100%,calc(100vh-1rem))]',
+			'lg:max-h-[min(100%,calc(100vh-var(--app-shell-bar-height,0px)-1rem))]',
 			'lg:pointer-events-auto',
 			'lg:sticky',
-			'lg:top-2',
+			'lg:top-[calc(var(--app-shell-bar-height,0px)+0.5rem)]',
 		]) {
 			expect(panel).toHaveClass(cls);
 		}
@@ -287,7 +287,7 @@ describe('StepDetailsPanel layout tabs', () => {
 		renderPanel({ layout: 'tabs' });
 		expect(screen.getByRole('complementary', { name: 'Step details' })).toHaveClass(
 			'max-h-[70vh]',
-			'lg:max-h-[min(100%,calc(100vh-1rem))]'
+			'lg:max-h-[min(100%,calc(100vh-var(--app-shell-bar-height,0px)-1rem))]'
 		);
 		expect(screen.getByTestId('panel-body')).toHaveClass('overflow-y-auto');
 	});
@@ -341,7 +341,7 @@ describe('StepDetailsPanel layout accordion', () => {
 		renderPanel({ layout: 'accordion' });
 		expect(screen.getByRole('complementary', { name: 'Step details' })).toHaveClass(
 			'max-h-[70vh]',
-			'lg:max-h-[min(100%,calc(100vh-1rem))]'
+			'lg:max-h-[min(100%,calc(100vh-var(--app-shell-bar-height,0px)-1rem))]'
 		);
 		expect(screen.getByTestId('panel-body')).toHaveClass('overflow-y-auto');
 	});
@@ -352,9 +352,9 @@ describe('StepDetailsPanel layout drawer', () => {
 		renderPanel({ layout: 'drawer' });
 		const panel = screen.getByRole('complementary', { name: 'Step details' });
 		expect(panel).toHaveClass(
-			'lg:h-[min(100%,calc(100vh-1rem))]',
+			'lg:h-[min(100%,calc(100vh-var(--app-shell-bar-height,0px)-1rem))]',
 			'max-h-[70vh]',
-			'lg:max-h-[min(100%,calc(100vh-1rem))]'
+			'lg:max-h-[min(100%,calc(100vh-var(--app-shell-bar-height,0px)-1rem))]'
 		);
 		expect(screen.getByTestId('panel-body')).toHaveClass('overflow-y-auto');
 	});

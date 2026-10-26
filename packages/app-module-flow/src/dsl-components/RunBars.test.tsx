@@ -61,7 +61,27 @@ describe('RunBars', () => {
 	it('names each day with its date and counts in the title', () => {
 		show();
 		const busy = screen.getAllByTestId('run-bars-day')[5]!;
-		expect(busy.getAttribute('title')).toBe('Sat, Oct 24: 20 completed, 12 failed');
+		expect(busy.getAttribute('title')).toMatch(/^Sat, Oct 24: 20 completed, 12 failed\. /);
+	});
+
+	it('gives the exact instant of the day start and its zone in the title of the day and of every bar', () => {
+		show();
+		const iso = DAYS[5]!.dayStart;
+		const busy = screen.getAllByTestId('run-bars-day')[5]!;
+		expect(busy.getAttribute('title')).toContain(
+			`Day starts ${iso} (local midnight of the machine that serves this page)`
+		);
+		const [completed, failed] = within(busy).getAllByRole('link');
+		expect(completed!.getAttribute('title')).toContain(`Day starts ${iso} (local midnight`);
+		expect(failed!.getAttribute('title')).toContain(`Day starts ${iso} (local midnight`);
+		// The accessible name stays short: the instant is for the tooltip only.
+		expect(completed!.getAttribute('aria-label')).not.toContain(iso);
+	});
+
+	it('writes the weekday labels at 11px or more', () => {
+		show();
+		const label = within(screen.getAllByTestId('run-bars-day')[5]!).getByText('Sat');
+		expect(label.className).toMatch(/text-\[(1[1-9]|[2-9]\d)px\]|text-(xs|sm|base)\b/);
 	});
 
 	it('summarises the week for assistive technology', () => {

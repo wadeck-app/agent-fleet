@@ -56,6 +56,8 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 		>
 			{parsed.map((day, index) => {
 				const date = `${formatWeekday(day.dayStart)}, ${formatShort(day.dayStart)}`;
+				// The days are the local days of the machine that serves the page: the tooltip gives the exact instant.
+				const dayStartNote = `Day starts ${isoTitle(day.dayStart)} (local midnight of the machine that serves this page).`;
 				const bars = [
 					{
 						status: 'completed',
@@ -69,7 +71,7 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 					<div
 						key={day.dayStart.toISOString()}
 						data-testid="run-bars-day"
-						title={`${date}: ${day.completed} completed, ${day.failed} failed`}
+						title={`${date}: ${day.completed} completed, ${day.failed} failed. ${dayStartNote}`}
 						className="flex min-h-0 min-w-0 flex-col gap-0.5"
 					>
 						<div className="relative flex min-h-0 flex-1 items-end justify-center gap-0.5 px-0.5">
@@ -90,7 +92,7 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 											key={bar.status}
 											to={barLink(to, bar.status)}
 											aria-label={`Show the ${bar.status} executions (${bar.count} on ${date})`}
-											title={`${date}: ${bar.count} ${bar.status}. Click to list every ${bar.status} execution.`}
+											title={`${date}: ${bar.count} ${bar.status}. ${dayStartNote} Click to list every ${bar.status} execution.`}
 											className={LINK_CLASSES}
 										>
 											<span
@@ -103,7 +105,7 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 								)
 							)}
 						</div>
-						<span title={isoTitle(day.dayStart)} className="text-center text-[10px] leading-3 text-muted">
+						<span title={isoTitle(day.dayStart)} className="text-center text-[11px] leading-3 text-muted">
 							{formatWeekday(day.dayStart)}
 						</span>
 					</div>

@@ -466,3 +466,40 @@ describe('LogStream choices', () => {
 		);
 	});
 });
+
+// The shell top bar is sticky and publishes its height; what sticks to the viewport top or is scrolled to must clear it.
+const BAR = 'var(--app-shell-bar-height,0px)';
+
+describe('LogStream under the sticky shell bar', () => {
+	it('chips: the sticky strip sticks under the bar, not at the viewport top', () => {
+		show({}, { ...BASE, navigation: 'chips' });
+		const strip = screen.getByRole('navigation', { name: 'Steps' }).parentElement!;
+		expect(strip.className).toContain('sticky');
+		expect(strip.className).toContain(`top-[${BAR}]`);
+		expect(strip.className).not.toMatch(/(^|\s)top-0(\s|$)/);
+	});
+
+	it('rail: the sticky index sticks 0.5rem under the bar', () => {
+		show({}, { ...BASE, navigation: 'rail' });
+		const rail = screen.getByRole('navigation', { name: 'Step index' });
+		expect(rail.className).toContain('sticky');
+		expect(rail.className).toContain(`top-[calc(${BAR}+0.5rem)]`);
+		expect(rail.className).not.toMatch(/(^|\s)top-2(\s|$)/);
+	});
+
+	it('rail: every scroll target keeps the bar clear (lines and step sections)', () => {
+		const flat = show({}, { ...BASE, navigation: 'rail' });
+		const lineAnchors = flat.container.querySelectorAll('li[data-log-step]');
+		expect(lineAnchors.length).toBeGreaterThan(0);
+		for (const anchor of lineAnchors) {
+			expect(anchor.className).toContain(`scroll-mt-[calc(${BAR}+0.5rem)]`);
+		}
+		flat.unmount();
+		const grouped = show({}, { ...BASE, navigation: 'rail', grouping: 'step' });
+		const sectionAnchors = grouped.container.querySelectorAll('section[data-log-step]');
+		expect(sectionAnchors.length).toBeGreaterThan(0);
+		for (const anchor of sectionAnchors) {
+			expect(anchor.className).toContain(`scroll-mt-[calc(${BAR}+0.5rem)]`);
+		}
+	});
+});

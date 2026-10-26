@@ -29,6 +29,11 @@ export function formatStarted(iso: string): string {
 	return iso.replace('T', ' ').slice(0, 19);
 }
 
+/** "2026-10-25 22:09:42 UTC": `formatStarted` with its zone written, for a line that stands alone (not a UTC column). */
+export function formatStartedUtc(iso: string): string {
+	return `${formatStarted(iso)} UTC`;
+}
+
 /**
  * `meta.cost` only exists on ModelStepMeta -- a script step's meta has no such field. `costText` replaces the raw
  * `$usd` of the meta (the last attempt, cumulative for a resumed claude session) by the step's computed cost.

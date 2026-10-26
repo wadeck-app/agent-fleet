@@ -57,6 +57,32 @@ function emptyMessageOf(total: number, filtered: boolean): string {
 	return filtered ? 'No execution matches the filters' : 'No execution yet: run a flow and it shows here';
 }
 
+interface ExecutionFilters {
+	status?: string;
+	flow?: string;
+	flowContains?: string;
+	id?: string;
+}
+
+/**
+ * "110 failed executions", "3 executions with a flow name containing \"deploy\"": the total behind the table (every page,
+ * the active filters), so the number of a dashboard tile can be compared with the list it links to.
+ */
+function countLabelOf(total: number, filters: ExecutionFilters): string {
+	const noun = total === 1 ? 'execution' : 'executions';
+	const parts = [`${total} ${filters.status === undefined ? '' : `${filters.status} `}${noun}`];
+	if (filters.flow !== undefined) {
+		parts.push(`of the flow "${filters.flow}"`);
+	}
+	if (filters.flowContains !== undefined) {
+		parts.push(`with a flow name containing "${filters.flowContains}"`);
+	}
+	if (filters.id !== undefined) {
+		parts.push(`with an id starting "${filters.id}"`);
+	}
+	return parts.join(' ');
+}
+
 /** What the flows table says about itself: it is the only place the DSL can show that the list was cut. */
 function flowsCaption(shown: number, total: number): string {
 	if (total === 0) {
@@ -97,6 +123,7 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 					page.total,
 					[status, flow, flowContains, id].some(value => value !== undefined)
 				),
+				countLabel: countLabelOf(page.total, { status, flow, flowContains, id }),
 			};
 			return reply.code(200).send(body);
 		} catch (err) {

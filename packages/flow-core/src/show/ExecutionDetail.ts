@@ -5,7 +5,7 @@ import { versionDetailLineOf } from '../definitions/RecordedVersion.js';
 import { FlowCoreError, errorMessage } from '../errors.js';
 import { looksLikeExecutionId } from '../execution/ExecutionId.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
-import { formatDuration, formatStarted } from '../history/ExecutionFormat.js';
+import { formatDuration, formatStartedUtc } from '../history/ExecutionFormat.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { renderStepCostLines, renderTotalCostLine } from './StepCostLines.js';
 import { renderStepIoLines } from './StepIoLines.js';
@@ -142,9 +142,9 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	lines.push(`Version:   ${versionDetailLineOf(record)}`);
 	lines.push(`File:      ${record.flowFile}`);
 	lines.push(`Status:    ${record.status}`);
-	lines.push(`Started:   ${formatStarted(record.startedAt)}`);
+	lines.push(`Started:   ${formatStartedUtc(record.startedAt)}`);
 	if (record.completedAt) {
-		lines.push(`Completed: ${formatStarted(record.completedAt)}`);
+		lines.push(`Completed: ${formatStartedUtc(record.completedAt)}`);
 	}
 	lines.push(`Duration:  ${formatDuration(record.startedAt, record.completedAt)}`);
 	// lastError is the last step failure ever seen; on a completed run it is a recovered retry, not the outcome.
@@ -172,7 +172,7 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 		for (const [i, relaunch] of (step.relaunches ?? []).entries()) {
 			const firstLine = relaunch.feedback.split('\n').find(l => l.trim() !== '') ?? '';
 			lines.push(
-				`      relaunch ${i + 1} (sub-step failed) ${formatStarted(relaunch.at)}: ${firstLine.slice(0, 160)}`
+				`      relaunch ${i + 1} (sub-step failed) ${formatStartedUtc(relaunch.at)}: ${firstLine.slice(0, 160)}`
 			);
 		}
 		if (step.skippedReason) {

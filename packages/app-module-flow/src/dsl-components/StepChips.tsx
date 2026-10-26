@@ -5,7 +5,8 @@ import { displayStepName } from './StepNames.js';
 import { StepPill } from './StepPill.js';
 import type { UrlLogFilter } from './UrlLogFilter.js';
 
-const STRIP_CLASS = 'sticky top-0 z-10 -mx-1 mb-2 flex flex-col gap-1 border-b border-border bg-bg px-1 pb-1.5 pt-1';
+const STRIP_CLASS =
+	'sticky top-[var(--app-shell-bar-height,0px)] z-10 -mx-1 mb-2 flex flex-col gap-1 border-b border-border bg-bg px-1 pb-1.5 pt-1';
 const ROW_CLASS = 'flex flex-wrap gap-1';
 
 function linesText(count: number): string {

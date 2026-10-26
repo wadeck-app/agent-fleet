@@ -77,46 +77,51 @@ sections:
                 - $type: ExtensionSlot
                   items: $sources.actions
 
-          - $type: DataTable
-            rows: $sources.executions.items
-            emptyMessage: $sources.executions.emptyMessage
-            expansion:
-                $type: HorizontalStack
-                gap: gap-2
-                align: items-center
-                items:
-                    # Each slot renders nothing while no module contributes.
-                    - $type: ExtensionSlot
-                      items: $sources.rowLinks
-                    - { $type: ButtonLink, label: Logs, to: $ctx.row.logsHref, variant: secondary, size: sm }
-                    - $type: ExtensionSlot
-                      items: $sources.rowActions
-            columns:
-                - {
-                      type: link,
-                      to: '/modules/flow/executions/{executionId}',
-                      icon: eye,
-                      label: Open details,
-                      position: start,
-                  }
-                - { key: 'startedAt', label: 'When', format: datetime, nowrap: true }
-                - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
-                - { key: 'versionLabel', label: 'Version', nowrap: true, mono: true }
-                - { key: 'executionId', label: 'Run', nowrap: true, mono: true }
-                # The cell text stays the status word: a shell older than dsl-ui 122 ignores nowrap and badge and shows it as is.
-                # The badge colours a cell whose text is exactly a key; "ok, 3 tries" and the like stay plain text.
-                - key: statusLabel
-                  label: Status
-                  nowrap: true
-                  badge:
-                      {
-                          ok: success,
-                          FAILED: danger,
-                          running: info,
-                          waiting: default,
-                          retry: warning,
-                          'ok, recovered': warning,
-                      }
+          # The section title is the route's countLabel ("110 failed executions": the total of every page under the active
+          # filters), so the number of a dashboard tile can be compared with this list.
+          - $type: Section
+            title: $sources.executions.countLabel
+            items:
+                - $type: DataTable
+                  rows: $sources.executions.items
+                  emptyMessage: $sources.executions.emptyMessage
+                  expansion:
+                      $type: HorizontalStack
+                      gap: gap-2
+                      align: items-center
+                      items:
+                          # Each slot renders nothing while no module contributes.
+                          - $type: ExtensionSlot
+                            items: $sources.rowLinks
+                          - { $type: ButtonLink, label: Logs, to: $ctx.row.logsHref, variant: secondary, size: sm }
+                          - $type: ExtensionSlot
+                            items: $sources.rowActions
+                  columns:
+                      - {
+                            type: link,
+                            to: '/modules/flow/executions/{executionId}',
+                            icon: eye,
+                            label: Open details,
+                            position: start,
+                        }
+                      - { key: 'startedAt', label: 'When', format: datetime, nowrap: true }
+                      - { key: 'flowId', label: 'Flow', truncate: true, mono: true }
+                      - { key: 'versionLabel', label: 'Version', nowrap: true, mono: true }
+                      - { key: 'executionId', label: 'Run', nowrap: true, mono: true }
+                      # The cell text stays the status word: a shell older than dsl-ui 122 ignores nowrap and badge and shows it as is.
+                      # The badge colours a cell whose text is exactly a key; "ok, 3 tries" and the like stay plain text.
+                      - key: statusLabel
+                        label: Status
+                        nowrap: true
+                        badge:
+                            {
+                                ok: success,
+                                FAILED: danger,
+                                running: info,
+                                waiting: default,
+                                retry: warning,
+                                'ok, recovered': warning,
+                            }
 
           - $type: HorizontalStack
             justify: justify-between

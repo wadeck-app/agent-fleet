@@ -32,8 +32,29 @@ describe('GET /executions', () => {
 				limit: 20,
 				offset: 0,
 				emptyMessage: 'No execution yet: run a flow and it shows here',
+				countLabel: '0 executions',
 			},
 		});
+	});
+
+	it('says how many executions match the active filters, whatever the page size, so a tile number can be compared', async () => {
+		for (let index = 0; index < 3; index++) {
+			fixture.addExecution({ executionId: `bad${index}`, flowId: 'deploy', status: 'failed' });
+		}
+		fixture.addExecution({ executionId: 'ok1', flowId: 'build', status: 'completed' });
+		const countLabel = async (query: Record<string, string>) =>
+			((await callRoute(routes, 'GET /executions', { query })).body as { countLabel: string }).countLabel;
+		expect(await countLabel({})).toBe('4 executions');
+		expect(await countLabel({ limit: '1' })).toBe('4 executions');
+		expect(await countLabel({ status: 'failed' })).toBe('3 failed executions');
+		expect(await countLabel({ status: 'completed' })).toBe('1 completed execution');
+		expect(await countLabel({ flowContains: 'depl' })).toBe('3 executions with a flow name containing "depl"');
+		expect(await countLabel({ status: 'failed', flowContains: 'depl' })).toBe(
+			'3 failed executions with a flow name containing "depl"'
+		);
+		expect(await countLabel({ status: 'failed', flowContains: 'nothing' })).toBe(
+			'0 failed executions with a flow name containing "nothing"'
+		);
 	});
 
 	it('counts the execution files it could not read, so a client can say the list is incomplete', async () => {

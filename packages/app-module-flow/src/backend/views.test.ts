@@ -267,6 +267,16 @@ describe('executions page filters (real controls bound to the URL, not links)', 
 		}
 	});
 
+	it('titles the executions table with the route count ("110 failed executions"), in every variant', () => {
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			const section = collectNodes(document, 'Section').find(
+				candidate => candidate['title'] === '$sources.executions.countLabel'
+			);
+			expect(section, String(variant)).toBeDefined();
+			expect(collectNodes(section, 'DataTable')[0], String(variant)).toBe(executionsTableOf(document));
+		}
+	});
+
 	it('resets the page when the page size changes, in every variant', () => {
 		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
 			expect(collectNodes(document, 'PageSizeSelect')[0], String(variant)).toMatchObject({

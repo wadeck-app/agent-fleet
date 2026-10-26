@@ -60,7 +60,7 @@ describe('FlowVersionListing', () => {
 
 		const text = renderVersionTable('f', listFlowVersions(store, 'f', registryFile));
 
-		expect(text).toMatch(/VERSION\s+DEFINITION\s+FIRST SEEN\s+WHERE/);
+		expect(text).toMatch(/VERSION\s+DEFINITION\s+FIRST SEEN \(UTC\)\s+WHERE/);
 		expect(text).toMatch(/1\.0\.0\s+[0-9a-f]{12}\s+\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\s+snapshot\n/);
 		expect(text).toMatch(/1\.1\.0 \*\s+[0-9a-f]{12}\s+-\s+registry \(not run yet\)/);
 		expect(text).toContain('* = latest');

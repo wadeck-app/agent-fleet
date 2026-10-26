@@ -41,7 +41,7 @@ export function registerHistoryCommand(program: Command, getConfigDir: () => str
 	program
 		.command('history')
 		.description(
-			'List past flow executions\n' +
+			'List past flow executions (times are UTC)\n' +
 				'  --limit N      Max results (default: 20)\n' +
 				'  --offset N     Skip first N (pagination)\n' +
 				'  --status s     Filter: completed|failed|running|queued\n' +

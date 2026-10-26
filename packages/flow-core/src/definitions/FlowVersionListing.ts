@@ -73,7 +73,7 @@ export function renderVersionTable(flowId: string, rows: readonly VersionRow[]):
 		);
 	}
 	const lines = [
-		padTruncate('VERSION', 16) + padTruncate('DEFINITION', 14) + padTruncate('FIRST SEEN', 21) + 'WHERE',
+		padTruncate('VERSION', 16) + padTruncate('DEFINITION', 14) + padTruncate('FIRST SEEN (UTC)', 21) + 'WHERE',
 		'-'.repeat(70),
 	];
 	for (const row of rows) {

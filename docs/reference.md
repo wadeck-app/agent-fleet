@@ -62,7 +62,7 @@ flow cli update                         # manual update
 | `flow run`         | Execute a flow YAML                                          |
 | `flow validate`    | Validate a flow YAML without running                         |
 | `flow show`        | Inspect a past execution                                     |
-| `flow history`     | List recent executions                                       |
+| `flow history`     | List recent executions (times are UTC)                       |
 | `flow resume <id>` | Re-dispatch a timed-out, unanswered `user_intervention` step |
 | `flow docs`        | Show flow YAML documentation                                 |
 | `flow cli update`  | Update to latest release                                     |
