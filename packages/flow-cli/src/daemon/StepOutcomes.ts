@@ -70,6 +70,12 @@ export class StepOutcomes {
 		this.recordSkippedSteps(executionId, scheduler);
 		this.recordRequeuedSteps(executionId, scheduler);
 
+		if (this.executions.resumable(executionId)) {
+			// Kept alive for `flow resume` after an unanswered intervention: a sibling finishing late
+			// must neither clean it up nor mark the steps behind the intervention as done.
+			return;
+		}
+
 		if (scheduler.isTerminal()) {
 			// Mark any steps skipped by the scheduler (still 'pending' in store) as completed
 			// so the daemon's allDone check can detect execution completion.

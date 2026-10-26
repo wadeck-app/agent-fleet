@@ -287,6 +287,17 @@ export class WorkerAssignmentSupervisor {
 				continue;
 			}
 
+			if (!this.executions.isActive(executionId)) {
+				// The run already ended (terminal failure of a sibling): re-queuing would hand a
+				// step to a worker for an execution that no longer exists.
+				this.logWriter.writeExecution(
+					executionId,
+					`Worker disconnected before starting ${stepId}, but the execution is already over; step dropped, not queued again`,
+					'info'
+				);
+				continue;
+			}
+
 			const key = `${executionId}:${stepId}`;
 			const spent = (this.redispatchCounts.get(key) ?? 0) + 1;
 			if (step === undefined) {

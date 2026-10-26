@@ -68,6 +68,17 @@ export class StepDispatcher {
 		while (this.queue.length > 0) {
 			const step = this.queue.shift()!;
 
+			// Purging happens once, when the run fails; a step re-queued later (a worker lost
+			// after the cleanup) must not be handed out for an execution that no longer exists.
+			if (!this.executions.isActive(step.executionContext.executionId)) {
+				this.logWriter.writeExecution(
+					step.executionContext.executionId,
+					`Step ${step.stepId} dropped from the queue: its execution is already over`,
+					'info'
+				);
+				continue;
+			}
+
 			let placement: StepPlacement;
 			try {
 				placement = this.placementFor(step);
