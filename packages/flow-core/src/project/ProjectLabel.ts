@@ -1,4 +1,4 @@
-import { defaultRegistryDir, loadDeleted, loadRegistry } from '@wadeck-app/project-sdk';
+import { defaultRegistryDir, findProjectIncludingDeleted } from '@wadeck-app/project-sdk';
 
 import { errorMessage } from '../errors.js';
 
@@ -38,19 +38,6 @@ export function projectLabelOf(
 }
 
 /**
- * Name of a project by exact id, looking at the live registry then at the soft-deleted projects.
- * SDK gap G3: the published SDK has no such helper (`findProjectIncludingDeleted` is not released yet);
- * replace this body by it once it is.
- */
-function findNameIncludingDeleted(registryDir: string, id: string): string | undefined {
-	const live = loadRegistry(registryDir).projects.find(project => project.id === id);
-	if (live !== undefined) {
-		return live.name;
-	}
-	return loadDeleted(registryDir).projects.find(project => project.id === id)?.name;
-}
-
-/**
  * A lookup over the project registry in `registryDir`, read on every call (a project added since is seen at once).
  * An unreadable registry yields `unavailable` and is reported once, on stderr, with the directory and the cause.
  */
@@ -58,8 +45,8 @@ export function createRegistryProjectLookup(registryDir: string): ProjectLookup 
 	let reported = false;
 	return projectId => {
 		try {
-			const name = findNameIncludingDeleted(registryDir, projectId.trim().toLowerCase());
-			return name === undefined ? { kind: 'removed' } : { kind: 'known', name };
+			const found = findProjectIncludingDeleted(registryDir, projectId.trim().toLowerCase());
+			return found === undefined ? { kind: 'removed' } : { kind: 'known', name: found.project.name };
 		} catch (error) {
 			if (!reported) {
 				reported = true;

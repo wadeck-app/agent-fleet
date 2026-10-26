@@ -136,10 +136,15 @@ export class CommandHandler {
 			this.logWriter,
 			this.queue,
 			this.executions,
-			(executionId, stepId, reason) => {
+			(executionId, stepId, reason, endReason) => {
 				// Only set while a disconnect is being processed (see handleWorkerDisconnect).
 				const details = this.disconnectDetails?.(executionId, stepId);
-				this.outcomes.failStep(executionId, stepId, details === undefined ? reason : `${reason} ${details}`);
+				this.outcomes.failStep(
+					executionId,
+					stepId,
+					details === undefined ? reason : `${reason} ${details}`,
+					endReason
+				);
 			},
 			stalledStepLimitMs
 		);

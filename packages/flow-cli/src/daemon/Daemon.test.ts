@@ -9,7 +9,6 @@ import { observeFor } from '../test-utils/WaitHelpers';
 import { Daemon } from './Daemon.js';
 import { writeDaemonLog } from './DaemonLog.js';
 import { declaresPlugins } from './declaresPlugins.js';
-import { loadFlowHooks } from './loadFlowHooks.js';
 
 // Daemon.js is imported statically: dynamic imports inside the tests put the cold load of the daemon module graph
 // (1.7 s idle, more under load) inside the first test's 5 s timeout.
@@ -89,48 +88,6 @@ describe('declaresPlugins', () => {
 
 		expect(() => declaresPlugins(configPath)).toThrow(/Failed to parse flow config/);
 		expect(() => declaresPlugins(configPath)).toThrow(configPath);
-	});
-});
-
-describe('loadFlowHooks', () => {
-	let tmpDir: string;
-
-	beforeEach(() => {
-		tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flow-hooks-')));
-	});
-
-	afterEach(() => {
-		fs.rmSync(tmpDir, { recursive: true, force: true });
-	});
-
-	it('reads the hooks section from the project .flow/config.yml', async () => {
-		fs.mkdirSync(path.join(tmpDir, '.flow'), { recursive: true });
-		fs.writeFileSync(
-			path.join(tmpDir, '.flow', 'config.yml'),
-			'hooks:\n  onFlowEnd:\n    - command: echo done\n',
-			'utf8'
-		);
-
-		expect(loadFlowHooks(tmpDir)).toHaveProperty('onFlowEnd');
-	});
-
-	it('returns no hooks when the project has no config file', async () => {
-		expect(loadFlowHooks(tmpDir)).toEqual({});
-	});
-
-	// The folder is the project's own: a legacy file there is not read as hooks, and not an error either.
-	it('does not read the legacy .flows/config.yml', async () => {
-		fs.mkdirSync(path.join(tmpDir, '.flows'), { recursive: true });
-		fs.writeFileSync(path.join(tmpDir, '.flows', 'config.yml'), 'hooks:\n  onFlowEnd:\n    - command: x\n', 'utf8');
-
-		expect(loadFlowHooks(tmpDir)).toEqual({});
-	});
-
-	it('throws on malformed YAML instead of silently dropping every hook', async () => {
-		fs.mkdirSync(path.join(tmpDir, '.flow'), { recursive: true });
-		fs.writeFileSync(path.join(tmpDir, '.flow', 'config.yml'), 'hooks:\n  onFlowEnd: [unclosed\n', 'utf8');
-
-		expect(() => loadFlowHooks(tmpDir)).toThrow(/Failed to parse flow config/);
 	});
 });
 

@@ -122,6 +122,7 @@ export async function executeScriptStep(
 	const scriptMeta: ScriptStepMeta = {
 		exit_code: result.exitCode,
 		duration_ms: result.durationMs,
+		end_reason: result.timedOut ? 'timeout' : result.success ? 'completed' : 'exit_nonzero',
 	};
 	stepTrace.meta = scriptMeta;
 

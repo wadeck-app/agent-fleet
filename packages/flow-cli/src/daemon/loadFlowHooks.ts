@@ -1,22 +1,16 @@
 import type { HookConfig } from '@wadeck-app/shared-cli/HookDispatcher';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
-import { parseFlowConfigFile } from './parseFlowConfigFile.js';
+import { type ProjectConfigSubject, loadProjectConfig } from '../config/ProjectFlowConfig.js';
 
 /**
- * Reads the `hooks:` section of the project's `.flow/config.yml`.
+ * Reads the `hooks:` section of the flow config of a project (in the project registry, see `loadProjectConfig`).
  *
- * Takes the folder of the registered project the run resolved to (not the client's cwd), so a run started from a
- * subfolder, or from elsewhere with `--project`, picks up the project's hooks.
+ * Takes the project the run resolved to (not the client's cwd), so a run started from a subfolder, or from elsewhere
+ * with `--project`, picks up the project's hooks.
+ *
+ * Fails (naming the file) rather than running the flow with no hooks: silently dropping every hook because of a typo,
+ * a misplaced key or a config still in the repository is worse than refusing to start.
  */
-export function loadFlowHooks(projectPath: string): Record<string, HookConfig[]> {
-	const configPath = path.join(projectPath, '.flow', 'config.yml');
-	if (!fs.existsSync(configPath)) {
-		return {};
-	}
-	// Fails rather than running the flow with no hooks: silently dropping every
-	// hook because of a typo is worse than refusing to start.
-	const raw = parseFlowConfigFile(configPath);
-	return (raw?.['hooks'] as Record<string, HookConfig[]> | undefined) ?? {};
+export function loadFlowHooks(project: ProjectConfigSubject): Record<string, HookConfig[]> {
+	return (loadProjectConfig(project).values['hooks'] as Record<string, HookConfig[]> | undefined) ?? {};
 }

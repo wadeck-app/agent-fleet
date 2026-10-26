@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { StepRunner } from 'flow-engine';
 import type { StepRunnerConfig } from 'flow-engine';
+import type { StepMeta } from 'flow-engine/types';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { WebSocket } from 'ws';
 
@@ -99,6 +100,7 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 				const stdout = (err as { stdout?: string }).stdout;
 				const stderr = (err as { stderr?: string }).stderr;
 				const io = (err as { io?: StepIoCapture }).io;
+				const meta = (err as { meta?: StepMeta }).meta;
 				sendForAssignment({
 					type: 'step_failed',
 					executionId: executionContext.executionId,
@@ -108,6 +110,7 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 					stdout,
 					stderr,
 					io,
+					meta,
 				});
 			}
 			send({ type: 'ready', ...READY });

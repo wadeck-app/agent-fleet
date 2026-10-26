@@ -28,12 +28,14 @@ export function serializeWorkerFrame(message: WorkerToDaemon): string {
 	if (message.type !== 'step_failed') {
 		throw new WorkerFrameTooLargeError(message.type, size);
 	}
-	const { assignmentId, executionId, stepId, error } = message;
+	const { assignmentId, executionId, stepId, error, meta } = message;
 	const shrunk = JSON.stringify({
 		type: 'step_failed',
 		assignmentId,
 		executionId,
 		stepId,
+		// Small, and the only record of what the failed attempt cost: kept
+		...(meta !== undefined && { meta }),
 		error: `${error} (the step's outputs and captured stdout/stderr were dropped: the failure report was ${String(size)} bytes, over the ${String(MAX_WORKER_FRAME_BYTES)}-byte limit)`,
 	});
 	const shrunkSize = Buffer.byteLength(shrunk, 'utf8');

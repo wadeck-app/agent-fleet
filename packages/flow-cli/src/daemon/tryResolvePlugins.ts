@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { flowConfigDir } from '../config/FlowConfigDir.js';
-import { launchProjectConfigPath } from '../config/LaunchProjectConfig.js';
+import { launchProjectConfig } from '../config/LaunchProjectConfig.js';
 import { PluginResolver } from '../config/PluginResolver.js';
 import { declaresPlugins } from './declaresPlugins.js';
 import { parseFlowConfigFile } from './parseFlowConfigFile.js';
@@ -24,7 +24,17 @@ const UNRESOLVED_PLUGIN_POINTS: Record<string, string> = {
 	interactivityPolicy: 'the built-in loud failure when no worker has a user interface',
 };
 
-/** Names the unresolved plugin sections a config file declares, if any. */
+/** Names the unresolved plugin points a `plugins` value declares, if any. */
+function unresolvedPointsIn(plugins: unknown): string[] {
+	if (typeof plugins !== 'object' || plugins === null) {
+		return [];
+	}
+	// violations-suppress: ts/no-unsafe-type-cast parsed YAML has no static shape; the plugins key is checked before use
+	const declared = plugins as Record<string, unknown>;
+	return Object.keys(UNRESOLVED_PLUGIN_POINTS).filter(point => declared[point] !== undefined);
+}
+
+/** Names the unresolved plugin sections the global config file declares, if any. */
 function declaresUnresolvedPlugins(configPath: string): string[] {
 	if (!fs.existsSync(configPath)) {
 		return [];
@@ -36,13 +46,7 @@ function declaresUnresolvedPlugins(configPath: string): string[] {
 		// declaresPlugins already reports a parse failure with the path; do not double-report.
 		return [];
 	}
-	const plugins = raw?.['plugins'];
-	if (typeof plugins !== 'object' || plugins === null) {
-		return [];
-	}
-	// violations-suppress: ts/no-unsafe-type-cast parsed YAML has no static shape; the plugins key is checked before use
-	const declared = plugins as Record<string, unknown>;
-	return Object.keys(UNRESOLVED_PLUGIN_POINTS).filter(point => declared[point] !== undefined);
+	return unresolvedPointsIn(raw?.['plugins']);
 }
 
 /**
@@ -60,23 +64,27 @@ export async function tryResolvePlugins(): Promise<{
 	// The daemon is a per-user machine-wide singleton, so it has no single project. The project config of its launch
 	// directory (registered project only) still applies; a launch directory in no project means the global config alone,
 	// reported on stderr, and an unregistered folder whose config declares plugins is an explicit error.
-	const projectConfigPath = launchProjectConfigPath(process.cwd());
+	const projectConfig = launchProjectConfig(process.cwd());
 
-	if (
-		!envOverride &&
-		!declaresPlugins(globalConfigPath) &&
-		(projectConfigPath === null || !declaresPlugins(projectConfigPath))
-	) {
+	if (!envOverride && !declaresPlugins(globalConfigPath) && projectConfig?.values['plugins'] === undefined) {
 		return {};
 	}
 
-	for (const configPath of [globalConfigPath, projectConfigPath]) {
-		if (configPath === null) {
-			continue;
-		}
-		for (const point of declaresUnresolvedPlugins(configPath)) {
+	const declarations: { file: string; points: string[] }[] = [
+		{ file: globalConfigPath, points: declaresUnresolvedPlugins(globalConfigPath) },
+		...(projectConfig === null
+			? []
+			: [
+					{
+						file: projectConfig.files.at(-1) ?? 'the project config',
+						points: unresolvedPointsIn(projectConfig.values['plugins']),
+					},
+				]),
+	];
+	for (const { file, points } of declarations) {
+		for (const point of points) {
 			throw new Error(
-				`"${configPath}" configures plugins.${point}, but the daemon does not load a ${point} plugin yet -- it uses ${UNRESOLVED_PLUGIN_POINTS[point] ?? 'a built-in implementation'}. Remove that section, or track the work to make it pluggable, rather than assuming it is active.`
+				`"${file}" configures plugins.${point}, but the daemon does not load a ${point} plugin yet -- it uses ${UNRESOLVED_PLUGIN_POINTS[point] ?? 'a built-in implementation'}. Remove that section, or track the work to make it pluggable, rather than assuming it is active.`
 			);
 		}
 	}

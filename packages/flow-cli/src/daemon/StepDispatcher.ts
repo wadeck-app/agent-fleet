@@ -10,6 +10,7 @@ import type { DaemonSecrets } from './DaemonSecrets.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import { assertStepLabels } from './LabelMatcher.js';
+import { ReRunKindTracker } from './ReRunKindTracker.js';
 import type { ReadyStep, ReadyStepQueue } from './ReadyStepQueue.js';
 import { StepRouter } from './StepRouter.js';
 import type { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
@@ -20,6 +21,8 @@ import type { WorkerRegistry } from './WorkerRegistry.js';
 export class StepDispatcher {
 	/** Chooses which live worker a step goes to (S3, S4) */
 	private readonly router = new StepRouter();
+	/** Tells a retry from another re-run when a step starts again, for the attempt history */
+	private readonly reRunKinds = new ReRunKindTracker();
 	/** When each interactive step started waiting, so an S9 policy can bound its own wait */
 	private readonly interactiveWaitSince = new Map<string, number>();
 
@@ -145,7 +148,8 @@ export class StepDispatcher {
 			step.executionContext.executionId,
 			step.stepId,
 			{ sourceId: worker?.sourceId, workerId: worker?.workerId },
-			relaunchFeedback
+			relaunchFeedback,
+			this.reRunKinds.kindFor(scheduler, step.stepId)
 		);
 		this.hooks.dispatch(step.executionContext.executionId, 'onStepStart', {
 			executionId: step.executionContext.executionId,

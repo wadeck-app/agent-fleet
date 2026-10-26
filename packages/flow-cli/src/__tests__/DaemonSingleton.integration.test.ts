@@ -62,8 +62,8 @@ describe('concurrent cold starts of the standalone bundle', () => {
 			);
 		}
 		const isolation = createIsolatedCliEnv();
-		// FLOW_QUEUE_EVENTS=0: the daemons must not declare events to the developer's real queue.
-		const env: NodeJS.ProcessEnv = { ...isolation.env, FLOW_QUEUE_EVENTS: '0' };
+		// isolation.env has FLOW_QUEUE_EVENTS=0: the daemons must not declare events to the developer's real queue.
+		const env: NodeJS.ProcessEnv = { ...isolation.env };
 		for (const name of [
 			'NODE_OPTIONS',
 			'VITEST',

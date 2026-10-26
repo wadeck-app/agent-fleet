@@ -68,6 +68,22 @@ describe('serializeWorkerFrame', () => {
 		expect(parsed['error']).toMatch(/dropped/);
 	});
 
+	// The meta is small and is what keeps the cost of a failed attempt: shrinking must not lose it.
+	it('keeps the meta of an oversized step_failed', () => {
+		const meta = { duration_ms: 5, exit_code: 1, end_reason: 'exit_nonzero' };
+		const frame = {
+			type: 'step_failed',
+			...ids,
+			error: 'boom',
+			stdout: 'x'.repeat(MAX_WORKER_FRAME_BYTES),
+			meta,
+		} as never;
+
+		const parsed = JSON.parse(serializeWorkerFrame(frame)) as Record<string, unknown>;
+
+		expect(parsed['meta']).toEqual(meta);
+	});
+
 	it('throws when even the shrunk step_failed is over the limit', () => {
 		const frame = { type: 'step_failed', ...ids, error: 'x'.repeat(MAX_WORKER_FRAME_BYTES) } as never;
 

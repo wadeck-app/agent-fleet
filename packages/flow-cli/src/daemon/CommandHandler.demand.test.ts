@@ -311,6 +311,57 @@ describe('CommandHandler — mid-step disconnect (D#62, D#65)', () => {
 		expect(mockExecStore.markStepFailed).toHaveBeenCalled();
 	});
 
+	// The attempt history labels each start: a start the scheduler granted as a retry is a retry, not a loop.
+	it('tells the store whether a re-run of a step is a retry', async () => {
+		const flowFile = path.join(tmpDir, 'retry.yml');
+		const retrying = VALID_FLOW_YAML.replace(
+			'    script: echo hello',
+			'    script: echo hello\n    retry: { maxAttempts: 1, backoff: linear }'
+		);
+		fs.writeFileSync(flowFile, retrying);
+		const workerPool = createMockWorkerPool();
+		workerPool.getIdle.mockReturnValue({} as never);
+		workerPool.send.mockReturnValue(true);
+		const handler = new TrackedCommandHandler(
+			daemonDir,
+			workerPool as never,
+			workerPool as never,
+			undefined,
+			mockExecStore as never,
+			mockLogWriter as never
+		);
+		const { executionId } = (await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never)) as {
+			executionId: string;
+		};
+
+		handler.onStepFailed(executionId, 's1', 'boom');
+		handler.tryDispatch();
+
+		const kinds = mockExecStore.markStepRunning.mock.calls.map(call => call[4]);
+		expect(kinds).toEqual(['loop', 'retry']);
+	});
+
+	// The attempt is recorded as an engine failure with its own end reason, not as a failure of the step.
+	it('records the attempt of a step lost mid-execution as engine_failed / worker_lost', async () => {
+		const { handler, worker, sent, executionId } = await dispatchOneStep();
+		handler.onStepStarted(worker, sent[0]!.assignmentId, executionId, 's1');
+
+		handler.handleWorkerDisconnect(worker);
+
+		expect(mockExecStore.markStepFailed.mock.calls.at(-1)?.[6]).toEqual({ engineEndReason: 'worker_lost' });
+	});
+
+	it('records the attempt of a step that exhausted its re-dispatches as engine_failed', async () => {
+		const { handler, worker } = await dispatchOneStep();
+
+		for (let i = 0; i <= MAX_REDISPATCHES; i++) {
+			handler.handleWorkerDisconnect(worker);
+			handler.tryDispatch();
+		}
+
+		expect(mockExecStore.markStepFailed.mock.calls.at(-1)?.[6]).toEqual({ engineEndReason: 'engine_failed' });
+	});
+
 	// The message used to suggest declaring "retry" on the step, which an engine failure now ignores:
 	// advice that cannot work is worse than none.
 	it('does not suggest declaring retry for a step lost mid-execution, since retry no longer applies to it', async () => {
@@ -485,6 +536,7 @@ describe('CommandHandler — a step whose worker went quiet', () => {
 			expect(reason).toContain('queue.stepSilenceLimitSeconds');
 			// Not retried: it was executing, so it may already have had an effect (D#65).
 			expect(reason).toMatch(/not retried/i);
+			expect(mockExecStore.markStepFailed.mock.calls.at(-1)?.[6]).toEqual({ engineEndReason: 'stalled' });
 		} finally {
 			vi.useRealTimers();
 		}

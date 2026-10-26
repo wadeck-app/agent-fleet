@@ -85,7 +85,7 @@ export async function startBundledDaemon(options: BundledDaemonOptions = {}): Pr
 		FLOW_DAEMON_MODE: '1',
 		XDG_CONFIG_HOME: configHome,
 		FLOW_DAEMON_PORT: '0',
-		FLOW_QUEUE_EVENTS: '0',
+		// FLOW_QUEUE_EVENTS=0 comes from createIsolatedCliEnv (opt in per test with options.env).
 		...options.env,
 	});
 	const flowDir = join(configHome, 'flow');

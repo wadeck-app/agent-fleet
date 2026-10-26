@@ -1177,6 +1177,8 @@ export interface StepMetaBase {
 /** Metadata specific to script steps */
 export interface ScriptStepMeta extends StepMetaBase {
 	exit_code: number;
+	/** Why this attempt ended: completed, exit_nonzero or timeout. Absent on records written before it existed. */
+	end_reason?: AttemptEndReason;
 }
 
 /** Metadata specific to model steps */
@@ -1195,8 +1197,60 @@ export interface ModelStepMeta extends StepMetaBase {
 		cache_read_tokens: number;
 		cache_write_tokens: number;
 		usd: number;
+		/**
+		 * False when the provider gave no cost for this attempt (process killed before its result, codex which never
+		 * reports one): `usd` is then a placeholder 0, not a measurement. Absent on records written before it existed,
+		 * which stay read as reported.
+		 */
+		reported?: boolean;
 	};
+	/**
+	 * Model turns of this attempt. Absent when the provider does not report them (codex: one turn is the
+	 * whole run) or the process ended before its result event.
+	 */
+	turns?: number;
+	/**
+	 * Tool calls seen in the provider's stream during this attempt (errored calls included). Absent when the
+	 * stream was not observed (non-streaming or interactive run). `by_tool` keeps 50 names, the rest under "other".
+	 */
+	tool_calls?: { total: number; by_tool: Record<string, number> };
+	/**
+	 * Distinct paths written through the provider's file tools (max 100, 500 chars each) in THIS attempt.
+	 * Writes done through a shell (`sed -i`, redirects, scripts) are not observable and are not listed.
+	 */
+	files_written?: string[];
+	/** True number of distinct paths written, even when `files_written` was capped. */
+	files_written_count?: number;
+	/** Why this attempt ended. Absent only on records written before it existed. */
+	end_reason?: AttemptEndReason;
 }
+
+/**
+ * Why a step attempt ended. Closed set: a new value must be added here and handled everywhere it is read.
+ *
+ * - completed: the attempt produced its result
+ * - exit_nonzero: the provider process exited with a failure code
+ * - is_error_result: exit 0 but the result event flagged the turn as an error
+ * - empty_output: exit 0 with no text and zero metered tokens
+ * - timeout: the step's `timeout` fired and the process was killed
+ * - stalled: the daemon saw no sign of life for too long (daemon-side)
+ * - worker_lost: the worker holding the step disconnected after it started (daemon-side)
+ * - engine_failed: the daemon failed the step itself (daemon-side)
+ * - execution_ended: the execution ended while the step was still running (daemon-side)
+ * - step_error: failed for a reason no other value covers (exception, spawn failure, configuration rejected before
+ *   launch, or a failure reported without a classified reason)
+ */
+export type AttemptEndReason =
+	| 'completed'
+	| 'exit_nonzero'
+	| 'is_error_result'
+	| 'empty_output'
+	| 'timeout'
+	| 'stalled'
+	| 'worker_lost'
+	| 'engine_failed'
+	| 'execution_ended'
+	| 'step_error';
 
 export type StepMeta = ScriptStepMeta | ModelStepMeta | StepMetaBase;
 

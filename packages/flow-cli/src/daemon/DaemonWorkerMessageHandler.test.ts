@@ -154,3 +154,65 @@ describe('DaemonWorkerMessageHandler -- handleClose diagnostics', () => {
 		);
 	});
 });
+
+describe('DaemonWorkerMessageHandler -- step_failed metrics', () => {
+	function makeFailingHandler() {
+		const commandHandler = {
+			verifyAssignment: vi.fn().mockReturnValue(true),
+			settleAssignment: vi.fn(),
+			onStepFailed: vi.fn(),
+			dispatchHook: vi.fn(),
+		};
+		const executionStore = { markStepFailed: vi.fn() };
+		const logWriter = { writeExecution: vi.fn() };
+		const daemonSecrets = { masks: { mask: (_executionId: string, text: string) => text } };
+		const workerRegistry = { describe: vi.fn().mockReturnValue({ workerId: 'w-old', version: '1.2.3' }) };
+		const handler = new DaemonWorkerMessageHandler(
+			'/logs',
+			() =>
+				({
+					commandHandler,
+					executionStore,
+					logWriter,
+					daemonSecrets,
+					workerRegistry,
+				}) as unknown as DaemonRuntime,
+			() => {}
+		);
+		return { handler, executionStore, logWriter };
+	}
+
+	it('records the meta the failing worker reported with the failure', () => {
+		const { handler, executionStore } = makeFailingHandler();
+		const meta = { duration_ms: 9, exit_code: 1, end_reason: 'exit_nonzero' };
+
+		handler.handleMessage(ws, { type: 'step_failed', ...base, error: 'boom', meta } as never);
+
+		expect(executionStore.markStepFailed).toHaveBeenCalledTimes(1);
+		expect(executionStore.markStepFailed.mock.calls[0]![6]).toEqual({ meta });
+	});
+
+	// An older worker cannot send it: the attempt is recorded without metrics, and the operator is told why.
+	it('accepts a failure without meta, records no metrics, and warns once per worker naming its version', () => {
+		const { handler, executionStore, logWriter } = makeFailingHandler();
+
+		handler.handleMessage(ws, { type: 'step_failed', ...base, error: 'boom' } as never);
+		handler.handleMessage(ws, { type: 'step_failed', ...base, error: 'boom again' } as never);
+
+		expect(executionStore.markStepFailed).toHaveBeenCalledTimes(2);
+		expect(executionStore.markStepFailed.mock.calls[0]![6]).toEqual({ meta: undefined });
+		const warnings = logWriter.writeExecution.mock.calls.filter(call => call[2] === 'warning');
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]![1]).toContain('w-old');
+		expect(warnings[0]![1]).toContain('1.2.3');
+		expect(warnings[0]![1]).toMatch(/flow cli update/);
+	});
+
+	it('does not warn when the failure carried a meta', () => {
+		const { handler, logWriter } = makeFailingHandler();
+
+		handler.handleMessage(ws, { type: 'step_failed', ...base, error: 'x', meta: { duration_ms: 1 } } as never);
+
+		expect(logWriter.writeExecution.mock.calls.filter(call => call[2] === 'warning')).toHaveLength(0);
+	});
+});

@@ -17,7 +17,7 @@ function fakeClient(overrides: Partial<QueueClient> = {}): QueueClient & { calls
 }
 
 describe('QueueFlowEventPublisher', () => {
-	it('publishes with the execution project as cwd', () => {
+	it('falls back to the project folder as cwd for an old record without a project id', () => {
 		const client = fakeClient();
 		new QueueFlowEventPublisher(client).publish('flow.step.started', {
 			executionId: 'e1',
@@ -32,6 +32,30 @@ describe('QueueFlowEventPublisher', () => {
 				{ cwd: '/work/p' },
 			],
 		]);
+	});
+
+	it('publishes with the project id, and no cwd, when the execution has one', () => {
+		const client = fakeClient();
+		const payload = {
+			executionId: 'e1',
+			flowId: 'f',
+			status: 'running' as const,
+			projectRoot: '/work/p',
+			projectId: 'a1b2c3d4',
+		};
+		new QueueFlowEventPublisher(client).publish('flow.step.started', payload);
+		expect(client.calls).toEqual([['flow.step.started', payload, { project: 'a1b2c3d4' }]]);
+	});
+
+	it('publishes with the project id alone when only the id is known', () => {
+		const client = fakeClient();
+		new QueueFlowEventPublisher(client).publish('flow.step.started', {
+			executionId: 'e1',
+			flowId: 'f',
+			status: 'running',
+			projectId: 'a1b2c3d4',
+		});
+		expect(client.calls[0]![2]).toEqual({ project: 'a1b2c3d4' });
 	});
 
 	it('does not pass a cwd when the event has no project', () => {
@@ -112,25 +136,5 @@ describe('QueueFlowEventPublisher', () => {
 		const declaration = await new QueueFlowEventPublisher(client).declareEvents();
 		expect(declaration.state).toBe('dropped');
 		expect(JSON.stringify(declaration)).toContain('kaput');
-	});
-});
-
-describe('QueueFlowEventPublisher with projectId', () => {
-	it('still pushes with cwd = projectRoot and carries projectId in the payload', () => {
-		const client = fakeClient();
-		new QueueFlowEventPublisher(client).publish('flow.step.started', {
-			executionId: 'e1',
-			flowId: 'f',
-			status: 'running',
-			projectId: 'a1b2c3d4',
-			projectRoot: '/work/p',
-		});
-		expect(client.calls).toEqual([
-			[
-				'flow.step.started',
-				{ executionId: 'e1', flowId: 'f', status: 'running', projectId: 'a1b2c3d4', projectRoot: '/work/p' },
-				{ cwd: '/work/p' },
-			],
-		]);
 	});
 });

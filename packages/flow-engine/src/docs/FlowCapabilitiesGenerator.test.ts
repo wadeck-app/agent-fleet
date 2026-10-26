@@ -22,6 +22,16 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result.length).toBeGreaterThan(0);
 	});
 
+	// `meta` is the LAST attempt only: the per-attempt history lives in the execution record, not in templates.
+	it('documents the attempt metrics of a model step as the last attempt, with what is not observable', () => {
+		expect(result).toContain('`turns`');
+		expect(result).toContain('`tool_calls.total`');
+		expect(result).toContain('`files_written_count`');
+		expect(result).toContain('`end_reason`');
+		expect(result).toMatch(/last attempt/i);
+		expect(result).toMatch(/shell/i);
+	});
+
 	it('contains all required section headings', () => {
 		expect(result).toContain('Step Types');
 		expect(result).toContain('Variable Types');

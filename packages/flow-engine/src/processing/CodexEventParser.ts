@@ -18,15 +18,9 @@
  * captured (reasoning, web_search, todo_list, ...) are reported once as "unrecognized" rather than
  * guessed at.
  */
-import type { StreamJsonEvent, StreamJsonEventCallback } from './StreamJsonParser';
+import { isRecord } from 'shared-common/utils/isRecord';
 
-/**
- * Narrow an unknown JSON value to a plain object.
- * Arrays and null are rejected -- they never carry the keys we read.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+import type { StreamJsonEvent, StreamJsonEventCallback } from './StreamJsonParser';
 
 function asString(value: unknown, fallback = ''): string {
 	return typeof value === 'string' ? value : fallback;

@@ -20,7 +20,7 @@ plugins:
                 baseDir: ~/workspaces # required: absolute or ~ path, outside project root
                 branchPrefix: flow/ # optional: prefix for created branches
 
-# .flow/config.yml
+# project flow config (see flow-cli PLUGINS.md)
 plugins:
     workspace:
         use: my-worktree

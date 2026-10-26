@@ -8,6 +8,9 @@ import { WorkerConnectionTracker } from './WorkerConnectionTracker.js';
 
 /** Reacts to what connected workers and relays say, and to their sockets closing. */
 export class DaemonWorkerMessageHandler {
+	/** Workers already warned about for reporting a failure without metrics: once each, not once per failure. */
+	private readonly warnedWithoutMetrics = new WeakSet<WebSocket>();
+
 	constructor(
 		private readonly logsDir: string,
 		private readonly runtime: () => DaemonRuntime,
@@ -156,17 +159,34 @@ export class DaemonWorkerMessageHandler {
 	private handleStepFailed(ws: WebSocket, message: Extract<WorkerToDaemon, { type: 'step_failed' }>): void {
 		const { commandHandler, executionStore, logWriter, daemonSecrets } = this.runtime();
 		try {
-			const { assignmentId, executionId, stepId, error: reportedError, output, stdout, stderr, io } = message;
+			const {
+				assignmentId,
+				executionId,
+				stepId,
+				error: reportedError,
+				output,
+				stdout,
+				stderr,
+				io,
+				meta,
+			} = message;
 			// The worker already masked it; this is the daemon's own pass, before hooks and logs see it.
 			const error = daemonSecrets.masks.mask(executionId, reportedError);
 			if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
 				return;
 			}
 			commandHandler.settleAssignment(assignmentId);
-			executionStore.markStepFailed(executionId, stepId, error, stdout, stderr, {
-				capture: io,
-				outputs: output ?? {},
-			});
+			this.warnOnceIfNoMetrics(ws, executionId, stepId, meta);
+			executionStore.markStepFailed(
+				executionId,
+				stepId,
+				error,
+				stdout,
+				stderr,
+				{ capture: io, outputs: output ?? {} },
+				// Undefined meta is recorded as such (attempt without metrics), never as a zero cost
+				{ meta }
+			);
 			commandHandler.onStepFailed(executionId, stepId, error, output);
 			// markExecutionFailed is now called inside onStepFailed only when the failure is terminal
 			logWriter.writeExecution(executionId, `Step ${stepId} failed: ${error}`, 'error');
@@ -175,6 +195,25 @@ export class DaemonWorkerMessageHandler {
 			process.stderr.write(`[daemon] step_failed handler error: ${String(err)}\n`);
 			writeDaemonLog(this.logsDir, 'error', `step_failed handler error: ${String(err)}`);
 		}
+	}
+
+	/**
+	 * A failure with no meta is recorded without cost or duration details. Said once per worker in the execution log, with
+	 * the way out: the usual cause is a worker built before failed attempts reported their metrics.
+	 */
+	private warnOnceIfNoMetrics(ws: WebSocket, executionId: string, stepId: string, meta: unknown): void {
+		if (meta !== undefined || this.warnedWithoutMetrics.has(ws)) {
+			return;
+		}
+		this.warnedWithoutMetrics.add(ws);
+		const worker = this.runtime().workerRegistry.describe(ws);
+		this.runtime().logWriter.writeExecution(
+			executionId,
+			`Step ${stepId} failed without attempt metrics from worker ${worker?.workerId ?? 'unknown'} (flow-cli ${worker?.version ?? 'unknown version'}): ` +
+				'its cost and duration are not recorded for this attempt. A worker built before failed attempts reported metrics causes this: update it with `flow cli update` and restart it. ' +
+				'This is said once per worker.',
+			'warning'
+		);
 	}
 
 	private handleLog(ws: WebSocket, message: Extract<WorkerToDaemon, { type: 'log' }>): void {

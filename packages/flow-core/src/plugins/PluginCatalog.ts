@@ -40,7 +40,7 @@ export class UnknownPluginError extends FlowCoreError {
 export const PLUGIN_CONFIGS: Record<string, PluginConfig> = {
 	none: {
 		extensionPoint: 'workspace',
-		snippet: `# Add to .flow/config.yml:
+		snippet: `# Add to the project flow config (see flow-cli PLUGINS.md):
 
 plugins:
   workspace:
@@ -50,7 +50,7 @@ plugins:
 	},
 	worktree: {
 		extensionPoint: 'workspace',
-		snippet: `# Add to .flow/config.yml:
+		snippet: `# Add to the project flow config (see flow-cli PLUGINS.md):
 
 plugins:
   workspace:
@@ -66,7 +66,7 @@ plugins:
 	},
 	'cli-approval': {
 		extensionPoint: 'approval',
-		snippet: `# Add to .flow/config.yml:
+		snippet: `# Add to the project flow config (see flow-cli PLUGINS.md):
 
 plugins:
   approval:
@@ -79,7 +79,7 @@ plugins:
 	},
 	'file-approval': {
 		extensionPoint: 'approval',
-		snippet: `# Add to .flow/config.yml:
+		snippet: `# Add to the project flow config (see flow-cli PLUGINS.md):
 
 plugins:
   approval:

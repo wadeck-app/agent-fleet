@@ -5,10 +5,8 @@ import { resolveOwnBundlePath } from '@wadeck-app/shared-cli/resolveOwnBundlePat
 import { readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
 import { createRemoteDaemonClient, logsDirOf } from 'flow-core';
-import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,7 +15,6 @@ import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { appCoreModuleOptions } from '../daemon/AppModuleLocator.js';
 import { Daemon } from '../daemon/Daemon.js';
 import { writeDaemonLog } from '../daemon/DaemonLog.js';
-import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../daemon/WindowsDaemonEnv.js';
 import { resolveDaemonPort } from '../daemon/resolveDaemonPort.js';
 import { resolveIdleCheckInterval } from '../daemon/resolveIdleCheckInterval.js';
 import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
@@ -30,6 +27,7 @@ import { registerPluginsCommand } from './commands/PluginsCommand';
 import { registerResumeCommand } from './commands/ResumeCommand';
 import { registerRunCommand } from './commands/RunCommand';
 import { registerShowCommand } from './commands/ShowCommand';
+import { startDaemonCommand } from './commands/StartCommand';
 import { registerValidateCommand } from './commands/ValidateCommand';
 import { registerVersionsCommand } from './commands/VersionsCommand';
 import { registerWorkerCommand } from './commands/WorkerCommand';
@@ -72,52 +70,12 @@ const DAEMON_DIR = flowConfigDir();
 // ---------------------------------------------------------------------------
 
 async function registerDaemonCommands(program: Command): Promise<void> {
-	// flow start -- spawn daemon detached and return immediately
+	// flow start -- spawn the daemon detached (once, even for concurrent calls) and return when it is up
 	program
 		.command('start')
 		.description('Start the flow daemon in the background')
 		.action(async () => {
-			const client = createRemoteDaemonClient(DAEMON_DIR);
-			if (await client.isRunning()) {
-				process.stdout.write('[ok] daemon already running\n');
-				return;
-			}
-			const bundlePath = resolveOwnBundlePath(FLOW_BUNDLE_NAME, fileURLToPath(import.meta.url));
-			if (process.platform === 'win32') {
-				const vbsPath = path.join(os.tmpdir(), `flow-daemon-start-${Date.now()}.vbs`);
-				const safeNode = process.execPath.replace(/"/g, '""');
-				const safeBundle = bundlePath.replace(/"/g, '""');
-				const daemonEnv: NodeJS.ProcessEnv = { ...process.env, FLOW_DAEMON_MODE: '1' };
-				const resolvedBashPath = resolveFlowBashPath(daemonEnv);
-				if (resolvedBashPath) {
-					daemonEnv['FLOW_BASH_PATH'] = resolvedBashPath;
-				}
-				fs.writeFileSync(
-					vbsPath,
-					[
-						'Dim oShell',
-						'Set oShell = CreateObject("WScript.Shell")',
-						'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
-						...buildWindowsDaemonEnvLines(daemonEnv),
-						`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
-					].join('\r\n')
-				);
-				const wscript = spawn('wscript.exe', [vbsPath], {
-					detached: true,
-					stdio: 'ignore',
-					windowsHide: true,
-					env: daemonEnv,
-				});
-				wscript.unref();
-			} else {
-				// violations-suppress: cli/no-spawn-without-windows-hide this is the non-Windows branch (win32 uses wscript.exe above), where windowsHide has no effect
-				const child = spawn(process.execPath, [bundlePath], {
-					stdio: 'ignore',
-					env: { ...process.env, FLOW_DAEMON_MODE: '1' },
-				});
-				child.unref();
-			}
-			process.stdout.write('[ok] daemon starting\n');
+			await startDaemonCommand(DAEMON_DIR, text => process.stdout.write(text));
 		});
 
 	// flow stop -- POST /quit to the running daemon

@@ -70,3 +70,47 @@ describe('createFlowEventPublisher: declaring the events to a queue daemon', () 
 		expect(daemon.pushes()).toEqual([]);
 	});
 });
+
+describe('createFlowEventPublisher: the project of a pushed event', () => {
+	let daemon: FakeQueueDaemon;
+	const log = (): void => {};
+
+	beforeEach(async () => {
+		daemon = await startFakeQueueDaemon();
+	});
+
+	afterEach(async () => {
+		await daemon.close();
+	});
+
+	it('sends the project id on the wire when the execution has one', async () => {
+		const publisher = createFlowEventPublisher({}, log, { configDir: daemon.configDir });
+		publisher.publish('flow.step.started', {
+			executionId: 'e',
+			flowId: 'f',
+			status: 'running',
+			projectId: 'a1b2c3d4',
+			projectRoot: '/work/app',
+		});
+		await publisher.flush();
+		expect(daemon.pushes().map(push => push.project)).toEqual(['a1b2c3d4']);
+	});
+
+	it('reports a queue daemon older than push protocol 1.2.0 instead of filing the event under another project', async () => {
+		await daemon.close();
+		daemon = await startFakeQueueDaemon({ protocolVersion: '1.1.0' });
+		const failures: string[] = [];
+		const publisher = createFlowEventPublisher({}, (_level, message) => failures.push(message), {
+			configDir: daemon.configDir,
+		});
+		publisher.publish('flow.step.started', {
+			executionId: 'e',
+			flowId: 'f',
+			status: 'running',
+			projectId: 'a1b2c3d4',
+		});
+		await publisher.flush();
+		expect(daemon.pushes()).toEqual([]);
+		expect(failures.join('\n')).toContain('queue cli update');
+	});
+});

@@ -1,7 +1,7 @@
 import type { StepRunner } from 'flow-engine';
 import type { TemplateContext } from 'flow-engine/processing/TemplateRenderer';
 import type { ToolCallInFlight, ToolProgress } from 'flow-engine/processing/ToolCallTracker';
-import type { LiveLogEntry, ModelFlowStep, ScriptFlowStep, Workspace } from 'flow-engine/types';
+import type { LiveLogEntry, ModelFlowStep, ScriptFlowStep, StepMeta, Workspace } from 'flow-engine/types';
 import { randomUUID } from 'node:crypto';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
@@ -92,12 +92,14 @@ function maskError(error: unknown, masker: SecretMasker): unknown {
 		stderr?: string;
 		stepOutputs?: Record<string, unknown>;
 		io?: StepIoCapture;
+		meta?: StepMeta;
 	};
 	return Object.assign(new Error(masker.mask(normalizeError(error).message)), {
 		stdout: maskOptional(masker, carried.stdout),
 		stderr: maskOptional(masker, carried.stderr),
 		stepOutputs: masker.maskDeep(carried.stepOutputs),
 		io: masker.maskDeep(carried.io),
+		meta: masker.maskDeep(carried.meta),
 	});
 }
 
@@ -317,7 +319,8 @@ export class WorkerAdapter {
 				}
 				const io = buildStepIoCapture(step, trace, context);
 				if (trace.error) {
-					throw Object.assign(new Error(trace.error), { io });
+					// The meta travels with the failure: a failed attempt has a cost and a duration too
+					throw Object.assign(new Error(trace.error), { io, meta: trace.meta });
 				}
 				// trace.outputs is undefined for model steps that produce no structured output --
 				// an empty map is the correct representation (no outputs to propagate to dependents).
@@ -354,6 +357,7 @@ export class WorkerAdapter {
 				stdout: trace.stdout,
 				stderr: trace.stderr,
 				io,
+				meta: trace.meta,
 			});
 			throw err;
 		}

@@ -7,7 +7,7 @@ $type: PageContent
 sections:
     - $type: PageHeader
       title: Flow plugins
-      subtitle: Plugins shipped with flow, and the type string that selects each in .flow/config.yml
+      subtitle: Plugins shipped with flow, and the type string that selects each in the flow config of the project
 
     - $type: DataTable
       rows: $sources.plugins.plugins

@@ -157,7 +157,7 @@ a forked pid that never connects is killed after 10s, and its exit is noticed.
 
 | You see                                                                                                     | It means                                                                                           |
 | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `interactive: false (no approval plugin configured…)`                                                       | add `plugins.approval` to `.flow/config.yml`                                                       |
+| `interactive: false (no approval plugin configured…)`                                                       | add `plugins.approval` to the project config (see PLUGINS.md)                                                       |
 | `interactive: false (the configured approval plugin needs a terminal…)`                                     | you are not on a TTY; use `plugins.file-approval`                                                  |
 | `[wait] daemon connection closed; waiting to re-register`                                                   | normal with no daemon; it is waiting, not dying                                                    |
 | `Step "x" needs a person to answer it. No connected worker declared a user interface in the 45s it waited.` | no interactive worker appeared; check `flow worker list` shows `interactive=true`                  |

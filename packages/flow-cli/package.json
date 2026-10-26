@@ -24,7 +24,7 @@
 	"dependencies": {
 		"@wadeck-app/app-core-sdk": "latest",
 		"@wadeck-app/project-sdk": "latest",
-		"@wadeck-app/queue-sdk": ">=2026.10.24-190-aa15e847",
+		"@wadeck-app/queue-sdk": ">=2026.10.25-229-8c220c5d",
 		"@wadeck-app/shared-cli": "latest",
 		"@wadeck-app/shared-updater": "latest",
 		"@wadeck-app/singleton-daemon-kit": "latest",

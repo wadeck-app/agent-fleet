@@ -1,4 +1,4 @@
-import type { StepMeta } from 'flow-engine/types';
+import type { AttemptEndReason, StepMeta } from 'flow-engine/types';
 
 // Single source of truth for the persisted execution shape: ExecutionStore (writer, flow-cli)
 // and every reader (history, show, app-module) use these types.
@@ -35,6 +35,64 @@ export interface StepIoRecord {
 	storedChars: number;
 }
 
+/**
+ * What started an attempt of a step: its first start, a `retry`, a `loop` (`onFailure.goto` or a sub-step round restart,
+ * i.e. any re-run that is not a retry), a `relaunch` of a parent after a failed sub-step, or a `resume` of an unanswered
+ * intervention.
+ */
+export type AttemptOrigin = 'first' | 'retry' | 'loop' | 'relaunch' | 'resume';
+
+/**
+ * How an attempt settled: `completed`, `failed` (the step reported a failure), `engine_failed` (the daemon failed it
+ * itself: worker lost, stalled, refused), or `abandoned` (the execution ended while it was running).
+ */
+export type AttemptOutcome = 'completed' | 'failed' | 'engine_failed' | 'abandoned';
+
+/**
+ * One settled attempt of a step, written when the attempt ENDS (never at the next start, so the last attempt and a
+ * crash are covered). Additive: absent on records written before it existed. Paths of written files are not kept here.
+ *
+ * Every figure is what the provider REPORTED for that attempt. `usd` absent means unknown (killed before its result,
+ * codex, no metrics received), never zero. Whether a provider's reported cost is cumulative across a resumed session
+ * is unverified, so these raw values must not be summed yet.
+ */
+export interface AttemptRecord {
+	/** Attempt number, as in `StepState.attempts` when it started. */
+	n: number;
+	origin: AttemptOrigin;
+	startedAt: string;
+	endedAt: string;
+	/** `endedAt - startedAt`: includes the time before the worker began. */
+	durationMs: number;
+	outcome: AttemptOutcome;
+	endReason: AttemptEndReason;
+	/** Failure message, cut to 500 characters and masked. */
+	error?: string;
+	model?: string;
+	usd?: number;
+	tokens?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+	turns?: number;
+	/** Total tool calls seen. */
+	toolCalls?: number;
+	/** True number of distinct files written (paths are only kept in `meta`, for the last attempt). */
+	filesWrittenCount?: number;
+	/** Position in `StepState.relaunches` of the relaunch that started this attempt. */
+	relaunchIndex?: number;
+}
+
+/**
+ * Totals of the oldest attempts folded out of `attemptLog` once it passes 50 entries for a step or 400 for an execution,
+ * so totals stay correct and nothing is dropped silently.
+ */
+export interface AttemptOverflow {
+	count: number;
+	/** Sum of the known `usd` of the folded attempts. */
+	usd: number;
+	/** How many of the folded attempts had no known `usd`. */
+	usdUnknownCount: number;
+	durationMs: number;
+}
+
 export interface StepState {
 	status: StepStatus;
 	startedAt?: string;
@@ -65,6 +123,15 @@ export interface StepState {
 	priorAttemptsMs?: number;
 	/** One entry per relaunch of this step caused by a failed sub-step, with the feedback it was resumed with (truncated). */
 	relaunches?: { at: string; feedback: string }[];
+	/**
+	 * One entry per settled attempt, oldest first (see {@link AttemptRecord}); `meta` stays "the last attempt". Absent on
+	 * records written before it existed: readers fall back to `meta` and `attempts`.
+	 */
+	attemptLog?: AttemptRecord[];
+	/** Totals of the attempts folded out of `attemptLog` by its size caps. */
+	attemptOverflow?: AttemptOverflow;
+	/** How the attempt now running started; moved into its `attemptLog` entry when it settles. */
+	runningAttempt?: { origin: AttemptOrigin; relaunchIndex?: number };
 	/**
 	 * Which source supplied the worker that ran this step, and which worker it was
 	 * (T-06). Without this, a step's outcome cannot be attributed to the machine that

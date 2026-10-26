@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { FlowConfig } from '../config/FlowConfig';
+import { projectConfigFile } from '../config/ProjectFlowConfig';
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { createDaemonCommands } from './createDaemonCommands';
 
@@ -26,9 +27,10 @@ describe('createDaemonCommands run', () => {
 		fixture.dispose();
 	});
 
-	function writeHooks(folder: string, command: string): void {
-		fs.mkdirSync(path.join(folder, '.flow'), { recursive: true });
-		fs.writeFileSync(path.join(folder, '.flow', 'config.yml'), `hooks:\n  onFlowEnd:\n    - command: ${command}\n`);
+	function writeHooks(projectId: string, command: string): void {
+		const file = projectConfigFile(fixture.registryDir, projectId);
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, `hooks:\n  onFlowEnd:\n    - command: ${command}\n`);
 	}
 
 	it('refuses a run from an unregistered folder without pruning, reading hooks or reaching the handler', async () => {
@@ -47,7 +49,7 @@ describe('createDaemonCommands run', () => {
 
 	it('prunes and reads the hooks of the project, then hands the resolved project to the handler', async () => {
 		const alpha = await fixture.register('alpha');
-		writeHooks(alpha.folder!, 'echo alpha');
+		writeHooks(alpha.id, 'echo alpha');
 		const sub = path.join(alpha.folder!, 'sub');
 		fs.mkdirSync(sub);
 
@@ -64,7 +66,7 @@ describe('createDaemonCommands run', () => {
 	it('works on the project named with --project, not on the folder the client is in', async () => {
 		const alpha = await fixture.register('alpha');
 		const beta = await fixture.register('beta');
-		writeHooks(beta.folder!, 'echo beta');
+		writeHooks(beta.id, 'echo beta');
 
 		await run({ type: 'run', flowFile: 'f.yml', cwd: alpha.folder, projectRef: 'beta' });
 
@@ -76,11 +78,25 @@ describe('createDaemonCommands run', () => {
 
 	it('refuses a run when the project hooks file cannot be parsed, instead of running without its hooks', async () => {
 		const alpha = await fixture.register('alpha');
-		fs.mkdirSync(path.join(alpha.folder!, '.flow'));
-		fs.writeFileSync(path.join(alpha.folder!, '.flow', 'config.yml'), 'hooks:\n  onFlowEnd: [unclosed\n');
+		const file = projectConfigFile(fixture.registryDir, alpha.id);
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, 'hooks:\n  onFlowEnd: [unclosed\n');
 
 		await expect(run({ type: 'run', flowFile: 'f.yml', cwd: alpha.folder })).rejects.toThrow(
 			/Failed to parse flow config/
+		);
+		expect(handleRun).not.toHaveBeenCalled();
+	});
+
+	it('refuses a run when the repository still holds the old .flow/config.yml, naming the command that moves it', async () => {
+		const alpha = await fixture.register('alpha');
+		const legacy = path.join(alpha.folder!, '.flow', 'config.yml');
+		fs.mkdirSync(path.dirname(legacy), { recursive: true });
+		fs.writeFileSync(legacy, 'hooks:\n  onFlowEnd:\n    - command: echo old\n');
+		const target = projectConfigFile(fixture.registryDir, alpha.id);
+
+		await expect(run({ type: 'run', flowFile: 'f.yml', cwd: alpha.folder })).rejects.toThrow(
+			`mv "${legacy}" "${target}"`
 		);
 		expect(handleRun).not.toHaveBeenCalled();
 	});

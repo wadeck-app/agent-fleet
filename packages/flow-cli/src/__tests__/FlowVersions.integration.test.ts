@@ -42,7 +42,6 @@ describe('flow versions (end to end)', () => {
 		registry = new RegisteredProjectFixture().useAsProcessEnv();
 		workDir = fs.realpathSync(createTempDirectory('versions-e2e-'));
 		fs.mkdirSync(path.join(workDir, '.flow'));
-		fs.writeFileSync(path.join(workDir, '.flow', 'config.yml'), '');
 		registryFile = path.join(workDir, '.flow', 'flows.yml');
 		await registry.register('versions-e2e', { folder: workDir });
 	});

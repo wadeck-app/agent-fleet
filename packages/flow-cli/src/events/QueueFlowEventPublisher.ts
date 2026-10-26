@@ -11,7 +11,7 @@ import type {
 
 /** The part of the queue SDK's publisher this class uses (structurally the SDK's `QueuePublisher`). */
 export interface QueueClient {
-	publish(event: string, payload: unknown, options?: { cwd?: string }): void;
+	publish(event: string, payload: unknown, options?: { cwd?: string; project?: string }): void;
 	flush(): Promise<void>;
 	status(): Promise<{ available: boolean; via?: 'daemon' | 'queue-start'; reason?: string }>;
 	registerEvents(
@@ -30,11 +30,14 @@ export class QueueFlowEventPublisher implements FlowEventPublisher {
 	constructor(private readonly client: QueueClient) {}
 
 	publish(event: FlowEventName, payload: FlowEventPayload): void {
-		// The project selects which `.queue/subscribers.yml` applies, so it travels as the push cwd.
-		if (payload.projectRoot === undefined) {
-			this.client.publish(event, payload);
-		} else {
+		// The project selects which `.queue/subscribers.yml` applies. Its registry id travels as the queue `project` (push protocol
+		// 1.2.0); only a record written before project ids existed falls back to its folder as the push cwd.
+		if (payload.projectId !== undefined) {
+			this.client.publish(event, payload, { project: payload.projectId });
+		} else if (payload.projectRoot !== undefined) {
 			this.client.publish(event, payload, { cwd: payload.projectRoot });
+		} else {
+			this.client.publish(event, payload);
 		}
 	}
 

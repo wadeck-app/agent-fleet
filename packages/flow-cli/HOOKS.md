@@ -59,7 +59,7 @@ Runs a shell command via `execFile`. The payload fields are passed as environmen
 **`debug: true`** -- pipes the hook's stdout and stderr directly to the calling terminal. For debugging only. Do NOT use in production (output mixes with CLI output, incompatible with `--json` mode). Default: `false`.
 
 ```yaml
-# .flow/config.yml
+# project flow config (see flow-cli PLUGINS.md)
 hooks:
     onFlowStart:
         - type: cli
@@ -89,7 +89,7 @@ Note: task hook command strings are split on whitespace. Complex commands must u
 POSTs a JSON body to the configured URL. The payload is the raw object (camelCase keys, not SCREAMING_SNAKE_CASE).
 
 ```yaml
-# .flow/config.yml
+# project flow config (see flow-cli PLUGINS.md)
 hooks:
     onFlowEnd:
         - type: http
@@ -111,7 +111,7 @@ Both `http://` and `https://` URLs are supported. Timeout is 10 seconds.
 
 ### Flow hooks
 
-File: `.flow/config.yml` in the folder of the registered project the run belongs to (`-p/--project`, `FLOW_PROJECT`, else the registered project containing the cwd; see `CLI_USAGE.md`). An unregistered folder is not read.
+File: the project config in the registry (`<registry>/projects/<project id>/flow/config/config.yml`; `.flow/config.yml` in the repository is no longer read and is an error) of the registered project the run belongs to (`-p/--project`, `FLOW_PROJECT`, else the registered project containing the cwd; see `CLI_USAGE.md`). An unregistered folder is not read.
 
 ```yaml
 hooks:

@@ -20,8 +20,10 @@ import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
  * Concurrent callers (several `flow run` on a cold machine) are serialised: the first spawns, the others find
  * the daemon it started and return. Without that each one spawned its own daemon and deleted the port file of the
  * one that was already up, so the daemons evicted each other while executions were being accepted.
+ *
+ * @returns true when this call started the daemon, false when one was already live.
  */
-export async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Promise<void> {
+export async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_000): Promise<boolean> {
 	fs.mkdirSync(daemonDir, { recursive: true, mode: 0o700 });
 	// A different file from the daemon's own start lock: the daemon being started takes that one while this lock is
 	// still held waiting for it.
@@ -31,9 +33,10 @@ export async function spawnDaemonBackground(daemonDir: string, timeoutMs = 10_00
 	});
 	try {
 		if ((await findLiveDaemon(daemonDir)) !== null) {
-			return;
+			return false;
 		}
 		await launchDaemon(daemonDir, timeoutMs);
+		return true;
 	} finally {
 		release();
 	}

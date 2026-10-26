@@ -6,6 +6,7 @@ import { AssignmentLedger } from './AssignmentLedger.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import type { ReadyStep, ReadyStepQueue } from './ReadyStepQueue.js';
 import { StalledStepWatch } from './StalledStepWatch.js';
+import type { EngineEndReason } from './StepOutcomes.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 
 /**
@@ -61,7 +62,12 @@ export class WorkerAssignmentSupervisor {
 		private readonly logWriter: LogWriter,
 		private readonly queue: ReadyStepQueue,
 		private readonly executions: ExecutionRegistry,
-		private readonly failStep: (executionId: string, stepId: string, reason: string) => void,
+		private readonly failStep: (
+			executionId: string,
+			stepId: string,
+			reason: string,
+			endReason?: EngineEndReason
+		) => void,
 		private readonly stalledStepLimitMs: number,
 		/** Injectable clock, so how long a call ran is testable */
 		private readonly now: () => number = Date.now
@@ -227,7 +233,8 @@ export class WorkerAssignmentSupervisor {
 				`the worker running this step reported nothing for ${String(Math.round(this.stalledStepLimitMs / 1000))}s, so it is treated as stuck. ` +
 					toolActivity +
 					'It was not retried automatically because it may have already had an effect. ' +
-					'A step that is legitimately quiet for that long needs a higher queue.stepSilenceLimitSeconds.'
+					'A step that is legitimately quiet for that long needs a higher queue.stepSilenceLimitSeconds.',
+				'stalled'
 			);
 		}
 	}
@@ -274,7 +281,8 @@ export class WorkerAssignmentSupervisor {
 				this.failStep(
 					executionId,
 					stepId,
-					`the worker running this step disconnected while it was executing. It was not retried because it may have already had an effect (the step's retry and onFailure do not apply to an engine failure); re-run the flow if it is safe to repeat.`
+					`the worker running this step disconnected while it was executing. It was not retried because it may have already had an effect (the step's retry and onFailure do not apply to an engine failure); re-run the flow if it is safe to repeat.`,
+					'worker_lost'
 				);
 				continue;
 			}

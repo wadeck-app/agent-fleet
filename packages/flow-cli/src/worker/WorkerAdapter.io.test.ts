@@ -139,4 +139,69 @@ describe('WorkerAdapter step io', () => {
 
 		expect((failure as { io?: unknown }).io).toMatchObject({ stdout: 'partial', stderr: 'bad' });
 	});
+
+	// The cost of a failed attempt used to vanish here: the thrown error carried the io but not the meta.
+	it('attaches the meta of the attempt to the error of a failed model step, masked', async () => {
+		const meta = {
+			model: 'haiku',
+			session_id: 's',
+			session_file: '',
+			ttft_ms: 1,
+			duration_ms: 2,
+			cost: {
+				input_tokens: 1,
+				output_tokens: 2,
+				cache_read_tokens: 0,
+				cache_write_tokens: 0,
+				usd: 0.5,
+				reported: true,
+			},
+			end_reason: 'exit_nonzero',
+			files_written: [`/tmp/${TOKEN}.txt`],
+		};
+		executeStep.mockResolvedValue({
+			error: 'exited 1',
+			prompt: 'p',
+			response: '',
+			stderr: 'bad',
+			outputs: {},
+			meta,
+		});
+
+		const failure = await adapter
+			.execute(modelStep, context({ secrets: { API_TOKEN: TOKEN } }), sendMessage)
+			.catch((error: unknown) => error);
+
+		expect((failure as { meta?: unknown }).meta).toMatchObject({
+			cost: { usd: 0.5 },
+			end_reason: 'exit_nonzero',
+		});
+		expect(JSON.stringify(failure)).not.toContain(TOKEN);
+	});
+
+	it('attaches the meta of the attempt to the error of a failed script step', async () => {
+		executeStep.mockResolvedValue({
+			error: 'exit 3',
+			stdout: '',
+			stderr: '',
+			outputs: {},
+			meta: { exit_code: 3, duration_ms: 9, end_reason: 'exit_nonzero' },
+		});
+
+		const failure = await adapter.execute(scriptStep, context(), sendMessage).catch((error: unknown) => error);
+
+		expect((failure as { meta?: unknown }).meta).toEqual({
+			exit_code: 3,
+			duration_ms: 9,
+			end_reason: 'exit_nonzero',
+		});
+	});
+
+	it('attaches no meta when the runner produced none (nothing invented)', async () => {
+		executeStep.mockResolvedValue({ error: 'x', stdout: '', stderr: '', outputs: {} });
+
+		const failure = await adapter.execute(scriptStep, context(), sendMessage).catch((error: unknown) => error);
+
+		expect((failure as { meta?: unknown }).meta).toBeUndefined();
+	});
 });

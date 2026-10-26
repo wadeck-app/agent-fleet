@@ -6,5 +6,5 @@ import { processLeakGuard } from './ProcessLeakGuard';
 
 afterAll(async () => {
 	await processLeakGuard.verify();
-	// Listing the machine's processes takes seconds on Windows; the default hook timeout would cut it short.
-}, 60_000);
+	// Listing the machine's processes takes seconds on Windows (up to 25 s under load); the hook must outlast the 60 s OS-tool timeout.
+}, 150_000);

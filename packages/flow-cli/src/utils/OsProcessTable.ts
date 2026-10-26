@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns, spawnSync } from 'node:child_process';
 
 /** One process of the machine, as the operating system reports it. */
 export interface OsProcess {
@@ -11,7 +11,24 @@ export interface OsProcess {
 
 const MAX_BUFFER = 128 * 1024 * 1024;
 
-function fail(tool: string, status: number | null, detail: string): never {
+/** Measured: a listing takes 0.75 s on an idle machine and 5 to 25 s when it has 3 busy processes per core. */
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+/** Seams for tests: the OS tool and the platform are injectable so no test depends on the machine's load. */
+export interface OsProcessReaderOptions {
+	spawn?: (command: string, args: string[], options: SpawnSyncOptionsWithStringEncoding) => SpawnSyncReturns<string>;
+	platform?: NodeJS.Platform;
+	/** Longest the OS tool may run. Must stay below any enclosing test/hook timeout: spawnSync blocks the thread. */
+	timeoutMs?: number;
+}
+
+function fail(tool: string, status: number | null, detail: string, timeoutMs?: number): never {
+	if (timeoutMs !== undefined) {
+		throw new Error(
+			`Listing the machine's processes with ${tool} timed out after ${String(timeoutMs / 1000)} s: the machine is busy (CPU saturated, other test runs?). ` +
+				'Retry when it is idle. Nothing was changed; the process list is only read.'
+		);
+	}
 	throw new Error(
 		`Could not list the machine's processes with ${tool} (status ${String(status)}): ${detail}. ` +
 			'Nothing was changed; the process list is only read.'
@@ -44,9 +61,11 @@ export function parseElapsed(etime: string): number | undefined {
  *
  * @throws naming the tool when the listing fails: an empty list would read as "no leaks".
  */
-export function listOsProcesses(now: Date = new Date()): OsProcess[] {
-	if (process.platform === 'win32') {
-		const result = spawnSync(
+export function listOsProcesses(now: Date = new Date(), options: OsProcessReaderOptions = {}): OsProcess[] {
+	const run = options.spawn ?? spawnSync;
+	const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+	if ((options.platform ?? process.platform) === 'win32') {
+		const result = run(
 			'powershell',
 			[
 				'-NoProfile',
@@ -54,10 +73,11 @@ export function listOsProcesses(now: Date = new Date()): OsProcess[] {
 				'-Command',
 				'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine,@{n="StartedMs";e={if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { $null }}} | ConvertTo-Json -Compress',
 			],
-			{ encoding: 'utf8', windowsHide: true, maxBuffer: MAX_BUFFER, timeout: 60_000 }
+			{ encoding: 'utf8', windowsHide: true, maxBuffer: MAX_BUFFER, timeout: timeoutMs }
 		);
 		if (result.error || result.status !== 0) {
-			fail('PowerShell', result.status, result.error?.message ?? result.stderr);
+			const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT';
+			fail('PowerShell', result.status, result.error?.message ?? result.stderr, timedOut ? timeoutMs : undefined);
 		}
 		return asArray(JSON.parse(result.stdout) as WindowsProcessRow | WindowsProcessRow[]).map(row => ({
 			pid: row.ProcessId,
@@ -67,9 +87,14 @@ export function listOsProcesses(now: Date = new Date()): OsProcess[] {
 		}));
 	}
 	// violations-suppress: cli/no-spawn-without-windows-hide this is the non-Windows branch (win32 uses PowerShell above), where windowsHide has no effect
-	const result = spawnSync('ps', ['-eo', 'pid=,ppid=,etime=,args='], { encoding: 'utf8', maxBuffer: MAX_BUFFER });
+	const result = run('ps', ['-eo', 'pid=,ppid=,etime=,args='], {
+		encoding: 'utf8',
+		maxBuffer: MAX_BUFFER,
+		timeout: timeoutMs,
+	});
 	if (result.error || result.status !== 0) {
-		fail('ps', result.status, result.error?.message ?? result.stderr);
+		const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT';
+		fail('ps', result.status, result.error?.message ?? result.stderr, timedOut ? timeoutMs : undefined);
 	}
 	const rows: OsProcess[] = [];
 	for (const line of result.stdout.split('\n')) {

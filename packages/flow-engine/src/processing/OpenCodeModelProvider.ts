@@ -24,6 +24,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
+import { isRecord } from 'shared-common/utils/isRecord';
 
 import { isAnthropicModel, isOpenAiModel } from './ModelAliases';
 import type {
@@ -82,14 +83,6 @@ export function splitConfigPaths(value: string): string[] {
 		.split(/[,;]|(?<![A-Za-z]):/)
 		.map(path => path.trim())
 		.filter(Boolean);
-}
-
-/**
- * Narrow an unknown JSON value to a plain object.
- * Arrays and null are rejected -- they never carry the keys we read.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -485,6 +478,8 @@ export class OpenCodeModelProvider implements ModelProvider {
 				let cacheReadTokens = 0;
 				let cacheWriteTokens = 0;
 				let firstStepStartFired = false;
+				// One step_start per model turn; only the first is forwarded (as system:init), so the count travels on the result
+				let stepStartCount = 0;
 
 				const processLine = (line: string): void => {
 					let raw: unknown;
@@ -508,6 +503,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 					}
 
 					if (eventType === 'step_start') {
+						stepStartCount++;
 						// A new turn starts here -- discard narration carried over from the previous
 						// turn (e.g. "Let me check that file first." before a tool call) so it does not
 						// glue, with no separator, onto this turn's text once it becomes the final result.
@@ -622,6 +618,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 							data: {
 								result: responseText,
 								cost_usd: costUsd,
+								num_turns: stepStartCount,
 								duration_ms: Date.now() - launchStartTime,
 								modelUsage: {
 									opencode: {

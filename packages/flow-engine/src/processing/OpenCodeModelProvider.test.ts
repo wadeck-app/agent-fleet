@@ -1055,6 +1055,25 @@ describe('OpenCodeModelProvider', () => {
 			expect(usage.cacheReadTokens).toBe(11088);
 		});
 
+		// opencode has no num_turns of its own, and only the first step_start is forwarded (as system:init), so
+		// the synthesized result is the only place the turn count can travel to the step's meta.
+		it('reports num_turns on the synthesized result: one per step_start, not only the first', async () => {
+			const events: StreamJsonEvent[] = [];
+			const resultPromise = provider.launchBackground(makeBaseOptions({ onStreamEvent: e => events.push(e) }));
+
+			setImmediate(() => {
+				const sessionID = 'ses_turns';
+				const start = (timestamp: number): string =>
+					JSON.stringify({ type: 'step_start', timestamp, sessionID, part: { type: 'step-start' } });
+				emitLines([start(1), start(2), start(3)]);
+				(mockProcess as EventEmitter).emit('exit', 0);
+			});
+
+			await resultPromise;
+
+			expect(events.find(e => e.type === 'result')?.data['num_turns']).toBe(3);
+		});
+
 		it('does not count cost from step_finish with reason other than stop', async () => {
 			const events: StreamJsonEvent[] = [];
 			const resultPromise = provider.launchBackground(makeBaseOptions({ onStreamEvent: e => events.push(e) }));

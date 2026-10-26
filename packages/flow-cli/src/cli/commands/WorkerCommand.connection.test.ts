@@ -314,6 +314,19 @@ describe('WorkerCommand -- connection, messages and banner (characterization)', 
 		expect(hoisted.displayCalls[1]).toEqual(['stepCompleted', 'step-1']);
 	});
 
+	it('forwards the meta of a failed attempt in step_failed', async () => {
+		const meta = { duration_ms: 12, exit_code: 2, end_reason: 'exit_nonzero' };
+		executeMock.mockRejectedValue(Object.assign(new Error('script failed'), { meta }));
+		await startWorker();
+		const ws = hoisted.wsInstances[0];
+		sendAssign(ws);
+		await flush();
+
+		const failed = JSON.parse(String(ws.send.mock.calls[1]?.[0])) as Record<string, unknown>;
+		expect(failed['type']).toBe('step_failed');
+		expect(failed['meta']).toEqual(meta);
+	});
+
 	it('reports a failed assignment with the error details, then ready', async () => {
 		executeMock.mockRejectedValue(
 			Object.assign(new Error('step blew up'), {

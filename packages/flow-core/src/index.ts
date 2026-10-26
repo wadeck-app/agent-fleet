@@ -56,6 +56,10 @@ export {
 } from './execution/ExecutionId.js';
 
 export type {
+	AttemptOrigin,
+	AttemptOutcome,
+	AttemptOverflow,
+	AttemptRecord,
 	ExecutionState,
 	VersionChoice,
 	ExecutionStatus,

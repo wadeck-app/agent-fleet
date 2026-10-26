@@ -1,3 +1,4 @@
+import type { StepMeta } from 'flow-engine/types';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
@@ -64,6 +65,7 @@ export async function handleWorkerMessage(
 				const stdout = (err as { stdout?: string }).stdout;
 				const stderr = (err as { stderr?: string }).stderr;
 				const io = (err as { io?: StepIoCapture }).io;
+				const meta = (err as { meta?: StepMeta }).meta;
 				sendForAssignment({
 					type: 'step_failed',
 					executionId: executionContext.executionId,
@@ -73,6 +75,7 @@ export async function handleWorkerMessage(
 					stdout,
 					stderr,
 					io,
+					meta,
 				});
 				display.stepFailed(stepId, error, Date.now() - startedAt);
 			} finally {

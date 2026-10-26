@@ -427,6 +427,24 @@ custom-flow:
 			expect(steps[0].timeout).toBe(90);
 		});
 
+		it('should carry the model step timeout (minutes) to the loaded step (not drop it)', async () => {
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+			vi.mocked(yaml.load).mockReturnValue({
+				'model-timeout-flow': {
+					version: '1.0.0',
+					name: 'Model Timeout Flow',
+					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					steps: [{ id: 'a', name: 'A', type: 'model', model: 'haiku', prompt: 'hi', timeout: 15 }],
+				},
+			});
+
+			await registry.loadProjectFlows();
+
+			const steps = registry.getFlow('model-timeout-flow')?.steps as any[];
+			expect(steps[0].timeout).toBe(15);
+		});
+
 		it('should not load flow when step is missing required type field', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('yaml');

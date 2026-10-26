@@ -50,19 +50,14 @@ describe('Daemon spawn — Windows wscript.exe approach', () => {
 		expect(RUN_COMMAND_SRC).toContain('unlinkSync(portFile)');
 	});
 
-	it('flow start (FlowIndex) uses wscript.exe on Windows for daemon spawn', () => {
-		expect(FLOW_INDEX_SRC).toContain("spawn('wscript.exe'");
-		expect(FLOW_INDEX_SRC).toContain('oShell.Run');
-	});
-
-	it('flow start (FlowIndex) does NOT fall back to direct node spawn on Windows', () => {
-		// Ensure the win32 branch is present and uses wscript, not a direct spawn. Sliced up to
-		// the else branch (the non-Windows direct spawn), not a fixed length -- the win32 block
-		// grows over time (e.g. more oShell.Environment lines) without this test caring.
-		const win32Start = FLOW_INDEX_SRC.indexOf("process.platform === 'win32'");
-		const elseStart = FLOW_INDEX_SRC.indexOf('} else {', win32Start);
-		const win32Block = FLOW_INDEX_SRC.slice(win32Start, elseStart);
-		expect(win32Block).toContain('wscript.exe');
+	it('flow start (FlowIndex) goes through the locked spawner, with no spawn of its own', () => {
+		// One implementation of the Windows wscript.exe launch (tested above) and one lock: a second, unlocked copy in
+		// FlowIndex let concurrent `flow start` run two daemons.
+		expect(FLOW_INDEX_SRC).toContain('startDaemonCommand');
+		expect(FLOW_INDEX_SRC).not.toContain("spawn('wscript.exe'");
+		expect(FLOW_INDEX_SRC).not.toContain('oShell.Run');
+		const startCommandSrc = fs.readFileSync(path.join(import.meta.dirname, 'StartCommand.ts'), 'utf8');
+		expect(startCommandSrc).toContain('spawnDaemonBackground');
 	});
 });
 

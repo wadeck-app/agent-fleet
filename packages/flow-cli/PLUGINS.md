@@ -1,6 +1,6 @@
 # flow-cli Plugins
 
-Two extension points: `workspace` (how a task gets a working directory) and `approval` (how a `user_intervention` step reaches a human or script). Both are configured in `.flow/config.yml` under `plugins:`.
+Two extension points: `workspace` (how a task gets a working directory) and `approval` (how a `user_intervention` step reaches a human or script). Both are configured in the project config under `plugins:`.
 
 `workspace` is required -- the daemon refuses to start without one. `approval` is optional; a worker without one reports `interactive: false` and rejects `user_intervention` steps.
 
@@ -88,6 +88,6 @@ plugins:
 
 ## How the daemon picks plugins
 
-The daemon reads `.flow/config.yml` in the folder of the registered project. Plugins declared in the config of the folder the daemon was launched from apply only if that folder is a registered project; an unregistered launch folder whose config declares `plugins:` is an error. A worker serves its own project (`FLOW_PROJECT`, else the registered project containing its cwd) plus the ones named by `--project` (see `WORKERS.md`).
+The daemon reads the project config in the registry (`<registry>/projects/<project id>/flow/config/config.yml`) of the registered project; `.flow/config.yml` in the repository is an error that gives the `mv` command. In a project config, `plugins` accepts only `workspace`, `tasks`, `secrets`, `approval` (`instances` belongs in `~/.config/flow/config.yml`), and any other key is refused with the file and key. Plugins declared in the config of the folder the daemon was launched from apply only if that folder is a registered project; an unregistered launch folder whose config declares `plugins:` is an error. A worker serves its own project (`FLOW_PROJECT`, else the registered project containing its cwd) plus the ones named by `--project` (see `WORKERS.md`).
 
 Third-party plugins resolve from `node_modules`; built-in plugins (`none`, `cli-approval`, `file-approval`, `worktree`) are bundled inside the CLI and need no install.

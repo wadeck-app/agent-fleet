@@ -27,6 +27,7 @@ const BUNDLING_TESTS = [
 	'src/__tests__/CliSmoke.integration.test.ts',
 	'src/__tests__/DaemonSingleton.integration.test.ts',
 	'src/__tests__/DaemonShutdown.integration.test.ts',
+	'src/__tests__/BundledDaemonQueueIsolation.integration.test.ts',
 	'src/cli/FlowIndex.integration.test.ts',
 ];
 

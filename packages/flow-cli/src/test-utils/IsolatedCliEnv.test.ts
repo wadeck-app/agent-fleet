@@ -50,6 +50,22 @@ describe('createIsolatedCliEnv', () => {
 		expect(iso.env['NPM_CONFIG_PREFIX']).toBe(iso.npmPrefix);
 	});
 
+	it('switches the queue events off, so a spawned daemon never declares events to the real queue', () => {
+		iso = createIsolatedCliEnv();
+		expect(iso.env['FLOW_QUEUE_EVENTS']).toBe('0');
+	});
+
+	it('does not let the parent shell turn the queue events back on', () => {
+		process.env['FLOW_QUEUE_EVENTS'] = '1';
+		iso = createIsolatedCliEnv();
+		expect(iso.env['FLOW_QUEUE_EVENTS']).toBe('0');
+	});
+
+	it('keeps the queue events on only when the test asks for it (it must then point at a fake queue)', () => {
+		iso = createIsolatedCliEnv({ queueEvents: true });
+		expect(iso.env['FLOW_QUEUE_EVENTS']).toBe('1');
+	});
+
 	it('applies extra entries last', () => {
 		iso = createIsolatedCliEnv({ extra: { UPDATER_FORCE: '1' } });
 		expect(iso.env['UPDATER_FORCE']).toBe('1');

@@ -35,9 +35,12 @@ Secrets, step I/O, versions, queue events, waves + transitive settling + restart
 - a4c42a9759096977c: script step timeout, tree kill, heartbeat (ScriptExecutor/ScriptStepExecutor, validation, docs generator).
 - a3aed41966337ef11: opencode shell on win32 (OpenCodeModelProvider env, validate warning, docs generator).
 - ac60d0a0fbbf5ca53: SKILL.md edits for project-sdk/timeout/opencode/processes (bypass skill-write-project valid until 00:11Z).
-- a168a0703c32d11d1: hardening (OsProcessTable flake, FLOW_QUEUE_EVENTS=0 in test helpers, `flow start` via spawner, FlowRegistry model timeout, fixed-port tests audit, isRecord dedup).
+- a168a0703c32d11d1: hardening, FINISHED, in tree, NOT committed (entangled with the two agents below; commit all together after a green full run). Done: OsProcessTable injectable reader + longer timeouts, FLOW_QUEUE_EVENTS=0 in createIsolatedCliEnv, `flow start` via StartCommand/DaemonBackgroundSpawner (waits for the port), FlowRegistry keeps model `timeout`, WebSocketServer.test fixed ports -> 0, isRecord dedup (StepMetricsCollector.ts still has a copy). OPEN: FlowRegistry model-step branch also drops subStepFeedbackPrompt/tools/skipPermissions/contextLimit/onCompact/permission (unverified whether another loader fills them).
+- a004c951c83f1b9ff: project-sdk phase 1b + 2 (lock refresh, SDK helpers, queue publisher project option, projectToolDir config, validateLayer/mergeLayers).
+- a90828e40c6b7f90b: step metrics phases 2-3 (attemptLog, step_failed meta, turns/tool_calls/files_written).
 - Next to launch: step metrics phases 2-3 (plan 2026-10-25_step-metrics-per-attempt.md); project-sdk phase 2; dock/legibility of logs page (low).
 
 ## Log
 
 - 2026-10-25: file created after user request to track progress.
+- 2026-10-26: project-sdk 1b + phase 2: SDK helpers (findProjectIncludingDeleted), queue events carry the project id, per-project flow config in the registry (plugins/hooks, schema-validated; repo .flow/config.yml is an error with the mv command); single -p per command.

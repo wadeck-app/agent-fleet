@@ -105,7 +105,9 @@ export class PluginResolver {
 
 		// Workspace is required - no implicit fallback (spec P-4)
 		if (!config.workspace) {
-			throw new Error('No workspace provider configured. Add a plugins.workspace section to .flow/config.yml');
+			throw new Error(
+				'No workspace provider configured. Add a plugins.workspace section to the flow config of the project (see PLUGINS.md)'
+			);
 		}
 		if (!config.workspace.type) {
 			throw new Error('workspace.type is required in config. Expected format: plugins.<pluginId>.<implName>');

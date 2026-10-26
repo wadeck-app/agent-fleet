@@ -12,10 +12,18 @@ import {
 import { buildContextLimitEnv, haikuContextLimitWarning, validateContextLimit } from '../processing/ContextLimit';
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import type { OutputExtractor } from '../processing/OutputExtractor';
+import { StepMetricsCollector } from '../processing/StepMetricsCollector';
 import { StreamEventMapper } from '../processing/StreamEventMapper';
 import type { TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
 import { ToolCallTracker, type ToolProgress } from '../processing/ToolCallTracker';
-import type { ExecutionConfig, LiveLogEntry, ModelFlowStep, ModelStepMeta, StepTrace } from '../types';
+import type {
+	AttemptEndReason,
+	ExecutionConfig,
+	LiveLogEntry,
+	ModelFlowStep,
+	ModelStepMeta,
+	StepTrace,
+} from '../types';
 import { writeOutputFiles } from './ScriptStepExecutor';
 import { buildSubStepRelaunch } from './SubStepRelaunch';
 
@@ -50,6 +58,37 @@ export interface ModelStepConfig {
 	resultGraceMs?: number;
 }
 
+/** The step's `timeout` fired; told apart from any other failure so the attempt is recorded as a timeout. */
+class ModelStepTimeoutError extends Error {}
+
+/**
+ * Fails an attempt that was refused before anything was launched (invalid configuration, relaunch without a
+ * session). It still carries a meta, so every failed model step reports one and a missing one can only mean an
+ * older worker.
+ */
+function rejectedBeforeLaunch(stepTrace: StepTrace, effectiveModel: string | undefined, error: string): StepTrace {
+	stepTrace.error = error;
+	stepTrace.endTime = Date.now();
+	stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
+	stepTrace.meta = {
+		model: effectiveModel ?? '',
+		session_id: '',
+		session_file: '',
+		ttft_ms: 0,
+		duration_ms: Math.max(1, stepTrace.durationMs),
+		cost: {
+			input_tokens: 0,
+			output_tokens: 0,
+			cache_read_tokens: 0,
+			cache_write_tokens: 0,
+			usd: 0,
+			reported: false,
+		},
+		end_reason: 'step_error',
+	} satisfies ModelStepMeta;
+	return stepTrace;
+}
+
 /**
  * Races `promise` against `step.timeout` (minutes). If the timer fires first, kills the
  * provider's underlying process and rejects with an actionable message naming the step,
@@ -71,7 +110,7 @@ function withModelTimeout<T>(
 		timer = setTimeout(() => {
 			provider.kill();
 			reject(
-				new Error(
+				new ModelStepTimeoutError(
 					`Model step '${step.id}' (provider: ${providerLabel}, model: ${effectiveModel ?? 'default'}) timed out after ${timeoutMinutes} minute(s) with no response -- killed.`
 				)
 			);
@@ -132,8 +171,7 @@ export async function executeModelStep(
 			templateRenderer,
 		});
 		if ('error' in relaunch) {
-			stepTrace.error = relaunch.error;
-			return stepTrace;
+			return rejectedBeforeLaunch(stepTrace, effectiveModel, relaunch.error);
 		}
 		renderedPrompt = relaunch.message;
 		relaunchSessionId = relaunch.resumeSessionId;
@@ -157,16 +195,14 @@ export async function executeModelStep(
 				sessionMode: step.session?.mode,
 			});
 		} catch (err) {
-			stepTrace.error = normalizeError(err).message;
-			return stepTrace;
+			return rejectedBeforeLaunch(stepTrace, effectiveModel, normalizeError(err).message);
 		}
 	}
 	if (step.onCompact !== undefined) {
 		try {
 			validateOnCompact({ onCompact: step.onCompact, provider: actualProvider });
 		} catch (err) {
-			stepTrace.error = normalizeError(err).message;
-			return stepTrace;
+			return rejectedBeforeLaunch(stepTrace, effectiveModel, normalizeError(err).message);
 		}
 	}
 	// Awaited before the step returns so no hook command outlives its step; each is bounded by its
@@ -197,6 +233,8 @@ export async function executeModelStep(
 	let capturedSessionId = '';
 	let capturedSessionFile = '';
 	let capturedCostUsd = 0;
+	// True once a result event carried a cost; false means `capturedCostUsd` is a placeholder 0, not a measurement.
+	let capturedCostReported = false;
 	let capturedInputTokens = 0;
 	let capturedOutputTokens = 0;
 	let capturedCacheReadTokens = 0;
@@ -210,6 +248,9 @@ export async function executeModelStep(
 	// usually still produced text/tokens, just not a real answer.
 	let capturedIsError = false;
 	const modelStartTime = Date.now();
+
+	// Only a streamed, non-interactive run shows its events: otherwise nothing is observable, so nothing is reported.
+	const metrics = streamJson && !config.interactive ? new StepMetricsCollector(actualProvider) : undefined;
 
 	if (streamJson && !config.interactive) {
 		if (logMode !== 'none') {
@@ -283,6 +324,7 @@ export async function executeModelStep(
 		onStreamEvent:
 			streamJson && !config.interactive
 				? (event: import('../processing/StreamJsonParser').StreamJsonEvent) => {
+						metrics?.observe(event);
 						if (onActivity !== undefined) {
 							const changed = toolCalls.observe(event);
 							onActivity({ ...toolCalls.state(), changed });
@@ -339,6 +381,11 @@ export async function executeModelStep(
 							// instead -- support both so neither provider regresses.
 							capturedCostUsd =
 								(event.data.total_cost_usd as number) ?? (event.data.cost_usd as number) ?? 0;
+							// codex synthesizes `cost_usd: 0` because it reports no cost at all: that 0 is not a measurement
+							capturedCostReported =
+								actualProvider !== 'codex' &&
+								(typeof event.data.total_cost_usd === 'number' ||
+									typeof event.data.cost_usd === 'number');
 							const usage = event.data.modelUsage as
 								| Record<
 										string,
@@ -383,20 +430,31 @@ export async function executeModelStep(
 				: undefined,
 	};
 
-	const buildModelMeta = (): ModelStepMeta => ({
-		model: effectiveModel ?? '',
-		session_id: capturedSessionId,
-		session_file: capturedSessionFile,
-		ttft_ms: capturedTtftMs ?? 0,
-		duration_ms: stepTrace.durationMs || Math.max(1, (stepTrace.endTime ?? Date.now()) - stepTrace.startTime),
-		cost: {
-			input_tokens: capturedInputTokens,
-			output_tokens: capturedOutputTokens,
-			cache_read_tokens: capturedCacheReadTokens,
-			cache_write_tokens: capturedCacheWriteTokens,
-			usd: capturedCostUsd,
-		},
-	});
+	const buildModelMeta = (endReason: AttemptEndReason): ModelStepMeta => {
+		const observed = metrics?.snapshot();
+		return {
+			model: effectiveModel ?? '',
+			session_id: capturedSessionId,
+			session_file: capturedSessionFile,
+			ttft_ms: capturedTtftMs ?? 0,
+			duration_ms: stepTrace.durationMs || Math.max(1, (stepTrace.endTime ?? Date.now()) - stepTrace.startTime),
+			cost: {
+				input_tokens: capturedInputTokens,
+				output_tokens: capturedOutputTokens,
+				cache_read_tokens: capturedCacheReadTokens,
+				cache_write_tokens: capturedCacheWriteTokens,
+				usd: capturedCostUsd,
+				reported: capturedCostReported,
+			},
+			...(observed?.turns !== undefined && { turns: observed.turns }),
+			...(observed !== undefined && { tool_calls: observed.toolCalls }),
+			...(observed?.filesWritten !== undefined && {
+				files_written: observed.filesWritten,
+				files_written_count: observed.filesWrittenCount,
+			}),
+			end_reason: endReason,
+		};
+	};
 
 	try {
 		if (config.interactive) {
@@ -412,9 +470,10 @@ export async function executeModelStep(
 			stepTrace.exitCode = result.exitCode ?? undefined;
 			stepTrace.endTime = Date.now();
 			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-			stepTrace.meta = buildModelMeta();
+			const interactiveFailed = result.exitCode !== 0 && result.exitCode !== 1 && result.exitCode !== null;
+			stepTrace.meta = buildModelMeta(interactiveFailed ? 'exit_nonzero' : 'completed');
 
-			if (result.exitCode !== 0 && result.exitCode !== 1 && result.exitCode !== null) {
+			if (interactiveFailed) {
 				stepTrace.error = `${providerLabel} exited with code ${result.exitCode}`;
 				return stepTrace;
 			}
@@ -465,13 +524,16 @@ export async function executeModelStep(
 			stepTrace.exitCode = result.exitCode;
 			stepTrace.endTime = Date.now();
 			stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
-			stepTrace.meta = buildModelMeta();
+			// The reason is settled below, once the checks that can fail an exit 0 have run
+			const meta = buildModelMeta('completed');
+			stepTrace.meta = meta;
 
 			if (stepTrace.liveLogEntries) {
 				stepTrace.liveLogEntries = StreamEventMapper.capEntries(stepTrace.liveLogEntries);
 			}
 
 			if (result.exitCode !== 0) {
+				meta.end_reason = 'exit_nonzero';
 				stepTrace.error = `${providerLabel} exited with code ${result.exitCode}\n${result.stderr}`;
 				return stepTrace;
 			}
@@ -480,6 +542,7 @@ export async function executeModelStep(
 			// produces text and meters tokens (just not a real answer), so the empty-output
 			// guard's zero-token condition would not catch it either.
 			if (capturedIsError) {
+				meta.end_reason = 'is_error_result';
 				stepTrace.error = `${providerLabel} exited 0 and reported subtype: "success" but flagged this turn as is_error: true -- likely auto-compact thrashing (terminal_reason: "rapid_refill_breaker") rather than a real answer.`;
 				return stepTrace;
 			}
@@ -496,6 +559,7 @@ export async function executeModelStep(
 			if (streamJson) {
 				const noResponseText = responseText == null || responseText.trim() === '';
 				if (noResponseText && capturedInputTokens === 0 && capturedOutputTokens === 0) {
+					meta.end_reason = 'empty_output';
 					// opencode's own most common cause for this exact symptom: a permission prompt
 					// (e.g. external_directory) stuck in its default `ask` state, which a headless
 					// worker can never answer, so the CLI eventually exits 0 having done nothing.
@@ -525,6 +589,8 @@ export async function executeModelStep(
 		stepTrace.endTime = Date.now();
 		stepTrace.durationMs = stepTrace.endTime - stepTrace.startTime;
 		stepTrace.error = normalizeError(error).message;
+		// What was seen before the failure still counts: a timed-out attempt is not a free one
+		stepTrace.meta = buildModelMeta(error instanceof ModelStepTimeoutError ? 'timeout' : 'step_error');
 		return stepTrace;
 	} finally {
 		await Promise.allSettled(pendingCompactHooks);

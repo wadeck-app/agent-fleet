@@ -385,6 +385,12 @@ export type WorkerToDaemon =
 			stdout?: string;
 			stderr?: string;
 			io?: StepIoCapture;
+			/**
+			 * What the failed attempt cost and did (duration, cost, turns, end reason). Absent from a worker older than
+			 * failed-attempt metrics, and from a step refused before anything ran: the daemon then records the attempt
+			 * without metrics, never with a zero cost.
+			 */
+			meta?: StepMeta;
 	  }
 	| { type: 'inject_steps'; assignmentId: string; executionId: string; steps: InjectedStep[] };
 

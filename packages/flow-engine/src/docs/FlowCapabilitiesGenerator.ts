@@ -251,7 +251,9 @@ ${TMPL} steps.<stepId>.meta.<field> }}
 
 **Script step meta fields:** \`exit_code\`, \`duration_ms\`
 
-**Model step meta fields:** \`session_id\`, \`session_file\`, \`model\`, \`ttft_ms\`, \`duration_ms\`, \`cost.input_tokens\`, \`cost.output_tokens\`, \`cost.usd\`
+**Model step meta fields:** \`session_id\`, \`session_file\`, \`model\`, \`ttft_ms\`, \`duration_ms\`, \`cost.input_tokens\`, \`cost.output_tokens\`, \`cost.usd\`, \`turns\`, \`tool_calls.total\`, \`files_written_count\`, \`end_reason\`
+
+\`meta\` describes the LAST attempt of the step only (earlier attempts of a retried or relaunched step are kept in the execution record, not in templates). \`turns\`, \`tool_calls\`, \`files_written\` and \`files_written_count\` are absent when the provider cannot show them: no \`turns\` for codex, and files written through a shell (\`sed -i\`, redirects, scripts) are never listed. \`cost.reported: false\` means the provider gave no cost for the attempt and \`cost.usd\` is a placeholder 0.
 
 Examples:
 - \`${TMPL} steps.generate.meta.session_id }}\` -- Claude session ID (for session continuation)

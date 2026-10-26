@@ -28,7 +28,7 @@ describe('WebSocketServer - loopback', () => {
 	it('serves a plaintext loopback client', async () => {
 		const received: unknown[] = [];
 		server = new WebSocketServer(
-			45_301,
+			0,
 			(_ws, message) => received.push(message),
 			() => {}
 		);
@@ -97,7 +97,7 @@ describe('WebSocketServer - P-5 enforcement', () => {
 		expect(
 			() =>
 				new WebSocketServer(
-					45_302,
+					0,
 					() => {},
 					() => {},
 					{ bindAddress: lan }
@@ -107,7 +107,7 @@ describe('WebSocketServer - P-5 enforcement', () => {
 
 	it('starts on an explicit loopback address without TLS', async () => {
 		server = new WebSocketServer(
-			45_303,
+			0,
 			() => {},
 			() => {},
 			{ bindAddress: '127.0.0.1' }
@@ -125,7 +125,7 @@ describe('WebSocketServer - P-5 enforcement', () => {
 			return true;
 		});
 		server = new WebSocketServer(
-			45_304,
+			0,
 			() => {},
 			() => {}
 		);
@@ -258,7 +258,7 @@ describe('WebSocketServer - diagnostics reach the injected log', () => {
 		const entries: Entry[] = [];
 		const closes: Array<{ code: unknown; reason: unknown }> = [];
 		server = new WebSocketServer(
-			45_320,
+			0,
 			() => {},
 			(_ws, code, reason) => closes.push({ code, reason }),
 			{ log: (level, msg) => entries.push({ level, msg }) }
@@ -277,7 +277,7 @@ describe('WebSocketServer - diagnostics reach the injected log', () => {
 	it('logs an abnormal close at error level', async () => {
 		const entries: Entry[] = [];
 		server = new WebSocketServer(
-			45_321,
+			0,
 			() => {},
 			() => {},
 			{ log: (level, msg) => entries.push({ level, msg }) }
@@ -294,7 +294,7 @@ describe('WebSocketServer - diagnostics reach the injected log', () => {
 	it('names a frame over the shared limit in the log, with the limit', async () => {
 		const entries: Entry[] = [];
 		server = new WebSocketServer(
-			45_322,
+			0,
 			() => {},
 			() => {},
 			{ log: (level, msg) => entries.push({ level, msg }) }
@@ -312,7 +312,7 @@ describe('WebSocketServer - diagnostics reach the injected log', () => {
 		const entries: Entry[] = [];
 		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 		server = new WebSocketServer(
-			45_323,
+			0,
 			() => {},
 			() => {},
 			{ log: (level, msg) => entries.push({ level, msg }) }
@@ -338,7 +338,7 @@ describe('WebSocketServer - diagnostics reach the injected log', () => {
 	it('logs a refused transport through the injected log', async () => {
 		const entries: Entry[] = [];
 		server = new WebSocketServer(
-			45_324,
+			0,
 			() => {},
 			() => {},
 			{ log: (level, msg) => entries.push({ level, msg }) }

@@ -6,6 +6,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
+import { singleProjectValue } from './SingleProjectOption';
 
 // stderr, so a piped table or --json document stays clean; the history itself is still shown.
 function warnAboutSkippedFiles(warning: string | undefined): void {
@@ -53,7 +54,11 @@ export function registerHistoryCommand(program: Command, getConfigDir: () => str
 		.option('--status <status>', 'Filter by status (completed|failed|running|queued)')
 		.option('--flow <flowId>', 'Filter by flow ID')
 		.option('--id <executionId>', 'Show detail for a specific execution (steps + injected* markers)')
-		.option('-p, --project <ref>', 'Only the executions of a project: name, alias or id (default: FLOW_PROJECT)')
+		.option(
+			'-p, --project <ref>',
+			'Only the executions of a project: name, alias or id (default: FLOW_PROJECT)',
+			singleProjectValue
+		)
 		.option('--json', 'Machine-readable JSON output')
 		.action((rawOpts: ExecutionFilterOptions & { json?: boolean; project?: string }) => {
 			const { project, ...rest } = rawOpts;

@@ -1,10 +1,11 @@
 import { isExecutionId } from 'flow-core';
-import type { StepMeta } from 'flow-engine/types';
+import type { AttemptEndReason, StepMeta } from 'flow-engine/types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { ExecutionState, StepIoCapture, StepStatus } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
+import { AttemptLedger } from './AttemptLedger';
 import type { ExecutionTransition, ExecutionTransitionListener } from './ExecutionTransition';
 import { StepIoRecorder } from './StepIoRecorder';
 
@@ -34,8 +35,18 @@ export interface StepResultIo {
 	outputs: Record<string, unknown>;
 }
 
+/** What the daemon knows about how a failed attempt ended, beyond the message. */
+export interface FailedAttemptDetails {
+	/** What the worker reported for the attempt. Absent from an older worker or a failure the engine decided itself. */
+	meta?: StepMeta;
+	/** Set when the daemon failed the step itself (not the step): the attempt is recorded as `engine_failed` with this reason. */
+	engineEndReason?: AttemptEndReason;
+}
+
 export class ExecutionStore {
 	private readonly recorder: StepIoRecorder;
+	/** Steps reopened by `markExecutionResumed` whose next start is a `resume`. Resume only exists within one daemon process. */
+	private readonly resumedSteps = new Set<string>();
 
 	constructor(
 		private readonly executionsDir: string,
@@ -182,7 +193,9 @@ export class ExecutionStore {
 		stepId: string,
 		provenance?: { sourceId?: string; workerId?: string },
 		/** Set when this start re-runs a parent because a sub-step failed; kept in `relaunches`. */
-		relaunchFeedback?: string
+		relaunchFeedback?: string,
+		/** What a start after the first is: a `retry`, or a `loop` (the default: any other re-run). Ignored for a first start. */
+		reRunKind: 'retry' | 'loop' = 'loop'
 	): ExecutionState {
 		const state = this.read(executionId);
 		const previous = state.steps[stepId];
@@ -190,22 +203,32 @@ export class ExecutionStore {
 			previous?.startedAt && previous.completedAt
 				? new Date(previous.completedAt).getTime() - new Date(previous.startedAt).getTime()
 				: 0;
+		const resumeKey = `${executionId}/${stepId}`;
+		const resumed = this.resumedSteps.delete(resumeKey);
+		const relaunches =
+			relaunchFeedback === undefined
+				? previous?.relaunches
+				: [
+						...(previous?.relaunches ?? []),
+						{
+							at: new Date().toISOString(),
+							feedback: relaunchFeedback.slice(0, MAX_RELAUNCH_FEEDBACK_CHARS),
+						},
+					];
+		const attempts = (previous?.attempts ?? 0) + 1;
 		// Preserve existing fields (e.g. injected: true) when transitioning to running
 		state.steps[stepId] = {
 			...previous,
-			attempts: (previous?.attempts ?? 0) + 1,
+			attempts,
 			priorAttemptsMs: (previous?.priorAttemptsMs ?? 0) + previousMs,
-			...(relaunchFeedback === undefined
-				? {}
-				: {
-						relaunches: [
-							...(previous?.relaunches ?? []),
-							{
-								at: new Date().toISOString(),
-								feedback: relaunchFeedback.slice(0, MAX_RELAUNCH_FEEDBACK_CHARS),
-							},
-						],
-					}),
+			...(relaunches === undefined ? {} : { relaunches }),
+			// Moved into the attemptLog entry when this attempt settles
+			runningAttempt:
+				relaunchFeedback !== undefined
+					? { origin: 'relaunch', relaunchIndex: relaunches!.length - 1 }
+					: resumed
+						? { origin: 'resume' }
+						: { origin: attempts === 1 ? 'first' : reRunKind },
 			status: 'running',
 			startedAt: new Date().toISOString(),
 			// A new attempt: the previous one's failure must not linger on a step that may now succeed
@@ -244,6 +267,9 @@ export class ExecutionStore {
 			step.completedAt = new Date().toISOString();
 			if (meta !== undefined) {
 				step.meta = meta;
+			}
+			if (wasRunning) {
+				AttemptLedger.settle(state, stepId, { outcome: 'completed', meta }, step.completedAt);
 			}
 			this.recordIo(state, stepId, result);
 		}
@@ -309,14 +335,32 @@ export class ExecutionStore {
 		error?: string,
 		stdout?: string,
 		stderr?: string,
-		result?: StepResultIo
+		result?: StepResultIo,
+		attempt?: FailedAttemptDetails
 	): ExecutionState {
 		const state = this.read(executionId);
 		const step = state.steps[stepId];
 		const alreadyFailed = step?.status === 'failed';
+		// Only an attempt in flight is settled here: failing a step that already settled (a parent failed by the
+		// engine after its own attempt completed) is not a new attempt
+		const wasRunning = step?.status === 'running';
 		if (step) {
 			step.status = 'failed';
 			step.completedAt = new Date().toISOString();
+			if (wasRunning) {
+				AttemptLedger.settle(
+					state,
+					stepId,
+					{
+						outcome: attempt?.engineEndReason === undefined ? 'failed' : 'engine_failed',
+						endReason: attempt?.engineEndReason,
+						meta: attempt?.meta,
+						// Masked BEFORE the entry cuts it: a cut could split a secret so the masker no longer recognises it
+						error: error === undefined ? undefined : this.masks.mask(executionId, error),
+					},
+					step.completedAt
+				);
+			}
 			if (error !== undefined) {
 				step.error = error;
 			}
@@ -355,7 +399,7 @@ export class ExecutionStore {
 			completedAt: new Date().toISOString(),
 			currentSteps: [],
 			steps: this.withRunningStepsFailed(
-				current.steps,
+				current,
 				current.lastError ?? 'the execution ended while this step was still running'
 			),
 		};
@@ -367,16 +411,33 @@ export class ExecutionStore {
 	}
 
 	/** A finished execution has no step in progress: any step still `running` is failed with `error`. */
-	private withRunningStepsFailed(steps: ExecutionState['steps'], error: string): ExecutionState['steps'] {
+	private withRunningStepsFailed(state: ExecutionState, error: string): ExecutionState['steps'] {
 		const completedAt = new Date().toISOString();
-		return Object.fromEntries(
-			Object.entries(steps).map(([id, step]) => [
+		const steps = Object.fromEntries(
+			Object.entries(state.steps).map(([id, step]) => [
 				id,
 				step.status === 'running'
 					? { ...step, status: 'failed' as StepStatus, error: step.error ?? error, completedAt }
 					: step,
 			])
 		);
+		// The attempt that was in flight is lost with the execution: recorded as abandoned, with no figures
+		const settling = { ...state, steps };
+		for (const [id, step] of Object.entries(state.steps)) {
+			if (step.status === 'running') {
+				AttemptLedger.settle(
+					settling,
+					id,
+					{
+						outcome: 'abandoned',
+						endReason: 'execution_ended',
+						error: this.masks.mask(state.executionId, error),
+					},
+					completedAt
+				);
+			}
+		}
+		return steps;
 	}
 
 	/**
@@ -417,7 +478,7 @@ export class ExecutionStore {
 	private interrupt(current: ExecutionState): void {
 		const reason = `interrupted: the daemon restarted while this execution was running; re-run it with flow run ${current.flowFile}`;
 		const completedAt = new Date().toISOString();
-		const steps = this.withRunningStepsFailed(current.steps, reason);
+		const steps = this.withRunningStepsFailed(current, reason);
 		for (const [id, step] of Object.entries(steps)) {
 			if (step.status === 'pending') {
 				steps[id] = { ...step, status: 'completed', completedAt, skippedReason: `not run (${reason})` };
@@ -447,6 +508,7 @@ export class ExecutionStore {
 			step.status = 'pending';
 			delete step.completedAt;
 			delete step.error;
+			this.resumedSteps.add(`${executionId}/${stepId}`);
 		}
 		this.write(state);
 		return state;

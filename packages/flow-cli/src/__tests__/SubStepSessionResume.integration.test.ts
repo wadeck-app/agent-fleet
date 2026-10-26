@@ -244,7 +244,12 @@ describe('daemon -> worker -> model step: sub-step feedback resumes the parent s
 
 		const warning = daemonLog()
 			.split('\n')
-			.find(line => line.includes(`[${executionId}|__execution]`) && line.includes('"level":"warning"'));
+			.find(
+				line =>
+					line.includes(`[${executionId}|__execution]`) &&
+					line.includes('"level":"warning"') &&
+					line.includes('cannot resume its session')
+			);
 		expect(warning).toBeDefined();
 		expect(warning).toContain('phase');
 		expect(warning).toContain('session');

@@ -61,3 +61,15 @@ describe('executeScriptStep - timeout', () => {
 		expect(trace.error).toContain('timeout');
 	});
 });
+
+describe('executeScriptStep - end_reason', () => {
+	it.each([
+		['completed', {}, 'completed'],
+		['a non-zero exit', { success: false, exitCode: 3 }, 'exit_nonzero'],
+		['a timeout', { success: false, exitCode: -1, timedOut: true, timeoutMs: 1000 }, 'timeout'],
+	])('records why the attempt ended for %s', async (_name, result, expected) => {
+		const { run } = setup(result);
+		const trace = await run({ timeout: 1 });
+		expect((trace.meta as { end_reason?: string }).end_reason).toBe(expected);
+	});
+});

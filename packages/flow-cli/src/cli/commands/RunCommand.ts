@@ -15,6 +15,7 @@ import { loadMockConfig } from './MockConfigLoader';
 import { parseInputArgs, parseTimeout } from './RunArgumentParser';
 import { sendToDaemon } from './RunDaemonSender';
 import { checkSecretInputs } from './SecretInputCheck';
+import { singleProjectValue } from './SingleProjectOption';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -51,7 +52,8 @@ export function registerRunCommand(program: Command): void {
 		.option('--flow-id <id>', 'Flow ID within a multi-flow YAML')
 		.option(
 			'-p, --project <ref>',
-			'Project (name, alias or id) the run belongs to. Default: FLOW_PROJECT, then the registered project containing the cwd (see: project list)'
+			'Project (name, alias or id) the run belongs to. Default: FLOW_PROJECT, then the registered project containing the cwd (see: project list)',
+			singleProjectValue
 		)
 		.option(
 			'--mock-config <path>',

@@ -710,6 +710,7 @@ export class FlowRegistry {
 				mcpServers: data.mcpServers,
 				toolHooks: data.toolHooks,
 				session: data.session,
+				timeout: data.timeout,
 			};
 		} else if (stepType === 'script') {
 			// Script step

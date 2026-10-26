@@ -274,6 +274,14 @@ export class FlowScheduler {
 	}
 
 	/**
+	 * How many retries (`retry`) the scheduler has granted this step so far; 0 for a step never retried or unknown. Read-only:
+	 * lets the consumer tell a retry from any other re-run (loop, sub-step round) when the step starts again.
+	 */
+	getRetryCount(stepId: string): number {
+		return this.state.retryCount.get(stepId) ?? 0;
+	}
+
+	/**
 	 * Returns the accumulated sub-step error history for the given parent step.
 	 * Used by CommandHandler to populate ExecutionContext.subStepErrors before dispatching.
 	 */

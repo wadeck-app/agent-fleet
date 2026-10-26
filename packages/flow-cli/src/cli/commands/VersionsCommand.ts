@@ -12,8 +12,8 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { FLOW_PROJECT_ENV, ProjectScopeError, ProjectScopeResolver } from '../../config/ProjectScopeResolver';
-
 // violations-suppress-end: ts/no-deep-relative
+import { singleProjectValue } from './SingleProjectOption';
 
 /**
  * The `.flow/flows.yml` of the project this command works on, or undefined when the working directory is in no registered
@@ -53,7 +53,8 @@ export function registerVersionsCommand(
 		.option('--json', 'Machine-readable JSON output')
 		.option(
 			'-p, --project <ref>',
-			'Project (name, alias or id) whose registry is read. Default: FLOW_PROJECT, then the registered project containing the cwd'
+			'Project (name, alias or id) whose registry is read. Default: FLOW_PROJECT, then the registered project containing the cwd',
+			singleProjectValue
 		)
 		.action((flowId: string, opts: { json?: boolean; project?: string }) => {
 			let rows;

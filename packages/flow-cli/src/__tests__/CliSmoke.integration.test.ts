@@ -23,6 +23,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { projectConfigFile } from '../config/ProjectFlowConfig';
 import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
 import { processLeakGuard } from '../test-utils/ProcessLeakGuard';
 import { pollUntil } from '../test-utils/WaitHelpers';
@@ -156,7 +157,6 @@ const bundlePath = resolve(agentFleetRoot, 'packages', 'flow-cli', 'dist-bundle'
  * the path untested.
  */
 const PROJECT_CONFIG_YAML = `\
-version: 1
 plugins:
   workspace:
     instance:
@@ -242,13 +242,13 @@ describe('the standalone bundle in daemon mode', () => {
 		processLeakGuard.watch(installDir);
 		const projectDir = mkdtempSync(join(tmpdir(), 'flow-bundle-daemon-project-'));
 		const configHome = mkdtempSync(join(tmpdir(), 'flow-bundle-daemon-config-'));
-		mkdirSync(join(projectDir, '.flow'), { recursive: true });
-		writeFileSync(join(projectDir, '.flow', 'config.yml'), PROJECT_CONFIG_YAML, 'utf8');
-		// A project is what the registry says: the daemon (XDG_CONFIG_HOME = configHome) only loads this config for a registered folder.
-		await addProject(defaultRegistryDir({ XDG_CONFIG_HOME: configHome }), {
-			name: 'bundle-daemon-project',
-			path: projectDir,
-		});
+		// A project is what the registry says: the daemon (XDG_CONFIG_HOME = configHome) only loads this config for a registered folder,
+		// and the config of a registered project lives in the registry too (projects/<id>/flow/config/config.yml).
+		const registryDir = defaultRegistryDir({ XDG_CONFIG_HOME: configHome });
+		const project = await addProject(registryDir, { name: 'bundle-daemon-project', path: projectDir });
+		const projectConfig = projectConfigFile(registryDir, project.id);
+		mkdirSync(dirname(projectConfig), { recursive: true });
+		writeFileSync(projectConfig, PROJECT_CONFIG_YAML, 'utf8');
 
 		const daemon = spawnBundledDaemon(installBundle(installDir), projectDir, configHome);
 		try {

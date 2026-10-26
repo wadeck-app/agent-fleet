@@ -1,5 +1,5 @@
 import type { FailureOrigin } from 'flow-engine';
-import type { StepMeta } from 'flow-engine/types';
+import type { AttemptEndReason, StepMeta } from 'flow-engine/types';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { DaemonResponse } from '../ipc/Protocol';
@@ -22,6 +22,9 @@ import type { ReadyStepQueue } from './ReadyStepQueue.js';
 function isUnansweredInterventionError(error: string): boolean {
 	return error.includes('this step is unanswered, not denied');
 }
+
+/** Why the daemon failed a step itself; `engine_failed` when none of the specific causes applies. */
+export type EngineEndReason = Extract<AttemptEndReason, 'engine_failed' | 'stalled' | 'worker_lost'>;
 
 /** What happens to an execution when a step ends: scheduler progress, failure, resume and cleanup. */
 export class StepOutcomes {
@@ -147,8 +150,10 @@ export class StepOutcomes {
 	 * execution store shows up in `flow history` as still running forever, and a hook that
 	 * fires for a failing script but not for a lost worker is a gap the author cannot see.
 	 */
-	failStep(executionId: string, stepId: string, reason: string): void {
-		this.executionStore.markStepFailed(executionId, stepId, reason);
+	failStep(executionId: string, stepId: string, reason: string, endReason: EngineEndReason = 'engine_failed'): void {
+		this.executionStore.markStepFailed(executionId, stepId, reason, undefined, undefined, undefined, {
+			engineEndReason: endReason,
+		});
 		this.logWriter.writeExecution(executionId, `Step ${stepId} failed: ${reason}`, 'error');
 		this.settleFailure(executionId, stepId, reason, 'engine');
 		this.hooks.dispatch(executionId, 'onStepFailed', { executionId, stepId, error: reason });

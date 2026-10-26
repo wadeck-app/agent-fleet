@@ -24,7 +24,7 @@ export function createDaemonCommands(
 				return project.response;
 			}
 			pruneProjectWorkspaces(project.projectPath, config);
-			const flowHooks: Record<string, HookConfig[]> = loadFlowHooks(project.projectPath);
+			const flowHooks: Record<string, HookConfig[]> = loadFlowHooks(project.project);
 			return runtime().commandHandler.handleRun(cmd, new HookDispatcher(flowHooks), project);
 		},
 		// Resumes an execution kept alive after a `user_intervention` step timed out

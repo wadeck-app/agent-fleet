@@ -114,3 +114,19 @@ Paths pass through the existing secrets masker in `WorkerAdapter` before leaving
 6. Docs and lessons-learned.
 
 Each phase is shippable alone; phases 2-3 already stop the cost loss (data recorded) even before any display changes. Until phase 4 the displayed cost stays last-attempt: flag this in the release notes.
+
+## Decisions taken (phases 2-3 implemented)
+
+Open questions: 1 yes (display not touched yet), 2 no, 3 no (counts only), 4 yes (50/step, 400/execution), 5 later, 6 yes. Deviations and additions:
+
+- `AttemptEndReason` gains `step_error` (exception, spawn failure, config refused before launch, failure reported without a classified reason).
+- `ModelStepMeta.cost.reported?: boolean`: false = provider gave no cost (killed before `result`, codex), `usd` is a placeholder 0. Absent on old records = reported. `AttemptRecord.usd` is omitted when `reported === false` or no meta arrived.
+- Script meta gains `end_reason` (`completed`/`exit_nonzero`/`timeout`).
+- opencode: provider now puts `num_turns` (count of `step_start`) on its synthesized `result`; the executor only sees the first `step_start`.
+- Pre-launch refusals in `ModelStepExecutor` also return a meta (`step_error`), so a missing `step_failed.meta` means an older worker (warned once per worker in the execution log).
+- `StepState.runningAttempt` (persisted) carries origin/relaunchIndex from start to settle. `origin: loop` also covers sub-step round restarts; `retry` is detected via new read-only `FlowScheduler.getRetryCount` (`ReRunKindTracker`). `resume` is tracked in memory (resume only works within one daemon).
+- Entry written only when the step was `running`: failing an already-settled parent adds no attempt.
+- Engine failures: `stalled`, `worker_lost`, else `engine_failed`; running steps at execution end/daemon restart: `abandoned` / `execution_ended`.
+- Raw per-attempt `usd` is stored, never summed (claude cumulative-on-resume still unverified).
+
+Not observable: shell writes, nested sub-agent writes (unverified), partial cost of killed processes, codex turns. opencode write-tool input path (`filePath`/`file_path`/`path`) is unverified; unknown shapes warn once.

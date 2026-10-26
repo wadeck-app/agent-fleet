@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { flowConfigDir } from './FlowConfigDir.js';
-import { launchProjectConfigPath } from './LaunchProjectConfig.js';
+import { launchProjectConfig } from './LaunchProjectConfig.js';
 import type {
 	GlobalConfig,
 	ProjectConfig,
@@ -14,6 +14,7 @@ import type {
 	ResolvedFeature,
 	ResolvedPluginsConfig,
 } from './PluginConfig.js';
+import { validateGlobalConfigLayer, validateProjectConfigLayer } from './ProjectFlowConfig.js';
 
 const SENSITIVE_FIELD_SET = new Set(SENSITIVE_FIELDS);
 
@@ -81,8 +82,8 @@ export class ConfigLoader {
 	constructor(options: ConfigLoaderOptions = {}) {
 		this.envVarOverride = process.env['FLOW_CONFIG'];
 		this.globalConfigPath = options.globalConfigPath ?? join(flowConfigDir(), 'config.yml');
-		// Resolved lazily: the project root depends on a filesystem walk that must
-		// not run (nor fail) merely because a ConfigLoader was constructed.
+		// Resolved lazily: the project comes from the registry, which must not be read (nor fail)
+		// merely because a ConfigLoader was constructed.
 		this.projectConfigPathOverride = options.projectConfigPath;
 	}
 
@@ -102,11 +103,13 @@ export class ConfigLoader {
 				throw new Error(`FLOW_CONFIG is set to "${this.envVarOverride}" but the file was not found`);
 			}
 			const config = loadYamlFile<GlobalConfig>(this.envVarOverride);
+			validateGlobalConfigLayer(this.envVarOverride, config ?? {});
 			this.validateGlobalConfig(config ?? {});
 			return config ?? {};
 		}
 
 		const config = loadYamlFile<GlobalConfig>(this.globalConfigPath);
+		validateGlobalConfigLayer(this.globalConfigPath, config ?? {});
 		this.validateGlobalConfig(config ?? {});
 		return config ?? {};
 	}
@@ -121,27 +124,18 @@ export class ConfigLoader {
 	}
 
 	/**
-	 * Resolves the project config path, or null when the working directory
-	 * belongs to no project.
-	 *
-	 * Uses the project resolver rather than a literal `process.cwd()` so that
-	 * running from a subdirectory still finds the project's config (Q#23).
+	 * The project config: the file given to the constructor, else the config of the registered project containing the
+	 * working directory (`FLOW_PROJECT` > cwd), read from the project registry. Empty when the working directory belongs
+	 * to no project (the reason is reported on stderr; a config that declares plugins in an unregistered folder is an
+	 * error, see launchProjectConfig). Keys that are not allowed in a project config are errors naming the file.
 	 */
-	private resolveProjectConfigPath(): string | null {
-		if (this.projectConfigPathOverride !== undefined) {
-			return this.projectConfigPathOverride;
-		}
-		// No project means no project config; the reason is reported on stderr, and a config that declares plugins
-		// in an unregistered folder is an error (see launchProjectConfigPath), never a silent loss.
-		return launchProjectConfigPath(process.cwd());
-	}
-
 	private loadProjectConfig(): ProjectConfig {
-		const projectConfigPath = this.resolveProjectConfigPath();
-		if (projectConfigPath === null) {
-			return {};
+		if (this.projectConfigPathOverride !== undefined) {
+			const config = loadYamlFile<ProjectConfig>(this.projectConfigPathOverride) ?? {};
+			validateProjectConfigLayer(this.projectConfigPathOverride, config);
+			return config;
 		}
-		return loadYamlFile<ProjectConfig>(projectConfigPath) ?? {};
+		return (launchProjectConfig(process.cwd())?.values ?? {}) as ProjectConfig;
 	}
 
 	private merge(global: GlobalConfig, project: ProjectConfig): ResolvedPluginsConfig {

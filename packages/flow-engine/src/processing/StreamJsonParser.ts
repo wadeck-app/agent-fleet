@@ -17,6 +17,8 @@ export interface StreamContentBlock {
 	input?: unknown;
 	tool_use_id?: string;
 	content?: unknown;
+	/** Set on a `tool_result` block whose tool call failed. */
+	is_error?: boolean;
 }
 
 /**

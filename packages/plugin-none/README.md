@@ -9,7 +9,7 @@ This plugin is a built-in dependency of `flow-cli` and requires no separate inst
 ## Configuration
 
 ```yaml
-# .flow/config.yml
+# project flow config (see flow-cli PLUGINS.md)
 plugins:
     workspace:
         instance:
