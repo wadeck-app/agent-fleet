@@ -148,6 +148,21 @@ describe('ScriptProcessSupervisor -- kill calls', () => {
 			expect(processKill).toHaveBeenCalledWith(PID, 'SIGKILL');
 		});
 
+		it('clears the running set: a second call does not signal the same tree again, and the script still settles later', async () => {
+			const child = makeChild();
+			const outcome = superviseScriptProcess(child, { onNotice: () => {} });
+
+			killAllRunningScripts();
+			expect(processKill).toHaveBeenCalledWith(PID, 'SIGKILL');
+			processKill.mockClear();
+			killAllRunningScripts();
+
+			expect(processKill).not.toHaveBeenCalled();
+			// Settling after the clear removes the script a second time: that must be harmless.
+			child.emit('close', null);
+			await expect(outcome).resolves.toEqual({ code: null, timedOut: false });
+		});
+
 		it('does not touch the process tree of a script that has already ended', async () => {
 			const child = makeChild();
 			const outcome = superviseScriptProcess(child, { onNotice: () => {} });

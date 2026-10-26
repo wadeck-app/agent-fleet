@@ -50,9 +50,13 @@ const running = new Set<RunningScript>();
 /**
  * Ends every script process tree still running, immediately and synchronously (usable from a
  * `process.on('exit')` handler). Problems are written to stderr and do not stop the others.
+ * The set is emptied: these scripts are handled, a second call must not signal them again. A script
+ * that settles afterwards deletes itself from the set again, which is harmless.
  */
 export function killAllRunningScripts(): void {
-	for (const script of [...running]) {
+	const scripts = [...running];
+	running.clear();
+	for (const script of scripts) {
 		try {
 			script.killNow();
 		} catch (error) {
