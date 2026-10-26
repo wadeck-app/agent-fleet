@@ -1,18 +1,11 @@
 import { Badge } from '@wadeck-app/dsl-ui';
 
+import { formatClock, isoTitle } from '../commons/DateText.js';
 import type { Density, Identity, TimeMode } from './LogStreamChoices.js';
 import { formatSigned, ownerOf, stepColor, stepHue } from './LogStreamModel.js';
 import { type LogLevel, type LogStreamEntry, RUN_EVENTS_STEP } from './LogStreamProps.js';
 import { MarkdownText } from './MarkdownText.js';
 import { StepLabel } from './StepLabel.js';
-
-const CLOCK_FORMAT = new Intl.DateTimeFormat(undefined, {
-	hour: '2-digit',
-	minute: '2-digit',
-	second: '2-digit',
-	fractionalSecondDigits: 3,
-});
-const TITLE_FORMAT = new Intl.DateTimeFormat(undefined, { dateStyle: 'long', timeStyle: 'medium' });
 
 const LEVEL_BADGE: Record<LogLevel, 'default' | 'info' | 'warning' | 'danger'> = {
 	debug: 'default',
@@ -34,7 +27,7 @@ const ROW_TINT: Partial<Record<LogLevel, string>> = { error: 'bg-danger-bg', war
 function timeText(entry: LogStreamEntry, mode: TimeMode): string {
 	switch (mode) {
 		case 'absolute':
-			return CLOCK_FORMAT.format(new Date(entry.timestamp));
+			return formatClock(entry.timestamp);
 		case 'offset':
 			return formatSigned(entry.offsetMs);
 		case 'delta':
@@ -97,7 +90,7 @@ export function LogLine({ entry, identity, time, density, showStep, open, onTogg
 				)}
 				<time
 					dateTime={entry.timestamp}
-					title={TITLE_FORMAT.format(new Date(entry.timestamp))}
+					title={isoTitle(entry.timestamp)}
 					className={`${time === 'absolute' ? 'w-28' : 'w-20'} shrink-0 whitespace-nowrap text-right font-mono tabular-nums text-muted`}
 				>
 					{timeText(entry, time)}

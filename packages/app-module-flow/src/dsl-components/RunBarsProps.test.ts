@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { RUN_BARS_KEYS, barHeights, dayLabel, parseRunBarsDays, readRunBarsProps } from './RunBarsProps.js';
+import { RUN_BARS_KEYS, barHeights, barLink, parseRunBarsDays, readRunBarsProps } from './RunBarsProps.js';
 
 const DAY = { dayStart: '2026-10-23T22:00:00.000Z', completed: 20, failed: 12 };
 
 describe('readRunBarsProps', () => {
 	it('resolves days against the context', () => {
-		expect(readRunBarsProps({ days: '$ctx.daily' }, { daily: [DAY] })).toEqual({ days: [DAY], unexpectedKeys: [] });
+		expect(readRunBarsProps({ days: '$ctx.daily', to: '/p' }, { daily: [DAY] })).toEqual({
+			days: [DAY],
+			to: '/p',
+			unexpectedKeys: [],
+		});
 	});
 
 	it('lists the keys outside the contract, sorted, ignoring engine keys', () => {
@@ -14,8 +18,8 @@ describe('readRunBarsProps', () => {
 		expect(props.unexpectedKeys).toEqual(['className', 'height']);
 	});
 
-	it('declares exactly days', () => {
-		expect([...RUN_BARS_KEYS]).toEqual(['days']);
+	it('declares exactly days and to', () => {
+		expect([...RUN_BARS_KEYS]).toEqual(['days', 'to']);
 	});
 });
 
@@ -64,10 +68,19 @@ describe('barHeights', () => {
 	});
 });
 
-describe('dayLabel', () => {
-	it('is the first letter of the weekday of the local day', () => {
-		// 2026-10-24 is a Saturday.
-		expect(dayLabel(new Date(2026, 9, 24, 12), 'en-US')).toBe('S');
-		expect(dayLabel(new Date(2026, 9, 26, 12), 'en-US')).toBe('M');
+describe('barLink', () => {
+	it('opens the executions page filtered on the status the bar stands for', () => {
+		expect(barLink('/modules/flow/executions', 'failed')).toBe('/modules/flow/executions?status=failed');
+		expect(barLink('/modules/flow/executions', 'completed')).toBe('/modules/flow/executions?status=completed');
+	});
+
+	it.each([
+		'executions',
+		'https://example.com/x',
+		'//evil.example',
+		'/modules/flow/executions?status=failed',
+		'/a#b',
+	])('refuses the page %j, saying what to write', to => {
+		expect(() => barLink(to, 'failed')).toThrow(/flow:RunBars to must be an app path/);
 	});
 });

@@ -256,7 +256,10 @@ describe('LogStream time', () => {
 		show({}, { ...BASE, time: 'absolute' });
 		const time = document.querySelector('time')!;
 		expect(time.getAttribute('datetime')).toBe('2026-10-24T10:00:08.000Z');
-		expect(time.getAttribute('title')).toMatch(/2026/);
+		// The exact instant, not a localized rendering of it.
+		expect(time.getAttribute('title')).toBe('2026-10-24T10:00:08.000Z');
+		// Local clock with milliseconds, in English digits whatever the language of the browser.
+		expect(time.textContent).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
 	});
 
 	it('says in a caption what the time column is', () => {

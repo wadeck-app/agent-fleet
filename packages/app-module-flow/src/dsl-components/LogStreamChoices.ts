@@ -86,7 +86,10 @@ export function useLogStreamChoices(): LogStreamChoices {
 		label: 'Time',
 		initial: LOG_STREAM_DEFAULTS.time,
 		options: {
-			absolute: { label: 'Clock', hint: 'Time of day of each line, in your locale.' },
+			absolute: {
+				label: 'Clock',
+				hint: 'Time of day of each line (24 hour clock, your time zone). Hover a time for the exact instant.',
+			},
 			offset: { label: 'Offset', hint: 'Time since the run started (+12.3s).' },
 			delta: { label: 'Delta', hint: 'Time since the previous line of the page (+0.4s).' },
 		},

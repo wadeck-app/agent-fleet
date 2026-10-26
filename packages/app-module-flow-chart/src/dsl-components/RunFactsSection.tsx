@@ -12,7 +12,9 @@ export function RunFactsSection({ view }: { view: IOView }) {
 				{view.run.map(row => (
 					<div key={row.label} className="contents">
 						<dt className="text-muted">{row.label}</dt>
-						<dd className="break-all">{row.value}</dd>
+						<dd className="break-all" title={row.title}>
+							{row.value}
+						</dd>
 					</div>
 				))}
 			</dl>

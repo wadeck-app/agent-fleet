@@ -70,3 +70,14 @@ describe('RunList', () => {
 		expect(screen.getByRole('alert').textContent).toMatch(message);
 	});
 });
+
+describe('RunList time', () => {
+	it('prints the start in one explicit English format and keeps the exact instant as tooltip', () => {
+		const started = new Date(2026, 9, 24, 18, 38, 7).toISOString();
+		show({ runs: [{ ...RUNS[0]!, startedAt: started }] });
+		const time = document.querySelector('time')!;
+		expect(time.textContent).toBe('Oct 24, 18:38');
+		expect(time.getAttribute('title')).toBe(started);
+		expect(time.getAttribute('datetime')).toBe(started);
+	});
+});

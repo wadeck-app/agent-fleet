@@ -1,10 +1,12 @@
 import { resolveExpressionValue } from '@wadeck-app/dsl-renderer';
 
-/** The keys a `flow:RunBars` node may carry: nothing that styles the bars. */
-export const RUN_BARS_KEYS = ['days'] as const;
+/** The keys a `flow:RunBars` node may carry: the data and the page a bar leads to, nothing that styles the bars. */
+export const RUN_BARS_KEYS = ['days', 'to'] as const;
 
 export interface RunBarsProps {
 	days: unknown;
+	/** App path of the executions page, without query: a bar adds ?status=. */
+	to: unknown;
 	/** Keys of the node outside the contract (the platform checks only the root $type, never the props). */
 	unexpectedKeys: string[];
 }
@@ -28,6 +30,7 @@ export function readRunBarsProps(node: Record<string, unknown>, ctx: Record<stri
 	const declared: readonly string[] = RUN_BARS_KEYS;
 	return {
 		days: resolveExpressionValue(node['days'], ctx),
+		to: resolveExpressionValue(node['to'], ctx),
 		// "$type", "$if" and the like belong to the engine, not to the node.
 		unexpectedKeys: Object.keys(node)
 			.filter(key => !key.startsWith('$') && !declared.includes(key))
@@ -73,7 +76,15 @@ export function barHeights(days: readonly RunBarsDay[]): RunBarsHeights[] {
 	return days.map(day => ({ completed: percent(day.completed), failed: percent(day.failed) }));
 }
 
-/** First letter of the weekday of `day`, in the viewer's language unless `locale` says otherwise. */
-export function dayLabel(day: Date, locale?: string): string {
-	return new Intl.DateTimeFormat(locale, { weekday: 'narrow' }).format(day);
+/**
+ * The executions page filtered on the status a bar stands for. `to` is the app path of the page (no query, no host): a
+ * bar must never leave the app. The page has no date filter, so the link shows every run of that status, not the day's.
+ */
+export function barLink(to: unknown, status: 'completed' | 'failed'): string {
+	if (typeof to !== 'string' || !to.startsWith('/') || to.startsWith('//') || /[?#]/.test(to)) {
+		throw new Error(
+			`flow:RunBars to must be an app path without query such as /modules/flow/executions, got ${JSON.stringify(to) ?? 'nothing'}.`
+		);
+	}
+	return `${to}?status=${status}`;
 }

@@ -77,7 +77,9 @@ export function buildPanelSections({
 						{rows.map(row => (
 							<div key={row.label} className="contents">
 								<dt className="text-muted">{row.label}</dt>
-								<dd className="break-words">{row.value}</dd>
+								<dd className="break-words" title={row.title}>
+									{row.value}
+								</dd>
 							</div>
 						))}
 					</dl>

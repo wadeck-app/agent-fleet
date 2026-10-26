@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 
 import { Badge } from '@wadeck-app/dsl-ui';
 
+import { formatMedium, isoTitle } from '../commons/DateText.js';
 import { RUN_LIST_KEYS, type RunListProps, parseRunListRows, runLink, runStatusVariant } from './RunListProps.js';
 
 function refusal(children: string) {
@@ -11,15 +12,6 @@ function refusal(children: string) {
 		</span>
 	);
 }
-
-const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
-	day: 'numeric',
-	month: 'short',
-	hour: '2-digit',
-	minute: '2-digit',
-});
-
-const TITLE_FORMAT = new Intl.DateTimeFormat(undefined, { dateStyle: 'long', timeStyle: 'medium' });
 
 /**
  * The latest runs of the dashboard card, one line per run: status badge, flow name, start time. The name takes the room
@@ -76,9 +68,9 @@ export function RunList({ runs, to, emptyMessage, unexpectedKeys }: RunListProps
 						<time
 							className="shrink-0 whitespace-nowrap text-xs text-muted"
 							dateTime={row.startedAt.toISOString()}
-							title={TITLE_FORMAT.format(row.startedAt)}
+							title={isoTitle(row.startedAt)}
 						>
-							{TIME_FORMAT.format(row.startedAt)}
+							{formatMedium(row.startedAt)}
 						</time>
 					</Link>
 				</li>

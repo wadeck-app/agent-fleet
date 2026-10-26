@@ -1021,12 +1021,35 @@ describe('dashboard widget', () => {
 
 	it('links only to pages that exist: the executions list, a run, the workers, the flow charts', () => {
 		const targets = [
+			// The numbers (StatTile href): Running, Failed, Total.
+			`${MODULE_PAGE_PREFIX}/executions?status=running`,
+			`${MODULE_PAGE_PREFIX}/executions?status=failed`,
+			`${MODULE_PAGE_PREFIX}/executions`,
+			// The bars of the chart, a run of the list, the buttons.
+			`${MODULE_PAGE_PREFIX}/executions`,
 			`${MODULE_PAGE_PREFIX}/executions/{executionId}`,
 			`${MODULE_PAGE_PREFIX}/executions`,
 			`${MODULE_PAGE_PREFIX}/workers`,
 			FLOW_CHART_INDEX_PATH,
 		];
 		expect([...collectStrings(widget.document, 'href'), ...collectStrings(widget.document, 'to')]).toEqual(targets);
+	});
+
+	it('makes each number a link to the executions page filtered on a status that page offers (Total: unfiltered)', () => {
+		const tiles = collectNodes(widget.document, 'StatTile');
+		const hrefs = Object.fromEntries(tiles.map(tile => [String(tile['label']), tile['href']]));
+		expect(hrefs).toEqual({
+			Running: `${MODULE_PAGE_PREFIX}/executions?status=running`,
+			Failed: `${MODULE_PAGE_PREFIX}/executions?status=failed`,
+			Total: `${MODULE_PAGE_PREFIX}/executions`,
+		});
+		const selects = collectNodes(parseView('executions-page.yaml').document, 'CompactSelect');
+		const status = selects.find(select => select['urlParam'] === 'status');
+		const offered = (status!['options'] as { value: string }[]).map(option => option.value);
+		for (const href of Object.values(hrefs)) {
+			const value = new URL(String(href), 'http://x').searchParams.get('status');
+			if (value !== null) expect(offered, String(href)).toContain(value);
+		}
 	});
 
 	it('offers the three buttons in the style of the other action buttons of the module', () => {
@@ -1056,7 +1079,7 @@ describe('dashboard widget', () => {
 
 	it('gives the daily bars the 7 days of the digest and no style key', () => {
 		const [bars] = collectNodes(widget.document, 'flow:RunBars');
-		expect(Object.keys(bars!).filter(key => !key.startsWith('$'))).toEqual(['days']);
+		expect(Object.keys(bars!).filter(key => !key.startsWith('$'))).toEqual(['days', 'to']);
 		const days = readSource(String(bars!['days'])).value as Record<string, unknown>[];
 		expect(days).toHaveLength(7);
 		for (const field of ['dayStart', 'completed', 'failed']) expect(Object.keys(days[0]!), field).toContain(field);

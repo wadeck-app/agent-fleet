@@ -1,7 +1,10 @@
 # Dashboard widget for a card of 3 x 4 grid cells (332 x 448px, declared in manifest.json): three counters on one row, the daily bars of the last 7 days, the 5
 # latest runs and a row of buttons. One source feeds all of it:
 #   recent: GET /api/modules/flow/widgets/executions, the digest of the runs (flow-core RunDigest, served as is)
-# Times are ISO 8601, formatted by flow:RunList (a StatTile or a composed string would show the raw text).
+# Times are ISO 8601, formatted in English by flow:RunList (a StatTile or a composed string would show the raw text).
+# Drill-down: each number is a link (StatTile href, a real anchor) to the executions page filtered by the same status the
+# number counts (?status= is bound to the page select); Total is unfiltered. A bar of the chart opens the same page
+# filtered on its status: the page has no date filter, so it lists that status for every day, not only the day clicked.
 # When the source cannot be read the renderer only logs it: the list falls back to its emptyMessage, numbers stay blank,
 # nothing throws.
 $sources:
@@ -17,15 +20,26 @@ items:
       gap: gap-1.5
       itemSizes: [flex, flex, flex]
       items:
-          - { $type: StatTile, label: Running, value: $sources.recent.running }
-          - { $type: StatTile, label: Failed, value: $sources.recent.failed }
-          - { $type: StatTile, label: Total, value: $sources.recent.total }
+          - {
+                $type: StatTile,
+                label: Running,
+                value: $sources.recent.running,
+                href: '/modules/flow/executions?status=running',
+            }
+          - {
+                $type: StatTile,
+                label: Failed,
+                value: $sources.recent.failed,
+                href: '/modules/flow/executions?status=failed',
+            }
+          - { $type: StatTile, label: Total, value: $sources.recent.total, href: /modules/flow/executions }
 
     # Runs of the last 7 days, one green (completed) and one red (failed) bar per day, one equal column per day over the
     # whole width of the tile. Hover a day for the date. Not the dsl-ui Chart: it draws nothing for a day without run, so a
     # quiet week showed two bars squeezed against the right edge and the rest of the tile empty.
     - $type: flow:RunBars
       days: $sources.recent.daily
+      to: /modules/flow/executions
 
     # The 5 newest runs, one line each (status, flow name, start time), a line opens the run. A DataTable cannot shrink under
     # its content, so in a narrow card it scrolled sideways and hid the time: flow:RunList (this module) gives the flow name

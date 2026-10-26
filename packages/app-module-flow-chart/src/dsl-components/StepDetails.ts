@@ -1,8 +1,12 @@
 import type { AttemptKind, FlowGraphNode } from 'flow-core';
 
+import { formatLong, isoTitle } from '../commons/DateText.js';
+
 export interface DetailRow {
 	label: string;
 	value: string;
+	/** Tooltip of the value: the exact ISO 8601 instant of a date. */
+	title?: string;
 }
 
 export interface StepDetail {
@@ -42,13 +46,14 @@ const ATTEMPT_KIND_WORDS: Record<AttemptKind, string> = {
 };
 const DATE_KEYS = new Set(['startedAt', 'completedAt']);
 
-function formatValue(key: string, value: string | number | boolean): string {
+function formatValue(key: string, value: string | number | boolean): { value: string; title?: string } {
 	if (DATE_KEYS.has(key) && typeof value === 'string') {
-		const date = new Date(value);
-		// violations-suppress: ts/no-locale-date shows the reader's own timezone; @wadeck-app/dsl-ui exports no shared date formatter
-		return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+		// An unparsable date is shown as it came: the panel must not hide what the run recorded.
+		return Number.isNaN(new Date(value).getTime())
+			? { value }
+			: { value: formatLong(value), title: isoTitle(value) };
 	}
-	return String(value);
+	return { value: String(value) };
 }
 
 /** The facts the details panel shows for one step, as label/value rows. */
@@ -91,7 +96,7 @@ export function describeStep(step: FlowGraphNode): StepDetail {
 		}
 		const value = meta[key];
 		if (value !== undefined) {
-			rows.push({ label: META_LABELS[key]!, value: formatValue(key, value) });
+			rows.push({ label: META_LABELS[key]!, ...formatValue(key, value) });
 		}
 	}
 	const error = meta['error'];
