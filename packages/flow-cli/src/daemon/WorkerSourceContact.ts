@@ -208,16 +208,19 @@ export async function contactDeclaredSources(
 	report: (message: string) => void,
 	dependencies: SourceProviderDependencies = {}
 ): Promise<void> {
-	for (const entry of entries) {
-		try {
-			const provider = await providerOf(entry, dependencies);
-			await provider.obtainWorker({
-				daemonEndpoint,
-				sourceId: entry.sourceId,
-				projects: [],
-			});
-		} catch (err) {
-			report(`could not obtain a worker from source "${entry.sourceId}": ${normalizeError(err).message}`);
-		}
-	}
+	// Concurrently: a plugin source can hang while it loads or answers, and the sources after it must not wait for it.
+	await Promise.all(
+		entries.map(async entry => {
+			try {
+				const provider = await providerOf(entry, dependencies);
+				await provider.obtainWorker({
+					daemonEndpoint,
+					sourceId: entry.sourceId,
+					projects: [],
+				});
+			} catch (err) {
+				report(`could not obtain a worker from source "${entry.sourceId}": ${normalizeError(err).message}`);
+			}
+		})
+	);
 }

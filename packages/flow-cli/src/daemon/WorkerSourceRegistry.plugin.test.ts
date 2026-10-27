@@ -72,7 +72,7 @@ describe('WorkerSourceRegistry - a plugin source', () => {
 		);
 	});
 
-	it.each(['sandbox', 'sandbox.', '.docker', 'a.b.c', ' ', 'a/b.c', 'a\b.c', '../x.y', 'a.b/c'])('rejects the malformed plugin ref %j', ref => {
+	it.each(['sandbox', 'sandbox.', '.docker', 'a.b.c', ' ', 'a/b.c', 'a\\b.c', '../x.y', 'a.b/c'])('rejects the malformed plugin ref %j', ref => {
 		const registry = new WorkerSourceRegistry(dir);
 
 		expect(() => registry.declare({ ...pluginDeclaration(), plugin: ref })).toThrow(

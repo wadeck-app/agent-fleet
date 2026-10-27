@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PluginLoader } from '../config/PluginLoader.js';
 import {
@@ -80,5 +80,34 @@ describe('contactDeclaredSources - plugin sources', () => {
 		await contact([plain], { workerTypes });
 
 		expect(reported.join(' ')).toContain('unknown worker source provider "nope"');
+	});
+});
+
+describe('contactDeclaredSources - a source that hangs', () => {
+	it('does not stop the sources after it from being contacted', async () => {
+		const patient = new WorkerTypeInstances(new PluginLoader(), () => {}, { buildTimeoutMs: 60_000 });
+		const contacting = contact([pluginEntry('stuck', { plugin: 'fixture-sandbox.slow' }), pluginEntry('fine')], {
+			workerTypes: patient,
+		});
+
+		await vi.waitFor(() => expect(fixture.obtained.map(o => o.sourceId)).toEqual(['fine']));
+
+		// Let the stuck build finish so the contact (and the test) ends.
+		fixture.pendingBuilds.shift()?.();
+		await contacting;
+		expect(fixture.obtained.map(o => o.sourceId).sort()).toEqual(['fine', 'stuck']);
+	});
+
+	it('reports the hung source by name once its build is given up, and the others are unaffected', async () => {
+		const impatient = new WorkerTypeInstances(new PluginLoader(), () => {}, { buildTimeoutMs: 30 });
+
+		await contact([pluginEntry('stuck', { plugin: 'fixture-sandbox.hangs' }), pluginEntry('fine')], {
+			workerTypes: impatient,
+		});
+
+		expect(reported).toHaveLength(1);
+		expect(reported[0]).toContain('source "stuck"');
+		expect(reported[0]).toContain('did not finish loading');
+		expect(fixture.obtained.map(o => o.sourceId)).toEqual(['fine']);
 	});
 });
