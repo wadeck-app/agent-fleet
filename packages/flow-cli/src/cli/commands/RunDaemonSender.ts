@@ -1,5 +1,6 @@
 import { readPortFile } from '@wadeck-app/singleton-daemon-kit';
 import { createRemoteDaemonClient } from 'flow-core';
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
@@ -57,17 +58,21 @@ async function describePort(daemonDir: string): Promise<string> {
  * A daemon that is stopping, closed, or closing is treated as "not running": a daemon is started (or the stop of the
  * old one awaited) and the run is sent again, up to {@link DAEMON_CONTACT_ATTEMPTS} attempts with a growing pause. An
  * error the daemon returned for the run itself (a refusal) is rethrown at once: starting another daemon would only
- * repeat it.
+ * repeat it. Every attempt carries the same `requestId`, so a daemon that did accept an attempt whose answer came too
+ * late (the client times out after 5 s) returns that execution to the retry rather than starting a second one.
  *
  * @throws DaemonContactError when no daemon could be reached; the message gives what was tried, the port and the log.
  * @throws Error the daemon's own error for the run, unchanged.
  * @exits 3 when a daemon could not be started at all.
  */
 export async function sendToDaemon(
-	cmd: Extract<ClientCommand, { type: 'run' }>,
+	command: Extract<ClientCommand, { type: 'run' }>,
 	daemonDir: string,
 	options: SendToDaemonOptions = {}
 ): Promise<DaemonResponse> {
+	// One id for every attempt of this invocation: a first attempt that timed out may still have been accepted, and the
+	// daemon answers a repeated id with the first execution instead of starting another.
+	const cmd = command.requestId === undefined ? { ...command, requestId: randomUUID() } : command;
 	const backoffMs = options.backoffMs ?? DEFAULT_BACKOFF_MS;
 	const makeClient = () => createRemoteDaemonClient<FlowCommands>(daemonDir);
 	let lastCause = '';

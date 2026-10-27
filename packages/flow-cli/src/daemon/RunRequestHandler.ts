@@ -17,6 +17,7 @@ import type { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
 import type { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
 import type { RunDefinitionLoader } from './RunDefinitionLoader.js';
+import { RunIdempotencyCache } from './RunIdempotencyCache';
 import { RunProjectResolver } from './RunProjectResolver.js';
 import type { RunProject } from './RunProjectResolver.js';
 import type { RunStepPreparer } from './RunStepPreparer.js';
@@ -38,14 +39,34 @@ export class RunRequestHandler {
 		private readonly executionStore: ExecutionStore,
 		private readonly logWriter: LogWriter,
 		private readonly tryDispatch: () => void,
-		private readonly projectResolver: RunProjectResolver = new RunProjectResolver()
+		private readonly projectResolver: RunProjectResolver = new RunProjectResolver(),
+		private readonly idempotency: RunIdempotencyCache<DaemonResponse> = new RunIdempotencyCache<DaemonResponse>()
 	) {}
 
+	/** Forgets the remembered request ids (the daemon is stopping). */
+	forgetRequests(): void {
+		this.idempotency.clear();
+	}
+
 	/**
+	 * Idempotent per `cmd.requestId`: a repeated id gets the response of the first request (in flight or finished), so a
+	 * client retry never starts a second execution. A run without an id is not deduplicated.
+	 *
 	 * @param resolvedProject The project when the caller already resolved it (the daemon command does, to read the project's
 	 *        hooks first); absent, it is resolved here from what the client sent.
 	 */
-	async handleRun(
+	handleRun(
+		cmd: Extract<ClientCommand, { type: 'run' }>,
+		hookDispatcher?: HookDispatcher,
+		resolvedProject?: RunProject
+	): Promise<DaemonResponse> {
+		if (cmd.requestId === undefined) {
+			return this.startRun(cmd, hookDispatcher, resolvedProject);
+		}
+		return this.idempotency.run(cmd.requestId, () => this.startRun(cmd, hookDispatcher, resolvedProject));
+	}
+
+	private async startRun(
 		cmd: Extract<ClientCommand, { type: 'run' }>,
 		hookDispatcher?: HookDispatcher,
 		resolvedProject?: RunProject

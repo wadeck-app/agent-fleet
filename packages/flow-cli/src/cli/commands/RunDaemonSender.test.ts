@@ -136,3 +136,56 @@ describe('sendToDaemon', () => {
 		expect(harness.send).toHaveBeenCalledTimes(DAEMON_CONTACT_ATTEMPTS);
 	});
 });
+
+describe('sendToDaemon request id (a retry must not start a second execution)', () => {
+	function sentIds(): unknown[] {
+		return harness.send.mock.calls.map(call => (call[1] as { requestId?: string }).requestId);
+	}
+
+	it('sends a request id on the first attempt', async () => {
+		harness.send.mockResolvedValue(started);
+
+		await sendToDaemon(cmd, '/dir', fast);
+
+		expect(sentIds()).toEqual([expect.any(String)]);
+		expect((sentIds()[0] as string).length).toBeGreaterThan(8);
+	});
+
+	it('sends the same id again after a timeout-like failure, then succeeds', async () => {
+		// The kit turns "HTTP timeout after 5s" into DaemonNotRunningError.
+		harness.send.mockRejectedValueOnce(new DaemonNotRunningError('/dir')).mockResolvedValueOnce(started);
+
+		expect(await sendToDaemon(cmd, '/dir', fast)).toBe(started);
+
+		const ids = sentIds();
+		expect(ids).toHaveLength(2);
+		expect(ids[1]).toBe(ids[0]);
+	});
+
+	it('carries the same id on every attempt', async () => {
+		harness.send.mockRejectedValue(new DaemonNotRunningError('/dir'));
+
+		await sendToDaemon(cmd, '/dir', fast).catch(() => undefined);
+
+		expect(new Set(sentIds()).size).toBe(1);
+		expect(sentIds()).toHaveLength(DAEMON_CONTACT_ATTEMPTS);
+	});
+
+	it('uses a different id for each invocation', async () => {
+		harness.send.mockResolvedValue(started);
+
+		await sendToDaemon(cmd, '/dir', fast);
+		await sendToDaemon(cmd, '/dir', fast);
+
+		const ids = sentIds();
+		expect(ids[1]).not.toBe(ids[0]);
+	});
+
+	it('keeps an id the caller already chose', async () => {
+		harness.send.mockResolvedValue(started);
+
+		await sendToDaemon({ ...cmd, requestId: 'chosen' }, '/dir', fast);
+
+		expect(sentIds()).toEqual(['chosen']);
+	});
+});

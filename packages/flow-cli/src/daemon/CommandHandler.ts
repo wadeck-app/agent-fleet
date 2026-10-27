@@ -416,5 +416,6 @@ export class CommandHandler {
 	stopBackgroundWork(): void {
 		this.demand.stop();
 		this.dispatcher.stop();
+		this.runRequests.forgetRequests();
 	}
 }

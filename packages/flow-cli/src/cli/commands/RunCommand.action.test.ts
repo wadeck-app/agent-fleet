@@ -192,6 +192,7 @@ describe('flow run: dispatch', () => {
 			mockEnv: { first: { X: '1' } },
 			mockConfigPath: mock,
 			registryDir: defaultRegistryDir(process.env),
+			requestId: expect.any(String),
 		});
 		expect(logs).toEqual(['exec0001']);
 	});

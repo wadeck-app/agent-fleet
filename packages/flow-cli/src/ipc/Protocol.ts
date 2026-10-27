@@ -106,6 +106,11 @@ export type ClientCommand =
 			flowFile: string;
 			flowId?: string;
 			/**
+			 * One id per `flow run` invocation, identical on every attempt to deliver it. The daemon answers a repeated id
+			 * with the answer of the first one instead of starting a second execution. Optional: an older CLI sends none.
+			 */
+			requestId?: string;
+			/**
 			 * `flow run <id>@<version>`: run exactly this version of the registered flow `flowId`. Absent = the
 			 * latest known version at the time of the run. Refused together with a flow file (`registered` absent).
 			 */
