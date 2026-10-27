@@ -16,6 +16,9 @@ packages/*/src/**/*.d.ts
 packages/*/src/**/*.js.map
 packages/*/src/**/*.d.ts.map
 
+# Test fixture: a plain-JS worker-type plugin must stay source (see worker-type-plugins/plugin-fixture-sandbox)
+!packages/flow-cli/src/test-utils/worker-type-plugins/**/*.js
+
 # Data files (task storage)
 data/tasks/*.json
 data/contexts/
