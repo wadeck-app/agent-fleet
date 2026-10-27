@@ -161,3 +161,38 @@ describe('shutDownWorkers -- worker types', () => {
 		expect(logged.join('\n')).toContain('fixture dispose failure');
 	});
 });
+
+describe('shutDownWorkers -- the total cap', () => {
+	const runtimeWith = (announced: Promise<void>, disposeAll: () => Promise<void>) =>
+		({
+			commandHandler: { announceDaemonStop: () => announced },
+			workerRegistry: { broadcastToEphemeral: () => {}, disconnectExternal: () => {} },
+			wsServer: { close: () => {} },
+			workerTypes: { disposeAll },
+		}) as never;
+
+	it('stops waiting for acknowledgements that never come once the cap is reached, and says so', async () => {
+		const exceeded = vi.fn();
+
+		await shutDownWorkers(runtimeWith(new Promise<void>(() => {}), () => Promise.resolve()), 30, exceeded);
+
+		expect(exceeded).toHaveBeenCalledTimes(1);
+		expect(exceeded).toHaveBeenCalledWith(30);
+	});
+
+	it('stops waiting for a dispose that never settles once the cap is reached, and says so', async () => {
+		const exceeded = vi.fn();
+
+		await shutDownWorkers(runtimeWith(Promise.resolve(), () => new Promise<void>(() => {})), 30, exceeded);
+
+		expect(exceeded).toHaveBeenCalledTimes(1);
+	});
+
+	it('says nothing when everything finished within the cap', async () => {
+		const exceeded = vi.fn();
+
+		await shutDownWorkers(runtimeWith(Promise.resolve(), () => Promise.resolve()), 1_000, exceeded);
+
+		expect(exceeded).not.toHaveBeenCalled();
+	});
+});

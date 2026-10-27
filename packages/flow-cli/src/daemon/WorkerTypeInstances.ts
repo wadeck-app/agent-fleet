@@ -9,7 +9,7 @@ import { PLUGIN_REF, type WorkerSourceEntry } from './WorkerSourceRegistry.js';
 const WORKER_TYPE_POINT = 'worker-type';
 
 const DEFAULT_BUILD_TIMEOUT_MS = 30_000;
-const DEFAULT_DISPOSE_TIMEOUT_MS = 30_000;
+export const DEFAULT_DISPOSE_TIMEOUT_MS = 30_000;
 
 /** How long the daemon waits on a plugin. Both are bounds: a plugin is third-party code and may hang. */
 export interface WorkerTypeTimeouts {

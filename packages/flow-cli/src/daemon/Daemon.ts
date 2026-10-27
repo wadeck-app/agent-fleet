@@ -38,7 +38,7 @@ import { WebSocketServer, WebSocketServerClosedError } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
-import { WorkerTypeInstances } from './WorkerTypeInstances.js';
+import { DEFAULT_DISPOSE_TIMEOUT_MS, WorkerTypeInstances } from './WorkerTypeInstances.js';
 import { createDaemonCommands } from './createDaemonCommands.js';
 import { publishWorkerPort, removeWorkerPort } from './publishWorkerPort.js';
 import { registerAppCoreModules } from './registerAppCoreModules.js';
@@ -251,7 +251,19 @@ async function startOwningDaemon(
 				// connected workers keep the process alive after its command server is gone: an orphan holding a
 				// worker port that the next daemon then has to scan past, until none is left.
 				// The runs in progress are told first (run_end), then the workers are closed; see shutDownWorkers.
-				const workersAnswered = runtime === undefined ? Promise.resolve() : shutDownWorkers(runtime);
+				// Capped in total: two ack timeouts (the acks, then the plugins' run hooks) plus the plugin dispose bound.
+				const stopCapMs = 2 * config.worker.ackTimeoutSeconds * 1000 + DEFAULT_DISPOSE_TIMEOUT_MS;
+				const workersAnswered =
+					runtime === undefined
+						? Promise.resolve()
+						: shutDownWorkers(runtime, stopCapMs, maxWaitMs => {
+								writeDaemonLog(
+									logsDir,
+									'error',
+									`Stopping: the workers and worker types did not finish within ${String(Math.round(maxWaitMs / 1000))}s; the daemon stops anyway. ` +
+										'Whatever a plugin still holds (for example sandboxes) may be left behind: remove it by hand.'
+								);
+							});
 				// After the polite request above (done + closed sockets): one that still runs after the grace is wedged.
 				terminateForkedWorkers?.(FORKED_WORKER_EXIT_GRACE_MS);
 				// The file tells workers where to dial; left behind it names a port nobody serves (or, later,
