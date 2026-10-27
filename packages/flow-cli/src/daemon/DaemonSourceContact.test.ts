@@ -86,13 +86,16 @@ describe('DaemonSourceContact - asking only the sources of some worker types', (
 		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
 	});
 
+	// The later contact for the wanted type is a marker: contacts are handled in order, so by the time it has
+	// produced a worker anything the earlier one would have produced is there too.
 	it('does not contact a source of another type', async () => {
 		declarePlugin('sandbox');
 
 		contact.contactSources(4101, new Set(['gpu']));
-		await new Promise(resolve => setTimeout(resolve, 100));
+		contact.contactSources(4101, new Set(['fixture-sandbox']));
+		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
 
-		expect(fixture.obtained).toHaveLength(0);
+		expect(fixture.obtained).toHaveLength(1);
 	});
 
 	it('contacts every source when no type is given', async () => {
@@ -110,7 +113,8 @@ describe('DaemonSourceContact - asking only the sources of some worker types', (
 		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
 
 		contact.contactSources(4101, new Set(['gpu']));
-		await new Promise(resolve => setTimeout(resolve, 100));
+		contact.contactSources(4101, new Set(['fixture-sandbox']));
+		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(2));
 
 		expect(fixture.disposed).toEqual([]);
 	});
