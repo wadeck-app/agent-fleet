@@ -12,6 +12,7 @@ import {
 import { buildContextLimitEnv, haikuContextLimitWarning, validateContextLimit } from '../processing/ContextLimit';
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import type { OutputExtractor } from '../processing/OutputExtractor';
+import type { ProcessLauncher } from '../processing/ProcessLauncher';
 import { StepMetricsCollector } from '../processing/StepMetricsCollector';
 import { StreamEventMapper } from '../processing/StreamEventMapper';
 import type { TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
@@ -33,6 +34,8 @@ export interface ModelStepConfig {
 	claudeEnv?: Record<string, string>;
 	mcpServers?: McpServer[];
 	provider: ModelProvider;
+	/** Runs the `onCompact` hook command. Default: the host implementation. */
+	processLauncher?: ProcessLauncher;
 	onClaudeProcessStarted?: (process: import('node:child_process').ChildProcess) => void;
 	executionConfig?: ExecutionConfig;
 	/** Called with the fully-rendered prompt before the model CLI is launched. Use for debug logging. */
@@ -353,6 +356,7 @@ export async function executeModelStep(
 										event: compactEvent,
 										context: { stepId: step.id, taskId: context.taskId },
 										onWarning: message => process.stderr.write(`[warn] ${message}\n`),
+										launcher: config.processLauncher,
 									})
 								);
 							}

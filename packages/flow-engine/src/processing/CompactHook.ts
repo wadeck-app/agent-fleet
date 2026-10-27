@@ -1,5 +1,5 @@
-import { type ChildProcess, spawn } from 'node:child_process';
-
+import { DefaultProcessLauncher } from './DefaultProcessLauncher';
+import type { ProcessLauncher } from './ProcessLauncher';
 import type { StreamJsonEvent } from './StreamJsonParser';
 
 export const DEFAULT_COMPACT_HOOK_TIMEOUT_SECONDS = 30;
@@ -84,28 +84,6 @@ function buildStdinPayload(event: CompactEvent, context: { stepId: string; taskI
 }
 
 /**
- * Kills the shell and everything it started: with `shell: true`, killing only the shell leaves the
- * user's command running (on Windows, `cmd.exe` dies and its child keeps going).
- */
-function killProcessTree(child: ChildProcess): Promise<void> {
-	const pid = child.pid;
-	if (pid === undefined) return Promise.resolve();
-	if (process.platform === 'win32') {
-		return new Promise(resolve => {
-			const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
-			killer.on('error', () => resolve());
-			killer.on('close', () => resolve());
-		});
-	}
-	try {
-		process.kill(-pid, 'SIGKILL');
-	} catch {
-		child.kill('SIGKILL');
-	}
-	return Promise.resolve();
-}
-
-/**
  * Runs the user's command for one compaction event. An observer only: a non-zero exit, a timeout
  * or a spawn error is reported through `onWarning` and never thrown, so it can neither fail the
  * step nor block a compaction. Resolves once the command has ended or been killed.
@@ -118,8 +96,11 @@ export function runCompactHook(params: {
 	event: CompactEvent;
 	context: { stepId: string; taskId?: string };
 	onWarning: (message: string) => void;
+	/** Spawns the command and ends its tree. Default: the host implementation. */
+	launcher?: ProcessLauncher;
 }): Promise<void> {
 	const { command, timeoutMs, cwd, env, event, context, onWarning } = params;
+	const launcher = params.launcher ?? new DefaultProcessLauncher();
 	const label = `onCompact command for step '${context.stepId}'`;
 
 	return new Promise(resolve => {
@@ -133,8 +114,7 @@ export function runCompactHook(params: {
 
 		// No windowsHide: it would strip the console handle and make the command's own children
 		// allocate a visible console (see commit d032e7e).
-		// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so the command's children allocate a visible console -- see d032e7e
-		const child = spawn(command, {
+		const child = launcher.spawn(command, {
 			cwd,
 			env: { ...env, ...buildCompactHookEnv(event) },
 			shell: true,
@@ -153,7 +133,7 @@ export function runCompactHook(params: {
 		const timer = setTimeout(() => {
 			timedOut = true;
 			onWarning(`${label} timed out after ${String(timeoutMs / 1000)}s and was killed.`);
-			void killProcessTree(child).then(finish);
+			void launcher.killTreeAndWait(child).then(finish);
 		}, timeoutMs);
 
 		child.on('error', err => {
