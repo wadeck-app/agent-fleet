@@ -3,6 +3,7 @@ import type { WebSocket } from 'ws';
 
 import { WORKER_FEATURE_RUN_EVENTS } from '../ipc/Protocol';
 import type { LogWriter } from '../storage/LogWriter';
+import { raceWithTimeout } from './BoundedWait.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 import type { WorkerTypeInstances } from './WorkerTypeInstances.js';
@@ -337,19 +338,6 @@ function seconds(ms: number): string {
 
 function describe(err: unknown): string {
 	return getErrorMessage(err);
-}
-
-/** Resolves 'done' when `wait` does, 'timeout' after `ms`; the timer never outlives the race. */
-async function raceWithTimeout(wait: Promise<void>, ms: number): Promise<'done' | 'timeout'> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	const timeout = new Promise<'timeout'>(resolve => {
-		timer = setTimeout(() => resolve('timeout'), ms);
-	});
-	try {
-		return await Promise.race([wait.then(() => 'done' as const), timeout]);
-	} finally {
-		clearTimeout(timer);
-	}
 }
 
 /** The coordinator's settings from the daemon's `worker.*` config (already range-checked by the loader). */
