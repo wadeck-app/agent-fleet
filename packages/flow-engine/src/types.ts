@@ -1041,6 +1041,16 @@ export interface FlowDefinition {
 	 */
 	labels?: string[];
 
+	/**
+	 * Worker type every step of the run -- injected steps included -- is restricted to (e.g. `sandbox`). The type is the
+	 * plugin id of a worker source declared with `--plugin <pluginId>.<implementation>`.
+	 *
+	 * Unlike {@link FlowDefinition.labels}, which are routing and merged into the steps at run start, this is enforced by
+	 * the daemon on every placement: a step of a bound run NEVER runs on a worker of another type or on a host worker.
+	 * With no worker of the type connected it waits `worker.boundStepWaitSeconds`, then fails. Absent: no restriction.
+	 */
+	workerType?: string;
+
 	/** Default working directory for script steps. Step-level workingDir takes precedence. */
 	workingDir?: string;
 

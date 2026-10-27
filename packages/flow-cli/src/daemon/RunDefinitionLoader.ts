@@ -46,9 +46,14 @@ function versionRefusalCode(kind: FlowVersionError['kind']): string {
  * (see FlowDefinitionResolver), without writing anything. Every refusal is a response, so a refused run leaves nothing behind.
  */
 export class RunDefinitionLoader {
+	/**
+	 * @param knownWorkerTypes The worker types the declared sources stand for, read when a flow names one (`workerType`)
+	 *        and not otherwise. Absent, a bound flow is checked for shape only.
+	 */
 	constructor(
 		private readonly resolver: FlowDefinitionResolver,
-		private readonly logWriter: LogWriter
+		private readonly logWriter: LogWriter,
+		private readonly knownWorkerTypes?: () => string[]
 	) {}
 
 	load(cmd: RunCommandMessage, flowFile: string): LoadedDefinition {
@@ -103,7 +108,7 @@ export class RunDefinitionLoader {
 			return refuse('PARSE_ERROR', 'Flow file is empty or not a YAML object');
 		}
 
-		const invalid = validationRefusal(flow);
+		const invalid = this.validationRefusal(flow);
 		if (invalid) {
 			return invalid;
 		}
@@ -112,19 +117,31 @@ export class RunDefinitionLoader {
 	}
 
 	private validated(resolved: ResolvedDefinition): LoadedDefinition {
-		return validationRefusal(resolved.flow) ?? { ok: true, resolved };
+		return this.validationRefusal(resolved.flow) ?? { ok: true, resolved };
 	}
-}
 
-function validationRefusal(flow: FlowDefinition): LoadedDefinition | undefined {
-	const result = new FlowValidator(undefined).validate(flow);
-	if (result.valid) {
-		return undefined;
+	private validationRefusal(flow: FlowDefinition): LoadedDefinition | undefined {
+		let knownWorkerTypes: string[] | undefined;
+		if ((flow as { workerType?: unknown }).workerType !== undefined && this.knownWorkerTypes !== undefined) {
+			try {
+				knownWorkerTypes = this.knownWorkerTypes();
+			} catch (err) {
+				return refuse(
+					'WORKER_SOURCES_UNREADABLE',
+					`The flow is bound to a worker type, but the declared worker sources cannot be read, so the type cannot be checked: ${getErrorMessage(err)}. ` +
+						'Fix or remove the worker sources file (see: flow worker source list), then run the flow again.'
+				);
+			}
+		}
+		const result = new FlowValidator(undefined, [], knownWorkerTypes).validate(flow);
+		if (result.valid) {
+			return undefined;
+		}
+		return refuse(
+			'VALIDATION_FAILED',
+			JSON.stringify(result.issues.filter((i: { severity: string }) => i.severity === 'error'))
+		);
 	}
-	return refuse(
-		'VALIDATION_FAILED',
-		JSON.stringify(result.issues.filter((i: { severity: string }) => i.severity === 'error'))
-	);
 }
 
 function refuse(code: string, message: string): { ok: false; response: DaemonResponse } {

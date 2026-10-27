@@ -53,7 +53,12 @@ export class SchemaValidator {
 	 */
 	constructor(
 		private issueCollector: IssueCollector,
-		private validTaskStatuses: string[] = []
+		private validTaskStatuses: string[] = [],
+		/**
+		 * Worker types the host can run steps on, to check a flow's `workerType` against. Absent, the name is only
+		 * checked for shape: the engine alone cannot know which worker sources a machine declared.
+		 */
+		private knownWorkerTypes?: readonly string[]
 	) {}
 
 	/**
@@ -114,6 +119,9 @@ export class SchemaValidator {
 
 		// Validate flow-level labels (optional)
 		this.validateFlowLabels(flow);
+
+		// Validate the flow-level worker type binding (optional)
+		this.validateFlowWorkerType(flow);
 
 		// Validate steps
 		const stepIds = this.validateSteps(flow.steps);
@@ -569,6 +577,59 @@ export class SchemaValidator {
 			message: `Flow '${flow.id}' sets the removed flow-level 'execution.skipPermissions' -- it never reached the model CLI through the real 'flow run' path.`,
 			location: { field: 'execution.skipPermissions' },
 			suggestion: `Set 'skipPermissions: true' on the individual steps[].skipPermissions that need it instead -- different steps legitimately need different permission scopes.`,
+		});
+	}
+
+	/**
+	 * Validates the flow-level `workerType`, which binds every step of the run (injected ones included) to the workers
+	 * of one worker type (see {@link FlowDefinition.workerType}).
+	 *
+	 * The shape is always checked. Whether the type exists is checked only when the host supplied the types it knows:
+	 * a bound run with a misspelt type would otherwise start and then fail its first step after the wait.
+	 */
+	private validateFlowWorkerType(flow: FlowDefinition): void {
+		const workerType = (flow as { workerType?: unknown }).workerType;
+		if (workerType === undefined) {
+			return;
+		}
+
+		if (typeof workerType !== 'string') {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_TYPE,
+				message: `Flow '${flow.id}' workerType must be a string, got ${workerType === null ? 'null' : typeof workerType}: ${JSON.stringify(workerType)}`,
+				location: { field: 'workerType' },
+				suggestion: `Write the name of one worker type, e.g. workerType: sandbox. Omit the field to let steps run on any worker.`,
+			});
+			return;
+		}
+
+		if (!/^[A-Za-z0-9_-]+$/.test(workerType)) {
+			this.issueCollector.addIssue({
+				severity: 'error',
+				code: ValidationCode.INVALID_VALUE,
+				message: `Flow '${flow.id}' workerType ${JSON.stringify(workerType)} is not a worker type name`,
+				location: { field: 'workerType' },
+				suggestion: `Use the plugin id of the worker source, made of letters, digits, '_' and '-' (for a source declared with --plugin sandbox.docker, the type is sandbox). Omit the field to let steps run on any worker.`,
+			});
+			return;
+		}
+
+		if (this.knownWorkerTypes === undefined || this.knownWorkerTypes.includes(workerType)) {
+			return;
+		}
+		this.issueCollector.addIssue({
+			severity: 'error',
+			code: ValidationCode.INVALID_VALUE,
+			message:
+				this.knownWorkerTypes.length === 0
+					? `Flow '${flow.id}' is bound to worker type "${workerType}" but no worker type is declared on this machine`
+					: `Flow '${flow.id}' is bound to unknown worker type "${workerType}". Known worker types: ${this.knownWorkerTypes.join(', ')}`,
+			location: { field: 'workerType' },
+			suggestion:
+				this.knownWorkerTypes.length === 0
+					? `Declare a worker source of that type (flow worker source add <id> --plugin ${workerType}.<implementation> --plugins-dir <dir>), or remove workerType to let steps run on any worker.`
+					: `Fix the spelling, check the declared sources (flow worker source list), or declare a source of type "${workerType}" (flow worker source add <id> --plugin ${workerType}.<implementation> --plugins-dir <dir>).`,
 		});
 	}
 
