@@ -108,7 +108,19 @@ export class WorkerProvisioner {
 		// count the worker against its own source cap and refuse it the moment it finished
 		// a step -- destroying the worker the user launched, which is the failure D#48
 		// exists to prevent. The socket was authenticated when it first joined.
-		if (this.registry.describe(ws) !== undefined) {
+		const admitted = this.registry.describe(ws);
+		if (admitted !== undefined) {
+			// The source was proven by a credential at admission and decides the worker's type and inherited labels.
+			// A refresh skips authentication, so it must not be able to name another source (or one, or none).
+			const pinned = admitted.sourceId || undefined;
+			const claimed = registration.sourceId || undefined;
+			if (claimed !== pinned) {
+				return this.refuse(
+					ws,
+					`refused worker ${admitted.workerId}: it was admitted ${pinned === undefined ? 'naming no source' : `for source "${pinned}"`} and is now ready ${claimed === undefined ? 'naming no source' : `for source "${claimed}"`}. ` +
+						'A connection keeps the source it authenticated with; the connection was closed. Start a new worker with the credential of the source it should belong to.'
+				);
+			}
 			// Labels are re-applied, not carried over: this refresh replaces the recorded
 			// registration, so skipping inheritance here would silently strip a worker's source
 			// labels after its first step and stop it matching the steps it was declared for.

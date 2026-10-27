@@ -451,6 +451,112 @@ describe('WorkerProvisioner - re-registration', () => {
 		expect(registry.liveCount).toBe(1);
 	});
 
+	// The source an admitted connection belongs to was proven by a token at admission. A second `ready` must not be
+	// able to rename it: the source decides the worker's type and inherited labels.
+	describe('a connection keeps the source it was admitted with', () => {
+		function twoSources() {
+			const registry = new WorkerRegistry();
+			const reports: string[] = [];
+			const provisioner = new WorkerProvisioner(
+				10,
+				registry,
+				fakeSource({ hasSpawned: () => false }),
+				allowAll() as never,
+				sourceCaps({ a: 5, b: 5 }, { a: ['la'], b: ['lb'] }) as never,
+				undefined,
+				message => reports.push(message)
+			);
+			return { registry, provisioner, reports };
+		}
+
+		it('refuses, reports and closes a worker admitted for source a that is ready again as source b', () => {
+			const { registry, provisioner, reports } = twoSources();
+			const ws = fakeWorker();
+			provisioner.registerWorker(ws, { pid: 1, sourceId: 'a', authToken: 't', features: MODERN });
+
+			const accepted = provisioner.registerWorker(ws, {
+				pid: 1,
+				sourceId: 'b',
+				authToken: 't',
+				features: MODERN,
+			});
+
+			expect(accepted).toBe(false);
+			expect(ws.terminate).toHaveBeenCalled();
+			expect(registry.describe(ws)?.sourceId).toBe('a');
+			expect(reports.join(' ')).toMatch(/source "a".*"b"|"b".*source "a"/s);
+		});
+
+		it('refuses a host worker (no source) that is ready again as a source id, and keeps its record unchanged', () => {
+			const { registry, provisioner } = twoSources();
+			const ws = fakeWorker();
+			provisioner.registerWorker(ws, { pid: 1, authToken: 't', features: MODERN });
+
+			const accepted = provisioner.registerWorker(ws, {
+				pid: 1,
+				sourceId: 'a',
+				authToken: 't',
+				features: MODERN,
+			});
+
+			expect(accepted).toBe(false);
+			expect(ws.terminate).toHaveBeenCalled();
+			expect(registry.describe(ws)?.sourceId).toBeUndefined();
+			expect(registry.describe(ws)?.labels).toEqual([]);
+		});
+
+		it('refuses a source worker that is ready again naming no source', () => {
+			const { registry, provisioner } = twoSources();
+			const ws = fakeWorker();
+			provisioner.registerWorker(ws, { pid: 1, sourceId: 'a', authToken: 't', features: MODERN });
+
+			const accepted = provisioner.registerWorker(ws, { pid: 1, features: MODERN });
+
+			expect(accepted).toBe(false);
+			expect(ws.terminate).toHaveBeenCalled();
+			expect(registry.describe(ws)?.sourceId).toBe('a');
+		});
+
+		it('refuses a daemon-forked worker that is ready again as a source id', () => {
+			const registry = new WorkerRegistry();
+			const provisioner = makeProvisioner(10, registry, fakeSource({ hasSpawned: () => true }));
+			const ws = fakeWorker();
+			provisioner.registerWorker(ws, { pid: 42 });
+
+			expect(provisioner.registerWorker(ws, { pid: 42, sourceId: 'a' })).toBe(false);
+			expect(registry.describe(ws)?.sourceId).toBeUndefined();
+		});
+
+		// `ready` after each step is the free signal: it must keep working, and keep the source labels.
+		it('still accepts the ready a worker sends after each step, with the same source', () => {
+			const { registry, provisioner } = twoSources();
+			const ws = fakeWorker();
+			provisioner.registerWorker(ws, { pid: 1, sourceId: 'a', authToken: 't', features: MODERN });
+			registry.markBusy(ws);
+
+			const accepted = provisioner.registerWorker(ws, {
+				pid: 1,
+				sourceId: 'a',
+				authToken: 't',
+				features: MODERN,
+			});
+
+			expect(accepted).toBe(true);
+			expect(ws.terminate).not.toHaveBeenCalled();
+			expect(registry.describe(ws)).toMatchObject({ sourceId: 'a', state: 'idle', labels: ['la'] });
+		});
+
+		it('treats an empty source id as no source on both sides', () => {
+			const { provisioner } = twoSources();
+			const ws = fakeWorker();
+			provisioner.registerWorker(ws, { pid: 1, authToken: 't', features: MODERN });
+
+			expect(provisioner.registerWorker(ws, { pid: 1, sourceId: '', authToken: 't', features: MODERN })).toBe(
+				true
+			);
+		});
+	});
+
 	it('keeps the ephemeral flag across re-registration', () => {
 		const registry = new WorkerRegistry();
 		const provisioner = makeProvisioner(10, registry, fakeSource({ hasSpawned: () => true }));
