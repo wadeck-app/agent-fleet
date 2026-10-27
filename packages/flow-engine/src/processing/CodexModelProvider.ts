@@ -30,7 +30,7 @@
  * process.env is never inherited wholesale.
  * Prompt limit: 32KB -- throws PromptTooLargeError if exceeded.
  */
-import { type ChildProcess, execSync, spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -41,9 +41,10 @@ import { CodexConfigBuilder } from './CodexConfigBuilder';
 import { CodexEventParser } from './CodexEventParser';
 import { CodexHookTranslator } from './CodexHookTranslator';
 import { CodexToolPolicy } from './CodexToolPolicy';
+import { DefaultProcessLauncher } from './DefaultProcessLauncher';
 import type { LaunchOptions, ModelBackgroundResult, ModelInteractiveResult, ModelProvider } from './ModelProvider';
 import { PromptTooLargeError, validateLaunchOptions } from './ModelProvider';
-import { killProcessTree } from './ProcessTreeKiller';
+import type { ProcessLauncher } from './ProcessLauncher';
 
 const MAX_PROMPT_BYTES = 32 * 1024; // 32KB
 
@@ -64,12 +65,14 @@ export class CodexModelProvider implements ModelProvider {
 	readonly supportsSessionResume = true;
 	private currentProcess: ChildProcess | null = null;
 
+	constructor(private readonly processLauncher: ProcessLauncher = new DefaultProcessLauncher()) {}
+
 	public async launchInteractive(options: LaunchOptions): Promise<ModelInteractiveResult> {
 		const prepared = this.prepare(options, 'tui');
 		try {
 			return await new Promise<ModelInteractiveResult>((resolve, reject) => {
 				// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren (the codex CLI's own child processes) allocate a visible console; this stdio:'inherit' spawn must inherit the daemon's hidden console (d032e7e)
-				const proc = spawn(prepared.command, prepared.args, {
+				const proc = this.processLauncher.spawn(prepared.command, prepared.args, {
 					cwd: options.workingDir,
 					stdio: 'inherit',
 					shell: prepared.shell,
@@ -102,7 +105,7 @@ export class CodexModelProvider implements ModelProvider {
 			return await new Promise<ModelBackgroundResult>((resolve, reject) => {
 				const launchStartTime = Date.now();
 
-				const proc = spawn(prepared.command, prepared.args, {
+				const proc = this.processLauncher.spawn(prepared.command, prepared.args, {
 					cwd: options.workingDir,
 					stdio: ['ignore', 'pipe', 'pipe'],
 					shell: prepared.shell,
@@ -151,7 +154,7 @@ export class CodexModelProvider implements ModelProvider {
 			// `ChildProcess.kill()` would end only codex and leave what it started (tool calls) running.
 			const pid = this.currentProcess?.pid;
 			if (pid !== undefined) {
-				killProcessTree(pid);
+				this.processLauncher.killTree(pid, 'SIGKILL');
 			}
 		} catch (err) {
 			console.warn('[CodexModelProvider] kill() failed:', normalizeError(err).message);
@@ -331,7 +334,8 @@ export class CodexModelProvider implements ModelProvider {
 			try {
 				// "2>nul" discards at the shell level -- where.exe writes its localized "could not
 				// find files" message straight to the console on a miss, bypassing stdio redirection.
-				const cmdPath = execSync('where.exe codex.cmd 2>nul', { encoding: 'utf8', windowsHide: true })
+				const cmdPath = this.processLauncher
+					.lookupExecutable('where.exe codex.cmd 2>nul')
 					.trim()
 					.split('\n')[0]!
 					.trim();
@@ -347,7 +351,7 @@ export class CodexModelProvider implements ModelProvider {
 		}
 		try {
 			return {
-				parts: [execSync('which codex', { encoding: 'utf8', windowsHide: true }).trim()],
+				parts: [this.processLauncher.lookupExecutable('which codex')],
 				needsShell: false,
 			};
 		} catch {

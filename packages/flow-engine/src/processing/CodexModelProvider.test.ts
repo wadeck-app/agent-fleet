@@ -571,7 +571,7 @@ describe('CodexModelProvider', () => {
 
 			provider.kill();
 
-			expect(killProcessTree).toHaveBeenCalledWith(1234);
+			expect(killProcessTree).toHaveBeenCalledWith(1234, 'SIGKILL');
 
 			// Complete the promise
 			(mockProcess as EventEmitter).emit('exit', 0);

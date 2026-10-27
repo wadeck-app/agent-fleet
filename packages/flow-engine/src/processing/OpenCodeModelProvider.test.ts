@@ -725,7 +725,7 @@ describe('OpenCodeModelProvider', () => {
 
 			provider.kill();
 
-			expect(killProcessTree).toHaveBeenCalledWith(5678);
+			expect(killProcessTree).toHaveBeenCalledWith(5678, 'SIGKILL');
 
 			(mockProcess as EventEmitter).emit('exit', 1);
 			await resultPromise.catch(() => {});

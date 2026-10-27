@@ -18,7 +18,7 @@
  * Prompt limit: 32KB -- throws PromptTooLargeError if exceeded.
  * XDG isolation: each subprocess gets a unique XDG_CONFIG_HOME so it never reads ~/.config/opencode/.
  */
-import { type ChildProcess, execSync, spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -26,6 +26,7 @@ import * as path from 'node:path';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { isRecord } from 'shared-common/utils/isRecord';
 
+import { DefaultProcessLauncher } from './DefaultProcessLauncher';
 import { isAnthropicModel, isOpenAiModel } from './ModelAliases';
 import type {
 	LaunchOptions,
@@ -43,7 +44,7 @@ import {
 	defaultOpenCodeShellProbe,
 	resolveOpenCodeShell,
 } from './OpenCodeWindowsShell';
-import { killProcessTree } from './ProcessTreeKiller';
+import type { ProcessLauncher } from './ProcessLauncher';
 import type { StreamJsonEvent } from './StreamJsonParser';
 import { buildOpenCodeToolsConfig } from './ToolAccess';
 
@@ -331,6 +332,8 @@ export interface OpenCodeModelProviderOptions {
 	maxInlineConfigBytes?: number;
 	/** Test seam: platform and Git Bash lookup for the Windows bash-tool SHELL. */
 	shellProbe?: OpenCodeShellProbe;
+	/** Every process this provider starts, ends or looks up goes through it. Default: the host implementation. */
+	processLauncher?: ProcessLauncher;
 }
 
 export class OpenCodeModelProvider implements ModelProvider {
@@ -339,10 +342,12 @@ export class OpenCodeModelProvider implements ModelProvider {
 	private currentProcess: ChildProcess | null = null;
 	private readonly maxInlineConfigBytes: number;
 	private readonly shellProbe: OpenCodeShellProbe;
+	private readonly processLauncher: ProcessLauncher;
 
 	constructor(options: OpenCodeModelProviderOptions = {}) {
 		this.maxInlineConfigBytes = options.maxInlineConfigBytes ?? DEFAULT_MAX_INLINE_CONFIG_BYTES;
 		this.shellProbe = options.shellProbe ?? defaultOpenCodeShellProbe;
+		this.processLauncher = options.processLauncher ?? new DefaultProcessLauncher();
 	}
 
 	/**
@@ -392,7 +397,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 		try {
 			return await new Promise<ModelInteractiveResult>((resolve, reject) => {
 				// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren (the opencode backend server) allocate a visible console; this stdio:'inherit' spawn must inherit the daemon's hidden console (d032e7e)
-				const proc = spawn(command, args, {
+				const proc = this.processLauncher.spawn(command, args, {
 					cwd: options.workingDir,
 					stdio: 'inherit',
 					shell,
@@ -456,7 +461,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 			return await new Promise<ModelBackgroundResult>((resolve, reject) => {
 				const launchStartTime = Date.now();
 
-				const proc = spawn(command, args, {
+				const proc = this.processLauncher.spawn(command, args, {
 					cwd: options.workingDir,
 					// stdin: 'ignore' -- OpenCode takes the prompt as a positional arg,
 					// not stdin. An open stdin pipe causes OpenCode to wait for EOF.
@@ -651,7 +656,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 			// `ChildProcess.kill()` would end only opencode and leave what it started (tool calls) running.
 			const pid = this.currentProcess?.pid;
 			if (pid !== undefined) {
-				killProcessTree(pid);
+				this.processLauncher.killTree(pid, 'SIGKILL');
 			}
 		} catch (err) {
 			console.warn('[OpenCodeModelProvider] kill() failed:', normalizeError(err).message);
@@ -678,7 +683,8 @@ export class OpenCodeModelProvider implements ModelProvider {
 			try {
 				// "2>nul" discards at the shell level -- where.exe writes its localized "could not
 				// find files" message straight to the console on a miss, bypassing stdio redirection.
-				const cmdPath = execSync('where.exe opencode.cmd 2>nul', { encoding: 'utf8', windowsHide: true })
+				const cmdPath = this.processLauncher
+					.lookupExecutable('where.exe opencode.cmd 2>nul')
 					.trim()
 					.split('\n')[0]!
 					.trim();
@@ -695,7 +701,7 @@ export class OpenCodeModelProvider implements ModelProvider {
 		}
 		try {
 			return {
-				parts: [execSync('which opencode', { encoding: 'utf8', windowsHide: true }).trim()],
+				parts: [this.processLauncher.lookupExecutable('which opencode')],
 				needsShell: false,
 			};
 		} catch {
