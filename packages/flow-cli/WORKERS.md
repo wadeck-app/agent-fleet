@@ -116,9 +116,13 @@ workerType: sandbox # flow level, next to `labels:`
 - **The type of a worker** is the plugin id of its source's `--plugin <pluginId>.<implName>`: `sandbox.docker` and `sandbox.podman` are both type `sandbox`. A worker of a source without a plugin, or naming no source, has no type. A worker's source is authenticated by its source token.
 - **Every step of a bound run runs only on workers of that type**, injected steps included. It never falls back to a host worker, and no acceptance or distribution plugin can widen the set. Labels cannot give this guarantee: flow labels are merged into steps only at run start.
 - **Unknown type**: the run is refused (`VALIDATION_FAILED`) listing the known types. `flow validate` checks the name's shape only; the declared sources are per machine.
-- **No worker of the type connected**: a step waits `worker.boundStepWaitSeconds`, then fails with a message naming the type and the known ones. A connected worker that is busy keeps the step queued without a deadline; the clock restarts whenever one is connected. A worker lost before the step starts is re-dispatched to the type up to 3 times, then the step fails.
-- A bound step can still make the daemon fork host workers for unmet demand; they stay idle for the bound run.
-- The binding is recorded in the execution record (`workerType`); `flow resume` keeps it.
+- **No worker of the type connected**: a step waits `worker.boundStepWaitSeconds`, then fails with a message naming the type and the known ones. The daemon watches the bound with its own timer, so it fires even when nothing else happens.
+- **What the wait does not cover**:
+    - The clock only runs while NO worker of the type is connected. It restarts each time one connects and later disconnects.
+    - A connected worker of the type that never accepts the step (label, shell or project mismatch) stalls it indefinitely. Failing on "cannot accept within the bound" needs per-worker refusal reasons and is a later change.
+- A worker lost before the step starts is re-dispatched to the type up to 3 times, then the step fails.
+- **Demand**: a bound step never causes a host worker to be forked; only the sources of its type are asked for a worker, once while it waits.
+- **A connection keeps the source it was admitted with.** A later `ready` naming another source, or none, is refused and the connection closed, so a worker cannot change its own type.
 - Not set: behavior is unchanged.
 
 ## Three rules that explain most surprises
