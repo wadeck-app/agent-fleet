@@ -94,12 +94,12 @@ describe('Claude classes -- ProcessLauncher seam', () => {
 	] as const)('on %s the binary lookup runs `%s` through the launcher', (platform, command) => {
 		vi.spyOn(process, 'platform', 'get').mockReturnValue(platform);
 		const fake = new FakeProcessLauncher();
-		fake.lookups.set(command, platform === 'win32' ? 'C:\bin\claude\nC:\bin\claude.cmd' : '/usr/bin/claude');
+		fake.lookups.set(command, platform === 'win32' ? 'C:\\bin\\claude\nC:\\bin\\claude.cmd' : '/usr/bin/claude');
 
 		const found = new ClaudeLauncher(fake).findClaudePath({});
 
 		expect(fake.callsOf('lookupExecutable')).toEqual([{ method: 'lookupExecutable', command }]);
-		expect(found).toBe(platform === 'win32' ? 'C:\bin\claude.cmd' : '/usr/bin/claude');
+		expect(found).toBe(platform === 'win32' ? 'C:\\bin\\claude.cmd' : '/usr/bin/claude');
 	});
 
 	it('ClaudeModelProvider passes its launcher down and kills the tree through it', async () => {
