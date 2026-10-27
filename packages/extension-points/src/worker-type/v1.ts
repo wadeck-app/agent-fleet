@@ -51,17 +51,23 @@ export interface WorkerTypeInstance {
 	 * Called once per run this type served (once per source, however many of its workers took part), after the workers
 	 * acknowledged the end of the run (or the wait expired) and before the run's workspace is released. Bounded by the
 	 * ack timeout: a rejection or a hang is logged with the source and the execution, never blocks the release further.
-	 * Only called for a source declared with a plugin ref, and only when a worker of the source declared `run-events`.
+	 * Only called for a source declared with a plugin ref, and ONLY when a worker of the source declared `run-events`
+	 * and was handed a step of the run: for any other worker it is never called, so the type cannot rely on it.
 	 * Omit when the type has no per-run resources.
 	 */
 	run?: { onRunEnded(event: RunEndEvent): Promise<void> };
 	/**
 	 * Releases everything the instance holds. Called once when the daemon stops (after the run-end hooks) and when the
-	 * source is no longer declared (noticed at the daemon's next worker request, as `flow worker source remove` runs in
+	 * source is no longer declared (noticed at the daemon's next contact with its sources, as `flow worker source remove` runs in
 	 * another process). Errors are logged, and a dispose that takes more than 30s is given up on.
 	 */
 	dispose(): Promise<void>;
 }
 
-/** Builds the instance for one declared source. Rejecting names the source in the daemon's error, so say what is wrong. */
+/**
+ * Builds the instance for one declared source. Rejecting names the source in the daemon's error, so say what is wrong.
+ * The daemon gives up on a factory that has not settled after 30s. A module that fails to import, or is edited, stays
+ * as Node first loaded it until the daemon restarts: the fix for a load error is a restart, not a retry.
+ * `context.options` has its `${ENV_VAR}` references already replaced from the daemon's environment.
+ */
 export type WorkerTypeFactory = (context: WorkerTypeContext) => Promise<WorkerTypeInstance>;

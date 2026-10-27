@@ -99,11 +99,13 @@ flow worker source add sandbox --provider docker-sandbox --plugin <pluginId>.<im
 ```
 
 - Implements the `worker-type` extension point (`extension-points/src/worker-type/v1.ts`). `--provider` is a free label, never `built-in:*`.
-- `--plugins-dir` must be absolute and contain `plugin-<pluginId>/plugin.config.js`: plain, self-contained JS (no `node_modules` beside it).
-- `--option` values are handed to the plugin unvalidated; a sensitive key (`token`, `password`, ...) must be `${ENV_VAR}`, a literal is refused.
-- The daemon builds one instance per source on first contact and reuses it. A load error names the source, plugin, cause and fix; the next worker request retries.
-- `onRunEnded` runs after the `run_end` acks, once per source per run, bounded by `ackTimeoutSeconds`; a failure is logged and the workspace is released anyway.
-- `dispose()` runs when the daemon stops (after the run-end acks) and when a source leaves the registry. `source remove` runs in another process, so the daemon disposes at its next worker request (or at stop). Pending changes to a source's settings are picked up the same way.
+- `--plugins-dir` must be absolute and contain `plugin-<pluginId>/plugin.config.js`: plain, self-contained JS (no `node_modules` beside it). `<pluginId>` and `<implName>` are plain names (letters, digits, `_`, `-`).
+- The plugin is trusted code: it runs inside the daemon with its privileges. Nothing confines it to `--plugins-dir` (a symlink or junction inside it is followed); the directory is yours to choose.
+- `--option key=value` values reach the plugin unvalidated. A value written as `${ENV_VAR}` is replaced by the daemon with the variable from ITS environment when it builds the instance; an unset variable fails the build with an error naming the source, the option and the variable. Set it where the daemon is started, then restart the daemon.
+- Only the keys in the sensitive list (`token`, `password`, `secret`, ...) are checked: a literal there is refused. A secret under any other key (for example `--option dockerPass=...`) is accepted, stored in plain text in `worker-sources.json`, and visible in shell history and the process list. Always pass secrets as `${ENV_VAR}`.
+- The daemon builds one instance per source on first contact and reuses it. Loading and the factory are bounded (30s). A load error names the source, plugin, cause and fix, and is only cured by restarting the daemon: Node keeps a module that failed to import, or was edited, as it first loaded it.
+- `onRunEnded` runs only when a worker of the source declared `run-events` and was handed a step of the run. It runs after the `run_end` acks, once per source per run, bounded by `ackTimeoutSeconds`; a failure or hang is logged and the workspace is released anyway.
+- `dispose()` runs when the daemon stops (after the run-end hooks; the whole stop is capped at two ack timeouts plus 30s) and when a source leaves the registry. `source remove` runs in another process, so the daemon disposes at its next contact with sources or at stop. A run that ends after its source was disposed logs a warning naming the source and execution: its leftovers (sandboxes) are yours to remove.
 
 ## Three rules that explain most surprises
 
