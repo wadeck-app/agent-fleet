@@ -79,6 +79,12 @@
 			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
 		},
 		{
+			"id": "worker-type",
+			"status": "stable",
+			"description": "Provides a kind of worker (for example one running inside a sandbox): obtains workers for a source, is told when a run ended, and is disposed with the source. Composes with worker-source v1, which stays unchanged.",
+			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
+		},
+		{
 			"id": "project-resolution",
 			"status": "stable",
 			"description": "DEPRECATED, not consulted: flow resolves projects through the shared project registry (@wadeck-app/project-sdk). Resolves which project a working directory belongs to; kept for one release, removal pending an owner decision.",

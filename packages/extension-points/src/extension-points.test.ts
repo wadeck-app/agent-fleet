@@ -11,6 +11,7 @@ import type {
 	WorkerAcceptanceRequest,
 	WorkerCandidate,
 } from './worker-acceptance/v1.js';
+import type { RunEndEvent, WorkerTypeFactory, WorkerTypeInstance } from './worker-type/v1.js';
 import type { WorkspaceHandle, WorkspaceProvider, WorkspaceRequest } from './workspace/v1.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -170,9 +171,49 @@ describe('extension-points.json registry is valid', () => {
 		expect(ap!.versions.some(v => v.version === 1 && v.status === 'stable')).toBe(true);
 	});
 
+	it('worker-type extension point is registered at version 1', () => {
+		const wt = extensionPointsJson.extensionPoints.find(ep => ep.id === 'worker-type');
+		expect(wt).toBeDefined();
+		expect(wt!.versions.some(v => v.version === 1 && v.status === 'stable')).toBe(true);
+	});
+
 	it('IDs are unique', () => {
 		const ids = extensionPointsJson.extensionPoints.map(ep => ep.id);
 		const unique = new Set(ids);
 		expect(unique.size).toBe(ids.length);
+	});
+});
+
+describe('worker-type v1 shape', () => {
+	it('a factory builds an instance composing a v1 worker source, an optional run hook and a dispose', async () => {
+		const ended: RunEndEvent[] = [];
+		const factory: WorkerTypeFactory = async () => ({
+			source: {
+				async obtainWorker(): Promise<void> {
+					// no-op
+				},
+			},
+			run: {
+				async onRunEnded(event: RunEndEvent): Promise<void> {
+					ended.push(event);
+				},
+			},
+			async dispose(): Promise<void> {
+				// no-op
+			},
+		});
+
+		const instance: WorkerTypeInstance = await factory({ sourceId: 'sbx', options: {} });
+		await instance.run?.onRunEnded({ executionId: 'e1', reason: 'completed' });
+
+		expect(ended).toEqual([{ executionId: 'e1', reason: 'completed' }]);
+	});
+
+	it('run is optional', async () => {
+		const instance: WorkerTypeInstance = {
+			source: { obtainWorker: async () => undefined },
+			dispose: async () => undefined,
+		};
+		expect(instance.run).toBeUndefined();
 	});
 });
