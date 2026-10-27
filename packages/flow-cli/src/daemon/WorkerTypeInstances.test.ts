@@ -204,6 +204,20 @@ describe('WorkerTypeInstances - disposing', () => {
 		expect(fixture.disposed).toEqual(['sandbox']);
 	});
 
+	it('gives up on a dispose that never settles, logs it, and forgets the instance', async () => {
+		const patient = new WorkerTypeInstances(new PluginLoader(), (level, message) => logged.push({ level, message }), 20);
+		await patient.get(entry());
+		fixture.hangDispose = true;
+
+		await patient.dispose('sandbox');
+
+		expect(logged).toHaveLength(1);
+		expect(logged[0]?.message).toContain('source "sandbox"');
+		expect(logged[0]?.message).toMatch(/did not finish.*within/);
+		await patient.dispose('sandbox');
+		expect(fixture.disposed).toEqual(['sandbox']);
+	});
+
 	it('disposes a source that is still being built once the build is done', async () => {
 		const building = instances.get(entry());
 		const disposing = instances.dispose('sandbox');

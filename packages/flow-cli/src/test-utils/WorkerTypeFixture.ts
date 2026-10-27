@@ -12,6 +12,8 @@ export interface WorkerTypeFixtureState {
 	runEnded: { sourceId: string; event: RunEndEvent }[];
 	disposed: string[];
 	failDispose: boolean;
+	/** dispose() never settles. */
+	hangDispose: boolean;
 	failRunEnded: boolean;
 }
 
@@ -23,6 +25,7 @@ export function resetWorkerTypeFixture(): WorkerTypeFixtureState {
 		runEnded: [],
 		disposed: [],
 		failDispose: false,
+		hangDispose: false,
 		failRunEnded: false,
 	};
 	(globalThis as { __workerTypeFixture?: WorkerTypeFixtureState }).__workerTypeFixture = fresh;

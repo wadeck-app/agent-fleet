@@ -7,6 +7,8 @@ import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 /** The extension point a worker-type plugin implements. */
 const WORKER_TYPE_POINT = 'worker-type';
 
+const DEFAULT_DISPOSE_TIMEOUT_MS = 30_000;
+
 interface CachedInstance {
 	/** What the instance was built from: a source declared differently gets a new one. */
 	fingerprint: string;
@@ -30,7 +32,9 @@ export class WorkerTypeInstances {
 
 	constructor(
 		private readonly loader: Pick<PluginLoader, 'loadProvider'>,
-		private readonly log: (level: 'info' | 'error', message: string) => void
+		private readonly log: (level: 'info' | 'error', message: string) => void,
+		/** How long a dispose may take before the daemon moves on (a stop must not hang on a plugin). */
+		private readonly disposeTimeoutMs: number = DEFAULT_DISPOSE_TIMEOUT_MS
 	) {}
 
 	/**
@@ -97,14 +101,29 @@ export class WorkerTypeInstances {
 		if (instance === undefined) {
 			return;
 		}
+		let timer: ReturnType<typeof setTimeout> | undefined;
 		try {
-			await instance.dispose();
+			const outcome = await Promise.race([
+				instance.dispose().then(() => 'done' as const),
+				new Promise<'timeout'>(resolve => {
+					timer = setTimeout(() => resolve('timeout'), this.disposeTimeoutMs);
+				}),
+			]);
+			if (outcome === 'timeout') {
+				this.log(
+					'error',
+					`worker source "${sourceId}": its worker-type instance did not finish disposing within ${String(Math.round(this.disposeTimeoutMs / 1000))}s; moving on. ` +
+						'Whatever the plugin still holds for this source (for example sandboxes) may be left behind: remove it by hand.'
+				);
+			}
 		} catch (err) {
 			this.log(
 				'error',
 				`worker source "${sourceId}": disposing its worker-type instance failed: ${getErrorMessage(err)}. ` +
 					'Whatever the plugin still holds for this source (for example sandboxes) may be left behind: remove it by hand.'
 			);
+		} finally {
+			clearTimeout(timer);
 		}
 	}
 
