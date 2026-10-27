@@ -53,6 +53,18 @@ export class WorkerAssignmentSupervisor {
 	private readonly toolActivity = new Map<string, ToolActivityKnowledge>();
 	/** Notices an executing step whose worker went quiet; the only detector of a wedged worker */
 	private readonly stalledSteps: StalledStepWatch;
+	/**
+	 * Workers that were handed a step of each execution, kept until the execution is forgotten. Not derived from the
+	 * ledger, which drops an assignment once it settles: the end of a run must still reach a worker whose only step
+	 * finished long ago.
+	 */
+	private readonly served = new Map<string, Set<WebSocket>>();
+	/** Callers waiting for some workers to hold nothing of an execution; checked whenever an assignment goes away. */
+	private readonly settleWaiters = new Set<{
+		executionId: string;
+		workers: readonly WebSocket[];
+		resolve: () => void;
+	}>();
 
 	/**
 	 * @param failStep Fails a step the daemon itself decided cannot proceed.
@@ -89,6 +101,54 @@ export class WorkerAssignmentSupervisor {
 	 */
 	watchHandedOver(assignmentId: string): void {
 		this.stalledSteps.started(assignmentId);
+		this.recordServed(assignmentId);
+	}
+
+	/** Workers handed a step of this execution (still connected), in the order they first got one. */
+	servedWorkers(executionId: string): WebSocket[] {
+		return [...(this.served.get(executionId) ?? [])];
+	}
+
+	/**
+	 * Waits until none of `workers` holds an outstanding assignment of the execution: settled, discarded or revoked by a
+	 * disconnect. Unbounded on its own: the caller races it against its timeout and calls `cancel` when it gives up.
+	 */
+	awaitSettled(executionId: string, workers: readonly WebSocket[]): { done: Promise<void>; cancel: () => void } {
+		if (!this.holdsAssignment(executionId, workers)) {
+			return { done: Promise.resolve(), cancel: () => {} };
+		}
+		let waiter!: { executionId: string; workers: readonly WebSocket[]; resolve: () => void };
+		const done = new Promise<void>(resolve => {
+			waiter = { executionId, workers, resolve };
+			this.settleWaiters.add(waiter);
+		});
+		return { done, cancel: () => this.settleWaiters.delete(waiter) };
+	}
+
+	private recordServed(assignmentId: string): void {
+		const executionId = this.assignments.describe(assignmentId)?.executionId;
+		const worker = this.assignments.connectionOf(assignmentId);
+		if (executionId === undefined || worker === undefined) {
+			return;
+		}
+		const workers = this.served.get(executionId) ?? new Set<WebSocket>();
+		workers.add(worker);
+		this.served.set(executionId, workers);
+	}
+
+	private holdsAssignment(executionId: string, workers: readonly WebSocket[]): boolean {
+		return workers.some(worker =>
+			this.assignments.outstandingFor(worker).some(assignment => assignment.executionId === executionId)
+		);
+	}
+
+	private releaseSettleWaiters(): void {
+		for (const waiter of [...this.settleWaiters]) {
+			if (!this.holdsAssignment(waiter.executionId, waiter.workers)) {
+				this.settleWaiters.delete(waiter);
+				waiter.resolve();
+			}
+		}
 	}
 
 	/** Drops an assignment that was never handed over, so it does not stay outstanding. */
@@ -96,6 +156,7 @@ export class WorkerAssignmentSupervisor {
 		this.assignments.settle(assignmentId);
 		this.dispatched.delete(assignmentId);
 		this.toolActivity.delete(assignmentId);
+		this.releaseSettleWaiters();
 	}
 
 	/**
@@ -131,6 +192,7 @@ export class WorkerAssignmentSupervisor {
 		this.toolActivity.delete(assignmentId);
 		// The payload was only kept for a possible re-dispatch, which can no longer happen.
 		this.dispatched.delete(assignmentId);
+		this.releaseSettleWaiters();
 	}
 
 	/** Records that a worker is still saying something about an assignment it holds. */
@@ -180,6 +242,7 @@ export class WorkerAssignmentSupervisor {
 
 	/** Forgets the re-dispatch budget of an execution that is over. */
 	forgetExecution(executionId: string): void {
+		this.served.delete(executionId);
 		// Keyed by execution and step, so nothing else would ever remove these entries and a
 		// long-lived daemon would accumulate one per step it has ever run.
 		for (const key of this.redispatchCounts.keys()) {
@@ -222,6 +285,7 @@ export class WorkerAssignmentSupervisor {
 			this.toolActivity.delete(assignmentId);
 			const connection = this.assignments.connectionOf(assignmentId);
 			this.assignments.settle(assignmentId);
+			this.releaseSettleWaiters();
 			// A wedged worker never sends the `ready` that would free it, so without this it would stay
 			// "busy" forever: the daemon could never hibernate and updates would wait on it for good.
 			if (connection !== undefined) {
@@ -269,7 +333,13 @@ export class WorkerAssignmentSupervisor {
 	 * socket that just died. `Daemon` calls `tryDispatch()` once the removal is done.
 	 */
 	handleWorkerDisconnect(worker: WebSocket): void {
-		for (const assignment of this.assignments.revokeWorker(worker)) {
+		// First: a step failed below can end the run, and a socket that is gone must not be told about it.
+		for (const workers of this.served.values()) {
+			workers.delete(worker);
+		}
+		const revoked = this.assignments.revokeWorker(worker);
+		this.releaseSettleWaiters();
+		for (const assignment of revoked) {
 			const { executionId, stepId, assignmentId, started } = assignment;
 			const step = this.dispatched.get(assignmentId);
 			this.dispatched.delete(assignmentId);
