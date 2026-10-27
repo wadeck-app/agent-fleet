@@ -23,6 +23,7 @@ import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DaemonSourceContact } from './DaemonSourceContact.js';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler.js';
+import { shutDownWorkers } from './DaemonWorkerShutdown.js';
 import { ExclusiveFileLock } from './ExclusiveFileLock.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
@@ -241,11 +242,8 @@ async function startOwningDaemon(
 				// Every stop path releases the worker listener, not only the idle one. An open listener and
 				// connected workers keep the process alive after its command server is gone: an orphan holding a
 				// worker port that the next daemon then has to scan past, until none is left.
-				if (runtime !== undefined) {
-					runtime.workerRegistry.broadcastToEphemeral({ type: 'done' });
-					runtime.workerRegistry.disconnectExternal();
-					runtime.wsServer.close();
-				}
+				// The runs in progress are told first (run_end), then the workers are closed; see shutDownWorkers.
+				const workersAnswered = runtime === undefined ? Promise.resolve() : shutDownWorkers(runtime);
 				// After the polite request above (done + closed sockets): one that still runs after the grace is wedged.
 				terminateForkedWorkers?.(FORKED_WORKER_EXIT_GRACE_MS);
 				// The file tells workers where to dial; left behind it names a port nobody serves (or, later,
@@ -256,9 +254,11 @@ async function startOwningDaemon(
 				}
 				// The hook is synchronous: the flush runs on, and stop() below waits for it. Pushes in flight
 				// also keep the process alive until they settle.
-				shutdownFlush = eventPublisher.flush().catch((err: unknown) => {
+				const eventsFlushed = eventPublisher.flush().catch((err: unknown) => {
 					writeDaemonLog(logsDir, 'error', `Queue events: flush at shutdown failed: ${getErrorMessage(err)}`);
 				});
+				// The hook can run twice (idle path, then stop()); the run_end wait is the same one both times.
+				shutdownFlush = Promise.all([eventsFlushed, workersAnswered]).then(() => undefined);
 			},
 			onStart: (port: number) => {
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
@@ -439,7 +439,12 @@ async function startOwningDaemon(
 					},
 					undefined,
 					config.queue.stepSilenceLimitSeconds * 1000,
-					daemonSecrets
+					daemonSecrets,
+					undefined,
+					{
+						enabled: config.worker.runEventsEnabled,
+						ackTimeoutMs: config.worker.ackTimeoutSeconds * 1000,
+					}
 				);
 				runtime = {
 					commandHandler,

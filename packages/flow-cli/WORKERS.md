@@ -150,6 +150,21 @@ reports nothing for `queue.stepSilenceLimitSeconds` (default 1800) is failed the
 output counts as progress, so a slow step is not a stuck one. Raise the setting for work that is
 legitimately quiet for longer.
 
+## Telling workers a run ended (`run-events`)
+
+A worker that declares the `run-events` feature and was handed a step of a run gets `run_end`
+(`completed`, `failed` or `daemon_stopping`) once, and answers `run_end_ack`. Other workers never
+receive it. The run's workspace is released only after the ack, the worker's disconnect, or the
+timeout; on timeout the daemon logs an error naming the worker, source and execution.
+
+| Key (daemon `config.yml`, section `worker`) | Default | Meaning                                                                                                                                          |
+| ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `runEventsEnabled`                          | `true`  | `false` restores the previous behavior: nothing sent, workspace released at once                                                                 |
+| `ackTimeoutSeconds`                         | `30`    | 1 to 120. Bounds each wait (served workers settling, then the acks), so a finished run can wait up to twice this; stopping the daemon waits once |
+
+On daemon stop the notice is written before the sockets close, so a worker the daemon did not
+create is closed right after it and cannot ack.
+
 Only a daemon-forked worker gets more than that, because only there does the daemon own the process:
 a forked pid that never connects is killed after 10s, and its exit is noticed.
 
@@ -157,7 +172,7 @@ a forked pid that never connects is killed after 10s, and its exit is noticed.
 
 | You see                                                                                                     | It means                                                                                           |
 | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `interactive: false (no approval plugin configured…)`                                                       | add `plugins.approval` to the project config (see PLUGINS.md)                                                       |
+| `interactive: false (no approval plugin configured…)`                                                       | add `plugins.approval` to the project config (see PLUGINS.md)                                      |
 | `interactive: false (the configured approval plugin needs a terminal…)`                                     | you are not on a TTY; use `plugins.file-approval`                                                  |
 | `[wait] daemon connection closed; waiting to re-register`                                                   | normal with no daemon; it is waiting, not dying                                                    |
 | `Step "x" needs a person to answer it. No connected worker declared a user interface in the 45s it waited.` | no interactive worker appeared; check `flow worker list` shows `interactive=true`                  |

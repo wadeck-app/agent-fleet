@@ -11,10 +11,12 @@ import {
 	mockExecStore,
 	mockLogWriter,
 	registerCommandHandlerHooks,
+	registeredProject,
 	tmpDir,
 } from './CommandHandlerTestHarness';
 import type { DaemonRuntime } from './DaemonRuntime';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler';
+import { shutDownWorkers } from './DaemonWorkerShutdown';
 import type { RunEndSettings } from './RunEndCoordinator';
 import { WorkerRegistry } from './WorkerRegistry';
 
@@ -393,5 +395,97 @@ describe('CommandHandler -- a sibling still running when the run ends', () => {
 		expect(lines.some(line => /already over.*dropped/.test(line))).toBe(true);
 		expect(lines.some(line => /re-queued/.test(line))).toBe(false);
 		expect(mockExecStore.markStepFailed.mock.calls.find(call => call[1] === 's2')).toBeUndefined();
+	});
+});
+
+describe('daemon stop -- run_end goes out before the workers are closed', () => {
+	async function runningFleet() {
+		const f = fleet();
+		const ephemeral = f.connect();
+		const executionId = await startFlow(f.handler, VALID_FLOW_YAML);
+		const wsServer = { close: vi.fn() };
+		const stop = () =>
+			shutDownWorkers({
+				commandHandler: f.handler,
+				workerRegistry: f.registry,
+				wsServer,
+			} as unknown as DaemonRuntime);
+		return { ...f, ephemeral, executionId, wsServer, stop };
+	}
+
+	it('writes run_end(daemon_stopping) to a worker the daemon created BEFORE the done notice', async () => {
+		const { ephemeral, executionId, stop, ack } = await runningFleet();
+
+		const stopped = stop();
+
+		expect(wrote(ephemeral).map(m => m.type)).toEqual(['assign', 'run_end', 'done']);
+		expect(wrote(ephemeral)[1]).toEqual({ type: 'run_end', executionId, reason: 'daemon_stopping' });
+		ack(ephemeral, executionId);
+		await stopped;
+	});
+
+	it('writes run_end to a worker the daemon did not create before closing its socket', async () => {
+		const f = fleet();
+		const closeSocket = vi.fn();
+		const external = {
+			readyState: 1,
+			OPEN: 1,
+			send: vi.fn(),
+			terminate: vi.fn(),
+			close: closeSocket,
+		} as unknown as FakeSocket;
+		f.registry.register(external, {
+			pid: 2,
+			sourceId: 'sbx-source',
+			features: [WORKER_FEATURE_RUN_EVENTS],
+			attachedProjectIds: [registeredProject.id],
+		});
+		await startFlow(f.handler, VALID_FLOW_YAML);
+		const closedAfter: number[] = [];
+		closeSocket.mockImplementation(() => closedAfter.push(external.send.mock.calls.length));
+
+		const stopped = shutDownWorkers({
+			commandHandler: f.handler,
+			workerRegistry: f.registry,
+			wsServer: { close: vi.fn() },
+		} as unknown as DaemonRuntime);
+
+		expect(wrote(external).map(m => m.type)).toEqual(['assign', 'run_end']);
+		expect(closedAfter).toEqual([2]);
+		f.messages.handleClose(external, 1005, '');
+		await stopped;
+	});
+
+	it('delivers once even if the shutdown hook runs twice', async () => {
+		const { ephemeral, executionId, stop, ack } = await runningFleet();
+
+		const first = stop();
+		const second = stop();
+
+		expect(wrote(ephemeral).filter(m => m.type === 'run_end')).toHaveLength(1);
+		ack(ephemeral, executionId);
+		await Promise.all([first, second]);
+	});
+
+	it('tells a worker without run-events nothing new: it still gets done, as before', async () => {
+		const f = fleet();
+		const old = f.connect(['secrets']);
+		await startFlow(f.handler, VALID_FLOW_YAML);
+
+		await shutDownWorkers({
+			commandHandler: f.handler,
+			workerRegistry: f.registry,
+			wsServer: { close: vi.fn() },
+		} as unknown as DaemonRuntime);
+
+		expect(wrote(old).map(m => m.type)).toEqual(['assign', 'done']);
+	});
+
+	it('closes the worker listener without waiting for the acknowledgements', async () => {
+		const { stop, wsServer } = await runningFleet();
+
+		void stop();
+
+		expect(wsServer.close).toHaveBeenCalledTimes(1);
 	});
 });
