@@ -54,6 +54,12 @@ describe('ExecutionWorkspaces.releaseWithRetry', () => {
 
 		expect(release).toHaveBeenCalledTimes(2);
 		expect(writeExecution).not.toHaveBeenCalledWith('abcd1234', expect.anything(), 'error');
+		// The first failure is said even though the retry worked: it is the only trace of why the release was slow.
+		expect(writeExecution).toHaveBeenCalledWith(
+			'abcd1234',
+			expect.stringMatching(/task-1.*EBUSY.*retry/s),
+			'warning'
+		);
 	});
 
 	it('reports a release that failed twice, naming the workspace and how to remove it, and still resolves', async () => {
@@ -61,16 +67,21 @@ describe('ExecutionWorkspaces.releaseWithRetry', () => {
 		const release = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('EBUSY'));
 		const workspaces = await allocated(release);
 		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+		let written: string[] = [];
 
 		try {
 			const done = workspaces.releaseWithRetry('abcd1234');
 			await vi.advanceTimersByTimeAsync(2_500);
 			await done;
+			written = stderr.mock.calls.map(call => String(call[0]));
 		} finally {
 			stderr.mockRestore();
 		}
 
 		expect(release).toHaveBeenCalledTimes(2);
+		// One line, not the two halves of a message split by a raw newline.
+		expect(written.length).toBeGreaterThan(0);
+		expect(written.every(text => text.endsWith('\n') && !text.slice(0, -1).includes('\n'))).toBe(true);
 		expect(writeExecution).toHaveBeenCalledWith(
 			'abcd1234',
 			expect.stringMatching(/task-1.*EBUSY.*(by hand|manually)/s),

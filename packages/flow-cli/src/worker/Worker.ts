@@ -121,9 +121,9 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 		case 'run_end':
 			// Only sent to workers declaring `run-events`, which this worker never does: reaching it is a daemon bug, and
 			// not acknowledging is right -- it did not claim to.
-			process.stderr
-				.write(`[worker] ignoring run_end for ${message.executionId}: this worker does not declare run-events
-`);
+			process.stderr.write(
+				`[worker] ignoring run_end for ${message.executionId}: this worker does not declare run-events\n`
+			);
 			break;
 		case 'done':
 			ws.close();

@@ -2,6 +2,7 @@ import type { WorkspaceHandle, WorkspaceProvider } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
 import { WorkspaceManager } from 'flow-engine';
 import type { FlowDefinition, FlowPluginOverrides } from 'flow-engine';
+import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 import type { DaemonResponse } from '../ipc/Protocol';
 import type { LogWriter } from '../storage/LogWriter';
@@ -178,6 +179,9 @@ export class ExecutionWorkspaces {
 	 * release fails (on Windows a file still held by a process that is exiting is the usual cause), and resolves in
 	 * every case.
 	 *
+	 * The provider's `release` is called directly rather than through `releaseWorkspace`, so the original run error
+	 * (`priorError`) is not carried here: a release failure is reported on its own and never replaces or hides it.
+	 *
 	 * Used only when the end of the run was announced to workers; {@link release} is unchanged for everything else. A
 	 * second failure is reported in the execution log and on stderr with where the workspace is and that it must be
 	 * removed by hand, since nothing else will.
@@ -214,17 +218,20 @@ export class ExecutionWorkspaces {
 		try {
 			await attempt();
 			return;
-		} catch {
-			// Tried once more below; only a second failure is worth saying.
+		} catch (firstErr) {
+			this.logWriter.writeExecution(
+				executionId,
+				`Releasing the workspace "${where}" failed (${getErrorMessage(firstErr)}); retrying once in ${String(Math.round(retryDelayMs / 1000))}s.`,
+				'warning'
+			);
 		}
 		await new Promise<void>(resolve => setTimeout(resolve, retryDelayMs));
 		try {
 			await attempt();
 		} catch (err) {
-			const message = `Failed to release the workspace "${where}" after a retry: ${String(err)}. Nothing else will remove it: delete it by hand once nothing uses it.`;
+			const message = `Failed to release the workspace "${where}" after a retry: ${getErrorMessage(err)}. Nothing else will remove it: delete it by hand once nothing uses it.`;
 			this.logWriter.writeExecution(executionId, message, 'error');
-			process.stderr.write(`[CommandHandler] execution ${executionId}: ${message}
-`);
+			process.stderr.write(`[CommandHandler] execution ${executionId}: ${message}\n`);
 		}
 	}
 }
