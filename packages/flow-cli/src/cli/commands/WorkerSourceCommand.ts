@@ -55,6 +55,19 @@ function buildCommandOptions(options: {
 	return Object.keys(built).length > 0 ? built : undefined;
 }
 
+/** `--option key=value` pairs as an options object; the value is everything after the first "=". */
+function parseOptionPairs(pairs: string[] | undefined): Record<string, unknown> {
+	const parsed: Record<string, unknown> = {};
+	for (const pair of pairs ?? []) {
+		const separator = pair.indexOf('=');
+		if (separator < 1) {
+			throw new Error(`--option must be key=value, got "${pair}"`);
+		}
+		parsed[pair.slice(0, separator)] = pair.slice(separator + 1);
+	}
+	return parsed;
+}
+
 function parseLabels(raw: string | undefined): string[] {
 	if (raw === undefined || raw.trim() === '') {
 		return [];
@@ -95,6 +108,16 @@ export function registerWorkerSourceCommand(program: Command): Command {
 			(value: string, previous: string[] = []) => [...previous, value]
 		)
 		.option('--cwd <path>', 'Directory --command runs in (defaults to the daemon working directory)')
+		.option(
+			'--plugin <ref>',
+			'Worker-type plugin that supplies this source, as <pluginId>.<implName> (needs --plugins-dir; --provider is then a free label)'
+		)
+		.option('--plugins-dir <path>', 'Absolute directory containing plugin-<pluginId>/ (plain, self-contained JS)')
+		.option(
+			'--option <key=value>',
+			'Option handed to the plugin (repeatable); a sensitive key must be ${ENV_VAR}',
+			(value: string, previous: string[] = []) => [...previous, value]
+		)
 		.action(
 			(
 				sourceId: string,
@@ -105,22 +128,29 @@ export function registerWorkerSourceCommand(program: Command): Command {
 					command?: string;
 					arg?: string[];
 					cwd?: string;
+					plugin?: string;
+					pluginsDir?: string;
+					option?: string[];
 				}
 			) => {
 				try {
 					const registry = new WorkerSourceRegistry(flowConfigDir());
+					const declaredOptions = { ...buildCommandOptions(options), ...parseOptionPairs(options.option) };
 					const { token, sourceToken, entry } = registry.declare({
 						sourceId,
 						provider: options.provider,
 						labels: parseLabels(options.labels),
 						maxWorkers: parseMaxWorkers(options.maxWorkers),
-						...(buildCommandOptions(options) !== undefined
-							? { options: buildCommandOptions(options) }
-							: {}),
+						...(Object.keys(declaredOptions).length > 0 ? { options: declaredOptions } : {}),
+						...(options.plugin !== undefined ? { plugin: options.plugin } : {}),
+						...(options.pluginsDir !== undefined ? { pluginsDir: options.pluginsDir } : {}),
 					});
 
 					console.log(`[ok] Declared worker source '${entry.sourceId}'`);
 					console.log(`     provider   : ${entry.provider}`);
+					if (entry.plugin !== undefined) {
+						console.log(`     plugin     : ${entry.plugin} (from ${String(entry.pluginsDir)})`);
+					}
 					console.log(`     labels     : ${entry.labels.length > 0 ? entry.labels.join(', ') : '(none)'}`);
 					console.log(`     maxWorkers : ${String(entry.maxWorkers)}`);
 					if (entry.options?.command !== undefined) {
@@ -242,12 +272,20 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		.description('Remove a declared worker source')
 		.action((sourceId: string) => {
 			try {
-				const removed = new WorkerSourceRegistry(flowConfigDir()).remove(sourceId);
+				const registry = new WorkerSourceRegistry(flowConfigDir());
+				const plugin = registry.list().find(entry => entry.sourceId === sourceId)?.plugin;
+				const removed = registry.remove(sourceId);
 				if (!removed) {
 					console.error(`[fail] No worker source declared with id '${sourceId}'`);
 					process.exit(1);
 				}
 				console.log(`[ok] Removed worker source '${sourceId}'`);
+				if (plugin !== undefined) {
+					// The plugin instance lives in the daemon process, which this command cannot reach.
+					console.log(
+						`     A running daemon disposes the instance of plugin '${plugin}' at its next worker request or when it stops.`
+					);
+				}
 			} catch (err) {
 				fail(err);
 			}

@@ -7,7 +7,9 @@ import {
 } from 'flow-core';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
+
+import { validateNoLiteralCredentials } from '../config/LiteralCredentials.js';
 
 // Re-exported: the entry shape is owned by flow-core, which also reads the registry for non-CLI hosts.
 export type { WorkerSourceEntry };
@@ -23,7 +25,14 @@ export interface WorkerSourceDeclaration {
 	pid?: number;
 	/** HTTP nudge endpoint; see {@link WorkerSourceEntry.nudgeUrl}. */
 	nudgeUrl?: string;
+	/** Worker-type plugin ref `<pluginId>.<implName>`; see {@link WorkerSourceEntry.plugin}. Needs `pluginsDir`. */
+	plugin?: string;
+	/** Absolute plugins directory; see {@link WorkerSourceEntry.pluginsDir}. Needs `plugin`. */
+	pluginsDir?: string;
 }
+
+/** `<pluginId>.<implName>`, the same shape `PluginLoader` parses (neither part may contain a dot). */
+const PLUGIN_REF = /^[^.\s]+\.[^.\s]+$/;
 
 /**
  * The sources a user has declared, persisted under the flow config directory.
@@ -42,7 +51,14 @@ export interface WorkerSourceDeclaration {
 export class WorkerSourceRegistry {
 	private readonly filePath: string;
 
-	constructor(private readonly configDir: string) {
+	/**
+	 * @param onRemoved told, in this process only, of each source `remove` or `pruneDead` drops. The daemon uses it to
+	 *        dispose the plugin instance of that source; the CLI process has none to dispose (see WORKERS.md).
+	 */
+	constructor(
+		private readonly configDir: string,
+		private readonly onRemoved?: (sourceId: string) => void
+	) {
 		this.filePath = join(configDir, WORKER_SOURCE_REGISTRY_FILE);
 	}
 
@@ -74,6 +90,8 @@ export class WorkerSourceRegistry {
 			maxWorkers: declaration.maxWorkers,
 			...(declaration.pid !== undefined ? { pid: declaration.pid } : {}),
 			...(declaration.nudgeUrl !== undefined ? { nudgeUrl: declaration.nudgeUrl } : {}),
+			...(declaration.plugin !== undefined ? { plugin: declaration.plugin } : {}),
+			...(declaration.pluginsDir !== undefined ? { pluginsDir: declaration.pluginsDir } : {}),
 			tokenHash: hashToken(token),
 			sourceTokenHash: hashToken(sourceToken),
 			createdAt: new Date().toISOString(),
@@ -101,6 +119,7 @@ export class WorkerSourceRegistry {
 			return false;
 		}
 		this.write(remaining);
+		this.onRemoved?.(sourceId);
 		return true;
 	}
 
@@ -124,6 +143,9 @@ export class WorkerSourceRegistry {
 		});
 		if (removed.length > 0) {
 			this.write(remaining);
+			for (const sourceId of removed) {
+				this.onRemoved?.(sourceId);
+			}
 		}
 		return removed;
 	}
@@ -206,7 +228,51 @@ export class WorkerSourceRegistry {
 			}
 		}
 		this.rejectRetiredProvider(declaration.sourceId, declaration.provider);
+		this.validatePlugin(declaration);
 		this.validateCommandOptions(declaration);
+		if (declaration.options !== undefined) {
+			validateNoLiteralCredentials(declaration.options, `worker source "${declaration.sourceId}" options`);
+		}
+	}
+
+	/**
+	 * Checks the plugin ref and its directory are consistent, at declaration time: a plugin source that cannot be
+	 * loaded would otherwise only fail inside the daemon, where the person who declared it is not looking.
+	 */
+	private validatePlugin(declaration: WorkerSourceDeclaration): void {
+		const { sourceId, provider, plugin, pluginsDir } = declaration;
+		if (plugin === undefined && pluginsDir === undefined) {
+			return;
+		}
+		if (plugin === undefined) {
+			throw new Error(
+				`Worker source "${sourceId}" declares pluginsDir "${String(pluginsDir)}" without a plugin. ` +
+					'Pass --plugin <pluginId>.<implName>, or drop --plugins-dir.'
+			);
+		}
+		if (!PLUGIN_REF.test(plugin)) {
+			throw new Error(
+				`Worker source "${sourceId}": plugin must be "<pluginId>.<implName>" (one dot, no spaces), got ${JSON.stringify(plugin)}.`
+			);
+		}
+		if (provider.startsWith('built-in:')) {
+			throw new Error(
+				`Worker source "${sourceId}" names a plugin ("${plugin}") and the built-in provider "${provider}": a source is one or the other. ` +
+					'Drop --plugin/--plugins-dir to use the built-in provider, or pass a free label as --provider (for example the plugin id) to use the plugin.'
+			);
+		}
+		if (pluginsDir === undefined) {
+			throw new Error(
+				`Worker source "${sourceId}" names plugin "${plugin}" but no pluginsDir: the daemon would not know where to load it from. ` +
+					'Pass --plugins-dir <absolute directory that contains plugin-<pluginId>/>.'
+			);
+		}
+		if (!isAbsolute(pluginsDir)) {
+			throw new Error(
+				`Worker source "${sourceId}": pluginsDir must be an absolute path, got "${pluginsDir}". ` +
+					'The daemon runs from another directory, so a relative path would point somewhere else.'
+			);
+		}
 	}
 
 	/**

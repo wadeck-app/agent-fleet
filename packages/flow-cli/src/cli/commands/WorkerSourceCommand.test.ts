@@ -129,6 +129,54 @@ describe('flow worker source command', () => {
 		});
 	});
 
+	describe('add - a plugin source', () => {
+		const pluginsDir = (): string => path.join(xdgHome, 'plugins');
+
+		it('stores the plugin ref, the plugins directory and the --option values', () => {
+			run(
+				'add',
+				'sandbox',
+				'--provider',
+				'docker-sandbox',
+				'--plugin',
+				'sandbox.docker',
+				'--plugins-dir',
+				pluginsDir(),
+				'--option',
+				'image=node:22',
+				'--option',
+				'flags=a=b'
+			);
+			expect(storedSources()[0]).toMatchObject({
+				plugin: 'sandbox.docker',
+				pluginsDir: pluginsDir(),
+				options: { image: 'node:22', flags: 'a=b' },
+			});
+			expect(printed()).toContain('plugin     : sandbox.docker');
+		});
+
+		it('exits 1 with the fix when --plugin has no --plugins-dir', () => {
+			expect(() => run('add', 'sandbox', '--provider', 'docker-sandbox', '--plugin', 'sandbox.docker')).toThrow(
+				'exit 1'
+			);
+			expect(errors()).toContain('--plugins-dir');
+		});
+
+		it('exits 1 on an --option without "="', () => {
+			expect(() =>
+				run('add', 'sandbox', '--provider', 'docker-sandbox', '--plugin', 'sandbox.docker', '--plugins-dir', pluginsDir(), '--option', 'oops')
+			).toThrow('exit 1');
+			expect(errors()).toContain('--option must be key=value');
+		});
+
+		it('says on remove that a running daemon disposes the plugin instance later', () => {
+			run('add', 'sandbox', '--provider', 'docker-sandbox', '--plugin', 'sandbox.docker', '--plugins-dir', pluginsDir());
+			logSpy.mockClear();
+			run('remove', 'sandbox');
+			expect(printed()).toContain('A running daemon disposes');
+		});
+	});
+
 	describe('remove', () => {
 		it('removes a declared source', () => {
 			run('add', 'gpu-box', '--provider', 'built-in:inbound');
