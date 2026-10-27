@@ -1,4 +1,3 @@
-import { SENSITIVE_FIELDS } from 'extension-points';
 import { load as parseYaml } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
@@ -7,6 +6,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { flowConfigDir } from './FlowConfigDir.js';
 import { launchProjectConfig } from './LaunchProjectConfig.js';
+import { validateNoLiteralCredentials } from './LiteralCredentials.js';
 import type {
 	GlobalConfig,
 	ProjectConfig,
@@ -15,8 +15,6 @@ import type {
 	ResolvedPluginsConfig,
 } from './PluginConfig.js';
 import { validateGlobalConfigLayer, validateProjectConfigLayer } from './ProjectFlowConfig.js';
-
-const SENSITIVE_FIELD_SET = new Set(SENSITIVE_FIELDS);
 
 interface ConfigLoaderOptions {
 	globalConfigPath?: string;
@@ -40,19 +38,6 @@ function resolveEnvVars(options: Record<string, unknown>): Record<string, unknow
 		}
 	}
 	return result;
-}
-
-function validateNoLiteralCredentials(options: Record<string, unknown>, context: string): void {
-	for (const [key, value] of Object.entries(options)) {
-		if (SENSITIVE_FIELD_SET.has(key) && typeof value === 'string') {
-			const isEnvVar = /^\$\{[^}]+\}$/.test(value);
-			if (!isEnvVar) {
-				throw new Error(
-					`Literal credential value in ${context}: sensitive field "${key}" must use \${ENV_VAR} interpolation, not a literal value`
-				);
-			}
-		}
-	}
 }
 
 function loadYamlFile<T>(filePath: string): T | null {
