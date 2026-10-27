@@ -81,7 +81,7 @@ export class DaemonWorkerMessageHandler {
 				break;
 			}
 			case 'run_end_ack': {
-				// Wired to the run-end coordination in the next change; until then nothing waits for it.
+				this.runtime().commandHandler.onRunEndAck(ws, message.executionId);
 				break;
 			}
 			default: {

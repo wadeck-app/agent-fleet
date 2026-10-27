@@ -73,6 +73,15 @@ describe('WorkerAssignmentSupervisor -- workers that served a run', () => {
 		expect(supervisor.servedWorkers('e1')).toEqual([b]);
 	});
 
+	it('lists the runs that were served and are not over', () => {
+		const { supervisor } = newSupervisor();
+		handOver(supervisor, fakeSocket(), 'e1', 's1');
+		handOver(supervisor, fakeSocket(), 'e2', 's1');
+		supervisor.forgetExecution('e1');
+
+		expect(supervisor.servedExecutions()).toEqual(['e2']);
+	});
+
 	it('forgets the run when it is over', () => {
 		const { supervisor } = newSupervisor();
 		handOver(supervisor, fakeSocket(), 'e1', 's1');

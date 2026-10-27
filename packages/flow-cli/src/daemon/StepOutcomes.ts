@@ -11,6 +11,7 @@ import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import type { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
+import type { RunEndCoordinator } from './RunEndCoordinator.js';
 
 /**
  * True when a step_failed error is the file-approval timeout's exact sentinel, as opposed to
@@ -41,7 +42,9 @@ export class StepOutcomes {
 		private readonly workspaces: ExecutionWorkspaces,
 		private readonly hooks: ExecutionHooks,
 		private readonly tryDispatch: () => void,
-		private readonly onExecutionEnded: (executionId: string) => void
+		private readonly onExecutionEnded: (executionId: string) => void,
+		/** Tells the workers that served a run that it ended; absent means nobody is ever told. */
+		private readonly runEnd?: RunEndCoordinator
 	) {}
 
 	/** Called by Daemon when a worker reports step_completed. */
@@ -80,7 +83,7 @@ export class StepOutcomes {
 			// Mark any steps skipped by the scheduler (still 'pending' in store) as completed
 			// so the daemon's allDone check can detect execution completion.
 			this.markSkippedStepsCompleted(executionId);
-			this.cleanupExecution(executionId);
+			this.cleanupExecution(executionId, 'completed');
 		} else {
 			this.queue.enqueueItems(newReady, context);
 			// Note: tryDispatch() is called by Daemon after onStepCompleted returns
@@ -138,7 +141,7 @@ export class StepOutcomes {
 				return;
 			}
 
-			this.cleanupExecution(executionId, new Error(error));
+			this.cleanupExecution(executionId, 'failed', new Error(error));
 		} else {
 			// Loop/retry/sub-step-re-run in progress - re-enqueue steps returned by the scheduler
 			this.queue.enqueueItems(newReady, context);
@@ -283,9 +286,17 @@ export class StepOutcomes {
 		}
 	}
 
-	private cleanupExecution(executionId: string, priorError?: unknown): void {
+	private cleanupExecution(executionId: string, reason: 'completed' | 'failed', priorError?: unknown): void {
+		// Before onExecutionEnded: it makes the supervisor forget which workers served the run.
+		const runEnd = this.runEnd?.begin(executionId, reason);
 		this.executions.remove(executionId);
 		this.onExecutionEnded(executionId);
-		this.workspaces.release(executionId, priorError);
+		if (runEnd === undefined) {
+			this.workspaces.release(executionId, priorError);
+			return;
+		}
+		// Workers that served the run are told it ended, and the workspace waits for their answer (bounded). The
+		// execution is already gone from the registry, so a late result is dropped exactly as it was.
+		void runEnd.finish(() => this.workspaces.releaseWithRetry(executionId));
 	}
 }

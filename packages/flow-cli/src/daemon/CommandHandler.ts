@@ -22,6 +22,7 @@ import { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
 import { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
 import { ReadyStepQueue } from './ReadyStepQueue.js';
 import { RunDefinitionLoader } from './RunDefinitionLoader.js';
+import { RunEndCoordinator, type RunEndSettings } from './RunEndCoordinator.js';
 import type { RunProject } from './RunProjectResolver.js';
 import { RunRequestHandler } from './RunRequestHandler.js';
 import { RunStepPreparer } from './RunStepPreparer.js';
@@ -34,6 +35,9 @@ import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 
 export { DEFAULT_STEP_SILENCE_LIMIT_MS, MAX_REDISPATCHES } from './WorkerAssignmentSupervisor.js';
+
+/** Same as the daemon's defaults (`worker.runEventsEnabled`, `worker.ackTimeoutSeconds`). */
+const DEFAULT_RUN_END_SETTINGS: RunEndSettings = { enabled: true, ackTimeoutMs: 30_000 };
 
 /**
  * The daemon's entry point for everything about executions and the work handed to workers.
@@ -53,6 +57,7 @@ export class CommandHandler {
 	private readonly supervisor: WorkerAssignmentSupervisor;
 	private readonly dispatcher: StepDispatcher;
 	private readonly outcomes: StepOutcomes;
+	private readonly runEnd: RunEndCoordinator;
 	private readonly injection: StepInjection;
 	private readonly runRequests: RunRequestHandler;
 	/**
@@ -124,7 +129,9 @@ export class CommandHandler {
 		 */
 		definitionResolver: FlowDefinitionResolver = new FlowDefinitionResolver(
 			new DefinitionSnapshotStore(definitionsDirOf(daemonDir))
-		)
+		),
+		/** Whether and how long workers that served a run are given to acknowledge its end (`worker.*` settings). */
+		runEndSettings: RunEndSettings = DEFAULT_RUN_END_SETTINGS
 	) {
 		this.executionStore =
 			executionStore ?? new ExecutionStore(executionsDirOf(daemonDir), undefined, daemonSecrets.masks);
@@ -148,6 +155,7 @@ export class CommandHandler {
 			},
 			stalledStepLimitMs
 		);
+		this.runEnd = new RunEndCoordinator(registry, this.supervisor, this.logWriter, runEndSettings);
 		this.dispatcher = new StepDispatcher(
 			registry,
 			this.queue,
@@ -174,7 +182,8 @@ export class CommandHandler {
 			executionId => {
 				this.supervisor.forgetExecution(executionId);
 				this.dispatcher.forgetExecution(executionId);
-			}
+			},
+			this.runEnd
 		);
 		this.injection = new StepInjection(
 			this.executions,
@@ -329,11 +338,22 @@ export class CommandHandler {
 	): void {
 		// Scoped to this synchronous call, so details never attach to an unrelated failure.
 		this.disconnectDetails = describeLostStep;
+		this.runEnd.workerGone(worker);
 		try {
 			this.supervisor.handleWorkerDisconnect(worker);
 		} finally {
 			this.disconnectDetails = undefined;
 		}
+	}
+
+	/** A worker answered `run_end`; see {@link RunEndCoordinator.handleAck}. */
+	onRunEndAck(worker: WebSocket, executionId: string): void {
+		this.runEnd.handleAck(worker, executionId);
+	}
+
+	/** Tells the workers of every run in progress that the daemon is stopping; see {@link RunEndCoordinator.announceDaemonStop}. */
+	announceDaemonStop(): Promise<void> {
+		return this.runEnd.announceDaemonStop();
 	}
 
 	/** Called by Daemon when a worker reports step_completed. */

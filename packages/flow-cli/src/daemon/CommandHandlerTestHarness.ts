@@ -41,7 +41,7 @@ export function createMockWorkerPool() {
 	// listIdle() is derived from getIdle() so a test only has to say which socket is idle.
 	const pool = {
 		// WorkerRegistry surface
-		describe: vi.fn().mockReturnValue({ workerId: 'w-test', sourceId: 'built-in:fork' }),
+		describe: vi.fn().mockReturnValue({ workerId: 'w-test', sourceId: 'built-in:fork', features: [] as string[] }),
 		remove: vi.fn(),
 		getIdle: vi.fn().mockReturnValue(undefined),
 		listIdle: vi.fn((): unknown[] => {

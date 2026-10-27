@@ -109,6 +109,11 @@ export class WorkerAssignmentSupervisor {
 		return [...(this.served.get(executionId) ?? [])];
 	}
 
+	/** Executions that have been handed at least one step and not been forgotten yet. */
+	servedExecutions(): string[] {
+		return [...this.served.keys()];
+	}
+
 	/**
 	 * Waits until none of `workers` holds an outstanding assignment of the execution: settled, discarded or revoked by a
 	 * disconnect. Unbounded on its own: the caller races it against its timeout and calls `cancel` when it gives up.

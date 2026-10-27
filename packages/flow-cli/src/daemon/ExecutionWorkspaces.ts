@@ -18,6 +18,9 @@ export type AllocatedWorkspace =
 	  }
 	| { ok: false; response: DaemonResponse };
 
+/** Pause before the single retry of a failed release. */
+const RELEASE_RETRY_DELAY_MS = 2_000;
+
 /** Allocates the workspace of an execution (plugin provider or native manager) and releases it when it is over. */
 export class ExecutionWorkspaces {
 	/** Per-execution plugin workspace handles (only when a workspace provider is used) */
@@ -167,6 +170,61 @@ export class ExecutionWorkspaces {
 					`[CommandHandler] Failed to release workspace for ${executionId}: ${String(err)}\n`
 				);
 			});
+		}
+	}
+
+	/**
+	 * Releases the workspace of an execution that is over, retrying once after {@link RELEASE_RETRY_DELAY_MS} when the
+	 * release fails (on Windows a file still held by a process that is exiting is the usual cause), and resolves in
+	 * every case.
+	 *
+	 * Used only when the end of the run was announced to workers; {@link release} is unchanged for everything else. A
+	 * second failure is reported in the execution log and on stderr with where the workspace is and that it must be
+	 * removed by hand, since nothing else will.
+	 */
+	async releaseWithRetry(executionId: string, retryDelayMs: number = RELEASE_RETRY_DELAY_MS): Promise<void> {
+		const pluginWs = this.pluginHandles.get(executionId);
+		const nativeWs = this.nativeManagers.get(executionId);
+		this.pluginHandles.delete(executionId);
+		this.nativeManagers.delete(executionId);
+		if (pluginWs) {
+			await this.releaseTwice(
+				executionId,
+				pluginWs.handle.path,
+				() => pluginWs.provider.release(pluginWs.handle),
+				retryDelayMs
+			);
+		}
+		if (nativeWs) {
+			await this.releaseTwice(
+				executionId,
+				nativeWs.workspaceId,
+				() => nativeWs.manager.release(nativeWs.workspaceId, executionId),
+				retryDelayMs
+			);
+		}
+	}
+
+	private async releaseTwice(
+		executionId: string,
+		where: string,
+		attempt: () => Promise<void>,
+		retryDelayMs: number
+	): Promise<void> {
+		try {
+			await attempt();
+			return;
+		} catch {
+			// Tried once more below; only a second failure is worth saying.
+		}
+		await new Promise<void>(resolve => setTimeout(resolve, retryDelayMs));
+		try {
+			await attempt();
+		} catch (err) {
+			const message = `Failed to release the workspace "${where}" after a retry: ${String(err)}. Nothing else will remove it: delete it by hand once nothing uses it.`;
+			this.logWriter.writeExecution(executionId, message, 'error');
+			process.stderr.write(`[CommandHandler] execution ${executionId}: ${message}
+`);
 		}
 	}
 }
