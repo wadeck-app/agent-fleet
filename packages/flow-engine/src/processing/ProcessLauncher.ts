@@ -19,7 +19,9 @@ export interface ProcessLauncher {
 	 * `child_process.spawn`. Both forms exist because callers use both: with `shell: true` and a whole
 	 * command line the argument list is omitted.
 	 */
+	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 	spawn(command: string, args: readonly string[], options: SpawnOptions): ChildProcess;
+	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 	spawn(command: string, options: SpawnOptions): ChildProcess;
 
 	/** Synchronously ends `pid` and everything it started (`ProcessTreeKiller.killProcessTree`). Throws an actionable Error. */

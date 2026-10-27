@@ -20,6 +20,7 @@ export type LauncherCall =
 
 /** Minimal child usable as a spawn result: emits events, has pipes and a no-op `kill`. */
 export function createFakeChild(pid: number | undefined = 1000): ChildProcess {
+	// violations-suppress: ts/no-unsafe-type-cast test double: a partial ChildProcess built field by field
 	const child = new EventEmitter() as unknown as Record<string, unknown>;
 	child['pid'] = pid;
 	child['exitCode'] = null;
@@ -45,8 +46,11 @@ export class FakeProcessLauncher implements ProcessLauncher {
 		return this.calls.filter((call): call is Extract<LauncherCall, { method: M }> => call.method === method);
 	}
 
+	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 	public spawn(command: string, args: readonly string[], options: SpawnOptions): ChildProcess;
+	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 	public spawn(command: string, options: SpawnOptions): ChildProcess;
+	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 	public spawn(
 		command: string,
 		argsOrOptions: readonly string[] | SpawnOptions,
@@ -60,6 +64,7 @@ export class FakeProcessLauncher implements ProcessLauncher {
 		const child = this.queuedChildren.shift();
 		if (child === undefined) {
 			throw new Error(
+				// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 				`FakeProcessLauncher.spawn('${command}') has no queued child: call queueChild() before the code under test spawns.`
 			);
 		}

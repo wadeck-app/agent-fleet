@@ -114,6 +114,7 @@ export function runCompactHook(params: {
 
 		// No windowsHide: it would strip the console handle and make the command's own children
 		// allocate a visible console (see commit d032e7e).
+		// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so the command's children allocate a visible console -- see d032e7e
 		const child = launcher.spawn(command, {
 			cwd,
 			env: { ...env, ...buildCompactHookEnv(event) },

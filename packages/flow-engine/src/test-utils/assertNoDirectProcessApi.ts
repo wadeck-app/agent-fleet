@@ -10,7 +10,9 @@ export function findDirectProcessApiUses(sourcePath: string): string[] {
 	const offenders: string[] = [];
 	for (const match of source.matchAll(/^import\s+(?!type\b)([^;]*?)\s+from\s+'([^']+)';/gms)) {
 		const [statement, clause, specifier] = match;
-		if (specifier === undefined || clause === undefined) continue;
+		if (specifier === undefined || clause === undefined) {
+			continue;
+		}
 		const isChildProcess = specifier === 'node:child_process' || specifier === 'child_process';
 		// `import { type A, type B }` has no runtime binding.
 		const hasRuntimeBinding = /\{[^}]*\}/.test(clause)

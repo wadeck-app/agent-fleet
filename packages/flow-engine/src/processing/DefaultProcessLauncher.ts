@@ -8,8 +8,11 @@ import type { ProcessLauncher, ProcessSignal } from './ProcessLauncher';
 import { killProcessTree, signalProcesses, snapshotDescendants } from './ProcessTreeKiller';
 
 export class DefaultProcessLauncher implements ProcessLauncher {
+	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 	public spawn(command: string, args: readonly string[], options: SpawnOptions): ChildProcess;
+	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 	public spawn(command: string, options: SpawnOptions): ChildProcess;
+	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 	public spawn(
 		command: string,
 		argsOrOptions: readonly string[] | SpawnOptions,
@@ -45,7 +48,9 @@ export class DefaultProcessLauncher implements ProcessLauncher {
 	 */
 	public killTreeAndWait(child: ChildProcess): Promise<void> {
 		const pid = child.pid;
-		if (pid === undefined) return Promise.resolve();
+		if (pid === undefined) {
+			return Promise.resolve();
+		}
 		if (process.platform === 'win32') {
 			return new Promise(resolve => {
 				const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
