@@ -59,6 +59,11 @@ export class StepDispatcher {
 		this.router = new StepRouter(undefined, undefined, workerTypes);
 	}
 
+	/** Drops the timers of the steps waiting for a worker of their type, for the daemon stop. */
+	stop(): void {
+		this.boundStepWait.stop();
+	}
+
 	/** Forgets the waits of an execution that is over. */
 	forgetExecution(executionId: string): void {
 		this.boundStepWait.forgetExecution(executionId);

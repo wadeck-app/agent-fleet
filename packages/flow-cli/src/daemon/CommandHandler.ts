@@ -190,7 +190,7 @@ export class CommandHandler {
 			interactivityPolicy ?? new DefaultInteractivityPolicy(),
 			(executionId, stepId, reason) => this.outcomes.failStep(executionId, stepId, reason),
 			workerRouting.workerTypes,
-			new BoundStepWait(workerRouting.boundStepWaitMs)
+			new BoundStepWait(workerRouting.boundStepWaitMs, Date.now, () => this.tryDispatch())
 		);
 		const workspaces = new ExecutionWorkspaces(this.logWriter, workspaceProvider, resolvePerFlowWorkspaceProvider);
 		this.outcomes = new StepOutcomes(
@@ -415,5 +415,6 @@ export class CommandHandler {
 	/** Drops work scheduled for later, when the daemon is shutting down; see {@link UnmetDemandCoverage.stop}. */
 	stopBackgroundWork(): void {
 		this.demand.stop();
+		this.dispatcher.stop();
 	}
 }

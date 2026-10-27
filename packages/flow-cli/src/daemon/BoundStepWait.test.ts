@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BoundStepWait } from './BoundStepWait.js';
 
@@ -117,5 +117,136 @@ describe('BoundStepWait', () => {
 
 		const reason = decision.action === 'fail' ? decision.reason : '';
 		expect(reason).toContain('no worker source with a plugin is declared');
+	});
+});
+
+// Dispatch only runs on events; with nothing connected, nothing may be left to notice that the bound has passed.
+describe('BoundStepWait - its own deadline timer', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function timed(waitMs: number) {
+		const onDeadline = vi.fn();
+		return { onDeadline, wait: new BoundStepWait(waitMs, Date.now, onDeadline) };
+	}
+
+	it('asks for a dispatch pass when the bound is spent, without any other event', () => {
+		const { wait, onDeadline } = timed(120_000);
+		wait.decide(request());
+
+		vi.advanceTimersByTime(119_999);
+		expect(onDeadline).not.toHaveBeenCalled();
+		vi.advanceTimersByTime(1);
+		expect(onDeadline).toHaveBeenCalledTimes(1);
+	});
+
+	it('arms one timer per step however often it is decided', () => {
+		const { wait, onDeadline } = timed(1_000);
+		wait.decide(request());
+		vi.advanceTimersByTime(400);
+		wait.decide(request());
+		wait.decide(request());
+
+		vi.advanceTimersByTime(10_000);
+
+		expect(onDeadline).toHaveBeenCalledTimes(1);
+	});
+
+	// A timer that fires while the clock reads short of the bound must not leave the step without one.
+	it('arms again for the remainder when it fires before the bound is spent', () => {
+		const onDeadline = vi.fn();
+		const clock = { now: 0 };
+		const wait = new BoundStepWait(1_000, () => clock.now, onDeadline);
+		wait.decide(request());
+		clock.now = 600;
+
+		vi.advanceTimersByTime(1_000);
+		expect(onDeadline).toHaveBeenCalledTimes(1);
+		wait.decide(request());
+
+		vi.advanceTimersByTime(400);
+		expect(onDeadline).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not fire for a step handed to a worker', () => {
+		const { wait, onDeadline } = timed(1_000);
+		wait.decide(request());
+		wait.clear('e1', 's1');
+
+		vi.advanceTimersByTime(5_000);
+
+		expect(onDeadline).not.toHaveBeenCalled();
+	});
+
+	it('does not fire for a step that failed', () => {
+		const { wait, onDeadline } = timed(1_000);
+		wait.decide(request());
+		vi.advanceTimersByTime(1_000);
+		expect(onDeadline).toHaveBeenCalledTimes(1);
+		wait.decide(request());
+
+		vi.advanceTimersByTime(5_000);
+
+		expect(onDeadline).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not fire while a worker of the type is connected', () => {
+		const { wait, onDeadline } = timed(1_000);
+		wait.decide(request());
+		wait.decide(request({ connectedOfType: 1 }));
+
+		vi.advanceTimersByTime(5_000);
+
+		expect(onDeadline).not.toHaveBeenCalled();
+	});
+
+	it('does not fire for an execution that is over', () => {
+		const { wait, onDeadline } = timed(1_000);
+		wait.decide(request());
+		wait.forgetExecution('e1');
+
+		vi.advanceTimersByTime(5_000);
+
+		expect(onDeadline).not.toHaveBeenCalled();
+	});
+
+	it('does not fire once stopped', () => {
+		const { wait, onDeadline } = timed(1_000);
+		wait.decide(request());
+		wait.decide(request({ stepId: 's2' }));
+
+		wait.stop();
+		vi.advanceTimersByTime(5_000);
+
+		expect(onDeadline).not.toHaveBeenCalled();
+		expect(wait.size).toBe(0);
+	});
+
+	it('leaves no timer behind for a bound of zero, which fails at once', () => {
+		const { wait } = timed(0);
+		wait.decide(request());
+
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it('never keeps the process alive', () => {
+		const unref = vi.fn();
+		const realSetTimeout = globalThis.setTimeout;
+		const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: () => void, ms: number) => {
+			const timer = realSetTimeout(fn, ms);
+			(timer as unknown as { unref: () => void }).unref = unref;
+			return timer;
+		}) as never);
+		const { wait } = timed(1_000);
+
+		wait.decide(request());
+
+		expect(unref).toHaveBeenCalledTimes(1);
+		spy.mockRestore();
+		wait.stop();
 	});
 });

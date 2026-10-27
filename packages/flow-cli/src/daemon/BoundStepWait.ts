@@ -31,16 +31,27 @@ export const DEFAULT_BOUND_STEP_WAIT_MS = 120_000;
  * type shows up (the source is not declared, its plugin cannot start workers). The clock only runs while NO worker
  * of the type is connected: one that is busy is a queue to wait in, not a worker that is missing.
  *
- * State is one start time per `executionId:stepId`, dropped when the step fails ({@link decide}), when it is handed to
- * a worker ({@link clear}) and when its execution is over ({@link forgetExecution}), so it cannot grow with the
- * executions a long-lived daemon has served.
+ * State is one start time and one timer per `executionId:stepId`, dropped when the step fails ({@link decide}), when it
+ * is handed to a worker ({@link clear}), when a worker of the type connects, when its execution is over
+ * ({@link forgetExecution}) and when the daemon stops ({@link stop}), so it cannot grow with the executions a
+ * long-lived daemon has served.
+ *
+ * The timer is what makes the bound real: dispatch runs on events (a worker registering, a step becoming ready) and
+ * on the demand re-check, which stops while workers are being forked. With nothing connected and a fork that failed,
+ * no event would ever come to notice the bound has passed, so the timer asks for the pass itself.
  */
 export class BoundStepWait {
 	private readonly waitingSince = new Map<string, number>();
+	private readonly deadlines = new Map<string, ReturnType<typeof setTimeout>>();
 
+	/**
+	 * @param onDeadline Runs a dispatch pass; called when the bound of a waiting step may have passed. Without it
+	 *        nothing is scheduled and the bound is only noticed by passes that happen anyway.
+	 */
 	constructor(
 		private readonly waitMs: number = DEFAULT_BOUND_STEP_WAIT_MS,
-		private readonly now: () => number = Date.now
+		private readonly now: () => number = Date.now,
+		private readonly onDeadline?: () => void
 	) {}
 
 	/** Number of steps currently being timed. */
@@ -51,7 +62,7 @@ export class BoundStepWait {
 	decide(request: BoundStepWaitRequest): BoundStepWaitDecision {
 		const key = keyOf(request.executionId, request.stepId);
 		if (request.connectedOfType > 0) {
-			this.waitingSince.delete(key);
+			this.forget(key);
 			return { action: 'wait' };
 		}
 
@@ -59,25 +70,55 @@ export class BoundStepWait {
 		this.waitingSince.set(key, since);
 		const waitedMs = this.now() - since;
 		if (waitedMs < this.waitMs) {
+			this.armDeadline(key, this.waitMs - waitedMs);
 			return { action: 'wait' };
 		}
 
-		this.waitingSince.delete(key);
+		this.forget(key);
 		return { action: 'fail', reason: describeFailure(request, waitedMs, this.waitMs) };
 	}
 
 	/** The step was handed to a worker: it is no longer waiting. */
 	clear(executionId: string, stepId: string): void {
-		this.waitingSince.delete(keyOf(executionId, stepId));
+		this.forget(keyOf(executionId, stepId));
 	}
 
 	/** Forgets the steps of an execution that is over. */
 	forgetExecution(executionId: string): void {
 		for (const key of this.waitingSince.keys()) {
 			if (key.startsWith(`${executionId}:`)) {
-				this.waitingSince.delete(key);
+				this.forget(key);
 			}
 		}
+	}
+
+	/** Drops every wait and timer, for the daemon stop: nothing may fire against collaborators that are torn down. */
+	stop(): void {
+		for (const key of [...this.waitingSince.keys()]) {
+			this.forget(key);
+		}
+	}
+
+	private forget(key: string): void {
+		this.waitingSince.delete(key);
+		const timer = this.deadlines.get(key);
+		if (timer !== undefined) {
+			clearTimeout(timer);
+			this.deadlines.delete(key);
+		}
+	}
+
+	private armDeadline(key: string, inMs: number): void {
+		if (this.onDeadline === undefined || this.deadlines.has(key)) {
+			return;
+		}
+		const timer = setTimeout(() => {
+			this.deadlines.delete(key);
+			this.onDeadline?.();
+		}, inMs);
+		// Never the reason the daemon stays up: idle shutdown is decided elsewhere.
+		timer.unref?.();
+		this.deadlines.set(key, timer);
 	}
 }
 

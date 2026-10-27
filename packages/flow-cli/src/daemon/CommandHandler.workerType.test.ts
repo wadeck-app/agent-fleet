@@ -286,6 +286,53 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 			expect(reason).toContain('worker.boundStepWaitSeconds');
 		});
 
+		// No manual dispatch pass: the daemon must notice the bound on its own. Forking is attempted and fails, which is
+		// the case where the demand re-check is off and no worker ever sends `ready`.
+		it('fails the step by itself when the bound passes, even though forking a worker failed', async () => {
+			vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+			const { handler, pool, sent } = daemonWith([idleWorker('host')], { boundStepWaitMs: 120_000 });
+			pool.planProvisioning.mockReturnValue({ fork: 1 });
+			pool.provision.mockRejectedValue(new Error('docker is down'));
+			await run(handler, BOUND_FLOW_YAML);
+
+			await vi.advanceTimersByTimeAsync(119_000);
+			expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+			await vi.advanceTimersByTimeAsync(2_000);
+
+			expect(sent).toEqual([]);
+			expect(mockExecStore.markStepFailed).toHaveBeenCalledTimes(1);
+			expect(lastFailureReason()).toContain('worker type "sandbox"');
+		});
+
+		it('fails an injected step by itself when the bound passes', async () => {
+			vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+			const host = idleWorker('host');
+			const { handler, sent, pool } = daemonWith([host, idleWorker('sandbox', { sourceId: 'sbx-1' })], {
+				boundStepWaitMs: 5_000,
+			});
+			pool.planProvisioning.mockReturnValue({ fork: 1 });
+			const { executionId } = (await run(handler, BOUND_FLOW_YAML)) as { executionId: string };
+			pool.listIdle.mockReturnValue([host]);
+			pool.summarize.mockReturnValue([host.worker]);
+			handler.injectSteps(executionId, [child('injected')]);
+			handler.tryDispatch();
+
+			await vi.advanceTimersByTimeAsync(6_000);
+
+			expect(sent.map(s => s.stepId)).toEqual(['s1']);
+			expect(mockExecStore.markStepFailed.mock.calls.map(call => call[1])).toEqual(['injected']);
+		});
+
+		it('stops watching the bound when the daemon stops', async () => {
+			const { handler } = daemonWith([idleWorker('host')], { boundStepWaitMs: 5_000 });
+			await run(handler, BOUND_FLOW_YAML);
+
+			handler.stopBackgroundWork();
+			await vi.advanceTimersByTimeAsync(60_000);
+
+			expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+		});
+
 		it('fails an injected step of a bound run the same way', async () => {
 			const host = idleWorker('host');
 			const { handler, sent, pool } = daemonWith([host, idleWorker('sandbox', { sourceId: 'sbx-1' })], {
