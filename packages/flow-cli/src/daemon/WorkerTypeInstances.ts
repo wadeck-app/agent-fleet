@@ -213,7 +213,12 @@ export class WorkerTypeInstances {
 					() => undefined
 				)
 			);
-			throw loadFailure(entry, plugin, pluginsDir, `did not finish loading within ${describeDuration(this.buildTimeoutMs)}`);
+			throw loadFailure(
+				entry,
+				plugin,
+				pluginsDir,
+				`did not finish loading within ${describeDuration(this.buildTimeoutMs)}`
+			);
 		}
 		return built;
 	}

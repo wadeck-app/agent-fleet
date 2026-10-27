@@ -72,13 +72,16 @@ describe('WorkerSourceRegistry - a plugin source', () => {
 		);
 	});
 
-	it.each(['sandbox', 'sandbox.', '.docker', 'a.b.c', ' ', 'a/b.c', 'a\\b.c', '../x.y', 'a.b/c'])('rejects the malformed plugin ref %j', ref => {
-		const registry = new WorkerSourceRegistry(dir);
+	it.each(['sandbox', 'sandbox.', '.docker', 'a.b.c', ' ', 'a/b.c', 'a\\b.c', '../x.y', 'a.b/c'])(
+		'rejects the malformed plugin ref %j',
+		ref => {
+			const registry = new WorkerSourceRegistry(dir);
 
-		expect(() => registry.declare({ ...pluginDeclaration(), plugin: ref })).toThrow(
-			/plugin must be "<pluginId>\.<implName>"/
-		);
-	});
+			expect(() => registry.declare({ ...pluginDeclaration(), plugin: ref })).toThrow(
+				/plugin must be "<pluginId>\.<implName>"/
+			);
+		}
+	);
 
 	it('still lets an unknown provider without a plugin be declared (it is refused when contacted)', () => {
 		const registry = new WorkerSourceRegistry(dir);

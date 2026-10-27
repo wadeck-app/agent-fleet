@@ -99,10 +99,14 @@ describe('WorkerTypeInstances -- a build that never finishes', () => {
 	});
 
 	it('gives up on a dispose that waits for a pending build, logs it, and disposes the instance once it exists', async () => {
-		const slowDispose = new WorkerTypeInstances(new PluginLoader(), (level, message) => logged.push({ level, message }), {
-			buildTimeoutMs: 5_000,
-			disposeTimeoutMs: 30,
-		});
+		const slowDispose = new WorkerTypeInstances(
+			new PluginLoader(),
+			(level, message) => logged.push({ level, message }),
+			{
+				buildTimeoutMs: 5_000,
+				disposeTimeoutMs: 30,
+			}
+		);
 		const building = slowDispose.get(entry({ plugin: 'fixture-sandbox.slow' }));
 
 		await slowDispose.dispose('sandbox');

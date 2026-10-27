@@ -114,7 +114,16 @@ describe('flow worker source command', () => {
 		});
 
 		it('shows the plugin of a plugin source', () => {
-			run('add', 'sandbox', '--provider', 'docker-sandbox', '--plugin', 'sandbox.docker', '--plugins-dir', path.join(xdgHome, 'plugins'));
+			run(
+				'add',
+				'sandbox',
+				'--provider',
+				'docker-sandbox',
+				'--plugin',
+				'sandbox.docker',
+				'--plugins-dir',
+				path.join(xdgHome, 'plugins')
+			);
 			logSpy.mockClear();
 			run('list');
 			expect(printed()).toContain('sandbox	docker-sandbox	max=1	labels=(none)	plugin=sandbox.docker');

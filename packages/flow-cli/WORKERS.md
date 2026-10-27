@@ -173,9 +173,9 @@ A worker that declares the `run-events` feature and was handed a step of a run g
 receive it. The run's workspace is released only after the ack, the worker's disconnect, or the
 timeout; on timeout the daemon logs an error naming the worker, source and execution.
 
-| Key (daemon `config.yml`, section `worker`) | Default | Meaning                                                                                                                                          |
-| ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `runEventsEnabled`                          | `true`  | `false` restores the previous behavior: nothing sent, workspace released at once                                                                 |
+| Key (daemon `config.yml`, section `worker`) | Default | Meaning                                                                                                                                                                                    |
+| ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `runEventsEnabled`                          | `true`  | `false` restores the previous behavior: nothing sent, workspace released at once                                                                                                           |
 | `ackTimeoutSeconds`                         | `30`    | 1 to 120. Bounds each wait (served workers settling, the acks, and a plugin's `onRunEnded`), so a finished run can wait up to three times this; stopping the daemon waits up to twice this |
 
 On daemon stop the notice is written before the sockets close, so a worker the daemon did not

@@ -174,7 +174,11 @@ describe('shutDownWorkers -- the total cap', () => {
 	it('stops waiting for acknowledgements that never come once the cap is reached, and says so', async () => {
 		const exceeded = vi.fn();
 
-		await shutDownWorkers(runtimeWith(new Promise<void>(() => {}), () => Promise.resolve()), 30, exceeded);
+		await shutDownWorkers(
+			runtimeWith(new Promise<void>(() => {}), () => Promise.resolve()),
+			30,
+			exceeded
+		);
 
 		expect(exceeded).toHaveBeenCalledTimes(1);
 		expect(exceeded).toHaveBeenCalledWith(30);
@@ -183,7 +187,11 @@ describe('shutDownWorkers -- the total cap', () => {
 	it('stops waiting for a dispose that never settles once the cap is reached, and says so', async () => {
 		const exceeded = vi.fn();
 
-		await shutDownWorkers(runtimeWith(Promise.resolve(), () => new Promise<void>(() => {})), 30, exceeded);
+		await shutDownWorkers(
+			runtimeWith(Promise.resolve(), () => new Promise<void>(() => {})),
+			30,
+			exceeded
+		);
 
 		expect(exceeded).toHaveBeenCalledTimes(1);
 	});
@@ -191,7 +199,11 @@ describe('shutDownWorkers -- the total cap', () => {
 	it('says nothing when everything finished within the cap', async () => {
 		const exceeded = vi.fn();
 
-		await shutDownWorkers(runtimeWith(Promise.resolve(), () => Promise.resolve()), 1_000, exceeded);
+		await shutDownWorkers(
+			runtimeWith(Promise.resolve(), () => Promise.resolve()),
+			1_000,
+			exceeded
+		);
 
 		expect(exceeded).not.toHaveBeenCalled();
 	});
