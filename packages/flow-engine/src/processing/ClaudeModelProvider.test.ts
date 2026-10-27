@@ -361,29 +361,89 @@ describe('ClaudeModelProvider', () => {
 			expect(() => provider.kill()).not.toThrow();
 		});
 
-		it('calls kill() on the current process', async () => {
+		it('ends the whole process tree with taskkill /T /F on Windows, not child.kill()', async () => {
+			vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+			vi.mocked(child_process.spawnSync).mockReturnValue({
+				status: 0,
+				stdout: '',
+				stderr: '',
+			} as unknown as ReturnType<typeof child_process.spawnSync>);
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 			// Don't emit close - process stays "running"
 			await new Promise(resolve => setImmediate(resolve));
 
 			provider.kill();
 
-			expect((mockProcess as unknown as Record<string, ReturnType<typeof vi.fn>>)['kill']).toHaveBeenCalled();
+			expect(child_process.spawnSync).toHaveBeenCalledOnce();
+			expect(child_process.spawnSync).toHaveBeenCalledWith('taskkill', ['/PID', '1234', '/T', '/F'], {
+				encoding: 'utf8',
+				windowsHide: true,
+			});
+			expect((mockProcess as unknown as Record<string, ReturnType<typeof vi.fn>>)['kill']).not.toHaveBeenCalled();
 
 			// Cleanup: emit close so the test doesn't hang
 			(mockProcess as EventEmitter).emit('close', 1);
 			await resultPromise.catch(() => {});
 		});
 
-		it('logs warning but does not throw when kill() on process fails', async () => {
+		it('SIGKILLs the process and its descendants on POSIX, not child.kill()', async () => {
+			vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+			// pgrep: 1234 has the child 9001, which has none.
+			vi.mocked(child_process.spawnSync).mockImplementation(((_command: string, args: string[]) => ({
+				status: 0,
+				stdout: args[1] === '1234' ? '9001\n' : '',
+				stderr: '',
+			})) as unknown as typeof child_process.spawnSync);
+			const processKill = vi.spyOn(process, 'kill').mockImplementation(() => true);
 			const resultPromise = provider.launchBackground(makeBaseOptions());
 			await new Promise(resolve => setImmediate(resolve));
 
-			// Make process.kill throw
-			const killFn = (mockProcess as unknown as Record<string, ReturnType<typeof vi.fn>>)['kill'];
-			killFn.mockImplementation(() => {
-				throw new Error('EPERM');
-			});
+			provider.kill();
+
+			expect(processKill.mock.calls).toEqual([
+				[9001, 'SIGKILL'],
+				[1234, 'SIGKILL'],
+			]);
+			expect((mockProcess as unknown as Record<string, ReturnType<typeof vi.fn>>)['kill']).not.toHaveBeenCalled();
+
+			(mockProcess as EventEmitter).emit('close', 1);
+			await resultPromise.catch(() => {});
+		});
+
+		it('skips the tree kill when the process has no pid (never spawned)', async () => {
+			(mockProcess as unknown as Record<string, unknown>).pid = undefined;
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			await new Promise(resolve => setImmediate(resolve));
+
+			provider.kill();
+
+			expect(child_process.spawnSync).not.toHaveBeenCalled();
+
+			(mockProcess as EventEmitter).emit('close', 1);
+			await resultPromise.catch(() => {});
+		});
+
+		it('does not tree-kill a process that already exited (its pid may have been reused)', async () => {
+			vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			await new Promise(resolve => setImmediate(resolve));
+			(mockProcess as unknown as Record<string, unknown>).exitCode = 0;
+
+			provider.kill();
+
+			expect(child_process.spawnSync).not.toHaveBeenCalled();
+
+			(mockProcess as EventEmitter).emit('close', 0);
+			await resultPromise.catch(() => {});
+		});
+
+		it('logs warning but does not throw when the tree kill fails', async () => {
+			vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+			vi.mocked(child_process.spawnSync).mockReturnValue({
+				error: new Error('EPERM'),
+			} as unknown as ReturnType<typeof child_process.spawnSync>);
+			const resultPromise = provider.launchBackground(makeBaseOptions());
+			await new Promise(resolve => setImmediate(resolve));
 
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 

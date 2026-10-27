@@ -26,6 +26,7 @@ import type {
 	ModelProvider,
 } from './ModelProvider';
 import { validateLaunchOptions } from './ModelProvider';
+import { killProcessTree } from './ProcessTreeKiller';
 
 /**
  * Build Claude MCP config JSON from McpServer[].
@@ -85,8 +86,11 @@ export class ClaudeModelProvider implements ModelProvider {
 
 	public kill(): void {
 		try {
-			if (this.currentProcess) {
-				this.currentProcess.kill();
+			// `ChildProcess.kill()` would end only claude and leave what it started (tool calls) running.
+			// The launch `finally` blocks also call this after the process ended: its pid may be reused by now.
+			const proc = this.currentProcess;
+			if (proc?.pid !== undefined && proc.exitCode == null && proc.signalCode == null) {
+				killProcessTree(proc.pid);
 			}
 		} catch (err) {
 			console.warn('[ClaudeModelProvider] kill() failed:', normalizeError(err).message);
