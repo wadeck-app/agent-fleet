@@ -23,3 +23,11 @@ export function shutDownWorkers(
 	runtime.wsServer.close();
 	return announced;
 }
+
+/**
+ * What `stop()` must wait for before the process may exit: the queue-event flush and the workers' side of the end of
+ * their runs (acknowledgements and workspace releases). Both, so an exit cannot cut either off.
+ */
+export function awaitShutdownWork(eventsFlushed: Promise<void>, workersAnswered: Promise<void>): Promise<void> {
+	return Promise.all([eventsFlushed, workersAnswered]).then(() => undefined);
+}

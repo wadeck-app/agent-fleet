@@ -304,3 +304,8 @@ async function raceWithTimeout(wait: Promise<void>, ms: number): Promise<'done' 
 		clearTimeout(timer);
 	}
 }
+
+/** The coordinator's settings from the daemon's `worker.*` config (already range-checked by the loader). */
+export function runEndSettingsOf(worker: { runEventsEnabled: boolean; ackTimeoutSeconds: number }): RunEndSettings {
+	return { enabled: worker.runEventsEnabled, ackTimeoutMs: worker.ackTimeoutSeconds * 1000 };
+}

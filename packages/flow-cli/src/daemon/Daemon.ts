@@ -23,12 +23,13 @@ import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DaemonSourceContact } from './DaemonSourceContact.js';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler.js';
-import { shutDownWorkers } from './DaemonWorkerShutdown.js';
+import { awaitShutdownWork, shutDownWorkers } from './DaemonWorkerShutdown.js';
 import { ExclusiveFileLock } from './ExclusiveFileLock.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { findLiveDaemon } from './LiveDaemonProbe.js';
 import { RelayRegistry } from './RelayRegistry.js';
+import { runEndSettingsOf } from './RunEndCoordinator.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { removeStaleDaemonFiles } from './StaleDaemonFiles.js';
 import { guardRunAgainstStop } from './StoppingDaemonRunGuard.js';
@@ -258,7 +259,7 @@ async function startOwningDaemon(
 					writeDaemonLog(logsDir, 'error', `Queue events: flush at shutdown failed: ${getErrorMessage(err)}`);
 				});
 				// The hook can run twice (idle path, then stop()); the run_end wait is the same one both times.
-				shutdownFlush = Promise.all([eventsFlushed, workersAnswered]).then(() => undefined);
+				shutdownFlush = awaitShutdownWork(eventsFlushed, workersAnswered);
 			},
 			onStart: (port: number) => {
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
@@ -441,10 +442,7 @@ async function startOwningDaemon(
 					config.queue.stepSilenceLimitSeconds * 1000,
 					daemonSecrets,
 					undefined,
-					{
-						enabled: config.worker.runEventsEnabled,
-						ackTimeoutMs: config.worker.ackTimeoutSeconds * 1000,
-					}
+					runEndSettingsOf(config.worker)
 				);
 				runtime = {
 					commandHandler,

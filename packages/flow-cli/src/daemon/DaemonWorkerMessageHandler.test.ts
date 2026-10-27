@@ -216,3 +216,20 @@ describe('DaemonWorkerMessageHandler -- step_failed metrics', () => {
 		expect(logWriter.writeExecution.mock.calls.filter(call => call[2] === 'warning')).toHaveLength(0);
 	});
 });
+
+describe('DaemonWorkerMessageHandler -- run_end_ack', () => {
+	it('hands the acknowledgement to the command handler with the connection it came from', () => {
+		const commandHandler = { onRunEndAck: vi.fn(), verifyAssignment: vi.fn() };
+		const handler = new DaemonWorkerMessageHandler(
+			'/logs',
+			() => ({ commandHandler }) as unknown as DaemonRuntime,
+			() => {}
+		);
+
+		handler.handleMessage(ws, { type: 'run_end_ack', executionId: 'e1' });
+
+		expect(commandHandler.onRunEndAck).toHaveBeenCalledWith(ws, 'e1');
+		// It concerns the whole run, not an assignment: nothing to bind it to.
+		expect(commandHandler.verifyAssignment).not.toHaveBeenCalled();
+	});
+});

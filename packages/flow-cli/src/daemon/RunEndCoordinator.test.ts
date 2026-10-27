@@ -1,9 +1,10 @@
 import type { WebSocket } from 'ws';
 
+import { FlowConfigLoader } from '../config/FlowConfig.js';
 import { WORKER_FEATURE_RUN_EVENTS } from '../ipc/Protocol';
 import { ExecutionRegistry } from './ExecutionRegistry.js';
 import { type ReadyStep, ReadyStepQueue } from './ReadyStepQueue.js';
-import { RunEndCoordinator, type RunEndSettings } from './RunEndCoordinator.js';
+import { RunEndCoordinator, type RunEndSettings, runEndSettingsOf } from './RunEndCoordinator.js';
 import { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
 
@@ -405,5 +406,16 @@ describe('RunEndCoordinator -- work still pending after the run left the registr
 	it('stop announcement resolves at once when nothing is pending', async () => {
 		const { coordinator } = setup();
 		await expect(coordinator.announceDaemonStop()).resolves.toBeUndefined();
+	});
+});
+
+describe('runEndSettingsOf -- daemon worker.* config to coordinator settings', () => {
+	it('maps the defaults to enabled and 30 000 ms', () => {
+		expect(runEndSettingsOf(FlowConfigLoader.DEFAULT.worker)).toEqual({ enabled: true, ackTimeoutMs: 30_000 });
+	});
+
+	it('maps the kill switch and converts seconds to milliseconds', () => {
+		const worker = { ...FlowConfigLoader.DEFAULT.worker, runEventsEnabled: false, ackTimeoutSeconds: 7 };
+		expect(runEndSettingsOf(worker)).toEqual({ enabled: false, ackTimeoutMs: 7_000 });
 	});
 });
