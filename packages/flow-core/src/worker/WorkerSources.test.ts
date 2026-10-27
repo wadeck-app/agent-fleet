@@ -44,6 +44,19 @@ describe('worker source registry reading', () => {
 			expect(parseWorkerSourceFile(file)).toEqual([entry('a')]);
 		});
 
+		it('parses an entry written before plugin and pluginsDir existed, without adding them', () => {
+			fs.writeFileSync(file, JSON.stringify({ sources: [entry('old')] }));
+			const [parsed] = parseWorkerSourceFile(file);
+			expect(parsed?.plugin).toBeUndefined();
+			expect(parsed?.pluginsDir).toBeUndefined();
+		});
+
+		it('keeps plugin and pluginsDir of a plugin entry', () => {
+			const plugin = { ...entry('p', 'docker'), plugin: 'sandbox.docker', pluginsDir: 'C:/plugins' };
+			fs.writeFileSync(file, JSON.stringify({ sources: [plugin] }));
+			expect(parseWorkerSourceFile(file)).toEqual([plugin]);
+		});
+
 		it('fails on unparseable JSON, names the file and the repair command', () => {
 			fs.writeFileSync(file, '{ nope');
 			expect(() => parseWorkerSourceFile(file)).toThrow(
@@ -76,6 +89,18 @@ describe('worker source registry reading', () => {
 			const result = readDeclaredWorkerSources(dir);
 			expect(result).toEqual([{ sourceId: 'a', provider: 'built-in:command', labels: ['gpu'], maxWorkers: 2 }]);
 			expect(JSON.stringify(result)).not.toContain('secret');
+		});
+
+		it('keeps options, plugin and pluginsDir out of what readers get', () => {
+			const plugin = {
+				...entry('a', 'docker'),
+				options: { image: 'x' },
+				plugin: 'sandbox.docker',
+				pluginsDir: 'C:/plugins',
+			};
+			fs.writeFileSync(file, JSON.stringify({ sources: [plugin] }));
+			const [declared] = readDeclaredWorkerSources(dir);
+			expect(Object.keys(declared ?? {}).sort()).toEqual(['labels', 'maxWorkers', 'provider', 'sourceId']);
 		});
 
 		it('fails on a retired provider entry rather than listing it', () => {

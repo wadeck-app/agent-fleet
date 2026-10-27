@@ -58,9 +58,23 @@ export interface WorkerSourceEntry {
 	 * that do not expose one still reconnect via backoff.
 	 */
 	nudgeUrl?: string;
+	/**
+	 * Worker-type plugin implementing this source, as `<pluginId>.<implName>`.
+	 *
+	 * Present only for a plugin source; then `pluginsDir` is required and `provider` is a free label
+	 * (never a `built-in:` provider). Absent in every entry written before worker-type plugins existed.
+	 */
+	plugin?: string;
+	/**
+	 * Absolute directory holding `plugin-<pluginId>/` (self-contained plain JS), set together with `plugin`.
+	 */
+	pluginsDir?: string;
 }
 
-/** What a reader may show of a declared source: never the credential hashes. */
+/**
+ * What a reader may show of a declared source: never the credential hashes, and neither `options` nor `pluginsDir`
+ * (options are configuration for the daemon's implementation, and a directory is not for display).
+ */
 export type DeclaredWorkerSource = Pick<WorkerSourceEntry, 'sourceId' | 'provider' | 'labels' | 'maxWorkers'>;
 
 export interface WorkerSourceRegistryFile {
