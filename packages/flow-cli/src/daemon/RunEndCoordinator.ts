@@ -1,3 +1,4 @@
+import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import type { WebSocket } from 'ws';
 
 import { WORKER_FEATURE_RUN_EVENTS } from '../ipc/Protocol';
@@ -228,7 +229,9 @@ export class RunEndCoordinator {
 		let check: () => void = () => {};
 		const allAnswered = new Promise<void>(resolve => {
 			check = () => {
-				if (awaiting.size === 0) resolve();
+				if (awaiting.size === 0) {
+					resolve();
+				}
 			};
 		});
 		this.pendingAcks.set(executionId, { awaiting, check });
@@ -264,7 +267,7 @@ function seconds(ms: number): string {
 }
 
 function describe(err: unknown): string {
-	return err instanceof Error ? err.message : String(err);
+	return getErrorMessage(err);
 }
 
 /** Resolves 'done' when `wait` does, 'timeout' after `ms`; the timer never outlives the race. */

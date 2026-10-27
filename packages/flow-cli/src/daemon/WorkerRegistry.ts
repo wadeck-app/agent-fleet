@@ -264,8 +264,12 @@ export class WorkerRegistry {
 	sendToRunWorkers(servedBy: Iterable<WebSocket>, message: DaemonToWorker): WebSocket[] {
 		const delivered: WebSocket[] = [];
 		for (const ws of servedBy) {
-			if (this.workers.get(ws)?.features.includes(WORKER_FEATURE_RUN_EVENTS) !== true) continue;
-			if (this.send(ws, message)) delivered.push(ws);
+			if (this.workers.get(ws)?.features.includes(WORKER_FEATURE_RUN_EVENTS) !== true) {
+				continue;
+			}
+			if (this.send(ws, message)) {
+				delivered.push(ws);
+			}
 		}
 		return delivered;
 	}
