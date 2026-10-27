@@ -11,10 +11,12 @@ import type { ApprovalProvider } from 'extension-points';
 
 import { ClaudeModelProvider } from '../processing/ClaudeModelProvider';
 import { CodexModelProvider } from '../processing/CodexModelProvider';
+import { DefaultProcessLauncher } from '../processing/DefaultProcessLauncher';
 import { resolveModelAlias } from '../processing/ModelAliases';
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
 import { OpenCodeModelProvider } from '../processing/OpenCodeModelProvider';
 import { OutputExtractor } from '../processing/OutputExtractor';
+import type { ProcessLauncher } from '../processing/ProcessLauncher';
 import { type TemplateContext, TemplateRenderer } from '../processing/TemplateRenderer';
 import type { ToolProgress } from '../processing/ToolCallTracker';
 import type { FlowRegistry } from '../registry/FlowRegistry';
@@ -71,6 +73,11 @@ export interface StepRunnerConfig {
 	providers?: Map<string, ModelProvider>;
 	/** Called with the rendered prompt before the model CLI launches. Use for debug logging. */
 	onRenderedPrompt?: (prompt: string) => void;
+	/**
+	 * Starts, ends and looks up every process of script and model steps (and the `onCompact` hook).
+	 * Absent = the host implementation. Not applied to `providers` the caller supplies.
+	 */
+	processLauncher?: ProcessLauncher;
 }
 
 /**
@@ -84,21 +91,25 @@ interface UnrecognizedFlowStep {
 
 export class StepRunner {
 	private readonly templateRenderer = new TemplateRenderer();
-	private readonly scriptExecutor = new ScriptExecutor();
+	private readonly scriptExecutor: ScriptExecutor;
 	private readonly outputExtractor = new OutputExtractor();
 	private readonly providers: Map<string, ModelProvider>;
+	private readonly processLauncher: ProcessLauncher;
 	private config: StepRunnerConfig;
 
 	constructor(config: StepRunnerConfig) {
 		this.config = config;
+		// The one place the launcher is chosen: every process class below receives this instance.
+		this.processLauncher = config.processLauncher ?? new DefaultProcessLauncher();
+		this.scriptExecutor = new ScriptExecutor(this.processLauncher);
 		// REQUIREMENT: When adding a new provider, add 1-2 flow-level integration tests
 		// in StepRunner.opencode.integration.test.ts using the provider's mock CLI.
 		this.providers =
 			config.providers ??
 			new Map<string, ModelProvider>([
-				['claude', new ClaudeModelProvider()],
-				['opencode', new OpenCodeModelProvider()],
-				['codex', new CodexModelProvider()],
+				['claude', new ClaudeModelProvider(this.processLauncher)],
+				['opencode', new OpenCodeModelProvider({ processLauncher: this.processLauncher })],
+				['codex', new CodexModelProvider(this.processLauncher)],
 			]);
 	}
 
@@ -188,6 +199,7 @@ export class StepRunner {
 						claudeEnv: this.config.claudeEnv,
 						mcpServers: this.config.mcpServers,
 						provider,
+						processLauncher: this.processLauncher,
 						onClaudeProcessStarted: this.config.onClaudeProcessStarted,
 						executionConfig: this.config.executionConfig,
 						onRenderedPrompt: this.config.onRenderedPrompt,
