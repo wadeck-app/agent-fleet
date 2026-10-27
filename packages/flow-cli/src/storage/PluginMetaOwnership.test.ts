@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PLUGIN_META_MARKER_FILE, PluginMetaOwnership } from './PluginMetaOwnership';
 
@@ -53,6 +53,28 @@ describe('PluginMetaOwnership', () => {
 		expect(ownership.create(metaDir, 'abcd1234')).toBe(false);
 
 		expect(ownership.readMarker(metaDir)).toBe('not an id!');
+	});
+
+	it('never claims a .meta that is a link, even when its target carries a valid marker: no marker written, warning logged', () => {
+		const target = path.join(root, 'elsewhere');
+		fs.mkdirSync(target);
+		fs.writeFileSync(path.join(target, PLUGIN_META_MARKER_FILE), 'aaaaaaaa');
+		const metaDir = path.join(root, 'task-1.meta');
+		// A junction needs no privilege on Windows; on POSIX it is a plain directory symlink.
+		fs.symlinkSync(target, metaDir, 'junction');
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		try {
+			expect(ownership.create(metaDir, 'bbbbbbbb')).toBe(false);
+
+			expect(fs.readFileSync(path.join(target, PLUGIN_META_MARKER_FILE), 'utf8')).toBe('aaaaaaaa');
+			expect(warn).toHaveBeenCalledOnce();
+			const message = String(warn.mock.calls[0]?.[0]);
+			expect(message).toContain(metaDir);
+			expect(message).toContain('remove');
+		} finally {
+			warn.mockRestore();
+		}
 	});
 
 	it('readMarker returns undefined when there is no marker', () => {

@@ -34,9 +34,18 @@ export class PluginMetaOwnership {
 			if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
 				throw err;
 			}
-			// The latest run owns a shared directory: an older record's marker no longer matches, so only the newest run can prune it.
-			const marker = this.readMarker(metaDir);
-			owned = marker !== undefined && isExecutionId(marker);
+			if (fs.lstatSync(metaDir).isSymbolicLink()) {
+				// Symlink or junction: its target is not ours, whatever marker it holds. The run goes on with an unowned (never pruned) .meta.
+				console.warn(
+					`[PluginMetaOwnership] '${metaDir}' is a symbolic link or junction: it will not be marked or pruned with the execution record. ` +
+						`To let the daemon manage this directory, remove the link (delete only the link, not its target) so that it can create a real directory.`
+				);
+				owned = false;
+			} else {
+				// The latest run owns a shared directory: an older record's marker no longer matches, so only the newest run can prune it.
+				const marker = this.readMarker(metaDir);
+				owned = marker !== undefined && isExecutionId(marker);
+			}
 		}
 		fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });
 		if (owned) {
