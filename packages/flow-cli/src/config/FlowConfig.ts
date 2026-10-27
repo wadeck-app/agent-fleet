@@ -37,6 +37,7 @@ const COMPARED_SETTINGS: { path: string; read: (config: FlowConfigData) => unkno
 	{ path: 'worker.tls', read: config => config.worker.tls },
 	{ path: 'worker.runEventsEnabled', read: config => config.worker.runEventsEnabled },
 	{ path: 'worker.ackTimeoutSeconds', read: config => config.worker.ackTimeoutSeconds },
+	{ path: 'worker.boundStepWaitSeconds', read: config => config.worker.boundStepWaitSeconds },
 	{ path: 'security.allowAbsolutePaths', read: config => config.security.allowAbsolutePaths },
 	{ path: 'limits.maxInjectedSteps', read: config => config.limits.maxInjectedSteps },
 	{ path: 'limits.maxStepsPerExecution', read: config => config.limits.maxStepsPerExecution },
@@ -112,6 +113,14 @@ export interface FlowConfigData {
 		 * runs and workers there are.
 		 */
 		ackTimeoutSeconds: number;
+		/**
+		 * How long, in seconds, a step of a run bound to a worker type (the flow's `workerType`) waits for a worker of
+		 * that type to be connected before it is FAILED. Default: 120. Must be between 1 and 600.
+		 *
+		 * Such a step never runs on another worker, so it cannot be left queued forever when nobody of the type shows
+		 * up. The clock only runs while no worker of the type is connected: a busy one is a queue to wait in.
+		 */
+		boundStepWaitSeconds: number;
 	};
 	security: {
 		/** Allow flow files outside cwd / home directory. Default: false. */
@@ -162,6 +171,10 @@ function expandHome(value: string): string {
 const MIN_ACK_TIMEOUT_SECONDS = 1;
 const MAX_ACK_TIMEOUT_SECONDS = 120;
 
+/** Range of `worker.boundStepWaitSeconds`: under a second no worker can be obtained, over ten minutes a missing worker type hides for too long. */
+const MIN_BOUND_STEP_WAIT_SECONDS = 1;
+const MAX_BOUND_STEP_WAIT_SECONDS = 600;
+
 // Keep FlowConfig as a type alias for backward compatibility with callers using `type FlowConfig`.
 export type FlowConfig = FlowConfigData;
 
@@ -169,7 +182,14 @@ export class FlowConfigLoader {
 	static readonly DEFAULT: FlowConfigData = {
 		queue: { concurrency: 1, stepSilenceLimitSeconds: 1800 },
 		logs: { retainDays: 30 },
-		worker: { wsPort: null, bindAddress: '127.0.0.1', tls: null, runEventsEnabled: true, ackTimeoutSeconds: 30 },
+		worker: {
+			wsPort: null,
+			bindAddress: '127.0.0.1',
+			tls: null,
+			runEventsEnabled: true,
+			ackTimeoutSeconds: 30,
+			boundStepWaitSeconds: 120,
+		},
 		security: { allowAbsolutePaths: false },
 		limits: {
 			maxInjectedSteps: 20,
@@ -276,6 +296,17 @@ export class FlowConfigLoader {
 		) {
 			throw new Error(
 				`worker.ackTimeoutSeconds in "${configFile}" must be a whole number of seconds between ${String(MIN_ACK_TIMEOUT_SECONDS)} and ${String(MAX_ACK_TIMEOUT_SECONDS)}, got ${JSON.stringify(ackTimeoutSeconds)}. Fix or remove the key (default: 30).`
+			);
+		}
+		const { boundStepWaitSeconds } = config.worker;
+		if (
+			typeof boundStepWaitSeconds !== 'number' ||
+			!Number.isInteger(boundStepWaitSeconds) ||
+			boundStepWaitSeconds < MIN_BOUND_STEP_WAIT_SECONDS ||
+			boundStepWaitSeconds > MAX_BOUND_STEP_WAIT_SECONDS
+		) {
+			throw new Error(
+				`worker.boundStepWaitSeconds in "${configFile}" must be a whole number of seconds between ${String(MIN_BOUND_STEP_WAIT_SECONDS)} and ${String(MAX_BOUND_STEP_WAIT_SECONDS)}, got ${JSON.stringify(boundStepWaitSeconds)}. Fix or remove the key (default: 120).`
 			);
 		}
 	}

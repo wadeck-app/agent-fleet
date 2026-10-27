@@ -114,6 +114,38 @@ describe('FlowConfigLoader.load', () => {
 		});
 	});
 
+	describe('worker.boundStepWaitSeconds', () => {
+		it('defaults to 120 seconds', () => {
+			expect(FlowConfigLoader.load(path.join(tmpDir, 'nonexistent.yaml')).worker.boundStepWaitSeconds).toBe(120);
+		});
+
+		it('overrides it and keeps the other worker defaults', () => {
+			const file = writeConfig('cfg.yaml', 'worker:\n  boundStepWaitSeconds: 300\n');
+			const { worker } = FlowConfigLoader.load(file);
+			expect(worker.boundStepWaitSeconds).toBe(300);
+			expect(worker.ackTimeoutSeconds).toBe(30);
+		});
+
+		it('accepts the bounds 1 and 600', () => {
+			const low = writeConfig('lo.yaml', 'worker:\n  boundStepWaitSeconds: 1\n');
+			const high = writeConfig('hi.yaml', 'worker:\n  boundStepWaitSeconds: 600\n');
+			expect(FlowConfigLoader.load(low).worker.boundStepWaitSeconds).toBe(1);
+			expect(FlowConfigLoader.load(high).worker.boundStepWaitSeconds).toBe(600);
+		});
+
+		it.each([0, 0.5, 601, -3])('refuses %s with the allowed range, the file and the default', value => {
+			const file = writeConfig('bad.yaml', `worker:\n  boundStepWaitSeconds: ${String(value)}\n`);
+			expect(() => FlowConfigLoader.load(file)).toThrow(
+				/worker\.boundStepWaitSeconds.*bad\.yaml.*between 1 and 600.*default: 120/s
+			);
+		});
+
+		it('refuses a non-number', () => {
+			const file = writeConfig('bad.yaml', 'worker:\n  boundStepWaitSeconds: soon\n');
+			expect(() => FlowConfigLoader.load(file)).toThrow(/worker\.boundStepWaitSeconds/);
+		});
+	});
+
 	it('overrides logs.retainDays', () => {
 		const file = writeConfig('cfg.yaml', 'logs:\n  retainDays: 7\n');
 		expect(FlowConfigLoader.load(file).logs.retainDays).toBe(7);
