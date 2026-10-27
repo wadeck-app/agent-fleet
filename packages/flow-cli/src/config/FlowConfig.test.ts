@@ -74,6 +74,46 @@ describe('FlowConfigLoader.load', () => {
 		expect(config.worker.bindAddress).toBe('127.0.0.1');
 	});
 
+	describe('worker run-end settings', () => {
+		it('defaults to enabled with a 30 second ack timeout', () => {
+			const { worker } = FlowConfigLoader.load(path.join(tmpDir, 'nonexistent.yaml'));
+			expect(worker.runEventsEnabled).toBe(true);
+			expect(worker.ackTimeoutSeconds).toBe(30);
+		});
+
+		it('overrides both and keeps the other worker defaults', () => {
+			const file = writeConfig('cfg.yaml', 'worker:\n  runEventsEnabled: false\n  ackTimeoutSeconds: 5\n');
+			const { worker } = FlowConfigLoader.load(file);
+			expect(worker.runEventsEnabled).toBe(false);
+			expect(worker.ackTimeoutSeconds).toBe(5);
+			expect(worker.bindAddress).toBe('127.0.0.1');
+		});
+
+		it('accepts the bounds 1 and 120', () => {
+			const low = writeConfig('lo.yaml', 'worker:\n  ackTimeoutSeconds: 1\n');
+			const high = writeConfig('hi.yaml', 'worker:\n  ackTimeoutSeconds: 120\n');
+			expect(FlowConfigLoader.load(low).worker.ackTimeoutSeconds).toBe(1);
+			expect(FlowConfigLoader.load(high).worker.ackTimeoutSeconds).toBe(120);
+		});
+
+		it.each([0, 0.5, 121, -3])('refuses worker.ackTimeoutSeconds %s with the allowed range and the file', value => {
+			const file = writeConfig('bad.yaml', `worker:\n  ackTimeoutSeconds: ${String(value)}\n`);
+			expect(() => FlowConfigLoader.load(file)).toThrow(
+				/worker\.ackTimeoutSeconds.*bad\.yaml.*between 1 and 120/s
+			);
+		});
+
+		it('refuses a non-number ack timeout', () => {
+			const file = writeConfig('bad.yaml', 'worker:\n  ackTimeoutSeconds: soon\n');
+			expect(() => FlowConfigLoader.load(file)).toThrow(/worker\.ackTimeoutSeconds/);
+		});
+
+		it('refuses a non-boolean kill switch', () => {
+			const file = writeConfig('bad.yaml', 'worker:\n  runEventsEnabled: "no"\n');
+			expect(() => FlowConfigLoader.load(file)).toThrow(/worker\.runEventsEnabled.*true or false/s);
+		});
+	});
+
 	it('overrides logs.retainDays', () => {
 		const file = writeConfig('cfg.yaml', 'logs:\n  retainDays: 7\n');
 		expect(FlowConfigLoader.load(file).logs.retainDays).toBe(7);

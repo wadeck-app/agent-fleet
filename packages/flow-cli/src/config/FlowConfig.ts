@@ -35,6 +35,8 @@ const COMPARED_SETTINGS: { path: string; read: (config: FlowConfigData) => unkno
 	{ path: 'worker.wsPort', read: config => config.worker.wsPort },
 	{ path: 'worker.bindAddress', read: config => config.worker.bindAddress },
 	{ path: 'worker.tls', read: config => config.worker.tls },
+	{ path: 'worker.runEventsEnabled', read: config => config.worker.runEventsEnabled },
+	{ path: 'worker.ackTimeoutSeconds', read: config => config.worker.ackTimeoutSeconds },
 	{ path: 'security.allowAbsolutePaths', read: config => config.security.allowAbsolutePaths },
 	{ path: 'limits.maxInjectedSteps', read: config => config.limits.maxInjectedSteps },
 	{ path: 'limits.maxStepsPerExecution', read: config => config.limits.maxStepsPerExecution },
@@ -92,6 +94,24 @@ export interface FlowConfigData {
 		 * Paths, not inline material -- a key pasted into config is a key in version control.
 		 */
 		tls: { cert: string; key: string } | null;
+		/**
+		 * Kill switch of the run-end notification (`run_end`), the only thing that talks to workers declaring the
+		 * `run-events` feature about the end of a run. Default: true.
+		 *
+		 * Off, the daemon behaves exactly as it did before the feature existed: nothing is sent, nothing is
+		 * awaited, the workspace is released at once. Turn it off if a worker of that kind misbehaves.
+		 */
+		runEventsEnabled: boolean;
+		/**
+		 * How long the daemon waits, in seconds, for the workers that served a run to settle and then to acknowledge
+		 * `run_end`, before it releases the run's workspace anyway (with an error naming what was left running).
+		 * Default: 30. Must be between 1 and 120.
+		 *
+		 * The two waits are each bounded by this value, so releasing a finished run can take up to twice as long;
+		 * stopping the daemon only waits for the acknowledgements, so it is bounded by one timeout, however many
+		 * runs and workers there are.
+		 */
+		ackTimeoutSeconds: number;
 	};
 	security: {
 		/** Allow flow files outside cwd / home directory. Default: false. */
@@ -138,6 +158,10 @@ function expandHome(value: string): string {
 	return value;
 }
 
+/** Range of `worker.ackTimeoutSeconds`: under a second no worker can answer, over two minutes a stop would hang. */
+const MIN_ACK_TIMEOUT_SECONDS = 1;
+const MAX_ACK_TIMEOUT_SECONDS = 120;
+
 // Keep FlowConfig as a type alias for backward compatibility with callers using `type FlowConfig`.
 export type FlowConfig = FlowConfigData;
 
@@ -145,7 +169,7 @@ export class FlowConfigLoader {
 	static readonly DEFAULT: FlowConfigData = {
 		queue: { concurrency: 1, stepSilenceLimitSeconds: 1800 },
 		logs: { retainDays: 30 },
-		worker: { wsPort: null, bindAddress: '127.0.0.1', tls: null },
+		worker: { wsPort: null, bindAddress: '127.0.0.1', tls: null, runEventsEnabled: true, ackTimeoutSeconds: 30 },
 		security: { allowAbsolutePaths: false },
 		limits: {
 			maxInjectedSteps: 20,
@@ -201,11 +225,12 @@ export class FlowConfigLoader {
 	 */
 	static load(configFile: string): FlowConfigData {
 		if (!fs.existsSync(configFile)) return FlowConfigLoader.DEFAULT;
+		let merged: FlowConfigData;
 		try {
 			const loaded = yaml.load(fs.readFileSync(configFile, 'utf8'), {
 				schema: yaml.JSON_SCHEMA,
 			}) as Partial<FlowConfigData>;
-			return {
+			merged = {
 				queue: { ...FlowConfigLoader.DEFAULT.queue, ...loaded?.queue },
 				logs: { ...FlowConfigLoader.DEFAULT.logs, ...loaded?.logs },
 				worker: { ...FlowConfigLoader.DEFAULT.worker, ...loaded?.worker },
@@ -226,6 +251,32 @@ export class FlowConfigLoader {
 		} catch {
 			process.stderr.write('Warning: daemon config could not be parsed, using defaults.\n');
 			return FlowConfigLoader.DEFAULT;
+		}
+		// Outside the try: a value out of range is not a parse problem to fall back from, it is a mistake to report.
+		FlowConfigLoader.assertWorkerRunEndSettings(merged, configFile);
+		return merged;
+	}
+
+	/**
+	 * @throws Error naming the key, the value, the allowed values and the file, because silently using the default
+	 *         would leave the user believing their timeout or kill switch is in force.
+	 */
+	private static assertWorkerRunEndSettings(config: FlowConfigData, configFile: string): void {
+		const { runEventsEnabled, ackTimeoutSeconds } = config.worker;
+		if (typeof runEventsEnabled !== 'boolean') {
+			throw new Error(
+				`worker.runEventsEnabled in "${configFile}" must be true or false, got ${JSON.stringify(runEventsEnabled)}. Fix or remove the key (default: true).`
+			);
+		}
+		if (
+			typeof ackTimeoutSeconds !== 'number' ||
+			!Number.isInteger(ackTimeoutSeconds) ||
+			ackTimeoutSeconds < MIN_ACK_TIMEOUT_SECONDS ||
+			ackTimeoutSeconds > MAX_ACK_TIMEOUT_SECONDS
+		) {
+			throw new Error(
+				`worker.ackTimeoutSeconds in "${configFile}" must be a whole number of seconds between ${String(MIN_ACK_TIMEOUT_SECONDS)} and ${String(MAX_ACK_TIMEOUT_SECONDS)}, got ${JSON.stringify(ackTimeoutSeconds)}. Fix or remove the key (default: 30).`
+			);
 		}
 	}
 
