@@ -5,6 +5,7 @@ import type { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import type { RelayRegistry } from './RelayRegistry.js';
 import { contactDeclaredSources } from './WorkerSourceContact.js';
 import type { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
+import type { WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 /** Asks the declared worker sources for capacity, and forgets the ones whose process is gone. */
 export class DaemonSourceContact {
@@ -12,7 +13,8 @@ export class DaemonSourceContact {
 		private readonly logsDir: string,
 		private readonly sourceRegistry: WorkerSourceRegistry,
 		private readonly relayRegistry: RelayRegistry,
-		private readonly launchTokens: LaunchTokenIssuer
+		private readonly launchTokens: LaunchTokenIssuer,
+		private readonly workerTypes: WorkerTypeInstances
 	) {}
 
 	/**
@@ -39,8 +41,12 @@ export class DaemonSourceContact {
 	// is why the caller checks the bind first.
 	contactSources(boundPort: number): void {
 		this.pruneDeadSources();
+		const declared = this.sourceRegistry.list();
+		// `flow worker source remove` runs in another process and cannot reach the instances held here: the daemon
+		// notices a source is gone from the registry file, here, and lets go of what it held for it.
+		void this.workerTypes.retainOnly(declared.map(entry => entry.sourceId));
 		void contactDeclaredSources(
-			this.sourceRegistry.list(),
+			declared,
 			`ws://127.0.0.1:${String(boundPort)}`,
 			message => {
 				process.stderr.write(`[daemon] ${message}\n`);
@@ -55,6 +61,7 @@ export class DaemonSourceContact {
 				// token -- only its hash is stored (T-09) -- so it is given a credential
 				// minted for that launch alone.
 				issueLaunchToken: (sourceId: string) => this.launchTokens.issue(sourceId),
+				workerTypes: this.workerTypes,
 			}
 		).catch((err: unknown) => {
 			process.stderr.write(`[daemon] contacting worker sources failed: ${getErrorMessage(err)}\n`);
