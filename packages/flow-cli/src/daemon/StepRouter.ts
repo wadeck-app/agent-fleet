@@ -143,11 +143,14 @@ export class StepRouter {
 	 *
 	 * Undefined is not an error: it is how the caller learns it needs to obtain a worker.
 	 *
+	 * @param typeOf which type a worker is of, when the caller already has the answer (and reports its own failure to
+	 *        get it); otherwise it is asked of the catalog this router was built with.
+	 *
 	 * A step bound to a worker type is first narrowed to the workers of that type -- before S4 and S3, which can
 	 * neither widen the set back nor be consulted about the others.
 	 */
-	select(step: StepPlacement, allCandidates: RoutingCandidate[]): WebSocket | undefined {
-		const candidates = this.ofBoundType(step, allCandidates);
+	select(step: StepPlacement, allCandidates: RoutingCandidate[], typeOf?: WorkerTypeLookup): WebSocket | undefined {
+		const candidates = this.ofBoundType(step, allCandidates, typeOf);
 		const byWorkerId = new Map(candidates.map(candidate => [candidate.worker.workerId, candidate]));
 
 		const eligible = candidates.filter(candidate => this.acceptsSafely(step, candidate.worker));
@@ -168,13 +171,17 @@ export class StepRouter {
 	 * A lookup that throws (the source registry cannot be read) leaves no worker of any type: the step stays unplaced
 	 * and the reason is reported, rather than the failure aborting the dispatch loop of every execution.
 	 */
-	private ofBoundType(step: StepPlacement, candidates: RoutingCandidate[]): RoutingCandidate[] {
+	private ofBoundType(
+		step: StepPlacement,
+		candidates: RoutingCandidate[],
+		given?: WorkerTypeLookup
+	): RoutingCandidate[] {
 		if (step.boundWorkerType === undefined) {
 			return candidates;
 		}
 		let typeOf: WorkerTypeLookup;
 		try {
-			typeOf = this.workerTypes.typeLookup();
+			typeOf = given ?? this.workerTypes.typeLookup();
 		} catch (err) {
 			process.stderr.write(
 				`[StepRouter] cannot tell which workers are of type "${step.boundWorkerType}" for step ${step.stepId}, so it is placed nowhere for now: ${normalizeError(err).message}\n`

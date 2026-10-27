@@ -17,7 +17,10 @@ import { StepRouter } from './StepRouter.js';
 import type { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
-import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
+import type { WorkerTypeCatalog, WorkerTypeLookup } from './WorkerTypeCatalog.js';
+
+/** Every worker is of no type. */
+const NO_TYPE: WorkerTypeLookup = () => undefined;
 
 /** No source is declared, so no worker has a type. */
 const NO_DECLARED_WORKER_TYPES: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'> = {
@@ -59,6 +62,9 @@ export class StepDispatcher {
 		this.router = new StepRouter(undefined, undefined, workerTypes);
 	}
 
+	/** Executions already told that the declared worker sources cannot be read. */
+	private readonly unreadableSourcesReported = new Set<string>();
+
 	/** Drops the timers of the steps waiting for a worker of their type, for the daemon stop. */
 	stop(): void {
 		this.boundStepWait.stop();
@@ -67,6 +73,7 @@ export class StepDispatcher {
 	/** Forgets the waits of an execution that is over. */
 	forgetExecution(executionId: string): void {
 		this.boundStepWait.forgetExecution(executionId);
+		this.unreadableSourcesReported.delete(executionId);
 		for (const key of this.interactiveWaitSince.keys()) {
 			if (key.startsWith(`${executionId}:`)) {
 				this.interactiveWaitSince.delete(key);
@@ -110,14 +117,15 @@ export class StepDispatcher {
 				continue;
 			}
 
-			const idleWorker = this.router.select(placement, this.registry.listIdle());
+			const typeOf = placement.boundWorkerType === undefined ? undefined : this.typeLookupFor(step);
+			const idleWorker = this.router.select(placement, this.registry.listIdle(), typeOf);
 			if (idleWorker === undefined && placement.requiresUserInterface && this.failIfNobodyCanAnswer(step)) {
 				continue;
 			}
 			if (
 				idleWorker === undefined &&
 				placement.boundWorkerType !== undefined &&
-				this.failIfNoWorkerOfBoundType(step, placement.boundWorkerType)
+				this.failIfNoWorkerOfBoundType(step, placement.boundWorkerType, typeOf ?? NO_TYPE)
 			) {
 				continue;
 			}
@@ -289,13 +297,13 @@ export class StepDispatcher {
 	 *
 	 * @returns true when the step was failed and must not be re-queued.
 	 */
-	private failIfNoWorkerOfBoundType(step: ReadyStep, workerType: string): boolean {
+	private failIfNoWorkerOfBoundType(step: ReadyStep, workerType: string, typeOf: WorkerTypeLookup): boolean {
 		const { executionId } = step.executionContext;
 		const decision = this.boundStepWait.decide({
 			executionId,
 			stepId: step.stepId,
 			workerType,
-			connectedOfType: this.connectedWorkersOfType(executionId, workerType),
+			connectedOfType: this.registry.summarize().filter(worker => typeOf(worker.sourceId) === workerType).length,
 			knownTypes: this.knownTypesOrNone(executionId),
 		});
 		if (decision.action === 'wait') {
@@ -305,18 +313,16 @@ export class StepDispatcher {
 		return true;
 	}
 
-	/** Workers of the type, idle or busy. An unreadable source registry counts none, and says so in the execution log. */
-	private connectedWorkersOfType(executionId: string, workerType: string): number {
+	/**
+	 * Which type each worker is of, read from the declared sources. When they cannot be read no worker has a type: the
+	 * step stays unplaced and fails after the bound, and the cause is written once to the execution's log.
+	 */
+	private typeLookupFor(step: ReadyStep): WorkerTypeLookup {
 		try {
-			const typeOf = this.workerTypes.typeLookup();
-			return this.registry.summarize().filter(worker => typeOf(worker.sourceId) === workerType).length;
+			return this.workerTypes.typeLookup();
 		} catch (err) {
-			this.logWriter.writeExecution(
-				executionId,
-				`Cannot tell which connected workers are of type "${workerType}", so none is counted: ${normalizeError(err).message}`,
-				'warning'
-			);
-			return 0;
+			this.reportUnreadableSources(step.executionContext.executionId, err);
+			return NO_TYPE;
 		}
 	}
 
@@ -324,13 +330,22 @@ export class StepDispatcher {
 		try {
 			return this.workerTypes.knownTypes();
 		} catch (err) {
-			this.logWriter.writeExecution(
-				executionId,
-				`Cannot read the declared worker sources: ${normalizeError(err).message}`,
-				'warning'
-			);
+			this.reportUnreadableSources(executionId, err);
 			return [];
 		}
+	}
+
+	/** Once per execution: the same unreadable file would otherwise be reported on every dispatch pass. */
+	private reportUnreadableSources(executionId: string, err: unknown): void {
+		if (this.unreadableSourcesReported.has(executionId)) {
+			return;
+		}
+		this.unreadableSourcesReported.add(executionId);
+		this.logWriter.writeExecution(
+			executionId,
+			`Cannot read the declared worker sources, so no connected worker counts as being of the bound worker type and its steps cannot be placed: ${normalizeError(err).message}. Fix or remove the worker sources file (see: flow worker source list).`,
+			'warning'
+		);
 	}
 
 	/**
