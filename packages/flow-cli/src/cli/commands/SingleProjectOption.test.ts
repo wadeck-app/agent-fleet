@@ -24,4 +24,11 @@ describe('singleProjectValue', () => {
 			/the project is given twice \("a" then "b"\); pass it once/
 		);
 	});
+
+	it('refuses a value that looks like another option, with an actionable message', () => {
+		const probe = program();
+		expect(() => probe.parse(['-p', '--json'], { from: 'user' })).toThrow(
+			/"--json" looks like another option, not a project; give the name, alias or id of a project after -p\/--project \("--project=--json" is refused too\)/
+		);
+	});
 });
