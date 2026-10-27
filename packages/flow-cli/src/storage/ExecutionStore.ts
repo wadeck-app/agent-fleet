@@ -59,6 +59,11 @@ export class ExecutionStore {
 		new ExecutionPruner(this.executionsDir, this.retainDays, activePluginMetaDirs).prune();
 	}
 
+	/** Same rules as pruneOldExecutions(), in chunks that yield the event loop: for the daemon start, off the critical path. */
+	pruneOldExecutionsInBackground(activePluginMetaDirs: () => readonly string[] = () => []): Promise<void> {
+		return new ExecutionPruner(this.executionsDir, this.retainDays, activePluginMetaDirs).pruneInBackground();
+	}
+
 	create(params: {
 		executionId: string;
 		flowFile: string;

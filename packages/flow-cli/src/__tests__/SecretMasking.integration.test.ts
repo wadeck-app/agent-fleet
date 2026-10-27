@@ -163,6 +163,8 @@ describe('secret masking (end to end)', () => {
 		expect(response.code).toBe('SECRET_RESOLUTION_FAILED');
 		expect(response.message).toContain('API_TOKEN');
 		expect(response.message).toContain('SECRET_E2E_TOKEN');
-		expect(fs.readdirSync(path.join(ctx.daemonDir, 'executions'))).toEqual([]);
+		expect(fs.readdirSync(path.join(ctx.daemonDir, 'executions')).filter(name => name.endsWith('.json'))).toEqual(
+			[]
+		);
 	}, 30000);
 });

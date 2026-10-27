@@ -322,7 +322,11 @@ async function startOwningDaemon(
 					)
 				);
 				const logWriter = new LogWriter(logsDir, config.logs.retainDays, daemonSecrets.masks);
-				executionStore.pruneOldExecutions();
+				// Off the critical path: retention pruning opens every record, which delayed the first answer by seconds.
+				// It yields the event loop between chunks and only deletes expired records, so it can run alongside work.
+				void executionStore.pruneOldExecutionsInBackground().catch((err: unknown) => {
+					writeDaemonLog(logsDir, 'error', `[warn] execution pruning failed: ${getErrorMessage(err)}`);
+				});
 				// Nothing can be live yet: a record still queued/running belongs to a previous daemon.
 				const interrupted = executionStore.reconcileInterruptedExecutions();
 				writeDaemonLog(

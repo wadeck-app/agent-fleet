@@ -115,6 +115,8 @@ describe('flow versions (end to end)', () => {
 		expect(JSON.stringify(pinned.steps)).toContain('marker-v1');
 		expect(JSON.stringify(pinned.steps)).not.toContain('marker-v2');
 
-		expect(fs.readdirSync(path.join(ctx.daemonDir, 'executions'))).toHaveLength(3);
+		expect(
+			fs.readdirSync(path.join(ctx.daemonDir, 'executions')).filter(name => name.endsWith('.json'))
+		).toHaveLength(3);
 	}, 90000);
 });

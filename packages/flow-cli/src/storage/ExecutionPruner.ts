@@ -22,22 +22,56 @@ export class ExecutionPruner {
 	) {}
 
 	prune(): void {
+		const run = this.start();
+		if (run !== undefined) {
+			for (const file of run.files) {
+				run.handle(file);
+			}
+			run.finish();
+		}
+	}
+
+	/**
+	 * Same rules as prune(), but reads at most `chunkSize` records at a time and yields the event loop in between,
+	 * so a daemon with a long history keeps answering while it prunes. Never rejects on a record problem.
+	 */
+	async pruneInBackground(
+		chunkSize = 50,
+		yieldToEventLoop: () => Promise<void> = () => new Promise<void>(resolve => setImmediate(resolve))
+	): Promise<void> {
+		const run = this.start();
+		if (run === undefined) {
+			return;
+		}
+		for (let index = 0; index < run.files.length; index += chunkSize) {
+			if (index > 0) {
+				await yieldToEventLoop();
+			}
+			for (const file of run.files.slice(index, index + chunkSize)) {
+				run.handle(file);
+			}
+		}
+		run.finish();
+	}
+
+	/** Lists the directory and removes stale temporary files; undefined when there is nothing to examine. */
+	private start(): { files: string[]; handle: (file: string) => void; finish: () => void } | undefined {
 		let rawFiles: string[];
 		try {
 			rawFiles = fs.readdirSync(this.executionsDir);
 		} catch (err) {
 			process.stderr.write(`[ExecutionStore] failed to read executions dir for pruning: ${String(err)}\n`);
-			return;
+			return undefined;
 		}
 		this.removeStaleTemporaryFiles(rawFiles);
 		const files = rawFiles.filter(f => f.endsWith('.json'));
 		if (files.length === 0) {
-			return;
+			return undefined;
 		}
 		const cutoffMs = Date.now() - this.retainDays * 24 * 60 * 60 * 1000;
 		const expiredMeta: PluginMetaCandidate[] = [];
 		const liveMeta: string[] = [];
-		for (const file of files) {
+		const handle = (file: string): void => {
 			const filePath = path.join(this.executionsDir, file);
 			try {
 				const content = fs.readFileSync(filePath, 'utf8');
@@ -63,9 +97,12 @@ export class ExecutionPruner {
 					/* ignore */
 				}
 			}
-		}
+		};
 		// Never throws: a failure warns, and the records have all been handled already.
-		this.metaCleaner.clean(expiredMeta, liveMeta, this.activePluginMetaDirs());
+		const finish = (): void => {
+			this.metaCleaner.clean(expiredMeta, liveMeta, this.activePluginMetaDirs());
+		};
+		return { files, handle, finish };
 	}
 
 	/** Deletes unfinished-write files left by a writer that died; a recent one may still be in use. */
