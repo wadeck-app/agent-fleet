@@ -33,6 +33,11 @@ export class ExecutionRegistry {
 	 */
 	private readonly projects = new Map<string, ExecutionProject>();
 	/**
+	 * Worker type each bound execution is restricted to (the flow's `workerType`). Absent for a run that is not bound.
+	 * Held per execution, not copied into steps, so a step injected later is covered too.
+	 */
+	private readonly boundWorkerTypes = new Map<string, string>();
+	/**
 	 * Executions kept alive (not cleaned up) after a `user_intervention` step timed out
 	 * unanswered, so a later `flow resume` can re-dispatch exactly that step.
 	 */
@@ -56,6 +61,7 @@ export class ExecutionRegistry {
 		this.resumables.delete(executionId);
 		this.stepCounts.delete(executionId);
 		this.projects.delete(executionId);
+		this.boundWorkerTypes.delete(executionId);
 		this.activeCount--;
 	}
 
@@ -99,6 +105,16 @@ export class ExecutionRegistry {
 
 	projectOf(executionId: string): ExecutionProject | undefined {
 		return this.projects.get(executionId);
+	}
+
+	/** Restricts every step of the execution, injected ones included, to workers of this type. */
+	bindWorkerType(executionId: string, workerType: string): void {
+		this.boundWorkerTypes.set(executionId, workerType);
+	}
+
+	/** The worker type the execution is bound to, or undefined when it is not bound. */
+	boundWorkerTypeOf(executionId: string): string | undefined {
+		return this.boundWorkerTypes.get(executionId);
 	}
 
 	markResumable(executionId: string, stepId: string): void {
