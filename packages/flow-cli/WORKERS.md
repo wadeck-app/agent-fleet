@@ -107,6 +107,20 @@ flow worker source add sandbox --provider docker-sandbox --plugin <pluginId>.<im
 - `onRunEnded` runs only when a worker of the source declared `run-events` and was handed a step of the run. It runs after the `run_end` acks, once per source per run, bounded by `ackTimeoutSeconds`; a failure or hang is logged and the workspace is released anyway.
 - `dispose()` runs when the daemon stops (after the run-end hooks; the whole stop is capped at two ack timeouts plus 30s) and when a source leaves the registry. `source remove` runs in another process, so the daemon disposes at its next contact with sources or at stop. A run that ends after its source was disposed logs a warning naming the source and execution: its leftovers (sandboxes) are yours to remove.
 
+### Binding a run to a worker type (`workerType:`)
+
+```yaml
+workerType: sandbox # flow level, next to `labels:`
+```
+
+- **The type of a worker** is the plugin id of its source's `--plugin <pluginId>.<implName>`: `sandbox.docker` and `sandbox.podman` are both type `sandbox`. A worker of a source without a plugin, or naming no source, has no type. A worker's source is authenticated by its source token.
+- **Every step of a bound run runs only on workers of that type**, injected steps included. It never falls back to a host worker, and no acceptance or distribution plugin can widen the set. Labels cannot give this guarantee: flow labels are merged into steps only at run start.
+- **Unknown type**: the run is refused (`VALIDATION_FAILED`) listing the known types. `flow validate` checks the name's shape only; the declared sources are per machine.
+- **No worker of the type connected**: a step waits `worker.boundStepWaitSeconds`, then fails with a message naming the type and the known ones. A connected worker that is busy keeps the step queued without a deadline; the clock restarts whenever one is connected. A worker lost before the step starts is re-dispatched to the type up to 3 times, then the step fails.
+- A bound step can still make the daemon fork host workers for unmet demand; they stay idle for the bound run.
+- The binding is recorded in the execution record (`workerType`); `flow resume` keeps it.
+- Not set: behavior is unchanged.
+
 ## Three rules that explain most surprises
 
 1. **Declared is not available** (D#4). A declared source with nothing attached is intent, not
@@ -177,6 +191,7 @@ timeout; on timeout the daemon logs an error naming the worker, source and execu
 | ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `runEventsEnabled`                          | `true`  | `false` restores the previous behavior: nothing sent, workspace released at once                                                                                                           |
 | `ackTimeoutSeconds`                         | `30`    | 1 to 120. Bounds each wait (served workers settling, the acks, and a plugin's `onRunEnded`), so a finished run can wait up to three times this; stopping the daemon waits up to twice this |
+| `boundStepWaitSeconds`                      | `120`   | 1 to 600. How long a step of a run bound to a worker type (`workerType:`) waits with no worker of that type connected before it fails                                                      |
 
 On daemon stop the notice is written before the sockets close, so a worker the daemon did not
 create is closed right after it and cannot ack.
