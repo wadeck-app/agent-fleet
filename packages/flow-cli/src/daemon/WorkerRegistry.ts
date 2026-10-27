@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 
-import type { DaemonToWorker, WorkerReady, WorkerSummary } from '../ipc/Protocol';
+import { type DaemonToWorker, WORKER_FEATURE_RUN_EVENTS, type WorkerReady, type WorkerSummary } from '../ipc/Protocol';
 
 type WorkerState = 'idle' | 'busy';
 
@@ -249,6 +249,25 @@ export class WorkerRegistry {
 		for (const [ws, worker] of this.workers) {
 			if (worker.ephemeral) this.send(ws, message);
 		}
+	}
+
+	/**
+	 * Sends a run-scoped message to the given workers, and only to those that declared {@link WORKER_FEATURE_RUN_EVENTS}.
+	 *
+	 * The caller names the workers (the ones that served the run); a worker outside that set, one that never declared
+	 * the feature and a connection no longer registered receive nothing. This is deliberately not a send-to-everyone: the
+	 * scope is part of the signature.
+	 *
+	 * @returns the workers the message was actually written to. A closed socket is left out, so the caller can stop
+	 *          waiting for an answer that cannot come.
+	 */
+	sendToRunWorkers(servedBy: Iterable<WebSocket>, message: DaemonToWorker): WebSocket[] {
+		const delivered: WebSocket[] = [];
+		for (const ws of servedBy) {
+			if (this.workers.get(ws)?.features.includes(WORKER_FEATURE_RUN_EVENTS) !== true) continue;
+			if (this.send(ws, message)) delivered.push(ws);
+		}
+		return delivered;
 	}
 
 	/**

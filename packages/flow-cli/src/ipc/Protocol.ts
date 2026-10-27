@@ -1,3 +1,4 @@
+import type { RunEndReason } from 'extension-points';
 import type { FlowStep, LiveLogEntry, StepMeta } from 'flow-engine/types';
 
 /**
@@ -92,6 +93,13 @@ export const WORKER_FEATURE_SECRETS = 'secrets';
  */
 export const WORKER_FEATURE_PROJECT_ID = 'project-id';
 
+/**
+ * The worker understands `run_end` and answers it with `run_end_ack`. Declared only by workers that need to know when a run
+ * ended (a sandbox bridge, to remove the sandbox of a run): it is deliberately NOT part of the features every worker
+ * declares, so a worker that does not declare it is never sent `run_end` and the wire does not change for it.
+ */
+export const WORKER_FEATURE_RUN_EVENTS = 'run-events';
+
 export type ClientCommand =
 	| {
 			type: 'run';
@@ -180,7 +188,14 @@ export type DaemonToWorker =
 	// { type: 'idle' } is never sent by the daemon in v1 but is kept for forward compatibility.
 	// Worker handles it as a no-op.
 	| { type: 'idle' }
-	| { type: 'done' };
+	| { type: 'done' }
+	/**
+	 * A run this worker served has ended; sent only to workers that declared {@link WORKER_FEATURE_RUN_EVENTS} AND ran a
+	 * step of that run, once per run. The worker answers `run_end_ack` once it no longer needs anything of the run.
+	 *
+	 * In-flight steps may still report after `run_end`; their results are dropped.
+	 */
+	| { type: 'run_end'; executionId: string; reason: RunEndReason };
 
 /**
  * A relay that supplies workers, connected to the daemon (D#17, D#19).
@@ -398,7 +413,9 @@ export type WorkerToDaemon =
 			 */
 			meta?: StepMeta;
 	  }
-	| { type: 'inject_steps'; assignmentId: string; executionId: string; steps: InjectedStep[] };
+	| { type: 'inject_steps'; assignmentId: string; executionId: string; steps: InjectedStep[] }
+	/** Answer to `run_end`: the worker is done with the run. Not bound to an assignment: it concerns the whole run. */
+	| { type: 'run_end_ack'; executionId: string };
 
 /**
  * A worker-to-daemon message about the step currently being executed, before its

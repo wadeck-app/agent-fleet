@@ -98,6 +98,12 @@ export async function handleWorkerMessage(
 				'[warn] received the shutdown notice meant for daemon-created workers; staying alive. Please report this.'
 			);
 			break;
+		case 'run_end':
+			// Only sent to workers declaring `run-events`, which this one never does: say so, and do not acknowledge.
+			console.error(
+				`[warn] received run_end for execution ${message.executionId} although this worker does not declare run-events; ignoring it. Please report this.`
+			);
+			break;
 		default: {
 			const exhaustive: never = message;
 			console.error(`[warn] unknown daemon message: ${JSON.stringify(exhaustive)}`);

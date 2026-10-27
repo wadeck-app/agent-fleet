@@ -80,6 +80,10 @@ export class DaemonWorkerMessageHandler {
 				this.handleInjectSteps(ws, message);
 				break;
 			}
+			case 'run_end_ack': {
+				// Wired to the run-end coordination in the next change; until then nothing waits for it.
+				break;
+			}
 			default: {
 				const _exhaustive: never = message;
 				throw new Error(`Unknown worker message type: ${JSON.stringify(_exhaustive)}`);

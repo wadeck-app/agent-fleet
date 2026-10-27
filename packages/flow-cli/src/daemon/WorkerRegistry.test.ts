@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 
+import { WORKER_FEATURE_RUN_EVENTS } from '../ipc/Protocol';
+import { WORKER_FEATURES } from '../worker/WorkerLaunch';
 import { WorkerRegistry } from './WorkerRegistry.js';
 
 function fakeWorker(readyState = 1): WebSocket {
@@ -412,5 +414,73 @@ describe('WorkerRegistry - updateWorker (Proposal 3)', () => {
 		const { workerId } = registry.describe(ws)!;
 
 		expect(() => registry.updateWorker(workerId, { shellCapabilities: ['sh'] })).toThrow(/bash, cmd, pwsh/);
+	});
+});
+
+// run_end is the one message that goes to workers by run, never to everyone (broadcasting `done` broke `flow worker`, D#48).
+describe('WorkerRegistry - sendToRunWorkers', () => {
+	const runEnd = { type: 'run_end', executionId: 'e1', reason: 'completed' } as const;
+	const withRunEvents = { pid: 1, features: [WORKER_FEATURE_RUN_EVENTS] };
+
+	it('delivers to a worker that declared run-events and served the run, and says so', () => {
+		const registry = new WorkerRegistry();
+		const served = fakeWorker();
+		registry.register(served, withRunEvents);
+
+		const delivered = registry.sendToRunWorkers([served], runEnd);
+
+		expect(served.send).toHaveBeenCalledWith(JSON.stringify(runEnd));
+		expect(delivered).toEqual([served]);
+	});
+
+	it('sends nothing to a worker that served the run but never declared run-events', () => {
+		const registry = new WorkerRegistry();
+		const old = fakeWorker();
+		registry.register(old, { pid: 1, features: ['secrets'] });
+		const veryOld = fakeWorker();
+		registry.register(veryOld, minimal);
+
+		const delivered = registry.sendToRunWorkers([old, veryOld], runEnd);
+
+		expect(old.send).not.toHaveBeenCalled();
+		expect(veryOld.send).not.toHaveBeenCalled();
+		expect(delivered).toEqual([]);
+	});
+
+	it('sends nothing to a run-events worker that did not serve the run', () => {
+		const registry = new WorkerRegistry();
+		const served = fakeWorker();
+		const bystander = fakeWorker();
+		registry.register(served, withRunEvents);
+		registry.register(bystander, withRunEvents);
+
+		registry.sendToRunWorkers([served], runEnd);
+
+		expect(bystander.send).not.toHaveBeenCalled();
+	});
+
+	it('ignores a connection that is no longer registered', () => {
+		const registry = new WorkerRegistry();
+		const gone = fakeWorker();
+
+		expect(registry.sendToRunWorkers([gone], runEnd)).toEqual([]);
+		expect(gone.send).not.toHaveBeenCalled();
+	});
+
+	it('leaves a dead socket out of the delivered workers', () => {
+		const registry = new WorkerRegistry();
+		const dead = fakeWorker(3);
+		const alive = fakeWorker();
+		registry.register(dead, withRunEvents);
+		registry.register(alive, withRunEvents);
+
+		const delivered = registry.sendToRunWorkers([dead, alive], runEnd);
+
+		expect(delivered).toEqual([alive]);
+		expect(dead.send).not.toHaveBeenCalled();
+	});
+
+	it('does not feature run-events among the features every worker declares', () => {
+		expect(WORKER_FEATURES).not.toContain(WORKER_FEATURE_RUN_EVENTS);
 	});
 });
