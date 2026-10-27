@@ -18,6 +18,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { ClaudeHookTranslator } from './ClaudeHookTranslator';
 import { ClaudeLauncher } from './ClaudeLauncher';
+import { DefaultProcessLauncher } from './DefaultProcessLauncher';
 import type {
 	LaunchOptions,
 	McpServer,
@@ -26,7 +27,7 @@ import type {
 	ModelProvider,
 } from './ModelProvider';
 import { validateLaunchOptions } from './ModelProvider';
-import { killProcessTree } from './ProcessTreeKiller';
+import type { ProcessLauncher } from './ProcessLauncher';
 
 /**
  * Build Claude MCP config JSON from McpServer[].
@@ -51,8 +52,12 @@ function buildClaudeMcpConfig(servers: McpServer[]): Record<string, unknown> {
 export class ClaudeModelProvider implements ModelProvider {
 	/** Passes `resumeSessionId` to the CLI, so a sub-step failure can be delivered into the parent's session. */
 	readonly supportsSessionResume = true;
-	private readonly launcher = new ClaudeLauncher();
+	private readonly launcher: ClaudeLauncher;
 	private currentProcess: ChildProcess | null = null;
+
+	constructor(private readonly processLauncher: ProcessLauncher = new DefaultProcessLauncher()) {
+		this.launcher = new ClaudeLauncher(processLauncher);
+	}
 
 	public async launchInteractive(options: LaunchOptions): Promise<ModelInteractiveResult> {
 		validateLaunchOptions(options);
@@ -90,7 +95,7 @@ export class ClaudeModelProvider implements ModelProvider {
 			// The launch `finally` blocks also call this after the process ended: its pid may be reused by now.
 			const proc = this.currentProcess;
 			if (proc?.pid !== undefined && proc.exitCode == null && proc.signalCode == null) {
-				killProcessTree(proc.pid);
+				this.processLauncher.killTree(proc.pid, 'SIGKILL');
 			}
 		} catch (err) {
 			console.warn('[ClaudeModelProvider] kill() failed:', normalizeError(err).message);

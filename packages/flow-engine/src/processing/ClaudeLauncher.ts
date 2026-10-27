@@ -5,9 +5,8 @@
  * - Interactive mode (stdio: inherit, terminal takeover)
  * - Background mode (capture stdout/stderr)
  */
-import { execSync, spawn } from 'node:child_process';
-
-import { killProcessTree } from './ProcessTreeKiller';
+import { DefaultProcessLauncher } from './DefaultProcessLauncher';
+import type { ProcessLauncher } from './ProcessLauncher';
 import { type StreamJsonEvent, type StreamJsonEventCallback, StreamJsonParser } from './StreamJsonParser';
 import { type ToolName, buildClaudeToolsArg } from './ToolAccess';
 
@@ -110,6 +109,9 @@ export interface ClaudeLaunchOptions {
  * Claude Launcher
  */
 export class ClaudeLauncher {
+	/** Every process this class starts, ends or looks up goes through the launcher (default: the host). */
+	constructor(private readonly processLauncher: ProcessLauncher = new DefaultProcessLauncher()) {}
+
 	/**
 	 * Find Claude executable path
 	 */
@@ -120,7 +122,7 @@ export class ClaudeLauncher {
 		}
 		try {
 			if (process.platform === 'win32') {
-				const result = execSync('where claude', { encoding: 'utf8', windowsHide: true }).trim();
+				const result = this.processLauncher.lookupExecutable('where claude');
 				const paths = result.split('\n').map(p => p.trim());
 				const cmdPath = paths.find(p => p.endsWith('.cmd'));
 				if (cmdPath) {
@@ -132,7 +134,7 @@ export class ClaudeLauncher {
 				}
 				return paths[0];
 			} else {
-				return execSync('which claude', { encoding: 'utf8', windowsHide: true }).trim();
+				return this.processLauncher.lookupExecutable('which claude');
 			}
 		} catch {
 			console.warn('Could not find claude in PATH, using "claude" as fallback');
@@ -315,7 +317,7 @@ export class ClaudeLauncher {
 				}
 			}
 			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; this spawn must inherit the daemon's hidden console (d032e7e). Guarded by ClaudeLauncher.windows-console.test.ts
-			const claudeProcess = spawn(command, args, {
+			const claudeProcess = this.processLauncher.spawn(command, args, {
 				cwd: options.workingDir,
 				stdio: 'inherit',
 				shell: false,
@@ -375,7 +377,7 @@ export class ClaudeLauncher {
 				}
 			}
 			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; this spawn must inherit the daemon's hidden console (d032e7e). Guarded by ClaudeLauncher.windows-console.test.ts
-			const claudeProcess = spawn(command, args, {
+			const claudeProcess = this.processLauncher.spawn(command, args, {
 				cwd: options.workingDir,
 				stdio: ['pipe', 'pipe', 'pipe'],
 				shell: false,
@@ -422,7 +424,7 @@ export class ClaudeLauncher {
 				const message = `Claude process ${pid === undefined ? '(no pid)' : String(pid)} (step ${options.stepId}) was ended after the final result because it kept running ${String(graceMs)} ms after it and emitted nothing more (likely held by a background task or child process).`;
 				console.warn(`[Claude] ${message}`);
 				if (pid !== undefined) {
-					killProcessTree(pid);
+					this.processLauncher.killTree(pid, 'SIGKILL');
 				}
 				// A grandchild that outlived the kill must not keep this launch pending through the pipes.
 				claudeProcess.stdout?.destroy();

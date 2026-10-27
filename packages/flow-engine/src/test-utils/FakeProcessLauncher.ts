@@ -25,8 +25,8 @@ export function createFakeChild(pid: number | undefined = 1000): ChildProcess {
 	child['exitCode'] = null;
 	child['signalCode'] = null;
 	child['kill'] = () => true;
-	child['stdout'] = new EventEmitter();
-	child['stderr'] = new EventEmitter();
+	child['stdout'] = Object.assign(new EventEmitter(), { destroy: () => undefined });
+	child['stderr'] = Object.assign(new EventEmitter(), { destroy: () => undefined });
 	child['stdin'] = Object.assign(new EventEmitter(), { end: () => undefined, write: () => true });
 	return child as unknown as ChildProcess;
 }
