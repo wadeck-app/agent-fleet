@@ -14,6 +14,7 @@ import type { WebSocket } from 'ws';
 import type { ClientCommand, DaemonResponse, InjectedStep, StepProgressDetail } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
+import { BoundStepWait, DEFAULT_BOUND_STEP_WAIT_MS, type WorkerTypeRouting } from './BoundStepWait.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
 import { ExecutionHooks } from './ExecutionHooks.js';
@@ -33,8 +34,15 @@ import { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import { DEFAULT_STEP_SILENCE_LIMIT_MS, WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
+import { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 
 export { DEFAULT_STEP_SILENCE_LIMIT_MS, MAX_REDISPATCHES } from './WorkerAssignmentSupervisor.js';
+
+/** No source declares a worker type, and the daemon's default `worker.boundStepWaitSeconds`. */
+const DEFAULT_WORKER_ROUTING: WorkerTypeRouting = {
+	workerTypes: new WorkerTypeCatalog({ list: () => [] }),
+	boundStepWaitMs: DEFAULT_BOUND_STEP_WAIT_MS,
+};
 
 /** Same as the daemon's defaults (`worker.runEventsEnabled`, `worker.ackTimeoutSeconds`). */
 const DEFAULT_RUN_END_SETTINGS: RunEndSettings = { enabled: true, ackTimeoutMs: 30_000 };
@@ -133,7 +141,12 @@ export class CommandHandler {
 		/** Whether and how long workers that served a run are given to acknowledge its end (`worker.*` settings). */
 		runEndSettings: RunEndSettings = DEFAULT_RUN_END_SETTINGS,
 		/** Told, after the acknowledgements, that a run ended, so the worker type that owns the source can clean up. */
-		runEndedListener?: RunEndedListener
+		runEndedListener?: RunEndedListener,
+		/**
+		 * What restricts a run to a worker type (the flow's `workerType`): the declared sources the types come from, and
+		 * `worker.boundStepWaitSeconds`. Without it no type is declared, so a flow naming one is refused at run start.
+		 */
+		workerRouting: WorkerTypeRouting = DEFAULT_WORKER_ROUTING
 	) {
 		this.executionStore =
 			executionStore ?? new ExecutionStore(executionsDirOf(daemonDir), undefined, daemonSecrets.masks);
@@ -175,7 +188,9 @@ export class CommandHandler {
 			this.hooks,
 			this.logWriter,
 			interactivityPolicy ?? new DefaultInteractivityPolicy(),
-			(executionId, stepId, reason) => this.outcomes.failStep(executionId, stepId, reason)
+			(executionId, stepId, reason) => this.outcomes.failStep(executionId, stepId, reason),
+			workerRouting.workerTypes,
+			new BoundStepWait(workerRouting.boundStepWaitMs)
 		);
 		const workspaces = new ExecutionWorkspaces(this.logWriter, workspaceProvider, resolvePerFlowWorkspaceProvider);
 		this.outcomes = new StepOutcomes(
@@ -202,7 +217,7 @@ export class CommandHandler {
 		);
 		this.runRequests = new RunRequestHandler(
 			new FlowFileAccessGuard(allowAbsolutePaths),
-			new RunDefinitionLoader(definitionResolver, this.logWriter),
+			new RunDefinitionLoader(definitionResolver, this.logWriter, () => workerRouting.workerTypes.knownTypes()),
 			new RunStepPreparer(daemonDir, this.logWriter),
 			daemonSecrets,
 			workspaces,

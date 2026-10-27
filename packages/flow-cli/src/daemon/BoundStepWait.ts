@@ -1,3 +1,12 @@
+import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
+
+/** What the daemon needs to restrict a run to a worker type: where types come from, and how long a missing one is waited for. */
+export interface WorkerTypeRouting {
+	workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'>;
+	/** `worker.boundStepWaitSeconds`, in milliseconds. */
+	boundStepWaitMs: number;
+}
+
 /** What routing found about a step of a run bound to a worker type that no idle worker could take. */
 export interface BoundStepWaitRequest {
 	executionId: string;

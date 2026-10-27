@@ -132,6 +132,11 @@ export class RunRequestHandler {
 			// Also kept in memory: routing consults it per dispatch, and a worker the daemon
 			// did not create only serves the projects it declared (D#9).
 			this.executions.setProject(executionId, { projectId, projectRoot });
+			// A run bound to a worker type keeps every step on workers of that type, injected ones included; held in
+			// memory next to the project because routing consults it per placement (the validator already checked the name).
+			if (flow.workerType !== undefined) {
+				this.executions.bindWorkerType(executionId, flow.workerType);
+			}
 			// The definition is frozen only now that the run is accepted: a refused run must not claim its version.
 			resolved.commit();
 			for (const warning of resolved.warnings) {

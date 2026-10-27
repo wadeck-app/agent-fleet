@@ -6,6 +6,7 @@ import type { WebSocket } from 'ws';
 import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { ExecutionStore } from '../storage/ExecutionStore';
 import type { LogWriter } from '../storage/LogWriter';
+import { BoundStepWait } from './BoundStepWait.js';
 import type { DaemonSecrets } from './DaemonSecrets.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
@@ -16,11 +17,18 @@ import { StepRouter } from './StepRouter.js';
 import type { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
+import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
+
+/** No source is declared, so no worker has a type. */
+const NO_DECLARED_WORKER_TYPES: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'> = {
+	typeLookup: () => () => undefined,
+	knownTypes: () => [],
+};
 
 /** Hands queued steps to the idle workers that may run them. */
 export class StepDispatcher {
-	/** Chooses which live worker a step goes to (S3, S4) */
-	private readonly router = new StepRouter();
+	/** Chooses which live worker a step goes to (S3, S4), after narrowing a bound run to its worker type */
+	private readonly router: StepRouter;
 	/** Tells a retry from another re-run when a step starts again, for the attempt history */
 	private readonly reRunKinds = new ReRunKindTracker();
 	/** When each interactive step started waiting, so an S9 policy can bound its own wait */
@@ -29,6 +37,9 @@ export class StepDispatcher {
 	/**
 	 * @param failStep Fails a step the daemon itself decided cannot proceed.
 	 * @param interactivityPolicy S9 policy deciding the fate of a step needing a human (D#39).
+	 * @param workerTypes Where a worker's type comes from. Without it no worker has a type, so a bound run's steps wait
+	 *        for the bound and then fail: the safe reading of a missing wiring.
+	 * @param boundStepWait Bounds the wait of a step of a bound run for a worker of its type.
 	 */
 	constructor(
 		private readonly registry: WorkerRegistry,
@@ -41,11 +52,16 @@ export class StepDispatcher {
 		private readonly hooks: ExecutionHooks,
 		private readonly logWriter: LogWriter,
 		private readonly interactivityPolicy: InteractivityPolicyProvider,
-		private readonly failStep: (executionId: string, stepId: string, reason: string) => void
-	) {}
+		private readonly failStep: (executionId: string, stepId: string, reason: string) => void,
+		private readonly workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'> = NO_DECLARED_WORKER_TYPES,
+		private readonly boundStepWait: BoundStepWait = new BoundStepWait()
+	) {
+		this.router = new StepRouter(undefined, undefined, workerTypes);
+	}
 
-	/** Forgets the interactive waits of an execution that is over. */
+	/** Forgets the waits of an execution that is over. */
 	forgetExecution(executionId: string): void {
+		this.boundStepWait.forgetExecution(executionId);
 		for (const key of this.interactiveWaitSince.keys()) {
 			if (key.startsWith(`${executionId}:`)) {
 				this.interactiveWaitSince.delete(key);
@@ -93,7 +109,17 @@ export class StepDispatcher {
 			if (idleWorker === undefined && placement.requiresUserInterface && this.failIfNobodyCanAnswer(step)) {
 				continue;
 			}
+			if (
+				idleWorker === undefined &&
+				placement.boundWorkerType !== undefined &&
+				this.failIfNoWorkerOfBoundType(step, placement.boundWorkerType)
+			) {
+				continue;
+			}
 			if (idleWorker) {
+				if (placement.boundWorkerType !== undefined) {
+					this.boundStepWait.clear(step.executionContext.executionId, step.stepId);
+				}
 				this.dispatchTo(idleWorker, step);
 			} else {
 				unplaced.push(step);
@@ -252,6 +278,57 @@ export class StepDispatcher {
 	}
 
 	/**
+	 * Fails a step of a bound run that no idle worker of its type could take, once no worker of that type has been
+	 * connected for the bound. A step never runs on another worker, so leaving it queued would hide a missing worker type
+	 * forever; a connected worker of the type that is merely busy keeps it queued (see {@link BoundStepWait}).
+	 *
+	 * @returns true when the step was failed and must not be re-queued.
+	 */
+	private failIfNoWorkerOfBoundType(step: ReadyStep, workerType: string): boolean {
+		const { executionId } = step.executionContext;
+		const decision = this.boundStepWait.decide({
+			executionId,
+			stepId: step.stepId,
+			workerType,
+			connectedOfType: this.connectedWorkersOfType(executionId, workerType),
+			knownTypes: this.knownTypesOrNone(executionId),
+		});
+		if (decision.action === 'wait') {
+			return false;
+		}
+		this.failStep(executionId, step.stepId, decision.reason);
+		return true;
+	}
+
+	/** Workers of the type, idle or busy. An unreadable source registry counts none, and says so in the execution log. */
+	private connectedWorkersOfType(executionId: string, workerType: string): number {
+		try {
+			const typeOf = this.workerTypes.typeLookup();
+			return this.registry.summarize().filter(worker => typeOf(worker.sourceId) === workerType).length;
+		} catch (err) {
+			this.logWriter.writeExecution(
+				executionId,
+				`Cannot tell which connected workers are of type "${workerType}", so none is counted: ${normalizeError(err).message}`,
+				'warning'
+			);
+			return 0;
+		}
+	}
+
+	private knownTypesOrNone(executionId: string): string[] {
+		try {
+			return this.workerTypes.knownTypes();
+		} catch (err) {
+			this.logWriter.writeExecution(
+				executionId,
+				`Cannot read the declared worker sources: ${normalizeError(err).message}`,
+				'warning'
+			);
+			return [];
+		}
+	}
+
+	/**
 	 * Describes a step for routing.
 	 *
 	 * @throws when the step's `labels` are not a list. Schema validation already refuses
@@ -267,6 +344,9 @@ export class StepDispatcher {
 		// no such field, which `workerSatisfiesShell` already treats as "no constraint".
 		const shellKind = (step.stepConfig as { shell?: 'bash' | 'cmd' | 'pwsh' }).shell;
 		const project = this.executions.projectOf(step.executionContext.executionId);
+		// Read per placement, from the execution and not from the step: a step injected later carries none of the flow's
+		// fields, and the binding must hold for it too.
+		const boundWorkerType = this.executions.boundWorkerTypeOf(step.executionContext.executionId);
 		return {
 			stepId: step.stepId,
 			labels: labels ?? [],
@@ -275,6 +355,7 @@ export class StepDispatcher {
 			requiresUserInterface: step.stepConfig.type === 'user_intervention',
 			...(project !== undefined ? { projectId: project.projectId, projectRoot: project.projectRoot } : {}),
 			...(shellKind !== undefined ? { shellKind } : {}),
+			...(boundWorkerType !== undefined ? { boundWorkerType } : {}),
 		};
 	}
 }

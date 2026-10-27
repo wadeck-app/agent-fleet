@@ -38,6 +38,7 @@ import { WebSocketServer, WebSocketServerClosedError } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
+import { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 import { DEFAULT_DISPOSE_TIMEOUT_MS, WorkerTypeInstances } from './WorkerTypeInstances.js';
 import { createDaemonCommands } from './createDaemonCommands.js';
 import { publishWorkerPort, removeWorkerPort } from './publishWorkerPort.js';
@@ -472,7 +473,11 @@ async function startOwningDaemon(
 					daemonSecrets,
 					undefined,
 					runEndSettingsOf(config.worker),
-					workerTypes
+					workerTypes,
+					{
+						workerTypes: new WorkerTypeCatalog(sourceRegistry),
+						boundStepWaitMs: config.worker.boundStepWaitSeconds * 1000,
+					}
 				);
 				runtime = {
 					commandHandler,

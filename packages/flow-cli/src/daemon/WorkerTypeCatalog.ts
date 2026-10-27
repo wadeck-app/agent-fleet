@@ -11,8 +11,9 @@ export type WorkerTypeLookup = (sourceId: string | undefined) => string | undefi
  * with no plugin (every built-in provider) has no type, and neither has a worker that names no source or one that is
  * not declared: such a worker is a host worker, never of a type.
  *
- * Authority: a worker's `sourceId` is authenticated (it presented that source's registration or one-shot launch
- * token), so the type derived from it cannot be claimed by a worker that does not belong to the source.
+ * Authority: a worker's `sourceId` is proven by that source's credential when the connection is admitted, and
+ * `WorkerProvisioner.registerWorker` pins it for the life of the connection (a later `ready` naming another source,
+ * or none, is refused). The type derived from it is therefore as trustworthy as the admission check.
  */
 export class WorkerTypeCatalog {
 	constructor(private readonly sources: { list(): WorkerSourceEntry[] }) {}
