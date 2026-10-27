@@ -17,7 +17,8 @@
 import type { ChildProcess } from 'node:child_process';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
-import { killProcessTree, signalProcesses, snapshotDescendants } from '../processing/ProcessTreeKiller';
+import { DefaultProcessLauncher } from '../processing/DefaultProcessLauncher';
+import type { ProcessLauncher } from '../processing/ProcessLauncher';
 
 /** Time a terminated process gets between SIGTERM and SIGKILL. */
 export const TERMINATION_GRACE_MS = 5000;
@@ -38,6 +39,8 @@ export interface ScriptProcessSupervisorOptions {
 	onNotice: (message: string) => void;
 	terminationGraceMs?: number;
 	pipeDrainGraceMs?: number;
+	/** Tree kill, descendant snapshot and signals go through it. Default: the host implementation. */
+	launcher?: ProcessLauncher;
 }
 
 /** What `killAllRunningScripts` needs to reach a script that is still running. */
@@ -73,6 +76,7 @@ export function superviseScriptProcess(
 ): Promise<ScriptProcessOutcome> {
 	const terminationGraceMs = options.terminationGraceMs ?? TERMINATION_GRACE_MS;
 	const pipeDrainGraceMs = options.pipeDrainGraceMs ?? PIPE_DRAIN_GRACE_MS;
+	const launcher = options.launcher ?? new DefaultProcessLauncher();
 
 	return new Promise<ScriptProcessOutcome>((resolve, reject) => {
 		let settled = false;
@@ -92,7 +96,7 @@ export function superviseScriptProcess(
 				child.kill(signal);
 				return;
 			}
-			killProcessTree(child.pid, signal);
+			launcher.killTree(child.pid, signal);
 		}
 
 		function settle(outcome: ScriptProcessOutcome | Error): void {
@@ -123,7 +127,7 @@ export function superviseScriptProcess(
 				if (!exited) {
 					signalTree('SIGKILL');
 				}
-				signalProcesses(descendants, 'SIGKILL');
+				launcher.signalProcesses(descendants, 'SIGKILL');
 			} catch (error) {
 				// A timer callback must not throw: that would take the worker down with it.
 				fail(error);
@@ -137,7 +141,7 @@ export function superviseScriptProcess(
 			);
 			try {
 				if (child.pid !== undefined) {
-					descendants = snapshotDescendants(child.pid);
+					descendants = launcher.snapshotDescendants(child.pid);
 				}
 				signalTree('SIGTERM');
 			} catch (error) {
