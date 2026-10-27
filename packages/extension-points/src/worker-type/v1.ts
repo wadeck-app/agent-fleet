@@ -23,8 +23,8 @@ export type RunEndReason = 'completed' | 'failed' | 'daemon_stopping';
  * bounded time for the workers that served the run to settle before it announces the end, so after that bound the
  * announcement goes out with a sibling possibly still running.
  *
- * Worst-case wait before the run's workspace is released: TWO ack timeouts per run (the settle wait, then the
- * acknowledgement wait), not one.
+ * Worst-case wait before the run's workspace is released: THREE ack timeouts per run (the settle wait, the
+ * acknowledgement wait, then `run.onRunEnded`), not one.
  *
  * `daemon_stopping` is a best-effort notice: it is written just before the daemon closes the worker sockets, and a
  * worker the daemon did not create is closed right after, so it may never get to acknowledge. Do not rely on it for
@@ -48,17 +48,17 @@ export interface WorkerTypeInstance {
 	/** Obtains workers for the source (worker-source v1, unchanged: no handle comes back). */
 	source: WorkerSourceProvider;
 	/**
-	 * Called once per run this type served, after the workers acknowledged the end of the run and before the run's
-	 * workspace is released. Omit when the type has no per-run resources.
-	 *
-	 * NOT CALLED BY THE DAEMON BEFORE C2b: the daemon does not load worker-type plugins yet, so an implementation of
-	 * this point is a silent no-op until then.
+	 * Called once per run this type served (once per source, however many of its workers took part), after the workers
+	 * acknowledged the end of the run (or the wait expired) and before the run's workspace is released. Bounded by the
+	 * ack timeout: a rejection or a hang is logged with the source and the execution, never blocks the release further.
+	 * Only called for a source declared with a plugin ref, and only when a worker of the source declared `run-events`.
+	 * Omit when the type has no per-run resources.
 	 */
 	run?: { onRunEnded(event: RunEndEvent): Promise<void> };
 	/**
-	 * Releases everything the instance holds; meant to be called when the source is removed or the daemon stops.
-	 *
-	 * NOT CALLED BY THE DAEMON BEFORE C2b (see `run`).
+	 * Releases everything the instance holds. Called once when the daemon stops (after the run-end hooks) and when the
+	 * source is no longer declared (noticed at the daemon's next worker request, as `flow worker source remove` runs in
+	 * another process). Errors are logged, and a dispose that takes more than 30s is given up on.
 	 */
 	dispose(): Promise<void>;
 }

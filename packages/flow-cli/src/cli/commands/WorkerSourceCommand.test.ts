@@ -164,13 +164,33 @@ describe('flow worker source command', () => {
 
 		it('exits 1 on an --option without "="', () => {
 			expect(() =>
-				run('add', 'sandbox', '--provider', 'docker-sandbox', '--plugin', 'sandbox.docker', '--plugins-dir', pluginsDir(), '--option', 'oops')
+				run(
+					'add',
+					'sandbox',
+					'--provider',
+					'docker-sandbox',
+					'--plugin',
+					'sandbox.docker',
+					'--plugins-dir',
+					pluginsDir(),
+					'--option',
+					'oops'
+				)
 			).toThrow('exit 1');
 			expect(errors()).toContain('--option must be key=value');
 		});
 
 		it('says on remove that a running daemon disposes the plugin instance later', () => {
-			run('add', 'sandbox', '--provider', 'docker-sandbox', '--plugin', 'sandbox.docker', '--plugins-dir', pluginsDir());
+			run(
+				'add',
+				'sandbox',
+				'--provider',
+				'docker-sandbox',
+				'--plugin',
+				'sandbox.docker',
+				'--plugins-dir',
+				pluginsDir()
+			);
 			logSpy.mockClear();
 			run('remove', 'sandbox');
 			expect(printed()).toContain('A running daemon disposes');

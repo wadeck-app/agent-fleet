@@ -34,7 +34,11 @@ describe('WorkerSourceRegistry - a plugin source', () => {
 
 		expect(entry.plugin).toBe('sandbox.docker');
 		expect(entry.pluginsDir).toBe(pluginsDir);
-		expect(registry.find('sandbox')).toMatchObject({ plugin: 'sandbox.docker', pluginsDir, options: { image: 'node:22' } });
+		expect(registry.find('sandbox')).toMatchObject({
+			plugin: 'sandbox.docker',
+			pluginsDir,
+			options: { image: 'node:22' },
+		});
 	});
 
 	it('rejects a plugin without pluginsDir, naming the source and the fix', () => {

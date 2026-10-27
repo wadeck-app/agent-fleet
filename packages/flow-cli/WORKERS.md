@@ -91,6 +91,20 @@ The daemon side exists (`RelayWorkerSource`, `provide_worker`); the process to r
 machine does not. Declaring one today yields "no relay connected". A relay does no work: it holds a
 connection to the daemon and launches a local worker when asked.
 
+### Plugin source -- a worker type from a plugin
+
+```
+flow worker source add sandbox --provider docker-sandbox --plugin <pluginId>.<implName> \
+  --plugins-dir <absolute dir> --option image=node:22
+```
+
+- Implements the `worker-type` extension point (`extension-points/src/worker-type/v1.ts`). `--provider` is a free label, never `built-in:*`.
+- `--plugins-dir` must be absolute and contain `plugin-<pluginId>/plugin.config.js`: plain, self-contained JS (no `node_modules` beside it).
+- `--option` values are handed to the plugin unvalidated; a sensitive key (`token`, `password`, ...) must be `${ENV_VAR}`, a literal is refused.
+- The daemon builds one instance per source on first contact and reuses it. A load error names the source, plugin, cause and fix; the next worker request retries.
+- `onRunEnded` runs after the `run_end` acks, once per source per run, bounded by `ackTimeoutSeconds`; a failure is logged and the workspace is released anyway.
+- `dispose()` runs when the daemon stops (after the run-end acks) and when a source leaves the registry. `source remove` runs in another process, so the daemon disposes at its next worker request (or at stop). Pending changes to a source's settings are picked up the same way.
+
 ## Three rules that explain most surprises
 
 1. **Declared is not available** (D#4). A declared source with nothing attached is intent, not
@@ -160,7 +174,7 @@ timeout; on timeout the daemon logs an error naming the worker, source and execu
 | Key (daemon `config.yml`, section `worker`) | Default | Meaning                                                                                                                                          |
 | ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `runEventsEnabled`                          | `true`  | `false` restores the previous behavior: nothing sent, workspace released at once                                                                 |
-| `ackTimeoutSeconds`                         | `30`    | 1 to 120. Bounds each wait (served workers settling, then the acks), so a finished run can wait up to twice this; stopping the daemon waits once |
+| `ackTimeoutSeconds`                         | `30`    | 1 to 120. Bounds each wait (served workers settling, the acks, and a plugin's `onRunEnded`), so a finished run can wait up to three times this; stopping the daemon waits up to twice this |
 
 On daemon stop the notice is written before the sockets close, so a worker the daemon did not
 create is closed right after it and cannot ack.

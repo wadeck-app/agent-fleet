@@ -54,10 +54,9 @@ describe('contactDeclaredSources - plugin sources', () => {
 	});
 
 	it('reports a plugin that cannot be loaded by source, plugin and fix, and still contacts the others', async () => {
-		await contact(
-			[pluginEntry('broken', { plugin: 'fixture-sandbox.throws' }), pluginEntry('fine')],
-			{ workerTypes }
-		);
+		await contact([pluginEntry('broken', { plugin: 'fixture-sandbox.throws' }), pluginEntry('fine')], {
+			workerTypes,
+		});
 
 		expect(reported).toHaveLength(1);
 		expect(reported[0]).toContain('could not obtain a worker from source "broken"');

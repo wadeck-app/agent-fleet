@@ -120,7 +120,7 @@ describe('RunEndCoordinator -- telling the worker type that owns the source', ()
 		expect(notifyRunEnded).toHaveBeenCalledTimes(1);
 	});
 
-	it('still tells it when the worker\'s connection closed before the acknowledgement', async () => {
+	it("still tells it when the worker's connection closed before the acknowledgement", async () => {
 		const { coordinator, serve, notifyRunEnded } = setup();
 		const worker = serve('sandbox', 'e1');
 		const finished = coordinator.begin('e1', 'completed')!.finish(vi.fn().mockResolvedValue(undefined));
@@ -139,7 +139,9 @@ describe('RunEndCoordinator -- telling the worker type that owns the source', ()
 	});
 
 	it('logs a failing hook with the source and the execution, and still runs the follow-up', async () => {
-		const { coordinator, serve, errorsLogged, ack } = setup(vi.fn<Hook>().mockRejectedValue(new Error('docker is gone')));
+		const { coordinator, serve, errorsLogged, ack } = setup(
+			vi.fn<Hook>().mockRejectedValue(new Error('docker is gone'))
+		);
 		const worker = serve('sandbox', 'e1');
 		const afterAck = vi.fn().mockResolvedValue(undefined);
 		const finished = coordinator.begin('e1', 'completed')!.finish(afterAck);
@@ -157,7 +159,9 @@ describe('RunEndCoordinator -- telling the worker type that owns the source', ()
 
 	it('gives up on a hook that never returns after the ack timeout, logs it, and releases', async () => {
 		vi.useFakeTimers();
-		const { coordinator, serve, errorsLogged, ack } = setup(vi.fn<Hook>().mockReturnValue(new Promise<void>(() => {})));
+		const { coordinator, serve, errorsLogged, ack } = setup(
+			vi.fn<Hook>().mockReturnValue(new Promise<void>(() => {}))
+		);
 		const worker = serve('sandbox', 'e1');
 		const afterAck = vi.fn().mockResolvedValue(undefined);
 		const finished = coordinator.begin('e1', 'completed')!.finish(afterAck);

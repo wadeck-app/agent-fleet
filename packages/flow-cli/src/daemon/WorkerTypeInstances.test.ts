@@ -205,7 +205,11 @@ describe('WorkerTypeInstances - disposing', () => {
 	});
 
 	it('gives up on a dispose that never settles, logs it, and forgets the instance', async () => {
-		const patient = new WorkerTypeInstances(new PluginLoader(), (level, message) => logged.push({ level, message }), 20);
+		const patient = new WorkerTypeInstances(
+			new PluginLoader(),
+			(level, message) => logged.push({ level, message }),
+			20
+		);
 		await patient.get(entry());
 		fixture.hangDispose = true;
 
@@ -285,7 +289,9 @@ describe('WorkerTypeInstances - run end', () => {
 	});
 
 	it('does nothing for a source with no instance (a built-in source)', async () => {
-		await expect(instances.notifyRunEnded('ghost', { executionId: 'e', reason: 'failed' })).resolves.toBeUndefined();
+		await expect(
+			instances.notifyRunEnded('ghost', { executionId: 'e', reason: 'failed' })
+		).resolves.toBeUndefined();
 		expect(fixture.runEnded).toEqual([]);
 	});
 

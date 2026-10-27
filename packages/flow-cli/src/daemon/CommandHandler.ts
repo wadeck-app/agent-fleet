@@ -157,7 +157,13 @@ export class CommandHandler {
 			},
 			stalledStepLimitMs
 		);
-		this.runEnd = new RunEndCoordinator(registry, this.supervisor, this.logWriter, runEndSettings, runEndedListener);
+		this.runEnd = new RunEndCoordinator(
+			registry,
+			this.supervisor,
+			this.logWriter,
+			runEndSettings,
+			runEndedListener
+		);
 		this.dispatcher = new StepDispatcher(
 			registry,
 			this.queue,

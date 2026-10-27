@@ -52,7 +52,11 @@ describe('shutDownWorkers -- order', () => {
 });
 
 describe('shutDownWorkers -- worker types', () => {
-	const runtimeOf = (calls: string[], disposeAll: () => Promise<void>, announced: Promise<void> = Promise.resolve()) =>
+	const runtimeOf = (
+		calls: string[],
+		disposeAll: () => Promise<void>,
+		announced: Promise<void> = Promise.resolve()
+	) =>
 		({
 			commandHandler: {
 				announceDaemonStop: () => {
