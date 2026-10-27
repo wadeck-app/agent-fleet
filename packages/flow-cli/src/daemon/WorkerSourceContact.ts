@@ -6,6 +6,7 @@ import { sendNudge } from './NudgeDispatch.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { RelayWorkerSource } from './RelayWorkerSource.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
+import type { WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 /** The S1 implementations that ship with flow. */
 const BUILT_IN_INBOUND = 'built-in:inbound';
@@ -23,6 +24,8 @@ export interface SourceProviderDependencies {
 	 * minted and the command is responsible for its own credential.
 	 */
 	issueLaunchToken?: (sourceId: string) => string;
+	/** Builds and keeps the worker-type instance of each plugin source; without it a plugin source cannot be served. */
+	workerTypes?: Pick<WorkerTypeInstances, 'get'>;
 }
 
 /**
@@ -165,6 +168,31 @@ export function resolveSourceProvider(
 }
 
 /**
+ * The provider that obtains workers for an entry: its plugin instance (built once, then reused) when it names a
+ * plugin, else the built-in one. A plugin ref is never read as a provider name, so an unknown provider still throws.
+ */
+async function providerOf(
+	entry: WorkerSourceEntry,
+	dependencies: SourceProviderDependencies
+): Promise<WorkerSourceProvider> {
+	if (entry.plugin === undefined) {
+		return resolveSourceProvider(
+			entry.provider,
+			(entry.options ?? {}) as CommandSourceOptions,
+			dependencies,
+			entry.nudgeUrl
+		);
+	}
+	const { workerTypes } = dependencies;
+	if (workerTypes === undefined) {
+		throw new Error(
+			`source declares plugin "${entry.plugin}" but the daemon was not wired to load worker-type plugins. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
+		);
+	}
+	return (await workerTypes.get(entry)).source;
+}
+
+/**
  * Asks every declared source to produce a worker, at daemon startup (D#54).
  *
  * The daemon pushes; a worker never polls. Nothing here pins the daemon (D#51) and
@@ -182,12 +210,7 @@ export async function contactDeclaredSources(
 ): Promise<void> {
 	for (const entry of entries) {
 		try {
-			const provider = resolveSourceProvider(
-				entry.provider,
-				(entry.options ?? {}) as CommandSourceOptions,
-				dependencies,
-				entry.nudgeUrl
-			);
+			const provider = await providerOf(entry, dependencies);
 			await provider.obtainWorker({
 				daemonEndpoint,
 				sourceId: entry.sourceId,
