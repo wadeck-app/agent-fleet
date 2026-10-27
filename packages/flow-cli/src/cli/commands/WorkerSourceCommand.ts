@@ -211,9 +211,10 @@ export function registerWorkerSourceCommand(program: Command): Command {
 				}
 				for (const entry of entries) {
 					const labels = entry.labels.length > 0 ? entry.labels.join(', ') : '(none)';
+					const pluginSuffix = entry.plugin === undefined ? '' : `	plugin=${entry.plugin}`;
 					const livenessSuffix = liveness ? `\tliveness=${liveness.get(entry.sourceId)}` : '';
 					console.log(
-						`${entry.sourceId}\t${entry.provider}\tmax=${String(entry.maxWorkers)}\tlabels=${labels}${livenessSuffix}`
+						`${entry.sourceId}\t${entry.provider}\tmax=${String(entry.maxWorkers)}\tlabels=${labels}${pluginSuffix}${livenessSuffix}`
 					);
 				}
 				// Declared is not the same as available: only a live connection proves that.
@@ -283,7 +284,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 				if (plugin !== undefined) {
 					// The plugin instance lives in the daemon process, which this command cannot reach.
 					console.log(
-						`     A running daemon disposes the instance of plugin '${plugin}' at its next worker request or when it stops.`
+						`     A running daemon disposes the instance of plugin '${plugin}' at its next daemon contact or stop.`
 					);
 				}
 			} catch (err) {

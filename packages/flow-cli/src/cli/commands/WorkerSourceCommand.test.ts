@@ -113,6 +113,13 @@ describe('flow worker source command', () => {
 			expect(printed()).toContain('Use "flow worker list" to see live workers.');
 		});
 
+		it('shows the plugin of a plugin source', () => {
+			run('add', 'sandbox', '--provider', 'docker-sandbox', '--plugin', 'sandbox.docker', '--plugins-dir', path.join(xdgHome, 'plugins'));
+			logSpy.mockClear();
+			run('list');
+			expect(printed()).toContain('sandbox	docker-sandbox	max=1	labels=(none)	plugin=sandbox.docker');
+		});
+
 		it('--json prints the entries', () => {
 			run('add', 'gpu-box', '--provider', 'built-in:inbound');
 			logSpy.mockClear();
@@ -193,7 +200,7 @@ describe('flow worker source command', () => {
 			);
 			logSpy.mockClear();
 			run('remove', 'sandbox');
-			expect(printed()).toContain('A running daemon disposes');
+			expect(printed()).toContain('at its next daemon contact or stop');
 		});
 	});
 
