@@ -5,6 +5,7 @@ import { WORKER_FEATURE_RUN_EVENTS } from '../ipc/Protocol';
 import type { LogWriter } from '../storage/LogWriter';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
+import type { WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 /** Settings of the run-end feature (`worker.runEventsEnabled`, `worker.ackTimeoutSeconds`). */
 export interface RunEndSettings {
@@ -24,6 +25,9 @@ export interface PendingRunEnd {
 	finish(afterAck: () => Promise<void>): Promise<void>;
 }
 
+/** Whoever owns the worker-type instance of a source: told, once per source, when a run its workers served ended. */
+export type RunEndedListener = Pick<WorkerTypeInstances, 'notifyRunEnded'>;
+
 /** A worker that must be told, with what an error about it has to name. */
 interface Recipient {
 	ws: WebSocket;
@@ -36,6 +40,8 @@ interface Run {
 	reason: 'completed' | 'failed' | 'daemon_stopping';
 	/** Still-connected workers that declared run-events and were handed a step of the run. */
 	recipients: Recipient[];
+	/** Sources of the workers handed a step, fixed when the run ended: a worker that left is still owed its cleanup. */
+	sourceIds: string[];
 	/** Set once run_end went out: resolves when every delivered worker answered, left, or the timeout expired. */
 	acknowledged?: Promise<void>;
 	/** Ends the settle wait early (the daemon is stopping). */
@@ -81,7 +87,8 @@ export class RunEndCoordinator {
 			'servedWorkers' | 'servedExecutions' | 'awaitSettled'
 		>,
 		private readonly logWriter: Pick<LogWriter, 'writeExecution'>,
-		private readonly settings: RunEndSettings
+		private readonly settings: RunEndSettings,
+		private readonly listener?: RunEndedListener
 	) {}
 
 	/**
@@ -99,7 +106,7 @@ export class RunEndCoordinator {
 		if (recipients.length === 0) {
 			return undefined;
 		}
-		const run: Run = { executionId, reason, recipients };
+		const run: Run = { executionId, reason, recipients, sourceIds: sourcesOf(recipients) };
 		this.running.set(executionId, run);
 		return {
 			finish: afterAck => {
@@ -176,7 +183,8 @@ export class RunEndCoordinator {
 				continue;
 			}
 			this.announcedByStop.add(executionId);
-			waits.push(this.announce({ executionId, reason: 'daemon_stopping', recipients }, 'daemon_stopping'));
+			const run: Run = { executionId, reason: 'daemon_stopping', recipients, sourceIds: sourcesOf(recipients) };
+			waits.push(this.announce(run, 'daemon_stopping'));
 		}
 		// Also the runs already ending: their settle, ack AND workspace release, which the exit would otherwise cut off.
 		waits.push(...this.finishing);
@@ -232,8 +240,40 @@ export class RunEndCoordinator {
 
 	/** Sends run_end (once per run) and waits for the delivered workers' acknowledgements, bounded. */
 	private announce(run: Run, reason: Run['reason']): Promise<void> {
-		run.acknowledged ??= this.sendAndAwait(run, reason);
+		run.acknowledged ??= this.sendAndAwait(run, reason).then(() => this.notifyWorkerTypes(run, reason));
 		return run.acknowledged;
+	}
+
+	/**
+	 * Tells the worker-type instance of each source that served the run, in parallel, after the acknowledgements.
+	 * Never rejects and never waits longer than the ack timeout: a plugin that fails or hangs is reported, and the
+	 * workspace is released anyway.
+	 */
+	private async notifyWorkerTypes(run: Run, reason: Run['reason']): Promise<void> {
+		const { listener } = this;
+		if (listener === undefined) {
+			return;
+		}
+		await Promise.all(
+			run.sourceIds.map(async sourceId => {
+				const { executionId } = run;
+				const hook = listener.notifyRunEnded(sourceId, { executionId, reason }).catch((err: unknown) => {
+					this.reportError(
+						executionId,
+						`the worker type of source "${sourceId}" failed on the end of execution ${executionId} (${reason}): ${describe(err)}. ` +
+							'Whatever it holds for this run (for example a sandbox) may be left behind: remove it by hand.'
+					);
+				});
+				if ((await raceWithTimeout(hook, this.settings.ackTimeoutMs)) === 'timeout') {
+					this.reportError(
+						executionId,
+						`the worker type of source "${sourceId}" did not finish handling the end of execution ${executionId} (${reason}) within ${seconds(this.settings.ackTimeoutMs)}s. ` +
+							"The run's workspace is released anyway, so whatever it holds for this run (for example a sandbox) may be left behind: remove it by hand. " +
+							'If it needs longer, raise worker.ackTimeoutSeconds in config.yml (maximum 120).'
+					);
+				}
+			})
+		);
 	}
 
 	private async sendAndAwait(run: Run, reason: Run['reason']): Promise<void> {
@@ -278,6 +318,13 @@ export class RunEndCoordinator {
 		this.logWriter.writeExecution(executionId, message, 'error');
 		process.stderr.write(`[RunEndCoordinator] execution ${executionId}: ${message}\n`);
 	}
+}
+
+/** The distinct sources of the workers, in first-seen order; a worker with no source has nothing to notify. */
+function sourcesOf(recipients: Recipient[]): string[] {
+	return [
+		...new Set(recipients.flatMap(recipient => (recipient.sourceId === undefined ? [] : [recipient.sourceId]))),
+	];
 }
 
 function describeRecipient(recipient: Recipient): string {
