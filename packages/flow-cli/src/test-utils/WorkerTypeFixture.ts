@@ -11,6 +11,8 @@ export interface WorkerTypeFixtureState {
 	obtained: { sourceId: string; request: unknown }[];
 	runEnded: { sourceId: string; event: RunEndEvent }[];
 	disposed: string[];
+	/** Builds of the `slow` implementation waiting to be finished: call one to let that build resolve. */
+	pendingBuilds: (() => void)[];
 	failDispose: boolean;
 	/** dispose() never settles. */
 	hangDispose: boolean;
@@ -24,6 +26,7 @@ export function resetWorkerTypeFixture(): WorkerTypeFixtureState {
 		obtained: [],
 		runEnded: [],
 		disposed: [],
+		pendingBuilds: [],
 		failDispose: false,
 		hangDispose: false,
 		failRunEnded: false,

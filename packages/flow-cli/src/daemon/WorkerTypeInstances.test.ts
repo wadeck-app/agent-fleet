@@ -208,7 +208,7 @@ describe('WorkerTypeInstances - disposing', () => {
 		const patient = new WorkerTypeInstances(
 			new PluginLoader(),
 			(level, message) => logged.push({ level, message }),
-			20
+			{ disposeTimeoutMs: 20 }
 		);
 		await patient.get(entry());
 		fixture.hangDispose = true;

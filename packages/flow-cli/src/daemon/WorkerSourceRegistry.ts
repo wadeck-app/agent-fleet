@@ -31,8 +31,11 @@ export interface WorkerSourceDeclaration {
 	pluginsDir?: string;
 }
 
-/** `<pluginId>.<implName>`, the same shape `PluginLoader` parses (neither part may contain a dot). */
-const PLUGIN_REF = /^[^.\s]+\.[^.\s]+$/;
+/**
+ * `<pluginId>.<implName>`: plain names, because both become path segments below `pluginsDir` (`plugin-<pluginId>/`),
+ * so no separator or dot may get through.
+ */
+export const PLUGIN_REF = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 
 /**
  * The sources a user has declared, persisted under the flow config directory.
@@ -252,7 +255,7 @@ export class WorkerSourceRegistry {
 		}
 		if (!PLUGIN_REF.test(plugin)) {
 			throw new Error(
-				`Worker source "${sourceId}": plugin must be "<pluginId>.<implName>" (one dot, no spaces), got ${JSON.stringify(plugin)}.`
+				`Worker source "${sourceId}": plugin must be "<pluginId>.<implName>" (letters, digits, "_" and "-", one dot), got ${JSON.stringify(plugin)}.`
 			);
 		}
 		if (provider.startsWith('built-in:')) {

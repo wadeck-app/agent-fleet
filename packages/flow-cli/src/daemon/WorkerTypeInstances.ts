@@ -2,12 +2,22 @@ import type { RunEndEvent, WorkerTypeInstance } from 'extension-points';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 import type { PluginLoader } from '../config/PluginLoader.js';
-import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
+import { raceWithTimeout } from './BoundedWait.js';
+import { PLUGIN_REF, type WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
 /** The extension point a worker-type plugin implements. */
 const WORKER_TYPE_POINT = 'worker-type';
 
+const DEFAULT_BUILD_TIMEOUT_MS = 30_000;
 const DEFAULT_DISPOSE_TIMEOUT_MS = 30_000;
+
+/** How long the daemon waits on a plugin. Both are bounds: a plugin is third-party code and may hang. */
+export interface WorkerTypeTimeouts {
+	/** Loading the plugin and running its factory. */
+	buildTimeoutMs?: number;
+	/** Disposing one instance, including waiting for its build if that is still running. */
+	disposeTimeoutMs?: number;
+}
 
 interface CachedInstance {
 	/** What the instance was built from: a source declared differently gets a new one. */
@@ -22,20 +32,29 @@ interface CachedInstance {
  * The instance is cached because it owns resources (the point's `dispose` exists for them) and has to see the end of
  * every run its workers served; rebuilding it at each contact would leak the previous one and lose that state.
  *
- * Built lazily by {@link get}, from the plugins directory the source entry names. A build that fails is not cached, so
- * the next contact tries again once the user fixed the plugin.
+ * Every wait on plugin code is bounded (build, dispose): a hung plugin costs one logged error, never the daemon. A
+ * build that fails or times out is not cached, but Node keeps a module that failed to import as it was, so a load
+ * error is only fixed by restarting the daemon.
  */
 export class WorkerTypeInstances {
 	private readonly cache = new Map<string, CachedInstance>();
+	/** Sources whose instance was disposed, so a run that ends later can be told why nobody answers. */
+	private readonly disposed = new Set<string>();
+	/** Instances already handed to dispose(), so the two ways one can be reached (cache, late build) dispose it once. */
+	private readonly disposedInstances = new WeakSet<WorkerTypeInstance>();
 	/** Set by {@link disposeAll}: a daemon that is stopping must not start building instances nobody will dispose. */
 	private closed = false;
+	private readonly buildTimeoutMs: number;
+	private readonly disposeTimeoutMs: number;
 
 	constructor(
 		private readonly loader: Pick<PluginLoader, 'loadProvider'>,
 		private readonly log: (level: 'info' | 'error', message: string) => void,
-		/** How long a dispose may take before the daemon moves on (a stop must not hang on a plugin). */
-		private readonly disposeTimeoutMs: number = DEFAULT_DISPOSE_TIMEOUT_MS
-	) {}
+		timeouts: WorkerTypeTimeouts = {}
+	) {
+		this.buildTimeoutMs = timeouts.buildTimeoutMs ?? DEFAULT_BUILD_TIMEOUT_MS;
+		this.disposeTimeoutMs = timeouts.disposeTimeoutMs ?? DEFAULT_DISPOSE_TIMEOUT_MS;
+	}
 
 	/**
 	 * The instance of a plugin source, built if it is the first request.
@@ -43,37 +62,47 @@ export class WorkerTypeInstances {
 	 * @throws an error naming the source, the plugin, the cause and the fix when the plugin cannot be loaded
 	 */
 	async get(entry: WorkerSourceEntry): Promise<WorkerTypeInstance> {
-		const { plugin, pluginsDir } = entry;
+		const { plugin, pluginsDir, sourceId } = entry;
 		if (plugin === undefined || pluginsDir === undefined) {
 			throw new Error(
-				`worker source "${entry.sourceId}" has no plugin or no pluginsDir, so there is no worker-type instance to build. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
+				`worker source "${sourceId}" has no plugin or no pluginsDir, so there is no worker-type instance to build. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
 			);
 		}
-		if (this.closed) {
+		if (!PLUGIN_REF.test(plugin)) {
+			// A hand-edited registry file: the ref is a file name below pluginsDir, so it must not be able to leave it.
 			throw new Error(
-				`worker source "${entry.sourceId}": the daemon is stopping, no worker-type instance is built any more.`
+				`worker source "${sourceId}": plugin must be "<pluginId>.<implName>" (letters, digits, "_" and "-"), got ${JSON.stringify(plugin)}. ` +
+					`Fix: flow worker source remove ${sourceId}, then declare it again.`
 			);
 		}
 
 		const fingerprint = JSON.stringify([plugin, pluginsDir, entry.options ?? null]);
-		const cached = this.cache.get(entry.sourceId);
-		if (cached?.fingerprint === fingerprint) {
-			return cached.instance;
-		}
-		if (cached !== undefined) {
+		// Re-read after every wait: another contact may have replaced the entry while this one was disposing it, and
+		// overwriting theirs would leave their instance alive and unreferenced.
+		for (;;) {
+			if (this.closed) {
+				throw new Error(
+					`worker source "${sourceId}": the daemon is stopping, no worker-type instance is built any more.`
+				);
+			}
+			const cached = this.cache.get(sourceId);
+			if (cached?.fingerprint === fingerprint) {
+				return cached.instance;
+			}
+			if (cached === undefined) {
+				break;
+			}
 			// Declared again with other settings (the file was edited): the old instance is not the one asked for.
-			await this.dispose(entry.sourceId);
+			await this.dispose(sourceId);
 		}
 
-		const created: CachedInstance = {
-			fingerprint,
-			instance: this.build(entry, plugin, pluginsDir),
-		};
-		this.cache.set(entry.sourceId, created);
+		const created: CachedInstance = { fingerprint, instance: this.build(entry, plugin, pluginsDir) };
+		this.cache.set(sourceId, created);
+		this.disposed.delete(sourceId);
 		created.instance.catch(() => {
-			// Not remembered, so a fixed plugin is picked up by the next contact. The caller sees the error.
-			if (this.cache.get(entry.sourceId) === created) {
-				this.cache.delete(entry.sourceId);
+			// Not remembered, so the next contact builds again. The caller sees the error.
+			if (this.cache.get(sourceId) === created) {
+				this.cache.delete(sourceId);
 			}
 		});
 		return created.instance;
@@ -86,45 +115,31 @@ export class WorkerTypeInstances {
 	 * @throws what the plugin's hook threw: the caller knows the execution and logs it.
 	 */
 	async notifyRunEnded(sourceId: string, event: RunEndEvent): Promise<void> {
-		const instance = await this.settled(this.cache.get(sourceId));
+		const cached = this.cache.get(sourceId);
+		if (cached === undefined) {
+			if (this.disposed.has(sourceId)) {
+				this.log(
+					'error',
+					`warning: worker source "${sourceId}" was removed (or the daemon is stopping) while execution ${event.executionId} was running: ` +
+						'its worker type was disposed before the run ended, so it could not clean up after it. ' +
+						'Check for leftovers of that execution (for example sandboxes) and remove them by hand.'
+				);
+			}
+			return;
+		}
+		const instance = await this.settled(cached);
 		await instance?.run?.onRunEnded(event);
 	}
 
-	/** Disposes the instance of one source and forgets it. Idempotent; a failing dispose is logged, never thrown. */
+	/** Disposes the instance of one source and forgets it. Idempotent; a failing or hanging dispose is logged, never thrown. */
 	async dispose(sourceId: string): Promise<void> {
 		const cached = this.cache.get(sourceId);
 		if (cached === undefined) {
 			return;
 		}
 		this.cache.delete(sourceId);
-		const instance = await this.settled(cached);
-		if (instance === undefined) {
-			return;
-		}
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		try {
-			const outcome = await Promise.race([
-				instance.dispose().then(() => 'done' as const),
-				new Promise<'timeout'>(resolve => {
-					timer = setTimeout(() => resolve('timeout'), this.disposeTimeoutMs);
-				}),
-			]);
-			if (outcome === 'timeout') {
-				this.log(
-					'error',
-					`worker source "${sourceId}": its worker-type instance did not finish disposing within ${String(Math.round(this.disposeTimeoutMs / 1000))}s; moving on. ` +
-						'Whatever the plugin still holds for this source (for example sandboxes) may be left behind: remove it by hand.'
-				);
-			}
-		} catch (err) {
-			this.log(
-				'error',
-				`worker source "${sourceId}": disposing its worker-type instance failed: ${getErrorMessage(err)}. ` +
-					'Whatever the plugin still holds for this source (for example sandboxes) may be left behind: remove it by hand.'
-			);
-		} finally {
-			clearTimeout(timer);
-		}
+		this.disposed.add(sourceId);
+		await this.disposeBounded(sourceId, this.settled(cached));
 	}
 
 	/** Disposes the instances of the sources not in `declared` (removed from another process since). */
@@ -139,11 +154,38 @@ export class WorkerTypeInstances {
 		await Promise.all([...this.cache.keys()].map(sourceId => this.dispose(sourceId)));
 	}
 
-	/** The instance behind a cache entry, or undefined when its build failed (already reported to whoever asked). */
-	private async settled(cached: CachedInstance | undefined): Promise<WorkerTypeInstance | undefined> {
-		if (cached === undefined) {
-			return undefined;
+	/**
+	 * Waits for the instance (a build still running included) and disposes it, all within the dispose bound. The work
+	 * goes on after the bound, so an instance that appears late is still disposed; its late failure is logged too.
+	 */
+	private async disposeBounded(sourceId: string, instance: Promise<WorkerTypeInstance | undefined>): Promise<void> {
+		const disposing = (async () => {
+			try {
+				const target = await instance;
+				if (target === undefined || this.disposedInstances.has(target)) {
+					return;
+				}
+				this.disposedInstances.add(target);
+				await target.dispose();
+			} catch (err) {
+				this.log(
+					'error',
+					`worker source "${sourceId}": disposing its worker-type instance failed: ${getErrorMessage(err)}. ` +
+						'Whatever the plugin still holds for this source (for example sandboxes) may be left behind: remove it by hand.'
+				);
+			}
+		})();
+		if ((await raceWithTimeout(disposing, this.disposeTimeoutMs)) === 'timeout') {
+			this.log(
+				'error',
+				`worker source "${sourceId}": its worker-type instance did not finish disposing within ${describeDuration(this.disposeTimeoutMs)}; moving on. ` +
+					'Whatever the plugin still holds for this source (for example sandboxes) may be left behind: remove it by hand.'
+			);
 		}
+	}
+
+	/** The instance behind a cache entry, or undefined when its build failed (already reported to whoever asked). */
+	private async settled(cached: CachedInstance): Promise<WorkerTypeInstance | undefined> {
 		try {
 			return await cached.instance;
 		} catch {
@@ -152,26 +194,100 @@ export class WorkerTypeInstances {
 	}
 
 	private async build(entry: WorkerSourceEntry, plugin: string, pluginsDir: string): Promise<WorkerTypeInstance> {
+		// Outside the load error below: an unset variable is the user's to fix, and says which one.
+		const options = resolveEnvVars(entry.sourceId, entry.options);
+		const loading = this.load(entry, plugin, pluginsDir, options);
+		let built: WorkerTypeInstance | undefined;
+		const outcome = await raceWithTimeout(
+			loading.then(instance => {
+				built = instance;
+			}),
+			this.buildTimeoutMs
+		);
+		if (outcome === 'timeout' || built === undefined) {
+			// The build goes on in the background: whatever it yields must not be left running with nobody to dispose it.
+			void this.disposeBounded(
+				entry.sourceId,
+				loading.then(
+					instance => instance,
+					() => undefined
+				)
+			);
+			throw loadFailure(entry, plugin, pluginsDir, `did not finish loading within ${describeDuration(this.buildTimeoutMs)}`);
+		}
+		return built;
+	}
+
+	private async load(
+		entry: WorkerSourceEntry,
+		plugin: string,
+		pluginsDir: string,
+		options: unknown
+	): Promise<WorkerTypeInstance> {
 		try {
 			const built = await this.loader.loadProvider(
 				`plugins.${plugin}`,
 				WORKER_TYPE_POINT,
-				{ sourceId: entry.sourceId, options: entry.options },
+				{ sourceId: entry.sourceId, options },
 				pluginsDir
 			);
 			assertWorkerTypeInstance(built);
 			return built;
 		} catch (err) {
-			const [pluginId = plugin] = plugin.split('.');
-			throw new Error(
-				`Cannot load worker source "${entry.sourceId}": worker-type plugin "${plugin}" from "${pluginsDir}" failed: ${getErrorMessage(err)}. ` +
-					`Fix: make sure "${pluginsDir}" holds plugin-${pluginId}/plugin.config.js (plain self-contained JS, no node_modules beside it) ` +
-					`that declares implementation "${plugin.slice(pluginId.length + 1)}" for "${WORKER_TYPE_POINT}" and whose factory resolves; ` +
-					`the next worker request tries again. To drop the source: flow worker source remove ${entry.sourceId}.`,
-				{ cause: err }
-			);
+			throw loadFailure(entry, plugin, pluginsDir, getErrorMessage(err), err);
 		}
 	}
+}
+
+/** The error for a plugin that could not be loaded: source, plugin, cause, and the fix that really works. */
+function loadFailure(
+	entry: WorkerSourceEntry,
+	plugin: string,
+	pluginsDir: string,
+	cause: string,
+	original?: unknown
+): Error {
+	const [pluginId = plugin] = plugin.split('.');
+	return new Error(
+		`Cannot load worker source "${entry.sourceId}": worker-type plugin "${plugin}" from "${pluginsDir}" failed: ${cause}. ` +
+			`Fix: make sure "${pluginsDir}" holds plugin-${pluginId}/plugin.config.js (plain self-contained JS, no node_modules beside it) ` +
+			`that declares implementation "${plugin.slice(pluginId.length + 1)}" for "${WORKER_TYPE_POINT}" and whose factory resolves, ` +
+			'then restart the daemon: Node keeps a module that failed to import (or was edited) as it first loaded it. ' +
+			`To drop the source: flow worker source remove ${entry.sourceId}.`,
+		original === undefined ? undefined : { cause: original }
+	);
+}
+
+/** Replaces `${NAME}` in every string of the options with the daemon's environment; an unset NAME is an error. */
+function resolveEnvVars(sourceId: string, value: unknown, keyPath = ''): unknown {
+	if (typeof value === 'string') {
+		return value.replace(/\$\{([^}]+)\}/g, (_reference, name: string) => {
+			const resolved = process.env[name];
+			if (resolved === undefined) {
+				throw new Error(
+					`worker source "${sourceId}": option "${keyPath}" references environment variable "${name}", which is not set in the daemon's environment. ` +
+						'Set it where the daemon is started and restart the daemon, or declare the source again without it.'
+				);
+			}
+			return resolved;
+		});
+	}
+	if (Array.isArray(value)) {
+		return value.map((item: unknown, index) => resolveEnvVars(sourceId, item, `${keyPath}[${String(index)}]`));
+	}
+	if (typeof value === 'object' && value !== null) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, item]) => [
+				key,
+				resolveEnvVars(sourceId, item, keyPath === '' ? key : `${keyPath}.${key}`),
+			])
+		);
+	}
+	return value;
+}
+
+function describeDuration(ms: number): string {
+	return ms < 1000 ? `${String(ms)}ms` : `${String(Math.round(ms / 1000))}s`;
 }
 
 function assertWorkerTypeInstance(candidate: unknown): asserts candidate is WorkerTypeInstance {
