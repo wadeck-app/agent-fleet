@@ -10,18 +10,23 @@ import type { DaemonRuntime } from './DaemonRuntime.js';
  * after the notice is written, and for them the wait ends at the close. It is bounded by ONE ack timeout however many
  * runs and workers there are.
  *
- * Safe to call twice (the hook can run twice after the idle path): the coordinator tells each run once.
+ * The worker-type instances of plugin sources are disposed LAST, once the runs were announced and answered: their
+ * run hooks (called after the acknowledgements) must still find them. A dispose that fails or hangs is bounded and
+ * logged by the instances, never thrown.
  *
- * @returns resolves when the workers answered, left, or the bound expired. Never rejects.
+ * Safe to call twice (the hook can run twice after the idle path): the coordinator tells each run once, and each
+ * instance is disposed once.
+ *
+ * @returns resolves when the workers answered, left, or the bound expired, and the instances are disposed. Never rejects.
  */
 export function shutDownWorkers(
-	runtime: Pick<DaemonRuntime, 'commandHandler' | 'workerRegistry' | 'wsServer'>
+	runtime: Pick<DaemonRuntime, 'commandHandler' | 'workerRegistry' | 'wsServer' | 'workerTypes'>
 ): Promise<void> {
 	const announced = runtime.commandHandler.announceDaemonStop();
 	runtime.workerRegistry.broadcastToEphemeral({ type: 'done' });
 	runtime.workerRegistry.disconnectExternal();
 	runtime.wsServer.close();
-	return announced;
+	return announced.then(() => runtime.workerTypes.disposeAll());
 }
 
 /**

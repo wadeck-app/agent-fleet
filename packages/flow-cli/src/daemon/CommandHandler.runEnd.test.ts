@@ -409,6 +409,7 @@ describe('daemon stop -- run_end goes out before the workers are closed', () => 
 				commandHandler: f.handler,
 				workerRegistry: f.registry,
 				wsServer,
+				workerTypes: { disposeAll: () => Promise.resolve() },
 			} as unknown as DaemonRuntime);
 		return { ...f, ephemeral, executionId, wsServer, stop };
 	}
@@ -448,6 +449,7 @@ describe('daemon stop -- run_end goes out before the workers are closed', () => 
 			commandHandler: f.handler,
 			workerRegistry: f.registry,
 			wsServer: { close: vi.fn() },
+			workerTypes: { disposeAll: () => Promise.resolve() },
 		} as unknown as DaemonRuntime);
 
 		expect(wrote(external).map(m => m.type)).toEqual(['assign', 'run_end']);
@@ -476,6 +478,7 @@ describe('daemon stop -- run_end goes out before the workers are closed', () => 
 			commandHandler: f.handler,
 			workerRegistry: f.registry,
 			wsServer: { close: vi.fn() },
+			workerTypes: { disposeAll: () => Promise.resolve() },
 		} as unknown as DaemonRuntime);
 
 		expect(wrote(old).map(m => m.type)).toEqual(['assign', 'done']);

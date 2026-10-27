@@ -22,7 +22,7 @@ import { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
 import { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
 import { ReadyStepQueue } from './ReadyStepQueue.js';
 import { RunDefinitionLoader } from './RunDefinitionLoader.js';
-import { RunEndCoordinator, type RunEndSettings } from './RunEndCoordinator.js';
+import { RunEndCoordinator, type RunEndSettings, type RunEndedListener } from './RunEndCoordinator.js';
 import type { RunProject } from './RunProjectResolver.js';
 import { RunRequestHandler } from './RunRequestHandler.js';
 import { RunStepPreparer } from './RunStepPreparer.js';
@@ -131,7 +131,9 @@ export class CommandHandler {
 			new DefinitionSnapshotStore(definitionsDirOf(daemonDir))
 		),
 		/** Whether and how long workers that served a run are given to acknowledge its end (`worker.*` settings). */
-		runEndSettings: RunEndSettings = DEFAULT_RUN_END_SETTINGS
+		runEndSettings: RunEndSettings = DEFAULT_RUN_END_SETTINGS,
+		/** Told, after the acknowledgements, that a run ended, so the worker type that owns the source can clean up. */
+		runEndedListener?: RunEndedListener
 	) {
 		this.executionStore =
 			executionStore ?? new ExecutionStore(executionsDirOf(daemonDir), undefined, daemonSecrets.masks);
@@ -155,7 +157,7 @@ export class CommandHandler {
 			},
 			stalledStepLimitMs
 		);
-		this.runEnd = new RunEndCoordinator(registry, this.supervisor, this.logWriter, runEndSettings);
+		this.runEnd = new RunEndCoordinator(registry, this.supervisor, this.logWriter, runEndSettings, runEndedListener);
 		this.dispatcher = new StepDispatcher(
 			registry,
 			this.queue,

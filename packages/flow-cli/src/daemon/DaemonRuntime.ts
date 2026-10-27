@@ -6,6 +6,7 @@ import type { RelayRegistry } from './RelayRegistry.js';
 import type { WebSocketServer } from './WebSocketServer';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
+import type { WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 /**
  * The collaborators a running daemon is made of, available once its start hook has built them.
@@ -22,4 +23,6 @@ export interface DaemonRuntime {
 	executionStore: ExecutionStore;
 	logWriter: LogWriter;
 	daemonSecrets: DaemonSecrets;
+	/** The worker-type instances of the plugin sources, disposed when the daemon stops. */
+	workerTypes: WorkerTypeInstances;
 }

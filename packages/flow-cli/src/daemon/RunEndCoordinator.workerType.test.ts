@@ -1,3 +1,4 @@
+import type { RunEndEvent } from 'extension-points';
 import type { WebSocket } from 'ws';
 
 import { WORKER_FEATURE_RUN_EVENTS } from '../ipc/Protocol';
@@ -20,7 +21,9 @@ function stepOf(executionId: string, stepId: string): ReadyStep {
 	return { stepId, stepConfig: { id: stepId } as never, executionContext: { executionId } as never };
 }
 
-function setup(notifyRunEnded: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined)) {
+type Hook = (sourceId: string, event: RunEndEvent) => Promise<void>;
+
+function setup(notifyRunEnded = vi.fn<Hook>().mockResolvedValue(undefined)) {
 	const registry = new WorkerRegistry();
 	const supervisor = new WorkerAssignmentSupervisor(
 		registry,
@@ -70,7 +73,7 @@ describe('RunEndCoordinator -- telling the worker type that owns the source', ()
 	it('calls the hook once, after the acknowledgement and before the follow-up, with the run and its reason', async () => {
 		const order: string[] = [];
 		const { coordinator, serve, notifyRunEnded, ack } = setup(
-			vi.fn().mockImplementation(() => {
+			vi.fn<Hook>().mockImplementation(() => {
 				order.push('hook');
 				return Promise.resolve();
 			})
@@ -136,7 +139,7 @@ describe('RunEndCoordinator -- telling the worker type that owns the source', ()
 	});
 
 	it('logs a failing hook with the source and the execution, and still runs the follow-up', async () => {
-		const { coordinator, serve, errorsLogged, ack } = setup(vi.fn().mockRejectedValue(new Error('docker is gone')));
+		const { coordinator, serve, errorsLogged, ack } = setup(vi.fn<Hook>().mockRejectedValue(new Error('docker is gone')));
 		const worker = serve('sandbox', 'e1');
 		const afterAck = vi.fn().mockResolvedValue(undefined);
 		const finished = coordinator.begin('e1', 'completed')!.finish(afterAck);
@@ -154,7 +157,7 @@ describe('RunEndCoordinator -- telling the worker type that owns the source', ()
 
 	it('gives up on a hook that never returns after the ack timeout, logs it, and releases', async () => {
 		vi.useFakeTimers();
-		const { coordinator, serve, errorsLogged, ack } = setup(vi.fn().mockReturnValue(new Promise(() => {})));
+		const { coordinator, serve, errorsLogged, ack } = setup(vi.fn<Hook>().mockReturnValue(new Promise<void>(() => {})));
 		const worker = serve('sandbox', 'e1');
 		const afterAck = vi.fn().mockResolvedValue(undefined);
 		const finished = coordinator.begin('e1', 'completed')!.finish(afterAck);

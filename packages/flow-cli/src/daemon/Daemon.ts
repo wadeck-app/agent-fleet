@@ -7,6 +7,7 @@ import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import { VERSION } from '../cli/version.js';
 import { type FlowConfig, FlowConfigLoader } from '../config/FlowConfig';
 import { flowConfigDir } from '../config/FlowConfigDir.js';
+import { PluginLoader } from '../config/PluginLoader.js';
 import { PluginResolver } from '../config/PluginResolver.js';
 import { FlowEventMapper } from '../events/FlowEventMapper.js';
 import type { FlowEventPublisher } from '../events/FlowEventPublisher.js';
@@ -37,6 +38,7 @@ import { WebSocketServer, WebSocketServerClosedError } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
+import { WorkerTypeInstances } from './WorkerTypeInstances.js';
 import { createDaemonCommands } from './createDaemonCommands.js';
 import { publishWorkerPort, removeWorkerPort } from './publishWorkerPort.js';
 import { registerAppCoreModules } from './registerAppCoreModules.js';
@@ -167,6 +169,11 @@ async function startOwningDaemon(
 	// Resolve plugins before createDaemon - onStart is synchronous so async must happen here
 	const pluginProviders = await tryResolvePlugins();
 	const perFlowWorkspaceResolver = await PluginResolver.create().createPerFlowWorkspaceResolver();
+
+	/** One worker-type instance per plugin source for the life of this daemon; disposed at stop (shutDownWorkers). */
+	const workerTypes = new WorkerTypeInstances(new PluginLoader(), (level, message) => {
+		writeDaemonLog(logsDir, level, message);
+	});
 
 	/** Built by onStart; the commands, message handler and idle shutdown below only run after it. */
 	let runtime: DaemonRuntime | undefined;
@@ -386,14 +393,24 @@ async function startOwningDaemon(
 					maskText: text => daemonSecrets.masks.maskAll(text),
 				});
 				terminateForkedWorkers = graceMs => forkSource.terminateRemaining(graceMs);
-				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir);
+				// A source dropped by this process (pruneDead) lets go of its plugin instance at once; one removed by
+				// `flow worker source remove` (another process) is noticed at the next contact.
+				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir, sourceId => {
+					void workerTypes.dispose(sourceId);
+				});
 				// Relays are tracked apart from workers because the two roles carry different
 				// credentials and neither may stand in for the other (T-04, T-11).
 				const relayRegistry = new RelayRegistry(sourceRegistry);
 				// One issuer, shared: the credential a launched worker presents has to be the one
 				// this daemon minted for it, and it is only ever valid here, once (T-09).
 				const launchTokens = new LaunchTokenIssuer();
-				const sourceContact = new DaemonSourceContact(logsDir, sourceRegistry, relayRegistry, launchTokens);
+				const sourceContact = new DaemonSourceContact(
+					logsDir,
+					sourceRegistry,
+					relayRegistry,
+					launchTokens,
+					workerTypes
+				);
 				const workerProvisioner = new WorkerProvisioner(
 					config.queue.concurrency,
 					workerRegistry,
@@ -442,7 +459,8 @@ async function startOwningDaemon(
 					config.queue.stepSilenceLimitSeconds * 1000,
 					daemonSecrets,
 					undefined,
-					runEndSettingsOf(config.worker)
+					runEndSettingsOf(config.worker),
+					workerTypes
 				);
 				runtime = {
 					commandHandler,
@@ -453,6 +471,7 @@ async function startOwningDaemon(
 					executionStore,
 					logWriter,
 					daemonSecrets,
+					workerTypes,
 				};
 
 				// Nothing else would notice a wedged worker: it keeps its socket open and answers
