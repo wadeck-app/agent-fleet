@@ -67,6 +67,11 @@ export class RunEndCoordinator {
 	private readonly pendingAcks = new Map<string, PendingAcks>();
 	/** Runs the stop already told, so ending them afterwards does not tell them again. */
 	private readonly announcedByStop = new Set<string>();
+	/**
+	 * Runs being finished, from `begin` until their follow-up (the workspace release) is over. The run is already gone
+	 * from the execution registry during that time, so this is what says the daemon still has work.
+	 */
+	private readonly finishing = new Set<Promise<void>>();
 	private stopping: Promise<void> | undefined;
 
 	constructor(
@@ -96,7 +101,22 @@ export class RunEndCoordinator {
 		}
 		const run: Run = { executionId, reason, recipients };
 		this.running.set(executionId, run);
-		return { finish: afterAck => this.finish(run, afterAck) };
+		return {
+			finish: afterAck => {
+				const finished = this.finish(run, afterAck);
+				this.finishing.add(finished);
+				void finished.then(() => this.finishing.delete(finished));
+				return finished;
+			},
+		};
+	}
+
+	/**
+	 * Whether a run-end is still in progress: settling, waiting for acknowledgements, or releasing the workspace. The
+	 * daemon must not call itself idle then, or exit and cut the release off.
+	 */
+	hasPending(): boolean {
+		return this.running.size > 0 || this.finishing.size > 0;
 	}
 
 	/** A worker acknowledged `run_end`. An ack nobody waits for is reported and dropped. */
@@ -158,6 +178,8 @@ export class RunEndCoordinator {
 			this.announcedByStop.add(executionId);
 			waits.push(this.announce({ executionId, reason: 'daemon_stopping', recipients }, 'daemon_stopping'));
 		}
+		// Also the runs already ending: their settle, ack AND workspace release, which the exit would otherwise cut off.
+		waits.push(...this.finishing);
 		return Promise.all(waits).then(() => undefined);
 	}
 

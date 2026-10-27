@@ -269,7 +269,15 @@ export class CommandHandler {
 	 * requiring another investigation from scratch.
 	 */
 	describeIdleState(): string {
-		return `queue=${String(this.queue.length)} activeExecutions=${String(this.executions.activeExecutionCount())} resumableInterventions=${String(this.executions.resumableCount())}`;
+		return `queue=${String(this.queue.length)} activeExecutions=${String(this.executions.activeExecutionCount())} resumableInterventions=${String(this.executions.resumableCount())} pendingRunEnds=${this.runEnd.hasPending() ? '1+' : '0'}`;
+	}
+
+	/**
+	 * Whether a finished run is still being closed: its workers are settling or acknowledging, or its workspace is being
+	 * released. The run is no longer an active execution then, so the idle check consults this too.
+	 */
+	hasPendingRunEnds(): boolean {
+		return this.runEnd.hasPending();
 	}
 
 	setDraining(draining: boolean): void {

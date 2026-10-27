@@ -112,7 +112,10 @@ export class DaemonIdleShutdown {
 			// works against this same daemon process's in-memory scheduler/context state, so
 			// idle-exit must not tear it down just because nothing is queued or running right
 			// this second.
-			!commandHandler.hasResumableInterventions()
+			!commandHandler.hasResumableInterventions() &&
+			// A finished run is no longer an active execution while its workers settle and ack and its workspace is
+			// released; exiting then would cut the release off.
+			!commandHandler.hasPendingRunEnds()
 		);
 	}
 

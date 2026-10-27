@@ -9,6 +9,7 @@ import type { DaemonRuntime } from './DaemonRuntime.js';
 describe('DaemonIdleShutdown', () => {
 	let logsDir: string;
 	let idle: boolean;
+	let runEndPending: boolean;
 	let stopPeriodicWork: Mock<() => void>;
 	let stopDaemon: Mock<() => Promise<void>>;
 	let wsClose: Mock<() => void>;
@@ -24,6 +25,7 @@ describe('DaemonIdleShutdown', () => {
 		vi.useFakeTimers();
 		logsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-idle-shutdown-'));
 		idle = true;
+		runEndPending = false;
 		stopPeriodicWork = vi.fn<() => void>();
 		stopDaemon = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 		wsClose = vi.fn<() => void>();
@@ -32,6 +34,7 @@ describe('DaemonIdleShutdown', () => {
 				isQueueEmpty: () => idle,
 				hasActiveExecutions: () => false,
 				hasResumableInterventions: () => false,
+				hasPendingRunEnds: () => runEndPending,
 				describeIdleState: () => 'state',
 				stopBackgroundWork: vi.fn(),
 			},
@@ -50,6 +53,35 @@ describe('DaemonIdleShutdown', () => {
 	afterEach(() => {
 		vi.useRealTimers();
 		fs.rmSync(logsDir, { recursive: true, force: true });
+	});
+
+	// executions.remove runs before the run-end settle/ack/release phase: no active execution does not mean no work.
+	it('does not stop while a run-end (settle, ack, workspace release) is still pending', () => {
+		runEndPending = true;
+
+		shutdown.checkShutdown();
+		vi.advanceTimersByTime(SHUTDOWN_GRACE_MS * 2);
+
+		expect(stopDaemon).not.toHaveBeenCalled();
+		expect(shutdown.isIdle()).toBe(false);
+	});
+
+	it('skips the stop on recheck when a run-end became pending during the grace period', () => {
+		shutdown.checkShutdown();
+		runEndPending = true;
+		vi.advanceTimersByTime(SHUTDOWN_GRACE_MS);
+
+		expect(stopDaemon).not.toHaveBeenCalled();
+	});
+
+	it('stops once the pending run-end is over', () => {
+		runEndPending = true;
+		shutdown.checkShutdown();
+		runEndPending = false;
+		shutdown.checkShutdown();
+		vi.advanceTimersByTime(SHUTDOWN_GRACE_MS);
+
+		expect(stopDaemon).toHaveBeenCalledTimes(1);
 	});
 
 	it('stops the daemon only after the grace period, once', () => {

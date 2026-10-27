@@ -354,3 +354,56 @@ describe('RunEndCoordinator -- daemon stop', () => {
 		expect(sentTo(worker)).toHaveLength(1);
 	});
 });
+
+describe('RunEndCoordinator -- work still pending after the run left the registry', () => {
+	it('counts a run-end from begin until the follow-up (the release) is over', async () => {
+		const { coordinator, connect, serve, supervisor, sentTo } = setup();
+		const worker = connect();
+		supervisor.settleAssignment(serve(worker, 'e1'));
+		expect(coordinator.hasPending()).toBe(false);
+
+		let finishRelease!: () => void;
+		const release = new Promise<void>(resolve => {
+			finishRelease = resolve;
+		});
+		const finished = coordinator.begin('e1', 'completed')!.finish(() => release);
+		expect(coordinator.hasPending()).toBe(true);
+
+		await vi.waitFor(() => expect(sentTo(worker)).toHaveLength(1));
+		coordinator.handleAck(worker, 'e1');
+		for (let i = 0; i < 5; i++) await Promise.resolve();
+		expect(coordinator.hasPending()).toBe(true);
+
+		finishRelease();
+		await finished;
+		expect(coordinator.hasPending()).toBe(false);
+	});
+
+	it('makes the daemon stop wait for the release of a run that was already ending, not only for the acks', async () => {
+		const { coordinator, connect, serve, supervisor } = setup();
+		const worker = connect();
+		supervisor.settleAssignment(serve(worker, 'e1'));
+		let finishRelease!: () => void;
+		const release = new Promise<void>(resolve => {
+			finishRelease = resolve;
+		});
+		void coordinator.begin('e1', 'completed')!.finish(() => release);
+		let stopped = false;
+		const stop = coordinator.announceDaemonStop().then(() => {
+			stopped = true;
+		});
+
+		coordinator.handleAck(worker, 'e1');
+		await new Promise<void>(resolve => setImmediate(resolve));
+		expect(stopped).toBe(false);
+
+		finishRelease();
+		await stop;
+		expect(stopped).toBe(true);
+	});
+
+	it('stop announcement resolves at once when nothing is pending', async () => {
+		const { coordinator } = setup();
+		await expect(coordinator.announceDaemonStop()).resolves.toBeUndefined();
+	});
+});

@@ -489,3 +489,20 @@ describe('daemon stop -- run_end goes out before the workers are closed', () => 
 		expect(wsServer.close).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('CommandHandler -- pending run-end counts as work', () => {
+	it('reports a pending run-end between the end of the run and the release of its workspace', async () => {
+		const { handler, connect, complete, ack } = fleet();
+		const worker = connect();
+		const executionId = await startFlow(handler, VALID_FLOW_YAML);
+		expect(handler.hasPendingRunEnds()).toBe(false);
+
+		complete(worker, executionId, 's1');
+		expect(handler.hasActiveExecutions()).toBe(false);
+		expect(handler.hasPendingRunEnds()).toBe(true);
+		expect(handler.describeIdleState()).toContain('pendingRunEnds=1+');
+
+		ack(worker, executionId);
+		await vi.waitFor(() => expect(handler.hasPendingRunEnds()).toBe(false));
+	});
+});
