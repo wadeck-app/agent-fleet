@@ -81,7 +81,7 @@
 		{
 			"id": "worker-type",
 			"status": "stable",
-			"description": "Provides a kind of worker (for example one running inside a sandbox): obtains workers for a source, is told when a run ended, and is disposed with the source. Composes with worker-source v1, which stays unchanged.",
+			"description": "Provides a kind of worker (for example one running inside a sandbox): obtains workers for a source, is told when a run ended, and is disposed with the source. Composes with worker-source v1, which stays unchanged. Not loaded by the daemon before C2b: an implementation is a no-op until then.",
 			"versions": [{ "version": 1, "status": "stable", "since": "0.1.0" }]
 		},
 		{

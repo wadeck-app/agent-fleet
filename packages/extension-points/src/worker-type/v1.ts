@@ -22,6 +22,13 @@ export type RunEndReason = 'completed' | 'failed' | 'daemon_stopping';
  * "Ended" is not "quiet": a sibling step can still be executing when a run fails terminally. The daemon waits a
  * bounded time for the workers that served the run to settle before it announces the end, so after that bound the
  * announcement goes out with a sibling possibly still running.
+ *
+ * Worst-case wait before the run's workspace is released: TWO ack timeouts per run (the settle wait, then the
+ * acknowledgement wait), not one.
+ *
+ * `daemon_stopping` is a best-effort notice: it is written just before the daemon closes the worker sockets, and a
+ * worker the daemon did not create is closed right after, so it may never get to acknowledge. Do not rely on it for
+ * cleanup that must happen; reap what is left at the next start.
  */
 export interface RunEndEvent {
 	executionId: string;
@@ -43,9 +50,16 @@ export interface WorkerTypeInstance {
 	/**
 	 * Called once per run this type served, after the workers acknowledged the end of the run and before the run's
 	 * workspace is released. Omit when the type has no per-run resources.
+	 *
+	 * NOT CALLED BY THE DAEMON BEFORE C2b: the daemon does not load worker-type plugins yet, so an implementation of
+	 * this point is a silent no-op until then.
 	 */
 	run?: { onRunEnded(event: RunEndEvent): Promise<void> };
-	/** Releases everything the instance holds; called when the source is removed or the daemon stops. */
+	/**
+	 * Releases everything the instance holds; meant to be called when the source is removed or the daemon stops.
+	 *
+	 * NOT CALLED BY THE DAEMON BEFORE C2b (see `run`).
+	 */
 	dispose(): Promise<void>;
 }
 
