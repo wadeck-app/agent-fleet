@@ -7,6 +7,8 @@ export { FlowExecutor } from './executor/FlowExecutor';
 export type { FlowExecutionOptions } from './executor/FlowExecutor';
 export { StepRunner } from './executor/StepRunner';
 export { killAllRunningScripts } from './executor/ScriptProcessSupervisor';
+export { DefaultProcessLauncher } from './processing/DefaultProcessLauncher';
+export type { ProcessLauncher, ProcessSignal } from './processing/ProcessLauncher';
 export type { StepRunnerConfig } from './executor/StepRunner';
 export { FlowValidator } from './validation/FlowValidator';
 export type { ValidationIssue, ValidationResult } from './validation/FlowValidator';
