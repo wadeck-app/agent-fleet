@@ -92,6 +92,10 @@ export class StepDispatcher {
 	tryDispatch(): void {
 		/** Steps nothing could run this pass, put back in order once the pass ends. */
 		const unplaced: ReadyStep[] = [];
+		/** How many of them a host worker could have run: bound steps are not demand for one. */
+		let unplacedForHost = 0;
+		/** Worker types the unplaced steps of bound runs wait for. */
+		const waitingForTypes = new Set<string>();
 
 		while (this.queue.length > 0) {
 			const step = this.queue.shift()!;
@@ -136,11 +140,16 @@ export class StepDispatcher {
 				this.dispatchTo(idleWorker, step);
 			} else {
 				unplaced.push(step);
+				if (placement.boundWorkerType === undefined) {
+					unplacedForHost++;
+				} else {
+					waitingForTypes.add(placement.boundWorkerType);
+				}
 			}
 		}
 
 		this.queue.unshift(...unplaced);
-		this.demand.cover(unplaced.length);
+		this.demand.cover(unplacedForHost, waitingForTypes);
 	}
 
 	private dispatchTo(idleWorker: WebSocket, step: ReadyStep): void {

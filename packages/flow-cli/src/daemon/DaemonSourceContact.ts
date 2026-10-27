@@ -5,6 +5,7 @@ import type { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import type { RelayRegistry } from './RelayRegistry.js';
 import { contactDeclaredSources } from './WorkerSourceContact.js';
 import type { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
+import { workerTypeOfSource } from './WorkerTypeCatalog.js';
 import type { WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 /** Asks the declared worker sources for capacity, and forgets the ones whose process is gone. */
@@ -39,14 +40,24 @@ export class DaemonSourceContact {
 	// Called only when dispatch finds demand nothing can serve (D#66). A source told to
 	// dial a port nothing is listening on would produce a worker that cannot join, which
 	// is why the caller checks the bind first.
-	contactSources(boundPort: number): void {
+	//
+	// `workerTypes` narrows who is asked to the sources of those worker types (demand that only they can serve); the
+	// registry is still reconciled against every declared source, so a source not asked is not mistaken for a removed one.
+	contactSources(boundPort: number, workerTypes?: ReadonlySet<string>): void {
 		this.pruneDeadSources();
 		const declared = this.sourceRegistry.list();
 		// `flow worker source remove` runs in another process and cannot reach the instances held here: the daemon
 		// notices a source is gone from the registry file, here, and lets go of what it held for it.
 		void this.workerTypes.retainOnly(declared.map(entry => entry.sourceId));
+		const asked =
+			workerTypes === undefined
+				? declared
+				: declared.filter(entry => {
+						const type = workerTypeOfSource(entry);
+						return type !== undefined && workerTypes.has(type);
+					});
 		void contactDeclaredSources(
-			declared,
+			asked,
 			`ws://127.0.0.1:${String(boundPort)}`,
 			message => {
 				process.stderr.write(`[daemon] ${message}\n`);

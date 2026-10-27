@@ -110,7 +110,7 @@ export class CommandHandler {
 		 * registry, the published endpoint -- which this class deliberately knows nothing
 		 * about. Optional so the many tests that never exercise provisioning stay unchanged.
 		 */
-		requestFromDeclaredSources?: () => void,
+		requestFromDeclaredSources?: (workerTypes?: ReadonlySet<string>) => void,
 		/**
 		 * S9 policy deciding the fate of a step needing a human (D#39).
 		 *

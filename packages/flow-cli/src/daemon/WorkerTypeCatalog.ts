@@ -46,6 +46,11 @@ export class WorkerTypeCatalog {
 	}
 }
 
+/** The worker type a declared source stands for, or undefined for a source without a plugin. */
+export function workerTypeOfSource(entry: WorkerSourceEntry): string | undefined {
+	return typeOfEntry(entry);
+}
+
 function typeOfEntry(entry: WorkerSourceEntry): string | undefined {
 	if (entry.plugin === undefined) {
 		return undefined;

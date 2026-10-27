@@ -76,3 +76,42 @@ describe('DaemonSourceContact - plugin sources', () => {
 		await vi.waitFor(() => expect(fixture.disposed).toEqual(['sandbox']));
 	});
 });
+
+describe('DaemonSourceContact - asking only the sources of some worker types', () => {
+	it('contacts a plugin source whose type is wanted', async () => {
+		declarePlugin('sandbox');
+
+		contact.contactSources(4101, new Set(['fixture-sandbox']));
+
+		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
+	});
+
+	it('does not contact a source of another type', async () => {
+		declarePlugin('sandbox');
+
+		contact.contactSources(4101, new Set(['gpu']));
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		expect(fixture.obtained).toHaveLength(0);
+	});
+
+	it('contacts every source when no type is given', async () => {
+		declarePlugin('sandbox');
+
+		contact.contactSources(4101);
+
+		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
+	});
+
+	// Dropping a source from the list asked is not removing it: its instance must stay.
+	it('does not dispose the instance of a source that was merely not asked', async () => {
+		declarePlugin('sandbox');
+		contact.contactSources(4101);
+		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
+
+		contact.contactSources(4101, new Set(['gpu']));
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		expect(fixture.disposed).toEqual([]);
+	});
+});

@@ -123,7 +123,14 @@ function idleWorker(name: string, props: { sourceId?: string; hasUserInterface?:
 type Idle = ReturnType<typeof idleWorker>;
 
 /** A daemon whose registry says `idle` workers are idle and `connected` are connected (idle or busy). */
-function daemonWith(idle: Idle[], options: { connected?: Idle[]; boundStepWaitMs?: number } = {}) {
+function daemonWith(
+	idle: Idle[],
+	options: {
+		connected?: Idle[];
+		boundStepWaitMs?: number;
+		requestFromSources?: (types?: ReadonlySet<string>) => void;
+	} = {}
+) {
 	const pool = createMockWorkerPool();
 	const sent: { to: string; stepId: string; assignmentId: string }[] = [];
 	pool.listIdle.mockImplementation(() => idle);
@@ -146,7 +153,7 @@ function daemonWith(idle: Idle[], options: { connected?: Idle[]; boundStepWaitMs
 		undefined,
 		undefined,
 		undefined,
-		undefined,
+		options.requestFromSources,
 		undefined,
 		undefined,
 		undefined,
@@ -378,6 +385,33 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 
 			expect(sent.map(s => s.to)).toEqual(['sandbox']);
 			expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+		});
+	});
+
+	// A host worker can never run a bound step: forking one for it only spends a process.
+	describe('demand for workers', () => {
+		it('plans and forks no host worker for a bound step nothing can run, and asks only the sources of its type', async () => {
+			const requested: (ReadonlySet<string> | undefined)[] = [];
+			const { handler, pool } = daemonWith([idleWorker('host')], {
+				requestFromSources: types => requested.push(types),
+			});
+
+			await run(handler, BOUND_FLOW_YAML);
+			handler.tryDispatch();
+
+			expect(pool.planProvisioning).not.toHaveBeenCalled();
+			expect(pool.provision).not.toHaveBeenCalled();
+			expect(requested).toEqual([new Set(['sandbox'])]);
+		});
+
+		it('still plans for the steps of a run that is not bound', async () => {
+			const requested: (ReadonlySet<string> | undefined)[] = [];
+			const { handler, pool } = daemonWith([], { requestFromSources: types => requested.push(types) });
+
+			await run(handler, UNBOUND_FLOW_YAML);
+
+			expect(pool.planProvisioning).toHaveBeenCalledWith(1, expect.any(Number));
+			expect(requested).toEqual([undefined]);
 		});
 	});
 

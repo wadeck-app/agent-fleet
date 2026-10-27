@@ -457,7 +457,7 @@ async function startOwningDaemon(
 					// the port the listener *asked* for: a source handed that number would
 					// create a worker that dials nothing, or worse something else. The startup
 					// contact fires the moment the bind completes, so nothing is lost.
-					() => {
+					requestedTypes => {
 						if (workerListenerPort === undefined) {
 							writeDaemonLog(
 								logsDir,
@@ -466,7 +466,7 @@ async function startOwningDaemon(
 							);
 							return;
 						}
-						sourceContact.contactSources(workerListenerPort);
+						sourceContact.contactSources(workerListenerPort, requestedTypes);
 					},
 					undefined,
 					config.queue.stepSilenceLimitSeconds * 1000,
