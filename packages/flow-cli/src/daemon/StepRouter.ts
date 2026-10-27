@@ -12,6 +12,10 @@ import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { workerSatisfiesLabels } from './LabelMatcher.js';
 import { workerSatisfiesShell } from './ShellMatcher.js';
 import type { RegisteredWorker } from './WorkerRegistry.js';
+import type { WorkerTypeCatalog, WorkerTypeLookup } from './WorkerTypeCatalog.js';
+
+/** No worker has a type: what a router built without a catalog knows. */
+const NO_WORKER_TYPES: Pick<WorkerTypeCatalog, 'typeLookup'> = { typeLookup: () => () => undefined };
 
 /** An idle worker together with the connection to reach it. */
 export interface RoutingCandidate {
@@ -124,17 +128,26 @@ export class DefaultStepDistribution implements StepDistributionProvider {
  * that only wants to express a preference cannot accidentally remove capacity.
  */
 export class StepRouter {
+	/**
+	 * @param workerTypes where a worker's type comes from (see {@link WorkerTypeCatalog}). Without it no worker has a
+	 *        type, so a step bound to a worker type is placed nowhere: the safe answer to a missing wiring.
+	 */
 	constructor(
 		private readonly acceptance: WorkerAcceptanceProvider = new DefaultWorkerAcceptance(),
-		private readonly distribution: StepDistributionProvider = new DefaultStepDistribution()
+		private readonly distribution: StepDistributionProvider = new DefaultStepDistribution(),
+		private readonly workerTypes: Pick<WorkerTypeCatalog, 'typeLookup'> = NO_WORKER_TYPES
 	) {}
 
 	/**
 	 * The connection to dispatch to, or undefined when no live worker may run this step.
 	 *
 	 * Undefined is not an error: it is how the caller learns it needs to obtain a worker.
+	 *
+	 * A step bound to a worker type is first narrowed to the workers of that type -- before S4 and S3, which can
+	 * neither widen the set back nor be consulted about the others.
 	 */
-	select(step: StepPlacement, candidates: RoutingCandidate[]): WebSocket | undefined {
+	select(step: StepPlacement, allCandidates: RoutingCandidate[]): WebSocket | undefined {
+		const candidates = this.ofBoundType(step, allCandidates);
 		const byWorkerId = new Map(candidates.map(candidate => [candidate.worker.workerId, candidate]));
 
 		const eligible = candidates.filter(candidate => this.acceptsSafely(step, candidate.worker));
@@ -147,6 +160,28 @@ export class StepRouter {
 		// The provider is author-written, so an id it returns is not guaranteed to be one
 		// we offered; an unknown one is dropped rather than trusted.
 		return first !== undefined ? byWorkerId.get(first.workerId)?.ws : eligible[0]?.ws;
+	}
+
+	/**
+	 * The candidates whose type is the one the step's run is bound to; all of them for a run that is not bound.
+	 *
+	 * A lookup that throws (the source registry cannot be read) leaves no worker of any type: the step stays unplaced
+	 * and the reason is reported, rather than the failure aborting the dispatch loop of every execution.
+	 */
+	private ofBoundType(step: StepPlacement, candidates: RoutingCandidate[]): RoutingCandidate[] {
+		if (step.boundWorkerType === undefined) {
+			return candidates;
+		}
+		let typeOf: WorkerTypeLookup;
+		try {
+			typeOf = this.workerTypes.typeLookup();
+		} catch (err) {
+			process.stderr.write(
+				`[StepRouter] cannot tell which workers are of type "${step.boundWorkerType}" for step ${step.stepId}, so it is placed nowhere for now: ${normalizeError(err).message}\n`
+			);
+			return [];
+		}
+		return candidates.filter(candidate => typeOf(candidate.worker.sourceId) === step.boundWorkerType);
 	}
 
 	/**

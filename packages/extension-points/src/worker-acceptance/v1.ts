@@ -36,6 +36,12 @@ export interface StepPlacement {
 	 * step at all.
 	 */
 	shellKind?: 'bash' | 'cmd' | 'pwsh';
+	/**
+	 * Worker type the step's run is bound to (flow-level `workerType:`), or undefined for a run that is not bound.
+	 * Informational for a plugin: the daemon has already removed every worker of another type (or of none) before
+	 * asking S4 or S3, and a plugin answering differently cannot bring one back.
+	 */
+	boundWorkerType?: string;
 }
 
 /** The candidate worker, as it declared itself when registering. */
