@@ -5,11 +5,12 @@
  * Simple wrapper around child_process for flow steps.
  */
 import type { ChildProcess } from 'node:child_process';
-import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { DefaultProcessLauncher } from '../processing/DefaultProcessLauncher';
+import type { ProcessLauncher } from '../processing/ProcessLauncher';
 import { NtStatusDescriber } from './NtStatusDescriber';
 import { killAllRunningScripts, superviseScriptProcess } from './ScriptProcessSupervisor';
 import { BashInvocation } from './shell/BashInvocation';
@@ -132,6 +133,9 @@ export class ScriptExecutionError extends Error {
  * Script Executor class
  */
 export class ScriptExecutor {
+	/** Every process this executor starts or ends goes through the launcher (default: the host). */
+	constructor(private readonly launcher: ProcessLauncher = new DefaultProcessLauncher()) {}
+
 	/**
 	 * Execute a script and return the result
 	 *
@@ -282,7 +286,7 @@ export class ScriptExecutor {
 
 		// Spawn process
 		// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so grandchildren allocate a visible console; the script must inherit the daemon's hidden console (d032e7e). Guarded by ScriptExecutor.windows-console.test.ts
-		const child = spawn(scriptToExecute, [], {
+		const child = this.launcher.spawn(scriptToExecute, [], {
 			cwd: workingDir,
 			env: cleanEnv,
 			shell,
@@ -373,6 +377,7 @@ export class ScriptExecutor {
 			const outcome = await superviseScriptProcess(child, {
 				timeoutMs: options.timeout,
 				onNotice: notice,
+				launcher: this.launcher,
 			});
 			return { stdout, stderr, code: outcome.code, timedOut: outcome.timedOut };
 		} catch (error) {
@@ -397,7 +402,7 @@ export class ScriptExecutor {
 	): Promise<ScriptExecutionResult> {
 		try {
 			// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, making grandchildren allocate a visible console -- see d032e7e
-			const child = spawn(binary, args, {
+			const child = this.launcher.spawn(binary, args, {
 				cwd: workingDir,
 				env: cleanEnv,
 				stdio: ['ignore', 'pipe', 'pipe'],
