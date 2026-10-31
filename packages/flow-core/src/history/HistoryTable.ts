@@ -46,6 +46,10 @@ export function renderDetailView(exec: ExecutionState, projectLookup?: ProjectLo
 		const name = step.injected ? `${stepId}*` : stepId;
 		const dur = step.startedAt ? formatDuration(step.startedAt, step.completedAt ?? null) : '-';
 		lines.push('  ' + padTruncate(name, COL_STEP) + padTruncate(step.status, COL_STATUS) + dur);
+		// Same wording as `flow show`: a step that never ran says why, instead of a bare "completed".
+		if (step.skippedReason) {
+			lines.push(`      skipped: ${step.skippedReason}`);
+		}
 		lines.push(...renderStepCostLines(step, '      '));
 	}
 

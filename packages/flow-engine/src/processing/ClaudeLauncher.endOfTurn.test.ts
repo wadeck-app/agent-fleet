@@ -51,7 +51,10 @@ describe('ClaudeLauncher -- end of turn on the result event', () => {
 				process.kill(pid);
 			}
 		}
-		fs.rmSync(tempDir, { recursive: true, force: true });
+		// The killed tree had tempDir as its working directory: on Windows the directory stays locked (EPERM)
+		// for a few ms after the process is gone. rmSync retries EPERM/EBUSY up to maxRetries * retryDelay
+		// (5 s) and then throws, so a directory that stays locked still fails loudly.
+		fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 50, retryDelay: 100 });
 	});
 
 	async function launch(mockEnv: Record<string, string>, extra: Partial<ClaudeLaunchOptions> = {}) {

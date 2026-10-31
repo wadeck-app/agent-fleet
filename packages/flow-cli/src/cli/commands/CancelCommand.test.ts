@@ -125,6 +125,14 @@ describe('flow cancel command', () => {
 		expect(printedErrors()).toContain('already ended as completed');
 	});
 
+	it('prefixes every refusal with "Error: " (a space after the colon)', async () => {
+		daemon.send.mockResolvedValue({ type: 'error', code: 'EXECUTION_NOT_FOUND', message: 'No execution found with id "x".' });
+
+		await expect(run(EXECUTION_ID)).rejects.toThrow('exit 1');
+
+		expect(printedErrors()).toBe('Error: No execution found with id "x".');
+	});
+
 	it('--json puts the refusal on stderr as JSON and exits 1', async () => {
 		daemon.send.mockResolvedValue({ type: 'error', code: 'EXECUTION_NOT_FOUND', message: 'No execution found' });
 

@@ -4,8 +4,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { ExecutionStore } from '../../storage/ExecutionStore';
 import { RegisteredProjectFixture } from '../../test-utils/RegisteredProjectFixture';
+// violations-suppress-end: ts/no-deep-relative
+import { executionsDirOf } from 'flow-core';
 import { registerHistoryCommand } from './HistoryCommand';
 
 // Filtering, pagination and rendering are covered in flow-core (history/*.test.ts); this file only
@@ -81,6 +84,39 @@ describe('flow history command', () => {
 	it('--id prints the detail view of one execution', () => {
 		run('--id', 'bbb');
 		expect(printed()).toContain('Execution: bbb33333');
+	});
+
+	describe('--id on an execution written by the store', () => {
+		const store = (): ExecutionStore => new ExecutionStore(executionsDirOf(configDir));
+		const stepRow = (stepId: string): string => printed().split('\n').find(line => line.trim().startsWith(stepId)) ?? '';
+
+		it('lists the steps of an execution ended by flow cancel, failed and skipped ones with their reason', () => {
+			const s = store();
+			s.create({ executionId: 'cancel01', flowFile: 'f.yml', flowId: 'f', stepIds: ['wait', 'after'] });
+			s.markStepRunning('cancel01', 'wait');
+			s.markStepSkipped('cancel01', 'after', 'cancelled by user');
+			s.update('cancel01', { lastError: 'cancelled by user', endReason: 'cancelled' });
+			s.markExecutionFailed('cancel01');
+
+			run('--id', 'cancel01');
+
+			expect(stepRow('wait')).toContain('failed');
+			expect(printed()).toContain("Step 'wait' failed:");
+			expect(printed()).toContain('Error:  cancelled by user');
+			expect(stepRow('after')).toContain('completed');
+			expect(printed()).toContain('skipped: cancelled by user');
+		});
+
+		it('lists the pending and running steps of a running execution', () => {
+			const s = store();
+			s.create({ executionId: 'live0001', flowFile: 'f.yml', flowId: 'f', stepIds: ['wait', 'after'] });
+			s.markStepRunning('live0001', 'wait');
+
+			run('--id', 'live0001');
+
+			expect(stepRow('wait')).toContain('running');
+			expect(stepRow('after')).toContain('pending');
+		});
 	});
 
 	it('--json prints the same selection as the table, as raw records', () => {

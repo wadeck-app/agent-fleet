@@ -118,7 +118,7 @@ export function registerCancelCommand(program: Command, getConfigDir: () => stri
 				if (options.json) {
 					process.stderr.write(JSON.stringify({ code: outcome.code, message: outcome.message }) + '\n');
 				} else {
-					console.error(`Error:${outcome.message}`);
+					console.error(`Error: ${outcome.message}`);
 				}
 				process.exit(1);
 			}
