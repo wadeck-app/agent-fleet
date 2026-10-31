@@ -191,7 +191,7 @@ describe.each(['wait-all', 'waves'] as const)('StepOutcomes -- store follows a p
 });
 
 describe('StepOutcomes -- production code fails loudly on a scheduler without takeRequeuedSteps', () => {
-	it('does not tolerate a scheduler that cannot report requeued steps', () => {
+	it('does not tolerate a scheduler that cannot report requeued steps: the execution ends failed, naming it', () => {
 		const registry = new ExecutionRegistry();
 		const scheduler = {
 			complete: vi.fn().mockReturnValue([]),
@@ -204,18 +204,36 @@ describe('StepOutcomes -- production code fails loudly on a scheduler without ta
 			{ executionId: EXECUTION_ID, inputs: {}, stepOutputs: {}, stepMeta: {} } as never,
 			[]
 		);
+		const store = {
+			markStepFailed: vi.fn(),
+			markExecutionFailed: vi.fn(),
+			markStepSkipped: vi.fn(),
+		};
 		const outcomes = new StepOutcomes(
 			registry,
 			new ReadyStepQueue(),
-			{} as never,
+			store as never,
 			{ writeExecution: vi.fn() } as never,
 			new DaemonSecrets(),
-			{} as never,
-			{} as never,
+			{ release: vi.fn() } as never,
+			{ dispatch: vi.fn() } as never,
 			vi.fn(),
 			vi.fn()
 		);
+		vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
-		expect(() => outcomes.onStepCompleted(EXECUTION_ID, 's', {})).toThrow(/takeRequeuedSteps/);
+		outcomes.onStepCompleted(EXECUTION_ID, 's', {});
+
+		expect(store.markStepFailed).toHaveBeenCalledWith(
+			EXECUTION_ID,
+			's',
+			expect.stringMatching(/takeRequeuedSteps/),
+			undefined,
+			undefined,
+			undefined,
+			expect.anything()
+		);
+		expect(store.markExecutionFailed).toHaveBeenCalledWith(EXECUTION_ID);
+		expect(registry.scheduler(EXECUTION_ID)).toBeUndefined();
 	});
 });

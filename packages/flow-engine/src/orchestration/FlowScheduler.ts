@@ -203,7 +203,9 @@ export class FlowScheduler {
 					const ready = this.collectReady();
 					return [...ready, ...this.coordinator.tryFireDeferredParent(stepId)];
 				}
-				return this.collectReady();
+				// Children skipped by `when` settle without a completion event, so no child will ever fire the parent
+				const ready = this.collectReady();
+				return [...ready, ...this.coordinator.tryFireDeferredParent(stepId)];
 			}
 		}
 

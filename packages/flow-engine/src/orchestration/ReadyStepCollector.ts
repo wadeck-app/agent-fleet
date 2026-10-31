@@ -27,6 +27,14 @@ export class ReadyStepCollector {
 					if (!shouldRun) {
 						completedSteps.add(stepId);
 						skipped.push(stepId);
+						// A sub-step cannot run without its parent: the whole subtree is skipped with it
+						for (const childId of this.state.descendantsOf(stepId)) {
+							if (pendingDeps.has(childId) && !inFlightSteps.has(childId)) {
+								pendingDeps.delete(childId);
+								completedSteps.add(childId);
+								skipped.push(childId);
+							}
+						}
 						continue;
 					}
 				}

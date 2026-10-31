@@ -39,7 +39,7 @@ export class WhenConditionEvaluator {
 		// e.g. steps.get-status.outputs.x -> steps['get-status'].outputs.x
 		condition = WhenConditionEvaluator.normalizeDotNotation(condition);
 
-		const depIds = Array.from(this.originalDeps.get(stepId) ?? []);
+		const depIds = this.transitiveDependenciesOf(stepId);
 
 		// outputs: keyed by dep step id
 		const outputs: Record<string, Record<string, unknown>> = {};
@@ -74,6 +74,25 @@ export class WhenConditionEvaluator {
 				stepId
 			);
 		}
+	}
+
+	/**
+	 * Direct and transitive dependencies: the dependency validator accepts a reference to any step in the
+	 * dependency chain (a sub-step depends on its parent, which depends on the step it reads), so the
+	 * condition must see them all, not only the declared ones.
+	 */
+	private transitiveDependenciesOf(stepId: string): string[] {
+		const found = new Set<string>();
+		const worklist = [stepId];
+		while (worklist.length > 0) {
+			for (const dep of this.originalDeps.get(worklist.shift()!) ?? new Set<string>()) {
+				if (!found.has(dep)) {
+					found.add(dep);
+					worklist.push(dep);
+				}
+			}
+		}
+		return [...found];
 	}
 
 	/**

@@ -24,6 +24,19 @@ function isUnansweredInterventionError(error: string): boolean {
 	return error.includes('this step is unanswered, not denied');
 }
 
+/** A scheduler `when` evaluation error, recognised by shape: flow-engine does not export the class. */
+function asConditionError(error: unknown): { stepId: string; condition: string } | undefined {
+	const candidate = error as { name?: unknown; stepId?: unknown; condition?: unknown } | null;
+	if (
+		candidate?.name === 'ConditionEvaluationError' &&
+		typeof candidate.stepId === 'string' &&
+		typeof candidate.condition === 'string'
+	) {
+		return { stepId: candidate.stepId, condition: candidate.condition };
+	}
+	return undefined;
+}
+
 /** Why the daemon failed a step itself; `engine_failed` when none of the specific causes applies. */
 export type EngineEndReason = Extract<AttemptEndReason, 'engine_failed' | 'stalled' | 'worker_lost'>;
 
@@ -60,6 +73,18 @@ export class StepOutcomes {
 			return;
 		}
 
+		this.guardSchedulerErrors(executionId, stepId, () =>
+			this.settleCompletion(executionId, stepId, scheduler, output, meta)
+		);
+	}
+
+	private settleCompletion(
+		executionId: string,
+		stepId: string,
+		scheduler: NonNullable<ReturnType<ExecutionRegistry['scheduler']>>,
+		output: Record<string, unknown>,
+		meta: StepMeta | undefined
+	): void {
 		// Sync output and meta to ExecutionContext (used by worker for template rendering in next step)
 		const context = this.executions.context(executionId)!;
 		context.stepOutputs[stepId] = output;
@@ -92,7 +117,51 @@ export class StepOutcomes {
 
 	/** Called by Daemon when a worker reports step_failed. */
 	onStepFailed(executionId: string, stepId: string, rawError: string, rawOutputs?: Record<string, unknown>): void {
-		this.settleFailure(executionId, stepId, rawError, 'step', rawOutputs);
+		this.guardSchedulerErrors(executionId, stepId, () =>
+			this.settleFailure(executionId, stepId, rawError, 'step', rawOutputs)
+		);
+	}
+
+	/**
+	 * The worker message handler only logs a throw, which would leave the execution `running` with its
+	 * remaining steps `pending` forever. A throw while settling an outcome (typically the scheduler failing
+	 * to evaluate a `when`) therefore ends the execution: the culprit step fails as an engine-origin
+	 * failure carrying the cause and the fix, through the same path as {@link failStep}.
+	 */
+	private guardSchedulerErrors(executionId: string, stepId: string, settle: () => void): void {
+		try {
+			settle();
+		} catch (error) {
+			this.endExecutionOnEngineError(executionId, stepId, error);
+		}
+	}
+
+	private endExecutionOnEngineError(executionId: string, settledStepId: string, error: unknown): void {
+		const { message: cause, stack } = normalizeError(error);
+		const condition = asConditionError(error);
+		const stepId = condition?.stepId ?? settledStepId;
+		const reason =
+			condition === undefined
+				? `Engine error while settling the outcome of step '${settledStepId}': ${cause}. The execution was ended because it could not progress; the daemon log has the stack.`
+				: `${cause}. The \`when\` of step '${stepId}' (${condition.condition}) can only read the outputs of steps it depends on, directly or through its parent or a chain of \`depends\`. Fix: add the step it reads to \`depends\` of '${stepId}'.`;
+		process.stderr.write(`[daemon] execution ${executionId}: ${reason}\n${stack ?? ''}\n`);
+		try {
+			this.failStep(executionId, stepId, reason);
+		} catch (secondError) {
+			// The normal failure path broke too: end the execution by hand, leaving nothing running
+			const secondCause = normalizeError(secondError).message;
+			process.stderr.write(
+				`[daemon] execution ${executionId}: failing step '${stepId}' also threw: ${secondCause}\n`
+			);
+			this.logWriter.writeExecution(
+				executionId,
+				`Step ${stepId} failed: ${reason} (and recording it failed: ${secondCause})`,
+				'error'
+			);
+			this.queue.purge(executionId);
+			this.executionStore.markExecutionFailed(executionId);
+			this.cleanupExecution(executionId, 'failed', new Error(reason));
+		}
 	}
 
 	private settleFailure(
