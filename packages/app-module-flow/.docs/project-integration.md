@@ -21,3 +21,14 @@
 | other failure | error reply (500), never a throw |
 
 Cost: one scan of the executions directory (same loader as the executions page), no cap on the scan.
+
+## Slots for the project module
+
+Both slots accept built-in DSL types only: `ButtonLink`, `IconButton`, `Badge`, `Link` (flow-core `FLOW_PROJECT_SLOTS`). A namespaced type would make the contributor fail to load without its provider, so flow has no `requires` and no dependency on the project module (pinned by `manifest.test.ts`). Only the root `$type` is checked, not its props.
+
+| Slot | Where | Host context |
+| --- | --- | --- |
+| `flow:execution-project-header` | execution detail, next to the badges | `$route.id`, `$sources.execution.projectId`, `$sources.execution.projectLabel` (absent on runs recorded before project ids) |
+| `flow:executions-project-header` | executions page, filter row | URL param `project` (the filter, 8 hex chars) |
+
+The action slots (`execution-links`, `execution-actions`, `executions-actions`, `execution-row-links`, `execution-row-actions`) still accept `flow-chart:FlowChartLink` only.

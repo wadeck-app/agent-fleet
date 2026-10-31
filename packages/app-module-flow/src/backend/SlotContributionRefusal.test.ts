@@ -1,4 +1,4 @@
-import { FLOW_ACTION_SLOT_ACCEPTS, FLOW_EXPOSED_SLOTS } from 'flow-core';
+import { FLOW_ACTION_SLOT_ACCEPTS, FLOW_EXPOSED_SLOTS, FLOW_PROJECT_SLOTS, FLOW_PROJECT_SLOT_ACCEPTS } from 'flow-core';
 import { removeTempDirectory } from 'flow-core/testing';
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
@@ -121,5 +121,31 @@ describe('the platform refuses a contribution outside the action-slot contract',
 			'link.yaml': '$type: flow-chart:FlowChartLink\ntarget: index\nvariant: primary\nclassName: x\n',
 		});
 		expect(checkContributor(dir).status).toBe(0);
+	});
+});
+
+describe('the project slots accept built-in link-like DSL types only', () => {
+	const slots = Object.keys(FLOW_PROJECT_SLOTS);
+	const cases = slots.flatMap(slot => FLOW_PROJECT_SLOT_ACCEPTS.map(type => [slot, type] as const));
+
+	it.each(slots)('on flow:%s, the platform refuses a flow-chart button and a layout root', slot => {
+		const dir = makeContributor(`refused-project-${slot}`, `flow:${slot}`, {
+			'chart.yaml': '$type: flow-chart:FlowChartLink\ntarget: index\n',
+			'stack.yaml': '$type: HorizontalStack\nitems: []\n',
+		});
+		const { status, output } = checkContributor(dir);
+		expect(status, output).not.toBe(0);
+		const accepted = FLOW_PROJECT_SLOT_ACCEPTS.join(', ');
+		for (const root of ['flow-chart:FlowChartLink', 'HorizontalStack']) {
+			expect(output).toContain(`contributes a "${root}" to "flow:${slot}", which accepts only: ${accepted}`);
+		}
+	});
+
+	it.each(cases)('on flow:%s, accepts a %s root', (slot, type) => {
+		const dir = makeContributor(`accepted-project-${slot}-${type}`, `flow:${slot}`, {
+			'node.yaml': `$type: ${type}\nlabel: Project\nto: /modules/project/p/a1b2c3d4\n`,
+		});
+		const { status, output } = checkContributor(dir);
+		expect(status, output).toBe(0);
 	});
 });

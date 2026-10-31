@@ -957,8 +957,8 @@ describe('extension slots', () => {
 	}
 
 	it.each([
-		['execution-detail-page.yaml', ['execution-actions', 'execution-links']],
-		['executions-page.yaml', ['execution-row-actions', 'execution-row-links', 'executions-actions']],
+		['execution-detail-page.yaml', ['execution-actions', 'execution-links', 'execution-project-header']],
+		['executions-page.yaml', ['execution-row-actions', 'execution-row-links', 'executions-actions', 'executions-project-header']],
 		['execution-logs-page.yaml', []],
 	])(
 		'%s embeds %j in every A/B variant: choosing a design must not drop the buttons other modules add',

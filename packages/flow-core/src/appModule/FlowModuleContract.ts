@@ -57,3 +57,21 @@ export function executionPagePath(executionId: string): string {
 export function executionLogsPath(executionId: string): string {
 	return `${executionPagePath(executionId)}/logs`;
 }
+
+/**
+ * Root `$type`s a contribution to a project slot may have: built-in DSL types only. A namespaced type would make
+ * the module fail to load when its provider is absent, and flow must load without the project module.
+ */
+export const FLOW_PROJECT_SLOT_ACCEPTS: readonly string[] = ['ButtonLink', 'IconButton', 'Badge', 'Link'];
+
+/**
+ * Slots where another module (the project module) links to the project of the page, apart from
+ * {@link FLOW_EXPOSED_SLOTS} (whose contributors are flow-chart's buttons). Name, without the `flow:` prefix -> accepted root `$type`s.
+ */
+export const FLOW_PROJECT_SLOTS: Readonly<Record<string, readonly string[]>> = {
+	// Execution detail page, next to the badges. Context: $route.id and $sources.execution.<field>, among them projectId
+	// (absent on a run recorded before project ids existed) and projectLabel.
+	'execution-project-header': FLOW_PROJECT_SLOT_ACCEPTS,
+	// Executions page, in the row of the filters. Context: the URL parameters of the page, among them ?project=<projectId>.
+	'executions-project-header': FLOW_PROJECT_SLOT_ACCEPTS,
+};

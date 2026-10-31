@@ -24,6 +24,8 @@
 $sources:
     actions:
         url: GET /api/slots/flow:executions-actions
+    projectLinks:
+        url: GET /api/slots/flow:executions-project-header
     rowLinks:
         url: GET /api/slots/flow:execution-row-links
     rowActions:
@@ -74,6 +76,10 @@ sections:
                             - { value: running, label: Running }
                             - { value: queued, label: Waiting }
                             - { value: recovered, label: Recovered }
+                      # Slot "flow:executions-project-header" (built-in link-like types only): shows the project the list is
+                      # filtered on (?project=). Renders nothing while no module contributes.
+                      - $type: ExtensionSlot
+                        items: $sources.projectLinks
 
                 # Renders nothing while no module contributes.
                 - $type: ExtensionSlot

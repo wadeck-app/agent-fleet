@@ -6,6 +6,8 @@ import {
 	FLOW_EXECUTION_ROW_CONTEXT_FIELDS,
 	FLOW_EXPOSED_SLOTS,
 	FLOW_PAGE_PATHS,
+	FLOW_PROJECT_SLOTS,
+	FLOW_PROJECT_SLOT_ACCEPTS,
 	FLOW_REQUIRED_RANGE,
 	executionLogsPath,
 	executionPagePath,
@@ -72,5 +74,20 @@ describe('page links to one execution', () => {
 describe('FLOW_EXECUTION_ROW_CONTEXT_FIELDS', () => {
 	it('names the row fields a contribution to execution-row-actions can read as $ctx.row.<field>', () => {
 		expect(FLOW_EXECUTION_ROW_CONTEXT_FIELDS).toEqual(['executionId', 'flowId']);
+	});
+});
+
+describe('FLOW_PROJECT_SLOTS', () => {
+	it('exposes one slot on the execution detail page and one in the executions page filter row, apart from the action slots', () => {
+		expect(Object.keys(FLOW_PROJECT_SLOTS).sort()).toEqual(['execution-project-header', 'executions-project-header']);
+		for (const slot of Object.keys(FLOW_PROJECT_SLOTS)) expect(FLOW_EXPOSED_SLOTS).not.toHaveProperty(slot);
+	});
+
+	it('accepts built-in link-like DSL types only (no namespaced type: flow never depends on the project module), never a flow-chart button nor a layout', () => {
+		expect([...FLOW_PROJECT_SLOT_ACCEPTS]).toEqual(['ButtonLink', 'IconButton', 'Badge', 'Link']);
+		expect(FLOW_PROJECT_SLOT_ACCEPTS.some(type => type.includes(':'))).toBe(false);
+		for (const [slot, accepts] of Object.entries(FLOW_PROJECT_SLOTS)) {
+			expect(accepts, slot).toEqual(FLOW_PROJECT_SLOT_ACCEPTS);
+		}
 	});
 });

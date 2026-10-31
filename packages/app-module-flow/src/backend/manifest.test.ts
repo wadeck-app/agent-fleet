@@ -1,4 +1,10 @@
-import { FLOW_ACTION_SLOT_ACCEPTS, FLOW_APP_MODULE_ID, FLOW_EXPOSED_SLOTS, FLOW_PAGE_PATHS } from 'flow-core';
+import {
+	FLOW_ACTION_SLOT_ACCEPTS,
+	FLOW_APP_MODULE_ID,
+	FLOW_EXPOSED_SLOTS,
+	FLOW_PAGE_PATHS,
+	FLOW_PROJECT_SLOTS,
+} from 'flow-core';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -104,20 +110,36 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 		const slots = manifest.expose?.slots ?? {};
 
 		it('exposes exactly the slots of flow-core FLOW_EXPOSED_SLOTS, the contract the modules filling them are tested against', () => {
-			expect(Object.keys(slots).sort()).toEqual(Object.keys(FLOW_EXPOSED_SLOTS).sort());
-			for (const [name, accepts] of Object.entries(FLOW_EXPOSED_SLOTS)) {
+			const contract = { ...FLOW_EXPOSED_SLOTS, ...FLOW_PROJECT_SLOTS };
+			expect(Object.keys(slots).sort()).toEqual(Object.keys(contract).sort());
+			for (const [name, accepts] of Object.entries(contract)) {
 				expect([...(slots[name]?.accepts ?? [])].sort(), `slot ${name}`).toEqual([...accepts].sort());
 			}
 		});
 
-		it('accepts only the action-slot contract roots (the one component whose style is fixed), never a free-form component', () => {
+		it('accepts only the action-slot contract roots (the one component whose style is fixed), or the project link on the project slots, never a free-form component', () => {
 			for (const [name, slot] of Object.entries(slots)) {
-				expect(slot.accepts, `slot ${name}`).toEqual([...FLOW_ACTION_SLOT_ACCEPTS]);
+				expect(slot.accepts, `slot ${name}`).toEqual([...(FLOW_PROJECT_SLOTS[name] ?? FLOW_ACTION_SLOT_ACCEPTS)]);
 			}
 		});
 
 		it('requires no other module: flow works with no contributor installed', () => {
 			expect(manifest.requires).toBeUndefined();
+		});
+
+		it('never depends on the project module: the project slots name built-in types only, flow loads without it', () => {
+			expect(JSON.stringify(manifest.requires ?? {})).not.toContain('project');
+			const packageJson = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as Record<
+				string,
+				Record<string, string> | undefined
+			>;
+			const names = ['dependencies', 'devDependencies', 'peerDependencies'].flatMap(key =>
+				Object.keys(packageJson[key] ?? {})
+			);
+			expect(names.filter(name => name.includes('project'))).toEqual([]);
+			for (const accepts of Object.values(manifest.expose?.slots ?? {})) {
+				expect(JSON.stringify(accepts)).not.toContain('project');
+			}
 		});
 	});
 });

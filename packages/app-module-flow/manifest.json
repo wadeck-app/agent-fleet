@@ -22,6 +22,12 @@
 			"execution-row-actions": {
 				"accepts": ["flow-chart:FlowChartLink"]
 			},
+			"execution-project-header": {
+				"accepts": ["ButtonLink", "IconButton", "Badge", "Link"]
+			},
+			"executions-project-header": {
+				"accepts": ["ButtonLink", "IconButton", "Badge", "Link"]
+			},
 			"execution-row-links": {
 				"accepts": ["flow-chart:FlowChartLink"]
 			}

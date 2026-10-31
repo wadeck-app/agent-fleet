@@ -25,6 +25,8 @@ $sources:
             full: $urlParam.full
     links:
         url: GET /api/slots/flow:execution-links
+    projectLinks:
+        url: GET /api/slots/flow:execution-project-header
     actions:
         url: GET /api/slots/flow:execution-actions
 
@@ -53,6 +55,9 @@ sections:
                             tone: subtle,
                         }
                       - { $type: Badge, label: $sources.execution.duration, variant: info }
+                      # Slot "flow:execution-project-header" (built-in link-like types only): a link to the project of the run.
+                      - $type: ExtensionSlot
+                        items: $sources.projectLinks
 
                 - $type: HorizontalStack
                   gap: gap-2
