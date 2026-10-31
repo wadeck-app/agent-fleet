@@ -351,6 +351,65 @@ describe('DependencyOrderValidator', () => {
 			expect(collector.issues).toHaveLength(1);
 			expect(collector.issues[0].location?.field).toBe('when');
 		});
+
+		describe('bare when expressions (no ${{ }} wrapper)', () => {
+			const check = {
+				type: 'script' as const,
+				id: 'check',
+				name: 'Check',
+				script: 'echo dev',
+				output: { go: { type: 'string' as const, from: 'stdout' as const } },
+			};
+			const conditional = (when: string, depends?: string[]) => ({
+				type: 'script' as const,
+				id: 'conditional',
+				name: 'Conditional',
+				script: 'echo x',
+				when,
+				...(depends ? { depends } : {}),
+			});
+
+			function validate(steps: FlowDefinition['steps']): ValidationIssue[] {
+				const collector = new MockIssueCollector();
+				new DependencyOrderValidator(collector).validateDependencyOrder(createFlow(steps));
+				return collector.issues;
+			}
+
+			it.each([
+				["steps.check.outputs.go == 'dev'", 'steps form'],
+				["outputs.check.go == 'dev'", 'outputs form'],
+				["outputs['check'].go == 'dev'", 'outputs bracket form'],
+				["steps['check'].outputs.go == 'dev'", 'steps bracket form'],
+			])('errors naming the step, the expression and the fix when the step is not a dependency: %s (%s)', when => {
+				const issues = validate([check, conditional(when)]);
+
+				expect(issues).toHaveLength(1);
+				expect(issues[0]!.code).toBe(ValidationCode.UNDEFINED_VARIABLE);
+				expect(issues[0]!.location?.stepId).toBe('conditional');
+				expect(issues[0]!.location?.field).toBe('when');
+				expect(issues[0]!.message).toContain("'conditional'");
+				expect(issues[0]!.message).toContain("'check'");
+				expect(issues[0]!.message).toContain(when);
+				expect(issues[0]!.suggestion).toContain("Add 'check' to the 'depends' array of 'conditional'");
+			});
+
+			it('accepts a direct dependency', () => {
+				expect(validate([check, conditional("steps.check.outputs.go == 'dev'", ['check'])])).toHaveLength(0);
+			});
+
+			it('accepts a transitive dependency through another step', () => {
+				const middle = { type: 'script' as const, id: 'middle', name: 'Middle', script: 'echo m', depends: ['check'] };
+				expect(validate([check, middle, conditional("steps.check.outputs.go == 'dev'", ['middle'])])).toHaveLength(0);
+			});
+
+			it('reports a reference once when the expression is wrapped in ${{ }}', () => {
+				expect(validate([check, conditional("${{ steps.check.outputs.go == 'dev' }}")])).toHaveLength(1);
+			});
+
+			it('ignores a flow input and a literal that merely looks like an output path', () => {
+				expect(validate([check, conditional("inputs.outputs == 'x' && inputs.check == 'steps'")])).toHaveLength(0);
+			});
+		});
 	});
 
 	describe('Multiple Variable References', () => {

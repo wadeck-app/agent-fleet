@@ -80,7 +80,15 @@ export class DependencyOrderValidator {
 		for (const step of flow.steps) {
 			const texts = this.getTemplateTexts(step);
 
+			if (step.when) {
+				references.push(...this.extractWhenReferences(step.id, step.when));
+			}
+
 			for (const { text: rawText, field } of texts) {
+				// A `when` is an expression, with or without ${{ }}: handled above
+				if (field === 'when') {
+					continue;
+				}
 				// $${{ ... }} is an escaped literal for the renderer: not a reference
 				const text = TemplateEscape.strip(rawText);
 				let match;
@@ -105,6 +113,26 @@ export class DependencyOrderValidator {
 		}
 
 		return references;
+	}
+
+	/**
+	 * The steps a `when` expression reads. The engine evaluates it bare (`steps.a.outputs.x == 'y'`), wrapped in
+	 * `${{ }}`, or through `outputs.a.x` / `outputs['a'].x`, and exposes only the outputs of the step's (transitive)
+	 * dependencies: a read of any other step fails at run time, so each is reported once per step.
+	 */
+	private extractWhenReferences(stepId: string, when: string): VariableReference[] {
+		const readPattern =
+			/(?<![\w.$-])(?:steps\.([\w-]+)\.outputs\b|steps\[\s*['"]([\w-]+)['"]\s*\]\.outputs\b|outputs\.([\w-]+)|outputs\[\s*['"]([\w-]+)['"]\s*\])/g;
+		const readSteps = new Set<string>();
+		for (const match of TemplateEscape.strip(when).matchAll(readPattern)) {
+			readSteps.add((match[1] ?? match[2] ?? match[3] ?? match[4])!);
+		}
+		return [...readSteps].map(producerStepId => ({
+			expression: when.trim(),
+			type: 'step' as const,
+			path: [producerStepId],
+			location: { stepId, field: 'when' },
+		}));
 	}
 
 	/**
@@ -170,7 +198,9 @@ export class DependencyOrderValidator {
 			this.issueCollector.addIssue({
 				severity: 'error',
 				code: ValidationCode.UNDEFINED_VARIABLE,
-				message: `Step '${consumerStepId}' uses variable from '${producerStepId}' but does not depend on it`,
+				message: `Step '${consumerStepId}' uses variable from '${producerStepId}' but does not depend on it${
+					ref.location.field === 'when' ? ` (when: ${ref.expression})` : ''
+				}`,
 				location: ref.location,
 				suggestion: `Add '${producerStepId}' to the 'depends' array of '${consumerStepId}' (directly or transitively)`,
 				context: {

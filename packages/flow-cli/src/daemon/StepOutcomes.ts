@@ -12,6 +12,7 @@ import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import type { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
 import type { RunEndCoordinator } from './RunEndCoordinator.js';
+import { describeConditionError } from './SchedulerConditionError.js';
 
 /**
  * True when a step_failed error is the file-approval timeout's exact sentinel, as opposed to
@@ -22,19 +23,6 @@ import type { RunEndCoordinator } from './RunEndCoordinator.js';
  */
 function isUnansweredInterventionError(error: string): boolean {
 	return error.includes('this step is unanswered, not denied');
-}
-
-/** A scheduler `when` evaluation error, recognised by shape: flow-engine does not export the class. */
-function asConditionError(error: unknown): { stepId: string; condition: string } | undefined {
-	const candidate = error as { name?: unknown; stepId?: unknown; condition?: unknown } | null;
-	if (
-		candidate?.name === 'ConditionEvaluationError' &&
-		typeof candidate.stepId === 'string' &&
-		typeof candidate.condition === 'string'
-	) {
-		return { stepId: candidate.stepId, condition: candidate.condition };
-	}
-	return undefined;
 }
 
 /** Why the daemon failed a step itself; `engine_failed` when none of the specific causes applies. */
@@ -138,12 +126,11 @@ export class StepOutcomes {
 
 	private endExecutionOnEngineError(executionId: string, settledStepId: string, error: unknown): void {
 		const { message: cause, stack } = normalizeError(error);
-		const condition = asConditionError(error);
+		const condition = describeConditionError(error);
 		const stepId = condition?.stepId ?? settledStepId;
 		const reason =
-			condition === undefined
-				? `Engine error while settling the outcome of step '${settledStepId}': ${cause}. The execution was ended because it could not progress; the daemon log has the stack.`
-				: `${cause}. The \`when\` of step '${stepId}' (${condition.condition}) can only read the outputs of steps it depends on, directly or through its parent or a chain of \`depends\`. Fix: add the step it reads to \`depends\` of '${stepId}'.`;
+			condition?.reason ??
+			`Engine error while settling the outcome of step '${settledStepId}': ${cause}. The execution was ended because it could not progress; the daemon log has the stack.`;
 		process.stderr.write(`[daemon] execution ${executionId}: ${reason}\n${stack ?? ''}\n`);
 		try {
 			this.failStep(executionId, stepId, reason);

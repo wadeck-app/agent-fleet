@@ -18,6 +18,7 @@ import type { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
 import type { RunDefinitionLoader } from './RunDefinitionLoader.js';
 import { RunIdempotencyCache } from './RunIdempotencyCache';
+import { describeConditionError } from './SchedulerConditionError.js';
 import { RunProjectResolver } from './RunProjectResolver.js';
 import type { RunProject } from './RunProjectResolver.js';
 import type { RunStepPreparer } from './RunStepPreparer.js';
@@ -209,9 +210,14 @@ export class RunRequestHandler {
 		const assignable = this.stepPreparer.prepareSteps(flow, cmd, executionId, context);
 
 		const scheduler = new FlowScheduler(schedulerCtx);
-		const readyItems = scheduler.start(assignable as unknown as SchedulerStep[], depends);
-
+		// Registered before the scheduler starts so that a refusal below is undone by the one removal that ends any execution.
 		this.executions.start(executionId, scheduler, context, assignable);
+		let readyItems: ReturnType<FlowScheduler['start']>;
+		try {
+			readyItems = scheduler.start(assignable as unknown as SchedulerStep[], depends);
+		} catch (error) {
+			return this.refuseAfterRecord(executionId, error);
+		}
 
 		if (hookDispatcher) {
 			this.hooks.register(executionId, hookDispatcher);
@@ -224,6 +230,39 @@ export class RunRequestHandler {
 		this.tryDispatch();
 
 		return { type: 'execution_started', executionId };
+	}
+
+	/**
+	 * The scheduler refused the run (typically a top-level `when` reading a step it does not depend on) after its record,
+	 * workspace and registry entries exist. The record ends `failed` with the reason (it stays for `flow show`), what was
+	 * allocated is released, and the client gets the same reason. Nothing was queued or hooked yet.
+	 *
+	 * Declared secrets stay masked for the daemon's lifetime, as for any ended execution (see DaemonSecrets).
+	 */
+	private refuseAfterRecord(executionId: string, error: unknown): DaemonResponse {
+		const { message: cause, stack } = normalizeError(error);
+		const condition = describeConditionError(error);
+		const reason =
+			condition?.reason ??
+			`Engine error while starting the execution: ${cause}. The execution was ended because it could not start; the daemon log has the stack.`;
+		process.stderr.write(`[daemon] execution ${executionId}: ${reason}\n${stack ?? ''}\n`);
+		try {
+			if (condition === undefined) {
+				this.executionStore.update(executionId, { lastError: reason });
+			} else {
+				this.executionStore.markStepFailed(executionId, condition.stepId, reason);
+			}
+			this.executionStore.markExecutionFailed(executionId);
+			this.logWriter.writeExecution(executionId, `Execution refused at start: ${reason}`, 'error');
+		} finally {
+			this.executions.remove(executionId);
+			this.workspaces.release(executionId, new Error(reason));
+		}
+		return {
+			type: 'error',
+			code: 'RUN_REFUSED_BY_ENGINE',
+			message: `${reason} The execution ${executionId} is recorded as failed (flow show ${executionId}).`,
+		};
 	}
 
 	/**
