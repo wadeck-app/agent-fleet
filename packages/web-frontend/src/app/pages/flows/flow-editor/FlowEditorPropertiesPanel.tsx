@@ -36,6 +36,7 @@ import type { ConstantNodeData } from './nodes/ConstantNode';
 import type { FlowNode } from './types';
 import { isConstantNodeData, isStepNodeData } from './types';
 import type { FlowStep, OutputVariableConfig } from './types/flow-engine.types';
+import { resolveOutputConfig } from './utils/OutputConfig';
 
 /**
  * Update data type - can be either FlowStep updates or ConstantNodeData updates
@@ -75,12 +76,15 @@ export function FlowEditorPropertiesPanel({
 
 	// Output configuration list management
 	const outputItems = useListItems<OutputItem>({
-		initialItems: Object.entries(step?.output || {}).map(([name, config]) => ({
-			name,
-			// The renderer only offers the basic output types; backend VariableType is a superset kept as-is at runtime
-			type: (config.type || 'string') as OutputType,
-			pattern: config.pattern,
-		})),
+		initialItems: Object.entries(step?.output || {}).map(([name, rawConfig]) => {
+			const config = resolveOutputConfig(rawConfig);
+			return {
+				name,
+				// The renderer only offers the basic output types; backend VariableType is a superset kept as-is at runtime
+				type: (config.type || 'string') as OutputType,
+				pattern: config.pattern,
+			};
+		}),
 		minItems: 0,
 	});
 

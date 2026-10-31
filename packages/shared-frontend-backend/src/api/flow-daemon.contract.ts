@@ -76,6 +76,10 @@ export const FlowExecutionSummarySchema = z.object({
 	projectId: z.string().optional(),
 	/** `name (id)`, `id (removed)` or `<root> (-)` (old runs): what to show for the project. */
 	projectLabel: z.string().optional(),
+	/** Version of the definition that ran; absent on runs recorded before flow versions existed. */
+	flowVersion: z.string().optional(),
+	/** `flowVersion`, or `-` when not recorded: the text of a table cell. */
+	versionLabel: z.string().optional(),
 	stepCount: z.number(),
 	failedStepCount: z.number(),
 });
@@ -137,6 +141,8 @@ export const FlowStepSchema = z.object({
 
 export const FlowExecutionDetailSchema = FlowExecutionSummarySchema.extend({
 	filePath: z.string(),
+	/** How the version was chosen and which definition it is (detail only; the list rows do not carry it). */
+	versionNote: z.string().optional(),
 	currentSteps: z.array(z.string()),
 	steps: z.array(FlowStepSchema),
 	/** Sum of the step totals (a lower bound when totalCostComplete is false). */

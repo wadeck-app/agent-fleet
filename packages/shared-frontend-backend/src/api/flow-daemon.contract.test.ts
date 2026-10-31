@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FlowExecutionDetailSchema, FlowStepSchema } from './flow-daemon.contract';
+import { FlowExecutionDetailSchema, FlowExecutionSummarySchema, FlowStepSchema } from './flow-daemon.contract';
 
 const OLD_STEP = {
 	stepId: 'build',
@@ -74,6 +74,22 @@ describe('flow-daemon contract: step cost', () => {
 		expect(FlowExecutionDetailSchema.parse(detail)).toEqual(detail);
 		const newer = { ...detail, totalCostComplete: false, totalCostLabel: '$0.5000+ (1 attempt unknown)' };
 		expect(FlowExecutionDetailSchema.parse(newer)).toEqual(newer);
+	});
+
+	it('keeps the recorded flow version of an execution and its note, and still accepts a record without them', () => {
+		const versioned = {
+			...SUMMARY,
+			steps: [],
+			flowVersion: '1.4.0',
+			versionLabel: '1.4.0',
+			versionNote: 'pinned by the request, definition cccccccccccc',
+		};
+		expect(FlowExecutionDetailSchema.parse(versioned)).toEqual(versioned);
+		const legacy = { ...SUMMARY, steps: [] };
+		expect(FlowExecutionDetailSchema.parse(legacy)).toEqual(legacy);
+		const listed = { ...SUMMARY, flowVersion: '1.4.0', versionLabel: '1.4.0' };
+		expect(FlowExecutionSummarySchema.parse(listed)).toMatchObject({ flowVersion: '1.4.0', versionLabel: '1.4.0' });
+		expect(FlowExecutionSummarySchema.parse(SUMMARY)).not.toHaveProperty('flowVersion');
 	});
 
 	it('rejects an attempt with an unknown shape for its numbers', () => {

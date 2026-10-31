@@ -1,5 +1,7 @@
 import type { FlowDefinition, FlowStep, VariableType } from '../types/flow-engine.types';
 
+import { resolveOutputConfig } from './OutputConfig';
+
 /**
  * Represents a variable port on a node
  */
@@ -41,13 +43,16 @@ interface VariableReference {
 export function extractOutputPorts(step: FlowStep): VariablePort[] {
 	if (!step.output) return [];
 
-	return Object.entries(step.output).map(([name, config]) => ({
-		id: `output-${name}`,
-		name,
-		type: config.type,
-		direction: 'output' as const,
-		required: config.required,
-	}));
+	return Object.entries(step.output).map(([name, rawConfig]) => {
+		const config = resolveOutputConfig(rawConfig);
+		return {
+			id: `output-${name}`,
+			name,
+			type: config.type,
+			direction: 'output' as const,
+			required: config.required,
+		};
+	});
 }
 
 /**
@@ -123,7 +128,7 @@ export function extractInputPorts(step: FlowStep, flowDefinition: FlowDefinition
 			// Find source step to get output type
 			const sourceStep = flowDefinition.steps.find(s => s.id === sourceStepId);
 			const outputConfig = sourceStep?.output?.[outputVar];
-			const outputType = outputConfig?.type || 'string';
+			const outputType = (outputConfig && resolveOutputConfig(outputConfig).type) || 'string';
 			const uncertain = !outputConfig; // Mark as uncertain if output not defined
 
 			ports.push({
