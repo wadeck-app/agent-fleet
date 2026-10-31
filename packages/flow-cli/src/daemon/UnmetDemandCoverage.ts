@@ -1,5 +1,6 @@
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
+import { RetryBackoff } from './RetryBackoff.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 
 /**
@@ -9,9 +10,6 @@ import type { WorkerProvisioner } from './WorkerProvisioner.js';
  * to re-run dispatch: without this the wait would never end and the queue would sit still.
  */
 const DEMAND_RECHECK_MS = 250;
-
-/** Longest wait before the re-check asks again after a dispatch pass that threw, and the least between two stderr lines about it. */
-const MAX_RECHECK_RETRY_MS = 30_000;
 
 /**
  * Acts on steps nothing could take, per the provisioning extension point (S8).
@@ -31,11 +29,8 @@ export class UnmetDemandCoverage {
 	private readonly requestedBoundTypes = new Set<string>();
 	/** Pending re-run of dispatch while S8 waits; nothing else would trigger one */
 	private demandRecheck: ReturnType<typeof setTimeout> | undefined;
-	/** Dispatch passes of the re-check that threw since one last went through; sets how long the next retry waits. */
-	private consecutiveRecheckFailures = 0;
-	/** When the failure of the re-check was last written to stderr, and how many were left out since. */
-	private lastRecheckReportAt: number | undefined;
-	private unreportedRecheckFailures = 0;
+	/** Delay and stderr line for a dispatch pass of the re-check that threw. */
+	private readonly recheckBackoff = new RetryBackoff('[UnmetDemandCoverage]', 2 * DEMAND_RECHECK_MS);
 
 	/**
 	 * @param rerunDispatch Runs a dispatch pass again once the S8 wait can have elapsed.
@@ -149,7 +144,7 @@ export class UnmetDemandCoverage {
 			this.demandRecheck = undefined;
 			try {
 				this.rerunDispatch();
-				this.consecutiveRecheckFailures = 0;
+				this.recheckBackoff.succeeded();
 			} catch (err) {
 				this.handleRecheckFailure(err);
 			}
@@ -161,29 +156,11 @@ export class UnmetDemandCoverage {
 	/**
 	 * A throw out of this timer would be an uncaught exception, and the daemon has no handler for those. The pass failed,
 	 * not the demand: steps are still waiting and only a pass can serve or fail them. So the failure is reported, never
-	 * swallowed, and a pass is asked for again, later each time (250ms doubling up to {@link MAX_RECHECK_RETRY_MS}) so a
-	 * permanent error costs one attempt every 30s, not four a second. A pass that goes through starts the delay over.
-	 *
-	 * The report is bounded the same way: at most one line per {@link MAX_RECHECK_RETRY_MS}, saying how many failures
-	 * since the last line were left out. This also bounds the lines when a failing pass re-arms the 250ms re-check by
-	 * itself before it throws (the retry here then finds the timer already armed and leaves it).
+	 * swallowed, and a pass is asked for again, later each time, so a permanent error costs one attempt and one stderr
+	 * line every 30s, not four a second (see {@link RetryBackoff}).
 	 */
 	private handleRecheckFailure(err: unknown): void {
-		this.consecutiveRecheckFailures++;
-		const retryMs = Math.min(DEMAND_RECHECK_MS * 2 ** this.consecutiveRecheckFailures, MAX_RECHECK_RETRY_MS);
-		const now = Date.now();
-		if (this.lastRecheckReportAt === undefined || now - this.lastRecheckReportAt >= MAX_RECHECK_RETRY_MS) {
-			const left = this.unreportedRecheckFailures;
-			const omitted = left === 0 ? '' : ` (${String(left)} similar failure(s) since the last line not shown)`;
-			process.stderr.write(
-				`[UnmetDemandCoverage] dispatch pass of the demand re-check failed (${String(this.consecutiveRecheckFailures)} in a row), asking again in ${String(retryMs / 1000)}s: ${getErrorMessage(err)}${omitted}\n`
-			);
-			this.lastRecheckReportAt = now;
-			this.unreportedRecheckFailures = 0;
-		} else {
-			this.unreportedRecheckFailures++;
-		}
-		this.scheduleRecheck(retryMs);
+		this.scheduleRecheck(this.recheckBackoff.failed('dispatch pass of the demand re-check', err));
 	}
 
 	private clearRecheck(): void {

@@ -271,6 +271,74 @@ describe('BoundStepWait - its own deadline timer', () => {
 			wait.stop();
 		});
 
+		it('waits twice as long after each failure in a row, up to 30s', () => {
+			const onDeadline = vi.fn().mockImplementation(() => {
+				throw new Error('dispatch exploded');
+			});
+			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
+			wait.decide(request());
+			vi.advanceTimersByTime(1_000);
+			expect(onDeadline).toHaveBeenCalledTimes(1);
+
+			for (const [gapMs, calls] of [
+				[5_000, 2],
+				[10_000, 3],
+				[20_000, 4],
+				[30_000, 5],
+				[30_000, 6],
+			] as const) {
+				vi.advanceTimersByTime(gapMs - 1);
+				expect(onDeadline).toHaveBeenCalledTimes(calls - 1);
+				vi.advanceTimersByTime(1);
+				expect(onDeadline).toHaveBeenCalledTimes(calls);
+			}
+			wait.stop();
+		});
+
+		it('writes a permanent error to stderr a few times a minute however many steps wait, and counts the rest', () => {
+			const onDeadline = vi.fn().mockImplementation(() => {
+				throw new Error('dispatch exploded');
+			});
+			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
+			wait.decide(request({ stepId: 's1' }));
+			wait.decide(request({ stepId: 's2' }));
+			wait.decide(request({ stepId: 's3' }));
+
+			vi.advanceTimersByTime(10 * 60_000);
+
+			const lines: string[] = stderr.mock.calls.map((call: unknown[]) => String(call[0]));
+			expect(lines.length).toBeLessThanOrEqual(25);
+			expect(lines.every((line: string) => line.startsWith('[BoundStepWait]'))).toBe(true);
+			expect(lines.join('')).toContain('similar failure');
+			// Three steps with their own timers, each retried about every 30s once the delay has grown.
+			expect(onDeadline.mock.calls.length).toBeLessThanOrEqual(3 * 25);
+			wait.stop();
+		});
+
+		it('starts over at the first delay once a pass goes through', () => {
+			const onDeadline = vi.fn().mockImplementation(() => {
+				throw new Error('dispatch exploded');
+			});
+			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
+			wait.decide(request());
+			vi.advanceTimersByTime(1_000 + 5_000);
+			expect(onDeadline).toHaveBeenCalledTimes(2);
+
+			onDeadline.mockImplementationOnce(() => undefined);
+			vi.advanceTimersByTime(10_000);
+			expect(onDeadline).toHaveBeenCalledTimes(3);
+			// A step that begins waiting now: its first failed pass waits the first delay again, not the grown one.
+			onDeadline.mockImplementation(() => {
+				throw new Error('dispatch exploded');
+			});
+			wait.decide(request({ stepId: 's2' }));
+			vi.advanceTimersByTime(1_000);
+			expect(onDeadline).toHaveBeenCalledTimes(4);
+			vi.advanceTimersByTime(5_000);
+			expect(onDeadline).toHaveBeenCalledTimes(5);
+			wait.stop();
+		});
+
 		it('does not ask again for a step the failed pass had already settled', () => {
 			const holder: { wait?: BoundStepWait } = {};
 			const onDeadline = vi.fn().mockImplementation(() => {

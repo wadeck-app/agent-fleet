@@ -1,5 +1,4 @@
-import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
-
+import { RetryBackoff } from './RetryBackoff.js';
 import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 
 /** What the daemon needs to restrict a run to a worker type: where types come from, and how long a missing one is waited for. */
@@ -26,7 +25,7 @@ export type BoundStepWaitDecision = { action: 'wait' } | { action: 'fail'; reaso
 /** How long a step of a bound run waits for a worker of its type to exist. Obtaining one (a sandbox) takes a while. */
 export const DEFAULT_BOUND_STEP_WAIT_MS = 120_000;
 
-/** How long after a failed dispatch pass the timer of a step that is still waiting asks for the next one. */
+/** How long after the first failed dispatch pass of a series the timer of a step that is still waiting asks again (it doubles from there). */
 export const DEADLINE_RETRY_MS = 5_000;
 
 /**
@@ -48,6 +47,8 @@ export const DEADLINE_RETRY_MS = 5_000;
 export class BoundStepWait {
 	private readonly waitingSince = new Map<string, number>();
 	private readonly deadlines = new Map<string, ReturnType<typeof setTimeout>>();
+	/** Delay and stderr line for a dispatch pass asked for by a deadline timer that threw; shared, a pass fails for every step. */
+	private readonly retryBackoff = new RetryBackoff('[BoundStepWait]', DEADLINE_RETRY_MS);
 
 	/**
 	 * @param onDeadline Runs a dispatch pass; called when the bound of a waiting step may have passed. Without it
@@ -121,16 +122,17 @@ export class BoundStepWait {
 			this.deadlines.delete(key);
 			try {
 				this.onDeadline?.();
+				this.retryBackoff.succeeded();
 			} catch (err) {
 				// A throw here would be an uncaught exception, and the daemon has no handler for those. The pass failed,
 				// not the step: it is still waiting and its bound is still to be enforced, which only a pass can do (it
 				// owns failing the step). So the failure is reported, never swallowed, and a pass is asked for again
-				// after a delay, for as long as the step waits (a pass that settled it has dropped it from here).
-				process.stderr.write(
-					`[BoundStepWait] dispatch pass for step "${key}" failed on its deadline, asking again in ${String(DEADLINE_RETRY_MS / 1000)}s: ${getErrorMessage(err)}\n`
-				);
+				// after a delay that grows while it keeps failing, for as long as the step waits (a pass that settled it
+				// has dropped it from here). The delay and the stderr line are shared by every waiting step, so a
+				// permanent error costs one line every 30s whatever their number (see RetryBackoff).
+				const retryMs = this.retryBackoff.failed(`dispatch pass for step "${key}" on its deadline`, err);
 				if (this.waitingSince.has(key)) {
-					this.armDeadline(key, DEADLINE_RETRY_MS);
+					this.armDeadline(key, retryMs);
 				}
 			}
 		}, inMs);
