@@ -8,6 +8,9 @@ import * as path from 'node:path';
 
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { startTestDaemon } from '../test-utils/TestHelpers';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
+
+armLeakGuardBeforeAll();
 
 const SIMPLE_SCRIPT_FLOW = `\
 id: resume-e2e

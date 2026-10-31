@@ -10,6 +10,9 @@ import { describe, expect, it } from 'vitest';
 
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
+
+armLeakGuardBeforeAll();
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
 const mockPath = path.resolve(fileURLToPath(import.meta.url), '../../../../flow-engine/src/testing/opencode-mock.mjs');

@@ -8,6 +8,9 @@ import { FlowConfigLoader } from '../config/FlowConfig.js';
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
 import { waitUntil } from '../test-utils/WaitHelpers';
 import { Daemon } from './Daemon.js';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
+
+armLeakGuardBeforeAll();
 
 // Characterization of the daemon's IPC command validation, its worker-socket protocol guards and its
 // plugin-config refusals: behaviour that no other test pins down and that lives in Daemon.ts.

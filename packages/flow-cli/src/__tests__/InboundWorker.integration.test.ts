@@ -17,6 +17,9 @@ import { WebSocket } from 'ws';
 
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
 import { observeFor, waitUntil } from '../test-utils/WaitHelpers';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
+
+armLeakGuardBeforeAll();
 
 let ctx: TestDaemonContext;
 

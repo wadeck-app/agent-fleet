@@ -21,6 +21,9 @@ import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
 import { waitUntil } from '../test-utils/WaitHelpers';
 import { WorkerAdapter } from '../worker/WorkerAdapter';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
+
+armLeakGuardBeforeAll();
 
 const FLOW_YAML = `\
 id: substep-resume-flow

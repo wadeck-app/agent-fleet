@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url';
 
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
+
+armLeakGuardBeforeAll();
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
 

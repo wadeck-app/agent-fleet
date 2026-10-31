@@ -13,6 +13,9 @@ import { SHUTDOWN_GRACE_MS } from '../daemon/DaemonIdleShutdown';
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 import { observeFor } from '../test-utils/WaitHelpers';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
+
+armLeakGuardBeforeAll();
 
 const workerBinary = path.resolve(fileURLToPath(import.meta.url), '../../../dist/worker/Worker.js');
 

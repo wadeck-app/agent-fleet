@@ -86,8 +86,14 @@ async function removeDaemonDirectory(daemonDir: string, quietMs: number): Promis
 }
 
 export async function startTestDaemon(options: TestDaemonOptions = {}): Promise<TestDaemonContext> {
-	// The daemon forks real workers: the file fails if one outlives its teardown.
-	processLeakGuard.arm();
+	// The daemon forks real workers: the file fails if one outlives its teardown. Arming lists every OS process (up to 25 s
+	// on a busy machine), so it must already be done by a hook, never inside a test body under the 5 s default timeout.
+	if (!processLeakGuard.isArmed()) {
+		throw new Error(
+			'startTestDaemon() needs the process leak guard armed beforehand: arming lists all OS processes (up to 25 s on a busy machine) ' +
+				'and would be charged to the calling test timeout. Call armLeakGuardBeforeAll() (src/test-utils/LeakGuardHooks.ts) at the top level of this test file.'
+		);
+	}
 	const daemonDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-e2e-'));
 	const stopWhenIdle = options.stopWhenIdle ?? false;
 	let handle: DaemonHandle;
