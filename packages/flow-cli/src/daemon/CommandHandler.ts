@@ -27,6 +27,7 @@ import { RunEndCoordinator, type RunEndSettings, type RunEndedListener } from '.
 import type { RunProject } from './RunProjectResolver.js';
 import { RunRequestHandler } from './RunRequestHandler.js';
 import { RunStepPreparer } from './RunStepPreparer.js';
+import { SchedulerIdleState } from './SchedulerIdleState.js';
 import { StepDispatcher } from './StepDispatcher.js';
 import { DEFAULT_MAX_INJECTED_STEPS, DEFAULT_MAX_STEPS_PER_EXECUTION, StepInjection } from './StepInjection.js';
 import { StepOutcomes } from './StepOutcomes.js';
@@ -66,6 +67,7 @@ export class CommandHandler {
 	private readonly dispatcher: StepDispatcher;
 	private readonly outcomes: StepOutcomes;
 	private readonly runEnd: RunEndCoordinator;
+	private readonly idleState: SchedulerIdleState;
 	private readonly injection: StepInjection;
 	private readonly runRequests: RunRequestHandler;
 	/**
@@ -177,6 +179,7 @@ export class CommandHandler {
 			runEndSettings,
 			runEndedListener
 		);
+		this.idleState = new SchedulerIdleState(this.queue, this.executions, this.runEnd);
 		this.dispatcher = new StepDispatcher(
 			registry,
 			this.queue,
@@ -242,65 +245,34 @@ export class CommandHandler {
 		this.hooks.remove(executionId);
 	}
 
+	/** See {@link SchedulerIdleState.isQueueEmpty}. */
 	isQueueEmpty(): boolean {
-		return this.queue.length === 0;
+		return this.idleState.isQueueEmpty();
 	}
 
+	/** See {@link SchedulerIdleState.hasActiveExecutions}. */
 	hasActiveExecutions(): boolean {
-		return this.executions.activeExecutionCount() > 0;
+		return this.idleState.hasActiveExecutions();
 	}
 
-	/**
-	 * Whether the scheduler still has work for this execution (steps queued, running, or about to
-	 * be re-run by a retry, loop or sub-step restart). False once it settled -- completed, failed
-	 * terminally -- or is unknown.
-	 *
-	 * The execution store cannot answer this: a step that failed and is about to run again still
-	 * reads `failed` there until its next attempt starts, which made the daemon declare a run
-	 * failed (and fire `onFlowError`) while the scheduler was in the middle of recovering it.
-	 */
+	/** See {@link SchedulerIdleState.isExecutionActive}. */
 	isExecutionActive(executionId: string): boolean {
-		return this.executions.isActive(executionId);
+		return this.idleState.isExecutionActive(executionId);
 	}
 
-	/**
-	 * Whether any execution is waiting on `flow resume` after an unanswered-intervention
-	 * timeout (see `ExecutionRegistry.markResumable`).
-	 *
-	 * Consulted by the daemon's own idle-exit check (`Daemon.ts`'s `isIdle()`) explicitly,
-	 * by name, rather than relying only on `hasActiveExecutions()` staying true for it: a
-	 * kept-alive execution not incrementing/decrementing the active count the way an
-	 * ordinary running one does is an implementation detail of cleanup being
-	 * skipped, not a documented contract -- a future change to that bookkeeping could silently
-	 * reopen the race `flow resume` depends on not happening (idle-exit destroying the
-	 * in-memory scheduler/context state before an operator can plausibly run it). Naming the
-	 * actual condition here makes the dependency explicit instead of incidental.
-	 */
+	/** Consulted by the daemon's idle-exit check by name; see {@link SchedulerIdleState.hasResumableInterventions}. */
 	hasResumableInterventions(): boolean {
-		return this.executions.resumableCount() > 0;
+		return this.idleState.hasResumableInterventions();
 	}
 
-	/**
-	 * One-line diagnostic snapshot of everything `isIdle()` consults here, for the daemon's
-	 * own idle-exit log entries (see `Daemon.ts`'s `checkShutdown()`).
-	 *
-	 * Added after an idle-exit race with `flow resume` was reported but could not be
-	 * conclusively reproduced (the suspected condition -- `hasActiveExecutions()` not
-	 * actually staying true through an unanswered-intervention timeout -- could not be
-	 * confirmed or ruled out from code reading or a live repro alone). If it recurs, this
-	 * line in the daemon log answers "what did isIdle() actually see" directly instead of
-	 * requiring another investigation from scratch.
-	 */
+	/** One-line snapshot for the idle-exit log entries; see {@link SchedulerIdleState.describe}. */
 	describeIdleState(): string {
-		return `queue=${String(this.queue.length)} activeExecutions=${String(this.executions.activeExecutionCount())} resumableInterventions=${String(this.executions.resumableCount())} pendingRunEnds=${this.runEnd.hasPending() ? '1+' : '0'}`;
+		return this.idleState.describe();
 	}
 
-	/**
-	 * Whether a finished run is still being closed: its workers are settling or acknowledging, or its workspace is being
-	 * released. The run is no longer an active execution then, so the idle check consults this too.
-	 */
+	/** See {@link SchedulerIdleState.hasPendingRunEnds}. */
 	hasPendingRunEnds(): boolean {
-		return this.runEnd.hasPending();
+		return this.idleState.hasPendingRunEnds();
 	}
 
 	setDraining(draining: boolean): void {
