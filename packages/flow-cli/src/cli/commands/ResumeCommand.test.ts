@@ -63,7 +63,7 @@ describe('flow resume command', () => {
 	it('says there is nothing to resume when no daemon runs, and exits 1', async () => {
 		daemon.send.mockRejectedValue(new DaemonNotRunningError('Daemon is not running'));
 		await expect(run('abc12345')).rejects.toThrow('exit 1');
-		expect(errorSpy.mock.calls.flat().join(' ')).toContain('The daemon is not running');
+		expect(errorSpy.mock.calls.flat().join(' ')).toContain('Error: The daemon is not running');
 	});
 
 	it('says the daemon did not answer, not "nothing to resume", when the request timed out', async () => {
@@ -93,7 +93,7 @@ describe('flow resume command', () => {
 			daemon.send.mockRejectedValue(Object.assign(new Error('socket hang up'), { code }));
 			await expect(run('abc12345')).rejects.toThrow('exit 1');
 			const printed = errorSpy.mock.calls.flat().join(' ');
-			expect(printed).toContain('The daemon is not running');
+			expect(printed).toContain('Error: The daemon is not running');
 			expect(printed).toContain('nothing to resume');
 		}
 	);

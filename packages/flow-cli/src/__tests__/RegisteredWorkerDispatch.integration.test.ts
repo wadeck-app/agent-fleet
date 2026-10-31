@@ -17,10 +17,10 @@ import { WebSocket } from 'ws';
 
 import { WORKER_FEATURE_PROJECT_ID } from '../ipc/Protocol';
 import type { DaemonToWorker, ExecutionState } from '../ipc/Protocol';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
 import { observeFor, waitUntil } from '../test-utils/WaitHelpers';
-import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 
 armLeakGuardBeforeAll();
 

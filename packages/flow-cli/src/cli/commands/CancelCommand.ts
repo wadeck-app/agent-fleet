@@ -6,6 +6,7 @@ import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { type ClientCommand, DAEMON_STOPPING_CODE, type DaemonResponse } from '../../ipc/Protocol';
 import { ExecutionStore } from '../../storage/ExecutionStore';
+import { formatCliError } from './CliErrorOutput';
 import { classifyDaemonContactFailure, describeDaemonContactFailure } from './DaemonContactFailure';
 import { resolveProjectFilter } from './ProjectFilter';
 import { singleProjectValue } from './SingleProjectOption';
@@ -59,10 +60,7 @@ function outcomeWithoutDaemon(executionId: string, configDir: string): Outcome {
 	};
 }
 
-async function askDaemon(
-	configDir: string,
-	cmd: Extract<ClientCommand, { type: 'cancel' }>
-): Promise<Outcome> {
+async function askDaemon(configDir: string, cmd: Extract<ClientCommand, { type: 'cancel' }>): Promise<Outcome> {
 	let response: DaemonResponse;
 	try {
 		response = (await createRemoteDaemonClient<FlowCommands>(configDir).send('cancel', cmd)) as DaemonResponse;
@@ -118,7 +116,7 @@ export function registerCancelCommand(program: Command, getConfigDir: () => stri
 				if (options.json) {
 					process.stderr.write(JSON.stringify({ code: outcome.code, message: outcome.message }) + '\n');
 				} else {
-					console.error(`Error: ${outcome.message}`);
+					console.error(formatCliError(outcome.message));
 				}
 				process.exit(1);
 			}

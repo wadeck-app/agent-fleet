@@ -10,10 +10,10 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SHUTDOWN_GRACE_MS } from '../daemon/DaemonIdleShutdown';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
 import { observeFor } from '../test-utils/WaitHelpers';
-import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 
 armLeakGuardBeforeAll();
 

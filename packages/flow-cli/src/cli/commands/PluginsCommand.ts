@@ -5,6 +5,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { BUILTIN_PLUGIN_MANIFESTS } from '../../config/BuiltinPlugins.js';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
+import { formatCliError } from './CliErrorOutput';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -44,7 +45,7 @@ export function registerPluginsCommand(program: Command): void {
 					throw err;
 				}
 				const message = normalizeError(err).message;
-				console.error(`Error: ${message}`);
+				console.error(formatCliError(message));
 				process.exit(1);
 			}
 		});

@@ -28,11 +28,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { processLeakGuard } from '../test-utils/ProcessLeakGuard';
 import { observeFor, pollUntil } from '../test-utils/WaitHelpers';
 
 // Every CLI/daemon process this file starts must be gone when it ends (see ProcessLeakGuard).
-processLeakGuard.arm();
+armLeakGuardBeforeAll();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // FLOW_TEST_BUNDLE_DIR: another build (an older one, to watch this test fail), as the BundledDaemonHarness does.

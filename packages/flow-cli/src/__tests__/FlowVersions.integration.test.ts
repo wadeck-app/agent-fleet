@@ -9,9 +9,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
-import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 
 armLeakGuardBeforeAll();
 

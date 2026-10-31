@@ -25,11 +25,12 @@ import { describe, expect, it } from 'vitest';
 
 import { projectConfigFile } from '../config/ProjectFlowConfig';
 import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { processLeakGuard } from '../test-utils/ProcessLeakGuard';
 import { pollUntil } from '../test-utils/WaitHelpers';
 
 // Every CLI/daemon process this file starts must be gone when it ends (see ProcessLeakGuard).
-processLeakGuard.arm();
+armLeakGuardBeforeAll();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const flowBin = resolve(__dirname, '..', '..', 'bin', 'flow.js');

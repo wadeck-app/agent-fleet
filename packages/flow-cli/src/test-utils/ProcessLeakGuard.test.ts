@@ -109,6 +109,7 @@ describe('ProcessLeakGuard (injected process table)', () => {
 	it('finds an orphaned process by the watched directory in its command line', async () => {
 		let table: OsProcess[] = [];
 		const { guard, killed } = guardOver(() => table);
+		guard.arm();
 		guard.watch('flow-test-install-abc');
 		table = [
 			proc(7, 1, 'node C:\\tmp\\flow-test-install-abc\\flow.cjs'),
@@ -153,6 +154,7 @@ describe('ProcessLeakGuard (real processes)', () => {
 		const script = path.join(directory, 'flow.cjs');
 		fs.writeFileSync(script, 'setInterval(() => {}, 1000);\n');
 		const guard = new ProcessLeakGuard({ graceMs: 1_000, pollMs: 200 });
+		guard.arm();
 		guard.watch(directory);
 		// Isolated env like every spawned flow-named script (a stand-in that only loops, but the rule is uniform).
 		const isolation = createIsolatedCliEnv();

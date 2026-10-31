@@ -15,9 +15,9 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
 import { observeFor, waitUntil } from '../test-utils/WaitHelpers';
-import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 
 armLeakGuardBeforeAll();
 

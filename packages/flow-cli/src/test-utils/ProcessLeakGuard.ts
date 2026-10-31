@@ -94,7 +94,12 @@ export class ProcessLeakGuard {
 		if (marker === '') {
 			throw new Error('ProcessLeakGuard.watch() needs a non-empty marker; an empty one matches every process.');
 		}
-		this.arm();
+		if (!this.armed) {
+			throw new Error(
+				'ProcessLeakGuard.watch() needs the guard armed beforehand: arming lists all OS processes (up to 25 s on a busy machine) ' +
+					'and would be charged to the calling test timeout. Call armLeakGuardBeforeAll() (src/test-utils/LeakGuardHooks.ts) at the top level of this test file.'
+			);
+		}
 		this.markers.add(marker);
 	}
 

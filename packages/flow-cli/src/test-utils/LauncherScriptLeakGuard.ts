@@ -29,7 +29,10 @@ function sourceLauncherScripts(directory: string): string[] {
 }
 
 /** Names of the launcher scripts written (into `directory`) by a test process since `baseline` was taken. */
-export function newSourceLauncherScripts(baseline: ReadonlySet<string>, directory: string = REAL_TEMP_DIRECTORY): string[] {
+export function newSourceLauncherScripts(
+	baseline: ReadonlySet<string>,
+	directory: string = REAL_TEMP_DIRECTORY
+): string[] {
 	return sourceLauncherScripts(directory).filter(name => !baseline.has(name));
 }
 

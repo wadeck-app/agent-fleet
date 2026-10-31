@@ -6,7 +6,10 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { startBundledDaemon } from '../test-utils/BundledDaemonHarness';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { pollUntil } from '../test-utils/WaitHelpers';
+
+armLeakGuardBeforeAll();
 
 function daemonLog(flowDir: string): string {
 	const dir = logsDirOf(flowDir);

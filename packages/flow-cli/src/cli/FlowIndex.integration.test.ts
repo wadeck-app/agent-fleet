@@ -17,10 +17,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
-import { processLeakGuard } from '../test-utils/ProcessLeakGuard';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 
 // Every CLI/daemon process this file starts must be gone when it ends (see ProcessLeakGuard).
-processLeakGuard.arm();
+armLeakGuardBeforeAll();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // agent-fleet root (4 levels up from src/cli/: src/cli -> src -> flow-cli -> packages -> agent-fleet)

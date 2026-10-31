@@ -10,11 +10,12 @@ import * as net from 'node:net';
 import { describe, expect, it } from 'vitest';
 
 import { type BundledDaemon, startBundledDaemon } from '../test-utils/BundledDaemonHarness';
-import { type OsProcess, isFlowProcess, listOsProcesses, processLeakGuard } from '../test-utils/ProcessLeakGuard';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
+import { type OsProcess, isFlowProcess, listOsProcesses } from '../test-utils/ProcessLeakGuard';
 import { requireBashOrSkip } from '../test-utils/TestHelpers';
 import { pollUntil } from '../test-utils/WaitHelpers';
 
-processLeakGuard.arm();
+armLeakGuardBeforeAll();
 
 /** Flow processes of this daemon's private install directory, whatever their parent. */
 function flowProcessesOf(daemon: BundledDaemon): OsProcess[] {

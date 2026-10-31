@@ -8,6 +8,7 @@ import { FlowConfigLoader } from '../../config/FlowConfig';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { FLOW_PROJECT_ENV } from '../../config/ProjectScopeResolver';
 import type { ClientCommand, DaemonResponse, ExecutionState } from '../../ipc/Protocol';
+import { formatCliError } from './CliErrorOutput';
 import { debugHint, describeCliFailure } from './CliFailureText';
 import { ExecutionTimeoutError, waitForCompletion } from './ExecutionCompletionWaiter';
 import { hasFastLogMode } from './FlowLogModeDetector';
@@ -101,15 +102,19 @@ export function registerRunCommand(program: Command): void {
 				const registered = resolution.kind === 'registered';
 				if (registered && options.flowId !== undefined) {
 					console.error(
-						`Error:--flow-id cannot be combined with a flow id reference ('${flowRef}'): the id is already given. ` +
-							'Use --flow-id only with a flow file.'
+						formatCliError(
+							`--flow-id cannot be combined with a flow id reference ('${flowRef}'): the id is already given. ` +
+								'Use --flow-id only with a flow file.'
+						)
 					);
 					process.exit(2);
 				}
 				if (registered && options.mockConfig !== undefined) {
 					console.error(
-						`Error:--mock-config needs a flow file to check its step ids; '${flowRef}' is a flow id. ` +
-							'Run the flow file by its path instead.'
+						formatCliError(
+							`--mock-config needs a flow file to check its step ids; '${flowRef}' is a flow id. ` +
+								'Run the flow file by its path instead.'
+						)
 					);
 					process.exit(2);
 				}
@@ -120,7 +125,7 @@ export function registerRunCommand(program: Command): void {
 				if (!registered) {
 					const secretError = checkSecretInputs(flowFile, inputs);
 					if (secretError) {
-						console.error(`Error:${secretError}`);
+						console.error(formatCliError(secretError));
 						process.exit(2);
 					}
 				}
@@ -161,7 +166,7 @@ export function registerRunCommand(program: Command): void {
 					console.error(
 						err instanceof DaemonContactError
 							? describeCliFailure(err)
-							: `Error:${describeCliFailure(err)}\n${debugHint()}`
+							: formatCliError(`${describeCliFailure(err)}\n${debugHint()}`)
 					);
 					process.exit(err instanceof DaemonContactError ? 3 : 1);
 				}
@@ -170,7 +175,7 @@ export function registerRunCommand(program: Command): void {
 					if (options.json && !options.human) {
 						process.stderr.write(JSON.stringify({ code: response.code, message: response.message }) + '\n');
 					} else {
-						console.error(`Error:${response.message}`);
+						console.error(formatCliError(response.message));
 					}
 					process.exit(
 						response.code === 'VALIDATION_FAILED' || response.code.startsWith('FLOW_VERSION_') ? 2 : 1
@@ -180,7 +185,7 @@ export function registerRunCommand(program: Command): void {
 				const { executionId } = response as { type: 'execution_started'; executionId: string };
 				if (!executionId) {
 					console.error(
-						'Error: daemon returned a response without an executionId -- try restarting the daemon'
+						formatCliError('daemon returned a response without an executionId -- try restarting the daemon')
 					);
 					process.exit(1);
 				}
@@ -214,13 +219,13 @@ export function registerRunCommand(program: Command): void {
 				} catch (err) {
 					if (!(err instanceof ExecutionTimeoutError)) {
 						// violations-suppress: security/no-raw-err-in-cli unexpected internal error while polling -- the normalized message is already user-facing
-						console.error(`Error:${getErrorMessage(err)}`);
+						console.error(formatCliError(getErrorMessage(err)));
 						process.exit(1);
 					}
 					if (options.json && !options.human) {
 						process.stderr.write(JSON.stringify({ error: 'execution_timeout', executionId }) + '\n');
 					} else {
-						console.error('Error:Execution timed out.');
+						console.error(formatCliError('Execution timed out.'));
 					}
 					process.exit(124); // timeout exit code
 				}
@@ -239,7 +244,7 @@ export function registerRunCommand(program: Command): void {
 						console.log(`Flow completed in ${durationMs}ms`);
 					} else {
 						const reason = finalState.lastError ? ` -- ${finalState.lastError}` : '';
-						console.error(`Error:Flow failed${reason}`);
+						console.error(formatCliError(`Flow failed${reason}`));
 						process.exit(1);
 					}
 				}

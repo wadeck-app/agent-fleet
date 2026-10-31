@@ -56,6 +56,14 @@ export interface BundledDaemonOptions {
  *   project's global setup; run the test through vitest).
  */
 export async function startBundledDaemon(options: BundledDaemonOptions = {}): Promise<BundledDaemon> {
+	// Checked first, before any directory or process exists. Arming lists every OS process (up to 25 s on a busy machine):
+	// it must already be done by a hook, never inside a test body under the 5 s default timeout.
+	if (!processLeakGuard.isArmed()) {
+		throw new Error(
+			'startBundledDaemon() needs the process leak guard armed beforehand: arming lists all OS processes (up to 25 s on a busy machine) ' +
+				'and would be charged to the calling test timeout. Call armLeakGuardBeforeAll() (src/test-utils/LeakGuardHooks.ts) at the top level of this test file.'
+		);
+	}
 	const flowBundle = join(bundleDir, 'flow.cjs');
 	const workerBundle = join(bundleDir, 'worker.cjs');
 	for (const bundle of [flowBundle, workerBundle]) {

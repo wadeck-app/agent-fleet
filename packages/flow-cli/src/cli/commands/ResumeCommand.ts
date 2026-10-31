@@ -5,13 +5,15 @@ import { createRemoteDaemonClient } from 'flow-core';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { type ClientCommand, DAEMON_STOPPING_CODE, type DaemonResponse } from '../../ipc/Protocol';
+import { formatCliError } from './CliErrorOutput';
 import { describeDaemonContactFailure } from './DaemonContactFailure';
 
 // violations-suppress-end: ts/no-deep-relative
 
 // Not "start it with flow start": the execution lives in the daemon that ran it and is not restored by a new one.
-const NOT_RUNNING_TEXT =
-	'Error:The daemon is not running -- there is nothing to resume. Resume only works while the daemon that ran the execution is alive.';
+const NOT_RUNNING_TEXT = formatCliError(
+	'The daemon is not running -- there is nothing to resume. Resume only works while the daemon that ran the execution is alive.'
+);
 
 type FlowCommands = { resume?: (payload: unknown) => Promise<DaemonResponse> };
 
@@ -37,7 +39,7 @@ export function registerResumeCommand(program: Command): void {
 				)) as DaemonResponse;
 			} catch (err) {
 				const failure = describeDaemonContactFailure(err);
-				console.error(failure.notRunning ? NOT_RUNNING_TEXT : `Error:${failure.message}`);
+				console.error(failure.notRunning ? NOT_RUNNING_TEXT : formatCliError(failure.message));
 				process.exit(1);
 			}
 
@@ -50,7 +52,7 @@ export function registerResumeCommand(program: Command): void {
 				if (options.json) {
 					process.stderr.write(JSON.stringify({ code: response.code, message: response.message }) + '\n');
 				} else {
-					console.error(`Error:${response.message}`);
+					console.error(formatCliError(response.message));
 				}
 				process.exit(response.code === 'EXECUTION_NOT_FOUND' ? 2 : 1);
 			}

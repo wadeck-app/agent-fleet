@@ -10,9 +10,9 @@ import { fileURLToPath } from 'node:url';
 
 import { tailLogFile } from '../cli/commands/ExecutionLogTail';
 import { logsCommand } from '../cli/commands/LogsCommand';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
-import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 
 armLeakGuardBeforeAll();
 

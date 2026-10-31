@@ -148,7 +148,7 @@ describe('flow run: argument validation', () => {
 
 	it('rejects a missing mock config file', async () => {
 		expect(await runCli(flowFile, '--mock-config', path.join(tmpDir, 'nope.yml'))).toBe(2);
-		expect(errors[0]).toContain('Error:Mock config file not found:');
+		expect(errors[0]).toContain('Error: Mock config file not found:');
 	});
 
 	it('rejects an unparsable mock config', async () => {
@@ -249,7 +249,7 @@ describe('flow run: dispatch', () => {
 	it('reports a failure of the daemon with its own message, never as a contact failure', async () => {
 		harness.send.mockRejectedValue(new Error('boom'));
 		expect(await runCli(flowFile)).toBe(1);
-		expect(errors).toEqual(['Error:boom\nSet FLOW_DEBUG=1 to print the stack trace.']);
+		expect(errors).toEqual(['Error: boom\nSet FLOW_DEBUG=1 to print the stack trace.']);
 	});
 
 	it('prints the message of a run the daemon refused (legacy project config) without a stack trace', async () => {
@@ -289,7 +289,7 @@ describe('flow run: dispatch', () => {
 	it('maps daemon error codes to exit codes and formats', async () => {
 		harness.send.mockResolvedValue({ type: 'error', code: 'VALIDATION_FAILED', message: 'bad flow' });
 		expect(await runCli(flowFile)).toBe(2);
-		expect(errors).toEqual(['Error:bad flow']);
+		expect(errors).toEqual(['Error: bad flow']);
 
 		harness.send.mockResolvedValue({ type: 'error', code: 'FLOW_VERSION_UNKNOWN', message: 'no version' });
 		expect(await runCli(flowFile, '--json')).toBe(2);
@@ -298,7 +298,7 @@ describe('flow run: dispatch', () => {
 		errors.length = 0;
 		harness.send.mockResolvedValue({ type: 'error', code: 'OTHER', message: 'other' });
 		expect(await runCli(flowFile, '--json', '--human')).toBe(1);
-		expect(errors).toEqual(['Error:other']);
+		expect(errors).toEqual(['Error: other']);
 	});
 
 	it('rejects a response without an executionId', async () => {
@@ -332,7 +332,7 @@ describe('flow run --wait', () => {
 		startedResponse();
 		createExecution('exec0001', { status: 'failed', lastError: 'step exploded' });
 		expect(await runCli(flowFile, '--wait', '--quiet')).toBe(1);
-		expect(errors).toEqual(['Error:Flow failed -- step exploded']);
+		expect(errors).toEqual(['Error: Flow failed -- step exploded']);
 		expect(stdout).toEqual([]);
 	});
 
@@ -352,7 +352,7 @@ describe('flow run --wait', () => {
 	it('exits 124 on timeout, in text and JSON modes', async () => {
 		startedResponse();
 		expect(await runCli(flowFile, '--wait', '--timeout', '1ms')).toBe(124);
-		expect(errors).toEqual(['Error:Execution timed out.']);
+		expect(errors).toEqual(['Error: Execution timed out.']);
 
 		expect(await runCli(flowFile, '--wait', '--timeout', '1ms', '--json')).toBe(124);
 		expect(stderr).toEqual(['{"error":"execution_timeout","executionId":"exec0001"}\n']);
@@ -364,7 +364,7 @@ describe('flow run --wait', () => {
 		fs.mkdirSync(dir, { recursive: true });
 		fs.writeFileSync(path.join(dir, 'exec0001.json'), '{not json');
 		expect(await runCli(flowFile, '--wait')).toBe(1);
-		expect(errors[0]).toContain('Error:Error: Corrupted execution state for exec0001');
+		expect(errors[0]).toContain('Error: Error: Corrupted execution state for exec0001');
 	});
 
 	it('rejects an invalid timeout', async () => {

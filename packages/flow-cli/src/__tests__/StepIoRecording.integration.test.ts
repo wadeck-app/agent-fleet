@@ -10,9 +10,9 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_IO_LIMITS } from '../storage/StepIoRecorder';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { requireBashOrSkip, startTestDaemon, waitForExecution } from '../test-utils/TestHelpers';
-import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 
 armLeakGuardBeforeAll();
 

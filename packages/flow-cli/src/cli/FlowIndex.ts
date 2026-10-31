@@ -17,13 +17,14 @@ import { resolveIdleCheckInterval } from '../daemon/resolveIdleCheckInterval.js'
 import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
 import { describeCommandLine } from './CommandLineLog';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
+import { registerCancelCommand } from './commands/CancelCommand';
 import { buildCliCommand } from './commands/CliCommand.js';
+import { formatCliError } from './commands/CliErrorOutput';
 import { describeCliFailure } from './commands/CliFailureText';
 import { printDaemonPid, runStatusCommand, runStopCommand } from './commands/DaemonLifecycleCommands';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
 import { registerPluginsCommand } from './commands/PluginsCommand';
-import { registerCancelCommand } from './commands/CancelCommand';
 import { registerResumeCommand } from './commands/ResumeCommand';
 import { registerRunCommand } from './commands/RunCommand';
 import { registerShowCommand } from './commands/ShowCommand';
@@ -224,7 +225,7 @@ if (isEntryPoint) {
 			recordDaemonStartError(DAEMON_DIR, error);
 		}
 		// violations-suppress: security/no-raw-err-in-cli describeCliFailure prints the message only (stack under FLOW_DEBUG=1)
-		process.stderr.write(`Error: ${describeCliFailure(error)}\n`);
+		process.stderr.write(`${formatCliError(describeCliFailure(error))}\n`);
 		process.exit(1);
 	});
 }
