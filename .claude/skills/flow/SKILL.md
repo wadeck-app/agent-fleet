@@ -99,6 +99,8 @@ status:    ok -> approved   fail -> todo
 - `N: if(expr)` in DEPENDS — conditional dependency (step runs only when expr is true)
 - `err -> N  max:Mx` — `onFailure.goto` feedback loop back to step N, at most M iterations
 
+**Cancelling an execution:** `flow cancel <execution-id> [-p <project>] [--json]` ends one run without stopping the daemon: in-flight steps fail with "cancelled by user", pending steps are not run, workers are released. The record ends `failed` with `endReason: cancelled`, no hook fires, and a second cancel is a no-op. Use it for a run that is stuck `running` or `queued`; `flow stop` still stops the daemon and every run.
+
 **Inspecting an execution:** `flow show <execution-id>` (id from `flow history`, unique prefix accepted) prints the run's steps with status, duration, model, cost and error. Failed steps also show the tail of stdout/stderr.
 
 ```bash
