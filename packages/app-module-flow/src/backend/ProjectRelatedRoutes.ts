@@ -6,6 +6,17 @@ import { invalidProjectIdMessage, isProjectId } from './ProjectIdQuery.js';
 
 export const RELATED_ITEMS_LIMIT = 10;
 export const RELATED_TITLE = 'Flow executions';
+// The project module shows the count as "{count} {countLabel}".
+export const RELATED_COUNT_LABEL = 'running or queued';
+
+export interface ProjectRelatedResponse {
+	title: string;
+	count: number;
+	countLabel: string;
+	items: { label: string; subtitle: string; url: string }[];
+	moreUrl: string;
+	project: { name: string; removed: boolean; virtual: boolean };
+}
 
 // Typed against ExecutionStatus so a status renamed in flow-core fails the build here. A queued run is the one that
 // waits (its words in the executions page are "waiting"), 're-queued' is the same wait after a crash recovery.
@@ -43,9 +54,10 @@ export function registerProjectRelatedRoutes(
 			}
 			// Computed before reply.code(): a failure must not leave a 200 status set on the error answer.
 			const { items } = service.listExecutions({ projectId, limit: Number.MAX_SAFE_INTEGER });
-			const body = {
+			const body: ProjectRelatedResponse = {
 				title: RELATED_TITLE,
 				count: items.filter(item => (ACTIVE_STATUSES as readonly string[]).includes(item.status)).length,
+				countLabel: RELATED_COUNT_LABEL,
 				items: items.slice(0, RELATED_ITEMS_LIMIT).map(item => ({
 					label: item.flowId,
 					subtitle: `${item.status} - ${item.startedAt}`,

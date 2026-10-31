@@ -34,6 +34,7 @@ describe('GET /related/project/:projectId', () => {
 			body: {
 				title: 'Flow executions',
 				count: 0,
+				countLabel: 'running or queued',
 				items: [],
 				moreUrl: `/modules/flow/executions?project=${PROJECT}`,
 				project: { name: 'shop', removed: false, virtual: false },
@@ -52,6 +53,7 @@ describe('GET /related/project/:projectId', () => {
 		expect(status).toBe(200);
 		expect(body).toMatchObject({
 			count: 2,
+			countLabel: 'running or queued',
 			items: [
 				{ label: 'lint', subtitle: 'queued - 2026-10-30T11:00:00.000Z', url: '/modules/flow/executions/q1' },
 				{ label: 'build', subtitle: 'running - 2026-10-30T10:00:00.000Z', url: '/modules/flow/executions/r1' },
@@ -100,7 +102,7 @@ describe('GET /related/project/:projectId', () => {
 		fixture.addExecution({ executionId: 'r1', projectId: PROJECT });
 		const { status, body } = await call(PROJECT);
 		expect(status).toBe(200);
-		expect(body).toMatchObject({ project: { name: 'old-shop', removed: true }, items: [{ url: '/modules/flow/executions/r1' }] });
+		expect(body).toMatchObject({ project: { name: 'old-shop', removed: true }, countLabel: 'running or queued', items: [{ url: '/modules/flow/executions/r1' }] });
 	});
 
 	it('answers a virtual project like any other, flagged virtual', async () => {

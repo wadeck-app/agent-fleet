@@ -5,10 +5,11 @@
 `GET /api/modules/flow/related/project/:projectId` (`ProjectRelatedRoutes.ts`). Read-only; the registry is read per request.
 
 ```
-{ title: 'Flow executions', count, items: [{ label, subtitle, url }], moreUrl, project: { name, removed, virtual } }
+{ title: 'Flow executions', count, countLabel: 'running or queued', items: [{ label, subtitle, url }], moreUrl, project: { name, removed, virtual } }
 ```
 
 - `count`: runs of the project with status `running`, `queued` (shown as "waiting") or `re-queued`. There is no approval status in executions.
+- `countLabel`: optional for consumers; flow always sends the exact string `running or queued` on every 200 (count 0, removed and virtual projects included). The project module shows `{count} {countLabel}`.
 - `items`: 10 latest runs. `label` = flow id, `subtitle` = `<status> - <startedAt ISO>`, `url` = `/modules/flow/executions/<id>`.
 - `moreUrl`: `/modules/flow/executions?project=<projectId>`. The executions page filters on `?project=` (route param `projectId`).
 - `project` is an addition to the requested contract: registry name, `removed` (soft-deleted, still answered), `virtual` (no path, answered like any other).
