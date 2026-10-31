@@ -158,9 +158,15 @@ export class UnmetDemandCoverage {
 	 * not the demand: steps are still waiting and only a pass can serve or fail them. So the failure is reported, never
 	 * swallowed, and a pass is asked for again, later each time, so a permanent error costs one attempt and one stderr
 	 * line every 30s, not four a second (see {@link RetryBackoff}).
+	 *
+	 * A timer the failing pass armed itself before throwing is replaced, not kept: it would fire at the short delay and
+	 * the backoff would never apply. The real pass cannot do this today (`StepDispatcher.tryDispatch` ends with
+	 * `cover()`, which arms and returns), but this class must not depend on that.
 	 */
 	private handleRecheckFailure(err: unknown): void {
-		this.scheduleRecheck(this.recheckBackoff.failed('dispatch pass of the demand re-check', err));
+		const retryMs = this.recheckBackoff.failed('dispatch pass of the demand re-check', err);
+		this.clearRecheck();
+		this.scheduleRecheck(retryMs);
 	}
 
 	private clearRecheck(): void {

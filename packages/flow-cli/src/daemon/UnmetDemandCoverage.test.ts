@@ -188,6 +188,23 @@ describe('UnmetDemandCoverage - the dispatch pass of the demand re-check throws'
 		coverage.stop();
 	});
 
+	// What the real pass cannot do today (StepDispatcher.tryDispatch ends with demand.cover(), which arms the re-check
+	// and returns), but nothing in this class may rely on: a pass that arms the 250ms re-check and then throws.
+	it('bounds the retries of a pass that arms the re-check by itself and then throws', () => {
+		const { coverage, rerunDispatch } = build({ fork: 0 });
+		rerunDispatch.mockImplementation(() => {
+			coverage.cover(1);
+			throw new Error('dispatch exploded');
+		});
+		coverage.cover(1);
+
+		vi.advanceTimersByTime(10 * 60_000);
+
+		expect(rerunDispatch.mock.calls.length).toBeLessThanOrEqual(30);
+		expect(written().length).toBeLessThanOrEqual(25);
+		coverage.stop();
+	});
+
 	it('does not ask again once stopped', () => {
 		const { coverage, rerunDispatch } = failing();
 		vi.advanceTimersByTime(250);
