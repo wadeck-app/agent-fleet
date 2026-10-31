@@ -11,8 +11,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // real `app-core-cli check` (the checker `package` and the load use) on throwaway contributors against the real manifest.
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const cliBundle = join(packageDir, '../../node_modules/@wadeck-app/app-core-cli/dist/cli.bundle.js');
-const WORK_DIR = mkdtempSync(join(tmpdir(), 'flow-slot-refusal-'));
-const providerDir = join(WORK_DIR, 'provider');
+// Created in beforeAll, not at import: an import without a run (filtered, collected only) must not leave a directory.
+let WORK_DIR: string;
+let providerDir: string;
 const STUB_BACKEND = 'export default function () {}\n';
 
 function runCli(args: string[], cwd: string) {
@@ -53,10 +54,12 @@ function makeContributor(name: string, slot: string, views: Record<string, strin
 }
 
 function checkContributor(dir: string) {
-	return runCli(['check', '.', '--link', `app-module-flow=${providerDir}`], dir);
+	return runCli(['check', dir, '--link', `app-module-flow=${providerDir}`], packageDir);
 }
 
 beforeAll(() => {
+	WORK_DIR = mkdtempSync(join(tmpdir(), 'flow-slot-refusal-'));
+	providerDir = join(WORK_DIR, 'provider');
 	if (!existsSync(cliBundle)) {
 		throw new Error(`app-core-cli is not installed at ${cliBundle}: run "npm install" at the repository root.`);
 	}
@@ -76,9 +79,10 @@ beforeAll(() => {
 	}
 });
 
-// A process started by the checker may hold the directory a moment longer (EPERM on Windows): see removeTempDirectory.
+// The checker runs with the package as cwd, not inside WORK_DIR. Measured: with the contributor dir as cwd the last one
+// survived 3 runs out of 7 (EPERM, cause of the lock not identified); with the package as cwd, 0 out of 6+.
 afterAll(() => {
-	removeTempDirectory(WORK_DIR);
+	if (WORK_DIR !== undefined) removeTempDirectory(WORK_DIR);
 });
 
 describe('the platform refuses a contribution outside the action-slot contract', () => {

@@ -10,14 +10,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { recordDaemonStartError } from '../../daemon/DaemonStartError';
 import { spawnDaemonBackground } from './DaemonBackgroundSpawner';
 
-const harness = vi.hoisted(() => ({ spawn: vi.fn() }));
+const harness = vi.hoisted(() => ({ spawn: vi.fn(), tmpdirOverride: null as string | null }));
 vi.mock('node:child_process', () => ({ spawn: harness.spawn }));
+// The launcher script is written to os.tmpdir(); the mocked wscript never runs it, so it would never delete itself.
+vi.mock('node:os', async importOriginal => {
+	const actual = await importOriginal<typeof import('node:os')>();
+	return { ...actual, tmpdir: () => harness.tmpdirOverride ?? actual.tmpdir() };
+});
 
 let dir: string;
 const servers: net.Server[] = [];
 
 beforeEach(() => {
+	harness.tmpdirOverride = null;
 	dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-spawner-'));
+	harness.tmpdirOverride = dir;
 });
 afterEach(async () => {
 	await Promise.all(servers.splice(0).map(s => new Promise<void>(resolve => s.close(() => resolve()))));

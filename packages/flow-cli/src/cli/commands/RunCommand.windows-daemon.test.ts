@@ -21,6 +21,9 @@ import { describe, expect, it } from 'vitest';
 // wscript replaced with direct node spawn, etc.).
 const RUN_COMMAND_SRC = fs.readFileSync(path.join(import.meta.dirname, 'DaemonBackgroundSpawner.ts'), 'utf8');
 
+// The VBScript text lives in its own module (its content is tested in WindowsDaemonLauncherScript.test.ts).
+const LAUNCHER_SCRIPT_SRC = fs.readFileSync(path.join(import.meta.dirname, '../../daemon/WindowsDaemonLauncherScript.ts'), 'utf8');
+
 const FLOW_INDEX_SRC = fs.readFileSync(path.join(import.meta.dirname, '../FlowIndex.ts'), 'utf8');
 
 describe('Daemon spawn — Windows wscript.exe approach', () => {
@@ -30,8 +33,9 @@ describe('Daemon spawn — Windows wscript.exe approach', () => {
 	});
 
 	it('spawnDaemonBackground() writes an oShell.Run VBScript for the daemon', () => {
-		expect(RUN_COMMAND_SRC).toContain('oShell.Run');
-		expect(RUN_COMMAND_SRC).toContain('FLOW_DAEMON_MODE');
+		expect(RUN_COMMAND_SRC).toContain('buildWindowsDaemonLauncherScript');
+		expect(LAUNCHER_SCRIPT_SRC).toContain('oShell.Run');
+		expect(LAUNCHER_SCRIPT_SRC).toContain('FLOW_DAEMON_MODE');
 	});
 
 	it('spawnDaemonBackground() uses detached:true on wscript.exe to escape Job Object', () => {

@@ -9,7 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { clearDaemonStartError, readDaemonStartError } from '../../daemon/DaemonStartError';
 import { ExclusiveFileLock } from '../../daemon/ExclusiveFileLock';
 import { findLiveDaemon } from '../../daemon/LiveDaemonProbe';
-import { buildWindowsDaemonEnvLines, resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
+import { LAUNCHER_SCRIPT_PREFIX, realSweepDeps, sweepStaleLauncherScripts } from '../../daemon/StaleLauncherScriptSweeper';
+import { resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
+import { buildWindowsDaemonLauncherScript } from '../../daemon/WindowsDaemonLauncherScript';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
 
 // violations-suppress-end: ts/no-deep-relative
@@ -91,27 +93,20 @@ async function launchDaemon(daemonDir: string, timeoutMs: number): Promise<void>
 	clearDaemonStartError(daemonDir);
 
 	if (process.platform === 'win32') {
-		const vbsPath = path.join(os.tmpdir(), `flow-daemon-run-${Date.now()}.vbs`);
-		const safeNode = process.execPath.replace(/"/g, '""');
-		const safeBundle = resolvedBundle.replace(/"/g, '""');
-		// Only forward an override we accepted: forwarding a foreign one would hand the daemon a
-		// bundle path belonging to another CLI (that is the bug this resolution guards against).
-		const overrideLines =
-			process.env['LAUNCHER_BUNDLE_OVERRIDE'] === resolvedBundle
-				? [
-						`oShell.Environment("Process")("LAUNCHER_BUNDLE_OVERRIDE") = "${resolvedBundle.replace(/"/g, '""')}"`,
-					]
-				: [];
+		const tempDirectory = os.tmpdir();
+		sweepStaleLauncherScripts(realSweepDeps(tempDirectory));
+		const vbsPath = path.join(tempDirectory, `${LAUNCHER_SCRIPT_PREFIX}${Date.now()}.vbs`);
 		fs.writeFileSync(
 			vbsPath,
-			[
-				'Dim oShell',
-				'Set oShell = CreateObject("WScript.Shell")',
-				'oShell.Environment("Process")("FLOW_DAEMON_MODE") = "1"',
-				...overrideLines,
-				...buildWindowsDaemonEnvLines(daemonEnv),
-				`oShell.Run """${safeNode}"" ""${safeBundle}""", 0, False`,
-			].join('\r\n')
+			buildWindowsDaemonLauncherScript({
+				nodePath: process.execPath,
+				bundlePath: resolvedBundle,
+				// Only forward an override we accepted: forwarding a foreign one would hand the daemon a
+				// bundle path belonging to another CLI (that is the bug this resolution guards against).
+				forwardedBundleOverride:
+					process.env['LAUNCHER_BUNDLE_OVERRIDE'] === resolvedBundle ? resolvedBundle : null,
+				daemonEnv,
+			})
 		);
 		const wscript = spawn('wscript.exe', [vbsPath], {
 			detached: true,
