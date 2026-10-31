@@ -23,6 +23,7 @@ import { printDaemonPid, runStatusCommand, runStopCommand } from './commands/Dae
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
 import { registerPluginsCommand } from './commands/PluginsCommand';
+import { registerCancelCommand } from './commands/CancelCommand';
 import { registerResumeCommand } from './commands/ResumeCommand';
 import { registerRunCommand } from './commands/RunCommand';
 import { registerShowCommand } from './commands/ShowCommand';
@@ -175,6 +176,7 @@ async function main(): Promise<void> {
 	registerValidateCommand(program);
 	registerRunCommand(program);
 	registerResumeCommand(program);
+	registerCancelCommand(program);
 	registerHistoryCommand(program);
 	registerVersionsCommand(program);
 	registerWorkerCommand(registerWorkerSourceCommand(program));

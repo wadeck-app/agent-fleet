@@ -151,6 +151,13 @@ export class AssignmentLedger {
 		return result;
 	}
 
+	/** Assignments still outstanding for an execution, with the connection each was issued to. */
+	outstandingForExecution(executionId: string): { assignmentId: string; worker: WebSocket }[] {
+		return [...this.outstanding.values()]
+			.filter(entry => entry.executionId === executionId)
+			.map(({ assignmentId, worker }) => ({ assignmentId, worker }));
+	}
+
 	/**
 	 * Drops everything outstanding for a disconnected worker and returns it, so the
 	 * caller can decide what to do with the interrupted steps (D#65).

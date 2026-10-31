@@ -64,6 +64,7 @@ flow cli update                         # manual update
 | `flow show`        | Inspect a past execution                                     |
 | `flow history`     | List recent executions (times are UTC)                       |
 | `flow resume <id>` | Re-dispatch a timed-out, unanswered `user_intervention` step |
+| `flow cancel <id>` | Cancel one queued/running execution; the daemon keeps running |
 | `flow docs`        | Show flow YAML documentation                                 |
 | `flow cli update`  | Update to latest release                                     |
 

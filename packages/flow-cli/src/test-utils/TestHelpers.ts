@@ -21,6 +21,8 @@ type FlowTestCommands = {
 	workers?: () => Promise<unknown>;
 	/** Resumes an execution kept alive after an unanswered user_intervention timeout. */
 	resume?: (payload: unknown) => Promise<DaemonResponse>;
+	/** Cancels one execution without stopping the daemon (`flow cancel`). */
+	cancel?: (payload: unknown) => Promise<DaemonResponse>;
 };
 
 export interface TestDaemonContext {

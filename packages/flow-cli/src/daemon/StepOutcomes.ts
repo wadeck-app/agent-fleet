@@ -342,7 +342,11 @@ export class StepOutcomes {
 		}
 	}
 
-	private cleanupExecution(executionId: string, reason: 'completed' | 'failed', priorError?: unknown): void {
+	/**
+	 * Ends an execution the scheduler still holds: tells the workers that served it, forgets its in-memory state and
+	 * releases its workspace. The one end-of-run path, also taken by `flow cancel` (ExecutionCanceller).
+	 */
+	cleanupExecution(executionId: string, reason: 'completed' | 'failed', priorError?: unknown): void {
 		// Before onExecutionEnded: it makes the supervisor forget which workers served the run.
 		const runEnd = this.runEnd?.begin(executionId, reason);
 		this.executions.remove(executionId);

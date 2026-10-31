@@ -7,6 +7,12 @@ import type { AttemptEndReason, StepMeta } from 'flow-engine/types';
 export type ExecutionStatus = 'queued' | 'running' | 'completed' | 'failed' | 're-queued';
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed';
 
+/**
+ * Why an execution ended when it was not by its own steps. `cancelled`: ended by `flow cancel`; the status is `failed`
+ * (so every consumer of the status keeps its meaning) and `lastError` is `cancelled by user`.
+ */
+export type ExecutionEndReason = 'cancelled';
+
 /** One recorded value: the (possibly cut) text and the length of the original, so a cut is never silent. */
 export interface RecordedValue {
 	text: string;
@@ -156,6 +162,8 @@ export interface ExecutionState {
 	steps: Record<string, StepState>;
 	/** Error message from the last failed step, surfaced to the CLI on flow failure. */
 	lastError?: string;
+	/** Additive: absent on every record written before `flow cancel` existed, and on a run that ended by its own steps. */
+	endReason?: ExecutionEndReason;
 	/**
 	 * Project this run belongs to, so the projects with active runs can be listed (D#10).
 	 *

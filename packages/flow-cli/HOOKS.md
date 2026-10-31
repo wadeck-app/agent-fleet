@@ -36,7 +36,7 @@ Separately from hooks, the flow daemon publishes lifecycle events to the queue, 
 | -------------------------- | -------------------------------------------------------- |
 | `flow.execution.started`   | First step of an execution is dispatched                 |
 | `flow.execution.completed` | Every step completed                                     |
-| `flow.execution.failed`    | Execution failed for good                                |
+| `flow.execution.failed`    | Execution failed for good (`flow cancel`: `error` is `cancelled by user`) |
 | `flow.step.started`        | A step attempt starts (retry: again, with `attempt` + 1) |
 | `flow.step.completed`      | A step attempt completed                                 |
 | `flow.step.failed`         | A step attempt failed                                    |

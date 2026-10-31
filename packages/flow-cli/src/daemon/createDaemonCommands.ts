@@ -37,6 +37,14 @@ export function createDaemonCommands(
 			}
 			return runtime().commandHandler.handleResume(executionId);
 		},
+		// Ends one execution in any non-terminal state; the daemon and every other execution keep running.
+		cancel: (payload: unknown): unknown => {
+			const cmd = payload as Extract<ClientCommand, { type: 'cancel' }>;
+			if (typeof cmd.executionId !== 'string' || cmd.executionId.trim() === '') {
+				throw new Error('cancel requires a non-empty "executionId".');
+			}
+			return runtime().commandHandler.handleCancel(cmd);
+		},
 		// Live connections only: a declared source with nothing connected is not
 		// capacity, and reporting it as available would suggest a step could reach it (D#4).
 		workers: (): unknown => runtime().workerRegistry.summarize(),

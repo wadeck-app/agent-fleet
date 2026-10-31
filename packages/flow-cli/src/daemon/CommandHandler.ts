@@ -17,6 +17,7 @@ import { LogWriter } from '../storage/LogWriter';
 import { BoundStepWait, DEFAULT_BOUND_STEP_WAIT_MS, type WorkerTypeRouting } from './BoundStepWait.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
+import { ExecutionCanceller } from './ExecutionCanceller.js';
 import { ExecutionHooks } from './ExecutionHooks.js';
 import { ExecutionRegistry } from './ExecutionRegistry.js';
 import { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
@@ -70,6 +71,7 @@ export class CommandHandler {
 	private readonly idleState: SchedulerIdleState;
 	private readonly injection: StepInjection;
 	private readonly runRequests: RunRequestHandler;
+	private readonly canceller: ExecutionCanceller;
 	/**
 	 * While draining, new runs are refused so in-flight executions can finish and a pending update
 	 * can restart the daemon. Refused rather than queued: execution state lives only in this
@@ -211,6 +213,19 @@ export class CommandHandler {
 			},
 			this.runEnd
 		);
+		this.canceller = new ExecutionCanceller({
+			executions: this.executions,
+			queue: this.queue,
+			store: this.executionStore,
+			supervisor: this.supervisor,
+			hooks: this.hooks,
+			workspaces,
+			logWriter: this.logWriter,
+			disconnectWorker: worker => registry.disconnect(worker),
+			endExecution: (executionId, reason, priorError) =>
+				this.outcomes.cleanupExecution(executionId, reason, priorError),
+			tryDispatch: () => this.tryDispatch(),
+		});
 		this.injection = new StepInjection(
 			this.executions,
 			this.queue,
@@ -372,6 +387,11 @@ export class CommandHandler {
 	/** Resumes an execution kept alive after an unanswered `user_intervention` step; see {@link StepOutcomes.handleResume}. */
 	handleResume(executionId: string): DaemonResponse {
 		return this.outcomes.handleResume(executionId);
+	}
+
+	/** Ends one execution in any non-terminal state without touching the others; see {@link ExecutionCanceller}. */
+	handleCancel(cmd: Extract<ClientCommand, { type: 'cancel' }>): DaemonResponse {
+		return this.canceller.cancel(cmd.executionId, cmd.projectId);
 	}
 
 	/** Called by Daemon for inject_steps messages. */

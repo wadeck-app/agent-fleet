@@ -1197,6 +1197,12 @@ This re-dispatches only the timed-out step -- nothing else re-runs. Only works w
 
 ---
 
+## Execution stuck `running`/`queued` (blocks the daemon update)
+
+`flow cancel <execution-id> [-p <project>] [--json]` ends that one execution; the daemon and other runs keep going. It works on queued, running and resumable (unanswered intervention) executions. The record ends `failed` with `lastError: cancelled by user` (and `endReason: cancelled`); its steps end as `cancelled by user`; workers holding its steps are disconnected; the workspace is released. No flow hook fires. Cancelling twice succeeds; an execution that already completed/failed is refused with its final status. With no daemon running, a `running` record is stale: `flow start` marks it failed.
+
+---
+
 ## Debugging Workflow
 
 Step-by-step process for debugging flow issues.

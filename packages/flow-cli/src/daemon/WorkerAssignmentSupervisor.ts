@@ -109,6 +109,11 @@ export class WorkerAssignmentSupervisor {
 		return [...(this.served.get(executionId) ?? [])];
 	}
 
+	/** What workers hold of this execution right now (handed over, not yet settled), for `flow cancel`. */
+	heldAssignments(executionId: string): { assignmentId: string; worker: WebSocket }[] {
+		return this.assignments.outstandingForExecution(executionId);
+	}
+
 	/** Executions that have been handed at least one step and not been forgotten yet. */
 	servedExecutions(): string[] {
 		return [...this.served.keys()];
