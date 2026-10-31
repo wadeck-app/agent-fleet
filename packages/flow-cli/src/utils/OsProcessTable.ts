@@ -46,6 +46,18 @@ function asArray<T>(parsed: T | T[]): T[] {
 	return Array.isArray(parsed) ? parsed : [parsed];
 }
 
+function parseWindowsRows(stdout: string): WindowsProcessRow | WindowsProcessRow[] {
+	try {
+		return JSON.parse(stdout) as WindowsProcessRow | WindowsProcessRow[];
+	} catch (error) {
+		throw new Error(
+			`The process list printed by PowerShell is not valid JSON (${(error as Error).message}). ` +
+				'A process command line probably holds a character the console encoding cannot carry. ' +
+				'Nothing was changed; the process list is only read.'
+		);
+	}
+}
+
 /** `ps` prints elapsed time as [[dd-]hh:]mm:ss. */
 export function parseElapsed(etime: string): number | undefined {
 	const match = /^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$/.exec(etime.trim());
@@ -71,7 +83,8 @@ export function listOsProcesses(now: Date = new Date(), options: OsProcessReader
 				'-NoProfile',
 				'-NonInteractive',
 				'-Command',
-				'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine,@{n="StartedMs";e={if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { $null }}} | ConvertTo-Json -Compress',
+				// UTF-8 first: the console code page (850 here) would encode some characters as raw control bytes, which breaks the JSON.
+				'[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine,@{n="StartedMs";e={if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { $null }}} | ConvertTo-Json -Compress',
 			],
 			{ encoding: 'utf8', windowsHide: true, maxBuffer: MAX_BUFFER, timeout: timeoutMs }
 		);
@@ -79,7 +92,7 @@ export function listOsProcesses(now: Date = new Date(), options: OsProcessReader
 			const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT';
 			fail('PowerShell', result.status, result.error?.message ?? result.stderr, timedOut ? timeoutMs : undefined);
 		}
-		return asArray(JSON.parse(result.stdout) as WindowsProcessRow | WindowsProcessRow[]).map(row => ({
+		return asArray(parseWindowsRows(result.stdout)).map(row => ({
 			pid: row.ProcessId,
 			ppid: row.ParentProcessId,
 			commandLine: row.CommandLine ?? '',

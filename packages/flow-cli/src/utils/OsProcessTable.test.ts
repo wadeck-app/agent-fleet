@@ -48,6 +48,12 @@ describe('listOsProcesses with an injected reader', () => {
 		expect(listOsProcesses(new Date(), win32(json))).toHaveLength(1);
 	});
 
+	it('names the tool and the position when the listing is not valid JSON, instead of a bare parse error', () => {
+		expect(() => listOsProcesses(new Date(), win32('[{"ProcessId":1,"CommandLine":"ab"}]'))).toThrow(
+			/PowerShell.*not valid JSON.*Bad control character/s
+		);
+	});
+
 	it('passes the requested timeout to the OS tool', () => {
 		let seen: number | undefined;
 		listOsProcesses(new Date(), {
@@ -120,6 +126,22 @@ describe('the real process table', () => {
 			const mine = listOsProcesses(new Date(), REAL).find(p => p.pid === child!.pid);
 
 			expect(mine?.ppid).toBe(process.pid);
+		},
+		REAL_TEST_TIMEOUT_MS
+	);
+
+	// Measured 2026-10-31: the Windows console code page is 850, and PowerShell encodes its output with it. In that code page
+	// U+2192 is byte 0x1A, U+2022 is 0x07 and U+263A is 0x01: raw control bytes inside the JSON strings, so JSON.parse
+	// threw "Bad control character" as soon as ANY process of the machine had such a character in its command line.
+	it(
+		'lists a process whose command line has characters that a legacy console code page encodes as control bytes',
+		() => {
+			const odd = 'arrow→ bullet• smile☺ accenté cjk中';
+			child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', odd], { stdio: 'ignore', windowsHide: true });
+
+			const mine = listOsProcesses(new Date(), REAL).find(p => p.pid === child!.pid);
+
+			expect(mine?.commandLine).toContain(odd);
 		},
 		REAL_TEST_TIMEOUT_MS
 	);

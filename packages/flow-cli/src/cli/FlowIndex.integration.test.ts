@@ -14,7 +14,7 @@ import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
 import { processLeakGuard } from '../test-utils/ProcessLeakGuard';
@@ -28,6 +28,13 @@ const agentFleetRoot = path.resolve(__dirname, '../../../..');
 const bundlePath = path.resolve(agentFleetRoot, 'packages/flow-cli/dist-bundle/flow.cjs');
 const updaterBundlePath = path.resolve(agentFleetRoot, 'packages/flow-cli/dist-bundle/flow-updater.cjs');
 
+/** Longest a spawned bundle may run: the updater alone runs `npm root -g` (own cap 10 s) and then `npm view`. */
+const CHILD_TIMEOUT_MS = 30_000;
+// Every test here blocks on spawnSync, which vitest cannot interrupt: the default 5 s test timeout is only reported after
+// the child returned, so a slow machine (alone: 0.4 to 0.6 s per updater run; seen > 5 s in a busy full run) failed
+// tests whose child was fine. The test budget must outlast the child's own cap, which then reports a real hang.
+vi.setConfig({ testTimeout: CHILD_TIMEOUT_MS + 15_000 });
+
 /** Runs `script` under a fresh isolated environment, removed afterwards. `prepare` may seed the config dir. */
 function runIsolated(
 	script: string,
@@ -39,7 +46,7 @@ function runIsolated(
 		opts.prepare?.(isolation.configDir);
 		const result = spawnSync(process.execPath, [script, ...args], {
 			env: isolation.env,
-			timeout: 30000,
+			timeout: CHILD_TIMEOUT_MS,
 			encoding: 'utf-8',
 		});
 		return { result, configDir: isolation.configDir };
