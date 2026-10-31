@@ -50,6 +50,10 @@ const declarePlugin = (sourceId: string): void => {
 	});
 };
 
+/** The daemon endpoint each obtained worker was asked to register with, in the order they were obtained. */
+const endpointsObtained = (): string[] =>
+	fixture.obtained.map(entry => (entry.request as { daemonEndpoint: string }).daemonEndpoint);
+
 describe('DaemonSourceContact - plugin sources', () => {
 	it('serves a plugin source through one instance, however many times demand arrives', async () => {
 		declarePlugin('sandbox');
@@ -86,16 +90,18 @@ describe('DaemonSourceContact - asking only the sources of some worker types', (
 		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
 	});
 
-	// The later contact for the wanted type is a marker: contacts are handled in order, so by the time it has
-	// produced a worker anything the earlier one would have produced is there too.
+	// The two contacts use different ports, so a worker request says which contact produced it. The later contact for
+	// the wanted type is a marker: contacts are handled in order, so by the time it has produced a worker anything the
+	// earlier one would have produced is there too. Counting workers alone would pass with a broken filter, as soon as
+	// the first one obtained satisfied the wait.
 	it('does not contact a source of another type', async () => {
 		declarePlugin('sandbox');
 
 		contact.contactSources(4101, new Set(['gpu']));
-		contact.contactSources(4101, new Set(['fixture-sandbox']));
-		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
+		contact.contactSources(4102, new Set(['fixture-sandbox']));
+		await vi.waitFor(() => expect(endpointsObtained()).toContain('ws://127.0.0.1:4102'));
 
-		expect(fixture.obtained).toHaveLength(1);
+		expect(endpointsObtained()).toEqual(['ws://127.0.0.1:4102']);
 	});
 
 	it('contacts every source when no type is given', async () => {
