@@ -2,36 +2,40 @@ import { MemoryRouter } from 'react-router-dom';
 
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { DEFAULT_DATE_SETTINGS, DateFormatProvider, createDateFormatter } from '@wadeck-app/dsl-ui';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RunBars } from './RunBars.js';
 
 const TO = '/modules/flow/executions';
 
-// Seven local days from Monday 2026-10-19, only the last two with runs: the case of the screenshot (five empty days).
-const DAYS = Array.from({ length: 7 }, (_, index) => ({
-	dayStart: new Date(2026, 9, 19 + index).toISOString(),
-	completed: index === 5 ? 20 : index === 6 ? 13 : 0,
-	failed: index === 5 ? 12 : index === 6 ? 4 : 0,
-}));
+// Sunday 2026-10-25 at noon UTC. The bars show the seven days Monday 19 to Sunday 25 in the time zone of the settings (UTC here
+// unless a test says otherwise); only the last two days have runs: the case of the screenshot (five empty days).
+const NOW = Date.parse('2026-10-25T12:00:00.000Z');
 
-// Without a DateFormatProvider the dsl-ui default applies (en-GB, 24h, zone of the machine).
-const formatter = createDateFormatter(DEFAULT_DATE_SETTINGS);
+function runsOf(day: string, completed: number, failed: number) {
+	return [
+		...Array.from({ length: completed }, () => ({ startedAt: `${day}T10:00:00.000Z`, status: 'completed' })),
+		...Array.from({ length: failed }, () => ({ startedAt: `${day}T11:00:00.000Z`, status: 'failed' })),
+	];
+}
+const RUNS = [...runsOf('2026-10-25', 13, 4), ...runsOf('2026-10-24', 20, 12)];
+
+// Date only: the timers stay real (ResizeObserver stubs, testing-library).
+beforeEach(() => {
+	vi.useFakeTimers({ toFake: ['Date'] });
+	vi.setSystemTime(NOW);
+});
+afterEach(() => vi.useRealTimers());
+
+const UTC = { ...DEFAULT_DATE_SETTINGS, timeZone: 'UTC' };
 
 function show(props: Partial<Parameters<typeof RunBars>[0]> = {}, settings?: Partial<typeof DEFAULT_DATE_SETTINGS>) {
-	const bars = (
-		<MemoryRouter>
-			<RunBars days={DAYS} to={TO} unexpectedKeys={[]} {...props} />
-		</MemoryRouter>
-	);
 	return render(
-		settings === undefined ? (
-			bars
-		) : (
-			<DateFormatProvider formatter={createDateFormatter({ ...DEFAULT_DATE_SETTINGS, ...settings })}>
-				{bars}
-			</DateFormatProvider>
-		)
+		<DateFormatProvider formatter={createDateFormatter({ ...UTC, ...settings })}>
+			<MemoryRouter>
+				<RunBars runs={RUNS} truncated={false} to={TO} unexpectedKeys={[]} {...props} />
+			</MemoryRouter>
+		</DateFormatProvider>
 	);
 }
 
@@ -100,7 +104,7 @@ describe('RunBars weekday label width', () => {
 			const busy = screen.getAllByTestId('run-bars-day')[5]!;
 			expect(busy.getAttribute('title')).toMatch(/^Saturday 24 Oct 2026: /);
 			const label = within(busy).getByText(/^(S|Sat|Saturday)$/);
-			expect(label.getAttribute('title')).toBe(`Saturday, ${formatter.exact(DAYS[5]!.dayStart)}`);
+			expect(label.getAttribute('title')).toBe('Saturday, 24 Oct 2026 (UTC)');
 			for (const link of within(busy).getAllByRole('link')) {
 				expect(link.getAttribute('title')).toMatch(/^Saturday 24 Oct 2026: /);
 				expect(link.getAttribute('aria-label')).toContain('on Saturday 24 Oct 2026)');
@@ -143,12 +147,12 @@ describe('RunBars', () => {
 		expect(failed!.className).toMatch(/\bbg-danger\b/);
 	});
 
-	it('names each day with the weekday of its own date in the style of the settings, with the exact timestamp as tooltip', () => {
+	it('names each day with the weekday of its own date in the style of the settings, with its date and zone as tooltip', () => {
 		show();
 		const columns = screen.getAllByTestId('run-bars-day');
 		expect(columns.map(column => column.textContent)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
 		const label = within(columns[5]!).getByText('Sat');
-		expect(label.getAttribute('title')).toBe(`Saturday, ${formatter.exact(DAYS[5]!.dayStart)}`);
+		expect(label.getAttribute('title')).toBe('Saturday, 24 Oct 2026 (UTC)');
 	});
 
 	it('keeps the bars in the order of the data (last 7 days ending today) whatever the first day of the week of the settings', () => {
@@ -177,18 +181,16 @@ describe('RunBars', () => {
 		expect(busy.getAttribute('title')).toMatch(/^Saturday 2026-10-24: 20 completed, 12 failed\. /);
 	});
 
-	it('gives the exact instant of the day start and its zone in the title of the day and of every bar', () => {
+	it('says in the title of the day and of every bar that the days follow the time zone of the date settings', () => {
 		show();
-		const iso = formatter.exact(DAYS[5]!.dayStart);
+		const note = 'Days follow the time zone of your date settings (UTC).';
 		const busy = screen.getAllByTestId('run-bars-day')[5]!;
-		expect(busy.getAttribute('title')).toContain(
-			`Day starts ${iso} (local midnight of the machine that serves this page)`
-		);
+		expect(busy.getAttribute('title')).toContain(note);
 		const [completed, failed] = within(busy).getAllByRole('link');
-		expect(completed!.getAttribute('title')).toContain(`Day starts ${iso} (local midnight`);
-		expect(failed!.getAttribute('title')).toContain(`Day starts ${iso} (local midnight`);
-		// The accessible name stays short: the instant is for the tooltip only.
-		expect(completed!.getAttribute('aria-label')).not.toContain(iso);
+		expect(completed!.getAttribute('title')).toContain(note);
+		expect(failed!.getAttribute('title')).toContain(note);
+		// The accessible name stays short: the note is for the tooltip only.
+		expect(completed!.getAttribute('aria-label')).not.toContain('time zone');
 	});
 
 	it('writes the weekday labels at 11px or more', () => {
@@ -223,24 +225,81 @@ describe('RunBars', () => {
 	});
 
 	it('draws no link on a day without run', () => {
-		show({ days: [DAYS[0]!] });
+		show({ runs: [] });
 		expect(screen.queryAllByRole('link')).toHaveLength(0);
 	});
 
-	it('says there is no data instead of drawing nothing for an empty list', () => {
-		show({ days: [] });
-		expect(screen.getByText('No data')).toBeInTheDocument();
+	it('draws seven empty days, each with a baseline, when no run is in the list', () => {
+		show({ runs: [] });
+		expect(screen.getAllByTestId('run-bars-day')).toHaveLength(7);
+		expect(screen.getAllByTestId('run-bars-baseline')).toHaveLength(7);
+		expect(screen.getByRole('group').getAttribute('aria-label')).toBe(
+			'Runs of the last 7 days: 0 completed, 0 failed'
+		);
+	});
+
+	it('puts a run on the day it started in the time zone of the settings, not on its UTC day', () => {
+		const lateRuns = [
+			{ startedAt: '2026-10-24T09:59:59.000Z', status: 'completed' },
+			{ startedAt: '2026-10-24T10:00:00.000Z', status: 'failed' },
+		];
+		// Pacific/Kiritimati is UTC+14: it is already Monday 26 there, and 10:00Z is the midnight that starts Sunday 25.
+		show({ runs: lateRuns }, { timeZone: 'Pacific/Kiritimati' });
+		const columns = screen.getAllByTestId('run-bars-day');
+		expect(columns.map(column => column.textContent)).toEqual(['Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon']);
+		expect(columns[4]!.getAttribute('title')).toMatch(/^Saturday 24 Oct 2026: 1 completed, 0 failed\. /);
+		expect(columns[5]!.getAttribute('title')).toMatch(/^Sunday 25 Oct 2026: 0 completed, 1 failed\. /);
+		expect(columns[6]!.getAttribute('title')).toMatch(/^Monday 26 Oct 2026: 0 completed, 0 failed\. /);
+		cleanup();
+		// The same two runs in UTC both belong to Saturday 24.
+		show({ runs: lateRuns }, { timeZone: 'UTC' });
+		expect(screen.getAllByTestId('run-bars-day')[5]!.getAttribute('title')).toMatch(
+			/^Saturday 24 Oct 2026: 1 completed, 1 failed\. /
+		);
+	});
+
+	it('puts a run of the evening of the day before in America/Los_Angeles (PDT, UTC-7)', () => {
+		show(
+			{ runs: [{ startedAt: '2026-10-25T06:59:00.000Z', status: 'failed' }] },
+			{ timeZone: 'America/Los_Angeles' }
+		);
+		const columns = screen.getAllByTestId('run-bars-day');
+		expect(columns[5]!.getAttribute('title')).toMatch(/^Saturday 24 Oct 2026: 0 completed, 1 failed\. /);
+		expect(columns[6]!.getAttribute('title')).toMatch(/^Sunday 25 Oct 2026: 0 completed, 0 failed\. /);
+	});
+
+	it('keeps one column per calendar day over the autumn DST change of Los Angeles (25-hour day)', () => {
+		vi.setSystemTime(Date.parse('2026-11-03T12:00:00.000Z'));
+		show({ runs: [] }, { timeZone: 'America/Los_Angeles', weekdayStyle: 'long' });
+		expect(labels()).toEqual(['Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday', 'Tuesday']);
+		expect(screen.getAllByTestId('run-bars-day')[4]!.getAttribute('title')).toMatch(/^Sunday 1 Nov 2026: /);
+	});
+
+	it('shows no note when the list is complete, and a note with the count when the source cut it', () => {
+		show();
+		expect(screen.queryByRole('status')).toBeNull();
+		cleanup();
+		show({ truncated: true });
+		expect(screen.getByRole('status').textContent).toBe(
+			`Only the newest ${RUNS.length} runs are counted: the oldest days may show fewer.`
+		);
 	});
 
 	it('renders an error naming the cause for keys outside the contract, bad days and a bad page', () => {
 		const { unmount } = show({ unexpectedKeys: ['height'] });
-		expect(screen.getByRole('alert').textContent).toMatch(/does not accept height.*Keep only days, to/);
+		expect(screen.getByRole('alert').textContent).toMatch(/does not accept height.*Keep only runs, truncated, to/);
 		unmount();
-		const second = show({ days: 'x' });
-		expect(screen.getByRole('alert').textContent).toMatch(/days must be a list/);
+		const second = show({ runs: 'x' });
+		expect(screen.getByRole('alert').textContent).toMatch(/runs must be a list/);
 		second.unmount();
 		show({ to: undefined });
 		expect(screen.getByRole('alert').textContent).toMatch(/flow:RunBars to must be an app path/);
+		cleanup();
+		show({ truncated: undefined });
+		expect(screen.getByRole('alert').textContent).toMatch(/truncated must be true or false/);
+		cleanup();
+		show({ runs: [{ startedAt: 'x', status: 'completed' }] });
+		expect(screen.getByRole('alert').textContent).toMatch(/run 0 startedAt/);
 	});
 });
 
@@ -274,9 +333,9 @@ function stubResizableChart(initialWidth: number) {
 
 function renderWith(weekdayStyle: 'narrow' | 'short' | 'long') {
 	return (
-		<DateFormatProvider formatter={createDateFormatter({ ...DEFAULT_DATE_SETTINGS, weekdayStyle })}>
+		<DateFormatProvider formatter={createDateFormatter({ ...UTC, weekdayStyle })}>
 			<MemoryRouter>
-				<RunBars days={DAYS} to={TO} unexpectedKeys={[]} />
+				<RunBars runs={RUNS} truncated={false} to={TO} unexpectedKeys={[]} />
 			</MemoryRouter>
 		</DateFormatProvider>
 	);

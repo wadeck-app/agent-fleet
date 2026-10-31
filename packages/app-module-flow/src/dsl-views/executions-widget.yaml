@@ -35,10 +35,12 @@ items:
           - { $type: StatTile, label: Total, value: $sources.recent.total, href: /modules/flow/executions }
 
     # Runs of the last 7 days, one green (completed) and one red (failed) bar per day, one equal column per day over the
-    # whole width of the tile. Hover a day for the date. Not the dsl-ui Chart: it draws nothing for a day without run, so a
+    # whole width of the tile. The route sends the finished runs of the last 8 days (start and status, capped); the component
+    # counts them per day in the time zone of the user's date settings. Hover a day for the date. Not the dsl-ui Chart: it draws nothing for a day without run, so a
     # quiet week showed two bars squeezed against the right edge and the rest of the tile empty.
     - $type: flow:RunBars
-      days: $sources.recent.daily
+      runs: $sources.recent.recentRuns
+      truncated: $sources.recent.recentRunsTruncated
       to: /modules/flow/executions
 
     # The 5 newest runs, one line each (status, flow name, start time), a line opens the run. A DataTable cannot shrink under

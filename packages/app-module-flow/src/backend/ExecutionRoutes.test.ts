@@ -586,3 +586,27 @@ describe('project of an execution', () => {
 		expect((detail.body as { text: string }).text).toContain('Project:   app (a1b2c3d4)');
 	});
 });
+
+describe('GET /executions project filter (?projectId=, the page forwards ?project=)', () => {
+	it('keeps the runs of this project only, and says so in the count label', async () => {
+		fixture.addExecution({ executionId: 'mine', projectId: 'a1b2c3d4' });
+		fixture.addExecution({ executionId: 'theirs', projectId: '00000000' });
+		fixture.addExecution({ executionId: 'none' });
+		const { status, body } = await callRoute(routes, 'GET /executions', { query: { projectId: 'a1b2c3d4' } });
+		expect(status).toBe(200);
+		expect((body as { items: { executionId: string }[] }).items.map(item => item.executionId)).toEqual(['mine']);
+		expect((body as { countLabel: string }).countLabel).toBe('1 execution of the project a1b2c3d4');
+	});
+
+	it('ignores an empty value, as the other filters do', async () => {
+		fixture.addExecution({ executionId: 'none' });
+		const { body } = await callRoute(routes, 'GET /executions', { query: { projectId: '' } });
+		expect((body as { total: number }).total).toBe(1);
+	});
+
+	it('refuses a malformed id with a 400 that says what an id looks like', async () => {
+		const { status, body } = await callRoute(routes, 'GET /executions', { query: { projectId: 'nope' } });
+		expect(status).toBe(400);
+		expect((body as { error: string }).error).toMatch(/8 lowercase hexadecimal/);
+	});
+});

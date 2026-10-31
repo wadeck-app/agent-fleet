@@ -5,6 +5,7 @@ import {
 	BUILTIN_PLUGIN_CATALOG,
 	FLOW_CONFIG_DIR_NAME,
 	FlowQueryService,
+	createRegistryProjectFinderFromEnv,
 	createRegistryProjectLookupFromEnv,
 } from 'flow-core';
 
@@ -13,6 +14,7 @@ import { registerExecutionRoutes } from './ExecutionRoutes.js';
 import { registerExecutionWidgetRoutes } from './ExecutionWidgetRoutes.js';
 import { registerLogRoutes } from './LogRoutes.js';
 import { registerPluginRoutes } from './PluginRoutes.js';
+import { registerProjectRelatedRoutes } from './ProjectRelatedRoutes.js';
 import { registerWorkerRoutes } from './WorkerRoutes.js';
 
 /**
@@ -35,4 +37,6 @@ export default function (ctx: ModuleContext): void {
 	registerWorkerRoutes(ctx, service);
 	registerLogRoutes(ctx, service);
 	registerPluginRoutes(ctx, service);
+	// Read per request, like the project names above: the registry is shared with the project CLI.
+	registerProjectRelatedRoutes(ctx, service, createRegistryProjectFinderFromEnv(process.env));
 }

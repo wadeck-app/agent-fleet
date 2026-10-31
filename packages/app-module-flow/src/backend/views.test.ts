@@ -254,6 +254,7 @@ describe('executions page filters (real controls bound to the URL, not links)', 
 		expect(executions?.spec.params).toEqual({
 			status: '$urlParam.status',
 			flowContains: '$urlParam.flow',
+			projectId: '$urlParam.project',
 			page: '$urlParam.page',
 			limit: '$urlParam.size',
 		});
@@ -1102,12 +1103,13 @@ describe('dashboard widget', () => {
 		}
 	});
 
-	it('gives the daily bars the 7 days of the digest and no style key', () => {
+	it('gives the bars the recent runs of the digest and the cut flag, and no style key', () => {
 		const [bars] = collectNodes(widget.document, 'flow:RunBars');
-		expect(Object.keys(bars!).filter(key => !key.startsWith('$'))).toEqual(['days', 'to']);
-		const days = readSource(String(bars!['days'])).value as Record<string, unknown>[];
-		expect(days).toHaveLength(7);
-		for (const field of ['dayStart', 'completed', 'failed']) expect(Object.keys(days[0]!), field).toContain(field);
+		expect(Object.keys(bars!).filter(key => !key.startsWith('$'))).toEqual(['runs', 'truncated', 'to']);
+		const runs = readSource(String(bars!['runs'])).value as Record<string, unknown>[];
+		expect(runs.length, 'the digest has no recent run to check').toBeGreaterThan(0);
+		for (const field of ['startedAt', 'status']) expect(Object.keys(runs[0]!), field).toContain(field);
+		expect(readSource(String(bars!['truncated'])).value).toBe(false);
 	});
 
 	// app-core grid: square cells of 100px, 1 to 12 cells. Without a width the card takes 2 cells and widens itself when its

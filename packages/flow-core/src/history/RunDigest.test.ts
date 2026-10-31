@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
 import { makeExec } from '../testing/makeExec.js';
-import { DIGEST_DAYS, DIGEST_ROWS, buildRunDigest } from './RunDigest.js';
+import { DIGEST_ROWS, buildRunDigest } from './RunDigest.js';
 
 const NOW = Date.parse('2026-10-22T12:00:00.000Z');
 
 describe('buildRunDigest', () => {
-	it('is all zeros and an empty list when nothing ran', () => {
+	it('is all zeros and empty lists when nothing ran', () => {
 		const digest = buildRunDigest([], NOW);
-		expect(digest).toMatchObject({ total: 0, running: 0, failed: 0, latest: [] });
-		expect(digest.daily).toHaveLength(DIGEST_DAYS);
+		expect(digest).toMatchObject({
+			total: 0,
+			running: 0,
+			failed: 0,
+			latest: [],
+			recentRuns: [],
+			recentRunsTruncated: false,
+		});
 	});
 
-	it('answers the counters, the per-day bars and the latest runs from the same runs (newest first)', () => {
+	it('answers the counters, the recent runs and the latest runs from the same runs (newest first)', () => {
 		const runs = [
 			makeExec({
 				executionId: 'live',
@@ -27,15 +33,15 @@ describe('buildRunDigest', () => {
 		const digest = buildRunDigest(runs, NOW);
 		expect(digest).toMatchObject({ total: 3, running: 1, failed: 1 });
 		expect(digest.latest.map(row => row.executionId)).toEqual(['live', 'bad', 'good']);
-		expect(digest.daily.map(day => ({ completed: day.completed, failed: day.failed })).at(-1)).toEqual({
-			completed: 1,
-			failed: 1,
-		});
+		expect(digest.recentRuns).toEqual([
+			{ startedAt: '2026-10-22T11:00:00.000Z', status: 'failed' },
+			{ startedAt: '2026-10-22T10:00:00.000Z', status: 'completed' },
+		]);
 	});
 
 	it('carries exactly the fields the dashboard widget reads', () => {
 		expect(Object.keys(buildRunDigest([], NOW)).sort()).toEqual(
-			['daily', 'failed', 'latest', 'running', 'total'].sort()
+			['failed', 'latest', 'recentRuns', 'recentRunsTruncated', 'running', 'total'].sort()
 		);
 	});
 

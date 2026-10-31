@@ -35,6 +35,8 @@ $sources:
         params:
             status: $urlParam.status
             flowContains: $urlParam.flow
+            # ?project=<projectId> (8 hex chars) keeps the runs of one project.
+            projectId: $urlParam.project
             page: $urlParam.page
             limit: $urlParam.size
 

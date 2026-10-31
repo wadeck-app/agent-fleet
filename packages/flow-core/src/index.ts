@@ -88,13 +88,16 @@ export {
 	projectLabelOf,
 } from './project/ProjectLabel.js';
 export type { ProjectLookup, ProjectLookupResult } from './project/ProjectLabel.js';
+export { createRegistryProjectFinder, createRegistryProjectFinderFromEnv } from './project/ProjectRegistryFinder.js';
+export type { ProjectFinder, ProjectFinding } from './project/ProjectRegistryFinder.js';
 export { countByStatus } from './history/StatusCounts.js';
 export type { StatusCounts } from './history/StatusCounts.js';
 export { summarizeFlows } from './history/FlowSummaries.js';
 export { buildRunDigest } from './history/RunDigest.js';
 export type { RunDigest } from './history/RunDigest.js';
 export type { LatestRunRow } from './history/RunRows.js';
-export type { DailyRunCount } from './history/RunTrend.js';
+export { RECENT_RUNS_CAP, RECENT_RUNS_DAYS } from './history/RecentRuns.js';
+export type { RecentRun } from './history/RecentRuns.js';
 export type { FlowSummary } from './history/FlowSummaries.js';
 export { formatDuration, formatModelCost, formatStarted, formatStartedUtc } from './history/ExecutionFormat.js';
 export { describeSkippedExecutions, loadExecutionReport, loadExecutions } from './history/ExecutionLoader.js';

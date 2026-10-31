@@ -18,16 +18,29 @@ describe('GET /widgets/executions', () => {
 
 	afterEach(() => fixture.dispose());
 
-	it('answers zeros, an empty list and the seven empty days when nothing ran yet', async () => {
+	it('answers zeros and empty lists when nothing ran yet', async () => {
 		const { status, body } = await callRoute(routes, 'GET /widgets/executions', { query: {} });
 		expect(status).toBe(200);
-		expect(body).toMatchObject({ total: 0, running: 0, failed: 0, latest: [] });
-		expect((body as { daily: unknown[] }).daily).toHaveLength(7);
+		expect(body).toMatchObject({
+			total: 0,
+			running: 0,
+			failed: 0,
+			latest: [],
+			recentRuns: [],
+			recentRunsTruncated: false,
+		});
 	});
 
 	it('serves exactly the fields the widget view reads', async () => {
 		const { body } = await callRoute(routes, 'GET /widgets/executions', { query: {} });
-		expect(Object.keys(body as object).sort()).toEqual(['daily', 'failed', 'latest', 'running', 'total']);
+		expect(Object.keys(body as object).sort()).toEqual([
+			'failed',
+			'latest',
+			'recentRuns',
+			'recentRunsTruncated',
+			'running',
+			'total',
+		]);
 	});
 
 	it('serves the runs of the config directory: counters and the latest runs with the full flow name', async () => {

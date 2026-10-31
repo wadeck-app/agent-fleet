@@ -22,6 +22,7 @@ import {
 
 import { replyWithError } from './ErrorReply.js';
 import { toExecutionDetailRow, toExecutionRow, toFlowRow } from './ExecutionDisplay.js';
+import { requireProjectId } from './ProjectIdQuery.js';
 import { renderStepsIoText } from './StepIoText.js';
 
 export const MAX_EXECUTIONS_LIMIT = 500;
@@ -62,6 +63,7 @@ interface ExecutionFilters {
 	flow?: string;
 	flowContains?: string;
 	id?: string;
+	projectId?: string;
 }
 
 /**
@@ -76,6 +78,9 @@ function countLabelOf(total: number, filters: ExecutionFilters): string {
 	}
 	if (filters.flowContains !== undefined) {
 		parts.push(`with a flow name containing "${filters.flowContains}"`);
+	}
+	if (filters.projectId !== undefined) {
+		parts.push(`of the project ${filters.projectId}`);
 	}
 	if (filters.id !== undefined) {
 		parts.push(`with an id starting "${filters.id}"`);
@@ -109,7 +114,9 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			const flow = optionalString(query, 'flow');
 			const flowContains = optionalString(query, 'flowContains');
 			const id = optionalString(query, 'id');
-			const page = service.listExecutions({ limit, offset, status, flow, flowContains, id });
+			const rawProjectId = optionalString(query, 'projectId');
+			const projectId = rawProjectId === undefined ? undefined : requireProjectId(rawProjectId);
+			const page = service.listExecutions({ limit, offset, status, flow, flowContains, id, projectId });
 			const body = {
 				items: page.items.map(record =>
 					toExecutionRow(toExecutionSummary(stripErrorsForServing(record), service.projectLookup))
@@ -121,9 +128,9 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 				offset: offset ?? 0,
 				emptyMessage: emptyMessageOf(
 					page.total,
-					[status, flow, flowContains, id].some(value => value !== undefined)
+					[status, flow, flowContains, id, projectId].some(value => value !== undefined)
 				),
-				countLabel: countLabelOf(page.total, { status, flow, flowContains, id }),
+				countLabel: countLabelOf(page.total, { status, flow, flowContains, id, projectId }),
 			};
 			return reply.code(200).send(body);
 		} catch (err) {

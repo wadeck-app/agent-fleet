@@ -61,9 +61,9 @@ Force one for a page load with `?ab.flow-logs-identity=badge`. Limits: grouping,
 
 Only the logs page has A/B experiments (above). `views.test.ts` asserts the executions page (`table`), the detail page (`steps-table`) and the widget hold no `AbTest`.
 
-Widget (`executions-widget.yaml`), one source `GET /widgets/executions` (flow-core `RunDigest`, served as is: `total`, `running`, `failed`, `daily`, `latest`):
+Widget (`executions-widget.yaml`), one source `GET /widgets/executions` (flow-core `RunDigest`, served as is: `total`, `running`, `failed`, `recentRuns`, `recentRunsTruncated`, `latest`):
 
 - Three tiles Running / Failed / Total on one row (a StatTile has no size prop: the height saving is the single row).
-- Daily bars: completed and failed runs of the last 7 days (`daily`, counted by flow-core).
+- Daily bars (`flow:RunBars`): completed and failed runs of the last 7 days. The route sends the finished runs of the last 8 days as `{ startedAt, status }` (`recentRuns`, newest first, capped at 2000, `recentRunsTruncated` true when cut) and the component counts them per calendar day in the time zone of the user's date settings (`useDateFormat().timeZone`), not the server's. A cut list shows a note under the bars.
 - Latest 5 runs: status badge, full flow name, start time (`datetime` column). The name column has `truncate` and no width, status and time are `nowrap`.
 - Buttons Runs / Workers / Charts, in `FLOW_ACTION_BUTTON_STYLE`. Charts leads to a flow-chart page, which exists only if that module is installed.

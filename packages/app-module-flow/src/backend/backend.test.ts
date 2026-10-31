@@ -39,6 +39,7 @@ describe('backend entry', () => {
 			'GET /logs',
 			'GET /plugins',
 			'GET /plugins/:id',
+			'GET /related/project/:projectId',
 			'GET /widgets/executions',
 			'GET /workers',
 		]);

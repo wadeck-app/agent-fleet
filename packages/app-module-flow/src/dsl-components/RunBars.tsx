@@ -3,7 +3,15 @@ import { Link } from 'react-router-dom';
 
 import { type DateFormatter, useDateFormat } from '@wadeck-app/dsl-ui';
 
-import { RUN_BARS_KEYS, type RunBarsProps, barHeights, barLink, parseRunBarsDays } from './RunBarsProps.js';
+import { type RunBarsDay, bucketRunsByDay } from './RunBarsDays.js';
+import {
+	RUN_BARS_KEYS,
+	type RunBarsProps,
+	barHeights,
+	barLink,
+	parseRunBarsRuns,
+	parseRunBarsTruncated,
+} from './RunBarsProps.js';
 
 function refusal(children: string) {
 	return (
@@ -17,8 +25,6 @@ function refusal(children: string) {
 // and the link shows a ring on keyboard focus.
 const LINK_CLASSES =
 	'group flex h-full w-full max-w-4 items-end rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary';
-
-const HALF_DAY_MS = 12 * 3600 * 1000;
 
 type NameStyle = 'narrow' | 'short' | 'long';
 
@@ -100,14 +106,15 @@ function requestedStyle(dates: DateFormatter): NameStyle {
  * draws nothing for a zero). The bars fill the height of the box; hover a day for the date and the counts. A bar is a link
  * to the executions page filtered on its status (the page has no date filter: it lists every run of that status).
  * Each bar is labelled with the weekday of ITS date (the date settings give the language and the style: letter, 3 letters
- * or full name), not by its place in a week that starts on the first day of the user's choice; the exact timestamp of the
- * day start is the tooltip. The days are the server's local days, so the date is read at noon of the day: a user whose time
- * zone differs from the server's by less than 12 hours still sees the right day.
+ * or full name), not by its place in a week that starts on the first day of the user's choice. The server sends the finished
+ * runs of the last 8 days (start time and status only); the days are the calendar days of the time zone of the date
+ * settings (`useDateFormat().timeZone`), and each day is read at the noon of that zone. When the source cut the list
+ * (`truncated`), a note says that the oldest days may show fewer runs.
  *
  * Local stand-in for a dsl-ui bar chart that keeps empty categories: when one ships, change `$type: flow:RunBars` in the
- * view and delete this component. Props are closed (days, to): anything else renders an error, so nobody restyles it.
+ * view and delete this component. Props are closed (runs, truncated, to): anything else renders an error, so nobody restyles it.
  */
-export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
+export function RunBars({ runs, truncated, to, unexpectedKeys }: RunBarsProps) {
 	const dates = useDateFormat();
 	const { ref, width } = useContentWidth();
 	if (unexpectedKeys.length > 0) {
@@ -115,96 +122,107 @@ export function RunBars({ days, to, unexpectedKeys }: RunBarsProps) {
 			`flow:RunBars does not accept ${unexpectedKeys.join(', ')}: its style is fixed. Keep only ${RUN_BARS_KEYS.join(', ')}.`
 		);
 	}
-	let parsed;
+	let parsed: RunBarsDay[];
+	let cut: boolean;
+	let runCount: number;
 	try {
-		parsed = parseRunBarsDays(days);
+		cut = parseRunBarsTruncated(truncated);
+		const finished = parseRunBarsRuns(runs);
+		runCount = finished.length;
+		parsed = bucketRunsByDay(finished, Date.now(), dates);
 		// Checked before drawing: a bad page is a message, not a bar that leads nowhere.
 		barLink(to, 'completed');
 	} catch (err) {
 		return refusal((err as Error).message);
 	}
-	if (parsed.length === 0) {
-		return <p className="px-3 py-2 text-sm text-muted">No data</p>;
-	}
 	const heights = barHeights(parsed);
 	const columnWidth = width === undefined ? undefined : (width - (parsed.length - 1) * COLUMN_GAP_PX) / parsed.length;
-	const noonOf = (day: { dayStart: Date }) => new Date(day.dayStart.getTime() + HALF_DAY_MS);
 	const labelStyle = fittingStyle(requestedStyle(dates), columnWidth, style =>
-		parsed.map(day => weekdayLabel(dates, noonOf(day), style))
+		parsed.map(day => weekdayLabel(dates, day.noon, style))
 	);
 	const completed = parsed.reduce((sum, day) => sum + day.completed, 0);
 	const failed = parsed.reduce((sum, day) => sum + day.failed, 0);
 	return (
-		<div
-			ref={ref}
-			role="group"
-			aria-label={`Runs of the last ${parsed.length} days: ${completed} completed, ${failed} failed`}
-			className="grid h-[4.75rem] w-full gap-1 rounded-md border border-border px-2 pb-1 pt-2"
-			style={{ gridTemplateColumns: `repeat(${parsed.length}, minmax(0, 1fr))` }}
-		>
-			{parsed.map((day, index) => {
-				// Noon of the day, so that the zone of the user does not move the date to a neighbouring day.
-				const noon = noonOf(day);
-				const weekday = dates.intl({ weekday: 'long' }).format(noon);
-				const date = `${weekday} ${dates.format(noon, 'medium', 'date')}`;
-				// The days are the local days of the machine that serves the page: the tooltip gives the exact timestamp.
-				const dayStartNote = `Day starts ${dates.exact(day.dayStart)} (local midnight of the machine that serves this page).`;
-				const bars = [
-					{
-						status: 'completed',
-						count: day.completed,
-						height: heights[index]!.completed,
-						colour: 'bg-success',
-					},
-					{ status: 'failed', count: day.failed, height: heights[index]!.failed, colour: 'bg-danger' },
-				] as const;
-				return (
-					<div
-						key={day.dayStart.toISOString()}
-						data-testid="run-bars-day"
-						title={`${date}: ${day.completed} completed, ${day.failed} failed. ${dayStartNote}`}
-						className="flex min-h-0 min-w-0 flex-col gap-0.5"
-					>
-						<div className="relative flex min-h-0 flex-1 items-end justify-center gap-0.5 px-0.5">
-							{day.completed === 0 && day.failed === 0 ? (
-								<div data-testid="run-bars-baseline" className="h-0.5 w-full rounded-full bg-border" />
-							) : (
-								bars.map(bar =>
-									bar.count === 0 ? (
-										// Nothing to open: keeps the column of the other bar, takes no focus.
-										<div
-											key={bar.status}
-											data-testid="run-bars-bar"
-											className="w-full max-w-4"
-											style={{ height: '0%' }}
-										/>
-									) : (
-										<Link
-											key={bar.status}
-											to={barLink(to, bar.status)}
-											aria-label={`Show the ${bar.status} executions (${bar.count} on ${date})`}
-											title={`${date}: ${bar.count} ${bar.status}. ${dayStartNote} Click to list every ${bar.status} execution.`}
-											className={LINK_CLASSES}
-										>
-											<span
-												data-testid="run-bars-bar"
-												className={`block w-full rounded-sm transition-opacity group-hover:opacity-70 ${bar.colour}`}
-												style={{ height: `${bar.height}%` }}
-											/>
-										</Link>
-									)
-								)
-							)}
-						</div>
-						<span
-							title={`${weekday}, ${dates.exact(day.dayStart)}`}
-							className="truncate text-center text-[11px] leading-3 text-muted"
+		<>
+			<div
+				ref={ref}
+				role="group"
+				aria-label={`Runs of the last ${parsed.length} days: ${completed} completed, ${failed} failed`}
+				className="grid h-[4.75rem] w-full gap-1 rounded-md border border-border px-2 pb-1 pt-2"
+				style={{ gridTemplateColumns: `repeat(${parsed.length}, minmax(0, 1fr))` }}
+			>
+				{parsed.map((day, index) => {
+					// Noon of the day in the zone of the date settings, so that formatting it gives the day of the bar.
+					const noon = day.noon;
+					const weekday = dates.intl({ weekday: 'long' }).format(noon);
+					const date = `${weekday} ${dates.format(noon, 'medium', 'date')}`;
+					// The days are those of the time zone of the date settings, not of the machine that serves the page.
+					const dayStartNote = `Days follow the time zone of your date settings (${dates.timeZone}).`;
+					const bars = [
+						{
+							status: 'completed',
+							count: day.completed,
+							height: heights[index]!.completed,
+							colour: 'bg-success',
+						},
+						{ status: 'failed', count: day.failed, height: heights[index]!.failed, colour: 'bg-danger' },
+					] as const;
+					return (
+						<div
+							key={day.date}
+							data-testid="run-bars-day"
+							title={`${date}: ${day.completed} completed, ${day.failed} failed. ${dayStartNote}`}
+							className="flex min-h-0 min-w-0 flex-col gap-0.5"
 						>
-							{weekdayLabel(dates, noon, labelStyle)}
-						</span>
-					</div>
-				);
-			})}
-		</div>
+							<div className="relative flex min-h-0 flex-1 items-end justify-center gap-0.5 px-0.5">
+								{day.completed === 0 && day.failed === 0 ? (
+									<div
+										data-testid="run-bars-baseline"
+										className="h-0.5 w-full rounded-full bg-border"
+									/>
+								) : (
+									bars.map(bar =>
+										bar.count === 0 ? (
+											// Nothing to open: keeps the column of the other bar, takes no focus.
+											<div
+												key={bar.status}
+												data-testid="run-bars-bar"
+												className="w-full max-w-4"
+												style={{ height: '0%' }}
+											/>
+										) : (
+											<Link
+												key={bar.status}
+												to={barLink(to, bar.status)}
+												aria-label={`Show the ${bar.status} executions (${bar.count} on ${date})`}
+												title={`${date}: ${bar.count} ${bar.status}. ${dayStartNote} Click to list every ${bar.status} execution.`}
+												className={LINK_CLASSES}
+											>
+												<span
+													data-testid="run-bars-bar"
+													className={`block w-full rounded-sm transition-opacity group-hover:opacity-70 ${bar.colour}`}
+													style={{ height: `${bar.height}%` }}
+												/>
+											</Link>
+										)
+									)
+								)}
+							</div>
+							<span
+								title={`${weekday}, ${dates.format(noon, 'medium', 'date')} (${dates.timeZone})`}
+								className="truncate text-center text-[11px] leading-3 text-muted"
+							>
+								{weekdayLabel(dates, noon, labelStyle)}
+							</span>
+						</div>
+					);
+				})}
+			</div>
+			{cut ? (
+				<p role="status" className="px-1 pt-0.5 text-[11px] leading-3 text-muted">
+					Only the newest {runCount} runs are counted: the oldest days may show fewer.
+				</p>
+			) : null}
+		</>
 	);
 }
