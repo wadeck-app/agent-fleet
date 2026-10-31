@@ -36,6 +36,8 @@ import type {
 	ModelProvider,
 } from './ModelProvider';
 import { PromptTooLargeError, validateLaunchOptions } from './ModelProvider';
+import { type ResolvedOpenCodeCommand, resolveOpenCodeCommand } from './OpenCodeBinaryResolver';
+import { OpenCodeFlagProbe, type RequiredFlag } from './OpenCodeFlagProbe';
 import { OpenCodeHookTranslator } from './OpenCodeHookTranslator';
 import type { OpenCodePermissionOverrides } from './OpenCodePermissions';
 import {
@@ -324,6 +326,16 @@ function buildSpawnParams(
 	return { command, args, env, tempFile, shell: needsShell };
 }
 
+/** Infrastructure variables only: the probe runs the binary's help, nothing step-specific. */
+function probeEnv(): Record<string, string> {
+	const env: Record<string, string> = {};
+	for (const name of ['PATH', 'HOME', 'USERPROFILE', 'SystemRoot', 'PATHEXT']) {
+		const value = process.env[name];
+		if (value) env[name] = value;
+	}
+	return env;
+}
+
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
@@ -343,11 +355,13 @@ export class OpenCodeModelProvider implements ModelProvider {
 	private readonly maxInlineConfigBytes: number;
 	private readonly shellProbe: OpenCodeShellProbe;
 	private readonly processLauncher: ProcessLauncher;
+	private readonly flagProbe: OpenCodeFlagProbe;
 
 	constructor(options: OpenCodeModelProviderOptions = {}) {
 		this.maxInlineConfigBytes = options.maxInlineConfigBytes ?? DEFAULT_MAX_INLINE_CONFIG_BYTES;
 		this.shellProbe = options.shellProbe ?? defaultOpenCodeShellProbe;
 		this.processLauncher = options.processLauncher ?? new DefaultProcessLauncher();
+		this.flagProbe = new OpenCodeFlagProbe(this.processLauncher);
 	}
 
 	/**
@@ -368,6 +382,12 @@ export class OpenCodeModelProvider implements ModelProvider {
 		const options = this.withAutoConfig(rawOptions);
 		validateLaunchOptions(options);
 
+		const resolved = this.findOpenCodeCommand({ ...process.env, ...(options.env ?? {}) });
+		// No await unless a probe is due: callers (and tests) may emit process events right after the call returns
+		const probe = this.flagsToProbe(resolved, options);
+		if (probe.length > 0) await this.flagProbe.assertSupports(resolved, probe, probeEnv());
+		const { parts, needsShell } = resolved;
+
 		// Each subprocess gets an isolated XDG_CONFIG_HOME so plugin state never leaks between runs.
 		// We copy the global config.json so auth and model settings are preserved.
 		const tempDir = path.join(os.tmpdir(), `opencode-run-${crypto.randomUUID()}`);
@@ -381,7 +401,6 @@ export class OpenCodeModelProvider implements ModelProvider {
 			fs.writeFileSync(pluginPath, OpenCodeHookTranslator.toPluginJs(options.toolHooks), { encoding: 'utf8' });
 		}
 
-		const { parts, needsShell } = this.findOpenCodeCommand({ ...process.env, ...(options.env ?? {}) });
 		const { command, args, env, tempFile, shell } = buildSpawnParams(
 			options,
 			true,
@@ -430,6 +449,12 @@ export class OpenCodeModelProvider implements ModelProvider {
 			throw new PromptTooLargeError(promptBytes, MAX_PROMPT_BYTES);
 		}
 
+		const resolved = this.findOpenCodeCommand({ ...process.env, ...(options.env ?? {}) });
+		// No await unless a probe is due: callers (and tests) may emit process events right after the call returns
+		const probe = this.flagsToProbe(resolved, options);
+		if (probe.length > 0) await this.flagProbe.assertSupports(resolved, probe, probeEnv());
+		const { parts, needsShell } = resolved;
+
 		// Each subprocess gets an isolated XDG_CONFIG_HOME so plugin state never leaks between runs.
 		// We copy the global config.json so auth and model settings are preserved.
 		const tempDir = path.join(os.tmpdir(), `opencode-run-${crypto.randomUUID()}`);
@@ -443,7 +468,6 @@ export class OpenCodeModelProvider implements ModelProvider {
 			fs.writeFileSync(pluginPath, OpenCodeHookTranslator.toPluginJs(options.toolHooks), { encoding: 'utf8' });
 		}
 
-		const { parts, needsShell } = this.findOpenCodeCommand({ ...process.env, ...(options.env ?? {}) });
 		const { command, args, env, tempFile, shell } = buildSpawnParams(
 			options,
 			false,
@@ -663,50 +687,23 @@ export class OpenCodeModelProvider implements ModelProvider {
 		}
 	}
 
+	/** See resolveOpenCodeCommand. OPENCODE_MOCK_PATH is read from `env`, which already carries options.env. */
+	private findOpenCodeCommand(env: NodeJS.ProcessEnv = process.env): ResolvedOpenCodeCommand {
+		return resolveOpenCodeCommand(env, this.processLauncher);
+	}
+
 	/**
-	 * Resolve the opencode binary path.
-	 * OPENCODE_MOCK_PATH env var overrides path resolution -- used in tests, and in a per-step
-	 * mock-config overlay (checked via `env`, which already carries options.env, before process.env).
+	 * Fails the step before the run when the binary lacks a flag this launch is about to send.
+	 * Only flags tied to an opt-in are probed: the always-sent ones (`--format`) are covered by the
+	 * flag contract test, and an older CLI missing them is not a supported install.
 	 */
-	private findOpenCodeCommand(env: NodeJS.ProcessEnv = process.env): { parts: string[]; needsShell: boolean } {
-		const mockPath = env['OPENCODE_MOCK_PATH'];
-		if (mockPath) {
-			// .mjs/.js files are not directly executable -- run via node
-			if (mockPath.endsWith('.mjs') || mockPath.endsWith('.js')) {
-				return { parts: ['node', mockPath], needsShell: false };
-			}
-			return { parts: [mockPath], needsShell: false };
+	private flagsToProbe(resolved: ResolvedOpenCodeCommand, options: LaunchOptions): RequiredFlag[] {
+		if (resolved.isMock) return [];
+		const required: RequiredFlag[] = [];
+		if (options.skipPermissions === true) {
+			required.push({ flag: '--auto', neededFor: 'skipPermissions: true (auto-approval of tool permissions)' });
 		}
-		if (process.platform === 'win32') {
-			// On Windows, find the real opencode.exe next to opencode.cmd in the npm global bin dir.
-			// shell:true with complex prompts (newlines, backticks) is unreliable on Windows cmd.exe.
-			try {
-				// "2>nul" discards at the shell level -- where.exe writes its localized "could not
-				// find files" message straight to the console on a miss, bypassing stdio redirection.
-				const cmdPath = this.processLauncher
-					.lookupExecutable('where.exe opencode.cmd 2>nul')
-					.trim()
-					.split('\n')[0]!
-					.trim();
-				const dir = path.dirname(cmdPath);
-				const exePath = path.join(dir, 'node_modules', 'opencode-ai', 'bin', 'opencode.exe');
-				if (fs.existsSync(exePath)) {
-					return { parts: [exePath], needsShell: false };
-				}
-			} catch {
-				// fall through to shell:true fallback
-			}
-			// Accepted risk: shell:true fallback (documented in out-of-scope.md)
-			return { parts: ['opencode'], needsShell: true };
-		}
-		try {
-			return {
-				parts: [this.processLauncher.lookupExecutable('which opencode')],
-				needsShell: false,
-			};
-		} catch {
-			return { parts: ['opencode'], needsShell: false };
-		}
+		return required;
 	}
 
 	private cleanupTempFile(filePath: string | undefined): void {

@@ -388,9 +388,17 @@ describe('OpenCodeModelProvider', () => {
 		});
 
 		it('includes --auto when skipPermissions is explicitly true', async () => {
-			const resultPromise = provider.launchBackground(makeBaseOptions({ skipPermissions: true }));
-			setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
-			await resultPromise;
+			// A mock binary: the pre-run flag probe (OpenCodeFlagProbe) is skipped, only the arguments are under test
+			const previous = process.env['OPENCODE_MOCK_PATH'];
+			process.env['OPENCODE_MOCK_PATH'] = 'opencode';
+			try {
+				const resultPromise = provider.launchBackground(makeBaseOptions({ skipPermissions: true }));
+				setImmediate(() => (mockProcess as EventEmitter).emit('exit', 0));
+				await resultPromise;
+			} finally {
+				if (previous === undefined) delete process.env['OPENCODE_MOCK_PATH'];
+				else process.env['OPENCODE_MOCK_PATH'] = previous;
+			}
 
 			const args = vi.mocked(child_process.spawn).mock.calls[0][1] as string[];
 			expect(args).toContain('--auto');

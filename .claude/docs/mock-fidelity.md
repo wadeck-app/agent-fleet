@@ -15,7 +15,7 @@ Single source for how the LLM CLI mocks are kept identical to the real CLIs.
 | `StepRunner.model.integration.test.ts`           | claude real vs mock (flags, NDJSON events, exit codes)                                      | on drift or `CLAUDE_INTEGRATION=1`        | tokens |
 | `StepRunner.opencode.integration.test.ts`        | opencode real vs mock                                                                       | on drift or `OPENCODE_INTEGRATION=1`      | tokens |
 | `StepRunner.codex.integration.test.ts`           | codex real vs mock: event schema, MCP, hooks, sandbox, resume, tool policy (~14 real calls) | on drift or `CODEX_INTEGRATION=1`         | tokens |
-| `processing/ProviderFlagContract.test.ts`        | every flag we emit still appears in each CLI's `--help`                                     | every test run                            | none   |
+| `processing/ProviderFlagContract.test.ts`        | every flag we emit still appears in each CLI's `--help`; opencode resolved as the provider does | every test run                        | none   |
 | `.claude/<cli>-version-tested.json` (gitignored) | `{testedVersion, testedAt}` last version confirmed; written by `testing/VersionBaseline.ts` | n/a                                       | n/a    |
 | `scripts/check-mock-drift.js`                    | compares installed `--version` with the cache; fails loudly                                 | `npm run check`, `npm test`, `test:agent` | none   |
 
@@ -34,11 +34,15 @@ States: `OK`, `DRIFT` (installed != cached), `NEVER-VERIFIED` (no cache file), `
 
 A CLI absent on this machine fails by default. Acknowledge explicitly with `MOCK_DRIFT_ALLOW_MISSING=codex,opencode` (reported as `WARN`). Unknown names in that variable are an error.
 
+`ProviderFlagContract.test.ts` has the same rule with its own variable: a CLI whose help cannot be read FAILS the suite (message: resolved path and `--version`). Acknowledge with `FLAG_CONTRACT_ALLOW_MISSING=claude,opencode,codex` (same syntax and parser, unknown names are an error); the skip is logged once per CLI. `scripts/test-config.js` sets it for the flow-engine suite when `CI` is set; nowhere else.
+
+At run time the OpenCode provider probes `<bin> run --help` once per binary path (`OpenCodeFlagProbe`) before a launch that sends `--auto`, and fails the step with version, path, flag and remedy when it is missing. Skipped for `OPENCODE_MOCK_PATH`.
+
 ## Where the check is wired
 
 - `npm run check` (`scripts/check-all.js`): "Mock drift" entry.
 - `npm test` (`scripts/test-all.js`) and `npm run test:agent*` (`scripts/test-agent.js`, only when the flow-engine suite is selected): `assertMocksUpToDate()` in `scripts/test-runner-utils.js` aborts before any test starts.
-- Running vitest directly in `flow-engine` is not gated by the script; the suites still auto-run on drift but skip silently when their CLI is missing. Use `npm run mocks:verify` for the loud check.
+- Running vitest directly in `flow-engine` is not gated by the script and has no `FLAG_CONTRACT_ALLOW_MISSING`, so a missing CLI fails `ProviderFlagContract.test.ts` there; the suites still auto-run on drift but skip silently when their CLI is missing. Use `npm run mocks:verify` for the loud check.
 
 ## When a CLI is updated
 

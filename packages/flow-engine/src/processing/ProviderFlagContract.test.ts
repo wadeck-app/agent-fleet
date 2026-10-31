@@ -10,8 +10,10 @@
  * CLI no longer lists is a hard failure -- sending it means the step dies with a usage screen
  * before the model is ever reached.
  *
- * Skips only when a CLI is absent, which is honest: there is nothing to compare against. It
- * says which one, so an empty run is never mistaken for a passing one.
+ * A CLI that cannot be run FAILS the suite, naming the resolved path and `--version`. It is skipped
+ * only when FLAG_CONTRACT_ALLOW_MISSING lists it (e.g. `opencode,codex`, same syntax as
+ * MOCK_DRIFT_ALLOW_MISSING), and that skip is logged once. opencode is resolved exactly as
+ * OpenCodeModelProvider does (OpenCodeBinaryResolver), not by whichever `opencode` is first in PATH.
  */
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -19,6 +21,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import {
+	ALLOW_MISSING_VARIABLE,
+	announceSkippedOnce,
+	missingCliMessage,
+	readAllowMissing,
+	readCliHelp,
+} from '../testing/FlagContractCli';
 import { RealCodexCommand } from '../testing/RealCodexCommand';
 import { CodexModelProvider } from './CodexModelProvider';
 import type { LaunchOptions } from './ModelProvider';
@@ -89,32 +98,25 @@ const PROVIDER_FLAGS: { cli: string; helpArgs: string[]; source: string; flags: 
 	},
 ];
 
-/** The CLI's own help text, or undefined when the CLI is not installed. */
-function helpText(cli: string, helpArgs: string[]): string | undefined {
-	const result = spawnSync(cli, helpArgs, { encoding: 'utf8', timeout: 60_000, shell: true });
-	if (result.error !== undefined) return undefined;
-	const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-	return output.trim() === '' ? undefined : output;
-}
+const allowMissing = await readAllowMissing(process.env);
 
 describe.each(PROVIDER_FLAGS)('$cli accepts every flag $source sends', ({ cli, helpArgs, flags }) => {
-	const help = helpText(cli, helpArgs);
+	const { help, install } = readCliHelp(cli, helpArgs);
 
-	it.skipIf(help === undefined)('lists all of them in its help', () => {
-		const missing = flags.filter(flag => !(help ?? '').includes(flag));
+	if (help === undefined && allowMissing.has(cli)) {
+		announceSkippedOnce(cli);
+		it.skip(`${cli} flags NOT VERIFIED: ${ALLOW_MISSING_VARIABLE} lists ${cli}`, () => undefined);
+		return;
+	}
+
+	it('lists all of them in its help', () => {
+		if (help === undefined) throw new Error(missingCliMessage(cli, helpArgs, install));
+		const missing = flags.filter(flag => !help.includes(flag));
 
 		expect(
 			missing,
-			`${cli} no longer lists: ${missing.join(', ')}. A step sending these dies on a usage screen before reaching the model. Check "${cli} ${helpArgs.join(' ')}" and update the provider.`
+			`${cli} no longer lists: ${missing.join(', ')} (${install}). A step sending these dies on a usage screen before reaching the model. Check "${cli} ${helpArgs.join(' ')}" and update the provider.`
 		).toEqual([]);
-	});
-
-	it(`reports whether ${cli} was available to check`, () => {
-		// Never silent: a run where the CLI is missing has to look different from a passing one.
-		if (help === undefined) {
-			console.warn(`[flag contract] ${cli} is not installed, so its flags were not verified`);
-		}
-		expect(true).toBe(true);
 	});
 });
 
@@ -126,7 +128,17 @@ describe.each(PROVIDER_FLAGS)('$cli accepts every flag $source sends', ({ cli, h
  * loaded result is compared with what was asked for.
  */
 describe('codex config overrides are loaded by the real CLI', () => {
-	const codexAvailable = helpText('codex', ['--help']) !== undefined;
+	const codexHelp = readCliHelp('codex', ['--help']);
+	const codexAvailable = codexHelp.help !== undefined;
+	const codexSkipped = !codexAvailable && allowMissing.has('codex');
+	if (codexSkipped) announceSkippedOnce('codex');
+	// Absent and not acknowledged: one failing test says so, instead of every test below skipping
+	if (!codexAvailable && !codexSkipped) {
+		it('needs codex to replay the config overrides', () => {
+			throw new Error(missingCliMessage('codex', ['--help'], codexHelp.install));
+		});
+	}
+	const itWithCodex = codexAvailable ? it : it.skip;
 
 	/** Runs the provider against a recorder that writes its argv to a file instead of calling a model. */
 	async function recordedArgs(overrides: Partial<LaunchOptions>): Promise<string[]> {
@@ -181,7 +193,7 @@ describe('codex config overrides are loaded by the real CLI', () => {
 
 	const awkward = 'a "quoted" \\ back\\slash, [bracket] {brace} = eq # hash';
 
-	it.skipIf(!codexAvailable)(
+	itWithCodex(
 		'loads MCP servers, hooks and the read-only restriction, and reports MCP servers back as asked',
 		async () => {
 			const args = await recordedArgs({
@@ -221,7 +233,7 @@ describe('codex config overrides are loaded by the real CLI', () => {
 		}
 	);
 
-	it.skipIf(!codexAvailable)('loads the web-search and shell switches', async () => {
+	itWithCodex('loads the web-search and shell switches', async () => {
 		const args = await recordedArgs({ tools: ['read', 'write', 'edit'] });
 
 		expect(args).toContain('--disable');
@@ -229,7 +241,7 @@ describe('codex config overrides are loaded by the real CLI', () => {
 		expect(loaded.status, loaded.stdout + loaded.stderr).toBe(0);
 	});
 
-	it.skipIf(!codexAvailable)('loads the resume-form permission overrides', async () => {
+	itWithCodex('loads the resume-form permission overrides', async () => {
 		const args = await recordedArgs({ resumeSessionId: 'abc-123', skipPermissions: true });
 
 		const loaded = loadConfig(args);
@@ -238,7 +250,7 @@ describe('codex config overrides are loaded by the real CLI', () => {
 	});
 
 	// Without this the checks above could pass because codex accepts anything
-	it.skipIf(!codexAvailable)('really does reject an invalid value (control)', () => {
+	itWithCodex('really does reject an invalid value (control)', () => {
 		const loaded = loadConfig(['-c', 'sandbox_mode="not-a-sandbox"']);
 
 		expect(loaded.status).not.toBe(0);

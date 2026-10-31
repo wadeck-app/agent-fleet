@@ -74,6 +74,11 @@ const testSuites = [
 		command: 'npm',
 		args: ['run', 'test', '--workspace=flow-engine'],
 		type: testSuiteType_UNIT,
+		// CI has no model CLI installed (it never runs the real ones): acknowledge it for the flag contract
+		// (processing/ProviderFlagContract.test.ts), explicitly. On a developer machine nothing is set, so a missing CLI fails.
+		env: process.env.CI
+			? { FLAG_CONTRACT_ALLOW_MISSING: process.env.FLAG_CONTRACT_ALLOW_MISSING ?? 'claude,opencode,codex' }
+			: {},
 	},
 	// No plugin package was covered either, although a plugin is what a daemon loads at startup:
 	// a broken one takes the whole daemon down.
