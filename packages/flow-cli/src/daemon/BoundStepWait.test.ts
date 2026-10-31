@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { BoundStepWait } from './BoundStepWait.js';
+import { BoundStepWait, DEADLINE_RETRY_MS } from './BoundStepWait.js';
 
 function waitWithClock(waitMs: number) {
 	const clock = { now: 1_000 };
@@ -224,6 +224,66 @@ describe('BoundStepWait - its own deadline timer', () => {
 
 		expect(onDeadline).not.toHaveBeenCalled();
 		expect(wait.size).toBe(0);
+	});
+
+	// A throw out of a timer callback is an uncaught exception, and the daemon has no handler for it.
+	describe('when the dispatch pass asked for by the timer throws', () => {
+		let stderr: ReturnType<typeof vi.spyOn>;
+		beforeEach(() => {
+			stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		});
+		afterEach(() => {
+			stderr.mockRestore();
+		});
+
+		it('does not let the error escape the timer, and reports it with the step it concerns', () => {
+			const onDeadline = vi.fn().mockImplementation(() => {
+				throw new Error('dispatch exploded');
+			});
+			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
+			wait.decide(request());
+
+			expect(() => vi.advanceTimersByTime(1_000)).not.toThrow();
+
+			const written = stderr.mock.calls.map((call: unknown[]) => String(call[0])).join('');
+			expect(written).toContain('[BoundStepWait]');
+			expect(written).toContain('e1:s1');
+			expect(written).toContain('dispatch exploded');
+			wait.stop();
+		});
+
+		it('asks again after the retry delay, so the bound of the step is still enforced', () => {
+			const onDeadline = vi
+				.fn()
+				.mockImplementationOnce(() => {
+					throw new Error('dispatch exploded');
+				})
+				.mockImplementation(() => undefined);
+			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
+			wait.decide(request());
+
+			vi.advanceTimersByTime(1_000);
+			expect(onDeadline).toHaveBeenCalledTimes(1);
+			vi.advanceTimersByTime(DEADLINE_RETRY_MS - 1);
+			expect(onDeadline).toHaveBeenCalledTimes(1);
+			vi.advanceTimersByTime(1);
+			expect(onDeadline).toHaveBeenCalledTimes(2);
+			wait.stop();
+		});
+
+		it('does not ask again for a step the failed pass had already settled', () => {
+			const holder: { wait?: BoundStepWait } = {};
+			const onDeadline = vi.fn().mockImplementation(() => {
+				holder.wait?.clear('e1', 's1');
+				throw new Error('dispatch exploded');
+			});
+			holder.wait = new BoundStepWait(1_000, Date.now, onDeadline);
+			holder.wait.decide(request());
+
+			vi.advanceTimersByTime(1_000 + DEADLINE_RETRY_MS * 3);
+
+			expect(onDeadline).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	it('leaves no timer behind for a bound of zero, which fails at once', () => {

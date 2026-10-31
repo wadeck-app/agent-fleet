@@ -1,3 +1,5 @@
+import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
+
 import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 
 /** What the daemon needs to restrict a run to a worker type: where types come from, and how long a missing one is waited for. */
@@ -23,6 +25,9 @@ export type BoundStepWaitDecision = { action: 'wait' } | { action: 'fail'; reaso
 
 /** How long a step of a bound run waits for a worker of its type to exist. Obtaining one (a sandbox) takes a while. */
 export const DEFAULT_BOUND_STEP_WAIT_MS = 120_000;
+
+/** How long after a failed dispatch pass the timer of a step that is still waiting asks for the next one. */
+export const DEADLINE_RETRY_MS = 5_000;
 
 /**
  * Bounds how long a step of a run bound to a worker type waits for a worker of that type.
@@ -114,7 +119,20 @@ export class BoundStepWait {
 		}
 		const timer = setTimeout(() => {
 			this.deadlines.delete(key);
-			this.onDeadline?.();
+			try {
+				this.onDeadline?.();
+			} catch (err) {
+				// A throw here would be an uncaught exception, and the daemon has no handler for those. The pass failed,
+				// not the step: it is still waiting and its bound is still to be enforced, which only a pass can do (it
+				// owns failing the step). So the failure is reported, never swallowed, and a pass is asked for again
+				// after a delay, for as long as the step waits (a pass that settled it has dropped it from here).
+				process.stderr.write(
+					`[BoundStepWait] dispatch pass for step "${key}" failed on its deadline, asking again in ${String(DEADLINE_RETRY_MS / 1000)}s: ${getErrorMessage(err)}\n`
+				);
+				if (this.waitingSince.has(key)) {
+					this.armDeadline(key, DEADLINE_RETRY_MS);
+				}
+			}
 		}, inMs);
 		// Never the reason the daemon stays up: idle shutdown is decided elsewhere.
 		timer.unref?.();
