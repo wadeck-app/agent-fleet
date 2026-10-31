@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { LAUNCHER_SCRIPT_PREFIX, sweepStaleLauncherScripts } from './StaleLauncherScriptSweeper';
+import { buildLauncherScriptName, LAUNCHER_SCRIPT_PREFIX, sweepStaleLauncherScripts } from './StaleLauncherScriptSweeper';
 
 const NOW = Date.parse('2026-10-31T12:00:00Z');
 const HOUR = 3_600_000;
@@ -86,5 +86,23 @@ describe('sweepStaleLauncherScripts', () => {
 			})
 		).not.toThrow();
 		expect(warn).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('buildLauncherScriptName', () => {
+	it('is unique per launch: timestamp, pid and a random suffix, still swept by prefix and extension', () => {
+		const name = buildLauncherScriptName(1_793_439_764_913, 4242, 'a1b2c3');
+		expect(name).toBe('flow-daemon-run-1793439764913-4242-a1b2c3.vbs');
+		const { deps, unlinked } = setup({ [name]: NOW - 30 * HOUR });
+		sweepStaleLauncherScripts(deps);
+		expect(unlinked).toEqual([name]);
+	});
+
+	it('draws a different random suffix on each default call, 6 hex characters', () => {
+		const names = new Set(Array.from({ length: 20 }, () => buildLauncherScriptName()));
+		expect(names.size).toBe(20);
+		for (const name of names) {
+			expect(name).toMatch(/^flow-daemon-run-\d+-\d+-[0-9a-f]{6}\.vbs$/);
+		}
 	});
 });

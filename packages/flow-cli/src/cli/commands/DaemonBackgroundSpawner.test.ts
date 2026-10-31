@@ -8,15 +8,23 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { recordDaemonStartError } from '../../daemon/DaemonStartError';
+import { armLauncherScriptLeakGuard } from '../../test-utils/LauncherScriptLeakGuard';
 import { spawnDaemonBackground } from './DaemonBackgroundSpawner';
 
-const harness = vi.hoisted(() => ({ spawn: vi.fn(), tmpdirOverride: null as string | null }));
+const harness = vi.hoisted(() => ({ spawn: vi.fn(), tmpdirOverride: null as string | null, randomBytes: null as Buffer | null }));
 vi.mock('node:child_process', () => ({ spawn: harness.spawn }));
 // The launcher script is written to os.tmpdir(); the mocked wscript never runs it, so it would never delete itself.
+// Lets one test force the random suffix of the script name, to provoke a name clash.
+vi.mock('node:crypto', async importOriginal => {
+	const actual = await importOriginal<typeof import('node:crypto')>();
+	return { ...actual, randomBytes: (size: number) => harness.randomBytes ?? actual.randomBytes(size) };
+});
 vi.mock('node:os', async importOriginal => {
 	const actual = await importOriginal<typeof import('node:os')>();
 	return { ...actual, tmpdir: () => harness.tmpdirOverride ?? actual.tmpdir() };
 });
+
+armLauncherScriptLeakGuard();
 
 let dir: string;
 const servers: net.Server[] = [];
@@ -113,5 +121,71 @@ describe('spawnDaemonBackground when the daemon dies while starting', () => {
 
 		expect((failure as Error).message).toContain('did not start within 300ms');
 		expect((failure as Error).message).toContain('flow logs');
+	});
+});
+
+// The launcher script only exists on Windows (elsewhere the bundle is spawned directly).
+describe.skipIf(process.platform !== 'win32')('spawnDaemonBackground launcher script (Windows)', () => {
+	function launchWithMockedWscript(): string {
+		harness.spawn.mockImplementation(() => {
+			void delay(30).then(bringUpDaemon);
+			return { unref: () => undefined };
+		});
+		return '';
+	}
+
+	async function launchedScripts(count: number): Promise<string[]> {
+		launchWithMockedWscript();
+		const scripts: string[] = [];
+		for (let i = 0; i < count; i++) {
+			fs.rmSync(path.join(dir, 'config.port'), { force: true });
+			await spawnDaemonBackground(dir, 5000);
+			scripts.push((harness.spawn.mock.calls.at(-1)![1] as string[])[0]!);
+		}
+		return scripts;
+	}
+
+	it('gives every launch its own file: time, pid and random suffix, so two launches never share a script', async () => {
+		const scripts = await launchedScripts(3);
+
+		expect(new Set(scripts).size).toBe(3);
+		for (const script of scripts) {
+			expect(path.dirname(script)).toBe(dir);
+			expect(path.basename(script)).toMatch(/^flow-daemon-run-\d+-\d+-[0-9a-f]{6}\.vbs$/);
+			expect(path.basename(script)).toContain(`-${String(process.pid)}-`);
+			expect(fs.existsSync(script)).toBe(true);
+		}
+	});
+
+	it('refuses to overwrite an existing script of the same name instead of sharing it', async () => {
+		harness.randomBytes = Buffer.from('abcdef', 'hex');
+		const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+		const clashing = path.join(dir, `flow-daemon-run-1700000000000-${String(process.pid)}-abcdef.vbs`);
+		fs.writeFileSync(clashing, 'previous launch');
+		launchWithMockedWscript();
+
+		const failure = await spawnDaemonBackground(dir, 500).catch((err: unknown) => err as Error);
+		now.mockRestore();
+		harness.randomBytes = null;
+
+		expect((failure as NodeJS.ErrnoException).code).toBe('EEXIST');
+		expect(fs.readFileSync(clashing, 'utf8')).toBe('previous launch');
+	});
+
+	it('writes one line to the daemon log naming the script, the pid and the bundle it points to', async () => {
+		const [script] = await launchedScripts(1);
+
+		const logFile = fs.readdirSync(path.join(dir, 'logs')).find(name => name.endsWith('.ndjson'))!;
+		const entries = fs
+			.readFileSync(path.join(dir, 'logs', logFile), 'utf8')
+			.trim()
+			.split('\n')
+			.map(line => JSON.parse(line) as { msg: string });
+		const launches = entries.filter(entry => entry.msg.includes('launcher script'));
+		expect(launches).toHaveLength(1);
+		const bundleInScript = /oShell\.Run """[^"]*"" ""([^"]*)"""/.exec(fs.readFileSync(script!, 'utf8'))![1]!;
+		expect(launches[0]!.msg).toContain(script);
+		expect(launches[0]!.msg).toContain(`pid ${String(process.pid)}`);
+		expect(launches[0]!.msg).toContain(bundleInScript);
 	});
 });

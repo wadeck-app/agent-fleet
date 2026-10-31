@@ -27,6 +27,10 @@ describe('createIsolatedCliEnv', () => {
 			'HOME',
 			'USERPROFILE',
 			'APPDATA',
+			// A spawned CLI that starts a daemon writes its launcher script to os.tmpdir() (TEMP/TMP on Windows, TMPDIR elsewhere).
+			'TEMP',
+			'TMP',
+			'TMPDIR',
 			'NPM_CONFIG_PREFIX',
 			'NPM_CONFIG_CACHE',
 			'NPM_CONFIG_USERCONFIG',

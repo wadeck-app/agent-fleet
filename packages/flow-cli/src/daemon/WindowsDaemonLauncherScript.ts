@@ -29,6 +29,10 @@ export function buildWindowsDaemonLauncherScript(input: WindowsDaemonLauncherScr
 		...overrideLines,
 		...buildWindowsDaemonEnvLines(input.daemonEnv),
 		`oShell.Run """${quote(input.nodePath)}"" ""${quote(input.bundlePath)}""", 0, False`,
+		// Removing a temp file is best-effort: if the file is already gone (removed by someone else, or by a second run of
+		// the same script) wscript would show a modal "File not found" (800A0035) dialog to the user. The sweeper picks any
+		// leftover up after 24 h. Placed after the launch so a failure to launch is still reported.
+		'On Error Resume Next',
 		'CreateObject("Scripting.FileSystemObject").DeleteFile WScript.ScriptFullName',
 	].join('\r\n');
 }

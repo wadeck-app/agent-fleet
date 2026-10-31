@@ -6,10 +6,11 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { writeDaemonLog } from '../../daemon/DaemonLog';
 import { clearDaemonStartError, readDaemonStartError } from '../../daemon/DaemonStartError';
 import { ExclusiveFileLock } from '../../daemon/ExclusiveFileLock';
 import { findLiveDaemon } from '../../daemon/LiveDaemonProbe';
-import { LAUNCHER_SCRIPT_PREFIX, realSweepDeps, sweepStaleLauncherScripts } from '../../daemon/StaleLauncherScriptSweeper';
+import { buildLauncherScriptName, realSweepDeps, sweepStaleLauncherScripts } from '../../daemon/StaleLauncherScriptSweeper';
 import { resolveFlowBashPath } from '../../daemon/WindowsDaemonEnv';
 import { buildWindowsDaemonLauncherScript } from '../../daemon/WindowsDaemonLauncherScript';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName';
@@ -95,7 +96,7 @@ async function launchDaemon(daemonDir: string, timeoutMs: number): Promise<void>
 	if (process.platform === 'win32') {
 		const tempDirectory = os.tmpdir();
 		sweepStaleLauncherScripts(realSweepDeps(tempDirectory));
-		const vbsPath = path.join(tempDirectory, `${LAUNCHER_SCRIPT_PREFIX}${Date.now()}.vbs`);
+		const vbsPath = path.join(tempDirectory, buildLauncherScriptName());
 		fs.writeFileSync(
 			vbsPath,
 			buildWindowsDaemonLauncherScript({
@@ -106,7 +107,16 @@ async function launchDaemon(daemonDir: string, timeoutMs: number): Promise<void>
 				forwardedBundleOverride:
 					process.env['LAUNCHER_BUNDLE_OVERRIDE'] === resolvedBundle ? resolvedBundle : null,
 				daemonEnv,
-			})
+			}),
+			// 'wx': never share nor overwrite a script another launch may be running.
+			{ flag: 'wx' }
+		);
+		// Goes to the daemon log (`flow logs`), not to the console: when a launcher script shows up where it should not
+		// (a popup, a leftover), its name leads back to who wrote it and which bundle it starts.
+		writeDaemonLog(
+			path.join(daemonDir, 'logs'),
+			'info',
+			`launcher script ${vbsPath} written by pid ${String(process.pid)}, starts bundle ${resolvedBundle}`
 		);
 		const wscript = spawn('wscript.exe', [vbsPath], {
 			detached: true,

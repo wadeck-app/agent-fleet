@@ -1,9 +1,20 @@
+import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 export const LAUNCHER_SCRIPT_PREFIX = 'flow-daemon-run-';
 const LAUNCHER_SCRIPT_EXTENSION = '.vbs';
 const MAX_AGE_MS = 24 * 3_600_000;
+
+/** Unique per launch (time, pid, random): two launches in the same millisecond must never share, nor overwrite, a script. */
+export function buildLauncherScriptName(
+	now: number = Date.now(),
+	pid: number = process.pid,
+	randomHex: string = randomBytes(3).toString('hex')
+): string {
+	return `${LAUNCHER_SCRIPT_PREFIX}${String(now)}-${String(pid)}-${randomHex}${LAUNCHER_SCRIPT_EXTENSION}`;
+}
+
 /** The file is gone or in use: nothing worth telling the user, the next start retries. */
 const SILENT_CODES = new Set(['ENOENT', 'EBUSY', 'EPERM']);
 

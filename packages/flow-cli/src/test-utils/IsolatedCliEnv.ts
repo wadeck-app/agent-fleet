@@ -15,7 +15,7 @@ export const UNREACHABLE_REGISTRY = 'http://127.0.0.1:9';
 // must not change a test, and the real values must never reach the child. Case-insensitive because
 // Windows env names are, while JS object keys are not.
 const STRIPPED =
-	/^(FLOW_QUEUE_EVENTS$|UPDATER_|LAUNCHER_|CLI_SELF_CHECK|NPM_CONFIG_|FLOW_CONFIG_DIR$|XDG_CONFIG_HOME$|HOME$|USERPROFILE$|APPDATA$|LOCALAPPDATA$)/i;
+	/^(FLOW_QUEUE_EVENTS$|UPDATER_|LAUNCHER_|CLI_SELF_CHECK|NPM_CONFIG_|FLOW_CONFIG_DIR$|XDG_CONFIG_HOME$|HOME$|USERPROFILE$|APPDATA$|LOCALAPPDATA$|TEMP$|TMP$|TMPDIR$)/i;
 
 export interface IsolatedCliEnv {
 	/** Root of the throwaway tree (config, home, npm prefix, npm cache). */
@@ -45,11 +45,14 @@ export function createIsolatedCliEnv(
 	const configDir = join(home, '.config', 'flow');
 	const npmPrefix = join(root, 'npm-prefix');
 	const npmCache = join(root, 'npm-cache');
+	// os.tmpdir() of the spawned CLI (Windows: TEMP/TMP, elsewhere: TMPDIR): the launcher script of a daemon start goes there.
+	const tempDir = join(root, 'tmp');
 	for (const dir of [
 		home,
 		configDir,
 		npmPrefix,
 		npmCache,
+		tempDir,
 		join(home, 'AppData', 'Roaming'),
 		join(home, 'AppData', 'Local'),
 	]) {
@@ -74,6 +77,9 @@ export function createIsolatedCliEnv(
 		{
 			FLOW_CONFIG_DIR: configDir,
 			XDG_CONFIG_HOME: join(home, '.config'),
+			TEMP: tempDir,
+			TMP: tempDir,
+			TMPDIR: tempDir,
 			HOME: home,
 			USERPROFILE: home,
 			APPDATA: join(home, 'AppData', 'Roaming'),
