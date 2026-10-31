@@ -102,3 +102,99 @@ describe('UnmetDemandCoverage - steps nothing could take', () => {
 		});
 	});
 });
+
+// A throw out of a timer callback is an uncaught exception, and the daemon has no handler for it.
+describe('UnmetDemandCoverage - the dispatch pass of the demand re-check throws', () => {
+	let stderr: ReturnType<typeof vi.spyOn>;
+	beforeEach(() => {
+		vi.useFakeTimers();
+		stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+	});
+	afterEach(() => {
+		stderr.mockRestore();
+		vi.useRealTimers();
+	});
+
+	const written = (): string[] => stderr.mock.calls.map((call: unknown[]) => String(call[0]));
+
+	function failing() {
+		const built = build({ fork: 0 });
+		built.rerunDispatch.mockImplementation(() => {
+			throw new Error('dispatch exploded');
+		});
+		built.coverage.cover(1);
+		return built;
+	}
+
+	it('does not let the error escape the timer, and reports it', () => {
+		const { coverage } = failing();
+
+		expect(() => vi.advanceTimersByTime(250)).not.toThrow();
+
+		expect(written()).toHaveLength(1);
+		expect(written()[0]).toContain('[UnmetDemandCoverage]');
+		expect(written()[0]).toContain('dispatch exploded');
+		expect(written()[0]).toContain('asking again in');
+		coverage.stop();
+	});
+
+	it('asks again after a longer delay each time, so a permanent error is not retried four times a second', () => {
+		const { coverage, rerunDispatch } = failing();
+
+		vi.advanceTimersByTime(250);
+		expect(rerunDispatch).toHaveBeenCalledTimes(1);
+		vi.advanceTimersByTime(499);
+		expect(rerunDispatch).toHaveBeenCalledTimes(1);
+		vi.advanceTimersByTime(1);
+		expect(rerunDispatch).toHaveBeenCalledTimes(2);
+		vi.advanceTimersByTime(999);
+		expect(rerunDispatch).toHaveBeenCalledTimes(2);
+		vi.advanceTimersByTime(1);
+		expect(rerunDispatch).toHaveBeenCalledTimes(3);
+		coverage.stop();
+	});
+
+	it('bounds the retries and the stderr lines of a permanent error to a few per minute', () => {
+		const { coverage, rerunDispatch } = failing();
+
+		vi.advanceTimersByTime(10 * 60_000);
+
+		// 250ms, then 0.5s, 1s ... 30s, then every 30s: about 20 attempts in ten minutes, not 2400.
+		expect(rerunDispatch.mock.calls.length).toBeLessThanOrEqual(30);
+		expect(written().length).toBeLessThanOrEqual(25);
+		// Reported, not swallowed: the first failure and the later ones that were left out are all accounted for.
+		expect(written().join('')).toContain('similar failure');
+		coverage.stop();
+	});
+
+	it('starts over at the short delay once a pass goes through', () => {
+		const { coverage, rerunDispatch } = failing();
+		vi.advanceTimersByTime(250 + 500);
+		expect(rerunDispatch).toHaveBeenCalledTimes(2);
+
+		rerunDispatch.mockImplementation(() => {
+			throw new Error('still exploding');
+		});
+		rerunDispatch.mockImplementationOnce(() => undefined);
+		vi.advanceTimersByTime(1_000);
+		expect(rerunDispatch).toHaveBeenCalledTimes(3);
+		coverage.cover(1);
+		vi.advanceTimersByTime(250);
+		expect(rerunDispatch).toHaveBeenCalledTimes(4);
+		vi.advanceTimersByTime(499);
+		expect(rerunDispatch).toHaveBeenCalledTimes(4);
+		vi.advanceTimersByTime(1);
+		expect(rerunDispatch).toHaveBeenCalledTimes(5);
+		coverage.stop();
+	});
+
+	it('does not ask again once stopped', () => {
+		const { coverage, rerunDispatch } = failing();
+		vi.advanceTimersByTime(250);
+
+		coverage.stop();
+		vi.advanceTimersByTime(60_000);
+
+		expect(rerunDispatch).toHaveBeenCalledTimes(1);
+	});
+});
