@@ -26,7 +26,7 @@ import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { PluginLoader } from '../../config/PluginLoader.js';
 import { FLOW_BUNDLE_NAME } from '../FlowBundleName.js';
 // violations-suppress-end: ts/no-deep-relative
-import { isDaemonUnavailable } from './DaemonContactFailure';
+import { classifyDaemonContactFailure, DAEMON_TIMEOUT_TEXT } from './DaemonContactFailure';
 import { logsCommand } from './LogsCommand.js';
 import { buildProcessesCommand } from './ProcessesCommand.js';
 
@@ -46,7 +46,16 @@ async function setDaemonDraining(draining: boolean): Promise<void> {
 		);
 		await client.send('setDraining', { draining });
 	} catch (err) {
-		if (isDaemonUnavailable(err)) {
+		const kind = classifyDaemonContactFailure(err);
+		// A timeout means the daemon may hold state and may have applied the request: never "update directly".
+		if (kind === 'timeout') {
+			process.stderr.write(
+				`[fail] Could not ${draining ? 'start' : 'cancel'} draining: ${DAEMON_TIMEOUT_TEXT}\n` +
+					'       The update was not started.\n'
+			);
+			process.exit(1);
+		}
+		if (kind === 'not-running') {
 			process.stdout.write(
 				draining
 					? '[ok] No daemon is running, so there is nothing to drain; updating directly.\n'

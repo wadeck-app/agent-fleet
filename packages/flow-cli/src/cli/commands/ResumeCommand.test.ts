@@ -66,6 +66,18 @@ describe('flow resume command', () => {
 		expect(errorSpy.mock.calls.flat().join(' ')).toContain('The daemon is not running');
 	});
 
+	it('says the daemon did not answer, not "nothing to resume", when the request timed out', async () => {
+		daemon.send.mockRejectedValue(
+			new DaemonNotRunningError('Daemon is not running (connection failed: HTTP timeout after 5s)')
+		);
+		await expect(run('abc12345')).rejects.toThrow('exit 1');
+		const printed = errorSpy.mock.calls.flat().join(' ');
+		expect(printed).toContain('did not answer within 5 s');
+		expect(printed).toContain('may have been received');
+		expect(printed).toContain('flow history');
+		expect(printed).not.toContain('nothing to resume');
+	});
+
 	it('prints the real cause and a hint, exit 1, when the daemon fails for another reason', async () => {
 		daemon.send.mockRejectedValue(new Error('Unknown command: resume'));
 		await expect(run('abc12345')).rejects.toThrow('exit 1');

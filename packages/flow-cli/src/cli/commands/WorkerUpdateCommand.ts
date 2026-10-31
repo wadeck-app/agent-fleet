@@ -5,7 +5,7 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import type { UpdateWorkerRequest, WorkerSummary } from '../../ipc/Protocol';
-import { isDaemonUnavailable } from './DaemonContactFailure';
+import { classifyDaemonContactFailure, DAEMON_TIMEOUT_TEXT } from './DaemonContactFailure';
 import { report } from './WorkerReport';
 // violations-suppress-end: ts/no-deep-relative
 import { parseWorkerLabels } from './parseWorkerLabels';
@@ -94,7 +94,12 @@ export function registerWorkerUpdateCommand(worker: Command): void {
 					`     shells : ${updated.shellCapabilities && updated.shellCapabilities.length > 0 ? updated.shellCapabilities.join(', ') : '(none)'}`
 				);
 			} catch (err) {
-				if (isDaemonUnavailable(err)) {
+				const kind = classifyDaemonContactFailure(err);
+				if (kind === 'timeout') {
+					report('[fail]', DAEMON_TIMEOUT_TEXT);
+					process.exit(1);
+				}
+				if (kind === 'not-running') {
 					report(
 						'[fail]',
 						'No daemon is running, so there is no live worker to update. Start one first ("flow worker" or "flow run").'

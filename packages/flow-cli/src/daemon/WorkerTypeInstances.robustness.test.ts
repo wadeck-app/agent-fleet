@@ -15,22 +15,78 @@ import { WorkerTypeInstances } from './WorkerTypeInstances.js';
 // A plugin is third-party code: it can hang, fail late, or be reconfigured while a build is in flight. None of that
 // may block the daemon (contacts, stop) or leak what the plugin built.
 
+// No real clock decides a test: the daemon's deadlines run on fake timers and a test crosses one by advancing it
+// (giveUp, advanceTimersByTimeAsync). Loading a plugin is real file system and import work of unpredictable duration,
+// so a real 40ms deadline raced it and failed whenever the machine was busy.
+const DEADLINE_MS = 40;
+
+// Lets every pending I/O callback run once. Not a wait for a duration: the callers loop on a condition.
+const yieldToIo = (): Promise<void> => new Promise(resolve => setImmediate(resolve));
+
+async function until(condition: () => boolean, what: string): Promise<void> {
+	for (let attempt = 0; !condition(); attempt++) {
+		if (attempt > 100_000) {
+			throw new Error(`never happened: ${what}`);
+		}
+		await yieldToIo();
+	}
+}
+
+/** The real loader, remembering the loads that can still touch the fixture so a test can wait for them before it ends. */
+class TrackedLoader {
+	readonly inflight = new Set<Promise<void>>();
+	private readonly real = new PluginLoader();
+
+	loadProvider(...args: Parameters<PluginLoader['loadProvider']>): ReturnType<PluginLoader['loadProvider']> {
+		const loading = this.real.loadProvider(...args);
+		// A factory that never settles never writes to the fixture either: nothing to wait for.
+		if (!args[0].endsWith('.hangs')) {
+			const done = loading.then(
+				() => undefined,
+				() => undefined
+			);
+			this.inflight.add(done);
+			void done.then(() => this.inflight.delete(done));
+		}
+		return loading;
+	}
+}
+
 let fixture: WorkerTypeFixtureState;
 let logged: { level: string; message: string }[];
+let loader: TrackedLoader;
 let instances: WorkerTypeInstances;
 
+function newInstances(timeouts: { buildTimeoutMs: number; disposeTimeoutMs: number }): WorkerTypeInstances {
+	return new WorkerTypeInstances(loader, (level, message) => logged.push({ level, message }), timeouts);
+}
+
 beforeEach(() => {
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 	fixture = resetWorkerTypeFixture();
 	logged = [];
-	instances = new WorkerTypeInstances(new PluginLoader(), (level, message) => logged.push({ level, message }), {
-		buildTimeoutMs: 40,
-		disposeTimeoutMs: 40,
-	});
+	loader = new TrackedLoader();
+	instances = newInstances({ buildTimeoutMs: DEADLINE_MS, disposeTimeoutMs: DEADLINE_MS });
 });
 
-afterEach(() => {
+afterEach(async () => {
+	// A build given up on keeps running and, once the plugin resolves, records itself in the fixture: finish them all
+	// here, or they would write into the next test's fixture.
+	while (loader.inflight.size > 0) {
+		fixture.pendingBuilds.splice(0).forEach(release => release());
+		await yieldToIo();
+	}
+	await yieldToIo();
+	vi.useRealTimers();
 	vi.unstubAllEnvs();
 });
+
+/** The rejection message of a call, once the daemon's deadline of `ms` has passed. */
+async function giveUp(call: Promise<unknown>, ms = DEADLINE_MS): Promise<string> {
+	const message = messageOf(call);
+	await vi.advanceTimersByTimeAsync(ms);
+	return message;
+}
 
 function entry(overrides: Partial<WorkerSourceEntry> = {}): WorkerSourceEntry {
 	return {
@@ -57,7 +113,7 @@ const messageOf = (promise: Promise<unknown>): Promise<string> =>
 
 describe('WorkerTypeInstances -- a build that never finishes', () => {
 	it('gives up on a factory that never settles, naming the source, the plugin and the wait', async () => {
-		const message = await messageOf(instances.get(entry({ plugin: 'fixture-sandbox.hangs' })));
+		const message = await giveUp(instances.get(entry({ plugin: 'fixture-sandbox.hangs' })));
 
 		expect(message).toContain('worker source "sandbox"');
 		expect(message).toContain('"fixture-sandbox.hangs"');
@@ -65,56 +121,68 @@ describe('WorkerTypeInstances -- a build that never finishes', () => {
 	});
 
 	it('does not remember the failed build: the next get builds again', async () => {
-		await messageOf(instances.get(entry({ plugin: 'fixture-sandbox.hangs' })));
+		await giveUp(instances.get(entry({ plugin: 'fixture-sandbox.hangs' })));
 
 		await expect(instances.get(entry())).resolves.toBeDefined();
 	});
 
 	it('disposes an instance whose build finished only after the wait was given up', async () => {
-		const message = await messageOf(instances.get(entry({ plugin: 'fixture-sandbox.slow' })));
+		const message = await giveUp(instances.get(entry({ plugin: 'fixture-sandbox.slow' })));
 		expect(message).toMatch(/did not finish loading within/);
 
+		// The factory may not even have started when the wait was given up: release it once it has.
+		await until(() => fixture.pendingBuilds.length === 1, 'the slow factory started');
 		fixture.pendingBuilds.shift()?.();
-		await vi.waitFor(() => expect(fixture.disposed).toEqual(['sandbox']));
+		await until(() => fixture.disposed.length === 1, 'the late instance was disposed');
+		expect(fixture.disposed).toEqual(['sandbox']);
 	});
 
 	it('disposeAll is bounded when a build is still pending', async () => {
 		const building = instances.get(entry({ plugin: 'fixture-sandbox.slow' })).catch(() => undefined);
-		const started = Date.now();
+		let finished = false;
+		const stopping = instances.disposeAll().then(() => {
+			finished = true;
+		});
+		await yieldToIo();
+		expect(finished).toBe(false);
 
-		await instances.disposeAll();
+		await vi.advanceTimersByTimeAsync(DEADLINE_MS);
 
-		expect(Date.now() - started).toBeLessThan(1_000);
+		await stopping;
+		expect(finished).toBe(true);
 		await building;
 	});
 
 	it('retainOnly is bounded when a build is still pending', async () => {
 		const building = instances.get(entry({ plugin: 'fixture-sandbox.slow' })).catch(() => undefined);
-		const started = Date.now();
+		let finished = false;
+		const retaining = instances.retainOnly([]).then(() => {
+			finished = true;
+		});
+		await yieldToIo();
+		expect(finished).toBe(false);
 
-		await instances.retainOnly([]);
+		await vi.advanceTimersByTimeAsync(DEADLINE_MS);
 
-		expect(Date.now() - started).toBeLessThan(1_000);
+		await retaining;
+		expect(finished).toBe(true);
 		await building;
 	});
 
 	it('gives up on a dispose that waits for a pending build, logs it, and disposes the instance once it exists', async () => {
-		const slowDispose = new WorkerTypeInstances(
-			new PluginLoader(),
-			(level, message) => logged.push({ level, message }),
-			{
-				buildTimeoutMs: 5_000,
-				disposeTimeoutMs: 30,
-			}
-		);
+		const slowDispose = newInstances({ buildTimeoutMs: 5_000, disposeTimeoutMs: 30 });
 		const building = slowDispose.get(entry({ plugin: 'fixture-sandbox.slow' }));
 
-		await slowDispose.dispose('sandbox');
+		const disposing = slowDispose.dispose('sandbox');
+		await vi.advanceTimersByTimeAsync(30);
+		await disposing;
 
 		expect(logged.some(l => l.message.includes('source "sandbox"') && /did not finish/.test(l.message))).toBe(true);
+		await until(() => fixture.pendingBuilds.length === 1, 'the slow factory started');
 		fixture.pendingBuilds.shift()?.();
 		await building;
-		await vi.waitFor(() => expect(fixture.disposed).toEqual(['sandbox']));
+		await until(() => fixture.disposed.length === 1, 'the late instance was disposed');
+		expect(fixture.disposed).toEqual(['sandbox']);
 	});
 });
 

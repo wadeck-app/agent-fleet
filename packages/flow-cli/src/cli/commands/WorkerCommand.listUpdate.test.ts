@@ -91,6 +91,27 @@ describe('flow worker list / update (characterization)', () => {
 		expect(errored()).toContain('No daemon is running, so there is no live worker to update.');
 	});
 
+	it('update says the daemon did not answer, not "No daemon is running", on a timeout', async () => {
+		await expect(
+			run(
+				{
+					createDaemonClient: () => ({
+						send: async () =>
+							Promise.reject(
+								new DaemonNotRunningError('Daemon is not running (connection failed: HTTP timeout after 5s)')
+							),
+					}),
+				},
+				['update', 'w1', '--labels', 'npm']
+			)
+		).rejects.toThrow('process.exit called');
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		expect(errored()).toContain('did not answer within 5 s');
+		expect(errored()).toContain('flow worker list');
+		expect(errored()).not.toContain('No daemon is running');
+	});
+
 	it('update treats a daemon that hangs up (ECONNRESET) as not running', async () => {
 		await expect(
 			run(

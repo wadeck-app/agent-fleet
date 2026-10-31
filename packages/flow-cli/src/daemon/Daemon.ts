@@ -10,8 +10,6 @@ import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { PluginLoader } from '../config/PluginLoader.js';
 import { PluginResolver } from '../config/PluginResolver.js';
 import { FlowEventMapper } from '../events/FlowEventMapper.js';
-import type { FlowEventPublisher } from '../events/FlowEventPublisher.js';
-import { flowEventsStatusLine } from '../events/FlowEventsStatusLine.js';
 import { NullFlowEventPublisher } from '../events/NullFlowEventPublisher.js';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { ExecutionStore } from '../storage/ExecutionStore';
@@ -22,9 +20,11 @@ import { DaemonIdleShutdown, IDLE_WATCHDOG_INTERVAL_MS } from './DaemonIdleShutd
 import { writeDaemonLog } from './DaemonLog.js';
 import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
+import { DaemonShutdownSequence } from './DaemonShutdownSequence.js';
 import { DaemonSourceContact } from './DaemonSourceContact.js';
+import { DaemonStartupTasks } from './DaemonStartupTasks.js';
+import { DaemonWorkerListener } from './DaemonWorkerListener.js';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler.js';
-import { awaitShutdownWork, shutDownWorkers } from './DaemonWorkerShutdown.js';
 import { ExclusiveFileLock } from './ExclusiveFileLock.js';
 import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
@@ -33,71 +33,20 @@ import { RelayRegistry } from './RelayRegistry.js';
 import { runEndSettingsOf } from './RunEndCoordinator.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { removeStaleDaemonFiles } from './StaleDaemonFiles.js';
+import { type StartDaemonOptions, assertValidStartDaemonOptions } from './StartDaemonOptions.js';
 import { guardRunAgainstStop } from './StoppingDaemonRunGuard.js';
-import { WebSocketServer, WebSocketServerClosedError } from './WebSocketServer';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 import { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
-import { DEFAULT_DISPOSE_TIMEOUT_MS, WorkerTypeInstances } from './WorkerTypeInstances.js';
+import { WorkerTypeInstances } from './WorkerTypeInstances.js';
 import { createDaemonCommands } from './createDaemonCommands.js';
-import { publishWorkerPort, removeWorkerPort } from './publishWorkerPort.js';
-import { registerAppCoreModules } from './registerAppCoreModules.js';
 import { resolveClaudePath } from './resolveClaudePath.js';
 import { startPeriodicUpdateCheck } from './startPeriodicUpdateCheck.js';
 import { tryResolvePlugins } from './tryResolvePlugins.js';
 
-/**
- * How long forked workers get to exit after the daemon told them to (and closed their sockets) before being killed.
- * Longer than the grace WebSocketServer gives its peers, so a worker that merely closes slowly is not killed.
- */
-const FORKED_WORKER_EXIT_GRACE_MS = 5_000;
-
 /** How often the daemon looks for a step whose worker went quiet. */
 const STALLED_SWEEP_INTERVAL_MS = 60_000;
-
-export interface StartDaemonOptions {
-	/**
-	 * Port for the daemon's command server. Omitted means the standard one, which is how a
-	 * user's daemon becomes discoverable.
-	 *
-	 * Zero asks the OS for a free port, which is what tests need: the standard port is a
-	 * fixed number shared with the user's own running daemon and with every other test
-	 * daemon, so they collide and the loser writes a port file nothing is listening on.
-	 */
-	port?: number;
-	/**
-	 * Whether the daemon stops itself once it has nothing left to do. Omitted means yes, which is what a user's
-	 * daemon does: the next `flow run` starts a new one. Tests pass false, because their client never restarts a
-	 * daemon, so a second run sent after the first ended raced the idle timer and met a dead server.
-	 */
-	stopWhenIdle?: boolean;
-	/**
-	 * How often an idle-stopping daemon checks, on its own, whether it has nothing left to do (milliseconds). Omitted
-	 * means {@link IDLE_WATCHDOG_INTERVAL_MS}. Ignored when `stopWhenIdle` is false. Tests lower it.
-	 */
-	idleCheckIntervalMs?: number;
-	/**
-	 * The packaged app-module to register with app-core on start. Omitted means the daemon does not
-	 * talk to app-core at all (tests and embedders); the CLI entry always passes it.
-	 */
-	appCoreModules?: { id: string; manifestPath: string }[];
-	/**
-	 * Where the lifecycle events (flow.execution.*, flow.step.*) go. Omitted means none are published,
-	 * which is what tests and embedders want; the CLI entry passes the queue-backed one.
-	 */
-	eventPublisher?: FlowEventPublisher;
-	/**
-	 * What to do when another daemon already owns the config dir. Omitted means `takeover`: the kit evicts it and this
-	 * one replaces it, which is what a deliberate restart wants.
-	 *
-	 * `yield` is for daemons nobody asked to replace anything (every `flow run` auto-starts one, so concurrent runs
-	 * start several): the late one logs a single line and leaves, WITHOUT touching state. A takeover there evicted
-	 * the live daemon and its start-up reconciliation then marked the executions that daemon had just accepted as
-	 * interrupted.
-	 */
-	existingDaemon?: 'takeover' | 'yield';
-}
 
 /** How long a starting daemon waits for another one that is mid-start before giving up. */
 const START_LOCK_TIMEOUT_MS = 60_000;
@@ -113,15 +62,8 @@ async function startDaemon(
 	options: StartDaemonOptions = {}
 ): Promise<DaemonHandle> {
 	const resolvedDaemonDir = daemonDir ?? flowConfigDir();
-	// Before the lock and any side effect: a zero or NaN interval would silently mean "never check".
-	if (
-		options.idleCheckIntervalMs !== undefined &&
-		!(Number.isFinite(options.idleCheckIntervalMs) && options.idleCheckIntervalMs > 0)
-	) {
-		throw new Error(
-			`idleCheckIntervalMs must be a positive number of milliseconds, got ${String(options.idleCheckIntervalMs)}.`
-		);
-	}
+	// Before the lock and any side effect.
+	assertValidStartDaemonOptions(options);
 	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });
 	const release = await ExclusiveFileLock.acquire(path.join(resolvedDaemonDir, 'daemon-start.lock'), {
 		timeoutMs: START_LOCK_TIMEOUT_MS,
@@ -164,8 +106,6 @@ async function startOwningDaemon(
 	const eventPublisher =
 		options.eventPublisher ??
 		new NullFlowEventPublisher('this daemon was started without an event publisher (embedded or test run)');
-	/** The flush started at shutdown, kept so the handle's stop() can wait for it. */
-	let shutdownFlush: Promise<void> = Promise.resolve();
 
 	// Resolve plugins before createDaemon - onStart is synchronous so async must happen here
 	const pluginProviders = await tryResolvePlugins();
@@ -184,8 +124,8 @@ async function startOwningDaemon(
 		}
 		return runtime;
 	};
-	/** The port workers must dial, known only once the listener has bound. */
-	let workerListenerPort: number | undefined;
+	/** Its bound port is what workers must dial, known only once the listener has bound. */
+	let workerListener: DaemonWorkerListener | undefined;
 	/** Ends forked workers that ignored the request to exit; set once the fork source exists. */
 	let terminateForkedWorkers: ((graceMs: number) => void) | undefined;
 	/** Held so shutdown can stop it: an unref'd timer still fires while the daemon tears down. */
@@ -196,6 +136,29 @@ async function startOwningDaemon(
 	 */
 	let updateCheckTimer: ReturnType<typeof setInterval> | undefined;
 
+	const startupTasks = new DaemonStartupTasks(logsDir, eventPublisher);
+	const shutdown = new DaemonShutdownSequence({
+		logsDir,
+		daemonDir: resolvedDaemonDir,
+		workerAckTimeoutSeconds: config.worker.ackTimeoutSeconds,
+		eventPublisher,
+		getRuntimeIfStarted: () => runtime,
+		stopUpdateCheck: () => {
+			if (updateCheckTimer !== undefined) {
+				clearInterval(updateCheckTimer);
+			}
+		},
+		disposeIdleShutdown: () => {
+			idleShutdown.dispose();
+		},
+		stopStalledSweep: () => {
+			if (stalledSweep !== undefined) {
+				clearInterval(stalledSweep);
+			}
+		},
+		terminateForkedWorkers: graceMs => terminateForkedWorkers?.(graceMs),
+		getWorkerListenerPort: () => workerListener?.boundPort,
+	});
 	const idleShutdown = new DaemonIdleShutdown(
 		logsDir,
 		getRuntime,
@@ -234,71 +197,14 @@ async function startOwningDaemon(
 			// in-process (tests, or `flow daemon stop` reusing the same process) must not keep
 			// firing it against a torn-down daemon.
 			onShutdown: reason => {
-				// Idle stops log their own line (with a snapshot); the others used to leave no trace of who stopped what.
-				if (reason !== 'idle') {
-					writeDaemonLog(logsDir, 'info', `Daemon stopped (${reason}) (pid ${String(process.pid)})`);
-				}
-				if (updateCheckTimer !== undefined) {
-					clearInterval(updateCheckTimer);
-				}
-				// Every stop path, not only the idle one: a pending debounced stop, the watchdog and the background
-				// work must not outlive the decision to stop (they would run against a torn-down daemon).
-				idleShutdown.dispose();
-				if (stalledSweep !== undefined) {
-					clearInterval(stalledSweep);
-				}
-				runtime?.commandHandler.stopBackgroundWork();
-				// Every stop path releases the worker listener, not only the idle one. An open listener and
-				// connected workers keep the process alive after its command server is gone: an orphan holding a
-				// worker port that the next daemon then has to scan past, until none is left.
-				// The runs in progress are told first (run_end), then the workers are closed; see shutDownWorkers.
-				// Capped in total: two ack timeouts (the acks, then the plugins' run hooks) plus the plugin dispose bound.
-				const stopCapMs = 2 * config.worker.ackTimeoutSeconds * 1000 + DEFAULT_DISPOSE_TIMEOUT_MS;
-				const workersAnswered =
-					runtime === undefined
-						? Promise.resolve()
-						: shutDownWorkers(runtime, stopCapMs, maxWaitMs => {
-								writeDaemonLog(
-									logsDir,
-									'error',
-									`Stopping: the workers and worker types did not finish within ${String(Math.round(maxWaitMs / 1000))}s; the daemon stops anyway. ` +
-										'Whatever a plugin still holds (for example sandboxes) may be left behind: remove it by hand.'
-								);
-							});
-				// After the polite request above (done + closed sockets): one that still runs after the grace is wedged.
-				terminateForkedWorkers?.(FORKED_WORKER_EXIT_GRACE_MS);
-				// The file tells workers where to dial; left behind it names a port nobody serves (or, later,
-				// something unrelated). Only removed if it still names OURS: a daemon that replaced this one may
-				// already have published its own.
-				if (workerListenerPort !== undefined) {
-					removeWorkerPort(resolvedDaemonDir, workerListenerPort);
-				}
-				// The hook is synchronous: the flush runs on, and stop() below waits for it. Pushes in flight
-				// also keep the process alive until they settle.
-				const eventsFlushed = eventPublisher.flush().catch((err: unknown) => {
-					writeDaemonLog(logsDir, 'error', `Queue events: flush at shutdown failed: ${getErrorMessage(err)}`);
-				});
-				// The hook can run twice (idle path, then stop()); the run_end wait is the same one both times.
-				shutdownFlush = awaitShutdownWork(eventsFlushed, workersAnswered);
+				shutdown.run(reason);
 			},
 			onStart: (port: number) => {
 				fs.mkdirSync(executionsDir, { recursive: true, mode: 0o700 });
 				fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
 				writeDaemonLog(logsDir, 'info', `Daemon started (pid ${String(process.pid)})`);
-				// One line, once: whether events will reach the queue, whether the queue documents them, and how to
-				// fix it if not. The events are declared only when the queue is reachable.
-				void (async () => {
-					const status = await eventPublisher.status();
-					const declaration = status.state === 'enabled' ? await eventPublisher.declareEvents() : undefined;
-					const line = flowEventsStatusLine(status, declaration);
-					writeDaemonLog(logsDir, line.level, line.message);
-				})();
-
-				// Fire-and-forget: app-core being absent or slow (the SDK waits up to 3 s) must not delay or break the
-				// daemon start. Whatever app-core answers lands in the daemon log, `flow logs` shows it.
-				if (options.appCoreModules && options.appCoreModules.length > 0) {
-					void registerAppCoreModules(options.appCoreModules, logsDir);
-				}
+				startupTasks.logEventsStatus();
+				startupTasks.registerWithAppCore(options.appCoreModules);
 
 				const wsPort = config.worker.wsPort ?? port + 1;
 				// One set of masks for everything that writes execution data: the stores below, the
@@ -322,18 +228,7 @@ async function startOwningDaemon(
 					)
 				);
 				const logWriter = new LogWriter(logsDir, config.logs.retainDays, daemonSecrets.masks);
-				// Off the critical path: retention pruning opens every record, which delayed the first answer by seconds.
-				// It yields the event loop between chunks and only deletes expired records, so it can run alongside work.
-				void executionStore.pruneOldExecutionsInBackground().catch((err: unknown) => {
-					writeDaemonLog(logsDir, 'error', `[warn] execution pruning failed: ${getErrorMessage(err)}`);
-				});
-				// Nothing can be live yet: a record still queued/running belongs to a previous daemon.
-				const interrupted = executionStore.reconcileInterruptedExecutions();
-				writeDaemonLog(
-					logsDir,
-					'info',
-					`Reconciled ${String(interrupted)} execution(s) interrupted by a previous daemon stop (marked failed; re-run with flow run)`
-				);
+				startupTasks.pruneAndReconcile(executionStore);
 				// Workspace pruning is per-project and so runs per request, not here:
 				// this daemon is shared across projects and its launch directory says
 				// nothing about whose workspaces should be pruned.
@@ -341,68 +236,33 @@ async function startOwningDaemon(
 				if (!claudePath) {
 					writeDaemonLog(logsDir, 'error', 'claude binary not found on PATH - model steps may fail');
 				}
-				const wsServer = new WebSocketServer(
-					wsPort,
-					(ws, message) => {
+				const listener = new DaemonWorkerListener(wsPort, logsDir, resolvedDaemonDir, config.worker, {
+					onMessage: (ws, message) => {
 						workerMessages.handleMessage(ws, message);
 					},
-					(ws, code, reason) => {
+					onClose: (ws, code, reason) => {
 						workerMessages.handleClose(ws, code, reason);
 					},
-					{
-						// Closes and errors of worker connections: stderr is ignored for a detached daemon.
-						log: (level, message) => {
-							writeDaemonLog(logsDir, level, message);
-						},
-						bindAddress: config.worker.bindAddress,
-						tls: config.worker.tls,
-					}
-				);
-				// Fire-and-forget: start() retries on EADDRINUSE (TIME_WAIT). Workers read port
-				// lazily via getter -- they are only spawned after tryDispatch(), which happens
-				// after handleRun(), which happens after this onStart returns. By then start()
-				// has resolved.
-				wsServer
-					.start()
-					.then(boundPort => {
-						// Recorded so nothing has to read the port before it means anything: the
-						// getter reports the *requested* port until the listener binds, and the
-						// retry above means that request is often wrong.
-						workerListenerPort = boundPort;
-						if (boundPort !== wsPort) {
-							writeDaemonLog(
-								logsDir,
-								'info',
-								`Worker listener bound on port ${String(boundPort)} instead of ${String(wsPort)}: the requested port and the ones above it were in use (orphaned flow daemons keep theirs; look for stray node processes running flow.cjs). Workers read the real port from worker.port.`
-							);
-						}
-						// Published because the retry means the bound port is not always
-						// `httpPort + 1`. A client that assumed the offset would dial whatever
-						// else holds that port, so the real one is written down for them.
-						publishWorkerPort(resolvedDaemonDir, boundPort);
-						// Sources are contacted when a step needs capacity (D#66), not here.
-						//
-						// The startup contact used to be unconditional, which asked every source for a
-						// worker even when the daemon had nothing to do -- and a daemon with nothing to
-						// do stops in about a second, so the worker it just created was disconnected
-						// 20ms after connecting. "Contact at startup only if there is work" is the
-						// on-demand path with extra steps, so there is only the on-demand path.
+					// Sources are contacted when a step needs capacity (D#66), not here.
+					//
+					// The startup contact used to be unconditional, which asked every source for a
+					// worker even when the daemon had nothing to do -- and a daemon with nothing to
+					// do stops in about a second, so the worker it just created was disconnected
+					// 20ms after connecting. "Contact at startup only if there is work" is the
+					// on-demand path with extra steps, so there is only the on-demand path.
+					onBound: () => {
 						sourceContact.pruneDeadSources();
-					})
-					.catch((err: Error) => {
-						if (err instanceof WebSocketServerClosedError) {
-							// Stopped while still scanning for a port: nothing was bound, nothing to publish.
-							writeDaemonLog(logsDir, 'info', 'Worker listener not bound: the daemon stopped first');
-							return;
-						}
-						process.stderr.write(`[daemon] WebSocket server failed to start: ${String(err)}\n`);
-					});
+					},
+				});
+				workerListener = listener;
+				const wsServer = listener.server;
+				listener.start();
 				const workerRegistry = new WorkerRegistry();
 				// Reads the bound port, not the requested one, for the same reason as above: a
 				// forked worker handed a port the listener moved away from can never register.
 				// It falls back to the getter only if a fork somehow precedes the bind, where
 				// the old behaviour is still the best guess available.
-				const forkSource = new ForkWorkerSource(port, () => workerListenerPort ?? wsServer.port, claudePath, {
+				const forkSource = new ForkWorkerSource(port, () => listener.boundPort ?? wsServer.port, claudePath, {
 					// A forked worker's exit and last stderr lines: the only trace of why it died.
 					log: (level, message) => {
 						writeDaemonLog(logsDir, level, message);
@@ -462,7 +322,8 @@ async function startOwningDaemon(
 					// create a worker that dials nothing, or worse something else. The startup
 					// contact fires the moment the bind completes, so nothing is lost.
 					requestedTypes => {
-						if (workerListenerPort === undefined) {
+						const boundWorkerPort = listener.boundPort;
+						if (boundWorkerPort === undefined) {
 							writeDaemonLog(
 								logsDir,
 								'info',
@@ -470,7 +331,7 @@ async function startOwningDaemon(
 							);
 							return;
 						}
-						sourceContact.contactSources(workerListenerPort, requestedTypes);
+						sourceContact.contactSources(boundWorkerPort, requestedTypes);
 					},
 					undefined,
 					config.queue.stepSilenceLimitSeconds * 1000,
@@ -520,7 +381,7 @@ async function startOwningDaemon(
 		},
 		stop: async reason => {
 			await daemonHandle.stop(reason);
-			await shutdownFlush;
+			await shutdown.whenSettled();
 		},
 	};
 }

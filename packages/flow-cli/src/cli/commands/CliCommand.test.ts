@@ -218,6 +218,27 @@ describe('cli update --drain / --cancel-drain', () => {
 		expect(cliUpdateCommand).toHaveBeenCalledTimes(1);
 	});
 
+	it('--drain does NOT update directly when the daemon only timed out: reports it and exits non-zero', async () => {
+		const { DaemonNotRunningError } = await import('@wadeck-app/singleton-daemon-kit');
+		sendMock.mockRejectedValue(new DaemonNotRunningError('Daemon is not running (connection failed: HTTP timeout after 5s)'));
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+		const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+			throw new Error('process.exit called');
+		});
+		const { cliUpdateCommand } = await import('@wadeck-app/shared-cli/CliMetaCommands');
+		vi.mocked(cliUpdateCommand).mockClear();
+
+		// runCliArgs swallows the throw of the process.exit mock.
+		await runCliArgs(['update', '--drain']);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		expect(cliUpdateCommand).not.toHaveBeenCalled();
+		const err = stderrSpy.mock.calls.map(c => String(c[0])).join('');
+		expect(err).toContain('did not answer within 5 s');
+		expect(err).not.toContain('updating directly');
+	});
+
 	it('--drain treats a daemon that is closing (EPIPE) as not running, like a missing one', async () => {
 		sendMock.mockRejectedValue(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }));
 		const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
