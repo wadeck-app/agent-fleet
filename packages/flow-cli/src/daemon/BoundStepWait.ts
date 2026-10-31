@@ -107,6 +107,10 @@ export class BoundStepWait {
 
 	private forget(key: string): void {
 		this.waitingSince.delete(key);
+		this.clearDeadline(key);
+	}
+
+	private clearDeadline(key: string): void {
 		const timer = this.deadlines.get(key);
 		if (timer !== undefined) {
 			clearTimeout(timer);
@@ -132,6 +136,9 @@ export class BoundStepWait {
 				// permanent error costs one line every 30s whatever their number (see RetryBackoff).
 				const retryMs = this.retryBackoff.failed(`dispatch pass for step "${key}" on its deadline`, err);
 				if (this.waitingSince.has(key)) {
+					// A timer the failing pass armed itself before throwing (`decide` does, for a step that still waits) is
+					// replaced, not kept: it would fire at the short delay and the backoff would never apply.
+					this.clearDeadline(key);
 					this.armDeadline(key, retryMs);
 				}
 			}

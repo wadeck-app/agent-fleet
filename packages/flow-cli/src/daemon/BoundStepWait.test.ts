@@ -339,6 +339,24 @@ describe('BoundStepWait - its own deadline timer', () => {
 			wait.stop();
 		});
 
+		// The clock the step is judged by reads short of the bound, so the failing pass re-arms the step's own timer
+		// (as `decide` does for a step that still waits) before it throws.
+		it('bounds the retries of a pass that re-arms the timer of its step and then throws', () => {
+			const holder: { wait?: BoundStepWait } = {};
+			const onDeadline = vi.fn().mockImplementation(() => {
+				holder.wait?.decide(request());
+				throw new Error('dispatch exploded');
+			});
+			holder.wait = new BoundStepWait(1_000, () => 0, onDeadline);
+			holder.wait.decide(request());
+
+			vi.advanceTimersByTime(10 * 60_000);
+
+			expect(onDeadline.mock.calls.length).toBeLessThanOrEqual(30);
+			expect(stderr.mock.calls.length).toBeLessThanOrEqual(25);
+			holder.wait.stop();
+		});
+
 		it('does not ask again for a step the failed pass had already settled', () => {
 			const holder: { wait?: BoundStepWait } = {};
 			const onDeadline = vi.fn().mockImplementation(() => {
