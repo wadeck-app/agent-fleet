@@ -1,0 +1,334 @@
+import type { RunMounts } from '../RunMounts';
+import { SandboxError } from '../SandboxError';
+import type { SandboxLifecycle } from '../SandboxLifecycle';
+import type { SandboxLog } from '../SandboxLog';
+import { type JsonObject, isJsonObject, isNonEmptyString } from '../harness/HarnessMessages';
+import type { DaemonControl, DaemonHandlers } from '../harness/HarnessWrapper';
+import { InsideMessageGuard } from '../harness/InsideMessageGuard';
+import type { RelayRegistration } from '../harness/RelayRegistration';
+import { ReturnedPaths } from '../harness/ReturnedPaths';
+import { ExecAssignment, type PreparedAssignment } from './ExecAssignment';
+import type { ExecPreparedSandbox, ExecSandboxPreparer } from './ExecSandboxPreparer';
+
+/** What the engine reports for a step that ran (the shape of flow-cli's `WorkerAdapter.execute` result). */
+export interface StepOutcome {
+	output: JsonObject;
+	meta?: JsonObject;
+	io?: JsonObject;
+}
+
+/** Runs one step with the engine on the host. Messages about the step are passed to `send` (assignment-scoped, unframed). */
+export interface StepExecutor {
+	execute(
+		stepConfig: JsonObject,
+		executionContext: JsonObject,
+		send: (message: JsonObject) => void
+	): Promise<StepOutcome>;
+}
+
+export interface StepExecutorContext {
+	sandbox: string;
+	mounts: RunMounts;
+	/** Environment names the step declares; any other variable that merely copies the host environment must not reach the VM. */
+	declaredEnvironmentNames: ReadonlySet<string>;
+	/** Stops the run's sandbox so a process in the VM dies (the lifecycle's `stopAfterStepTimeout`). */
+	stopSandbox: () => Promise<void>;
+}
+
+export interface ExecWrapperDependencies {
+	registration: RelayRegistration;
+	lifecycle: SandboxLifecycle;
+	preparer: Pick<ExecSandboxPreparer, 'prepare'>;
+	/** Builds the engine for one step: a StepRunner with the sandbox launcher injected. May await (executable lookup). */
+	createExecutor: (context: StepExecutorContext) => Promise<StepExecutor>;
+	log: SandboxLog;
+	createDaemon: (handlers: DaemonHandlers) => DaemonControl;
+	/** The RunMounts of a run (workspace, `.meta` next to it). Throws with an actionable message when they are unusable. */
+	createMounts: (workspaceDir: string, workspaceMetaDir: string) => RunMounts;
+	now: () => number;
+	/** Called once, when the wrapper is over (the daemon went away). The process should exit. */
+	onFinished: () => void;
+}
+
+/**
+ * The exec variant of the sandbox worker. It registers with the daemon as one worker (labels incl. `sandbox`) and, for
+ * each `assign`, runs the step with a normal flow engine ON THE HOST whose `ProcessLauncher` is the sandbox launcher: the
+ * engine, the MCP server, outputs and `.meta` stay on the host, only the processes of the step run in the run's sandbox
+ * (SbxProcessLauncher). Per run it creates or restarts the sandbox (SandboxLifecycle) and prepares it once
+ * (credentials, network rules, tool store: ExecSandboxPreparer).
+ *
+ * The messages the engine produces for the daemon still pass the closed set of InsideMessageGuard (plan decision 21):
+ * `inject_steps` only from a started MODEL step, rebuilt from known fields, returned paths inside the mounts. The
+ * sandbox does not talk to the daemon, so the guard here protects against an engine bug and keeps both variants on one
+ * rule; the real boundary of "the sandbox cannot add steps" is the MCP callback (see the invariant tests).
+ *
+ * A failure before or around the step (sandbox cannot be created, assignment refused) becomes a `step_failed` with the
+ * reason; nothing is retried and nothing falls back to running on the host. Limits as in the relay harness: one run per
+ * wrapper lifetime, the sandbox is left STOPPED (never removed) when the daemon goes away, no run-end events (plan C2).
+ */
+export class ExecWrapper {
+	private readonly daemon: DaemonControl;
+	private readonly guard: InsideMessageGuard;
+	private mounts: { executionId: string; mounts: RunMounts } | undefined;
+	private prepared: { sandbox: string; value: ExecPreparedSandbox } | undefined;
+	private queue: Promise<void> = Promise.resolve();
+	private finished = false;
+
+	constructor(private readonly dependencies: ExecWrapperDependencies) {
+		this.guard = new InsideMessageGuard({
+			log: dependencies.log,
+			returnedPaths: () => (this.mounts === undefined ? undefined : new ReturnedPaths(this.mounts.mounts)),
+		});
+		this.daemon = dependencies.createDaemon({
+			onMessage: message => this.handleDaemonMessage(message),
+			onClosed: (code, reason) => {
+				void this.handleDaemonClosed(code, reason);
+			},
+		});
+	}
+
+	/** Starts the lifecycle, connects to the daemon and registers (sends `ready`). */
+	async start(): Promise<void> {
+		this.dependencies.lifecycle.start();
+		await this.daemon.connect();
+		this.daemon.send(this.dependencies.registration.ready());
+		this.dependencies.log.info(
+			'exec wrapper registered with the daemon; waiting for a step with the "sandbox" label.'
+		);
+	}
+
+	/** Stops everything the wrapper holds. The sandbox is stopped, never removed. Idempotent. */
+	async shutdown(reason: string): Promise<void> {
+		if (this.finished) return;
+		this.finished = true;
+		const { log, lifecycle } = this.dependencies;
+		log.info(`exec wrapper shutting down: ${reason}`);
+		const held = lifecycle.current();
+		try {
+			if (held !== undefined) await lifecycle.endRun(held.executionId, 'daemon_stopping');
+			await lifecycle.shutdown();
+		} catch (error) {
+			log.warn(`could not stop the sandbox cleanly: ${describe(error)}`);
+		}
+		this.daemon.close();
+	}
+
+	// ---- daemon side ----
+
+	private handleDaemonMessage(message: JsonObject): void {
+		switch (message['type']) {
+			case 'assign':
+				this.queue = this.queue
+					.then(() => this.serveAssignment(message))
+					.catch(error => {
+						this.dependencies.log.warn(`assignment handling failed unexpectedly: ${describe(error)}`);
+					});
+				return;
+			case 'idle':
+				return;
+			case 'done':
+				this.dependencies.log.warn(
+					'the daemon sent "done" (a shutdown notice meant for daemon-forked workers); ignored, as flow worker does.'
+				);
+				return;
+			default:
+				this.dependencies.log.warn(
+					`ignored an unknown daemon message of type ${JSON.stringify(message['type'])}.`
+				);
+		}
+	}
+
+	private async handleDaemonClosed(code: number, reason: string): Promise<void> {
+		if (this.finished) return;
+		this.dependencies.log.warn(
+			`the connection to the flow daemon closed (code ${code}${reason === '' ? '' : `, ${reason}`}). The run, if any, is interrupted; its sandbox is stopped and kept (leftover list).`
+		);
+		await this.shutdown('daemon connection closed');
+		this.dependencies.onFinished();
+	}
+
+	private async serveAssignment(raw: JsonObject): Promise<void> {
+		const { log, lifecycle, now } = this.dependencies;
+		const ids = this.identify(raw);
+		if (ids === undefined) {
+			log.warn(
+				'refused an "assign" without assignmentId, stepId and executionContext.executionId; nothing was done.'
+			);
+			return;
+		}
+		const timings = { received: now(), sandboxReady: 0, prepared: 0, outcome: 0 };
+		let reported = false;
+		try {
+			const mounts = this.mountsFor(raw, ids.executionId);
+			await lifecycle.runStep({ executionId: ids.executionId, mounts }, async ({ sandbox }) => {
+				timings.sandboxReady = now();
+				const preparedSandbox = await this.ensurePrepared(sandbox, mounts);
+				const assignment = new ExecAssignment({
+					mounts,
+					log,
+					injectedEnv: stepType => preparedSandbox.envFor(stepType),
+				}).prepare(raw);
+				const executor = await this.dependencies.createExecutor({
+					sandbox,
+					mounts,
+					declaredEnvironmentNames: assignment.declaredEnvironmentNames,
+					stopSandbox: () => lifecycle.stopAfterStepTimeout(ids.executionId),
+				});
+				timings.prepared = now();
+				reported = await this.runStep(executor, assignment);
+				timings.outcome = now();
+			});
+			log.info(
+				`timing ${JSON.stringify({
+					stepId: ids.stepId,
+					toSandboxReadyMs: timings.sandboxReady - timings.received,
+					prepareMs: timings.prepared - timings.sandboxReady,
+					stepMs: timings.outcome - timings.prepared,
+					totalMs: timings.outcome - timings.received,
+				})}`
+			);
+		} catch (error) {
+			this.guard.end();
+			if (!reported) {
+				this.safeSend({
+					type: 'step_failed',
+					assignmentId: ids.assignmentId,
+					executionId: ids.executionId,
+					stepId: ids.stepId,
+					error: `The sandbox worker could not run step "${ids.stepId}": ${describe(error)}`,
+				});
+			}
+			log.warn(`step "${ids.stepId}" failed in the exec wrapper: ${describe(error)}`);
+		} finally {
+			// Announced after the sandbox work is over, so the next assign never meets a busy lifecycle.
+			this.safeSend(this.dependencies.registration.ready());
+		}
+	}
+
+	/** Runs the step and reports its outcome to the daemon. Returns true once an outcome was sent. */
+	private async runStep(executor: StepExecutor, assignment: PreparedAssignment): Promise<boolean> {
+		const { assignmentId, executionId, stepId } = assignment;
+		this.guard.begin({ assignmentId, executionId, stepId, stepType: assignment.stepType });
+		const header = { assignmentId, executionId, stepId };
+		// Announced before the first side effect: after this the daemon treats a disconnect as a failure, not a replay.
+		this.relay({ type: 'step_started', ...header });
+		let outcome: JsonObject;
+		try {
+			const result = await executor.execute(assignment.stepConfig, assignment.executionContext, scoped =>
+				this.relay({ ...scoped, assignmentId })
+			);
+			outcome = {
+				type: 'step_completed',
+				...header,
+				output: result.output,
+				...(result.meta === undefined ? {} : { meta: this.hostMeta(result.meta) }),
+				...(result.io === undefined ? {} : { io: result.io }),
+			};
+		} catch (error) {
+			outcome = this.failure(header, error);
+		}
+		if (this.relay(outcome) !== 'terminal') {
+			// The guard dropped the outcome (too big, malformed): the daemon must still hear that the step is over.
+			this.safeSend({
+				type: 'step_failed',
+				...header,
+				error: `The result of step "${stepId}" was refused by the exec wrapper (see the wrapper log for the reason).`,
+			});
+		}
+		this.guard.end();
+		return true;
+	}
+
+	/**
+	 * Same fields as flow-cli's Worker.ts for a failed step (`stepOutputs`, `stdout`, `stderr`, `io`, `meta` carried by the
+	 * error), so the daemon records the same failure it would record for a local worker.
+	 */
+	private failure(header: JsonObject, error: unknown): JsonObject {
+		const carried = (typeof error === 'object' && error !== null ? error : {}) as {
+			stepOutputs?: JsonObject;
+			stdout?: string;
+			stderr?: string;
+			io?: JsonObject;
+			meta?: JsonObject;
+		};
+		return {
+			type: 'step_failed',
+			...header,
+			error: describe(error),
+			...(carried.stepOutputs === undefined ? {} : { output: carried.stepOutputs }),
+			...(carried.stdout === undefined ? {} : { stdout: carried.stdout }),
+			...(carried.stderr === undefined ? {} : { stderr: carried.stderr }),
+			...(carried.io === undefined ? {} : { io: carried.io }),
+			...(carried.meta === undefined ? {} : { meta: this.hostMeta(carried.meta) }),
+		};
+	}
+
+	/**
+	 * The engine read the paths of the session from what the CLI printed: sandbox paths (`/c/Users/...`), in places joined
+	 * with the HOST separator (`\c\Users\...`). Normalised to the sandbox form so the guard translates them back to host
+	 * paths and checks they stay inside the mounts.
+	 */
+	private hostMeta(meta: JsonObject): JsonObject {
+		const normalised: JsonObject = { ...meta };
+		const fix = (value: unknown): unknown =>
+			typeof value === 'string' && value.startsWith('\\') && !value.startsWith('\\\\')
+				? value.replaceAll('\\', '/')
+				: value;
+		if (normalised['session_file'] !== undefined) normalised['session_file'] = fix(normalised['session_file']);
+		if (Array.isArray(normalised['files_written']))
+			normalised['files_written'] = normalised['files_written'].map(fix);
+		return normalised;
+	}
+
+	/** Sends one engine message through the guard. Returns what happened to it. */
+	private relay(message: JsonObject): 'sent' | 'terminal' | 'dropped' {
+		const decision = this.guard.handle(JSON.stringify(message));
+		if (decision.action !== 'forward') return 'dropped';
+		if (!this.safeSend(decision.message)) return 'dropped';
+		return decision.terminal ? 'terminal' : 'sent';
+	}
+
+	private identify(raw: JsonObject): { assignmentId: string; executionId: string; stepId: string } | undefined {
+		const context = raw['executionContext'];
+		if (!isNonEmptyString(raw['assignmentId']) || !isNonEmptyString(raw['stepId']) || !isJsonObject(context)) {
+			return undefined;
+		}
+		if (!isNonEmptyString(context['executionId'])) return undefined;
+		return { assignmentId: raw['assignmentId'], stepId: raw['stepId'], executionId: context['executionId'] };
+	}
+
+	private mountsFor(raw: JsonObject, executionId: string): RunMounts {
+		if (this.mounts !== undefined && this.mounts.executionId === executionId) return this.mounts.mounts;
+		const context = raw['executionContext'] as JsonObject;
+		const workspaceDir = context['workspaceDir'];
+		if (!isNonEmptyString(workspaceDir)) {
+			throw new SandboxError('invalid-argument', 'The assignment has no executionContext.workspaceDir.');
+		}
+		// The daemon puts a run's `.meta` next to its workspace (ExecutionWorkspaces: `<workspace>.meta`).
+		const mounts = this.dependencies.createMounts(workspaceDir, `${workspaceDir}.meta`);
+		// A different run keeps its own mounts; SandboxLifecycle refuses it (worker-busy) before anything is created.
+		this.mounts = { executionId, mounts };
+		return mounts;
+	}
+
+	private async ensurePrepared(sandbox: string, mounts: RunMounts): Promise<ExecPreparedSandbox> {
+		if (this.prepared?.sandbox === sandbox) return this.prepared.value;
+		const value = await this.dependencies.preparer.prepare(sandbox, mounts);
+		this.prepared = { sandbox, value };
+		return value;
+	}
+
+	private safeSend(message: JsonObject): boolean {
+		try {
+			this.daemon.send(message);
+			return true;
+		} catch (error) {
+			this.dependencies.log.warn(`could not send "${String(message['type'])}" to the daemon: ${describe(error)}`);
+			return false;
+		}
+	}
+}
+
+function describe(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}

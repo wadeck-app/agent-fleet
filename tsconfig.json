@@ -11,6 +11,7 @@
 		{ "path": "packages/flow-cli" },
 		{ "path": "packages/flow-core" },
 		{ "path": "packages/flow-engine" },
+		{ "path": "packages/flow-sandbox" },
 		{ "path": "packages/orchestrator" },
 		{ "path": "packages/shared-common" },
 		{ "path": "packages/shared-frontend-backend" },

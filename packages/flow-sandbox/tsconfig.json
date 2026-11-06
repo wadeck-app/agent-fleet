@@ -1,0 +1,17 @@
+{
+	"extends": "../../tsconfig.shared.json",
+	"compilerOptions": {
+		"outDir": "dist",
+		"declarationDir": "dist-types",
+		"rootDir": "src"
+	},
+	"include": ["src"],
+	"exclude": ["dist", "dist-types"],
+	// The exec variant (src/exec) composes the host engine: it implements flow-engine's ProcessLauncher and drives
+	// flow-cli's WorkerAdapter. Referenced, not copied, so the types cannot drift.
+	"references": [
+		//
+		{ "path": "../flow-engine" },
+		{ "path": "../flow-cli" }
+	]
+}

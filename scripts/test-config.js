@@ -95,6 +95,13 @@ const testSuites = [
 		],
 		type: testSuiteType_UNIT,
 	},
+	// Shared sandbox layer (sbx runtime, fake, mock sbx CLI). Its tests spawn the mock through real child processes.
+	{
+		name: 'Flow Sandbox Unit Tests',
+		command: 'npm',
+		args: ['run', 'test', '--workspace=flow-sandbox'],
+		type: testSuiteType_UNIT,
+	},
 	// Disabled: setup cost (~14s build + servers) not amortized by only 3 tests.
 	// Re-enable when the test suite grows. Run individually: npm run test:app --workspace=e2e-web
 	// {

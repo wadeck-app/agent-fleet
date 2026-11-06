@@ -48,6 +48,7 @@ const PACKAGES = [
 	// `npm run check` never typechecked them.
 	'e2e-web',
 	'extension-points',
+	'flow-sandbox',
 ];
 
 /**
