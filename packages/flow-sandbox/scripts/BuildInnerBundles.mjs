@@ -16,10 +16,12 @@
  * Env: BUNDLE_VERSION  version stamped into the worker (default 0.0.0-sandbox-harness).
  */
 import { build } from 'esbuild';
-import { copyFileSync, statSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { ImageMcpServerStager } from '../src/exec/ImageMcpServerStager.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.join(here, '..');
@@ -68,7 +70,7 @@ await Promise.all([
 		outfile: path.join(outDirectory, 'inner-bridge.cjs'),
 	}),
 ]);
-copyFileSync(path.join(flowCli, 'src', 'worker', 'mcp-server.cjs'), path.join(outDirectory, 'mcp-server.cjs'));
+new ImageMcpServerStager(flowCli).stageInto(outDirectory);
 
 for (const file of ['worker.cjs', 'mcp-server.cjs', 'inner-bridge.cjs']) {
 	const size = statSync(path.join(outDirectory, file)).size;

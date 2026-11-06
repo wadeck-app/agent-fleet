@@ -6,9 +6,10 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ObservedList } from '../testing/ObservedList';
+import { ImageMcpServerStager } from './ImageMcpServerStager';
 
 /**
  * T-01 / T-08 in the exec variant: "the sandbox cannot add steps" except where today's engine lets a model do it.
@@ -20,7 +21,29 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(here, '..', '..');
 const engineMcpServer = path.resolve(packageRoot, '..', 'flow-cli', 'src', 'worker', 'mcp-server.cjs');
 const forwarderSource = path.join(packageRoot, 'image', 'mcp-callback-forwarder.cjs');
-const imageMcpServer = path.join(packageRoot, 'image', 'opt-flow', 'mcp-server.cjs');
+/** The image's mcp-server.cjs, produced by the code BuildInnerBundles.mjs uses for image/opt-flow, into a temp directory. */
+let imageMcpServer: string;
+let imageBuildDirectory: string;
+
+beforeAll(() => {
+	imageBuildDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-mcp-image-'));
+	try {
+		imageMcpServer = new ImageMcpServerStager(path.resolve(packageRoot, '..', 'flow-cli')).stageInto(
+			imageBuildDirectory
+		);
+	} catch (error) {
+		throw new Error(
+			`Cannot produce the image's mcp-server.cjs for this test: ${error instanceof Error ? error.message : String(error)}`,
+			{
+				cause: error,
+			}
+		);
+	}
+});
+
+afterAll(() => {
+	fs.rmSync(imageBuildDirectory, { recursive: true, force: true });
+});
 
 const STEPS = [{ id: 'extra', type: 'script', script: 'echo injected' }];
 
@@ -161,11 +184,6 @@ describe('the MCP tool surface the sandbox gets', () => {
 	});
 
 	it('is served by a file identical to the one in the image build context (a stale image would be a different surface)', () => {
-		if (!fs.existsSync(imageMcpServer)) {
-			throw new Error(
-				`${imageMcpServer} does not exist: run \`node --import tsx packages/flow-sandbox/scripts/BuildInnerBundles.mjs\` before the tests.`
-			);
-		}
 		expect(sha256(imageMcpServer)).toBe(sha256(engineMcpServer));
 	});
 });
