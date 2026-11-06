@@ -129,4 +129,29 @@ describe('relay worker-type plugin', () => {
 		expect(sent).toHaveLength(1);
 		expect(logged.some(message => message.includes('built-in registry'))).toBe(true);
 	});
+
+	it('serves a source declared with plugin relay.default and no pluginsDir', async () => {
+		const { relay, sent } = acceptingRelay();
+		const entry: WorkerSourceEntry = {
+			sourceId: 'build-box',
+			provider: 'relay',
+			plugin: 'relay.default',
+			labels: [],
+			maxWorkers: 1,
+			tokenHash: 'h',
+			createdAt: '2026-11-06T00:00:00.000Z',
+		};
+		const workerTypes = new WorkerTypeInstances(new PluginLoader(), () => {});
+		const reported: string[] = [];
+
+		await contactDeclaredSources([entry], request.daemonEndpoint, message => reported.push(message), {
+			findRelay: () => relay,
+			workerTypes,
+		});
+		await workerTypes.disposeAll();
+
+		expect(reported).toEqual([]);
+		expect(sent).toHaveLength(1);
+		expect(sent[0]).toMatchObject({ type: 'provide_worker' });
+	});
 });

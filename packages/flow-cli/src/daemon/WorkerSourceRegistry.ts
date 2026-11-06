@@ -26,10 +26,24 @@ export interface WorkerSourceDeclaration {
 	pid?: number;
 	/** HTTP nudge endpoint; see {@link WorkerSourceEntry.nudgeUrl}. */
 	nudgeUrl?: string;
-	/** Worker-type plugin ref `<pluginId>.<implName>`; see {@link WorkerSourceEntry.plugin}. Needs `pluginsDir`. */
+	/** Worker-type plugin ref `<pluginId>.<implName>` (or `plugins.<pluginId>.<implName>`); see {@link WorkerSourceEntry.plugin}. Needs `pluginsDir` unless it is a built-in worker type. */
 	plugin?: string;
 	/** Absolute plugins directory; see {@link WorkerSourceEntry.pluginsDir}. Needs `plugin`. */
 	pluginsDir?: string;
+}
+
+/**
+ * The declaration with its plugin ref in the plain `<pluginId>.<implName>` form: the type reference
+ * `plugins.<pluginId>.<implName>` is accepted too and stored without its prefix. Left alone when stripping would not
+ * give a valid ref, so the usual error names what the user wrote.
+ */
+function withPlainPluginRef(declaration: WorkerSourceDeclaration): WorkerSourceDeclaration {
+	const { plugin } = declaration;
+	if (plugin?.startsWith('plugins.') !== true) {
+		return declaration;
+	}
+	const plain = plugin.slice('plugins.'.length);
+	return PLUGIN_REF.test(plain) ? { ...declaration, plugin: plain } : declaration;
 }
 
 /**
@@ -72,13 +86,14 @@ export class WorkerSourceRegistry {
 	 * The token is returned once and never recoverable afterwards, so the caller must
 	 * surface it immediately.
 	 */
-	declare(declaration: WorkerSourceDeclaration): {
+	declare(requested: WorkerSourceDeclaration): {
 		token: string;
 		sourceToken: string;
 		entry: WorkerSourceEntry;
 		/** Advice that does not stop the declaration; the caller shows each one to the user. */
 		warnings: string[];
 	} {
+		const declaration = withPlainPluginRef(requested);
 		this.validate(declaration);
 
 		const sources = this.read();
@@ -117,11 +132,15 @@ export class WorkerSourceRegistry {
 	 */
 	private warningsFor(declaration: WorkerSourceDeclaration): string[] {
 		const { sourceId, plugin, pluginsDir } = declaration;
-		if (plugin === undefined || findBuiltinWorkerType(`plugins.${plugin}`) === undefined) {
+		if (
+			plugin === undefined ||
+			pluginsDir === undefined ||
+			findBuiltinWorkerType(`plugins.${plugin}`) === undefined
+		) {
 			return [];
 		}
 		return [
-			`Worker source "${sourceId}": plugin "${plugin}" is a built-in worker type of flow, so the daemon serves it from the built-in registry and ignores the pluginsDir "${String(pluginsDir)}". ` +
+			`Worker source "${sourceId}": plugin "${plugin}" is a built-in worker type of flow, so the daemon serves it from the built-in registry and ignores the pluginsDir "${pluginsDir}". ` +
 				'To use a copy from that directory instead, give it another plugin id.',
 		];
 	}
@@ -286,13 +305,14 @@ export class WorkerSourceRegistry {
 					'Drop --plugin/--plugins-dir to use the built-in provider, or pass a free label as --provider (for example the plugin id) to use the plugin.'
 			);
 		}
-		if (pluginsDir === undefined) {
+		// A built-in is served from the registry, so it needs no directory; anything else is loaded from one.
+		if (pluginsDir === undefined && findBuiltinWorkerType(`plugins.${plugin}`) === undefined) {
 			throw new Error(
 				`Worker source "${sourceId}" names plugin "${plugin}" but no pluginsDir: the daemon would not know where to load it from. ` +
 					'Pass --plugins-dir <absolute directory that contains plugin-<pluginId>/>.'
 			);
 		}
-		if (!isAbsolute(pluginsDir)) {
+		if (pluginsDir !== undefined && !isAbsolute(pluginsDir)) {
 			throw new Error(
 				`Worker source "${sourceId}": pluginsDir must be an absolute path, got "${pluginsDir}". ` +
 					'The daemon runs from another directory, so a relative path would point somewhere else.'

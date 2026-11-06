@@ -53,3 +53,39 @@ describe('WorkerSourceRegistry - pluginsDir and a plugin ref (characterization)'
 		).toThrow(/pluginsDir must be an absolute path/);
 	});
 });
+
+describe('WorkerSourceRegistry - a built-in ref needs no pluginsDir', () => {
+	it('declares relay.default without a directory, stores none, and warns about nothing', () => {
+		const { entry, warnings } = new WorkerSourceRegistry(dir).declare(declaration('relay.default', false));
+
+		expect(entry.plugin).toBe('relay.default');
+		expect(entry).not.toHaveProperty('pluginsDir');
+		expect(warnings).toEqual([]);
+	});
+
+	it('accepts the type reference plugins.relay.default and stores the plain ref', () => {
+		const { entry } = new WorkerSourceRegistry(dir).declare(declaration('plugins.relay.default', false));
+
+		expect(entry.plugin).toBe('relay.default');
+	});
+
+	it('reads back an entry stored without a directory', () => {
+		new WorkerSourceRegistry(dir).declare(declaration('relay.default', false));
+
+		expect(new WorkerSourceRegistry(dir).list().map(entry => entry.plugin)).toEqual(['relay.default']);
+	});
+
+	it('still warns when a built-in ref is declared with a directory', () => {
+		const { warnings } = new WorkerSourceRegistry(dir).declare(declaration('relay.default', true));
+
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('ignores the pluginsDir');
+	});
+
+	it('still rejects a ref that is not a built-in without a directory, also in the plugins.<ref> form', () => {
+		expect(() => new WorkerSourceRegistry(dir).declare(declaration('plugins.sandbox.docker', false))).toThrow(
+			'Worker source "build-box" names plugin "sandbox.docker" but no pluginsDir: the daemon would not know where to load it from. ' +
+				'Pass --plugins-dir <absolute directory that contains plugin-<pluginId>/>.'
+		);
+	});
+});

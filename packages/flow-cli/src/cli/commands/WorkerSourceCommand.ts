@@ -110,9 +110,12 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		.option('--cwd <path>', 'Directory --command runs in (defaults to the daemon working directory)')
 		.option(
 			'--plugin <ref>',
-			'Worker-type plugin that supplies this source, as <pluginId>.<implName> (needs --plugins-dir; --provider is then a free label)'
+			'Worker-type plugin that supplies this source, as <pluginId>.<implName> (needs --plugins-dir unless it is a built-in such as relay.default; --provider is then a free label)'
 		)
-		.option('--plugins-dir <path>', 'Absolute directory containing plugin-<pluginId>/ (plain, self-contained JS)')
+		.option(
+			'--plugins-dir <path>',
+			'Absolute directory containing plugin-<pluginId>/ (plain, self-contained JS); not needed for a built-in plugin such as relay.default, and ignored (with a warning) if given'
+		)
 		.option(
 			'--option <key=value>',
 			'Option handed to the plugin (repeatable); a sensitive key must be ${ENV_VAR}',
@@ -149,7 +152,9 @@ export function registerWorkerSourceCommand(program: Command): Command {
 					console.log(`[ok] Declared worker source '${entry.sourceId}'`);
 					console.log(`     provider   : ${entry.provider}`);
 					if (entry.plugin !== undefined) {
-						console.log(`     plugin     : ${entry.plugin} (from ${String(entry.pluginsDir)})`);
+						console.log(
+							`     plugin     : ${entry.plugin} (${entry.pluginsDir === undefined ? 'built-in' : `from ${entry.pluginsDir}`})`
+						);
 					}
 					console.log(`     labels     : ${entry.labels.length > 0 ? entry.labels.join(', ') : '(none)'}`);
 					console.log(`     maxWorkers : ${String(entry.maxWorkers)}`);

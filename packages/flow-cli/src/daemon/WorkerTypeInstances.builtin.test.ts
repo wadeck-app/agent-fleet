@@ -235,3 +235,42 @@ describe('WorkerTypeInstances - a built-in that fails to load', () => {
 		expect(message).not.toContain('built-in worker type of flow');
 	});
 });
+
+describe('WorkerTypeInstances - a built-in without pluginsDir', () => {
+	it('builds a registry-answered built-in from an entry that has no directory, and logs that no directory was involved', async () => {
+		const { plugin, created } = builtin();
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, plugin);
+		const { pluginsDir: _omitted, ...withoutDir } = entry();
+		const logged2 = logged;
+
+		await instances().get(withoutDir);
+
+		expect(created).toHaveLength(1);
+		const line = logged2.find(item => item.message.includes('built-in registry'));
+		expect(line?.message).toBe(
+			`worker source "sandbox": plugin "${SHADOWED_REF}" answered by the built-in registry.`
+		);
+	});
+
+	it('still refuses a ref that is not a built-in without a directory, as a wiring mistake', async () => {
+		const { pluginsDir: _omitted, ...withoutDir } = entry();
+
+		const message = await messageOf(instances().get(withoutDir));
+
+		expect(message).toContain('has no plugin or no pluginsDir');
+		expect(message).toContain('please report it');
+	});
+
+	it('names no directory in a built-in failure either', async () => {
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, {
+			extensionPoint: 'worker-type',
+			create: () => Promise.reject(new Error('boom')),
+		});
+		const { pluginsDir: _omitted, ...withoutDir } = entry();
+
+		const message = await messageOf(instances().get(withoutDir));
+
+		expect(message).toContain('is a built-in worker type of flow and failed');
+		expect(message).not.toContain('undefined');
+	});
+});

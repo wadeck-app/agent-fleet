@@ -81,10 +81,8 @@ export class WorkerTypeInstances {
 	 */
 	async get(entry: WorkerSourceEntry, host: WorkerTypeHost = {}): Promise<WorkerTypeInstance> {
 		const { plugin, pluginsDir, sourceId } = entry;
-		if (plugin === undefined || pluginsDir === undefined) {
-			throw new Error(
-				`worker source "${sourceId}" has no plugin or no pluginsDir, so there is no worker-type instance to build. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
-			);
+		if (plugin === undefined) {
+			throw missingPluginOrDirectory(sourceId);
 		}
 		if (!PLUGIN_REF.test(plugin)) {
 			// A hand-edited registry file: the ref is a file name below pluginsDir, so it must not be able to leave it.
@@ -92,6 +90,11 @@ export class WorkerTypeInstances {
 				`worker source "${sourceId}": plugin must be "<pluginId>.<implName>" (letters, digits, "_" and "-"), got ${JSON.stringify(plugin)}. ` +
 					`Fix: flow worker source remove ${sourceId}, then declare it again.`
 			);
+		}
+		// A built-in needs no directory; anything else is loaded from one, so one without it cannot be built.
+		const registered = this.lookupBuiltin(`plugins.${plugin}`);
+		if (registered === undefined && pluginsDir === undefined) {
+			throw missingPluginOrDirectory(sourceId);
 		}
 
 		// `host` is deliberately not part of the fingerprint: the first caller's findRelay is kept; harmless while there is one relay lookup per daemon.
@@ -115,7 +118,10 @@ export class WorkerTypeInstances {
 			await this.dispose(sourceId);
 		}
 
-		const created: CachedInstance = { fingerprint, instance: this.build(entry, plugin, pluginsDir, host) };
+		const created: CachedInstance = {
+			fingerprint,
+			instance: this.build(entry, plugin, pluginsDir, host, registered),
+		};
 		this.cache.set(sourceId, created);
 		this.disposed.delete(sourceId);
 		created.instance.catch(() => {
@@ -215,13 +221,12 @@ export class WorkerTypeInstances {
 	private async build(
 		entry: WorkerSourceEntry,
 		plugin: string,
-		pluginsDir: string,
-		host: WorkerTypeHost
+		pluginsDir: string | undefined,
+		host: WorkerTypeHost,
+		registered: FlowPlugin | undefined
 	): Promise<WorkerTypeInstance> {
 		// Outside the load error below: an unset variable is the user's to fix, and says which one.
 		const options = resolveEnvVars(entry.sourceId, entry.options);
-		// Asked once: which kind answered decides both how it is loaded and which advice a failure carries.
-		const registered = this.lookupBuiltin(`plugins.${plugin}`);
 		const loading = this.load(entry, plugin, pluginsDir, options, host, registered);
 		let built: WorkerTypeInstance | undefined;
 		const outcome = await raceWithTimeout(
@@ -268,7 +273,7 @@ export class WorkerTypeInstances {
 	private async load(
 		entry: WorkerSourceEntry,
 		plugin: string,
-		pluginsDir: string,
+		pluginsDir: string | undefined,
 		options: unknown,
 		host: WorkerTypeHost,
 		registered: FlowPlugin | undefined
@@ -278,12 +283,18 @@ export class WorkerTypeInstances {
 			if (registered !== undefined) {
 				this.log(
 					'info',
-					`worker source "${entry.sourceId}": plugin "${plugin}" answered by the built-in registry; the plugins directory "${pluginsDir}" is ignored for it. ` +
-						`To use a copy from that directory, give it another plugin id.`
+					`worker source "${entry.sourceId}": plugin "${plugin}" answered by the built-in registry` +
+						(pluginsDir === undefined
+							? '.'
+							: `; the plugins directory "${pluginsDir}" is ignored for it. To use a copy from that directory, give it another plugin id.`)
 				);
 				const built = await this.createBuiltin(registered, typeRef, entry.sourceId, options, host);
 				assertWorkerTypeInstance(built);
 				return built;
+			}
+			if (pluginsDir === undefined) {
+				// Unreachable through get(), which refuses it; kept so a future caller fails here, loudly.
+				throw missingPluginOrDirectory(entry.sourceId);
 			}
 			this.log(
 				'info',
@@ -303,16 +314,22 @@ export class WorkerTypeInstances {
 	}
 }
 
+function missingPluginOrDirectory(sourceId: string): Error {
+	return new Error(
+		`worker source "${sourceId}" has no plugin or no pluginsDir, so there is no worker-type instance to build. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
+	);
+}
+
 /** The load error matching what answered: a built-in is flow's own code, so the on-disk advice would send the user to fix nothing. */
 function failureOf(
 	entry: WorkerSourceEntry,
 	plugin: string,
-	pluginsDir: string,
+	pluginsDir: string | undefined,
 	isBuiltin: boolean,
 	cause: string,
 	original?: unknown
 ): Error {
-	if (!isBuiltin) {
+	if (!isBuiltin && pluginsDir !== undefined) {
 		return loadFailure(entry, plugin, pluginsDir, cause, original);
 	}
 	return new Error(

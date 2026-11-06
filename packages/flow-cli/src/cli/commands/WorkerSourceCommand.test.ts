@@ -171,6 +171,28 @@ describe('flow worker source command', () => {
 			expect(printed()).toContain('plugin     : sandbox.docker');
 		});
 
+		it('declares a built-in plugin ref with no --plugins-dir: no warning, no directory stored', () => {
+			run('add', 'build-box', '--provider', 'relay', '--plugin', 'relay.default');
+
+			expect(printed()).toContain('plugin     : relay.default (built-in)');
+			expect(printed()).not.toContain('[warn]');
+			expect(printed()).not.toContain('undefined');
+			expect(storedSources()[0]).toMatchObject({ plugin: 'relay.default' });
+			expect(storedSources()[0]).not.toHaveProperty('pluginsDir');
+		});
+
+		it('help describes --plugins-dir as needed only for plugins that are not built-in', () => {
+			const program = new Command();
+			registerWorkerSourceCommand(program);
+			const add = program.commands
+				.find(c => c.name() === 'worker')
+				?.commands.find(c => c.name() === 'source')
+				?.commands.find(c => c.name() === 'add');
+			const help = (add?.helpInformation() ?? '').replace(/\s+/g, ' ');
+
+			expect(help).toContain('not needed for a built-in plugin such as relay.default');
+		});
+
 		it('warns, and still declares, when the plugin is a built-in so the --plugins-dir is ignored', () => {
 			run('add', 'build-box', '--provider', 'relay', '--plugin', 'relay.default', '--plugins-dir', pluginsDir());
 
