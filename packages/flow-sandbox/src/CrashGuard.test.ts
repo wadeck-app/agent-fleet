@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CleanupStack } from './CleanupStack';
 import { CrashGuard } from './CrashGuard';
+import { eachRow } from './testing/EachRow';
 import { RecordingSandboxLog } from './testing/RecordingSandboxLog';
 
 async function crash(
@@ -29,16 +30,20 @@ async function crash(
 }
 
 describe('CrashGuard (a crash of the wrapper must leave nothing running)', () => {
-	it.each([
-		{ event: 'uncaughtException' as const, value: new Error('callback boom'), text: 'uncaughtException' },
-		{ event: 'unhandledRejection' as const, value: 'plain rejection', text: 'unhandledRejection' },
-	])('$event: logs it, releases everything once, exits non-zero', async ({ event, value, text }) => {
-		const { ran, exits, log } = await crash(event, value);
+	it('(each case): logs it, releases everything once, exits non-zero', () =>
+		eachRow(
+			[
+				{ event: 'uncaughtException' as const, value: new Error('callback boom'), text: 'uncaughtException' },
+				{ event: 'unhandledRejection' as const, value: 'plain rejection', text: 'unhandledRejection' },
+			],
+			async ({ event, value, text }) => {
+				const { ran, exits, log } = await crash(event, value);
 
-		expect(ran).toEqual(['wrapper', 'secrets']);
-		expect(exits).toEqual([1]);
-		expect(log.text()).toContain(`fatal ${text}`);
-	});
+				expect(ran).toEqual(['wrapper', 'secrets']);
+				expect(exits).toEqual([1]);
+				expect(log.text()).toContain(`fatal ${text}`);
+			}
+		));
 
 	it('exits anyway, saying so, when the cleanup does not finish', async () => {
 		const { ran, exits, log } = await crash('uncaughtException', new Error('x'), { cleanupNeverEnds: true });

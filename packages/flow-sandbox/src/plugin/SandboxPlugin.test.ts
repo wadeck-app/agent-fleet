@@ -8,6 +8,8 @@ import { PassThrough } from 'node:stream';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { eachRow } from '../testing/EachRow';
+
 // The plugin is plain JavaScript that a user's daemon loads from a directory (see plugin/plugin.config.js): it is imported
 // by file URL here, exactly like the daemon's loader does, never through the TypeScript sources.
 const PLUGIN_FILE = fileURLToPath(new URL('../../plugin/plugin.config.js', import.meta.url));
@@ -141,177 +143,184 @@ describe('sandbox plugin: the manifest', () => {
 });
 
 describe('sandbox plugin: options are flat strings and parsed strictly', () => {
-	it.each([
-		{
-			label: 'projects is required',
-			options: { region: 'us-east-1', profiles: 'claude=p' },
-			fragment: 'projects',
-			example: 'projects=ab12cd34',
-		},
-		{
-			label: 'region is required',
-			options: { projects: 'a1', profiles: 'claude=p' },
-			fragment: 'region',
-			example: 'region=us-east-1',
-		},
-		{
-			label: 'profiles is required',
-			options: { projects: 'a1', region: 'us-east-1' },
-			fragment: 'profiles',
-			example: 'profiles=claude=my-sso-profile',
-		},
-		{
-			label: 'an unknown option (a typo is not a default)',
-			options: { ...GOOD, cpu: '2' },
-			fragment: 'Unknown option "cpu"',
-			example: 'cpus',
-		},
-		{
-			label: 'an empty value',
-			options: { ...GOOD, image: '' },
-			fragment: 'option "image" is empty',
-			example: 'image=flow-sandbox:m7',
-		},
-		{
-			label: 'a blank value',
-			options: { ...GOOD, memory: '   ' },
-			fragment: 'option "memory" is empty',
-			example: 'memory=2g',
-		},
-		{
-			label: 'a value that is not a string',
-			options: { ...GOOD, cpus: 2 },
-			fragment: 'option "cpus" must be a string',
-			example: 'cpus=2',
-		},
-		{
-			label: 'an empty list item',
-			options: { ...GOOD, projects: 'a1,,b2' },
-			fragment: 'empty item',
-			example: 'projects=ab12cd34,ef56ab78',
-		},
-		{
-			label: 'a duplicate project id',
-			options: { ...GOOD, projects: 'a1,a1' },
-			fragment: 'twice',
-			example: 'projects=ab12cd34',
-		},
-		{
-			label: 'a profile entry without "="',
-			options: { ...GOOD, profiles: 'claude' },
-			fragment: 'alias=profile',
-			example: 'profiles=claude=my-sso-profile',
-		},
-		{
-			label: 'a profile name with a comma (not expressible: the comma separates entries)',
-			options: { ...GOOD, profiles: 'claude=a,b' },
-			fragment: 'comma',
-			example: 'profiles=claude=my-sso-profile',
-		},
-		{
-			label: 'two profile aliases (the exec wrapper serves one in v1)',
-			options: { ...GOOD, profiles: 'a=x,b=y' },
-			fragment: 'exactly one',
-			example: 'profiles=claude=my-sso-profile',
-		},
-		{ label: 'a fractional cpus', options: { ...GOOD, cpus: '1.5' }, fragment: 'whole number', example: 'cpus=2' },
-		{
-			label: 'a memory below the sbx minimum',
-			options: { ...GOOD, memory: '256m' },
-			fragment: 'at least 512m',
-			example: 'memory=2g',
-		},
-		{
-			label: 'an idle delay over 24 hours',
-			options: { ...GOOD, idleStopMinutes: '1441' },
-			fragment: 'at most 1440',
-			example: 'idleStopMinutes=5',
-		},
-		{
-			label: 'a pull policy that does not exist',
-			options: { ...GOOD, pull: 'sometimes' },
-			fragment: 'always, missing or never',
-			example: 'pull=never',
-		},
-		{
-			label: 'a host without a port',
-			options: { ...GOOD, extraAllowedHosts: 'registry.example.org' },
-			fragment: 'host:port',
-			example: 'extraAllowedHosts=registry.example.org:443',
-		},
-		{
-			label: 'a boolean that is not true or false',
-			options: { ...GOOD, acceptSshAgentForwarding: 'yes' },
-			fragment: 'true or false',
-			example: 'acceptSshAgentForwarding=true',
-		},
-		{
-			label: 'a name from the prototype chain (toString)',
-			options: JSON.parse('{"projects":"a1","region":"us-east-1","profiles":"c=p","toString":"x"}') as Record<
-				string,
-				string
-			>,
-			fragment: 'Unknown option "toString"',
-			example: 'cpus',
-		},
-		{
-			label: 'the name __proto__',
-			options: JSON.parse('{"projects":"a1","region":"us-east-1","profiles":"c=p","__proto__":"x"}') as Record<
-				string,
-				string
-			>,
-			fragment: 'Unknown option "__proto__"',
-			example: 'cpus',
-		},
-		{
-			label: 'an image that is an option (leading dash)',
-			options: { ...GOOD, image: '--pull' },
-			fragment: 'must not start with "-"',
-			example: 'image=flow-sandbox:m7',
-		},
-		{
-			label: 'a value over 512 characters',
-			options: { ...GOOD, image: 'a'.repeat(513) },
-			fragment: 'at most 512 characters',
-			example: 'image=flow-sandbox:m7',
-		},
-		{
-			label: 'a control character in a value',
-			options: { ...GOOD, region: 'us-east-1\u0007' },
-			fragment: 'control character',
-			example: 'region=us-east-1',
-		},
-		{
-			label: 'an sbx path that is a directory',
-			options: { ...GOOD, sbxPath: os.tmpdir() },
-			fragment: 'must be a file',
-			example: 'sbxPath=',
-		},
-		{
-			label: 'an sbx path on a network share',
-			options: { ...GOOD, sbxPath: '\\\\server\\share\\sbx.exe' },
-			fragment: 'network path',
-			example: 'sbxPath=',
-		},
-		{
-			label: 'a relative sbx path',
-			options: { ...GOOD, sbxPath: 'sbx.exe' },
-			fragment: 'absolute',
-			example: 'sbxPath=',
-		},
-	])('refuses $label, naming the option and giving an example', async ({ options, fragment, example }) => {
-		const plugin = await load();
+	it('refuses (each case), naming the option and giving an example', () =>
+		eachRow(
+			[
+				{
+					label: 'projects is required',
+					options: { region: 'us-east-1', profiles: 'claude=p' },
+					fragment: 'projects',
+					example: 'projects=ab12cd34',
+				},
+				{
+					label: 'region is required',
+					options: { projects: 'a1', profiles: 'claude=p' },
+					fragment: 'region',
+					example: 'region=us-east-1',
+				},
+				{
+					label: 'profiles is required',
+					options: { projects: 'a1', region: 'us-east-1' },
+					fragment: 'profiles',
+					example: 'profiles=claude=my-sso-profile',
+				},
+				{
+					label: 'an unknown option (a typo is not a default)',
+					options: { ...GOOD, cpu: '2' },
+					fragment: 'Unknown option "cpu"',
+					example: 'cpus',
+				},
+				{
+					label: 'an empty value',
+					options: { ...GOOD, image: '' },
+					fragment: 'option "image" is empty',
+					example: 'image=flow-sandbox:m7',
+				},
+				{
+					label: 'a blank value',
+					options: { ...GOOD, memory: '   ' },
+					fragment: 'option "memory" is empty',
+					example: 'memory=2g',
+				},
+				{
+					label: 'a value that is not a string',
+					options: { ...GOOD, cpus: 2 },
+					fragment: 'option "cpus" must be a string',
+					example: 'cpus=2',
+				},
+				{
+					label: 'an empty list item',
+					options: { ...GOOD, projects: 'a1,,b2' },
+					fragment: 'empty item',
+					example: 'projects=ab12cd34,ef56ab78',
+				},
+				{
+					label: 'a duplicate project id',
+					options: { ...GOOD, projects: 'a1,a1' },
+					fragment: 'twice',
+					example: 'projects=ab12cd34',
+				},
+				{
+					label: 'a profile entry without "="',
+					options: { ...GOOD, profiles: 'claude' },
+					fragment: 'alias=profile',
+					example: 'profiles=claude=my-sso-profile',
+				},
+				{
+					label: 'a profile name with a comma (not expressible: the comma separates entries)',
+					options: { ...GOOD, profiles: 'claude=a,b' },
+					fragment: 'comma',
+					example: 'profiles=claude=my-sso-profile',
+				},
+				{
+					label: 'two profile aliases (the exec wrapper serves one in v1)',
+					options: { ...GOOD, profiles: 'a=x,b=y' },
+					fragment: 'exactly one',
+					example: 'profiles=claude=my-sso-profile',
+				},
+				{
+					label: 'a fractional cpus',
+					options: { ...GOOD, cpus: '1.5' },
+					fragment: 'whole number',
+					example: 'cpus=2',
+				},
+				{
+					label: 'a memory below the sbx minimum',
+					options: { ...GOOD, memory: '256m' },
+					fragment: 'at least 512m',
+					example: 'memory=2g',
+				},
+				{
+					label: 'an idle delay over 24 hours',
+					options: { ...GOOD, idleStopMinutes: '1441' },
+					fragment: 'at most 1440',
+					example: 'idleStopMinutes=5',
+				},
+				{
+					label: 'a pull policy that does not exist',
+					options: { ...GOOD, pull: 'sometimes' },
+					fragment: 'always, missing or never',
+					example: 'pull=never',
+				},
+				{
+					label: 'a host without a port',
+					options: { ...GOOD, extraAllowedHosts: 'registry.example.org' },
+					fragment: 'host:port',
+					example: 'extraAllowedHosts=registry.example.org:443',
+				},
+				{
+					label: 'a boolean that is not true or false',
+					options: { ...GOOD, acceptSshAgentForwarding: 'yes' },
+					fragment: 'true or false',
+					example: 'acceptSshAgentForwarding=true',
+				},
+				{
+					label: 'a name from the prototype chain (toString)',
+					options: JSON.parse(
+						'{"projects":"a1","region":"us-east-1","profiles":"c=p","toString":"x"}'
+					) as Record<string, string>,
+					fragment: 'Unknown option "toString"',
+					example: 'cpus',
+				},
+				{
+					label: 'the name __proto__',
+					options: JSON.parse(
+						'{"projects":"a1","region":"us-east-1","profiles":"c=p","__proto__":"x"}'
+					) as Record<string, string>,
+					fragment: 'Unknown option "__proto__"',
+					example: 'cpus',
+				},
+				{
+					label: 'an image that is an option (leading dash)',
+					options: { ...GOOD, image: '--pull' },
+					fragment: 'must not start with "-"',
+					example: 'image=flow-sandbox:m7',
+				},
+				{
+					label: 'a value over 512 characters',
+					options: { ...GOOD, image: 'a'.repeat(513) },
+					fragment: 'at most 512 characters',
+					example: 'image=flow-sandbox:m7',
+				},
+				{
+					label: 'a control character in a value',
+					options: { ...GOOD, region: 'us-east-1\u0007' },
+					fragment: 'control character',
+					example: 'region=us-east-1',
+				},
+				{
+					label: 'an sbx path that is a directory',
+					options: { ...GOOD, sbxPath: os.tmpdir() },
+					fragment: 'must be a file',
+					example: 'sbxPath=',
+				},
+				{
+					label: 'an sbx path on a network share',
+					options: { ...GOOD, sbxPath: '\\\\server\\share\\sbx.exe' },
+					fragment: 'network path',
+					example: 'sbxPath=',
+				},
+				{
+					label: 'a relative sbx path',
+					options: { ...GOOD, sbxPath: 'sbx.exe' },
+					fragment: 'absolute',
+					example: 'sbxPath=',
+				},
+			],
+			async ({ options, fragment, example }) => {
+				const plugin = await load();
 
-		let message = '';
-		try {
-			plugin.internals.parseOptions(options);
-		} catch (error) {
-			message = (error as Error).message;
-		}
+				let message = '';
+				try {
+					plugin.internals.parseOptions(options);
+				} catch (error) {
+					message = (error as Error).message;
+				}
 
-		expect(message).toContain(fragment);
-		expect(message).toContain(example);
-	});
+				expect(message).toContain(fragment);
+				expect(message).toContain(example);
+			}
+		));
 
 	it('turns valid options into the wrapper command line: "=" splits a profile at the first one, nothing secret is in it', async () => {
 		const plugin = await load();

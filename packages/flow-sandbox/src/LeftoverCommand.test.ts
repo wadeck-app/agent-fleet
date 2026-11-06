@@ -5,6 +5,7 @@ import { FakeSandboxRuntime } from './FakeSandboxRuntime';
 import { LEFTOVER_EXIT_FAILED, LEFTOVER_EXIT_OK, LEFTOVER_EXIT_USAGE, LeftoverCommand } from './LeftoverCommand';
 import { LeftoverSandboxes } from './LeftoverSandboxes';
 import { SandboxError } from './SandboxError';
+import { eachRow } from './testing/EachRow';
 import { RecordingPresence } from './testing/RecordingPresence';
 import { RecordingSandboxLog } from './testing/RecordingSandboxLog';
 
@@ -20,7 +21,8 @@ async function seed(name: string): Promise<void> {
 	await runtime.create({ name, agent: 'shell', mounts: [{ hostPath: '/w' }], cpus: 1, memory: '1g' });
 }
 
-beforeEach(() => {
+/** A new world: rows of a table run in ONE test and must not see each other. */
+function reset(): void {
 	clock = new FakeClock(Date.UTC(2026, 9, 27));
 	runtime = new FakeSandboxRuntime({ clock });
 	presence = new RecordingPresence();
@@ -32,7 +34,9 @@ beforeEach(() => {
 		{ out: line => out.push(line), err: line => err.push(line) },
 		{ directory: '/p/presence', exists: () => presenceExists }
 	);
-});
+}
+
+beforeEach(reset);
 
 describe('LeftoverCommand list', () => {
 	it('prints a tab-separated table and exits 0', async () => {
@@ -98,44 +102,54 @@ describe('LeftoverCommand remove', () => {
 		expect(runtime.has('personal-box')).toBe(true);
 	});
 
-	it.each([
-		['no name', ['remove']],
-		['two names', ['remove', 'a', 'b']],
-		['an option instead of a name', ['remove', '--all']],
-	])('exits 2 with usage for %s', async (_label, args) => {
-		expect(await command.run(args)).toBe(LEFTOVER_EXIT_USAGE);
+	it('exits 2 with usage for each case', () =>
+		eachRow(
+			[
+				['no name', ['remove']],
+				['two names', ['remove', 'a', 'b']],
+				['an option instead of a name', ['remove', '--all']],
+			],
+			async (_label, args) => {
+				reset();
+				expect(await command.run(args)).toBe(LEFTOVER_EXIT_USAGE);
 
-		expect(err.join('\n')).toContain('"remove" takes exactly one exact sandbox name');
-		expect(runtime.callsTo('remove')).toHaveLength(0);
-	});
+				expect(err.join('\n')).toContain('"remove" takes exactly one exact sandbox name');
+				expect(runtime.callsTo('remove')).toHaveLength(0);
+			}
+		));
 });
 
 describe('LeftoverCommand when the presence directory does not exist', () => {
 	// Without it every wrapper looks dead: a sandbox of a live run could be removed. Wrong directory = loud, never silent.
-	it.each([
-		{
-			label: 'remove is refused',
-			args: ['remove', 'flow-sbx-w1-run1'],
-			code: LEFTOVER_EXIT_FAILED,
-			removed: false,
-		},
-		{
-			label: 'remove --force goes ahead and warns',
-			args: ['remove', 'flow-sbx-w1-run1', '--force'],
-			code: LEFTOVER_EXIT_OK,
-			removed: true,
-		},
-		{ label: 'list warns', args: ['list'], code: LEFTOVER_EXIT_OK, removed: false },
-	])('$label', async ({ args, code, removed }) => {
-		await seed('flow-sbx-w1-run1');
-		presenceExists = false;
+	it('refuses a missing presence directory for remove, and warns for list and for remove --force (each case)', () =>
+		eachRow(
+			[
+				{
+					label: 'remove is refused',
+					args: ['remove', 'flow-sbx-w1-run1'],
+					code: LEFTOVER_EXIT_FAILED,
+					removed: false,
+				},
+				{
+					label: 'remove --force goes ahead and warns',
+					args: ['remove', 'flow-sbx-w1-run1', '--force'],
+					code: LEFTOVER_EXIT_OK,
+					removed: true,
+				},
+				{ label: 'list warns', args: ['list'], code: LEFTOVER_EXIT_OK, removed: false },
+			],
+			async ({ args, code, removed }) => {
+				reset();
+				await seed('flow-sbx-w1-run1');
+				presenceExists = false;
 
-		expect(await command.run(args)).toBe(code);
+				expect(await command.run(args)).toBe(code);
 
-		expect(err.join('\n')).toContain('/p/presence does not exist');
-		expect(err.join('\n')).toContain('FLOW_SANDBOX_PRESENCE_DIR');
-		expect(runtime.has('flow-sbx-w1-run1')).toBe(!removed);
-	});
+				expect(err.join('\n')).toContain('/p/presence does not exist');
+				expect(err.join('\n')).toContain('FLOW_SANDBOX_PRESENCE_DIR');
+				expect(runtime.has('flow-sbx-w1-run1')).toBe(!removed);
+			}
+		));
 });
 
 describe('LeftoverCommand usage', () => {

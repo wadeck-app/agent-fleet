@@ -10,6 +10,7 @@ import { RunMounts } from './RunMounts';
 import { SandboxCapacity } from './SandboxCapacity';
 import { SandboxError } from './SandboxError';
 import { SandboxLifecycle, type SandboxLifecycleOptions } from './SandboxLifecycle';
+import { eachRow } from './testing/EachRow';
 import { rejection } from './testing/ExpectedFailures';
 import { RecordingPresence } from './testing/RecordingPresence';
 import { RecordingSandboxLog } from './testing/RecordingSandboxLog';
@@ -74,17 +75,22 @@ function resetWorld(): void {
 	presence = new RecordingPresence();
 }
 
-beforeEach(() => {
-	root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flow-lifecycle-')));
-	fs.mkdirSync(path.join(root, 'ws'));
-	fs.mkdirSync(path.join(root, 'ws.meta'));
-	resetWorld();
+/** Mounts over the test's two directories, writing to the current log. */
+function newMounts(): void {
 	mounts = new RunMounts({
 		workspaceDir: path.join(root, 'ws'),
 		workspaceMetaDir: path.join(root, 'ws.meta'),
 		platform: process.platform,
 		log,
 	});
+}
+
+beforeEach(() => {
+	root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flow-lifecycle-')));
+	fs.mkdirSync(path.join(root, 'ws'));
+	fs.mkdirSync(path.join(root, 'ws.meta'));
+	resetWorld();
+	newMounts();
 });
 
 afterEach(() => {
@@ -181,60 +187,71 @@ describe('SandboxLifecycle creation', () => {
 	});
 
 	// sbx may have created the VM before create failed (a timeout says nothing): nothing may be left to block the retry.
-	it.each([
-		{ label: 'sbx created it, then create timed out', created: true, removeFails: false },
-		{ label: 'create failed before sbx created anything', created: false, removeFails: false },
-		{ label: 'sbx created it and the cleanup fails too', created: true, removeFails: true },
-	])('after a failed create ($label) cleans up what it can and never blames an earlier wrapper', async spec => {
-		const life = lifecycle();
-		runtime.failNext('create', new SandboxError('timeout', 'sbx create timed out'), {
-			createsAnyway: spec.created,
-		});
-		if (spec.removeFails) runtime.failNext('remove', new SandboxError('command-failed', 'daemon unreachable'));
+	it('after a failed create (each case) cleans up what it can and never blames an earlier wrapper', () =>
+		eachRow(
+			[
+				{ label: 'sbx created it, then create timed out', created: true, removeFails: false },
+				{ label: 'create failed before sbx created anything', created: false, removeFails: false },
+				{ label: 'sbx created it and the cleanup fails too', created: true, removeFails: true },
+			],
+			async spec => {
+				// Every row starts from a new world: the rows run in ONE test.
+				resetWorld();
+				newMounts();
+				const life = lifecycle();
+				runtime.failNext('create', new SandboxError('timeout', 'sbx create timed out'), {
+					createsAnyway: spec.created,
+				});
+				if (spec.removeFails)
+					runtime.failNext('remove', new SandboxError('command-failed', 'daemon unreachable'));
 
-		await expect(life.beginStep('run1', mounts)).rejects.toThrow('timed out');
+				await expect(life.beginStep('run1', mounts)).rejects.toThrow('timed out');
 
-		expect(count('remove')).toBe(spec.created ? 1 : 0);
-		expect(runtime.has(NAME)).toBe(spec.removeFails);
-		if (spec.removeFails) {
-			expect(log.text()).toContain(`leftover remove ${NAME}`);
-			const error = await rejection(life.beginStep('run1', mounts));
-			expect(error.kind).toBe('already-exists');
-			expect(error.message).toContain('failed and could not be cleaned up');
-			expect(error.message).not.toContain('earlier wrapper');
-		} else {
-			await life.beginStep('run1', mounts);
-			expect(life.current()?.status).toBe('running');
-		}
-	});
+				expect(count('remove')).toBe(spec.created ? 1 : 0);
+				expect(runtime.has(NAME)).toBe(spec.removeFails);
+				if (spec.removeFails) {
+					expect(log.text()).toContain(`leftover remove ${NAME}`);
+					const error = await rejection(life.beginStep('run1', mounts));
+					expect(error.kind).toBe('already-exists');
+					expect(error.message).toContain('failed and could not be cleaned up');
+					expect(error.message).not.toContain('earlier wrapper');
+				} else {
+					await life.beginStep('run1', mounts);
+					expect(life.current()?.status).toBe('running');
+				}
+			}
+		));
 });
 
 describe('SandboxLifecycle after a process kill', () => {
 	// The launcher ends a process by stopping the VM; the step goes on and may exec again (which restarts the VM).
-	it.each([
-		{ ending: 'the idle timer', end: (life: SandboxLifecycle) => advance(life, 5 * MINUTE) },
-		{ ending: 'the wrapper shutdown', end: (life: SandboxLifecycle) => life.shutdown() },
-	])(
-		'keeps the VM, the capacity slot and the idle timer accounted: kill, exec again, step end, $ending',
-		async spec => {
-			const capacity = new SandboxCapacity(runtime, 1);
-			const life = lifecycle({}, capacity);
-			await life.beginStep('run1', mounts);
+	it('keeps the VM, the capacity slot and the idle timer accounted: kill, exec again, step end, each case', () =>
+		eachRow(
+			[
+				{ ending: 'the idle timer', end: (life: SandboxLifecycle) => advance(life, 5 * MINUTE) },
+				{ ending: 'the wrapper shutdown', end: (life: SandboxLifecycle) => life.shutdown() },
+			],
+			async spec => {
+				resetWorld();
+				newMounts();
+				const capacity = new SandboxCapacity(runtime, 1);
+				const life = lifecycle({}, capacity);
+				await life.beginStep('run1', mounts);
 
-			await life.stopForKill('run1');
-			expect(runtime.state(NAME).status).toBe('stopped');
-			await life.ensureRunning('run1');
-			// What a later exec does to the VM, as sbx exec would: it runs.
-			expect(runtime.state(NAME).status).toBe('running');
-			expect(life.current()).toMatchObject({ status: 'running', stepActive: true });
-			await life.endStep('run1');
-			await spec.end(life);
+				await life.stopForKill('run1');
+				expect(runtime.state(NAME).status).toBe('stopped');
+				await life.ensureRunning('run1');
+				// What a later exec does to the VM, as sbx exec would: it runs.
+				expect(runtime.state(NAME).status).toBe('running');
+				expect(life.current()).toMatchObject({ status: 'running', stepActive: true });
+				await life.endStep('run1');
+				await spec.end(life);
 
-			expect(runtime.state(NAME).status).toBe('stopped');
-			// The slot is free again: another sandbox can run under a cap of 1.
-			await expect(capacity.acquire('flow-sbx-w1-other')).resolves.toBeUndefined();
-		}
-	);
+				expect(runtime.state(NAME).status).toBe('stopped');
+				// The slot is free again: another sandbox can run under a cap of 1.
+				await expect(capacity.acquire('flow-sbx-w1-other')).resolves.toBeUndefined();
+			}
+		));
 });
 
 describe('SandboxLifecycle options', () => {

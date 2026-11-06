@@ -4,6 +4,7 @@ import { FakeClock } from './FakeClock';
 import { FakeSandboxRuntime } from './FakeSandboxRuntime';
 import { SandboxCapacity } from './SandboxCapacity';
 import { SandboxError } from './SandboxError';
+import { eachRow } from './testing/EachRow';
 import { rejection } from './testing/ExpectedFailures';
 
 async function createRunning(runtime: FakeSandboxRuntime, name: string): Promise<void> {
@@ -75,11 +76,12 @@ describe('SandboxCapacity', () => {
 		expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected']);
 	});
 
-	it.each([[0], [-1], [1.5], [Number.NaN]])('refuses a cap of %s', cap => {
-		expect(() => new SandboxCapacity(new FakeSandboxRuntime({ clock: new FakeClock() }), cap)).toThrow(
-			'maxConcurrentSandboxes must be a whole number of at least 1'
-		);
-	});
+	it('refuses a cap of (each case)', () =>
+		eachRow([[0], [-1], [1.5], [Number.NaN]], cap => {
+			expect(() => new SandboxCapacity(new FakeSandboxRuntime({ clock: new FakeClock() }), cap)).toThrow(
+				'maxConcurrentSandboxes must be a whole number of at least 1'
+			);
+		}));
 
 	it('propagates a failure of the listing instead of guessing', async () => {
 		const runtime = new FakeSandboxRuntime({ clock: new FakeClock() });

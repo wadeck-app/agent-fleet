@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { FakeClock } from './FakeClock';
 import { StaleTempSweep } from './StaleTempSweep';
+import { eachRow } from './testing/EachRow';
 import { RecordingPresence } from './testing/RecordingPresence';
 import { RecordingSandboxLog } from './testing/RecordingSandboxLog';
 
@@ -30,68 +31,80 @@ function directoryAged(name: string, ageHours: number): void {
 }
 
 describe('StaleTempSweep (secret and env directories a crashed wrapper left in the temp directory)', () => {
-	it.each([
-		{
-			label: 'a secrets directory of a dead wrapper, past the age',
-			name: 'flow-sbx-exec-secrets-w1-aB3dE9',
-			age: 25,
-			live: [],
-			removed: true,
-		},
-		{
-			label: 'a harness secrets directory of a dead wrapper',
-			name: 'flow-sbx-harness-secrets-w1-aB3dE9',
-			age: 25,
-			live: [],
-			removed: true,
-		},
-		{
-			label: 'a secrets directory of a LIVE wrapper',
-			name: 'flow-sbx-exec-secrets-w1-aB3dE9',
-			age: 25,
-			live: ['w1'],
-			removed: false,
-		},
-		{
-			label: 'a secrets directory of a dead wrapper, still young',
-			name: 'flow-sbx-exec-secrets-w1-aB3dE9',
-			age: 1,
-			live: [],
-			removed: false,
-		},
-		{
-			label: 'an env directory when no wrapper is alive',
-			name: 'flow-sandbox-env-aB3dE9',
-			age: 30,
-			live: [],
-			removed: true,
-		},
-		{
-			label: 'an env directory while some wrapper is alive (its step may run for hours)',
-			name: 'flow-sandbox-env-aB3dE9',
-			age: 30,
-			live: ['w9'],
-			removed: false,
-		},
-		{
-			label: 'a directory that merely looks similar',
-			name: 'flow-sandbox-environment',
-			age: 99,
-			live: [],
-			removed: false,
-		},
-	])('$label', ({ name, age, live, removed }) => {
-		directoryAged(name, age);
-		const presence = new RecordingPresence();
-		for (const id of live) presence.aliveWrappers.add(id);
-		const log = new RecordingSandboxLog();
+	it('removes only the secret and env directories it can prove dead, and keeps the others (each case)', () =>
+		eachRow(
+			[
+				{
+					label: 'a secrets directory of a dead wrapper, past the age',
+					name: 'flow-sbx-exec-secrets-w1-aB3dE9',
+					age: 25,
+					live: [],
+					removed: true,
+				},
+				{
+					label: 'a harness secrets directory of a dead wrapper',
+					name: 'flow-sbx-harness-secrets-w1-aB3dE9',
+					age: 25,
+					live: [],
+					removed: true,
+				},
+				{
+					label: 'a secrets directory of a LIVE wrapper',
+					name: 'flow-sbx-exec-secrets-w1-aB3dE9',
+					age: 25,
+					live: ['w1'],
+					removed: false,
+				},
+				{
+					label: 'a secrets directory of a dead wrapper, still young',
+					name: 'flow-sbx-exec-secrets-w1-aB3dE9',
+					age: 1,
+					live: [],
+					removed: false,
+				},
+				{
+					label: 'an env directory when no wrapper is alive',
+					name: 'flow-sandbox-env-aB3dE9',
+					age: 30,
+					live: [],
+					removed: true,
+				},
+				{
+					label: 'an env directory while some wrapper is alive (its step may run for hours)',
+					name: 'flow-sandbox-env-aB3dE9',
+					age: 30,
+					live: ['w9'],
+					removed: false,
+				},
+				{
+					label: 'a directory that merely looks similar',
+					name: 'flow-sandbox-environment',
+					age: 99,
+					live: [],
+					removed: false,
+				},
+			],
+			({ name, age, live, removed }) => {
+				// Every row works in its own empty temp directory (the rows run in ONE test: nothing may leak from one to the next).
+				fs.rmSync(temp, { recursive: true, force: true });
+				temp = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sweep-row-'));
+				directoryAged(name, age);
+				const presence = new RecordingPresence();
+				for (const id of live) presence.aliveWrappers.add(id);
+				const log = new RecordingSandboxLog();
 
-		const result = new StaleTempSweep({ tempDirectory: temp, presence, clock: new FakeClock(NOW), log }).run();
+				const result = new StaleTempSweep({
+					tempDirectory: temp,
+					presence,
+					clock: new FakeClock(NOW),
+					log,
+				}).run();
 
-		expect(fs.existsSync(path.join(temp, name))).toBe(!removed);
-		expect(result).toEqual(removed ? [name] : []);
-		if (removed) expect(log.text()).toContain(`removed stale ${name}`);
-	});
+				expect(fs.existsSync(path.join(temp, name))).toBe(!removed);
+				expect(result).toEqual(removed ? [name] : []);
+				if (removed) expect(log.text()).toContain(`removed stale ${name}`);
+			}
+		));
 
 	it('removes nothing that is a file or a link, and never throws when the temp directory is unreadable', () => {
 		fs.writeFileSync(path.join(temp, 'flow-sandbox-env-aB3dE9'), 'a file');

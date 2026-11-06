@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MAX_TIMER_DELAY_MS, SystemScheduler } from './SystemScheduler';
+import { eachRow } from './testing/EachRow';
 
 describe('SystemScheduler', () => {
 	beforeEach(() => {
@@ -34,10 +35,8 @@ describe('SystemScheduler', () => {
 		expect(callback).not.toHaveBeenCalled();
 	});
 
-	it.each([[-1], [Number.NaN], [Number.POSITIVE_INFINITY], [MAX_TIMER_DELAY_MS + 1]])(
-		'refuses the delay %s instead of letting setTimeout fire at once',
-		delay => {
+	it('refuses the delay (each case) instead of letting setTimeout fire at once', () =>
+		eachRow([[-1], [Number.NaN], [Number.POSITIVE_INFINITY], [MAX_TIMER_DELAY_MS + 1]], delay => {
 			expect(() => new SystemScheduler().schedule(delay, () => undefined)).toThrow(RangeError);
-		}
-	);
+		}));
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { PrerequisiteReport } from '../SbxPrerequisiteCheck';
+import { eachRow } from '../testing/EachRow';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { SbxTemplateListing, WrapperPreflight } from './WrapperPreflight';
 
@@ -24,64 +25,72 @@ const CONFIG = {
 };
 
 describe('SbxTemplateListing', () => {
-	it.each([
-		{ tag: 'flow-sandbox:m7', present: true },
-		{ tag: 'flow-sandbox:m8', present: false },
-		{ tag: 'sandbox:m7', present: false },
-		{ tag: 'flow-sandbox:m', present: false },
-	])('finds $tag: $present', ({ tag, present }) => {
-		expect(SbxTemplateListing.has(LISTING, tag)).toBe(present);
-	});
+	it('finds a template tag in the listing (each case)', () =>
+		eachRow(
+			[
+				{ tag: 'flow-sandbox:m7', present: true },
+				{ tag: 'flow-sandbox:m8', present: false },
+				{ tag: 'sandbox:m7', present: false },
+				{ tag: 'flow-sandbox:m', present: false },
+			],
+			({ tag, present }) => {
+				expect(SbxTemplateListing.has(LISTING, tag)).toBe(present);
+			}
+		));
 });
 
 describe('WrapperPreflight (what "flow-sandbox preflight" checks before a worker is asked for)', () => {
-	it.each([
-		{
-			label: 'a machine that is ready',
-			report: OK,
-			listing: () => Promise.resolve(LISTING),
-			config: CONFIG,
-			outcome: undefined,
-		},
-		{
-			label: 'no image configured: the template list is not even read',
-			report: OK,
-			listing: () => Promise.reject(new Error('must not be read')),
-			config: { ...CONFIG, image: undefined },
-			outcome: undefined,
-		},
-		{
-			label: 'sbx not signed in',
-			report: BROKEN,
-			listing: () => Promise.resolve(LISTING),
-			config: CONFIG,
-			outcome: 'sbx login',
-		},
-		{
-			label: 'an image this machine does not know',
-			report: OK,
-			listing: () => Promise.resolve(LISTING),
-			config: { ...CONFIG, image: 'flow-sandbox:m9' },
-			outcome: 'build-image.mjs',
-		},
-		{
-			label: 'a memory below the sbx minimum (the same options parser as the package)',
-			report: OK,
-			listing: () => Promise.resolve(LISTING),
-			config: { ...CONFIG, memory: '128m' },
-			outcome: 'at least 512m',
-		},
-	])('$label', async ({ report, listing, config, outcome }) => {
-		const log = new RecordingSandboxLog();
-		const preflight = new WrapperPreflight({
-			prerequisites: () => Promise.resolve(report),
-			templateListing: listing,
-			log,
-		});
+	it('checks options, sbx and the image before a worker is asked for (each case)', () =>
+		eachRow(
+			[
+				{
+					label: 'a machine that is ready',
+					report: OK,
+					listing: () => Promise.resolve(LISTING),
+					config: CONFIG,
+					outcome: undefined,
+				},
+				{
+					label: 'no image configured: the template list is not even read',
+					report: OK,
+					listing: () => Promise.reject(new Error('must not be read')),
+					config: { ...CONFIG, image: undefined },
+					outcome: undefined,
+				},
+				{
+					label: 'sbx not signed in',
+					report: BROKEN,
+					listing: () => Promise.resolve(LISTING),
+					config: CONFIG,
+					outcome: 'sbx login',
+				},
+				{
+					label: 'an image this machine does not know',
+					report: OK,
+					listing: () => Promise.resolve(LISTING),
+					config: { ...CONFIG, image: 'flow-sandbox:m9' },
+					outcome: 'build-image.mjs',
+				},
+				{
+					label: 'a memory below the sbx minimum (the same options parser as the package)',
+					report: OK,
+					listing: () => Promise.resolve(LISTING),
+					config: { ...CONFIG, memory: '128m' },
+					outcome: 'at least 512m',
+				},
+			],
+			async ({ report, listing, config, outcome }) => {
+				const log = new RecordingSandboxLog();
+				const preflight = new WrapperPreflight({
+					prerequisites: () => Promise.resolve(report),
+					templateListing: listing,
+					log,
+				});
 
-		if (outcome === undefined) await expect(preflight.run(config)).resolves.toBeUndefined();
-		else await expect(preflight.run(config)).rejects.toThrow(outcome);
-	});
+				if (outcome === undefined) await expect(preflight.run(config)).resolves.toBeUndefined();
+				else await expect(preflight.run(config)).rejects.toThrow(outcome);
+			}
+		));
 
 	it('only warns when the template list itself cannot be read (best effort), saying why', async () => {
 		const log = new RecordingSandboxLog();

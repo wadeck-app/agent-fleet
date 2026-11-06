@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { SbxBinaryLocator, type SbxBinaryLocatorOptions } from './SbxBinaryLocator';
+import { eachRow } from './testing/EachRow';
 import { failure } from './testing/ExpectedFailures';
 
 const NODE = 'node-for-tests';
@@ -27,13 +28,14 @@ describe('SbxBinaryLocator explicit configuration', () => {
 		expect(binary).toEqual({ command: 'C:\\tools\\sbx.exe', prefixArgs: [], displayPath: 'C:\\tools\\sbx.exe' });
 	});
 
-	it.each([['mock.mjs'], ['mock.js'], ['mock.cjs'], ['MOCK.MJS']])('runs the script %s through node', script => {
-		const full = `/tmp/${script}`;
+	it('runs the script (each case) through node', () =>
+		eachRow([['mock.mjs'], ['mock.js'], ['mock.cjs'], ['MOCK.MJS']], script => {
+			const full = `/tmp/${script}`;
 
-		const binary = locator([full], { binaryPath: full, platform: 'linux' }).locate();
+			const binary = locator([full], { binaryPath: full, platform: 'linux' }).locate();
 
-		expect(binary).toEqual({ command: NODE, prefixArgs: [full], displayPath: full });
-	});
+			expect(binary).toEqual({ command: NODE, prefixArgs: [full], displayPath: full });
+		}));
 
 	it('prefers the option over SBX_MOCK_PATH over SBX_PATH', () => {
 		const existing = ['/a/option', '/b/mock', '/c/path'];
@@ -57,23 +59,24 @@ describe('SbxBinaryLocator explicit configuration', () => {
 		expect(binary.displayPath).toBe(WINDOWS_DEFAULT);
 	});
 
-	it.each([
-		['the "binaryPath" option', { binaryPath: '/nope/sbx' }],
-		['SBX_MOCK_PATH', { env: { SBX_MOCK_PATH: '/nope/sbx' } }],
-		['SBX_PATH', { env: { SBX_PATH: '/nope/sbx' } }],
-	])(
-		'fails when the file configured through %s does not exist, and does not fall back to another sbx',
-		(source, options) => {
-			const error = failure(() =>
-				locator([WINDOWS_DEFAULT, '/usr/bin/sbx'], { ...options, platform: 'linux' }).locate()
-			);
+	it('fails when the file configured through (each case) does not exist, and does not fall back to another sbx', () =>
+		eachRow(
+			[
+				['the "binaryPath" option', { binaryPath: '/nope/sbx' }],
+				['SBX_MOCK_PATH', { env: { SBX_MOCK_PATH: '/nope/sbx' } }],
+				['SBX_PATH', { env: { SBX_PATH: '/nope/sbx' } }],
+			],
+			(source, options) => {
+				const error = failure(() =>
+					locator([WINDOWS_DEFAULT, '/usr/bin/sbx'], { ...options, platform: 'linux' }).locate()
+				);
 
-			expect(error.kind).toBe('binary-missing');
-			expect(error.message).toBe(
-				`The sbx executable configured through ${source} does not exist: "/nope/sbx". Fix the path or remove the setting to use the default location.`
-			);
-		}
-	);
+				expect(error.kind).toBe('binary-missing');
+				expect(error.message).toBe(
+					`The sbx executable configured through ${source} does not exist: "/nope/sbx". Fix the path or remove the setting to use the default location.`
+				);
+			}
+		));
 
 	it('treats a directory as missing with the real file system check', () => {
 		const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'locator-dir-'));

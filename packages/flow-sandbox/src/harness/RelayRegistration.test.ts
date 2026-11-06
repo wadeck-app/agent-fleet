@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { eachRow } from '../testing/EachRow';
 import { RelayRegistration, type RelayRegistrationOptions } from './RelayRegistration';
 
 const OPTIONS: RelayRegistrationOptions = {
@@ -45,10 +46,14 @@ describe('RelayRegistration', () => {
 		expect(() => new RelayRegistration({ ...OPTIONS, attachedProjectIds: [] })).toThrow('--project-id');
 	});
 
-	it.each([
-		['authToken', { authToken: '' }],
-		['sourceId', { sourceId: '' }],
-	])('requires %s and names the source command', (_name, override) => {
-		expect(() => new RelayRegistration({ ...OPTIONS, ...override })).toThrow('built-in:command');
-	});
+	it('requires (each case) and names the source command', () =>
+		eachRow(
+			[
+				['authToken', { authToken: '' }],
+				['sourceId', { sourceId: '' }],
+			],
+			(_name, override) => {
+				expect(() => new RelayRegistration({ ...OPTIONS, ...override })).toThrow('built-in:command');
+			}
+		));
 });

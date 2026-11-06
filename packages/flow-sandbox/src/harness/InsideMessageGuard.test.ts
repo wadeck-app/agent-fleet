@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { RunMounts } from '../RunMounts';
+import { eachRow } from '../testing/EachRow';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { ASSIGNMENT_SCOPED_TYPES, type ActiveAssignment, type JsonObject, MAX_FRAME_BYTES } from './HarnessMessages';
 import { type InsideDecision, InsideMessageGuard } from './InsideMessageGuard';
@@ -54,14 +55,21 @@ function forwarded(decision: InsideDecision): JsonObject {
 
 // What the worker adds when it fits a result to the frame limit must reach the daemon (the retry decision depends on it).
 describe('InsideMessageGuard: the fields of a fitted result', () => {
-	it.each([
-		{ type: 'step_completed', extra: { truncated: [{ field: 'io.stdout', originalBytes: 9, keptBytes: 3 }] } },
-		{ type: 'step_failed', extra: { error: 'too big', origin: 'engine' } },
-	])('keeps them on a $type', ({ type, extra }) => {
-		const decision = guard().handle(scoped(type, { output: {}, ...extra }));
+	it('keeps the fields of a fitted result (each case)', () =>
+		eachRow(
+			[
+				{
+					type: 'step_completed',
+					extra: { truncated: [{ field: 'io.stdout', originalBytes: 9, keptBytes: 3 }] },
+				},
+				{ type: 'step_failed', extra: { error: 'too big', origin: 'engine' } },
+			],
+			({ type, extra }) => {
+				const decision = guard().handle(scoped(type, { output: {}, ...extra }));
 
-		expect(forwarded(decision)).toMatchObject(extra);
-	});
+				expect(forwarded(decision)).toMatchObject(extra);
+			}
+		));
 });
 
 describe('InsideMessageGuard: the allowed messages', () => {

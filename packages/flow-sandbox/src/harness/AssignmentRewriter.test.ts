@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
+import { eachRow } from '../testing/EachRow';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { AssignmentRewriter } from './AssignmentRewriter';
 import type { JsonObject } from './HarnessMessages';
@@ -155,18 +156,23 @@ describe('AssignmentRewriter environment', () => {
 });
 
 describe('AssignmentRewriter validation', () => {
-	it.each([['user_intervention'], ['subflow'], ['nonsense']])('refuses a %s step with the reason', type => {
-		expect(() => rewriter().rewrite(assign({ step: { type } }))).toThrow(/only "model" and "script" steps/);
-	});
+	it('refuses a (each case) step with the reason', () =>
+		eachRow([['user_intervention'], ['subflow'], ['nonsense']], type => {
+			expect(() => rewriter().rewrite(assign({ step: { type } }))).toThrow(/only "model" and "script" steps/);
+		}));
 
-	it.each([
-		['not an object', 'text'],
-		['another type', { type: 'idle' }],
-		['no assignmentId', { type: 'assign', stepId: 's', stepConfig: {}, executionContext: {} }],
-		['no stepConfig', { type: 'assign', assignmentId: 'a', stepId: 's', executionContext: {} }],
-	])('refuses a message that is %s', (_name, raw) => {
-		expect(() => rewriter().rewrite(raw)).toThrow(SandboxError);
-	});
+	it('refuses a message that is (each case)', () =>
+		eachRow(
+			[
+				['not an object', 'text'],
+				['another type', { type: 'idle' }],
+				['no assignmentId', { type: 'assign', stepId: 's', stepConfig: {}, executionContext: {} }],
+				['no stepConfig', { type: 'assign', assignmentId: 'a', stepId: 's', executionContext: {} }],
+			],
+			(_name, raw) => {
+				expect(() => rewriter().rewrite(raw)).toThrow(SandboxError);
+			}
+		));
 
 	it('refuses an execution context without workspaceDir, naming the field', () => {
 		const message = assign();

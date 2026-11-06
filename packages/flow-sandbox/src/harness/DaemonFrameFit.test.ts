@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { eachRow } from '../testing/EachRow';
 import { DaemonFrameFit } from './DaemonFrameFit';
 import type { JsonObject } from './HarnessMessages';
 
@@ -33,26 +34,30 @@ describe('DaemonFrameFit (the same shrinking as flow-cli Worker.ts)', () => {
 		expect((fitted['truncated'] as JsonObject[]).map(cut => cut['field'])).toContain('io.stdout');
 	});
 
-	it.each([
-		{
-			label: 'a declared output that cannot fit fails the step for good, keeping the attempt cost',
-			message: { type: 'step_completed', ...HEADER, output: { answer: BIG }, meta: { cost: 3 } },
-			declared: ['answer'],
-			expected: { type: 'step_failed', stepId: 's1', origin: 'engine', meta: { cost: 3 } },
-		},
-		{
-			label: 'an oversized step_failed keeps its error and drops the rest',
-			message: { type: 'step_failed', ...HEADER, error: 'boom', stdout: BIG },
-			declared: [],
-			expected: { type: 'step_failed', stepId: 's1' },
-		},
-	])('$label', ({ message, declared, expected }) => {
-		const fitted = DaemonFrameFit.fit(message, new Set(declared));
+	it('fits an oversized frame like flow does, or fails the step for good (each case)', () =>
+		eachRow(
+			[
+				{
+					label: 'a declared output that cannot fit fails the step for good, keeping the attempt cost',
+					message: { type: 'step_completed', ...HEADER, output: { answer: BIG }, meta: { cost: 3 } },
+					declared: ['answer'],
+					expected: { type: 'step_failed', stepId: 's1', origin: 'engine', meta: { cost: 3 } },
+				},
+				{
+					label: 'an oversized step_failed keeps its error and drops the rest',
+					message: { type: 'step_failed', ...HEADER, error: 'boom', stdout: BIG },
+					declared: [],
+					expected: { type: 'step_failed', stepId: 's1' },
+				},
+			],
+			({ message, declared, expected }) => {
+				const fitted = DaemonFrameFit.fit(message, new Set(declared));
 
-		expect(bytes(fitted)).toBeLessThanOrEqual(LIMIT);
-		expect(fitted).toMatchObject(expected);
-		expect(String(fitted['error'])).toContain(declared.length > 0 ? 'cannot be sent' : 'boom');
-	});
+				expect(bytes(fitted)).toBeLessThanOrEqual(LIMIT);
+				expect(fitted).toMatchObject(expected);
+				expect(String(fitted['error'])).toContain(declared.length > 0 ? 'cannot be sent' : 'boom');
+			}
+		));
 
 	it('throws, naming the type and the limit, for any other oversized frame', () => {
 		expect(() => DaemonFrameFit.fit({ type: 'ready', pad: BIG }, new Set())).toThrow(

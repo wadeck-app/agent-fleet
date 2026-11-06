@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { eachRow } from '../testing/EachRow';
 import { HarnessConfigParser } from './HarnessConfig';
 
 const ENV: NodeJS.ProcessEnv = {
@@ -115,73 +116,83 @@ describe('HarnessConfigParser', () => {
 		expect(config.workerToken).toBe('tok');
 	});
 
-	it.each(['FLOW_DAEMON_WS_URL', 'FLOW_WORKER_SOURCE_ID', 'FLOW_WORKER_TOKEN'])(
-		'names %s and the way to start the harness when it is missing',
-		name => {
+	it('names (each case) and the way to start the harness when it is missing', () =>
+		eachRow(['FLOW_DAEMON_WS_URL', 'FLOW_WORKER_SOURCE_ID', 'FLOW_WORKER_TOKEN'], name => {
 			const env = { ...ENV };
 			delete env[name];
 
 			expect(() => parse(BASE, env)).toThrow(new RegExp(`${name} is not set[\\s\\S]*built-in:command`));
-		}
-	);
+		}));
 
-	it.each([
-		['no project id', ['--profile', 'claude=p', '--region', 'us-east-1'], '--project-id is required'],
-		['no profile', ['--project-id', 'a', '--region', 'us-east-1'], '--profile'],
-		[
-			'a profile without a host profile',
-			['--project-id', 'a', '--profile', 'claude=', '--region', 'us-east-1'],
-			'--profile',
-		],
-		['no region', ['--project-id', 'a', '--profile', 'claude=p'], '--region is required'],
-		['a bad region', [...BASE.slice(0, 4), '--region', 'nowhere'], 'not valid'],
-		['a bad wrapper id', [...BASE, '--wrapper-id', 'Bad_Id'], '--wrapper-id'],
-		['a bad pull', [...BASE, '--pull', 'sometimes'], '--pull'],
-		['a zero cpus', [...BASE, '--cpus', '0'], '--cpus'],
-		['a fractional cpus', [...BASE, '--cpus', '1.5'], '--cpus must be a whole number'],
-		['a fractional max-sandboxes', [...BASE, '--max-sandboxes', '1.5'], '--max-sandboxes must be a whole number'],
-		['idle minutes that are too long', [...BASE, '--idle-minutes', '99999'], '--idle-minutes'],
-		['a model env without a value', [...BASE, '--model-env', 'NOVALUE'], '--model-env'],
-		['an unknown option', [...BASE, '--cpu', '2'], 'Unknown option'],
-		[
-			'an extra allowed host without a port',
-			[...BASE, '--extra-allowed-host', 'example.org'],
-			'invalid --extra-allowed-host',
-		],
-		[
-			'an overbroad wildcard as extra allowed host',
-			[...BASE, '--extra-allowed-host', '*.com:443'],
-			'would open every host under "com"',
-		],
-		['a positional argument', [...BASE, 'stray'], 'Unexpected argument'],
-	])('refuses %s with the usage', (_name, argv, fragment) => {
-		expect(() => parse(argv)).toThrow(fragment);
-		expect(() => parse(argv)).toThrow('Usage: node');
-	});
+	it('refuses (each case) with the usage', () =>
+		eachRow(
+			[
+				['no project id', ['--profile', 'claude=p', '--region', 'us-east-1'], '--project-id is required'],
+				['no profile', ['--project-id', 'a', '--region', 'us-east-1'], '--profile'],
+				[
+					'a profile without a host profile',
+					['--project-id', 'a', '--profile', 'claude=', '--region', 'us-east-1'],
+					'--profile',
+				],
+				['no region', ['--project-id', 'a', '--profile', 'claude=p'], '--region is required'],
+				['a bad region', [...BASE.slice(0, 4), '--region', 'nowhere'], 'not valid'],
+				['a bad wrapper id', [...BASE, '--wrapper-id', 'Bad_Id'], '--wrapper-id'],
+				['a bad pull', [...BASE, '--pull', 'sometimes'], '--pull'],
+				['a zero cpus', [...BASE, '--cpus', '0'], '--cpus'],
+				['a fractional cpus', [...BASE, '--cpus', '1.5'], '--cpus must be a whole number'],
+				[
+					'a fractional max-sandboxes',
+					[...BASE, '--max-sandboxes', '1.5'],
+					'--max-sandboxes must be a whole number',
+				],
+				['idle minutes that are too long', [...BASE, '--idle-minutes', '99999'], '--idle-minutes'],
+				['a model env without a value', [...BASE, '--model-env', 'NOVALUE'], '--model-env'],
+				['an unknown option', [...BASE, '--cpu', '2'], 'Unknown option'],
+				[
+					'an extra allowed host without a port',
+					[...BASE, '--extra-allowed-host', 'example.org'],
+					'invalid --extra-allowed-host',
+				],
+				[
+					'an overbroad wildcard as extra allowed host',
+					[...BASE, '--extra-allowed-host', '*.com:443'],
+					'would open every host under "com"',
+				],
+				['a positional argument', [...BASE, 'stray'], 'Unexpected argument'],
+			],
+			(_name, argv, fragment) => {
+				expect(() => parse(argv)).toThrow(fragment);
+				expect(() => parse(argv)).toThrow('Usage: node');
+			}
+		));
 
 	// One resolution for the wrappers and the leftover CLI (PresenceDirectory): option, then FLOW_SANDBOX_PRESENCE_DIR, then default.
-	it.each([
-		{
-			label: 'the option wins over the variable',
-			argv: ['--presence-dir', '/from-option'],
-			env: { FLOW_SANDBOX_PRESENCE_DIR: '/from-env' },
-			expected: '/from-option',
-		},
-		{
-			label: 'the variable wins over the default',
-			argv: [],
-			env: { FLOW_SANDBOX_PRESENCE_DIR: '/from-env' },
-			expected: '/from-env',
-		},
-		{
-			label: 'an empty variable counts as unset',
-			argv: [],
-			env: { FLOW_SANDBOX_PRESENCE_DIR: '' },
-			expected: '/presence',
-		},
-	])('presence directory: $label', ({ argv, env, expected }) => {
-		expect(parse([...BASE, ...argv], { ...ENV, ...env }).presenceDirectory).toBe(path.resolve(expected));
-	});
+	it('presence directory (each case)', () =>
+		eachRow(
+			[
+				{
+					label: 'the option wins over the variable',
+					argv: ['--presence-dir', '/from-option'],
+					env: { FLOW_SANDBOX_PRESENCE_DIR: '/from-env' },
+					expected: '/from-option',
+				},
+				{
+					label: 'the variable wins over the default',
+					argv: [],
+					env: { FLOW_SANDBOX_PRESENCE_DIR: '/from-env' },
+					expected: '/from-env',
+				},
+				{
+					label: 'an empty variable counts as unset',
+					argv: [],
+					env: { FLOW_SANDBOX_PRESENCE_DIR: '' },
+					expected: '/presence',
+				},
+			],
+			({ argv, env, expected }) => {
+				expect(parse([...BASE, ...argv], { ...ENV, ...env }).presenceDirectory).toBe(path.resolve(expected));
+			}
+		));
 
 	it('names the script the operator runs in the usage and in a missing-variable error', () => {
 		const exec = new HarnessConfigParser('ExecWrapper.mjs');

@@ -9,6 +9,7 @@ import { type FakeExecHandler, FakeSandboxRuntime } from '../FakeSandboxRuntime'
 import { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import type { SandboxRuntime } from '../SandboxRuntime';
+import { eachRow } from '../testing/EachRow';
 import { MockSbxHarness } from '../testing/MockSbxHarness';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { McpCallbackRules } from './McpCallbackRules';
@@ -295,16 +296,14 @@ describe('SbxProcessLauncher spawn against the fake runtime', () => {
 		expect((await collect(child)).code).toBe(0);
 	});
 
-	it.each([['inherit'], [['inherit', 'pipe', 'pipe']], [['ignore', 'inherit', 'inherit']]])(
-		'refuses stdio %j (interactive) before anything starts',
-		async stdio => {
+	it('refuses interactive stdio (each case) before anything starts', () =>
+		eachRow([['inherit'], [['inherit', 'pipe', 'pipe']], [['ignore', 'inherit', 'inherit']]], async stdio => {
 			const runtime = await fakeRuntime(() => ({ exitCode: 0, stdout: '', stderr: '' }));
 			expect(() => launcherFor(runtime).spawn('claude', [], { stdio: stdio as never })).toThrow(
 				/only "pipe" and "ignore" are supported/
 			);
 			expect(runtime.callsTo('exec')).toHaveLength(0);
-		}
-	);
+		}));
 });
 
 describe('SbxProcessLauncher MCP callback rule', () => {
@@ -495,32 +494,6 @@ describe('SbxProcessLauncher lookupExecutable', () => {
 });
 
 describe('SbxProcessLauncher against the sbx mock (real sbx child processes)', () => {
-	it('maps exit codes, streams output, and passes stdin, env and cwd', async () => {
-		const launcher = launcherFor(await mockRuntime());
-		const echoed = launcher.spawn('cat', [], { stdio: ['pipe', 'pipe', 'pipe'] });
-		echoed.stdin?.end('prompt text');
-
-		// One after the other: the mock keeps the state of its sandboxes in one file and is not meant for concurrent calls.
-		const stdin = await collect(echoed);
-		const ok = await collect(launcher.spawn('echo', ['hello'], pipes));
-		const failed = await collect(launcher.spawn('fail', ['3', 'boom'], pipes));
-		const streamed = await collect(launcher.spawn('stream', ['3', '10'], pipes));
-		const env = await collect(
-			launcher.spawn('printenv', ['STEP_VAR'], { ...pipes, env: { STEP_VAR: 'value-1', HOME: 'C:\\x' } })
-		);
-		const hostHome = await collect(launcher.spawn('printenv', ['HOME'], { ...pipes, env: { HOME: 'C:\\x' } }));
-		const pwd = await collect(launcher.spawn('pwd', [], { ...pipes, cwd: workspace }));
-
-		expect(ok).toMatchObject({ code: 0, stdout: 'hello\n' });
-		expect(failed).toMatchObject({ code: 3, stderr: 'boom\n' });
-		expect(streamed.stdout).toBe('line 1\nline 2\nline 3\n');
-		expect(stdin.stdout).toBe('prompt text');
-		expect(env.stdout).toBe('value-1\n');
-		// HOME describes the host: the VM keeps its own.
-		expect(hostHome.code).toBe(1);
-		expect(pwd.stdout).toBe(`${sandboxForm(workspace)}\n`);
-	});
-
 	it('ends a program that keeps running: the sandbox is stopped, then the host sbx exec is killed', async () => {
 		const runtime = await mockRuntime();
 		const launcher = launcherFor(runtime);

@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { ImageBuildPlan } from './ImageBuildPlan';
+import { eachRow } from './testing/EachRow';
 
 const roots: string[] = [];
 
@@ -29,26 +30,36 @@ describe('ImageBuildPlan', () => {
 		for (const command of commands) expect(command).not.toContain('-c');
 	});
 
-	it.each([
-		{
-			label: 'the folder does not exist',
-			present: undefined,
-			missing: ['worker.cjs', 'mcp-server.cjs', 'inner-bridge.cjs'],
-		},
-		{ label: 'a bundle is missing', present: ['worker.cjs', 'mcp-server.cjs'], missing: ['inner-bridge.cjs'] },
-	])('refuses a build when $label, pointing to BuildInnerBundles.mjs', ({ present, missing }) => {
-		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-image-plan-'));
-		roots.push(root);
-		const folder = path.join(root, 'opt-flow');
-		if (present !== undefined) {
-			fs.mkdirSync(folder);
-			for (const file of present) fs.writeFileSync(path.join(folder, file), '//');
-		}
+	it('refuses a build when (each case), pointing to BuildInnerBundles.mjs', () =>
+		eachRow(
+			[
+				{
+					label: 'the folder does not exist',
+					present: undefined,
+					missing: ['worker.cjs', 'mcp-server.cjs', 'inner-bridge.cjs'],
+				},
+				{
+					label: 'a bundle is missing',
+					present: ['worker.cjs', 'mcp-server.cjs'],
+					missing: ['inner-bridge.cjs'],
+				},
+			],
+			({ present, missing }) => {
+				const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-image-plan-'));
+				roots.push(root);
+				const folder = path.join(root, 'opt-flow');
+				if (present !== undefined) {
+					fs.mkdirSync(folder);
+					for (const file of present) fs.writeFileSync(path.join(folder, file), '//');
+				}
 
-		expect(() => ImageBuildPlan.assertBundles(folder)).toThrow(
-			new RegExp(`${missing.join(', ')}.*node --import tsx packages/flow-sandbox/scripts/BuildInnerBundles\\.mjs`)
-		);
-	});
+				expect(() => ImageBuildPlan.assertBundles(folder)).toThrow(
+					new RegExp(
+						`${missing.join(', ')}.*node --import tsx packages/flow-sandbox/scripts/BuildInnerBundles\\.mjs`
+					)
+				);
+			}
+		));
 
 	it('accepts a folder with the three bundles', () => {
 		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-image-plan-'));

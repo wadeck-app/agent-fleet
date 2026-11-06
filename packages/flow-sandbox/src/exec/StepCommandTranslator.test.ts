@@ -7,6 +7,7 @@ import { FakeClock } from '../FakeClock';
 import { FakeSandboxRuntime } from '../FakeSandboxRuntime';
 import { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
+import { eachRow } from '../testing/EachRow';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { StepCommandTranslator } from './StepCommandTranslator';
 import { VmEnvironmentFilter } from './VmEnvironmentFilter';
@@ -137,14 +138,18 @@ describe('StepCommandTranslator program', () => {
 		expect(error.message).toMatch(/only sh and bash are/);
 	});
 
-	it.each([
-		['C:\\Windows\\System32\\cmd.exe', /cmd\.exe does not exist in the VM.*without the "sandbox" label/],
-		['pwsh', /PowerShell does not exist in the VM/],
-		['powershell.exe', /PowerShell does not exist in the VM/],
-	])('refuses %s', async (command, pattern) => {
-		const error = await refusal(translator.translate(request({ command, args: ['/c', 'dir'] })));
-		expect(error.message).toMatch(pattern);
-	});
+	it('refuses what a sandbox cannot run (each case)', () =>
+		eachRow(
+			[
+				['C:\\Windows\\System32\\cmd.exe', /cmd\.exe does not exist in the VM.*without the "sandbox" label/],
+				['pwsh', /PowerShell does not exist in the VM/],
+				['powershell.exe', /PowerShell does not exist in the VM/],
+			],
+			async (command, pattern) => {
+				const error = await refusal(translator.translate(request({ command, args: ['/c', 'dir'] })));
+				expect(error.message).toMatch(pattern);
+			}
+		));
 
 	it('refuses a host program the VM does not have, and a shell with arguments', async () => {
 		expect((await refusal(translator.translate(request({ command: 'C:\\tools\\mytool.exe' })))).message).toMatch(

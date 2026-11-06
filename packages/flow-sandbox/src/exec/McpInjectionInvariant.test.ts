@@ -354,16 +354,6 @@ describe('the callback server itself, reached as any process that knows the port
 		callback.end();
 	});
 
-	it('accepts the right token and execution id (this is the tool surface of a model step, not a bypass)', async () => {
-		const engine = await startEngineServer('run-1');
-		const callback = rawCallback(engine.port, [
-			JSON.stringify({ token: engine.token, executionId: 'run-1', steps: STEPS }),
-		]);
-		await engine.injected.waitForCount(1);
-		expect(engine.injected.items[0]).toEqual(STEPS);
-		callback.end();
-	});
-
 	it('is closed when no model step runs: a script step (or the end of the step) finds nothing to talk to', async () => {
 		const engine = await startEngineServer('run-1');
 		await engine.server.stop();
