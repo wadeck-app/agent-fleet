@@ -235,6 +235,56 @@ describe('the path from the sandbox to the engine: forwarder, unmodified mcp-ser
 		expect(engine.injected.items).toEqual([]);
 	});
 
+	// The callback server now destroys a connection at the first protocol violation. The forwarder must pass that on in
+	// both directions, once, and never reconnect on its own.
+	it('passes a destroyed connection on to the caller, and a closed caller on to the upstream, without reconnecting', async () => {
+		const upstream = { connections: 0, closedByForwarder: 0 };
+		const server = net.createServer(socket => {
+			upstream.connections += 1;
+			socket.on('close', () => (upstream.closedByForwarder += 1));
+			// First connection: a protocol violation, destroyed at once. Second: stays open until the forwarder closes it.
+			if (upstream.connections === 1) socket.on('data', () => socket.destroy());
+		});
+		await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+		try {
+			const directory = path.join(root, 'opt-flow');
+			fs.mkdirSync(directory);
+			fs.copyFileSync(forwarderSource, path.join(directory, 'mcp-callback-forwarder.cjs'));
+			// Stands for mcp-server.cjs: reports the local port the forwarder opened, then stays alive.
+			fs.writeFileSync(
+				path.join(directory, 'mcp-server.cjs'),
+				'process.stdout.write(process.env.FLOW_MCP_CALLBACK_PORT + "\\n"); setInterval(() => undefined, 1000);'
+			);
+			const child = spawn(process.execPath, [path.join(directory, 'mcp-callback-forwarder.cjs')], {
+				env: {
+					...process.env,
+					FLOW_MCP_UPSTREAM_HOST: '127.0.0.1',
+					FLOW_MCP_UPSTREAM_PORT: String((server.address() as net.AddressInfo).port),
+				},
+				stdio: ['ignore', 'pipe', 'pipe'],
+			});
+			children.push(child);
+			const port = await new Promise<number>(resolve =>
+				child.stdout?.once('data', (data: Buffer) => resolve(Number(data.toString().trim())))
+			);
+
+			const garbage = rawCallback(port, ['not json']);
+			await garbage.closed;
+			expect(upstream).toEqual({ connections: 1, closedByForwarder: 1 });
+
+			const second = rawCallback(port, []);
+			await new Promise(resolve => setTimeout(resolve, 200));
+			expect(upstream.connections).toBe(2);
+			second.end();
+			await vi.waitFor(() => expect(upstream.closedByForwarder).toBe(2));
+			// No reconnection of its own after either end went away.
+			await new Promise(resolve => setTimeout(resolve, 300));
+			expect(upstream.connections).toBe(2);
+		} finally {
+			server.close();
+		}
+	});
+
 	it('refuses to start without its upstream, naming the missing variable', async () => {
 		const forwarder = installImageFiles();
 		const child = spawn(process.execPath, [forwarder], {
@@ -251,18 +301,34 @@ describe('the path from the sandbox to the engine: forwarder, unmodified mcp-ser
 });
 
 describe('the callback server itself, reached as any process that knows the port would', () => {
-	it('rejects a wrong token and a wrong execution id, ignores garbage, and injects nothing', async () => {
+	// Any protocol violation destroys the socket (flow-cli McpCallbackConnection); the close is the event, no text is relied on.
+	it('closes the connection on every protocol violation, injects nothing, and still serves a valid caller afterwards', async () => {
 		const engine = await startEngineServer('run-1');
-		// The server drops these connections: the close is the event.
-		await rawCallback(engine.port, [JSON.stringify({ token: 'x', executionId: 'run-1', steps: STEPS })]).closed;
-		await rawCallback(engine.port, [JSON.stringify({ token: engine.token, executionId: 'run-2', steps: STEPS })])
-			.closed;
-		// Garbage is ignored and the connection stays open: the server says so for each line, and the socket is still open.
-		const garbage = rawCallback(engine.port, ['not json', '{"truncated":']);
-		await engineStderr.waitFor(lines => lines.filter(line => line.includes('invalid JSON payload')).length >= 2);
-		expect(garbage.isClosed()).toBe(false);
-		garbage.end();
+		const valid = { token: engine.token, executionId: 'run-1', steps: STEPS };
+		const violations: [string, string[]][] = [
+			['invalid JSON', ['not json']],
+			['a truncated object', ['{"truncated":']],
+			['null', ['null']],
+			['a number', ['5']],
+			['an array', ['[]']],
+			['a wrong token', [JSON.stringify({ ...valid, token: 'x' })]],
+			['a wrong execution id', [JSON.stringify({ ...valid, executionId: 'run-2' })]],
+			['a line over the size cap', ['x'.repeat(2 * 1024 * 1024 + 1024)]],
+		];
+
+		for (const [label, lines] of violations) {
+			const closed = await Promise.race([
+				rawCallback(engine.port, lines).closed.then(() => true),
+				new Promise<boolean>(resolve => setTimeout(() => resolve(false), 5000)),
+			]);
+			expect(closed, `${label}: the server must destroy the connection`).toBe(true);
+		}
 		expect(engine.injected.items).toEqual([]);
+
+		const callback = rawCallback(engine.port, [JSON.stringify(valid)]);
+		await engine.injected.waitForCount(1);
+		expect(engine.injected.items[0]).toEqual(STEPS);
+		callback.end();
 	});
 
 	it('accepts the right token and execution id (this is the tool surface of a model step, not a bypass)', async () => {
