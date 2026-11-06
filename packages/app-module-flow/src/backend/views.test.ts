@@ -1124,6 +1124,43 @@ describe('dashboard widget', () => {
 	});
 });
 
+describe('rows of buttons wrap whole at a narrow width (HorizontalStack wrap, dsl-ui >= 2026.11.6-307)', () => {
+	function rowsHolding(file: string, predicate: (item: Record<string, unknown>) => boolean) {
+		return collectNodes(initialView(file), 'HorizontalStack').filter(stack =>
+			(stack['items'] as Record<string, unknown>[]).some(predicate)
+		);
+	}
+
+	it('wraps every header row of the execution detail page (project slot, links, Logs, actions)', () => {
+		const rows = collectNodes(initialView('execution-detail-page.yaml'), 'HorizontalStack').slice(0, 3);
+		expect(rows).toHaveLength(3);
+		for (const row of rows) expect(row, JSON.stringify(row['items'])).toMatchObject({ wrap: true });
+		expect(rowsHolding('execution-detail-page.yaml', item => item['label'] === 'Logs')[0]).toMatchObject({
+			wrap: true,
+			gap: 'gap-2',
+		});
+	});
+
+	it('wraps the filter row of the executions page and the row between the filters and the actions slot', () => {
+		const rows = rowsHolding(
+			'executions-page.yaml',
+			item => item['$type'] === 'SearchBar' || item['items'] === '$sources.actions'
+		);
+		expect(rows).toHaveLength(2);
+		for (const row of rows) expect(row, JSON.stringify(row['items'])).toMatchObject({ wrap: true });
+	});
+
+	it('wraps the row-expansion panel of the executions table in every variant', () => {
+		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
+			expect(executionsTableOf(document)['expansion'], String(variant)).toMatchObject({
+				$type: 'HorizontalStack',
+				wrap: true,
+				gap: 'gap-2',
+			});
+		}
+	});
+});
+
 describe('views keys', () => {
 	it.each(viewFiles)("%s holds no key the shell's dsl-ui does not know", async file => {
 		const { findUnknownKeys, knownKeys } = await loadKeyCheck();

@@ -74,17 +74,20 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 	});
 
 	// app-core checks these ranges against the build-info.json of its SERVER and refuses the whole module when it is
-	// older ("built for ... but the shell provides"). 2026.10.26-290 is the first shell build with the central date
+	// older ("built for ... but the shell provides"). 2026.11.6-307 is the first shell build with HorizontalStack `wrap` and nowrap button labels (the header rows of these modules); 2026.10.26-290 added the central date
 	// formatter (DateFormatProvider, useDateFormat, DateText) these components call. The range ends in "-0" on purpose:
-	// semver ranks the numeric prerelease "290" BELOW any alphanumeric one such as "289-a8a6cc98" (CI stamps
-	// <build>-<hash>), so ">=2026.10.26-290" or "^2026.10.26-290" would accept the older builds of that day.
+	// semver ranks the numeric prerelease "307" BELOW any alphanumeric one such as "306-a8a6cc98" (CI stamps
+	// <build>-<hash>), so ">=2026.11.6-307" or "^2026.11.6-307" would accept the older builds of that day.
 	it.each(['@wadeck-app/dsl-ui', '@wadeck-app/dsl-renderer'])(
 		'%s accepts the server build and refuses older shells',
 		name => {
 			const range = manifest.dslLib?.shared?.[name] ?? '';
-			expect(satisfies('2026.10.26-290-52b6493c', range, { includePrerelease: true })).toBe(true);
-			expect(satisfies('2026.10.26-291-8cd15823', range, { includePrerelease: true })).toBe(true);
-			expect(satisfies('2026.10.27-5-abcdef12', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.11.6-307-0136621b', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.11.6-308-abcdef12', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.11.7-1-abcdef12', range, { includePrerelease: true })).toBe(true);
+			expect(satisfies('2026.11.6-306-abcdef12', range, { includePrerelease: true })).toBe(false);
+			expect(satisfies('2026.10.26-295-e3eadd21', range, { includePrerelease: true })).toBe(false);
+			expect(satisfies('2026.10.26-290-52b6493c', range, { includePrerelease: true })).toBe(false);
 			expect(satisfies('2026.10.26-289-a8a6cc98', range, { includePrerelease: true })).toBe(false);
 			expect(satisfies('2026.10.26-279-33f64eeb', range, { includePrerelease: true })).toBe(false);
 			expect(satisfies('2026.10.24-153-308eef77', range, { includePrerelease: true })).toBe(false);

@@ -53,11 +53,13 @@ sections:
 
           - $type: HorizontalStack
             gap: gap-3
+            wrap: true
             align: items-center
             justify: justify-between
             items:
                 - $type: HorizontalStack
                   gap: gap-3
+                  wrap: true
                   align: items-center
                   items:
                       - $type: SearchBar
@@ -96,6 +98,7 @@ sections:
                   expansion:
                       $type: HorizontalStack
                       gap: gap-2
+                      wrap: true
                       align: items-center
                       items:
                           # Each slot renders nothing while no module contributes.
