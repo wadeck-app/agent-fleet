@@ -6,9 +6,9 @@ import { readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { BUILTIN_PLUGIN_MANIFESTS } from './BuiltinPlugins';
+import { ModuleImporter } from './ModuleImporter';
 
 interface ExtensionPointVersion {
 	version: number;
@@ -140,9 +140,7 @@ export class PluginLoader {
 			if (!exportName) {
 				throw new Error(`Plugin "${pluginId}" JSON manifest has "entrypoint" but no "export" field`);
 			}
-			const moduleUrl = pathToFileURL(resolvedEntrypoint).href;
-			// violations-suppress: ts/no-unsafe-type-cast a dynamically imported plugin module has no compile-time type; its exports are checked before use
-			const mod = (await import(moduleUrl)) as Record<string, unknown>;
+			const mod = await ModuleImporter.importFile(resolvedEntrypoint);
 			const factory = mod[exportName];
 			if (typeof factory !== 'function') {
 				throw new Error(`Plugin "${pluginId}" entrypoint does not export "${exportName}" as a function`);
@@ -173,9 +171,8 @@ export class PluginLoader {
 			.catch(() => false);
 
 		if (hasJsManifest) {
-			const moduleUrl = pathToFileURL(jsManifestPath).href;
-			// violations-suppress: ts/no-unsafe-type-cast a dynamically imported plugin module has no compile-time type; its exports are checked before use
-			const mod = (await import(moduleUrl)) as Record<string, unknown>;
+			// resolve(): a relative pluginPackagesDir was always read against the cwd by pathToFileURL
+			const mod = await ModuleImporter.importFile(resolve(jsManifestPath));
 			const manifest = (mod['manifest'] ?? mod['default']) as PluginManifest | undefined;
 			if (!manifest || typeof manifest !== 'object') {
 				throw new Error(
