@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { AwsCredentialExporter } from '../AwsCredentialExporter';
 import { CleanupStack } from '../CleanupStack';
+import { CrashGuard } from '../CrashGuard';
 import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { LeftoverSandboxes } from '../LeftoverSandboxes';
 import { NodeCommandRunner } from '../NodeCommandRunner';
@@ -80,6 +81,13 @@ export async function runHarness(argv: readonly string[], env: NodeJS.ProcessEnv
 	presence.publish(config.wrapperId, undefined);
 	// Everything acquired from here on is released by this stack, whatever fails later (prerequisites, startup, run).
 	const cleanup = new CleanupStack(log);
+	// A crash (uncaught exception, unhandled rejection) must not leave the VM running or the port and secrets behind.
+	new CrashGuard({
+		source: { on: (event, listener) => process.on(event, listener) },
+		cleanup,
+		log,
+		exit: code => process.exit(code),
+	}).install();
 	cleanup.add('withdraw the presence file', () => presence.withdraw(config.wrapperId));
 	try {
 		const runtime = new SbxCliRuntime();
