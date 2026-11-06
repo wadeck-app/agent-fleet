@@ -71,7 +71,7 @@ describe('the sandbox plugin artifact', () => {
 				"const fs = require('node:fs');",
 				"if (process.argv[2] === 'preflight') process.exit(0);",
 				`fs.writeFileSync(${JSON.stringify(record)}, JSON.stringify({ argv: process.argv.slice(2), token: process.env.FLOW_WORKER_TOKEN, endpoint: process.env.FLOW_DAEMON_WS_URL, source: process.env.FLOW_WORKER_SOURCE_ID }));`,
-				'setTimeout(() => process.exit(0), 200);',
+				'setTimeout(() => process.exit(0), 1500);',
 			].join('\n')
 		);
 		process.env['FLOW_SANDBOX_PLUGIN_WRAPPER'] = stub;
@@ -91,7 +91,7 @@ describe('the sandbox plugin artifact', () => {
 				{ issueLaunchToken: () => 'per-ask-secret', revokeLaunchToken: () => undefined }
 			);
 
-			await instance.source.obtainWorker({
+			const spawned = await instance.source.obtainWorker({
 				daemonEndpoint: 'ws://127.0.0.1:4101',
 				sourceId: 'sandbox-1',
 				projects: [],
@@ -99,6 +99,16 @@ describe('the sandbox plugin artifact', () => {
 			for (let attempt = 0; attempt < 100 && !fs.existsSync(record); attempt += 1) {
 				await new Promise(resolve => setTimeout(resolve, 50));
 			}
+
+			// The contract of flow's core: { launched: true } keeps the credential, { launched: false } (nothing started) gives it back.
+			expect(spawned).toEqual({ launched: true });
+			expect(
+				await instance.source.obtainWorker({
+					daemonEndpoint: 'ws://127.0.0.1:4101',
+					sourceId: 'sandbox-1',
+					projects: [],
+				})
+			).toEqual({ launched: false });
 
 			const launch = JSON.parse(fs.readFileSync(record, 'utf8')) as {
 				argv: string[];

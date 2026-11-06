@@ -380,13 +380,14 @@ function createInstance(context) {
 					failure = undefined;
 					throw new Error(describeFailure(found));
 				}
-				if (!exited) return;
+				// Nothing is started: { launched: false } gives the credential minted for this ask back to the daemon (it caps them per source).
+				if (!exited) return { launched: false };
 				const other = presenceAlive(id);
 				if (other !== undefined) {
 					process.stderr.write(
 						`[source ${sourceId}] a wrapper (${other === true ? 'pid unknown' : `pid ${other}`}) of this source is already running; not starting a second one.\n`
 					);
-					return;
+					return { launched: false };
 				}
 				const token = request.authToken;
 				const started = spawnProcess(process.execPath, [wrapperPath(), ...wrapperArguments(parsed, sourceId)], {
@@ -450,6 +451,8 @@ function createInstance(context) {
 				// The wrapper's lifetime is its own (it leaves when the daemon connection closes); the daemon must not wait for it.
 				started.unref();
 				started.stderr?.unref?.();
+				// A worker is starting: its credential must stay valid (anything but { launched: false } keeps it).
+				return { launched: true };
 			},
 		},
 		// No `run` hook in v1: the wrapper declares run-events and removes its sandbox when the daemon says a run ended.

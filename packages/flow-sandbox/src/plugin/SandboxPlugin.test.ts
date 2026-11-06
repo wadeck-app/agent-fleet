@@ -1,3 +1,5 @@
+import { LaunchCredentialSource } from 'flow-cli/src/daemon/LaunchCredentialSource';
+import { LaunchTokenIssuer } from 'flow-cli/src/daemon/LaunchTokenIssuer';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -549,6 +551,38 @@ describe('sandbox plugin: what the wrapper process is given and how it fails', (
 		}
 
 		expect(written.join('')).toContain('FLOW_SANDBOX_PLUGIN_WRAPPER');
+	});
+});
+
+// The daemon mints a credential per ask and caps the outstanding ones at 32 per source; an ask that starts nothing must say so
+// ({ launched: false }) so the credential goes back. Through flow's real wrapper of the source and its real issuer.
+describe('sandbox plugin: the credential of an ask that starts no wrapper goes back', () => {
+	it('reuses a running wrapper 40 times in a row without reaching the cap, and keeps the credential of the ask that spawned', async () => {
+		const issuer = new LaunchTokenIssuer();
+		const instance = await build();
+		const source = new LaunchCredentialSource(
+			instance.source,
+			sourceId => issuer.issue(sourceId),
+			(sourceId, token) => issuer.revoke(sourceId, token)
+		);
+		const ask = (): Promise<unknown> =>
+			source.obtainWorker({ daemonEndpoint: 'ws://127.0.0.1:4101', sourceId: 'sandbox-1', projects: [] });
+
+		const spawned = await ask();
+		await waitFor(() => launches().length === 1, 'the wrapper to start');
+		let reused = 0;
+		for (let index = 0; index < 40; index += 1) {
+			const result = await ask();
+			if ((result as { launched?: boolean } | undefined)?.launched === false) reused += 1;
+		}
+
+		expect(reused).toBe(40);
+		expect(launches()).toHaveLength(1);
+		// The spawning ask's credential is the one the wrapper was given, and it is still valid for its registration.
+		expect((spawned as { launched?: boolean } | undefined)?.launched).toBe(true);
+		const given = launches()[0]?.env['FLOW_WORKER_TOKEN'] as string;
+		expect(issuer.consume('sandbox-1', given)).toBe(true);
+		await instance.dispose();
 	});
 });
 
