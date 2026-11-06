@@ -43,11 +43,42 @@ describe('GET /related/project/:projectId', () => {
 	});
 
 	it('counts the running and waiting runs of this project only, and lists its latest runs, newest first', async () => {
-		fixture.addExecution({ executionId: 'r1', flowId: 'build', status: 'running', completedAt: null, projectId: PROJECT, startedAt: '2026-10-30T10:00:00.000Z' });
-		fixture.addExecution({ executionId: 'q1', flowId: 'lint', status: 'queued', completedAt: null, projectId: PROJECT, startedAt: '2026-10-30T11:00:00.000Z' });
-		fixture.addExecution({ executionId: 'd1', flowId: 'deploy', status: 'completed', projectId: PROJECT, startedAt: '2026-10-30T09:00:00.000Z' });
-		fixture.addExecution({ executionId: 'other', status: 'running', completedAt: null, projectId: '00000000', startedAt: '2026-10-30T12:00:00.000Z' });
-		fixture.addExecution({ executionId: 'old', status: 'running', completedAt: null, startedAt: '2026-10-30T12:30:00.000Z' });
+		fixture.addExecution({
+			executionId: 'r1',
+			flowId: 'build',
+			status: 'running',
+			completedAt: null,
+			projectId: PROJECT,
+			startedAt: '2026-10-30T10:00:00.000Z',
+		});
+		fixture.addExecution({
+			executionId: 'q1',
+			flowId: 'lint',
+			status: 'queued',
+			completedAt: null,
+			projectId: PROJECT,
+			startedAt: '2026-10-30T11:00:00.000Z',
+		});
+		fixture.addExecution({
+			executionId: 'd1',
+			flowId: 'deploy',
+			status: 'completed',
+			projectId: PROJECT,
+			startedAt: '2026-10-30T09:00:00.000Z',
+		});
+		fixture.addExecution({
+			executionId: 'other',
+			status: 'running',
+			completedAt: null,
+			projectId: '00000000',
+			startedAt: '2026-10-30T12:00:00.000Z',
+		});
+		fixture.addExecution({
+			executionId: 'old',
+			status: 'running',
+			completedAt: null,
+			startedAt: '2026-10-30T12:30:00.000Z',
+		});
 
 		const { status, body } = await call(PROJECT);
 		expect(status).toBe(200);
@@ -57,14 +88,24 @@ describe('GET /related/project/:projectId', () => {
 			items: [
 				{ label: 'lint', subtitle: 'queued - 2026-10-30T11:00:00.000Z', url: '/modules/flow/executions/q1' },
 				{ label: 'build', subtitle: 'running - 2026-10-30T10:00:00.000Z', url: '/modules/flow/executions/r1' },
-				{ label: 'deploy', subtitle: 'completed - 2026-10-30T09:00:00.000Z', url: '/modules/flow/executions/d1' },
+				{
+					label: 'deploy',
+					subtitle: 'completed - 2026-10-30T09:00:00.000Z',
+					url: '/modules/flow/executions/d1',
+				},
 			],
 		});
 	});
 
 	it('keeps the 10 latest runs but counts the active ones beyond them', async () => {
 		for (let n = 0; n < 12; n++) {
-			fixture.addExecution({ executionId: `e${String(n).padStart(2, '0')}`, status: 'running', completedAt: null, projectId: PROJECT, startedAt: `2026-10-30T10:${String(n).padStart(2, '0')}:00.000Z` });
+			fixture.addExecution({
+				executionId: `e${String(n).padStart(2, '0')}`,
+				status: 'running',
+				completedAt: null,
+				projectId: PROJECT,
+				startedAt: `2026-10-30T10:${String(n).padStart(2, '0')}:00.000Z`,
+			});
 		}
 		const { body } = (await call(PROJECT)) as { body: { count: number; items: unknown[] } };
 		expect(body.count).toBe(12);
@@ -102,7 +143,11 @@ describe('GET /related/project/:projectId', () => {
 		fixture.addExecution({ executionId: 'r1', projectId: PROJECT });
 		const { status, body } = await call(PROJECT);
 		expect(status).toBe(200);
-		expect(body).toMatchObject({ project: { name: 'old-shop', removed: true }, countLabel: 'running or queued', items: [{ url: '/modules/flow/executions/r1' }] });
+		expect(body).toMatchObject({
+			project: { name: 'old-shop', removed: true },
+			countLabel: 'running or queued',
+			items: [{ url: '/modules/flow/executions/r1' }],
+		});
 	});
 
 	it('answers a virtual project like any other, flagged virtual', async () => {

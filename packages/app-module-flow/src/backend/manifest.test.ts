@@ -122,7 +122,9 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 
 		it('accepts only the action-slot contract roots (the one component whose style is fixed), or the project link on the project slots, never a free-form component', () => {
 			for (const [name, slot] of Object.entries(slots)) {
-				expect(slot.accepts, `slot ${name}`).toEqual([...(FLOW_PROJECT_SLOTS[name] ?? FLOW_ACTION_SLOT_ACCEPTS)]);
+				expect(slot.accepts, `slot ${name}`).toEqual([
+					...(FLOW_PROJECT_SLOTS[name] ?? FLOW_ACTION_SLOT_ACCEPTS),
+				]);
 			}
 		});
 
