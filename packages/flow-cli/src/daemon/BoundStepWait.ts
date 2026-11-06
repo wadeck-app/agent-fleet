@@ -2,6 +2,16 @@ import { RetryBackoff } from './RetryBackoff.js';
 import type { SourceContactErrors } from './SourceContactErrors.js';
 import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 
+/** What the dispatcher needs to place the steps of a run bound to a worker type, and to say why none could be. */
+export interface BoundStepRouting {
+	/** Where a worker's type comes from. */
+	workerTypes: WorkerTypeRouting['workerTypes'];
+	/** Bounds the wait of a step of a bound run for a worker of its type. */
+	wait: BoundStepWait;
+	/** Where the contact failures of the sources are kept. */
+	contactErrors: WorkerTypeRouting['contactErrors'];
+}
+
 /** What the daemon needs to restrict a run to a worker type: where types come from, and how long a missing one is waited for. */
 export interface WorkerTypeRouting {
 	workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'>;

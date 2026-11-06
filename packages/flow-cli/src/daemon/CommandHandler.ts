@@ -188,9 +188,11 @@ export class CommandHandler {
 			this.logWriter,
 			interactivityPolicy ?? new DefaultInteractivityPolicy(),
 			(executionId, stepId, reason) => this.outcomes.failStep(executionId, stepId, reason),
-			workerRouting.workerTypes,
-			new BoundStepWait(workerRouting.boundStepWaitMs, Date.now, () => this.tryDispatch()),
-			workerRouting.contactErrors
+			{
+				workerTypes: workerRouting.workerTypes,
+				wait: new BoundStepWait(workerRouting.boundStepWaitMs, Date.now, () => this.tryDispatch()),
+				contactErrors: workerRouting.contactErrors,
+			}
 		);
 		const workspaces = new ExecutionWorkspaces(this.logWriter, workspaceProvider, resolvePerFlowWorkspaceProvider);
 		this.outcomes = new StepOutcomes(

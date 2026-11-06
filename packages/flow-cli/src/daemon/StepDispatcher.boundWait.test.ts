@@ -74,9 +74,7 @@ describe('StepDispatcher - the wait of a step of a bound run is forgotten', () =
 			logWriter as never,
 			{ decide: () => ({ action: 'wait' }) },
 			(_executionId, stepId) => failed.push(stepId),
-			catalog,
-			boundWait,
-			{ sinceFor: () => () => [] }
+			{ workerTypes: catalog, wait: boundWait, contactErrors: { sinceFor: () => () => [] } }
 		);
 		const enqueue = (stepId: string) =>
 			queue.unshift({

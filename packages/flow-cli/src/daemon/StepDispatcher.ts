@@ -6,7 +6,7 @@ import type { WebSocket } from 'ws';
 import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { ExecutionStore } from '../storage/ExecutionStore';
 import type { LogWriter } from '../storage/LogWriter';
-import { BoundStepWait, type WorkerTypeRouting } from './BoundStepWait.js';
+import type { BoundStepRouting } from './BoundStepWait.js';
 import type { DaemonSecrets } from './DaemonSecrets.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
@@ -17,16 +17,10 @@ import { StepRouter } from './StepRouter.js';
 import type { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
-import type { WorkerTypeCatalog, WorkerTypeLookup } from './WorkerTypeCatalog.js';
+import type { WorkerTypeLookup } from './WorkerTypeCatalog.js';
 
 /** Every worker is of no type. */
 const NO_TYPE: WorkerTypeLookup = () => undefined;
-
-/** No source is declared, so no worker has a type. */
-const NO_DECLARED_WORKER_TYPES: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'> = {
-	typeLookup: () => () => undefined,
-	knownTypes: () => [],
-};
 
 /** Hands queued steps to the idle workers that may run them. */
 export class StepDispatcher {
@@ -40,9 +34,8 @@ export class StepDispatcher {
 	/**
 	 * @param failStep Fails a step the daemon itself decided cannot proceed.
 	 * @param interactivityPolicy S9 policy deciding the fate of a step needing a human (D#39).
-	 * @param workerTypes Where a worker's type comes from. Without it no worker has a type, so a bound run's steps wait
-	 *        for the bound and then fail: the safe reading of a missing wiring.
-	 * @param boundStepWait Bounds the wait of a step of a bound run for a worker of its type.
+	 * @param routing Where a worker's type comes from, how long a bound run's step waits for one, and where the contact
+	 *        failures of the sources are kept (see {@link BoundStepRouting}).
 	 */
 	constructor(
 		private readonly registry: WorkerRegistry,
@@ -56,12 +49,9 @@ export class StepDispatcher {
 		private readonly logWriter: LogWriter,
 		private readonly interactivityPolicy: InteractivityPolicyProvider,
 		private readonly failStep: (executionId: string, stepId: string, reason: string) => void,
-		private readonly workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'> = NO_DECLARED_WORKER_TYPES,
-		private readonly boundStepWait: BoundStepWait = new BoundStepWait(),
-		/** Where the last contact error of each source is kept; read, masked, when a bound step fails. */
-		private readonly contactErrors: WorkerTypeRouting['contactErrors']
+		private readonly routing: BoundStepRouting
 	) {
-		this.router = new StepRouter(undefined, undefined, workerTypes);
+		this.router = new StepRouter(undefined, undefined, routing.workerTypes);
 	}
 
 	/** Executions already told that the declared worker sources cannot be read. */
@@ -69,12 +59,12 @@ export class StepDispatcher {
 
 	/** Drops the timers of the steps waiting for a worker of their type, for the daemon stop. */
 	stop(): void {
-		this.boundStepWait.stop();
+		this.routing.wait.stop();
 	}
 
 	/** Forgets the waits of an execution that is over. */
 	forgetExecution(executionId: string): void {
-		this.boundStepWait.forgetExecution(executionId);
+		this.routing.wait.forgetExecution(executionId);
 		this.unreadableSourcesReported.delete(executionId);
 		for (const key of this.interactiveWaitSince.keys()) {
 			if (key.startsWith(`${executionId}:`)) {
@@ -137,7 +127,7 @@ export class StepDispatcher {
 			}
 			if (idleWorker) {
 				if (placement.boundWorkerType !== undefined) {
-					this.boundStepWait.clear(step.executionContext.executionId, step.stepId);
+					this.routing.wait.clear(step.executionContext.executionId, step.stepId);
 				}
 				this.dispatchTo(idleWorker, step);
 			} else {
@@ -310,13 +300,13 @@ export class StepDispatcher {
 	 */
 	private failIfNoWorkerOfBoundType(step: ReadyStep, workerType: string, typeOf: WorkerTypeLookup): boolean {
 		const { executionId } = step.executionContext;
-		const decision = this.boundStepWait.decide({
+		const decision = this.routing.wait.decide({
 			executionId,
 			stepId: step.stepId,
 			workerType,
 			connectedOfType: this.registry.summarize().filter(worker => typeOf(worker.sourceId) === workerType).length,
 			knownTypes: this.knownTypesOrNone(executionId),
-			contactErrorsSince: this.contactErrors.sinceFor(workerType, typeOf),
+			contactErrorsSince: this.routing.contactErrors.sinceFor(workerType, typeOf),
 		});
 		if (decision.action === 'wait') {
 			return false;
@@ -331,7 +321,7 @@ export class StepDispatcher {
 	 */
 	private typeLookupFor(step: ReadyStep): WorkerTypeLookup {
 		try {
-			return this.workerTypes.typeLookup();
+			return this.routing.workerTypes.typeLookup();
 		} catch (err) {
 			this.reportUnreadableSources(step.executionContext.executionId, err);
 			return NO_TYPE;
@@ -340,7 +330,7 @@ export class StepDispatcher {
 
 	private knownTypesOrNone(executionId: string): string[] {
 		try {
-			return this.workerTypes.knownTypes();
+			return this.routing.workerTypes.knownTypes();
 		} catch (err) {
 			this.reportUnreadableSources(executionId, err);
 			return [];
