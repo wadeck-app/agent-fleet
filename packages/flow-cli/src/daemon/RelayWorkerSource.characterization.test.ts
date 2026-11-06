@@ -134,17 +134,18 @@ describe('a declared built-in:relay source - characterization', () => {
 		const reported = await contact(declaredRelay(), { findRelay: () => undefined });
 
 		expect(reported).toHaveLength(1);
-		expect(reported[0]).toContain('could not obtain a worker from source "build-box"');
-		expect(reported[0]).toContain('has no relay connected');
-		expect(reported[0]).toContain('flow worker source list');
+		expect(reported[0]).toBe(
+			'could not obtain a worker from source "build-box": source "build-box" has no relay connected, so it cannot be asked for a worker. A relay dials the daemon itself -- start it on that machine and check it registered with "flow worker source list".'
+		);
 	});
 
 	it('reports a daemon wired without a relay registry as a wiring mistake, not a configuration error', async () => {
 		const reported = await contact(declaredRelay(), {});
 
 		expect(reported).toHaveLength(1);
-		expect(reported[0]).toContain("provider built-in:relay needs the daemon's relay registry");
-		expect(reported[0]).toContain('please report it');
+		expect(reported[0]).toBe(
+			'could not obtain a worker from source "build-box": provider built-in:relay needs the daemon\'s relay registry, which was not supplied. This is a wiring mistake in the daemon, not a configuration error -- please report it.'
+		);
 	});
 
 	// An entry written by an older flow: no plugin, no pluginsDir, no options. It must keep loading and answering.

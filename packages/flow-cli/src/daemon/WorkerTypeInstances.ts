@@ -94,6 +94,7 @@ export class WorkerTypeInstances {
 			);
 		}
 
+		// `host` is deliberately not part of the fingerprint: the first caller's findRelay is kept; harmless while there is one relay lookup per daemon.
 		const fingerprint = JSON.stringify([plugin, pluginsDir, entry.options ?? null]);
 		// Re-read after every wait: another contact may have replaced the entry while this one was disposing it, and
 		// overwriting theirs would leave their instance alive and unreferenced.

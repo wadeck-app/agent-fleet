@@ -159,6 +159,7 @@ export function resolveSourceProvider(
 				);
 			}
 			// The same construction the relay worker-type plugin uses: one path for both ways of declaring a relay.
+			// Remove this case once resolution can be async (the plugin factory is async; this function is not).
 			return buildRelayWorkerType(findRelay).source;
 		}
 		default:
