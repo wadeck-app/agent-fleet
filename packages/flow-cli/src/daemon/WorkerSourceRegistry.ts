@@ -28,6 +28,8 @@ export interface WorkerSourceDeclaration {
 	pid?: number;
 	/** HTTP nudge endpoint; see {@link WorkerSourceEntry.nudgeUrl}. */
 	nudgeUrl?: string;
+	/** A worker recording itself (SelfDeclaration): its own endpoint is not user input, so it is not checked. Not stored. */
+	selfDeclared?: boolean;
 	/** Worker-type plugin ref `<pluginId>.<implName>` (or `plugins.<pluginId>.<implName>`); see {@link WorkerSourceEntry.plugin}. Needs `pluginsDir` unless it is a built-in worker type. */
 	plugin?: string;
 	/** Absolute plugins directory; see {@link WorkerSourceEntry.pluginsDir}. Needs `plugin`. */

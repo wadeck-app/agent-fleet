@@ -40,6 +40,7 @@ export function declareSelf(
 			maxWorkers: 1,
 			options: { projects: [...worker.projects] },
 			pid: worker.pid,
+			selfDeclared: true,
 			...(worker.nudgeUrl !== undefined ? { nudgeUrl: worker.nudgeUrl } : {}),
 		});
 	} catch (err) {

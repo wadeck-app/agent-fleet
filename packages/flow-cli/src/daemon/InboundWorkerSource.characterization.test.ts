@@ -134,17 +134,83 @@ describe('a declared built-in:inbound source - characterization', () => {
 		expect(registry.list()).toEqual([]);
 	});
 
-	// Today nudgeUrl is not checked at declaration: it is stored as given, and a bad one only fails when contacted.
-	it('stores any nudgeUrl as given, even one that is not a URL or carries a token in its query', () => {
-		const entries = new WorkerSourceRegistry(dir).declare({
+	// CHANGED from the original characterization (which pinned "any nudgeUrl string is accepted"): declaring a
+	// built-in:inbound source now refuses a nudgeUrl that is not an http(s) URL or carries a literal credential.
+	// Entries that are already stored, and entries a worker writes about itself, are not affected (tests below).
+	it.each([
+		[
+			'not a url?token=abc123',
+			'nudgeUrl "not a url?token=abc123" must be an http(s) URL, e.g. http://127.0.0.1:5555/nudge.',
+		],
+		['ftp://host/x', 'nudgeUrl "ftp://host/x" must be an http(s) URL, e.g. http://127.0.0.1:5555/nudge.'],
+		[
+			'http://user:pw@127.0.0.1:5555/nudge',
+			'nudgeUrl carries a credential (user info). Write ${NAME} instead of the literal value and set NAME in the daemon environment.',
+		],
+		[
+			'http://127.0.0.1:5555/nudge?token=abc123',
+			'nudgeUrl carries a credential (query parameter "token"). Write ${NAME} instead of the literal value and set NAME in the daemon environment.',
+		],
+	])('refuses at declaration the nudgeUrl %s', (nudgeUrl, reason) => {
+		const registry = new WorkerSourceRegistry(dir);
+
+		expect(() =>
+			registry.declare({
+				sourceId: 'terminal-1',
+				provider: 'built-in:inbound',
+				labels: [],
+				maxWorkers: 1,
+				nudgeUrl,
+			})
+		).toThrow(`Worker source "terminal-1": ${reason}`);
+		expect(registry.list()).toEqual([]);
+	});
+
+	it('still stores a valid nudgeUrl as given', () => {
+		const { entry, warnings } = new WorkerSourceRegistry(dir).declare({
 			sourceId: 'terminal-1',
 			provider: 'built-in:inbound',
 			labels: [],
 			maxWorkers: 1,
-			nudgeUrl: 'not a url?token=abc123',
+			nudgeUrl: 'http://127.0.0.1:5555/nudge',
 		});
 
-		expect(entries.entry.nudgeUrl).toBe('not a url?token=abc123');
-		expect(entries.warnings).toEqual([]);
+		expect(entry.nudgeUrl).toBe('http://127.0.0.1:5555/nudge');
+		expect(warnings).toEqual([]);
+	});
+
+	it('still loads and contacts an already stored entry whose nudgeUrl would be refused today', async () => {
+		writeFileSync(
+			join(dir, 'worker-sources.json'),
+			JSON.stringify({
+				sources: [
+					{
+						sourceId: 'stored-bad',
+						provider: 'built-in:inbound',
+						labels: [],
+						maxWorkers: 1,
+						nudgeUrl: 'not a url?token=abc123',
+						tokenHash: 'deadbeef',
+						createdAt: '2026-01-01T00:00:00.000Z',
+					},
+				],
+			}),
+			'utf8'
+		);
+
+		const entries = new WorkerSourceRegistry(dir).list();
+		const reported = await contact(entries);
+
+		expect(entries.map(entry => entry.nudgeUrl)).toEqual(['not a url?token=abc123']);
+		expect(reported).toEqual([]);
+		expect(sendNudgeMock).toHaveBeenCalledExactlyOnceWith('not a url?token=abc123', ENDPOINT);
+	});
+
+	// declareSelf goes through declare() too, so it is exempted explicitly: the endpoint is the worker's own, not user input.
+	it('does not check the nudgeUrl a worker writes about itself', () => {
+		const handle = declareSelf(dir, { projects: [], labels: [], pid: 99, nudgeUrl: 'worker-chose-this' });
+
+		expect(handle?.sourceId).toBe('terminal-99');
+		expect(new WorkerSourceRegistry(dir).list().map(entry => entry.nudgeUrl)).toEqual(['worker-chose-this']);
 	});
 });

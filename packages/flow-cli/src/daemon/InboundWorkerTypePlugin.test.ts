@@ -213,16 +213,4 @@ describe('WorkerSourceRegistry - the inbound worker type declared as a plugin', 
 			`Worker source "terminal-1": nudgeUrl is set twice with different values (entry "${URL_A}", options "${URL_B}"). Keep one: flow worker source remove terminal-1, then declare it again.`
 		);
 	});
-
-	it('leaves the provider form untouched: no URL check for built-in:inbound', () => {
-		expect(
-			new WorkerSourceRegistry(dir).declare({
-				sourceId: 'legacy',
-				provider: 'built-in:inbound',
-				labels: [],
-				maxWorkers: 1,
-				nudgeUrl: 'not a url',
-			}).entry.nudgeUrl
-		).toBe('not a url');
-	});
 });

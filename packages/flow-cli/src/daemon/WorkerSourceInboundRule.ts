@@ -11,8 +11,9 @@ const WHOLE_ENV_REFERENCE = /^\$\{[^}]+\}$/;
 /**
  * Checks the `nudgeUrl` of a source declared with the inbound worker type, at declaration time.
  *
- * Only the plugin form is checked. A `built-in:inbound` source stores its `nudgeUrl` as given, exactly as before,
- * because workers write that field about themselves and an old entry must keep working untouched.
+ * Checked for the inbound worker type (plugin form: `options.nudgeUrl` and the entry's) and for the `built-in:inbound`
+ * provider (the entry's `nudgeUrl`). Never for a worker declaring itself (`selfDeclared`): that URL is its own endpoint,
+ * not user input. Entries already stored are not re-checked here: this runs at declaration only.
  *
  * A `${NAME}` reference is allowed anywhere in the URL and is expanded by the daemon when it builds the instance.
  */
@@ -21,12 +22,18 @@ export class WorkerSourceInboundRule {
 
 	validate(declaration: WorkerSourceDeclaration): void {
 		const { sourceId, plugin } = declaration;
-		if (plugin === undefined || this.pluginReference.normalize(declaration).plugin !== INBOUND_PLUGIN_REF) {
+		if (declaration.selfDeclared === true) {
+			return;
+		}
+		const isPluginForm =
+			plugin !== undefined && this.pluginReference.normalize(declaration).plugin === INBOUND_PLUGIN_REF;
+		if (!isPluginForm && declaration.provider !== 'built-in:inbound') {
 			return;
 		}
 		const entryUrl = declaration.nudgeUrl;
 		const rawOptionsUrl: unknown = declaration.options?.['nudgeUrl'];
-		const optionsUrl = typeof rawOptionsUrl === 'string' ? rawOptionsUrl : undefined;
+		// The provider form reads only the entry's nudgeUrl; options.nudgeUrl means nothing to it.
+		const optionsUrl = isPluginForm && typeof rawOptionsUrl === 'string' ? rawOptionsUrl : undefined;
 		for (const url of [entryUrl, optionsUrl]) {
 			if (url !== undefined) {
 				this.checkUrl(sourceId, url);
