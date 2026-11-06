@@ -22,19 +22,10 @@ import os from 'node:os';
 import { LeftoverCommand } from '../src/LeftoverCommand.ts';
 import { LeftoverSandboxes } from '../src/LeftoverSandboxes.ts';
 import { PresenceDirectory } from '../src/PresenceDirectory.ts';
+import { isProcessAlive } from '../src/ProcessLiveness.ts';
 import { SbxCliRuntime } from '../src/SbxCliRuntime.ts';
 import { SystemClock } from '../src/SystemClock.ts';
 import { WrapperPresence } from '../src/WrapperPresence.ts';
-
-function isProcessAlive(pid) {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch (error) {
-		// EPERM = the process exists but belongs to someone else.
-		return error.code === 'EPERM';
-	}
-}
 
 // The same resolution as the wrappers (--presence-dir, then the variable, then the default): one source of truth.
 const presenceDirectory = PresenceDirectory.resolve(

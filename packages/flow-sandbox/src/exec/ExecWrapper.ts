@@ -1,5 +1,6 @@
 import { declaredOutputNames } from 'flow-cli/src/worker/StepResultFrame';
 
+import { describeError } from '../ErrorText';
 import type { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import type { SandboxLifecycle } from '../SandboxLifecycle';
@@ -118,7 +119,7 @@ export class ExecWrapper {
 			if (held !== undefined) await lifecycle.endRun(held.executionId, 'daemon_stopping');
 			await lifecycle.shutdown();
 		} catch (error) {
-			log.warn(`could not stop the sandbox cleanly: ${describe(error)}`);
+			log.warn(`could not stop the sandbox cleanly: ${describeError(error)}`);
 		}
 		this.daemon.close();
 	}
@@ -131,7 +132,7 @@ export class ExecWrapper {
 				this.queue = this.queue
 					.then(() => this.serveAssignment(message))
 					.catch(error => {
-						this.dependencies.log.warn(`assignment handling failed unexpectedly: ${describe(error)}`);
+						this.dependencies.log.warn(`assignment handling failed unexpectedly: ${describeError(error)}`);
 					});
 				return;
 			case 'idle':
@@ -206,10 +207,10 @@ export class ExecWrapper {
 					assignmentId: ids.assignmentId,
 					executionId: ids.executionId,
 					stepId: ids.stepId,
-					error: `The sandbox worker could not run step "${ids.stepId}": ${describe(error)}`,
+					error: `The sandbox worker could not run step "${ids.stepId}": ${describeError(error)}`,
 				});
 			}
-			log.warn(`step "${ids.stepId}" failed in the exec wrapper: ${describe(error)}`);
+			log.warn(`step "${ids.stepId}" failed in the exec wrapper: ${describeError(error)}`);
 		} finally {
 			// Announced after the sandbox work is over, so the next assign never meets a busy lifecycle.
 			this.reporter.send(this.dependencies.registration.ready());
@@ -266,7 +267,7 @@ export class ExecWrapper {
 		return {
 			type: 'step_failed',
 			...header,
-			error: describe(error),
+			error: describeError(error),
 			...(carried.stepOutputs === undefined ? {} : { output: carried.stepOutputs }),
 			...(carried.stdout === undefined ? {} : { stdout: carried.stdout }),
 			...(carried.stderr === undefined ? {} : { stderr: carried.stderr }),
@@ -300,7 +301,7 @@ export class ExecWrapper {
 		try {
 			fitted = DaemonFrameFit.fit(message, this.declared);
 		} catch (error) {
-			this.dependencies.log.warn(`could not fit a "${String(message['type'])}" message: ${describe(error)}`);
+			this.dependencies.log.warn(`could not fit a "${String(message['type'])}" message: ${describeError(error)}`);
 			return 'dropped';
 		}
 		const decision = this.guard.handle(JSON.stringify(fitted));
@@ -338,8 +339,4 @@ export class ExecWrapper {
 		this.prepared = { sandbox, value };
 		return value;
 	}
-}
-
-function describe(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

@@ -11,6 +11,7 @@ import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { LeftoverSandboxes } from '../LeftoverSandboxes';
 import { NodeCommandRunner } from '../NodeCommandRunner';
 import { PresenceDirectory } from '../PresenceDirectory';
+import { isProcessAlive } from '../ProcessLiveness';
 import { RunMounts } from '../RunMounts';
 import { SandboxCapacity } from '../SandboxCapacity';
 import { SandboxLifecycle } from '../SandboxLifecycle';
@@ -20,6 +21,7 @@ import { SbxPrerequisiteCheck } from '../SbxPrerequisiteCheck';
 import { StaleTempSweep } from '../StaleTempSweep';
 import { SystemClock } from '../SystemClock';
 import { SystemScheduler } from '../SystemScheduler';
+import { WrapperLog } from '../WrapperLog';
 import { WrapperPresence } from '../WrapperPresence';
 import { DaemonLink } from '../harness/DaemonLink';
 import { EnvironmentCommandRunner } from '../harness/EnvironmentCommandRunner';
@@ -37,34 +39,6 @@ import { VmFileStager } from './VmFileStager';
 /** Version string the wrapper reports to the daemon (`flow worker list`). */
 const EXEC_VERSION = 'sandbox-exec-m7';
 
-function isProcessAlive(pid: number): boolean {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch (error) {
-		return (error as NodeJS.ErrnoException).code === 'EPERM';
-	}
-}
-
-/** stderr (the daemon forwards it as `[source <id>] ...`) plus, when asked, a file. */
-class ExecLog implements SandboxLog {
-	constructor(private readonly logFile: string | undefined) {}
-
-	info(message: string): void {
-		this.write('info', message);
-	}
-
-	warn(message: string): void {
-		this.write('warn', message);
-	}
-
-	private write(level: string, message: string): void {
-		const line = `${new Date().toISOString()} [exec] ${level}: ${message}\n`;
-		process.stderr.write(line);
-		if (this.logFile !== undefined) fs.appendFileSync(this.logFile, line);
-	}
-}
-
 /**
  * Entry of the exec variant (milestone M7): `node --import tsx packages/flow-sandbox/scripts/ExecWrapper.mjs <options>`,
  * launched by a built-in:command source. The options are the ones of the relay harness (HarnessConfigParser).
@@ -77,7 +51,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 		env,
 		PresenceDirectory.defaultPath(os.homedir())
 	);
-	const log = new ExecLog(config.logFile);
+	const log = new WrapperLog('exec', config.logFile);
 	log.info(
 		`starting: wrapper ${config.wrapperId}, source ${config.sourceId}, projects ${config.projectIds.join(',')}, labels ${config.labels.join(',')}, image ${config.image ?? '(agent default)'}`
 	);

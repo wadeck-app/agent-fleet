@@ -9,6 +9,7 @@ import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { LeftoverSandboxes } from '../LeftoverSandboxes';
 import { NodeCommandRunner } from '../NodeCommandRunner';
 import { PresenceDirectory } from '../PresenceDirectory';
+import { isProcessAlive } from '../ProcessLiveness';
 import { RunMounts } from '../RunMounts';
 import { SandboxCapacity } from '../SandboxCapacity';
 import { SandboxLifecycle } from '../SandboxLifecycle';
@@ -18,6 +19,7 @@ import { SbxPrerequisiteCheck } from '../SbxPrerequisiteCheck';
 import { StaleTempSweep } from '../StaleTempSweep';
 import { SystemClock } from '../SystemClock';
 import { SystemScheduler } from '../SystemScheduler';
+import { WrapperLog } from '../WrapperLog';
 import { WrapperPresence } from '../WrapperPresence';
 import { BridgeTokenGuard } from './BridgeTokenGuard';
 import { CredentialedSandboxPreparer } from './CredentialedSandboxPreparer';
@@ -32,34 +34,6 @@ import { RelayRegistration } from './RelayRegistration';
 /** Version string the harness reports to the daemon (`flow worker list`). */
 const HARNESS_VERSION = 'sandbox-harness-m4';
 
-function isProcessAlive(pid: number): boolean {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch (error) {
-		return (error as NodeJS.ErrnoException).code === 'EPERM';
-	}
-}
-
-/** stderr (the daemon forwards it as `[source <id>] ...`) plus, when asked, a file. */
-class HarnessLog implements SandboxLog {
-	constructor(private readonly logFile: string | undefined) {}
-
-	info(message: string): void {
-		this.write('info', message);
-	}
-
-	warn(message: string): void {
-		this.write('warn', message);
-	}
-
-	private write(level: string, message: string): void {
-		const line = `${new Date().toISOString()} [harness] ${level}: ${message}\n`;
-		process.stderr.write(line);
-		if (this.logFile !== undefined) fs.appendFileSync(this.logFile, line);
-	}
-}
-
 /**
  * Entry of the development harness (M4): `node --import tsx packages/flow-sandbox/scripts/HarnessWrapper.mjs <options>`,
  * launched by a built-in:command source. Resolves when the harness is over; a configuration error or a failed
@@ -67,7 +41,7 @@ class HarnessLog implements SandboxLog {
  */
 export async function runHarness(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<void> {
 	const config = new HarnessConfigParser().parse(argv, env, PresenceDirectory.defaultPath(os.homedir()));
-	const log = new HarnessLog(config.logFile);
+	const log = new WrapperLog('harness', config.logFile);
 	log.info(
 		`starting: wrapper ${config.wrapperId}, source ${config.sourceId}, projects ${config.projectIds.join(',')}, labels ${config.labels.join(',')}, image ${config.image ?? '(agent default)'}`
 	);
