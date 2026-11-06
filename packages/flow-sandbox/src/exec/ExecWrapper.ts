@@ -1,7 +1,11 @@
+import { declaredOutputNames } from 'flow-cli/src/worker/StepResultFrame';
+
 import type { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import type { SandboxLifecycle } from '../SandboxLifecycle';
 import type { SandboxLog } from '../SandboxLog';
+import { DaemonFrameFit } from '../harness/DaemonFrameFit';
+import { DaemonReporter } from '../harness/DaemonReporter';
 import { type JsonObject, isJsonObject, isNonEmptyString } from '../harness/HarnessMessages';
 import type { DaemonControl, DaemonHandlers } from '../harness/HarnessWrapper';
 import { InsideMessageGuard } from '../harness/InsideMessageGuard';
@@ -71,6 +75,9 @@ export interface ExecWrapperDependencies {
 export class ExecWrapper {
 	private readonly daemon: DaemonControl;
 	private readonly guard: InsideMessageGuard;
+	private readonly reporter: DaemonReporter;
+	/** The output names the active step declares: the only ones a too-large result never loses. */
+	private declared: ReadonlySet<string> = new Set();
 	private mounts: { executionId: string; mounts: RunMounts } | undefined;
 	private prepared: { sandbox: string; value: ExecPreparedSandbox } | undefined;
 	private queue: Promise<void> = Promise.resolve();
@@ -87,6 +94,7 @@ export class ExecWrapper {
 				void this.handleDaemonClosed(code, reason);
 			},
 		});
+		this.reporter = new DaemonReporter(this.daemon, dependencies.log);
 	}
 
 	/** Starts the lifecycle, connects to the daemon and registers (sends `ready`). */
@@ -193,7 +201,7 @@ export class ExecWrapper {
 		} catch (error) {
 			this.guard.end();
 			if (!reported) {
-				this.safeSend({
+				this.reporter.send({
 					type: 'step_failed',
 					assignmentId: ids.assignmentId,
 					executionId: ids.executionId,
@@ -204,7 +212,7 @@ export class ExecWrapper {
 			log.warn(`step "${ids.stepId}" failed in the exec wrapper: ${describe(error)}`);
 		} finally {
 			// Announced after the sandbox work is over, so the next assign never meets a busy lifecycle.
-			this.safeSend(this.dependencies.registration.ready());
+			this.reporter.send(this.dependencies.registration.ready());
 		}
 	}
 
@@ -213,6 +221,7 @@ export class ExecWrapper {
 		const { assignmentId, executionId, stepId } = assignment;
 		this.guard.begin({ assignmentId, executionId, stepId, stepType: assignment.stepType });
 		const header = { assignmentId, executionId, stepId };
+		this.declared = declaredOutputNames(assignment.stepConfig);
 		// Announced before the first side effect: after this the daemon treats a disconnect as a failure, not a replay.
 		this.relay({ type: 'step_started', ...header });
 		let outcome: JsonObject;
@@ -232,7 +241,7 @@ export class ExecWrapper {
 		}
 		if (this.relay(outcome) !== 'terminal') {
 			// The guard dropped the outcome (too big, malformed): the daemon must still hear that the step is over.
-			this.safeSend({
+			this.reporter.send({
 				type: 'step_failed',
 				...header,
 				error: `The result of step "${stepId}" was refused by the exec wrapper (see the wrapper log for the reason).`,
@@ -285,9 +294,18 @@ export class ExecWrapper {
 
 	/** Sends one engine message through the guard. Returns what happened to it. */
 	private relay(message: JsonObject): 'sent' | 'terminal' | 'dropped' {
-		const decision = this.guard.handle(JSON.stringify(message));
+		// Fitted before the guard (it refuses a raw frame over the limit) and again by the reporter after the guard
+		// translated the paths (a host path is longer than a sandbox one).
+		let fitted: JsonObject;
+		try {
+			fitted = DaemonFrameFit.fit(message, this.declared);
+		} catch (error) {
+			this.dependencies.log.warn(`could not fit a "${String(message['type'])}" message: ${describe(error)}`);
+			return 'dropped';
+		}
+		const decision = this.guard.handle(JSON.stringify(fitted));
 		if (decision.action !== 'forward') return 'dropped';
-		if (!this.safeSend(decision.message)) return 'dropped';
+		if (!this.reporter.send(decision.message, this.declared)) return 'dropped';
 		return decision.terminal ? 'terminal' : 'sent';
 	}
 
@@ -319,16 +337,6 @@ export class ExecWrapper {
 		const value = await this.dependencies.preparer.prepare(sandbox, mounts);
 		this.prepared = { sandbox, value };
 		return value;
-	}
-
-	private safeSend(message: JsonObject): boolean {
-		try {
-			this.daemon.send(message);
-			return true;
-		} catch (error) {
-			this.dependencies.log.warn(`could not send "${String(message['type'])}" to the daemon: ${describe(error)}`);
-			return false;
-		}
 	}
 }
 

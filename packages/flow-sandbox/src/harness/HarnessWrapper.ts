@@ -1,8 +1,13 @@
+import { declaredOutputNames } from 'flow-cli/src/worker/StepResultFrame';
+
+import { describeError } from '../ErrorText';
 import type { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import type { SandboxLifecycle } from '../SandboxLifecycle';
 import type { SandboxLog } from '../SandboxLog';
 import { AssignmentRewriter } from './AssignmentRewriter';
+import { type AssignmentWait, newAssignmentWait, withTimeout } from './AssignmentWait';
+import { DaemonReporter } from './DaemonReporter';
 import { type JsonObject, isJsonObject, isNonEmptyString } from './HarnessMessages';
 import type { InnerWorkerHandle, InnerWorkerLauncher } from './InnerWorkerLauncher';
 import { InsideMessageGuard } from './InsideMessageGuard';
@@ -58,16 +63,6 @@ export interface HarnessWrapperDependencies {
 	innerFreeTimeoutMs?: number;
 }
 
-interface AssignmentWait {
-	terminal: Promise<void>;
-	resolveTerminal: () => void;
-	free: Promise<void>;
-	resolveFree: () => void;
-	/** The outcome (or a synthetic failure) already went to the daemon. */
-	reported: boolean;
-	ids: { assignmentId: string; executionId: string; stepId: string };
-}
-
 const DEFAULT_INNER_CONNECT_TIMEOUT_MS = 60_000;
 const DEFAULT_INNER_FREE_TIMEOUT_MS = 10_000;
 
@@ -88,6 +83,7 @@ export class HarnessWrapper {
 	private readonly bridge: BridgeControl;
 	private readonly daemon: DaemonControl;
 	private readonly guard: InsideMessageGuard;
+	private readonly reporter: DaemonReporter;
 	private readonly innerConnectTimeoutMs: number;
 	private readonly innerFreeTimeoutMs: number;
 	private mounts: { executionId: string; mounts: RunMounts } | undefined;
@@ -116,6 +112,7 @@ export class HarnessWrapper {
 				void this.handleDaemonClosed(code, reason);
 			},
 		});
+		this.reporter = new DaemonReporter(this.daemon, dependencies.log);
 	}
 
 	/** Starts the lifecycle and the bridge, connects to the daemon and registers (sends `ready`). */
@@ -138,7 +135,7 @@ export class HarnessWrapper {
 			if (held !== undefined) await lifecycle.endRun(held.executionId, 'daemon_stopping');
 			await lifecycle.shutdown();
 		} catch (error) {
-			log.warn(`could not stop the sandbox cleanly: ${describe(error)}`);
+			log.warn(`could not stop the sandbox cleanly: ${describeError(error)}`);
 		}
 		this.inner?.stop();
 		await this.bridge.stop();
@@ -153,7 +150,7 @@ export class HarnessWrapper {
 				this.queue = this.queue
 					.then(() => this.serveAssignment(message))
 					.catch(error => {
-						this.dependencies.log.warn(`assignment handling failed unexpectedly: ${describe(error)}`);
+						this.dependencies.log.warn(`assignment handling failed unexpectedly: ${describeError(error)}`);
 					});
 				return;
 			case 'idle':
@@ -188,7 +185,7 @@ export class HarnessWrapper {
 			);
 			return;
 		}
-		const wait = this.newWait(ids);
+		const wait = newAssignmentWait(ids, declaredOutputNames(raw['stepConfig']));
 		this.wait = wait;
 		const timings = { received: now(), sandboxReady: 0, forwarded: 0, outcome: 0, free: 0 };
 		try {
@@ -224,19 +221,19 @@ export class HarnessWrapper {
 			this.guard.end();
 			if (!wait.reported) {
 				wait.reported = true;
-				this.safeSend({
+				this.reporter.send({
 					type: 'step_failed',
 					assignmentId: ids.assignmentId,
 					executionId: ids.executionId,
 					stepId: ids.stepId,
-					error: `The sandbox worker could not run step "${ids.stepId}": ${describe(error)}`,
+					error: `The sandbox worker could not run step "${ids.stepId}": ${describeError(error)}`,
 				});
 			}
-			log.warn(`step "${ids.stepId}" failed in the harness: ${describe(error)}`);
+			log.warn(`step "${ids.stepId}" failed in the harness: ${describeError(error)}`);
 		} finally {
 			this.wait = undefined;
 			// Announced after the sandbox work is over, so the next assign never meets a busy lifecycle.
-			this.safeSend(this.dependencies.registration.ready());
+			this.reporter.send(this.dependencies.registration.ready());
 		}
 	}
 
@@ -247,14 +244,6 @@ export class HarnessWrapper {
 		}
 		if (!isNonEmptyString(context['executionId'])) return undefined;
 		return { assignmentId: raw['assignmentId'], stepId: raw['stepId'], executionId: context['executionId'] };
-	}
-
-	private newWait(ids: AssignmentWait['ids']): AssignmentWait {
-		let resolveTerminal = (): void => undefined;
-		let resolveFree = (): void => undefined;
-		const terminal = new Promise<void>(resolve => (resolveTerminal = resolve));
-		const free = new Promise<void>(resolve => (resolveFree = resolve));
-		return { terminal, resolveTerminal, free, resolveFree, reported: false, ids };
 	}
 
 	private mountsFor(raw: JsonObject, executionId: string): RunMounts {
@@ -347,9 +336,21 @@ export class HarnessWrapper {
 		const wait = this.wait;
 		switch (decision.action) {
 			case 'forward':
-				if (this.safeSend(decision.message) && decision.terminal && wait !== undefined) {
-					wait.reported = true;
-					wait.resolveTerminal();
+				{
+					const sent = this.reporter.send(decision.message, wait?.declared);
+					if (decision.terminal && wait !== undefined) {
+						// The outcome could not be sent (frame too large, connection down): the daemon must still hear that the
+						// step is over, and this wrapper must not wait for ever for a message that will not come.
+						if (!sent) {
+							this.reporter.send({
+								type: 'step_failed',
+								...wait.ids,
+								error: `The result of step "${wait.ids.stepId}" could not be sent to the daemon (see the wrapper log for the reason).`,
+							});
+						}
+						wait.reported = true;
+						wait.resolveTerminal();
+					}
 				}
 				return;
 			case 'free':
@@ -377,7 +378,7 @@ export class HarnessWrapper {
 		}
 		wait.reported = true;
 		this.guard.end();
-		this.safeSend({
+		this.reporter.send({
 			type: 'step_failed',
 			assignmentId: wait.ids.assignmentId,
 			executionId: wait.ids.executionId,
@@ -387,29 +388,4 @@ export class HarnessWrapper {
 		wait.resolveTerminal();
 		wait.resolveFree();
 	}
-
-	private safeSend(message: JsonObject): boolean {
-		try {
-			this.daemon.send(message);
-			return true;
-		} catch (error) {
-			this.dependencies.log.warn(`could not send "${String(message['type'])}" to the daemon: ${describe(error)}`);
-			return false;
-		}
-	}
-}
-
-function describe(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
-/** Resolves when `promise` does, or after `timeoutMs` (the caller continues; a late value is ignored). */
-function withTimeout(promise: Promise<void>, timeoutMs: number): Promise<void> {
-	return new Promise<void>(resolve => {
-		const timer = setTimeout(resolve, timeoutMs);
-		void promise.then(() => {
-			clearTimeout(timer);
-			resolve();
-		});
-	});
 }

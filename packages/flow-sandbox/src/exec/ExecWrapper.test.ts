@@ -352,12 +352,29 @@ describe('ExecWrapper failures', () => {
 		expect(failure?.['executionId']).toBe('run2');
 	});
 
-	it('replaces an outcome the daemon would reject (too big) by a failure, so the step is never left hanging', async () => {
-		behaviour = () => Promise.resolve({ output: { text: 'x'.repeat(1_100_000) } });
+	// Same result as flow's own worker: diagnostics are cut to fit, a result that cannot fit fails for good.
+	it.each([
+		{
+			label: 'cuts an undeclared stdout and says so',
+			output: { stdout: 'x'.repeat(1_100_000), answer: 'kept' },
+			expected: { type: 'step_completed', output: { answer: 'kept' } },
+			text: /only the last/,
+		},
+		{
+			label: 'fails, without a retry, a result whose undeclared output cannot be cut',
+			output: { text: 'x'.repeat(1_100_000) },
+			expected: { type: 'step_failed', origin: 'engine' },
+			text: /cannot be sent/,
+		},
+	])('an outcome over the daemon limit: $label', async spec => {
+		behaviour = () => Promise.resolve({ output: spec.output });
 		await run(assign('probe'));
-		expect(daemon.ofType('step_completed')).toHaveLength(0);
-		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(/refused by the exec wrapper/);
-		expect(log.text()).toMatch(/exceeds the 1048576-byte limit/);
+		const outcome = daemon.received.find(message =>
+			['step_completed', 'step_failed'].includes(String(message['type']))
+		);
+		expect(outcome).toMatchObject(spec.expected);
+		expect(JSON.stringify(outcome)).toMatch(spec.text);
+		expect(Buffer.byteLength(JSON.stringify(outcome))).toBeLessThanOrEqual(1024 * 1024);
 	});
 });
 

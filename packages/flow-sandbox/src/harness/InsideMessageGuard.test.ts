@@ -52,6 +52,18 @@ function forwarded(decision: InsideDecision): JsonObject {
 	return decision.message;
 }
 
+// What the worker adds when it fits a result to the frame limit must reach the daemon (the retry decision depends on it).
+describe('InsideMessageGuard: the fields of a fitted result', () => {
+	it.each([
+		{ type: 'step_completed', extra: { truncated: [{ field: 'io.stdout', originalBytes: 9, keptBytes: 3 }] } },
+		{ type: 'step_failed', extra: { error: 'too big', origin: 'engine' } },
+	])('keeps them on a $type', ({ type, extra }) => {
+		const decision = guard().handle(scoped(type, { output: {}, ...extra }));
+
+		expect(forwarded(decision)).toMatchObject(extra);
+	});
+});
+
 describe('InsideMessageGuard: the allowed messages', () => {
 	it('forwards log, started and progress for the active assignment, rebuilt from the known fields', () => {
 		const instance = guard();

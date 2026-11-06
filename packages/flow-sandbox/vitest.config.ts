@@ -1,6 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
+const flowCliSource = fileURLToPath(new URL('../flow-cli/src', import.meta.url));
+
 export default defineConfig({
 	test: {
 		include: ['src/**/*.test.ts'],
@@ -17,9 +19,11 @@ export default defineConfig({
 		},
 	},
 	resolve: {
-		alias: {
-			// Same mapping as `paths` in tsconfig.shared.json: the exec variant tests run the engine's real McpServer.
-			'flow-cli': fileURLToPath(new URL('../flow-cli/src', import.meta.url)),
-		},
+		// Same mapping as `paths` in tsconfig.shared.json: the exec variant tests run the engine's real McpServer.
+		// `flow-cli/src/...` is the spelling Node resolves through the workspace link (ExecMain, DaemonFrameFit): same folder.
+		alias: [
+			{ find: /^flow-cli\/src\//, replacement: flowCliSource + '/' },
+			{ find: 'flow-cli', replacement: flowCliSource },
+		],
 	},
 });

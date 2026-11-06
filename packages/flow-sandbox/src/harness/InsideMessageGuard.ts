@@ -153,7 +153,7 @@ export class InsideMessageGuard {
 				};
 			}
 			case 'step_completed':
-				return this.handleOutcome(header, message, assignment, ['output', 'meta', 'io']);
+				return this.handleOutcome(header, message, assignment, ['output', 'meta', 'io', 'truncated']);
 			case 'step_failed': {
 				if (!isNonEmptyString(message['error'])) return this.drop('"step_failed" without an error text', type);
 				return this.handleOutcome(header, message, assignment, [
@@ -163,6 +163,7 @@ export class InsideMessageGuard {
 					'stderr',
 					'io',
 					'meta',
+					'origin',
 				]);
 			}
 			case 'inject_steps': {
@@ -219,6 +220,10 @@ export class InsideMessageGuard {
 			if (typeof translated === 'string') return this.refuseResult(header, assignment, translated);
 			picked['meta'] = translated;
 		}
+		// `truncated` (what the worker cut to fit the frame) and `origin: 'engine'` (do not retry) are the worker's own
+		// fields; nothing else is accepted in their place.
+		if (picked['truncated'] !== undefined && !Array.isArray(picked['truncated'])) delete picked['truncated'];
+		if (picked['origin'] !== undefined && picked['origin'] !== 'engine') delete picked['origin'];
 		assignment.finished = true;
 		return { action: 'forward', message: { ...header, ...picked }, terminal: true };
 	}

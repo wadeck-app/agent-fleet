@@ -43,7 +43,11 @@ class FakeDaemon implements DaemonControl {
 		return Promise.resolve();
 	}
 
+	/** Messages for which `send` throws, like DaemonLink does for a frame over the limit or a closed connection. */
+	refuse: (message: JsonObject) => boolean = () => false;
+
 	send(message: JsonObject): void {
+		if (this.refuse(message)) throw new Error('frame refused by the fake daemon');
 		this.arrivals.push(message);
 	}
 
@@ -282,6 +286,16 @@ describe('HarnessWrapper registration', () => {
 });
 
 describe('HarnessWrapper relaying a step', () => {
+	it('tells the daemon the step failed, and does not wait for ever, when the outcome cannot be sent', async () => {
+		daemon.refuse = message => message['type'] === 'step_completed';
+
+		await serve(assign(), 2);
+
+		expect(daemon.types()).toEqual(['ready', 'step_started', 'log', 'step_failed', 'ready']);
+		expect(daemon.received[3]?.['error']).toMatch(/could not be sent to the daemon/);
+		expect(log.text()).toMatch(/could not send "step_completed"/);
+	}, 5000);
+
 	it('creates one sandbox, runs the inner worker, forwards the report and announces the wrapper as free', async () => {
 		await serve(assign(), 2);
 
