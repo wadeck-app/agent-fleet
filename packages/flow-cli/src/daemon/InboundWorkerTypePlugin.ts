@@ -3,6 +3,7 @@ import type { WorkerTypeInstance } from 'extension-points';
 import type { FlowPlugin } from '../config/FlowPlugin.js';
 import { InboundWorkerSource } from './InboundWorkerSource.js';
 import { nudgeUrlProblem } from './NudgeUrlCheck.js';
+import { PluginConfigurationError } from './PluginConfigurationError.js';
 
 /** The type reference the inbound worker type is registered under (see BuiltinPluginRegistry). */
 export const INBOUND_WORKER_TYPE_REF = 'plugins.inbound.default';
@@ -41,7 +42,7 @@ export const inboundWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 		const options: unknown = context['options'] ?? {};
 		if (typeof options !== 'object' || options === null || Array.isArray(options)) {
 			return Promise.reject(
-				new Error(
+				new PluginConfigurationError(
 					`the inbound worker type needs its options to be an object, got ${Array.isArray(options) ? 'array' : options === null ? 'null' : typeof options}.`
 				)
 			);
@@ -49,7 +50,7 @@ export const inboundWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 		const { nudgeUrl } = options as { nudgeUrl?: unknown };
 		if (nudgeUrl !== undefined && typeof nudgeUrl !== 'string') {
 			return Promise.reject(
-				new Error(
+				new PluginConfigurationError(
 					`the inbound worker type needs options.nudgeUrl to be a string (an http(s) URL), got ${typeof nudgeUrl}. ` +
 						`Fix: flow worker source remove ${sourceId}, then declare it again with a URL.`
 				)
@@ -63,7 +64,7 @@ export const inboundWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 					? `carries a credential (${problem.where}). A nudgeUrl never carries credentials: only host, port and path are used`
 					: 'is not an http(s) URL (the value is not shown: it may hold a secret)';
 			return Promise.reject(
-				new Error(
+				new PluginConfigurationError(
 					`the inbound worker type got a nudgeUrl that ${what}. ` +
 						`Fix: flow worker source remove ${sourceId}, then declare it again with an http(s) URL that has no credentials.`
 				)

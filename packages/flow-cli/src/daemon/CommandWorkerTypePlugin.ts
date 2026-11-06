@@ -2,6 +2,7 @@ import type { WorkerTypeInstance } from 'extension-points';
 
 import type { FlowPlugin } from '../config/FlowPlugin.js';
 import { type CommandSourceOptions, CommandWorkerSource } from './CommandWorkerSource.js';
+import { PluginConfigurationError } from './PluginConfigurationError.js';
 
 /** The type reference the command worker type is registered under (see BuiltinPluginRegistry). */
 export const COMMAND_WORKER_TYPE_REF = 'plugins.command.default';
@@ -84,7 +85,9 @@ function checkedOptions(sourceId: string, options: unknown): CommandSourceOption
 		return {};
 	}
 	if (typeof options !== 'object' || options === null || Array.isArray(options)) {
-		throw new Error(`the command worker type needs its options to be an object, got ${typeName(options)}.${fix}`);
+		throw new PluginConfigurationError(
+			`the command worker type needs its options to be an object, got ${typeName(options)}.${fix}`
+		);
 	}
 	const { command, args, cwd } = options as Record<string, unknown>;
 	for (const [name, value] of [
@@ -92,13 +95,15 @@ function checkedOptions(sourceId: string, options: unknown): CommandSourceOption
 		['cwd', cwd],
 	] as const) {
 		if (value !== undefined && typeof value !== 'string') {
-			throw new Error(
+			throw new PluginConfigurationError(
 				`the command worker type needs options.${name} to be a string, got ${typeName(value)}.${fix}`
 			);
 		}
 	}
 	if (args !== undefined && (!Array.isArray(args) || args.some(arg => typeof arg !== 'string'))) {
-		throw new Error(`the command worker type needs options.args to be an array of strings.${fix}`);
+		throw new PluginConfigurationError(
+			`the command worker type needs options.args to be an array of strings.${fix}`
+		);
 	}
 	return options as CommandSourceOptions;
 }

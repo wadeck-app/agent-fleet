@@ -1,3 +1,4 @@
+import { PluginConfigurationError } from './PluginConfigurationError.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
 /** The extension point a worker-type plugin implements. */
@@ -29,6 +30,14 @@ export function failureOf(
 ): Error {
 	if (!isBuiltin && pluginsDir !== undefined) {
 		return loadFailure(entry, plugin, pluginsDir, cause, original);
+	}
+	// The built-in itself says the declaration is wrong and how to fix it: its message is shown as it is. Only the class
+	// counts: a plugin from disk cannot import it, and the on-disk advice above is right for those.
+	if (original instanceof PluginConfigurationError) {
+		return new Error(
+			`Cannot load worker source "${entry.sourceId}": configuration error in its built-in worker type "${plugin}": ${original.message}`,
+			{ cause: original }
+		);
 	}
 	return new Error(
 		`Cannot load worker source "${entry.sourceId}": "${plugin}" is a built-in worker type of flow and failed: ${cause}. ` +

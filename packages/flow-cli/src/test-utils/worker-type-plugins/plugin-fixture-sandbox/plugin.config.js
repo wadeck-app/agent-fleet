@@ -6,6 +6,7 @@
 //   slow     like sandbox, but its factory resolves only when a test calls state.pendingBuilds.shift()()
 //   hangs    whose factory never settles
 //   throws   whose factory rejects
+//   configerror  whose factory rejects with an error NAMED PluginConfigurationError (a plain Error: a plugin from disk cannot import the class)
 //   invalid  whose factory returns something that is not a worker-type instance
 
 function state() {
@@ -76,6 +77,14 @@ export const manifest = {
 				version: 1,
 				provider: async () => {
 					throw new Error('fixture factory failure');
+				},
+			},
+			configerror: {
+				version: 1,
+				provider: async () => {
+					const error = new Error('fixture says the options are wrong. Fix: change them.');
+					error.name = 'PluginConfigurationError';
+					throw error;
 				},
 			},
 			invalid: {

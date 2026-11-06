@@ -7,8 +7,8 @@ import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 import { WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 /**
- * Pins how a worker type that fails to load is rendered TODAY, whatever the cause: every failure of a built-in is
- * reported as "a bug in flow", a failure of a plugin from disk with the on-disk advice.
+ * Pins how a worker type that fails to load is rendered when the cause is NOT a PluginConfigurationError: a wiring mistake
+ * or an arbitrary error of a built-in is reported as "a bug in flow", a failure of a plugin from disk with the on-disk advice.
  */
 
 beforeEach(() => {
@@ -45,31 +45,8 @@ const messageOf = (promise: Promise<unknown>): Promise<string> =>
 const BUG = 'This is a bug in flow, not in your configuration: please report this error.';
 
 describe('worker type load failures - characterization', () => {
-	it('renders a user-fixable command option error as a bug in flow', async () => {
-		const message = await messageOf(
-			instances().get(entry({ plugin: 'command.default', options: { command: 42 } }))
-		);
-
-		expect(message).toBe(
-			'Cannot load worker source "laptop": "command.default" is a built-in worker type of flow and failed: ' +
-				'Error: the command worker type needs options.command to be a string, got number. Fix: flow worker source remove laptop, then declare it again.. ' +
-				BUG
-		);
-	});
-
-	it('renders a bad inbound nudgeUrl as a bug in flow, without echoing the credential', async () => {
-		const message = await messageOf(
-			instances().get(entry({ plugin: 'inbound.default', options: { nudgeUrl: 'http://u:pw@h/x' } }))
-		);
-
-		expect(message).toBe(
-			'Cannot load worker source "laptop": "inbound.default" is a built-in worker type of flow and failed: ' +
-				'Error: the inbound worker type got a nudgeUrl that carries a credential (user info). A nudgeUrl never carries credentials: only host, port and path are used. ' +
-				'Fix: flow worker source remove laptop, then declare it again with an http(s) URL that has no credentials.. ' +
-				BUG
-		);
-		expect(message).not.toContain('pw');
-	});
+	// Removed when PluginConfigurationError landed: the two tests that pinned a user-fixable command option error and a
+	// bad inbound nudgeUrl as "a bug in flow". Their replacements are in PluginConfigurationError.test.ts.
 
 	it('renders a wiring mistake as a bug in flow', async () => {
 		const message = await messageOf(
