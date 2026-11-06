@@ -36,6 +36,11 @@ describe('PathTranslator toSandbox (Windows host)', () => {
 			['the outputs directory', `${META}\\outputs`, '/c/Users/me/flow/ws one.meta/outputs'],
 			['forward slashes', 'C:/Users/me/flow/ws one/src/a.ts', '/c/Users/me/flow/ws one/src/a.ts'],
 			['a trailing backslash', `${WORKSPACE}\\`, '/c/Users/me/flow/ws one'],
+			[
+				'names that only start like a device name',
+				`${WORKSPACE}\\console\\com10.txt`,
+				'/c/Users/me/flow/ws one/console/com10.txt',
+			],
 			['a trailing slash after a subdirectory', `${WORKSPACE}/src/`, '/c/Users/me/flow/ws one/src'],
 			[
 				'duplicate separators and dot segments',
@@ -84,6 +89,18 @@ describe('PathTranslator toSandbox (Windows host)', () => {
 				['an alternate data stream', `${WORKSPACE}\\a.txt:hidden`, 'has a character Windows treats specially'],
 				['a trailing dot segment', `${WORKSPACE}\\dir.\\a`, 'has a character Windows treats specially'],
 				['a wildcard segment', `${WORKSPACE}\\*`, 'has a character Windows treats specially'],
+				['a reserved device name', `${WORKSPACE}\\NUL`, 'reserved Windows device name'],
+				[
+					'a reserved name with an extension, any case',
+					`${WORKSPACE}\\src\\Com1.txt`,
+					'reserved Windows device name',
+				],
+				[
+					'a reserved name with several extensions',
+					`${WORKSPACE}\\out\\con.tar.gz`,
+					'reserved Windows device name',
+				],
+				['the highest LPT port', `${WORKSPACE}\\lpt9`, 'reserved Windows device name'],
 				['a POSIX style host path', '/c/Users/me/flow/ws one', 'only absolute drive-letter paths'],
 				['an empty string', '', 'it is empty'],
 				['a NUL character', `${WORKSPACE}\\a\0b`, 'it contains a NUL character'],
@@ -138,6 +155,8 @@ describe('PathTranslator toHost (Windows host)', () => {
 				['a relative path', 'c/Users/me/flow/ws one/a', 'must be absolute'],
 				['a colon in a name', '/c/Users/me/flow/ws one/a:b', 'cannot be a Windows file name'],
 				['a trailing space segment', '/c/Users/me/flow/ws one/a /b', 'cannot be a Windows file name'],
+				['a reserved device name', '/c/Users/me/flow/ws one/Aux.log', 'reserved Windows device name'],
+				['a reserved name in a subdirectory', '/c/Users/me/flow/ws one/lpt1/a', 'reserved Windows device name'],
 				['the root', '/', 'starts with a lowercase drive letter'],
 			]
 		);

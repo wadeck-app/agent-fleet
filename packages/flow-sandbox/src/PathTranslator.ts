@@ -44,6 +44,9 @@ function isUnsafeWindowsSegment(segment: string): boolean {
 	const hasControlCharacter = [...segment].some(character => character.charCodeAt(0) < 32);
 	return hasControlCharacter || WINDOWS_FORBIDDEN_CHARACTERS.test(segment) || /[. ]$/.test(segment);
 }
+/** CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without an extension, any case: Windows opens a device, not a file. */
+const WINDOWS_DEVICE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+
 const WINDOWS_PATH_IN_TEXT = /(?<![A-Za-z0-9])[A-Za-z]:[\\/][^\s"'<>|;]*/g;
 const UNC_PATH_IN_TEXT = /(?<![\\\w])\\\\[\w.$-]+\\[\w.$-]+[^\s"'<>|]*/g;
 
@@ -199,6 +202,13 @@ export class PathTranslator {
 					`the segment "${segment}" has a character Windows treats specially (: < > " | ? * or a trailing dot or space)`
 				);
 			}
+			if (WINDOWS_DEVICE_NAME.test(segment)) {
+				throw this.invalid(
+					label,
+					hostPath,
+					`the segment "${segment}" is a reserved Windows device name (CON, PRN, AUX, NUL, COM1-9, LPT1-9)`
+				);
+			}
 		}
 		return { drive: match[1].toLowerCase(), segments };
 	}
@@ -227,6 +237,13 @@ export class PathTranslator {
 		for (const segment of rest) {
 			if (isUnsafeWindowsSegment(segment)) {
 				throw this.invalid(label, sandboxPath, `the segment "${segment}" cannot be a Windows file name`);
+			}
+			if (WINDOWS_DEVICE_NAME.test(segment)) {
+				throw this.invalid(
+					label,
+					sandboxPath,
+					`the segment "${segment}" is a reserved Windows device name (CON, PRN, AUX, NUL, COM1-9, LPT1-9)`
+				);
 			}
 		}
 		return { drive, segments: rest };
