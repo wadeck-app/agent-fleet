@@ -15,7 +15,7 @@ Two commands answer "what have I got":
 | Terminal                  | `flow worker`                           | `external`      | yes, if a plugin can prompt | yes                       | --                  |
 | `built-in:command` source | `flow worker source add …`              | `<sourceId>`    | yes                         | yes                       | `--max-workers`     |
 | `built-in:inbound` source | `flow worker --source <id> --token <t>` | `<sourceId>`    | yes                         | yes                       | `--max-workers`     |
-| `built-in:relay` source   | not implemented                         | --              | --                          | --                        | --                  |
+| Relay source              | no relay process ships yet              | --              | --                          | --                        | --                  |
 
 ### Daemon-forked
 
@@ -85,11 +85,22 @@ flow worker --source laptop --token <worker token>     # wherever that worker li
 Nothing can reach such a worker, so nothing nudges it; it inherits the source's labels (D#30) and
 counts against its cap.
 
-### `built-in:relay` -- declared but not usable
+### Relay worker type -- daemon side only
 
-The daemon side exists (`RelayWorkerSource`, `provide_worker`); the process to run on the remote
-machine does not. Declaring one today yields "no relay connected". A relay does no work: it holds a
-connection to the daemon and launches a local worker when asked.
+A relay holds a connection to the daemon and launches a local worker when asked; it runs no steps itself. The daemon side ships (`RelayWorkerSource`, `provide_worker`). **No relay process ships**: until one exists, a declared relay source yields "no relay connected".
+
+Two equivalent ways to declare it, both served by the same code (`RelayWorkerTypePlugin.ts`):
+
+```
+flow worker source add build-box --provider relay --plugin relay.default      # worker-type plugin, no directory
+flow worker source add build-box --provider built-in:relay                    # legacy provider string, unchanged
+```
+
+- `--plugin relay.default` (or `plugins.relay.default`, stored as `relay.default`) is a **built-in** worker type: no `--plugins-dir` is needed. `--provider` is a free label.
+- A `--plugins-dir` given with a built-in ref is **ignored**; `source add` prints a `[warn]` and the daemon log says so on every build. To use your own copy from a directory, give it another plugin id.
+- **The registry answers before any directory**, for sources and for `PluginProviderLoader`. A stale or planted same-named copy therefore cannot replace a built-in. Which one answered is logged, and `PluginProviderLoader` warns in both directions when a directory is given.
+- Entries written before this (`built-in:relay`, or `relay.default` with a directory) keep loading unchanged.
+- A built-in that fails to load is reported as a bug of flow (`please report this error`), not with the on-disk plugin advice.
 
 ### Plugin source -- a worker type from a plugin
 
@@ -99,7 +110,7 @@ flow worker source add sandbox --provider docker-sandbox --plugin <pluginId>.<im
 ```
 
 - Implements the `worker-type` extension point (`extension-points/src/worker-type/v1.ts`). `--provider` is a free label, never `built-in:*`.
-- `--plugins-dir` must be absolute and contain `plugin-<pluginId>/plugin.config.js`: plain, self-contained JS (no `node_modules` beside it). `<pluginId>` and `<implName>` are plain names (letters, digits, `_`, `-`).
+- `--plugins-dir` is required for a plugin that is not built-in (a built-in such as `relay.default` needs none, see above). It must be absolute and contain `plugin-<pluginId>/plugin.config.js`: plain, self-contained JS (no `node_modules` beside it). `<pluginId>` and `<implName>` are plain names (letters, digits, `_`, `-`).
 - The plugin is trusted code: it runs inside the daemon with its privileges. Nothing confines it to `--plugins-dir` (a symlink or junction inside it is followed); the directory is yours to choose.
 - `--option key=value` values reach the plugin unvalidated. A value written as `${ENV_VAR}` is replaced by the daemon with the variable from ITS environment when it builds the instance; an unset variable fails the build with an error naming the source, the option and the variable. Set it where the daemon is started, then restart the daemon.
 - Only the keys in the sensitive list (`token`, `password`, `secret`, ...) are checked: a literal there is refused. A secret under any other key (for example `--option dockerPass=...`) is accepted, stored in plain text in `worker-sources.json`, and visible in shell history and the process list. Always pass secrets as `${ENV_VAR}`.
