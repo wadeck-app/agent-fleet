@@ -151,6 +151,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 				profileAlias: config.profileAlias,
 				region: config.region,
 				modelEnvironment: config.modelEnvironment,
+				extraAllowedHosts: config.extraAllowedHosts,
 			}),
 			createExecutor: async ({ sandbox, mounts, stopSandbox, ensureRunning, declaredEnvironmentNames }) => {
 				await lookup.prime(sandbox);

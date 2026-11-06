@@ -133,6 +133,7 @@ export async function runHarness(argv: readonly string[], env: NodeJS.ProcessEnv
 				profileAlias: config.profileAlias,
 				region: config.region,
 				modelEnvironment: config.modelEnvironment,
+				extraAllowedHosts: config.extraAllowedHosts,
 			}),
 			launcher: new SandboxInnerWorkerLauncher(runtime, log),
 			log,

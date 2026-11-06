@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 
 import { requireAwsRegion } from '../AwsRegion';
+import { NetworkResourceRule } from '../NetworkResourceRule';
 import { PresenceDirectory } from '../PresenceDirectory';
 import { RunSandboxName } from '../RunSandboxName';
 import { SandboxError } from '../SandboxError';
@@ -33,6 +34,8 @@ export interface HarnessConfig {
 	acceptSshAgentForwarding: boolean;
 	/** Environment for model steps (for example the Bedrock model alias). */
 	modelEnvironment: Record<string, string>;
+	/** Extra `host:port` network rules opened for every sandbox, on top of what the model tool needs. */
+	extraAllowedHosts: string[];
 	/** Variables handed to the `aws` CLI (the real home directory when the daemon runs with a redirected one). */
 	awsEnvironment: NodeJS.ProcessEnv;
 }
@@ -45,7 +48,7 @@ function usage(script: string): string {
 		'  --region <aws region>                       for example us-east-1',
 		'  [--wrapper-id <1-12 [a-z0-9]>] [--labels a,b] [--image <tag>] [--pull always|missing|never] [--agent <kind>]',
 		'  [--cpus <n>] [--memory <2g>] [--idle-minutes <n>] [--max-sandboxes <n>] [--presence-dir <dir>] [--log-file <file>]',
-		'  [--project-path <folder> ...] [--model-env NAME=VALUE ...] [--accept-ssh-agent-forwarding]',
+		'  [--project-path <folder> ...] [--model-env NAME=VALUE ...] [--extra-allowed-host <host:port> ...] [--accept-ssh-agent-forwarding]',
 		'Environment (set by the daemon for a built-in:command source): FLOW_DAEMON_WS_URL, FLOW_WORKER_SOURCE_ID, FLOW_WORKER_TOKEN.',
 		'Optional: FLOW_SANDBOX_HOST_HOME (home directory given to the aws CLI), FLOW_SANDBOX_PRESENCE_DIR (default of --presence-dir, shared with the leftover CLI), SBX_PATH.',
 	].join('\n');
@@ -113,6 +116,7 @@ export class HarnessConfigParser {
 					'presence-dir': { type: 'string' },
 					'log-file': { type: 'string' },
 					'model-env': { type: 'string', multiple: true },
+					'extra-allowed-host': { type: 'string', multiple: true },
 					'accept-ssh-agent-forwarding': { type: 'boolean' },
 				},
 			}).values;
@@ -170,6 +174,12 @@ export class HarnessConfigParser {
 			modelEnvironment[entry.slice(0, index)] = entry.slice(index + 1);
 		}
 
+		const extraAllowedHosts = (values['extra-allowed-host'] as string[] | undefined) ?? [];
+		for (const host of extraAllowedHosts) {
+			const problem = NetworkResourceRule.problem(host);
+			if (problem !== undefined) fail(`invalid --extra-allowed-host ${JSON.stringify(host)}: ${problem}.`);
+		}
+
 		const hostHome = env['FLOW_SANDBOX_HOST_HOME'];
 		// The aws CLI needs none of the FLOW_* launch variables (the worker token lets whoever has it speak as this worker).
 		const awsEnvironment: NodeJS.ProcessEnv = Object.fromEntries(
@@ -211,6 +221,7 @@ export class HarnessConfigParser {
 			logFile: values['log-file'] as string | undefined,
 			acceptSshAgentForwarding: values['accept-ssh-agent-forwarding'] === true,
 			modelEnvironment,
+			extraAllowedHosts,
 			awsEnvironment,
 		};
 	}

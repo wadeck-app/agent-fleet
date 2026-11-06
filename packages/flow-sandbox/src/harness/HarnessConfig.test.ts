@@ -85,6 +85,14 @@ describe('HarnessConfigParser', () => {
 		});
 	});
 
+	it('takes extra allowed hosts, repeatable, none by default', () => {
+		expect(parse().extraAllowedHosts).toEqual([]);
+		expect(
+			parse([...BASE, '--extra-allowed-host', 'a.example.org:443', '--extra-allowed-host', '*.npmjs.org:443'])
+				.extraAllowedHosts
+		).toEqual(['a.example.org:443', '*.npmjs.org:443']);
+	});
+
 	it('gives the aws CLI the real home when FLOW_SANDBOX_HOST_HOME is set', () => {
 		const config = parse(BASE, { ...ENV, FLOW_SANDBOX_HOST_HOME: '/real/home', HOME: '/fake' });
 
@@ -135,6 +143,16 @@ describe('HarnessConfigParser', () => {
 		['idle minutes that are too long', [...BASE, '--idle-minutes', '99999'], '--idle-minutes'],
 		['a model env without a value', [...BASE, '--model-env', 'NOVALUE'], '--model-env'],
 		['an unknown option', [...BASE, '--cpu', '2'], 'Unknown option'],
+		[
+			'an extra allowed host without a port',
+			[...BASE, '--extra-allowed-host', 'example.org'],
+			'invalid --extra-allowed-host',
+		],
+		[
+			'an overbroad wildcard as extra allowed host',
+			[...BASE, '--extra-allowed-host', '*.com:443'],
+			'would open every host under "com"',
+		],
 		['a positional argument', [...BASE, 'stray'], 'Unexpected argument'],
 	])('refuses %s with the usage', (_name, argv, fragment) => {
 		expect(() => parse(argv)).toThrow(fragment);
