@@ -10,7 +10,8 @@ import type { WorkerSourceDeclaration } from './WorkerSourceRegistry.js';
  * provider (the entry's `nudgeUrl`). Never for a worker declaring itself (`selfDeclared`): that URL is its own endpoint,
  * not user input. Entries already stored are not re-checked here: this runs at declaration only.
  *
- * A `${NAME}` reference is allowed anywhere in the URL and is expanded by the daemon when it builds the instance.
+ * A `${NAME}` reference is allowed in the host, port and path (it is expanded by the daemon when it builds the
+ * instance) but is no way around the credential rule: see {@link nudgeUrlProblem}.
  */
 export class WorkerSourceInboundRule {
 	constructor(private readonly pluginReference: WorkerSourcePluginReference) {}
@@ -70,6 +71,6 @@ function invalidUrl(sourceId: string, url: string): Error {
 function credential(sourceId: string, where: string): Error {
 	return new Error(
 		`Worker source "${sourceId}": nudgeUrl carries a credential (${where}). ` +
-			'Write ${NAME} instead of the literal value and set NAME in the daemon environment.'
+			'A nudgeUrl never carries credentials: only host, port and path are used, so remove it.'
 	);
 }

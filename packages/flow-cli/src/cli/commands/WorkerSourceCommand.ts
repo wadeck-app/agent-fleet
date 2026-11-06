@@ -6,7 +6,8 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
-import { WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
+import { redactNudgeUrl } from '../../daemon/NudgeUrlCheck.js';
+import { type WorkerSourceEntry, WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -205,9 +206,9 @@ export function registerWorkerSourceCommand(program: Command): Command {
 					: undefined;
 
 				if (options.json) {
-					const payload = liveness
-						? entries.map(e => ({ ...e, liveness: liveness.get(e.sourceId) }))
-						: entries;
+					// Stored URLs may hold user info or query credentials (old or self-declared entries): print them redacted.
+					const shown = entries.map(redactedForListing);
+					const payload = liveness ? shown.map(e => ({ ...e, liveness: liveness.get(e.sourceId) })) : shown;
 					console.log(JSON.stringify(payload, null, 2));
 					return;
 				}
@@ -302,4 +303,16 @@ export function registerWorkerSourceCommand(program: Command): Command {
 
 	// Returned so `flow worker start` can be attached to the same group.
 	return worker;
+}
+
+/** The entry as `list --json` prints it: both places a nudgeUrl can be stored, redacted. */
+function redactedForListing(entry: WorkerSourceEntry): WorkerSourceEntry {
+	const optionsUrl: unknown = entry.options?.['nudgeUrl'];
+	return {
+		...entry,
+		...(entry.nudgeUrl === undefined ? {} : { nudgeUrl: redactNudgeUrl(entry.nudgeUrl) }),
+		...(entry.options !== undefined && typeof optionsUrl === 'string'
+			? { options: { ...entry.options, nudgeUrl: redactNudgeUrl(optionsUrl) } }
+			: {}),
+	};
 }

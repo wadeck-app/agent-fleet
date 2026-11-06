@@ -1,3 +1,4 @@
+import { redactNudgeUrl } from './NudgeUrlCheck.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
 /** The plain plugin ref of the built-in inbound worker type. */
@@ -6,7 +7,7 @@ export const INBOUND_PLUGIN_REF = 'inbound.default';
 /** The one message for two different `nudgeUrl` values, at declaration and when the instance is built. */
 export function nudgeUrlConflict(sourceId: string, entryUrl: string, optionsUrl: string): Error {
 	return new Error(
-		`Worker source "${sourceId}": nudgeUrl is set twice with different values (entry "${entryUrl}", options "${optionsUrl}"). ` +
+		`Worker source "${sourceId}": nudgeUrl is set twice with different values (entry "${redactNudgeUrl(entryUrl)}", options "${redactNudgeUrl(optionsUrl)}"). ` +
 			`Keep one: flow worker source remove ${sourceId}, then declare it again.`
 	);
 }

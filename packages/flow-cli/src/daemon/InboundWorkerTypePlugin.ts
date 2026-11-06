@@ -30,7 +30,9 @@ export function buildInboundWorkerType(nudgeUrl?: string): WorkerTypeInstance {
  * expanded), so the plugin never sees the entry.
  *
  * The URL is checked again here, after expansion: http(s) only, no user info, no query key named like a credential.
- * That check is a false positive for a harmless `?key=abc`: write `${NAME}` instead.
+ * A nudgeUrl never carries credentials (only host, port and path are used), a `${NAME}` reference included. The
+ * query-key rule goes by the name, so a harmless `?key=abc` is refused too: remove the query. The path is used and
+ * logged: do not put a secret in it.
  */
 export const inboundWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 	extensionPoint: 'worker-type',
@@ -58,12 +60,12 @@ export const inboundWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 		if (problem !== undefined) {
 			const what =
 				problem.kind === 'credential'
-					? `carries a credential (${problem.where})`
+					? `carries a credential (${problem.where}). A nudgeUrl never carries credentials: only host, port and path are used`
 					: 'is not an http(s) URL (the value is not shown: it may hold a secret)';
 			return Promise.reject(
 				new Error(
 					`the inbound worker type got a nudgeUrl that ${what}. ` +
-						`Fix: flow worker source remove ${sourceId}, then declare it again with an http(s) URL; write \${NAME} instead of a literal credential.`
+						`Fix: flow worker source remove ${sourceId}, then declare it again with an http(s) URL that has no credentials.`
 				)
 			);
 		}

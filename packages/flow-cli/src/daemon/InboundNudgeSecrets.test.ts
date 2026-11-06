@@ -152,7 +152,7 @@ describe('fix 3 and 4 - declaration', () => {
 			...extra,
 		});
 	const credentialMessage = (where: string) =>
-		`Worker source "terminal-1": nudgeUrl carries a credential (${where}). Write \${NAME} instead of the literal value and set NAME in the daemon environment.`;
+		`Worker source "terminal-1": nudgeUrl carries a credential (${where}). A nudgeUrl never carries credentials: only host, port and path are used, so remove it.`;
 
 	it('reports a credential before a bad scheme, and never echoes the value', () => {
 		expect(() => declare({ nudgeUrl: 'ftp://u:pw@h/?token=x' })).toThrow(credentialMessage('user info'));

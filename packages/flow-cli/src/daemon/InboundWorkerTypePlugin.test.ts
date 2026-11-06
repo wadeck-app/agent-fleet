@@ -196,16 +196,17 @@ describe('WorkerSourceRegistry - the inbound worker type declared as a plugin', 
 		}
 	});
 
-	it('refuses a credential in the nudgeUrl, without echoing it, and accepts a ${NAME} reference instead', () => {
+	it('refuses a credential in the nudgeUrl, without echoing it, even as a ${NAME} reference', () => {
 		expect(() => declare({ nudgeUrl: 'http://user:pw@127.0.0.1:5555/nudge' })).toThrow(
-			'Worker source "terminal-1": nudgeUrl carries a credential (user info). Write ${NAME} instead of the literal value and set NAME in the daemon environment.'
+			'Worker source "terminal-1": nudgeUrl carries a credential (user info). A nudgeUrl never carries credentials: only host, port and path are used, so remove it.'
 		);
 		expect(() => declare({ options: { nudgeUrl: 'http://127.0.0.1:5555/nudge?token=abc123' } })).toThrow(
-			'Worker source "terminal-1": nudgeUrl carries a credential (query parameter "token"). Write ${NAME} instead of the literal value and set NAME in the daemon environment.'
+			'Worker source "terminal-1": nudgeUrl carries a credential (query parameter "token"). A nudgeUrl never carries credentials: only host, port and path are used, so remove it.'
 		);
-		expect(
-			declare({ options: { nudgeUrl: 'http://127.0.0.1:5555/nudge?token=${NUDGE_TOKEN}' } }).entry.plugin
-		).toBe('inbound.default');
+		// A ${NAME} reference is no way around it either: only host, port and path are ever used.
+		expect(() => declare({ options: { nudgeUrl: 'http://127.0.0.1:5555/nudge?token=${NUDGE_TOKEN}' } })).toThrow(
+			'nudgeUrl carries a credential (query parameter "token")'
+		);
 	});
 
 	it('refuses two different nudgeUrl values with the same message the daemon uses', () => {

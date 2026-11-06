@@ -140,16 +140,16 @@ describe('a declared built-in:inbound source - characterization', () => {
 	it.each([
 		[
 			'not a url?token=abc123',
-			'nudgeUrl carries a credential (query parameter "token"). Write ${NAME} instead of the literal value and set NAME in the daemon environment.',
+			'nudgeUrl carries a credential (query parameter "token"). A nudgeUrl never carries credentials: only host, port and path are used, so remove it.',
 		],
 		['ftp://host/x', 'nudgeUrl "ftp://host/x" must be an http(s) URL, e.g. http://127.0.0.1:5555/nudge.'],
 		[
 			'http://user:pw@127.0.0.1:5555/nudge',
-			'nudgeUrl carries a credential (user info). Write ${NAME} instead of the literal value and set NAME in the daemon environment.',
+			'nudgeUrl carries a credential (user info). A nudgeUrl never carries credentials: only host, port and path are used, so remove it.',
 		],
 		[
 			'http://127.0.0.1:5555/nudge?token=abc123',
-			'nudgeUrl carries a credential (query parameter "token"). Write ${NAME} instead of the literal value and set NAME in the daemon environment.',
+			'nudgeUrl carries a credential (query parameter "token"). A nudgeUrl never carries credentials: only host, port and path are used, so remove it.',
 		],
 	])('refuses at declaration the nudgeUrl %s', (nudgeUrl, reason) => {
 		const registry = new WorkerSourceRegistry(dir);

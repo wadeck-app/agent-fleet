@@ -145,6 +145,40 @@ describe('flow worker source command', () => {
 		});
 	});
 
+	describe('list --json - stored URLs are redacted', () => {
+		it('prints scheme, host and path of nudgeUrl and options.nudgeUrl, with no user info and no query values', () => {
+			fs.mkdirSync(path.dirname(registryFile()), { recursive: true });
+			fs.writeFileSync(
+				registryFile(),
+				JSON.stringify({
+					sources: [
+						{
+							sourceId: 'old-terminal',
+							provider: 'built-in:inbound',
+							labels: [],
+							maxWorkers: 1,
+							nudgeUrl: 'http://user:pw@127.0.0.1:5555/nudge?token=abc123',
+							options: { nudgeUrl: 'http:u:p2@127.0.0.1:6666/x?key=zzz', projects: ['C:/proj'] },
+							tokenHash: 'h',
+							createdAt: '2026-01-01T00:00:00.000Z',
+						},
+					],
+				}),
+				'utf8'
+			);
+
+			run('list', '--json');
+
+			const out = printed();
+			const [listed] = JSON.parse(out) as { nudgeUrl: string; options: Record<string, unknown> }[];
+			expect(listed!.nudgeUrl).toBe('http://127.0.0.1:5555/nudge?…');
+			expect(listed!.options).toEqual({ nudgeUrl: 'http://127.0.0.1:6666/x?…', projects: ['C:/proj'] });
+			for (const secret of ['pw', 'abc123', 'p2', 'zzz']) {
+				expect(out).not.toContain(secret);
+			}
+		});
+	});
+
 	describe('add - a plugin source', () => {
 		const pluginsDir = (): string => path.join(xdgHome, 'plugins');
 
