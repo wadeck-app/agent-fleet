@@ -20,10 +20,11 @@ type IssueLaunchToken = (sourceId: string) => string;
  */
 export function buildCommandWorkerType(
 	options: CommandSourceOptions,
-	issueLaunchToken?: IssueLaunchToken
+	issueLaunchToken?: IssueLaunchToken,
+	kind?: string
 ): WorkerTypeInstance {
 	return {
-		source: new CommandWorkerSource(options, issueLaunchToken),
+		source: new CommandWorkerSource(options, issueLaunchToken, kind),
 		dispose: () => Promise.resolve(),
 	};
 }
@@ -32,14 +33,76 @@ export function buildCommandWorkerType(
  * Plugin form of the command worker type, served from the built-in registry.
  *
  * The one-shot launch credential comes from the daemon (`host.issueLaunchToken`), lent to built-ins only (see
- * WorkerTypeInstances). `options` are the source entry's, unvalidated as for the provider string: a missing command
- * is reported when a worker is asked for.
+ * WorkerTypeInstances). A missing command is reported when a worker is asked for, as for the provider string.
+ *
+ * **Differs from `built-in:command`:** the daemon expands `${NAME}` in every string of `options` (so in `command`,
+ * `args` and `cwd`) from ITS environment before this factory runs, and the build fails when a variable is unset. The
+ * provider string never did that, so `--command "echo ${HOME}"` means different things in the two forms.
  */
 export const commandWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 	extensionPoint: 'worker-type',
 	create: context => {
-		const host = context['host'] as { issueLaunchToken?: IssueLaunchToken } | undefined;
-		const options = (context['options'] ?? {}) as CommandSourceOptions;
-		return Promise.resolve(buildCommandWorkerType(options, host?.issueLaunchToken));
+		try {
+			const sourceId = String(context['sourceId']);
+			return Promise.resolve(
+				buildCommandWorkerType(
+					checkedOptions(sourceId, context['options']),
+					checkedHost(context['host']),
+					COMMAND_PLUGIN_REF
+				)
+			);
+		} catch (err) {
+			return Promise.reject(err instanceof Error ? err : new Error(String(err)));
+		}
 	},
 };
+
+const COMMAND_PLUGIN_REF = 'command.default';
+const WIRING = ' This is a wiring mistake in the daemon, not a configuration error -- please report it.';
+
+/** @throws when the host the daemon lent is not what this plugin was written against */
+function checkedHost(host: unknown): IssueLaunchToken | undefined {
+	if (host === undefined) {
+		return undefined;
+	}
+	if (typeof host !== 'object' || host === null) {
+		throw new Error(`the command worker type got a host that is not an object (${typeName(host)}).${WIRING}`);
+	}
+	const { issueLaunchToken } = host as { issueLaunchToken?: unknown };
+	if (issueLaunchToken !== undefined && typeof issueLaunchToken !== 'function') {
+		throw new Error(
+			`the command worker type needs host.issueLaunchToken to be a function when given, got ${typeName(issueLaunchToken)}.${WIRING}`
+		);
+	}
+	return issueLaunchToken as IssueLaunchToken | undefined;
+}
+
+/** @throws when the declared options have the wrong shape; absent options are fine (the missing command is reported on use) */
+function checkedOptions(sourceId: string, options: unknown): CommandSourceOptions {
+	const fix = ` Fix: flow worker source remove ${sourceId}, then declare it again.`;
+	if (options === undefined) {
+		return {};
+	}
+	if (typeof options !== 'object' || options === null || Array.isArray(options)) {
+		throw new Error(`the command worker type needs its options to be an object, got ${typeName(options)}.${fix}`);
+	}
+	const { command, args, cwd } = options as Record<string, unknown>;
+	for (const [name, value] of [
+		['command', command],
+		['cwd', cwd],
+	] as const) {
+		if (value !== undefined && typeof value !== 'string') {
+			throw new Error(
+				`the command worker type needs options.${name} to be a string, got ${typeName(value)}.${fix}`
+			);
+		}
+	}
+	if (args !== undefined && (!Array.isArray(args) || args.some(arg => typeof arg !== 'string'))) {
+		throw new Error(`the command worker type needs options.args to be an array of strings.${fix}`);
+	}
+	return options as CommandSourceOptions;
+}
+
+function typeName(value: unknown): string {
+	return Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value;
+}

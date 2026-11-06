@@ -149,3 +149,60 @@ describe('WorkerSourceRegistry - the command worker type declared as a plugin', 
 		).toThrow('declares a command, but provider "relay" never runs one');
 	});
 });
+
+describe('command worker-type plugin - follow-ups from the review', () => {
+	it('names the form in the missing-command error: built-in:command for the provider string, command.default for the plugin', async () => {
+		const viaPlugin = (await commandWorkerTypePlugin.create({ sourceId: 'laptop', options: {} })) as ReturnType<
+			typeof buildCommandWorkerType
+		>;
+		await expect(viaPlugin.source.obtainWorker(request)).rejects.toThrow(
+			'source "laptop" uses command.default but declares no command to run. Add options.command to the source entry.'
+		);
+
+		await expect(resolveSourceProvider('built-in:command', {}).obtainWorker(request)).rejects.toThrow(
+			'source "laptop" uses built-in:command but declares no command to run. Add options.command to the source entry.'
+		);
+	});
+
+	const wiring = ' This is a wiring mistake in the daemon, not a configuration error -- please report it.';
+	const fix = ' Fix: flow worker source remove laptop, then declare it again.';
+
+	it.each([
+		[
+			'a host that is not an object',
+			{ host: 'x', options: { command: 'flow' } },
+			`the command worker type got a host that is not an object (string).${wiring}`,
+		],
+		[
+			'an issueLaunchToken that is not a function',
+			{ host: { issueLaunchToken: 'x' }, options: { command: 'flow' } },
+			`the command worker type needs host.issueLaunchToken to be a function when given, got string.${wiring}`,
+		],
+		[
+			'options that are not an object',
+			{ options: 'x' },
+			`the command worker type needs its options to be an object, got string.${fix}`,
+		],
+		[
+			'a command that is not a string',
+			{ options: { command: 42 } },
+			`the command worker type needs options.command to be a string, got number.${fix}`,
+		],
+		[
+			'args that are not strings',
+			{ options: { command: 'flow', args: ['a', 1] } },
+			`the command worker type needs options.args to be an array of strings.${fix}`,
+		],
+		[
+			'a cwd that is not a string',
+			{ options: { command: 'flow', cwd: 7 } },
+			`the command worker type needs options.cwd to be a string, got number.${fix}`,
+		],
+	])('refuses %s with an actionable error', async (_label, context, message) => {
+		await expect(commandWorkerTypePlugin.create({ sourceId: 'laptop', ...context })).rejects.toThrow(message);
+	});
+
+	it('still accepts no options at all: a missing command is reported when a worker is asked for', async () => {
+		await expect(commandWorkerTypePlugin.create({ sourceId: 'laptop' })).resolves.toBeDefined();
+	});
+});

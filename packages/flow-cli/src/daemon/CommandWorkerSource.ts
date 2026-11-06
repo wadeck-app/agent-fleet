@@ -38,7 +38,9 @@ export interface CommandSourceOptions {
 export class CommandWorkerSource implements WorkerSourceProvider {
 	constructor(
 		private readonly options: CommandSourceOptions,
-		private readonly issueLaunchToken?: (sourceId: string) => string
+		private readonly issueLaunchToken?: (sourceId: string) => string,
+		/** How the source is named in its errors: the provider string or the plugin ref it was declared with. */
+		private readonly kind: string = BUILT_IN_COMMAND
 	) {}
 
 	// eslint-disable-next-line @typescript-eslint/require-await -- async by interface contract
@@ -46,7 +48,7 @@ export class CommandWorkerSource implements WorkerSourceProvider {
 		const { command } = this.options;
 		if (command === undefined || command.trim() === '') {
 			throw new Error(
-				`source "${request.sourceId}" uses ${BUILT_IN_COMMAND} but declares no command to run. Add options.command to the source entry.`
+				`source "${request.sourceId}" uses ${this.kind} but declares no command to run. Add options.command to the source entry.`
 			);
 		}
 

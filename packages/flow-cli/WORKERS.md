@@ -68,6 +68,8 @@ source; keep the worker token only if you also intend to start that worker by ha
 
 The same kind is also a built-in worker type, `command.default` (`plugins.command.default`), served from the built-in registry by the same code: `flow worker source add factory-local --provider command --plugin command.default --command "flow worker"`. No `--plugins-dir` is needed (one given is ignored, with a warning), and the launch token is lent by the daemon to built-ins only. The `built-in:command` provider string stays valid and unchanged.
 
+**The two forms differ on `${NAME}`.** The plugin form expands `${NAME}` in `command`, `args` and `cwd` from the daemon's environment before launching (and the build fails, naming the variable, when it is unset). The `built-in:command` provider string never expanded anything: `--command "echo ${HOME}"` is left to the shell there and expanded by the daemon in the plugin form.
+
 `--cwd` is still the worker's working directory, and `flow worker` serves the registered project
 containing it (or `FLOW_PROJECT`). Without `--cwd` that is the daemon's directory, which is usually
 not a project: start the worker from a registered folder, or set `FLOW_WORKER_PROJECTS` /
