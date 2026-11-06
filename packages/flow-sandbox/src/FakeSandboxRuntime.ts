@@ -62,6 +62,7 @@ interface InjectedFailure {
 	error: SandboxError;
 	remaining: number;
 	when: ((request: unknown) => boolean) | undefined;
+	createsAnyway: boolean;
 }
 
 const MIB_PER_UNIT = { m: 1, g: 1024 } as const;
@@ -100,13 +101,22 @@ export class FakeSandboxRuntime implements SandboxRuntime {
 		this.execHandler = handler;
 	}
 
-	/** Makes the next `times` calls to `method` (matching `when`, if given) throw `error` after being recorded. */
+	/**
+	 * Makes the next `times` calls to `method` (matching `when`, if given) throw `error` after being recorded.
+	 * `createsAnyway` (create only): the sandbox exists afterwards, as when sbx made it and the call then timed out.
+	 */
 	failNext(
 		method: SandboxMethod,
 		error: SandboxError,
-		options: { times?: number; when?: (request: unknown) => boolean } = {}
+		options: { times?: number; when?: (request: unknown) => boolean; createsAnyway?: boolean } = {}
 	): void {
-		this.failures.push({ method, error, remaining: options.times ?? 1, when: options.when });
+		this.failures.push({
+			method,
+			error,
+			remaining: options.times ?? 1,
+			when: options.when,
+			createsAnyway: options.createsAnyway === true,
+		});
 	}
 
 	/** The state of a sandbox; throws when it does not exist so a test never asserts on nothing. */
@@ -147,6 +157,11 @@ export class FakeSandboxRuntime implements SandboxRuntime {
 				}
 			);
 		}
+		this.register(request);
+		await Promise.resolve();
+	}
+
+	private register(request: CreateSandboxRequest): void {
 		const now = this.clock.now();
 		this.states.set(request.name, {
 			name: request.name,
@@ -163,7 +178,6 @@ export class FakeSandboxRuntime implements SandboxRuntime {
 			serviceSecrets: new Map(),
 			files: new Map(),
 		});
-		await Promise.resolve();
 	}
 
 	async exec(request: ExecRequest): Promise<ExecResult> {
@@ -315,6 +329,7 @@ export class FakeSandboxRuntime implements SandboxRuntime {
 		);
 		if (failure !== undefined) {
 			failure.remaining -= 1;
+			if (failure.createsAnyway) this.register(request as CreateSandboxRequest);
 			throw failure.error;
 		}
 	}

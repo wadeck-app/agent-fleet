@@ -1,65 +1,30 @@
+import { describeError } from './ErrorText';
+import { FailedCreateCleanup } from './FailedCreateCleanup';
 import type { RunMounts } from './RunMounts';
 import { RunSandboxName } from './RunSandboxName';
-import type { SandboxCapacity } from './SandboxCapacity';
 import { SandboxError } from './SandboxError';
-import type { SandboxLog } from './SandboxLog';
-import { MAX_IDLE_STOP_MINUTES } from './SandboxOptionsParser';
-import type { SandboxRuntime } from './SandboxRuntime';
-import type { CancelScheduled, Scheduler } from './Scheduler';
+import {
+	type Held,
+	type HeldSandbox,
+	type RunEndReason,
+	type SandboxLifecycleDependencies,
+	type SandboxLifecycleOptions,
+	type StepContext,
+	type StepRequest,
+	validateLifecycleOptions,
+} from './SandboxLifecycleTypes';
+import type { CancelScheduled } from './Scheduler';
 import { SerialQueue } from './SerialQueue';
-import type { PresencePublisher } from './WrapperPresence';
 
-export interface SandboxLifecycleOptions {
-	/** Identifies this worker in sandbox names (see RunSandboxName). */
-	wrapperId: string;
-	/** sbx agent kind of the sandboxes (required, no hidden default). */
-	agent: string;
-	cpus: number;
-	memory: string;
-	image?: string;
-	pull?: 'always' | 'missing' | 'never';
-	/** Minutes without a step before the sandbox is STOPPED (never removed). */
-	idleStopMinutes: number;
-}
-
-export interface SandboxLifecycleDependencies {
-	runtime: SandboxRuntime;
-	scheduler: Scheduler;
-	log: SandboxLog;
-	capacity: SandboxCapacity;
-	presence: PresencePublisher;
-}
-
-/** Why a run ended. All reasons but `daemon_stopping` remove the sandbox; `daemon_stopping` stops and keeps it. */
-export type RunEndReason = 'completed' | 'failed' | 'cancelled' | 'daemon_stopping';
-
-export interface StepRequest {
-	executionId: string;
-	mounts: RunMounts;
-	/** Step time limit; omitted = none (the caller owns cancellation through the run events). */
-	timeoutMs?: number;
-}
-
-export interface StepContext {
-	/** Sandbox to `exec` in. */
-	sandbox: string;
-	/** Aborted when the step times out; aborting does NOT stop the process inside the VM (the sandbox is stopped). */
-	signal: AbortSignal;
-}
-
-export type HeldSandboxStatus = 'running' | 'stopped';
-
-export interface HeldSandbox {
-	executionId: string;
-	name: string;
-	status: HeldSandboxStatus;
-	stepActive: boolean;
-}
-
-interface Held extends HeldSandbox {
-	generation: number;
-	cancelIdle: CancelScheduled | undefined;
-}
+export type {
+	HeldSandbox,
+	HeldSandboxStatus,
+	RunEndReason,
+	SandboxLifecycleDependencies,
+	SandboxLifecycleOptions,
+	StepContext,
+	StepRequest,
+} from './SandboxLifecycleTypes';
 
 const ENDED_RUNS_REMEMBERED = 256;
 
@@ -82,6 +47,7 @@ const ENDED_RUNS_REMEMBERED = 256;
 export class SandboxLifecycle {
 	private readonly queue = new SerialQueue();
 	private readonly ended = new Set<string>();
+	private readonly createCleanup: FailedCreateCleanup;
 	private held: Held | undefined;
 	private started = false;
 	private closed = false;
@@ -90,22 +56,8 @@ export class SandboxLifecycle {
 		private readonly options: SandboxLifecycleOptions,
 		private readonly dependencies: SandboxLifecycleDependencies
 	) {
-		if (!RunSandboxName.isWrapperId(options.wrapperId)) {
-			throw new SandboxError(
-				'invalid-argument',
-				`Wrapper id ${JSON.stringify(options.wrapperId)} is not valid: use 1 to 12 lowercase letters or digits.`
-			);
-		}
-		if (
-			!Number.isFinite(options.idleStopMinutes) ||
-			options.idleStopMinutes <= 0 ||
-			options.idleStopMinutes > MAX_IDLE_STOP_MINUTES
-		) {
-			throw new SandboxError(
-				'invalid-options',
-				`idleStopMinutes must be greater than 0 and at most ${MAX_IDLE_STOP_MINUTES}, got ${options.idleStopMinutes}`
-			);
-		}
+		validateLifecycleOptions(options);
+		this.createCleanup = new FailedCreateCleanup(dependencies.runtime, dependencies.log);
 	}
 
 	/** Announces this wrapper (presence). Must be called once before the first step. */
@@ -262,7 +214,7 @@ export class SandboxLifecycle {
 			} catch (error) {
 				if (!(error instanceof SandboxError && error.kind === 'not-found')) {
 					this.dependencies.log.warn(
-						`Could not remove sandbox "${held.name}" at the end of run "${executionId}" (${reason}): ${describe(error)}. A second end-of-run event retries; otherwise run \`leftover remove ${held.name}\`.`
+						`Could not remove sandbox "${held.name}" at the end of run "${executionId}" (${reason}): ${describeError(error)}. A second end-of-run event retries; otherwise run \`leftover remove ${held.name}\`.`
 					);
 					throw error;
 				}
@@ -327,12 +279,10 @@ export class SandboxLifecycle {
 		} catch (error) {
 			this.dependencies.capacity.release(name);
 			if (error instanceof SandboxError && error.kind === 'already-exists') {
-				throw new SandboxError(
-					'already-exists',
-					`Sandbox "${name}" already exists although this worker holds none: it is left over from an earlier wrapper with the same id. Inspect it with \`leftover list\`; once its run is over, remove it with \`leftover remove ${name}\`.`,
-					{ sandbox: name, cause: error }
-				);
+				throw this.createCleanup.alreadyExists(name, error);
 			}
+			// sbx may have created the VM before failing (a timeout says nothing): do not leave it to block the retry.
+			await this.createCleanup.afterFailure(name, error);
 			throw error;
 		}
 		this.held = { executionId, name, status: 'running', stepActive: true, generation: 0, cancelIdle: undefined };
@@ -360,7 +310,7 @@ export class SandboxLifecycle {
 			await this.dependencies.runtime.stop(held.name);
 		} catch (error) {
 			this.dependencies.log.warn(
-				`Could not stop sandbox "${held.name}" (${cause}): ${describe(error)}. It may still run: stop it with \`sbx stop ${held.name}\`.`
+				`Could not stop sandbox "${held.name}" (${cause}): ${describeError(error)}. It may still run: stop it with \`sbx stop ${held.name}\`.`
 			);
 			throw error;
 		}
@@ -419,8 +369,4 @@ export class SandboxLifecycle {
 	private closedMessage(): string {
 		return `The sandbox lifecycle of wrapper "${this.options.wrapperId}" was shut down; create a new one.`;
 	}
-}
-
-function describe(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

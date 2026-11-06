@@ -179,6 +179,34 @@ describe('SandboxLifecycle creation', () => {
 		expect(error.message).toContain(`leftover remove ${NAME}`);
 		expect(count('remove')).toBe(0);
 	});
+
+	// sbx may have created the VM before create failed (a timeout says nothing): nothing may be left to block the retry.
+	it.each([
+		{ label: 'sbx created it, then create timed out', created: true, removeFails: false },
+		{ label: 'create failed before sbx created anything', created: false, removeFails: false },
+		{ label: 'sbx created it and the cleanup fails too', created: true, removeFails: true },
+	])('after a failed create ($label) cleans up what it can and never blames an earlier wrapper', async spec => {
+		const life = lifecycle();
+		runtime.failNext('create', new SandboxError('timeout', 'sbx create timed out'), {
+			createsAnyway: spec.created,
+		});
+		if (spec.removeFails) runtime.failNext('remove', new SandboxError('command-failed', 'daemon unreachable'));
+
+		await expect(life.beginStep('run1', mounts)).rejects.toThrow('timed out');
+
+		expect(count('remove')).toBe(spec.created ? 1 : 0);
+		expect(runtime.has(NAME)).toBe(spec.removeFails);
+		if (spec.removeFails) {
+			expect(log.text()).toContain(`leftover remove ${NAME}`);
+			const error = await rejection(life.beginStep('run1', mounts));
+			expect(error.kind).toBe('already-exists');
+			expect(error.message).toContain('failed and could not be cleaned up');
+			expect(error.message).not.toContain('earlier wrapper');
+		} else {
+			await life.beginStep('run1', mounts);
+			expect(life.current()?.status).toBe('running');
+		}
+	});
 });
 
 describe('SandboxLifecycle options', () => {
