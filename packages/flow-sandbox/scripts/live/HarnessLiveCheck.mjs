@@ -4,6 +4,11 @@
  * GATED live acceptance of milestone M4 (the relay development harness). Never part of `npm test`, `npm run check`
  * or CI. It makes real Bedrock calls (one word), creates ONE real sandbox and starts a real (isolated) flow daemon.
  *
+ * Routing here is by LABELS (`labels: [sandbox]`, a `built-in:command` source), which does NOT isolate against steps a
+ * model injects (they carry no labels). The strict form, `workerType: sandbox` in the flow with a source declared by
+ * `--plugin sandbox.<impl>`, needs the sandbox plugin bundle (M6.3/M6.4), which this script cannot declare yet: adding
+ * `workerType` to its flow alone would make every step wait for a worker type that does not exist and fail.
+ *
  * What it does:
  *  1. builds an ISOLATED flow environment (own FLOW_CONFIG_DIR / XDG_CONFIG_HOME / npm config, see
  *     flow-cli `createIsolatedCliEnv`), registers a throw-away project in the isolated project registry, and declares
