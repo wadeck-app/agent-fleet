@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
 import { FlowConfigLoader } from '../config/FlowConfig.js';
+import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 import { type TestDaemonContext, startTestDaemon } from '../test-utils/TestHelpers';
 import { waitUntil } from '../test-utils/WaitHelpers';
 import { Daemon } from './Daemon.js';
-import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
 
 armLeakGuardBeforeAll();
 

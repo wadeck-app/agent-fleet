@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildLauncherScriptName, LAUNCHER_SCRIPT_PREFIX, sweepStaleLauncherScripts } from './StaleLauncherScriptSweeper';
+import {
+	LAUNCHER_SCRIPT_PREFIX,
+	buildLauncherScriptName,
+	sweepStaleLauncherScripts,
+} from './StaleLauncherScriptSweeper';
 
 const NOW = Date.parse('2026-10-31T12:00:00Z');
 const HOUR = 3_600_000;
@@ -59,7 +63,10 @@ describe('sweepStaleLauncherScripts', () => {
 	});
 
 	it('reports any other unlink failure on stderr, without throwing', () => {
-		const { deps, warn } = setup({ 'flow-daemon-run-1.vbs': NOW - 30 * HOUR }, { 'flow-daemon-run-1.vbs': 'EACCES' });
+		const { deps, warn } = setup(
+			{ 'flow-daemon-run-1.vbs': NOW - 30 * HOUR },
+			{ 'flow-daemon-run-1.vbs': 'EACCES' }
+		);
 		expect(() => sweepStaleLauncherScripts(deps)).not.toThrow();
 		expect(warn).toHaveBeenCalledTimes(1);
 		expect(warn.mock.calls[0]![0]).toContain('flow-daemon-run-1.vbs');
