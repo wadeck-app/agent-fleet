@@ -72,6 +72,10 @@ Config dir: `~/.config/flow/` (override: `FLOW_CONFIG_DIR` env). Auto-updates in
 
 **Project names**: `flow show` and `flow history` print an execution's project as `name (id)`; a soft-deleted project as `name (id, removed)`; an id the registry never knew (or an unreadable registry) as the bare id.
 
+**Qualified ids**: `flow show`, `flow history --id`, `flow resume` and `flow cancel` accept `<project>/<id>` (e.g. `shop/abc12345`). The project part resolves like `-p` (name or alias, then id, then unique id prefix of 4+ characters); the id part keeps its usual rule. The execution must belong to that project, else the command fails naming both. `-p` naming another project than the id is an error; an ambient `FLOW_PROJECT` is overridden by the explicit project part. A plain `<id>` behaves as before.
+
+**Started from**: a run started with `-p`/`FLOW_PROJECT` from outside that project's folder (another project, or no project) records its origin; `flow show` prints `Started from: <origin>`. Runs started inside their project, and older records, print no such line.
+
 **Updates wait for the daemon to have nothing to lose**: no queued step, active execution, busy worker or resumable intervention. Idle connected workers do not block an update. The check retries every 2 minutes.
 
 If executions keep arriving, `flow cli update --drain` makes the daemon refuse new `flow run` (error `DAEMON_DRAINING`) while running executions finish, then the update applies. `flow cli update --cancel-drain` undoes it. Runs are refused rather than queued because execution state lives only in daemon memory and the update restarts the daemon.

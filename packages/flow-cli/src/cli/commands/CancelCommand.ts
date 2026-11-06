@@ -8,7 +8,7 @@ import { type ClientCommand, DAEMON_STOPPING_CODE, type DaemonResponse } from '.
 import { ExecutionStore } from '../../storage/ExecutionStore';
 import { formatCliError } from './CliErrorOutput';
 import { classifyDaemonContactFailure, describeDaemonContactFailure } from './DaemonContactFailure';
-import { resolveProjectFilter } from './ProjectFilter';
+import { assertQualifiedExecutionOwner, exitOnReferenceError, resolveExecutionReference } from './ExecutionReference';
 import { singleProjectValue } from './SingleProjectOption';
 
 // violations-suppress-end: ts/no-deep-relative
@@ -91,6 +91,7 @@ export function registerCancelCommand(program: Command, getConfigDir: () => stri
 		.command('cancel <executionId>')
 		.description(
 			'Cancel ONE execution without stopping the daemon (queued, running or waiting on an intervention)\n' +
+				'  <executionId>  An id, or <project>/<id> (e.g. shop/abc12345) to also require the execution to belong to that project\n' +
 				'  Its steps end as "cancelled by user", the workers holding its steps are dropped, its workspace is\n' +
 				'  released and the execution is recorded as failed (flow history shows "cancelled by user").\n' +
 				'  Other executions are untouched. Cancelling twice succeeds. Exit 0: cancelled; 1: error.\n' +
@@ -102,8 +103,12 @@ export function registerCancelCommand(program: Command, getConfigDir: () => stri
 			singleProjectValue
 		)
 		.option('--json', 'Machine-readable output')
-		.action(async (executionId: string, options: CancelOptions) => {
-			const projectId = resolveProjectFilter(options.project, process.env);
+		.action(async (typedId: string, options: CancelOptions) => {
+			const { executionId, projectId } = exitOnReferenceError(() => {
+				const reference = resolveExecutionReference(typedId, options.project, process.env);
+				assertQualifiedExecutionOwner(typedId, reference, getConfigDir(), process.env);
+				return reference;
+			});
 			const cmd: Extract<ClientCommand, { type: 'cancel' }> = {
 				type: 'cancel',
 				executionId,

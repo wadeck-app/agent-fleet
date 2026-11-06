@@ -20,6 +20,12 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { loadYaml } from '../../utils/loadYaml';
+import {
+	assertStoredExecutionInProject,
+	exitOnReferenceError,
+	isQualifiedExecutionTarget,
+	resolveExecutionReference,
+} from './ExecutionReference';
 import { describeMissingFlowFile, isFileLikeReference } from './FlowReference';
 import { renderSecretsSummary } from './SecretsSummary';
 
@@ -92,6 +98,7 @@ export function registerShowCommand(program: Command, getConfigDir: () => string
 			'Display a flow YAML file summary, or the steps of a past execution\n' +
 				'  <target>       Path to a .yaml file, or an execution id (or unique prefix) from `flow history`\n' +
 				'                 An existing file always wins; otherwise <target> is treated as an execution id\n' +
+				'                 <project>/<id> (e.g. shop/abc12345) also requires the execution to belong to that project\n' +
 				'  --json         Machine-readable output (execution: raw record, untruncated)\n' +
 				`  --tail <n>     Execution only: trailing chars of stdout/stderr of failed steps (default: ${DEFAULT_TAIL_CHARS})\n` +
 				'  --full         Execution only: print stdout/stderr of failed steps untruncated\n' +
@@ -106,6 +113,21 @@ export function registerShowCommand(program: Command, getConfigDir: () => string
 		.action((target: string, opts: { json?: boolean; tail?: number; full?: boolean; io?: boolean }) => {
 			if (isExistingFile(target)) {
 				showFlowFile(target, opts, new DefinitionSnapshotStore(definitionsDirOf(getConfigDir())));
+				return;
+			}
+			// <project>/<id>: the project part is resolved like -p, and the execution must belong to it.
+			if (isQualifiedExecutionTarget(target)) {
+				const service = FlowQueryService.forConfigDir(
+					getConfigDir(),
+					undefined,
+					createRegistryProjectLookup(defaultRegistryDir(process.env))
+				);
+				const reference = exitOnReferenceError(() => {
+					const resolved = resolveExecutionReference(target, undefined, process.env);
+					assertStoredExecutionInProject(service, resolved, process.env);
+					return resolved;
+				});
+				showExecution(reference.executionId, service, opts);
 				return;
 			}
 			if (looksLikeExecutionId(target)) {

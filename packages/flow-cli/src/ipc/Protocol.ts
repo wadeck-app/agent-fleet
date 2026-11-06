@@ -1,3 +1,4 @@
+import type { Origin } from '@wadeck-app/project-sdk';
 import type { RunEndReason } from 'extension-points';
 import type { FlowStep, LiveLogEntry, StepMeta } from 'flow-engine/types';
 
@@ -144,6 +145,12 @@ export type ClientCommand =
 			 * (an `XDG_CONFIG_HOME` set in one shell only), rather than answering from another registry.
 			 */
 			registryDir?: string;
+			/**
+			 * Where the run was started from, sent only when it is not the project's own folder (`-p other` from another
+			 * project, or from outside any project). Stored as is on the execution (`flow show`: "Started from"). Optional:
+			 * an older CLI sends none, and an older daemon ignores it.
+			 */
+			origin?: Origin;
 	  }
 	| {
 			type: 'resume';

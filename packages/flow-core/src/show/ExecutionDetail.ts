@@ -1,3 +1,4 @@
+import { formatOrigin } from '@wadeck-app/project-sdk';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -138,6 +139,9 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	const projectLabel = projectLabelOf(record, options.projectLookup);
 	if (projectLabel !== undefined) {
 		lines.push(`Project:   ${projectLabel}`);
+	}
+	if (record.origin !== undefined) {
+		lines.push(`Started from: ${formatOrigin(record.origin)}`);
 	}
 	lines.push(`Version:   ${versionDetailLineOf(record)}`);
 	lines.push(`File:      ${record.flowFile}`);

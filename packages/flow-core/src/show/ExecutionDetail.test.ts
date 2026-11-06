@@ -1,3 +1,4 @@
+import { formatOrigin } from '@wadeck-app/project-sdk';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -369,5 +370,41 @@ describe('renderExecutionDetail waves', () => {
 		expect(lines.find(l => l.startsWith('  check '))).toContain('wave: 1');
 		expect(lines.find(l => l.startsWith('  late '))).toContain('wave: 2');
 		expect(lines).toContain('      skipped: not run: wave 1 failed, wave 2 was not started');
+	});
+});
+
+describe('ExecutionDetail origin line', () => {
+	const baseRecord = {
+		executionId: 'orig0001',
+		flowFile: 'f.yml',
+		flowId: 'f',
+		status: 'completed',
+		currentSteps: [],
+		startedAt: '2026-10-04T14:00:00.000Z',
+		completedAt: '2026-10-04T14:00:05.000Z',
+		steps: {},
+	};
+	let dir: string;
+
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), 'exec-origin-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true });
+	});
+
+	const render = (record: unknown): string => {
+		fs.writeFileSync(path.join(dir, 'orig0001.json'), JSON.stringify(record));
+		return renderExecutionDetail(resolveExecution(dir, 'orig0001'), { tail: 10, full: false });
+	};
+
+	it('prints "Started from:" with the formatted origin when the record has one', () => {
+		const origin = { tool: 'flow', at: '2026-10-04T14:00:00.000Z', projectId: 'abcd1234', projectName: 'beta', cwd: 'C:/work/beta' };
+		expect(render({ ...baseRecord, origin })).toContain(`Started from: ${formatOrigin(origin)}`);
+	});
+
+	it('prints nothing about an origin for a record without one (older records)', () => {
+		expect(render(baseRecord)).not.toContain('Started from');
 	});
 });

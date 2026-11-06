@@ -1,6 +1,15 @@
 import { DaemonNotRunningError } from '@wadeck-app/singleton-daemon-kit';
 import { Command } from 'commander';
+import { executionsDirOf } from 'flow-core';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { ExecutionStore } from '../../storage/ExecutionStore';
+import { RegisteredProjectFixture } from '../../test-utils/RegisteredProjectFixture';
+// violations-suppress-end: ts/no-deep-relative
 
 import { registerResumeCommand } from './ResumeCommand';
 
@@ -123,5 +132,69 @@ describe('flow resume command', () => {
 			code: 'NOT_RESUMABLE',
 			message: 'Step already answered',
 		});
+	});
+});
+
+describe('flow resume command with a qualified id', () => {
+	let configDir: string;
+	let fixture: RegisteredProjectFixture;
+	let errorSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(async () => {
+		fixture = new RegisteredProjectFixture().useAsProcessEnv();
+		const alphaId = (await fixture.register('alpha')).id;
+		await fixture.register('beta');
+		configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resume-cmd-'));
+		fs.mkdirSync(executionsDirOf(configDir), { recursive: true });
+		new ExecutionStore(executionsDirOf(configDir)).create({
+			executionId: 'abc12345',
+			flowFile: 'f.yml',
+			flowId: 'f',
+			stepIds: ['approve'],
+			projectId: alphaId,
+		});
+		vi.spyOn(console, 'log').mockImplementation(() => {});
+		errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+		vi.spyOn(process, 'exit').mockImplementation(code => {
+			throw new Error(`exit ${String(code)}`);
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		daemon.send.mockReset();
+		fs.rmSync(configDir, { recursive: true, force: true });
+		fixture.dispose();
+	});
+
+	const run = (...args: string[]): Promise<Command> => {
+		const program = new Command();
+		program.exitOverride();
+		registerResumeCommand(program, () => configDir);
+		return program.parseAsync(['node', 'test', 'resume', ...args]);
+	};
+
+	it('sends the local id of <project>/<id> to the daemon', async () => {
+		daemon.send.mockResolvedValue({ type: 'execution_resumed', executionId: 'abc12345', stepId: 'approve' });
+		await run('alpha/abc12345');
+		expect(daemon.send).toHaveBeenCalledWith('resume', { type: 'resume', executionId: 'abc12345' });
+	});
+
+	it('refuses an execution of another project before contacting the daemon, naming both', async () => {
+		await expect(run('beta/abc12345')).rejects.toThrow('exit 1');
+		expect(daemon.send).not.toHaveBeenCalled();
+		expect(errorSpy.mock.calls.flat().join(' ')).toMatch(/abc12345.*alpha.*beta/s);
+	});
+
+	it('explains the form for a malformed id', async () => {
+		await expect(run('/abc12345')).rejects.toThrow('exit 1');
+		expect(errorSpy.mock.calls.flat().join(' ')).toContain('<project>/<id>');
+	});
+
+	it('lets the daemon answer for an id it has no record of', async () => {
+		daemon.send.mockResolvedValue({ type: 'error', code: 'EXECUTION_NOT_FOUND', message: 'No execution zzzzzzzz' });
+		await expect(run('alpha/zzzzzzzz')).rejects.toThrow('exit 2');
+		expect(daemon.send).toHaveBeenCalled();
 	});
 });

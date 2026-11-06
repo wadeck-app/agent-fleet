@@ -149,6 +149,57 @@ describe('flow cancel command', () => {
 		expect(printedErrors()).toContain(DAEMON_TIMEOUT_TEXT);
 	});
 
+	describe('with a qualified id', () => {
+		let fixture: RegisteredProjectFixture;
+		let alphaId: string;
+
+		beforeEach(async () => {
+			fixture = new RegisteredProjectFixture().useAsProcessEnv();
+			alphaId = (await fixture.register('alpha')).id;
+			await fixture.register('beta');
+			fs.mkdirSync(executionsDirOf(configDir), { recursive: true });
+			new ExecutionStore(executionsDirOf(configDir)).create({
+				executionId: EXECUTION_ID,
+				flowFile: 'f.yml',
+				flowId: 'f',
+				stepIds: ['s1'],
+				projectId: alphaId,
+			});
+		});
+
+		afterEach(() => {
+			fixture.dispose();
+		});
+
+		it('sends the local id and the project of <project>/<id>', async () => {
+			daemon.send.mockResolvedValue({ type: 'execution_cancelled', executionId: EXECUTION_ID, alreadyCancelled: false });
+
+			await run(`alpha/${EXECUTION_ID}`);
+
+			expect(daemon.send).toHaveBeenCalledWith('cancel', { type: 'cancel', executionId: EXECUTION_ID, projectId: alphaId });
+		});
+
+		it('refuses an execution of another project before contacting the daemon, naming both', async () => {
+			await expect(run(`beta/${EXECUTION_ID}`)).rejects.toThrow('exit 1');
+
+			expect(daemon.send).not.toHaveBeenCalled();
+			expect(printedErrors()).toMatch(/abc12345.*alpha.*beta/s);
+		});
+
+		it('refuses -p naming another project than the id', async () => {
+			await expect(run(`alpha/${EXECUTION_ID}`, '-p', 'beta')).rejects.toThrow('exit 1');
+
+			expect(daemon.send).not.toHaveBeenCalled();
+			expect(printedErrors()).toMatch(/alpha.*beta/s);
+		});
+
+		it('explains the form for a malformed id', async () => {
+			await expect(run('alpha/')).rejects.toThrow('exit 1');
+
+			expect(printedErrors()).toContain('<project>/<id>');
+		});
+	});
+
 	describe('when no daemon is running', () => {
 		beforeEach(() => {
 			daemon.send.mockRejectedValue(new DaemonNotRunningError('ECONNREFUSED'));

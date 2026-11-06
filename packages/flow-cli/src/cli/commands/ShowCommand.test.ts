@@ -362,3 +362,72 @@ describe('ShowCommand project line', () => {
 		}
 	});
 });
+
+describe('ShowCommand qualified execution id', () => {
+	let fixture: RegisteredProjectFixture;
+	let configDir: string;
+	let alphaId: string;
+	let log: ReturnType<typeof vi.spyOn>;
+	let error: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(async () => {
+		fixture = new RegisteredProjectFixture().useAsProcessEnv();
+		alphaId = (await fixture.register('alpha')).id;
+		await fixture.register('beta');
+		configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-show-qualified-'));
+		fs.mkdirSync(path.join(configDir, 'executions'));
+		fs.writeFileSync(
+			path.join(configDir, 'executions', 'qa000001.json'),
+			JSON.stringify({
+				executionId: 'qa000001',
+				flowId: 'f',
+				flowFile: 'f.yml',
+				status: 'completed',
+				currentSteps: [],
+				startedAt: '2026-08-16T12:00:00.000Z',
+				completedAt: '2026-08-16T12:00:01.000Z',
+				steps: {},
+				projectId: alphaId,
+			})
+		);
+		log = vi.spyOn(console, 'log').mockImplementation(() => {});
+		error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(process, 'exit').mockImplementation(() => {
+			throw new Error('exit');
+		});
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		fs.rmSync(configDir, { recursive: true, force: true });
+		fixture.dispose();
+	});
+
+	const show = (target: string): void => {
+		const program = new Command();
+		program.exitOverride();
+		registerShowCommand(program, () => configDir);
+		program.parse(['node', 'test', 'show', target]);
+	};
+	const out = (spy: ReturnType<typeof vi.spyOn>): string => spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+
+	it('shows the execution of <project>/<id>, the id part keeping its prefix rule', () => {
+		show('alpha/qa0');
+		expect(out(log)).toContain('Execution: qa000001');
+	});
+
+	it('refuses an execution of another project, naming both', () => {
+		expect(() => show('beta/qa000001')).toThrow('exit');
+		expect(out(error)).toMatch(/qa000001.*alpha.*beta/s);
+	});
+
+	it('reports an unknown project with a suggestion', () => {
+		expect(() => show('alpa/qa000001')).toThrow('exit');
+		expect(out(error)).toMatch(/did you mean.*alpha/is);
+	});
+
+	it('explains the form for a malformed id', () => {
+		expect(() => show('alpha/')).toThrow('exit');
+		expect(out(error)).toContain('<project>/<id>');
+	});
+});

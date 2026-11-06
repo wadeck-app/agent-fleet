@@ -21,6 +21,7 @@ import { RunIdempotencyCache } from './RunIdempotencyCache';
 import { describeConditionError } from './SchedulerConditionError.js';
 import { RunProjectResolver } from './RunProjectResolver.js';
 import type { RunProject } from './RunProjectResolver.js';
+import { checkRunOrigin } from './RunOriginCheck.js';
 import type { RunStepPreparer } from './RunStepPreparer.js';
 
 /** Accepts a `run` request: validates it, allocates what the execution needs, records it and starts its scheduler. */
@@ -72,6 +73,10 @@ export class RunRequestHandler {
 		hookDispatcher?: HookDispatcher,
 		resolvedProject?: RunProject
 	): Promise<DaemonResponse> {
+		const invalidOrigin = checkRunOrigin(cmd.origin);
+		if (invalidOrigin) {
+			return invalidOrigin;
+		}
 		// Resolved before anything is read or allocated, so a refusal leaves nothing behind. Every run belongs to a registered
 		// project; the working directory is the client's cwd, or the project folder when the client named the project from elsewhere.
 		const project = resolvedProject ? { ok: true as const, ...resolvedProject } : this.resolveProject(cmd);
@@ -172,6 +177,7 @@ export class RunRequestHandler {
 				stepWaves,
 				projectId,
 				projectRoot,
+				...(cmd.origin === undefined ? {} : { origin: cmd.origin }),
 				pluginMetaDir,
 				definition: {
 					flowVersion: resolved.version,

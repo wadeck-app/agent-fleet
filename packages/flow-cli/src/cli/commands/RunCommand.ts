@@ -16,6 +16,7 @@ import { resolveFlowReference } from './FlowReference';
 import { loadMockConfig } from './MockConfigLoader';
 import { parseInputArgs, parseTimeout } from './RunArgumentParser';
 import { DaemonContactError, sendToDaemon } from './RunDaemonSender';
+import { resolveRunOrigin } from './RunOrigin';
 import { checkSecretInputs } from './SecretInputCheck';
 import { singleProjectValue } from './SingleProjectOption';
 
@@ -143,6 +144,7 @@ export function registerRunCommand(program: Command): void {
 					: undefined;
 				const mockEnv = options.mockConfig ? loadMockConfig(options.mockConfig, flowFile) : undefined;
 
+				const origin = resolveRunOrigin({ cwd, projectRef: options.project, env: process.env });
 				const cmd: Extract<ClientCommand, { type: 'run' }> = {
 					type: 'run',
 					flowFile,
@@ -154,6 +156,7 @@ export function registerRunCommand(program: Command): void {
 					...(options.project === undefined ? {} : { projectRef: options.project }),
 					...(namedEnvProject === undefined ? {} : { envProject: namedEnvProject }),
 					registryDir: defaultRegistryDir(process.env),
+					...(origin === undefined ? {} : { origin }),
 					...(mockEnv ? { mockEnv, mockConfigPath: resolvedMockConfigPath } : {}),
 				};
 

@@ -265,3 +265,79 @@ describe('CommandHandler project resolution', () => {
 		expectNothingLeftBehind();
 	});
 });
+
+describe('CommandHandler run origin', () => {
+	let tmpDir: string;
+	let daemonDir: string;
+	let flowFile: string;
+	let handler: CommandHandler;
+	let registry: RegisteredProjectFixture;
+
+	beforeEach(() => {
+		registry = new RegisteredProjectFixture().useAsProcessEnv();
+		tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-origin-')));
+		daemonDir = path.join(tmpDir, 'daemon');
+		fs.mkdirSync(path.join(daemonDir, 'executions'), { recursive: true });
+		fs.mkdirSync(path.join(daemonDir, 'logs'), { recursive: true });
+		flowFile = path.join(tmpDir, 'flow.yml');
+		fs.writeFileSync(flowFile, FLOW_YAML);
+		mockAllocate.mockReset();
+		mockAllocate.mockResolvedValue({
+			path: path.join(tmpDir, 'ws'),
+			id: 'ws-1',
+			metaDir: path.join(tmpDir, 'ws.meta'),
+		});
+		const pool = {
+			describe: vi.fn().mockReturnValue({ workerId: 'w', sourceId: 'built-in:fork', features: [] }),
+			remove: vi.fn(),
+			listIdle: vi.fn(() => []),
+			markBusy: vi.fn(),
+			hasBusyWorkers: vi.fn().mockReturnValue(false),
+			send: vi.fn(() => true),
+			summarize: vi.fn().mockReturnValue([]),
+			canProvision: vi.fn().mockReturnValue(false),
+			planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
+		};
+		handler = new CommandHandler(daemonDir, pool as never, pool as never);
+	});
+
+	afterEach(() => {
+		handler.stopBackgroundWork();
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+		registry.dispose();
+	});
+
+	const records = (): Record<string, unknown>[] =>
+		fs
+			.readdirSync(path.join(daemonDir, 'executions'))
+			.map(file => JSON.parse(fs.readFileSync(path.join(daemonDir, 'executions', file), 'utf8')) as Record<string, unknown>);
+
+	it('records on the execution the origin the client sent with the run', async () => {
+		await registry.register('alpha');
+		const origin = { tool: 'flow', at: '2026-10-31T12:00:00.000Z', projectId: 'abcd1234', projectName: 'beta', cwd: 'C:/work/beta' };
+
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: registry.makeFolder('x'), projectRef: 'alpha', origin } as never);
+
+		expect(result.type).toBe('execution_started');
+		expect(records()).toEqual([expect.objectContaining({ origin })]);
+	});
+
+	it('records no origin when the client sent none', async () => {
+		await registry.register('alpha');
+
+		await handler.handleRun({ type: 'run', flowFile, cwd: registry.makeFolder('x'), projectRef: 'alpha' } as never);
+
+		expect(records()[0]).not.toHaveProperty('origin');
+	});
+
+	it('refuses a malformed origin before any workspace or record exists', async () => {
+		await registry.register('alpha');
+
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: registry.makeFolder('x'), projectRef: 'alpha', origin: { tool: 3 } } as never);
+
+		expect(result).toMatchObject({ type: 'error', code: 'INVALID_ORIGIN' });
+		expect((result as { message: string }).message).toContain('origin');
+		expect(mockAllocate).not.toHaveBeenCalled();
+		expect(records()).toEqual([]);
+	});
+});

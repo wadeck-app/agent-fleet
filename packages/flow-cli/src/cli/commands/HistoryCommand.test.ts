@@ -286,3 +286,61 @@ describe('flow history command and projects', () => {
 		expect(records).toEqual([expect.objectContaining({ executionId: 'aaa11111', projectId: alphaId })]);
 	});
 });
+
+describe('flow history --id with a qualified id', () => {
+	let configDir: string;
+	let fixture: RegisteredProjectFixture;
+	let alphaId: string;
+	let logSpy: ReturnType<typeof vi.spyOn>;
+	let errorSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(async () => {
+		fixture = new RegisteredProjectFixture().useAsProcessEnv();
+		alphaId = (await fixture.register('alpha')).id;
+		await fixture.register('beta');
+		configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-history-qualified-'));
+		fs.mkdirSync(path.join(configDir, 'executions'));
+		fs.writeFileSync(
+			path.join(configDir, 'executions', 'aaa11111.json'),
+			JSON.stringify({ ...exec('aaa11111', 'flow-a', 'completed', '2026-08-16T10:00:00.000Z'), projectId: alphaId })
+		);
+		logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(process, 'exit').mockImplementation(() => {
+			throw new Error('exit');
+		});
+	});
+
+	afterEach(() => {
+		fs.rmSync(configDir, { recursive: true, force: true });
+		fixture.dispose();
+	});
+
+	const run = (...args: string[]): void => {
+		const program = new Command();
+		program.exitOverride();
+		registerHistoryCommand(program, () => configDir);
+		program.parse(['node', 'test', 'history', ...args]);
+	};
+	const printed = (spy: ReturnType<typeof vi.spyOn>): string => spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+
+	it('shows the detail of <project>/<id>', () => {
+		run('--id', 'alpha/aaa');
+		expect(printed(logSpy)).toContain('Execution: aaa11111');
+	});
+
+	it('refuses an execution of another project, naming both', () => {
+		expect(() => run('--id', 'beta/aaa11111')).toThrow('exit');
+		expect(printed(errorSpy)).toMatch(/aaa11111.*alpha.*beta/s);
+	});
+
+	it('refuses -p naming another project than the id', () => {
+		expect(() => run('--id', 'alpha/aaa11111', '-p', 'beta')).toThrow('exit');
+		expect(printed(errorSpy)).toMatch(/alpha.*beta/s);
+	});
+
+	it('keeps a plain id as it was', () => {
+		run('--id', 'aaa');
+		expect(printed(logSpy)).toContain('Execution: aaa11111');
+	});
+});

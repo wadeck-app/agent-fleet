@@ -1,3 +1,4 @@
+import type { Origin } from '@wadeck-app/project-sdk';
 import type { AttemptEndReason, StepMeta } from 'flow-engine/types';
 
 // Single source of truth for the persisted execution shape: ExecutionStore (writer, flow-cli)
@@ -177,6 +178,11 @@ export interface ExecutionState {
 	 * records written before project ids existed, which stay readable (they only have `projectRoot`).
 	 */
 	projectId?: string;
+	/**
+	 * Where the run was started from, recorded only when that is not the project's own folder (`-p other` from another
+	 * project or from outside any project). Additive: absent on older records and on runs started inside their project.
+	 */
+	origin?: Origin;
 	/**
 	 * Which definition ran (format note: additive, absent on records written before flow versions existed;
 	 * readers must treat absence as "version not recorded"). The four fields below are written together, once, when

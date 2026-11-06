@@ -7,6 +7,7 @@ import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { type ClientCommand, DAEMON_STOPPING_CODE, type DaemonResponse } from '../../ipc/Protocol';
 import { formatCliError } from './CliErrorOutput';
 import { describeDaemonContactFailure } from './DaemonContactFailure';
+import { assertQualifiedExecutionOwner, exitOnReferenceError, resolveExecutionReference } from './ExecutionReference';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -17,18 +18,24 @@ const NOT_RUNNING_TEXT = formatCliError(
 
 type FlowCommands = { resume?: (payload: unknown) => Promise<DaemonResponse> };
 
-export function registerResumeCommand(program: Command): void {
+export function registerResumeCommand(program: Command, getConfigDir: () => string = flowConfigDir): void {
 	program
 		.command('resume <executionId>')
 		.description(
 			'Resume an execution that failed on an unanswered user_intervention step past its timeout\n' +
+				'  <executionId>  An id, or <project>/<id> (e.g. shop/abc12345) to also require the execution to belong to that project\n' +
 				'  Re-dispatches only that one step -- answer it (e.g. create the approval response\n' +
 				'  file) before or after running this command. Only works while the daemon that ran\n' +
 				'  the execution is still alive; it is not restored across a daemon restart.'
 		)
 		.option('--json', 'Machine-readable output')
-		.action(async (executionId: string, options: { json?: boolean }) => {
-			const daemonDir = flowConfigDir();
+		.action(async (typedId: string, options: { json?: boolean }) => {
+			const daemonDir = getConfigDir();
+			const { executionId } = exitOnReferenceError(() => {
+				const reference = resolveExecutionReference(typedId, undefined, process.env);
+				assertQualifiedExecutionOwner(typedId, reference, daemonDir, process.env);
+				return reference;
+			});
 			const cmd: Extract<ClientCommand, { type: 'resume' }> = { type: 'resume', executionId };
 
 			let response: DaemonResponse;

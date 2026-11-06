@@ -209,6 +209,26 @@ describe('flow run: dispatch', () => {
 		);
 	});
 
+	it('sends the origin of a run started with -p from outside that project, and none otherwise', async () => {
+		const fixture = new RegisteredProjectFixture().useAsProcessEnv();
+		try {
+			const alpha = await fixture.register('alpha');
+			startedResponse();
+
+			expect(await runCli(flowFile, '-p', 'alpha')).toBe(0);
+			expect(harness.send.mock.calls[0]![1]).toMatchObject({
+				origin: { tool: 'flow', projectId: alpha.id, projectName: 'alpha' },
+			});
+
+			harness.send.mockClear();
+			vi.spyOn(process, 'cwd').mockReturnValue(alpha.folder!);
+			expect(await runCli(flowFile, '-p', 'alpha')).toBe(0);
+			expect(harness.send.mock.calls[0]![1]).not.toHaveProperty('origin');
+		} finally {
+			fixture.dispose();
+		}
+	});
+
 	it('sends neither project field when none was named (a blank FLOW_PROJECT is unset)', async () => {
 		vi.stubEnv('FLOW_PROJECT', '  ');
 		startedResponse();

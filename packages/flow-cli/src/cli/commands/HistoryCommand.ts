@@ -1,12 +1,21 @@
 import { defaultRegistryDir } from '@wadeck-app/project-sdk';
 import type { Command } from 'commander';
-import { FlowQueryService, InvalidQueryError, createRegistryProjectLookup, describeSkippedExecutions } from 'flow-core';
+import {
+	FlowQueryService,
+	InvalidQueryError,
+	createRegistryProjectLookup,
+	describeSkippedExecutions,
+} from 'flow-core';
 import type { ExecutionFilterOptions } from 'flow-core';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
-import { resolveProjectFilter } from './ProjectFilter';
+import {
+	assertStoredExecutionInProject,
+	exitOnReferenceError,
+	resolveExecutionReference,
+} from './ExecutionReference';
 import { singleProjectValue } from './SingleProjectOption';
 
 // stderr, so a piped table or --json document stays clean; the history itself is still shown.
@@ -41,16 +50,27 @@ export function registerHistoryCommand(program: Command, getConfigDir: () => str
 		.option('--json', 'Machine-readable JSON output')
 		.action((rawOpts: ExecutionFilterOptions & { json?: boolean; project?: string }) => {
 			const { project, ...rest } = rawOpts;
-			const projectId = resolveProjectFilter(project, process.env);
-			const opts: ExecutionFilterOptions & { json?: boolean } = {
-				...rest,
-				...(projectId === undefined ? {} : { projectId }),
-			};
 			const service = FlowQueryService.forConfigDir(
 				getConfigDir(),
 				undefined,
 				createRegistryProjectLookup(defaultRegistryDir(process.env))
 			);
+			// `--id <project>/<id>`: the project part is resolved like -p, and the execution must belong to it.
+			const qualified = rest.id !== undefined && rest.id.includes('/');
+			const reference = exitOnReferenceError(() => {
+				// Without --id there is no id to split: only the -p/FLOW_PROJECT scope comes out.
+				const resolved = resolveExecutionReference(rest.id ?? '', project, process.env);
+				if (qualified) {
+					assertStoredExecutionInProject(service, resolved, process.env);
+				}
+				return resolved;
+			});
+			const { projectId } = reference;
+			const opts: ExecutionFilterOptions & { json?: boolean } = {
+				...rest,
+				...(qualified ? { id: reference.executionId } : {}),
+				...(projectId === undefined ? {} : { projectId }),
+			};
 			try {
 				if (!opts.json) {
 					const { text, skippedWarning } = service.renderHistoryReport(opts);

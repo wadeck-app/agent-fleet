@@ -75,6 +75,8 @@ export class ExecutionStore {
 		projectRoot?: string;
 		/** Registry id of the project (project-sdk), written next to projectRoot. */
 		projectId?: string;
+		/** Where a run started from when that is not the project's own folder (`-p` from elsewhere); see `ExecutionState.origin`. */
+		origin?: ExecutionState['origin'];
 		/** `.meta` of a plugin workspace the daemon created for this run; deleted with the record once it expires. */
 		pluginMetaDir?: string;
 		/** Which definition ran: version, content hash, snapshot and how the version was chosen. Written once, never changed. */
@@ -95,6 +97,7 @@ export class ExecutionStore {
 			flowId: params.flowId,
 			...(params.projectRoot !== undefined ? { projectRoot: params.projectRoot } : {}),
 			...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+			...(params.origin !== undefined ? { origin: params.origin } : {}),
 			...(params.pluginMetaDir !== undefined ? { pluginMetaDir: params.pluginMetaDir } : {}),
 			...params.definition,
 			status: 'queued',
