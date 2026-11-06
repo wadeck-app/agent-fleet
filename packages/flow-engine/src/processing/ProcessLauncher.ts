@@ -20,6 +20,10 @@ export interface ProcessLauncher {
 	 * VM): launch tokens, cloud profiles and other host-only variables stay out of them by construction. Callers that
 	 * would hand a process the worker's whole environment then pass only an allow-list plus what the step declares.
 	 * Optional and additive: absent or false is the host, which is unchanged.
+	 *
+	 * What it does NOT do: the allow-list a caller then forwards (HOME, TMPDIR/TEMP/TMP, USERPROFILE, SystemRoot,
+	 * FLOW_BASH_PATH) holds HOST paths, valid inside the sandbox only if the launcher rewrites them. The host's provider
+	 * credential (ANTHROPIC_API_KEY for Claude) is not forwarded; the sandbox supplies its own through the step's env.
 	 */
 	readonly isolatesEnvironment?: boolean;
 

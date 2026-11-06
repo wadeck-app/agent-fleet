@@ -283,6 +283,16 @@ export class ClaudeLauncher {
 	}
 
 	/**
+	 * The host's provider credential, for the allow-listed environment of a process on the host. A launcher that runs the
+	 * process where the host's environment must not reach (it declares `isolatesEnvironment`) gets none: the sandbox
+	 * supplies its own through `options.env`.
+	 */
+	private hostProviderCredentials(): NodeJS.ProcessEnv {
+		const key = process.env['ANTHROPIC_API_KEY'];
+		return this.processLauncher.isolatesEnvironment !== true && key ? { ANTHROPIC_API_KEY: key } : {};
+	}
+
+	/**
 	 * Execute Claude in interactive mode
 	 */
 	private async executeInteractive(
@@ -296,10 +306,8 @@ export class ClaudeLauncher {
 				? {
 						PATH: process.env['PATH'],
 						HOME: process.env['HOME'],
-						// Claude requires ANTHROPIC_API_KEY -- pass it explicitly
-						...(process.env['ANTHROPIC_API_KEY']
-							? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
-							: {}),
+						// Claude requires ANTHROPIC_API_KEY -- pass it explicitly (not into a launcher that isolates the environment)
+						...this.hostProviderCredentials(),
 						// Windows
 						...(process.platform === 'win32' && process.env['SystemRoot']
 							? { SystemRoot: process.env['SystemRoot'] }
@@ -356,10 +364,8 @@ export class ClaudeLauncher {
 				? {
 						PATH: process.env['PATH'],
 						HOME: process.env['HOME'],
-						// Claude requires ANTHROPIC_API_KEY -- pass it explicitly
-						...(process.env['ANTHROPIC_API_KEY']
-							? { ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] }
-							: {}),
+						// Claude requires ANTHROPIC_API_KEY -- pass it explicitly (not into a launcher that isolates the environment)
+						...this.hostProviderCredentials(),
 						// Windows
 						...(process.platform === 'win32' && process.env['SystemRoot']
 							? { SystemRoot: process.env['SystemRoot'] }
