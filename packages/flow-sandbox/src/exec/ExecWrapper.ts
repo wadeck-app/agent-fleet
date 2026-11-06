@@ -1,3 +1,4 @@
+import { WORKER_FEATURE_RUN_EVENTS } from 'flow-cli/src/ipc/Protocol';
 import { declaredOutputNames } from 'flow-cli/src/worker/StepResultFrame';
 
 import { describeError } from '../ErrorText';
@@ -13,6 +14,7 @@ import { InsideMessageGuard } from '../harness/InsideMessageGuard';
 import type { RelayRegistration } from '../harness/RelayRegistration';
 import { ReturnedPaths } from '../harness/ReturnedPaths';
 import { ExecAssignment, type PreparedAssignment } from './ExecAssignment';
+import { ExecRunEnd } from './ExecRunEnd';
 import type { ExecPreparedSandbox, ExecSandboxPreparer } from './ExecSandboxPreparer';
 
 /** What the engine reports for a step that ran (the shape of flow-cli's `WorkerAdapter.execute` result). */
@@ -55,6 +57,8 @@ export interface ExecWrapperDependencies {
 	now: () => number;
 	/** Called once, when the wrapper is over (the daemon went away). The process should exit. */
 	onFinished: () => void;
+	/** Pause before the single retry of a failed removal at the end of a run (see ExecRunEnd). Default 2 s. */
+	runEndRetryDelayMs?: number;
 }
 
 /**
@@ -77,6 +81,7 @@ export class ExecWrapper {
 	private readonly daemon: DaemonControl;
 	private readonly guard: InsideMessageGuard;
 	private readonly reporter: DaemonReporter;
+	private readonly runEnd: ExecRunEnd;
 	/** The output names the active step declares: the only ones a too-large result never loses. */
 	private declared: ReadonlySet<string> = new Set();
 	private mounts: { executionId: string; mounts: RunMounts } | undefined;
@@ -96,13 +101,20 @@ export class ExecWrapper {
 			},
 		});
 		this.reporter = new DaemonReporter(this.daemon, dependencies.log);
+		this.runEnd = new ExecRunEnd({
+			lifecycle: dependencies.lifecycle,
+			log: dependencies.log,
+			sendAck: executionId => this.reporter.send({ type: 'run_end_ack', executionId }),
+			retryDelayMs: dependencies.runEndRetryDelayMs ?? 2000,
+			afterRemoval: (executionId, sandbox) => this.forgetRun(executionId, sandbox),
+		});
 	}
 
 	/** Starts the lifecycle, connects to the daemon and registers (sends `ready`). */
 	async start(): Promise<void> {
 		this.dependencies.lifecycle.start();
 		await this.daemon.connect();
-		this.daemon.send(this.dependencies.registration.ready());
+		this.daemon.send(this.ready());
 		this.dependencies.log.info(
 			'exec wrapper registered with the daemon; waiting for a step with the "sandbox" label.'
 		);
@@ -135,6 +147,14 @@ export class ExecWrapper {
 						this.dependencies.log.warn(`assignment handling failed unexpectedly: ${describeError(error)}`);
 					});
 				return;
+			case 'run_end':
+				// Not on the assignment queue: it must not wait for a step that may be running (see ExecRunEnd).
+				if (!this.finished) {
+					this.runEnd.handle(message).catch((error: unknown) => {
+						this.dependencies.log.warn(`run_end handling failed unexpectedly: ${describeError(error)}`);
+					});
+				}
+				return;
 			case 'idle':
 				return;
 			case 'done':
@@ -147,6 +167,22 @@ export class ExecWrapper {
 					`ignored an unknown daemon message of type ${JSON.stringify(message['type'])}.`
 				);
 		}
+	}
+
+	/** The registration `ready`, plus the one feature only this variant has: it wants to know when a run ends. */
+	private ready(): JsonObject {
+		const ready = this.dependencies.registration.ready();
+		const features = Array.isArray(ready['features']) ? ready['features'] : [];
+		return { ...ready, features: [...features, WORKER_FEATURE_RUN_EVENTS] };
+	}
+
+	/** The sandbox of the run is gone: its prepared credentials and mounts are not needed any more. */
+	private async forgetRun(executionId: string, sandbox: string | undefined): Promise<void> {
+		if (this.mounts?.executionId === executionId) this.mounts = undefined;
+		const prepared = this.prepared;
+		if (prepared === undefined || prepared.sandbox !== sandbox) return;
+		this.prepared = undefined;
+		await prepared.value.detach();
 	}
 
 	private async handleDaemonClosed(code: number, reason: string): Promise<void> {
@@ -213,7 +249,7 @@ export class ExecWrapper {
 			log.warn(`step "${ids.stepId}" failed in the exec wrapper: ${describeError(error)}`);
 		} finally {
 			// Announced after the sandbox work is over, so the next assign never meets a busy lifecycle.
-			this.reporter.send(this.dependencies.registration.ready());
+			this.reporter.send(this.ready());
 		}
 	}
 

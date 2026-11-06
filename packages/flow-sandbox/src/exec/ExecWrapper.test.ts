@@ -1,3 +1,4 @@
+import { WORKER_FEATURE_RUN_EVENTS } from 'flow-cli/src/ipc/Protocol';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import { FakeSandboxRuntime } from '../FakeSandboxRuntime';
 import { FakeScheduler } from '../FakeScheduler';
 import { RunMounts } from '../RunMounts';
 import { SandboxCapacity } from '../SandboxCapacity';
+import { SandboxError } from '../SandboxError';
 import { SandboxLifecycle } from '../SandboxLifecycle';
 import type { JsonObject } from '../harness/HarnessMessages';
 import type { DaemonControl, DaemonHandlers } from '../harness/HarnessWrapper';
@@ -22,6 +24,8 @@ class FakeDaemon implements DaemonControl {
 	readonly arrivals = new ObservedList<JsonObject>();
 	handlers: DaemonHandlers | undefined;
 	closed = false;
+	/** Called with every message the wrapper sends, before it is recorded (to look at the world at that instant). */
+	onSend: (message: JsonObject) => void = () => undefined;
 
 	get received(): JsonObject[] {
 		return this.arrivals.items;
@@ -32,6 +36,7 @@ class FakeDaemon implements DaemonControl {
 	}
 
 	send(message: JsonObject): void {
+		this.onSend(message);
 		this.arrivals.push(message);
 	}
 
@@ -142,6 +147,7 @@ beforeEach(async () => {
 			new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log }),
 		now: () => Date.now(),
 		onFinished: () => ownFinished.push(true),
+		runEndRetryDelayMs: 5,
 	});
 	await wrapper.start();
 });
@@ -191,6 +197,152 @@ describe('ExecWrapper registration', () => {
 			sourceId: 'sbx-exec',
 			hasUserInterface: false,
 		});
+	});
+
+	it('declares run-events (the constant of flow-cli) in the registration and after every step, so the daemon sends run_end', async () => {
+		await run(assign('probe'));
+
+		const readies = daemon.ofType('ready');
+		expect(readies).toHaveLength(2);
+		for (const ready of readies) expect(ready['features']).toContain(WORKER_FEATURE_RUN_EVENTS);
+	});
+});
+
+describe('ExecWrapper run_end (the daemon says a run this wrapper served is over)', () => {
+	const SANDBOX = 'flow-sbx-x1-run1';
+	const runEnd = (reason: string, executionId = 'run1'): JsonObject => ({ type: 'run_end', executionId, reason });
+	const acks = (): JsonObject[] => daemon.ofType('run_end_ack');
+
+	// The ack is the daemon's signal to release the run's workspace: it must come after the removal, never without it.
+	it.each([
+		{
+			label: 'completed: removes the sandbox, then acks',
+			reason: 'completed',
+			serve: true,
+			failures: 0,
+			gone: true,
+			kept: false,
+			ack: true,
+		},
+		{
+			label: 'failed: removes the sandbox, then acks',
+			reason: 'failed',
+			serve: true,
+			failures: 0,
+			gone: true,
+			kept: false,
+			ack: true,
+		},
+		{
+			label: 'daemon_stopping: stops and keeps the sandbox, then acks',
+			reason: 'daemon_stopping',
+			serve: true,
+			failures: 0,
+			gone: false,
+			kept: true,
+			ack: true,
+		},
+		{
+			label: 'a run this wrapper holds no sandbox for: nothing to remove, acked at once',
+			reason: 'completed',
+			serve: false,
+			failures: 0,
+			gone: false,
+			kept: false,
+			ack: true,
+		},
+		{
+			label: 'a removal that fails once is retried, then acked',
+			reason: 'completed',
+			serve: true,
+			failures: 1,
+			gone: true,
+			kept: false,
+			ack: true,
+		},
+		{
+			label: 'a removal that fails twice: no ack, the manual command is logged',
+			reason: 'completed',
+			serve: true,
+			failures: 2,
+			gone: false,
+			kept: false,
+			ack: false,
+			log: `leftover remove ${SANDBOX}`,
+		},
+		{
+			label: 'an unknown reason: nothing removed, no ack, logged',
+			reason: 'abandoned',
+			serve: true,
+			failures: 0,
+			gone: false,
+			kept: false,
+			ack: false,
+			log: 'unknown reason "abandoned"',
+		},
+	])('$label', async spec => {
+		if (spec.serve) await run(assign('probe'));
+		if (spec.failures > 0) {
+			runtime.failNext('remove', new SandboxError('command-failed', 'sbx rm failed'), { times: spec.failures });
+		}
+		let sandboxAtAck: boolean | undefined;
+		daemon.onSend = message => {
+			if (message['type'] === 'run_end_ack') sandboxAtAck = serves() && runtime.has(SANDBOX);
+		};
+		function serves(): boolean {
+			return spec.serve;
+		}
+
+		daemon.handlers?.onMessage(runEnd(spec.reason));
+		if (spec.ack) await daemon.arrivals.waitFor(() => acks().length > 0);
+		else await log.waitForText(spec.log ?? '');
+
+		expect(acks().map(ack => ack['executionId'])).toEqual(spec.ack ? ['run1'] : []);
+		if (spec.serve) {
+			expect(runtime.has(SANDBOX)).toBe(!spec.gone);
+			// Whatever the world looks like at the ack, the sandbox must already be gone for completed/failed.
+			if (spec.ack && spec.gone) expect(sandboxAtAck).toBe(false);
+			if (spec.kept) expect(runtime.state(SANDBOX).status).toBe('stopped');
+		}
+		if (spec.log !== undefined) expect(log.text()).toContain(spec.log);
+	});
+
+	it('is idempotent: a second run_end for the same run removes nothing again and is acked again, harmlessly', async () => {
+		await run(assign('probe'));
+
+		daemon.handlers?.onMessage(runEnd('completed'));
+		await daemon.arrivals.waitFor(() => acks().length >= 1);
+		daemon.handlers?.onMessage(runEnd('completed'));
+		await daemon.arrivals.waitFor(() => acks().length >= 2);
+
+		expect(runtime.callsTo('remove')).toHaveLength(1);
+	});
+
+	it('removes the sandbox of a run whose step is still running (a late run_end), without waiting for the step', async () => {
+		let finishStep: () => void = () => undefined;
+		behaviour = () => new Promise(resolve => (finishStep = () => resolve({ output: { stdout: 'late' } })));
+		daemon.handlers?.onMessage(assign('probe'));
+		await daemon.arrivals.waitFor(messages => messages.some(message => message['type'] === 'step_started'));
+
+		daemon.handlers?.onMessage(runEnd('failed'));
+		await daemon.arrivals.waitFor(() => acks().length > 0);
+
+		expect(runtime.has(SANDBOX)).toBe(false);
+		finishStep();
+		await daemon.arrivals.waitFor(messages => messages.filter(message => message['type'] === 'ready').length >= 2);
+	});
+
+	it('stays registered and serves the next run with a fresh sandbox once the first run ended', async () => {
+		await run(assign('probe'));
+		daemon.handlers?.onMessage(runEnd('completed'));
+		await daemon.arrivals.waitFor(() => acks().length > 0);
+
+		await run(assign('probe', { executionId: 'run2' }));
+
+		expect(runtime.has(SANDBOX)).toBe(false);
+		expect(runtime.has('flow-sbx-x1-run2')).toBe(true);
+		expect(prepares).toBe(2);
+		expect(daemon.ofType('step_completed').map(message => message['executionId'])).toEqual(['run1', 'run2']);
 	});
 });
 
@@ -450,8 +602,8 @@ describe('ExecWrapper daemon connection', () => {
 	it('ignores idle, warns about done and unknown messages', () => {
 		daemon.handlers?.onMessage({ type: 'idle' });
 		daemon.handlers?.onMessage({ type: 'done' });
-		daemon.handlers?.onMessage({ type: 'run_end' });
+		daemon.handlers?.onMessage({ type: 'run_started' });
 		expect(log.text()).toMatch(/sent "done"/);
-		expect(log.text()).toMatch(/unknown daemon message of type "run_end"/);
+		expect(log.text()).toMatch(/unknown daemon message of type "run_started"/);
 	});
 });

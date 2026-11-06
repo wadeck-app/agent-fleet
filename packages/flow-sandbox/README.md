@@ -127,7 +127,7 @@ The harness uses the header. It only works for clients that go through the proxy
 
 ### Limits of the harness
 
-- One run per wrapper lifetime (no run-end events yet, plan C2): a step of another run fails with `worker-busy`. The sandbox is left STOPPED, never removed (`LeftoverCli.mjs list|remove`). When the daemon goes away the run is interrupted with `daemon_stopping` (stop and keep).
+- One run per wrapper lifetime (no run-end events: the relay harness does not declare `run-events`; the exec variant does): a step of another run fails with `worker-busy`. The sandbox is left STOPPED, never removed (`LeftoverCli.mjs list|remove`). When the daemon goes away the run is interrupted with `daemon_stopping` (stop and keep).
 - No reconnect to the daemon (the launch token is one-shot).
 - The registered sandbox worker also takes steps WITHOUT labels (routing prefers registered workers; flow-owner finding H4). Do not register it on a daemon whose other flows you do not want in the VM.
 - The daemon asks its sources again whenever a step finds no free worker, without a cap on launches: 5 launches of the wrapper for one 4-step run were observed, 4 refused by the wrapper-id lock (`presence`). It also forks a local worker 3 s after asking if none arrived.
@@ -150,6 +150,20 @@ Run: same source declaration as M4 with `scripts/ExecWrapper.mjs` (same options,
 | `VmExecutableLookup`                        | `lookupExecutable` is synchronous, the VM is not: one `exec` primes `command -v` for claude, codex, opencode, node, bash per sandbox                                                       |
 | `McpCallbackRules`                          | per-process `localhost:<port>` rule scoped to the sandbox, removed before the process reports its end                                                                                      |
 | `ExecWrapper`, `ExecAssignment`, `ExecMain` | worker registration (reuses `DaemonLink`, `RelayRegistration`, `InsideMessageGuard`, `SandboxLifecycle`, `RunMounts`), per-run `ExecSandboxPreparer` (M2 credentials, no bridge, no token) |
+
+### Run end (`run_end`, class `ExecRunEnd`)
+
+The exec wrapper declares the `run-events` feature in every `ready` (the constant of flow-cli `Protocol.ts`; the relay harness does not). The daemon then sends `run_end { executionId, reason }` once per run to a worker that was handed a step of it, and releases the run's workspace when the worker answers `run_end_ack` or its wait expires (`worker.ackTimeoutSeconds`, 30 s by default, 120 s at most). The ack is therefore sent only AFTER the sandbox that mounts the workspace is gone.
+
+| reason | what the wrapper does | ack |
+| ------ | --------------------- | --- |
+| `completed`, `failed` | `SandboxLifecycle.endRun`: the sandbox is REMOVED (serialized on the lifecycle queue). The prepared credentials and mounts of the run are forgotten. The wrapper stays registered and the next run gets a fresh sandbox. | after the removal |
+| `daemon_stopping` | the sandbox is stopped and KEPT (the run may resume; `leftover list` / `leftover remove`) | after the stop |
+| a run it holds no sandbox for | nothing to remove (its create may have failed): the daemon counts this worker as served and waits for it | at once |
+| second `run_end` of the same run | nothing is removed again (`endRun` is idempotent) | again; an ack the daemon no longer waits for is only logged there |
+| unknown reason / no run id | logged and ignored: protocol drift must be visible | none |
+
+A removal that fails (anything but "not found") is retried once after 2 s. If it fails again NO ack is sent, so the daemon releases the workspace only when its wait expires, and the log says, with the cause: `sandbox <name> could not be removed: <cause>. No run_end_ack was sent ... Finish by hand: leftover remove <name>`. A step of the run that is still running (a sibling after a terminal failure; the daemon waits for it to settle first, bounded) does not delay the removal: `sbx rm --force` ends its processes and the daemon drops whatever it reports after `run_end`. `sbx rm` duration is not measured yet (live check pending): if it exceeds the daemon's bound, raise `worker.ackTimeoutSeconds`.
 
 Mapping limits:
 
