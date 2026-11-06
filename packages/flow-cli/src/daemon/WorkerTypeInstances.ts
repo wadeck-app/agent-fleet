@@ -1,10 +1,10 @@
 import type { RunEndEvent, WorkerTypeInstance } from 'extension-points';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
-import { getBuiltinPlugin } from '../config/BuiltinPluginRegistry.js';
 import type { FlowPlugin } from '../config/FlowPlugin.js';
 import type { PluginLoader } from '../config/PluginLoader.js';
 import { raceWithTimeout } from './BoundedWait.js';
+import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { PLUGIN_REF, type WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
@@ -68,7 +68,7 @@ export class WorkerTypeInstances {
 		 * carries the daemon's host services and is the code shipped with this daemon, so a same-named copy left in a
 		 * plugins directory (stale, or planted) must not replace it. Which of the two answered is logged on every build.
 		 */
-		private readonly lookupBuiltin: (typeRef: string) => FlowPlugin | undefined = getBuiltinPlugin
+		private readonly lookupBuiltin: (typeRef: string) => FlowPlugin | undefined = findBuiltinWorkerType
 	) {
 		this.buildTimeoutMs = timeouts.buildTimeoutMs ?? DEFAULT_BUILD_TIMEOUT_MS;
 		this.disposeTimeoutMs = timeouts.disposeTimeoutMs ?? DEFAULT_DISPOSE_TIMEOUT_MS;

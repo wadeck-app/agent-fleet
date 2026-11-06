@@ -171,6 +171,15 @@ describe('flow worker source command', () => {
 			expect(printed()).toContain('plugin     : sandbox.docker');
 		});
 
+		it('warns, and still declares, when the plugin is a built-in so the --plugins-dir is ignored', () => {
+			run('add', 'build-box', '--provider', 'relay', '--plugin', 'relay.default', '--plugins-dir', pluginsDir());
+
+			expect(printed()).toContain(
+				`[warn] Worker source "build-box": plugin "relay.default" is a built-in worker type of flow, so the daemon serves it from the built-in registry and ignores the pluginsDir "${pluginsDir()}".`
+			);
+			expect(storedSources()).toHaveLength(1);
+		});
+
 		it('exits 1 with the fix when --plugin has no --plugins-dir', () => {
 			expect(() => run('add', 'sandbox', '--provider', 'docker-sandbox', '--plugin', 'sandbox.docker')).toThrow(
 				'exit 1'

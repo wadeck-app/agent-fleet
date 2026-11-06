@@ -136,7 +136,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 				try {
 					const registry = new WorkerSourceRegistry(flowConfigDir());
 					const declaredOptions = { ...buildCommandOptions(options), ...parseOptionPairs(options.option) };
-					const { token, sourceToken, entry } = registry.declare({
+					const { token, sourceToken, entry, warnings } = registry.declare({
 						sourceId,
 						provider: options.provider,
 						labels: parseLabels(options.labels),
@@ -153,6 +153,9 @@ export function registerWorkerSourceCommand(program: Command): Command {
 					}
 					console.log(`     labels     : ${entry.labels.length > 0 ? entry.labels.join(', ') : '(none)'}`);
 					console.log(`     maxWorkers : ${String(entry.maxWorkers)}`);
+					for (const warning of warnings) {
+						console.log(`[warn] ${warning}`);
+					}
 					if (entry.options?.command !== undefined) {
 						console.log(`     command    : ${entry.options.command}`);
 					}

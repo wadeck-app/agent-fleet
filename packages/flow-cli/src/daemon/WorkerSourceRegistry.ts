@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'no
 import { isAbsolute, join } from 'node:path';
 
 import { validateNoLiteralCredentials } from '../config/LiteralCredentials.js';
+import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
 
 // Re-exported: the entry shape is owned by flow-core, which also reads the registry for non-CLI hosts.
 export type { WorkerSourceEntry };
@@ -71,7 +72,13 @@ export class WorkerSourceRegistry {
 	 * The token is returned once and never recoverable afterwards, so the caller must
 	 * surface it immediately.
 	 */
-	declare(declaration: WorkerSourceDeclaration): { token: string; sourceToken: string; entry: WorkerSourceEntry } {
+	declare(declaration: WorkerSourceDeclaration): {
+		token: string;
+		sourceToken: string;
+		entry: WorkerSourceEntry;
+		/** Advice that does not stop the declaration; the caller shows each one to the user. */
+		warnings: string[];
+	} {
 		this.validate(declaration);
 
 		const sources = this.read();
@@ -101,7 +108,22 @@ export class WorkerSourceRegistry {
 		};
 
 		this.write([...sources, entry]);
-		return { token, sourceToken, entry };
+		return { token, sourceToken, entry, warnings: this.warningsFor(declaration) };
+	}
+
+	/**
+	 * Advice for a declaration that is valid but does not do what it seems to: a plugin ref that is a built-in worker
+	 * type is served from the built-in registry, so the plugins directory passed with it is never read.
+	 */
+	private warningsFor(declaration: WorkerSourceDeclaration): string[] {
+		const { sourceId, plugin, pluginsDir } = declaration;
+		if (plugin === undefined || findBuiltinWorkerType(`plugins.${plugin}`) === undefined) {
+			return [];
+		}
+		return [
+			`Worker source "${sourceId}": plugin "${plugin}" is a built-in worker type of flow, so the daemon serves it from the built-in registry and ignores the pluginsDir "${String(pluginsDir)}". ` +
+				'To use a copy from that directory instead, give it another plugin id.',
+		];
 	}
 
 	list(): WorkerSourceEntry[] {

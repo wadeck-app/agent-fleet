@@ -3,14 +3,10 @@ import type { WebSocket } from 'ws';
 
 import { __resetBuiltinPluginsForTests, getBuiltinPlugin } from '../config/BuiltinPluginRegistry.js';
 import { PluginLoader } from '../config/PluginLoader.js';
+import { registerBuiltinWorkerTypes } from './BuiltinWorkerTypes.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { RelayWorkerSource } from './RelayWorkerSource.js';
-import {
-	RELAY_WORKER_TYPE_REF,
-	buildRelayWorkerType,
-	registerBuiltinWorkerTypes,
-	relayWorkerTypePlugin,
-} from './RelayWorkerTypePlugin.js';
+import { RELAY_WORKER_TYPE_REF, buildRelayWorkerType, relayWorkerTypePlugin } from './RelayWorkerTypePlugin.js';
 import { contactDeclaredSources, resolveSourceProvider } from './WorkerSourceContact.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 import { WorkerTypeInstances } from './WorkerTypeInstances.js';

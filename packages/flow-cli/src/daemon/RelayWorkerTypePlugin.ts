@@ -1,6 +1,5 @@
 import type { WorkerTypeInstance } from 'extension-points';
 
-import { registerBuiltinPlugin } from '../config/BuiltinPluginRegistry.js';
 import type { FlowPlugin } from '../config/FlowPlugin.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { RelayWorkerSource } from './RelayWorkerSource.js';
@@ -48,8 +47,3 @@ export const relayWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 		return Promise.resolve(buildRelayWorkerType(host.findRelay));
 	},
 };
-
-/** Registers the worker types that ship with flow. Statically referenced, so the single-file bundle contains them. Idempotent. */
-export function registerBuiltinWorkerTypes(): void {
-	registerBuiltinPlugin(RELAY_WORKER_TYPE_REF, relayWorkerTypePlugin);
-}
