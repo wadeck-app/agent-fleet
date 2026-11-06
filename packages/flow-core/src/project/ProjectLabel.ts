@@ -3,14 +3,14 @@ import { defaultRegistryDir, findProjectIncludingDeleted } from '@wadeck-app/pro
 import { errorMessage } from '../errors.js';
 
 /** What the registry says about a project id recorded on an execution. */
-export type ProjectLookupResult = { kind: 'known'; name: string } | { kind: 'removed' } | { kind: 'unavailable' };
+export type ProjectLookupResult = { kind: 'known'; name: string } | { kind: 'removed'; name: string } | { kind: 'unknown' } | { kind: 'unavailable' };
 
 /** Answers for a project id; must not throw (a lookup failure may never break a listing). */
 export type ProjectLookup = (projectId: string) => ProjectLookupResult;
 
 /**
- * The text that names the project of an execution: `name (id)` when the registry knows the id (live or soft-deleted),
- * `id (removed)` when it is gone, the bare id when the registry cannot be read or no lookup is given, and
+ * The text that names the project of an execution: `name (id)` when the registry knows the id (live),
+ * `name (id, removed)` when it was soft-deleted, the bare id when the registry never knew it, cannot be read or no lookup is given, and
  * `<projectRoot> (-)` for a record written before project ids existed. Undefined when the record has neither.
  */
 export function projectLabelOf(
@@ -26,7 +26,8 @@ export function projectLabelOf(
 		case 'known':
 			return `${found.name} (${projectId})`;
 		case 'removed':
-			return `${projectId} (removed)`;
+			return `${found.name} (${projectId}, removed)`;
+		case 'unknown':
 		case 'unavailable':
 		case undefined:
 			return projectId;
@@ -46,7 +47,10 @@ export function createRegistryProjectLookup(registryDir: string): ProjectLookup 
 	return projectId => {
 		try {
 			const found = findProjectIncludingDeleted(registryDir, projectId.trim().toLowerCase());
-			return found === undefined ? { kind: 'removed' } : { kind: 'known', name: found.project.name };
+			if (found === undefined) {
+				return { kind: 'unknown' };
+			}
+			return found.deleted ? { kind: 'removed', name: found.project.name } : { kind: 'known', name: found.project.name };
 		} catch (error) {
 			if (!reported) {
 				reported = true;

@@ -1,3 +1,4 @@
+import { removeProject } from '@wadeck-app/project-sdk';
 import { Command } from 'commander';
 import { DefinitionSnapshotStore, hashDefinition } from 'flow-core';
 import { SECRET_EXAMPLE_FLOW_YAML } from 'flow-engine/secrets/SecretFlowExample';
@@ -320,10 +321,13 @@ describe('ShowCommand project line', () => {
 		const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-show-project-'));
 		try {
 			const alpha = await fixture.register('alpha');
+			const gone = await fixture.register('gone-app');
+			await removeProject(fixture.registryDir, gone.id);
 			fs.mkdirSync(path.join(configDir, 'executions'));
 			for (const [id, projectId] of [
 				['pr000001', alpha.id],
 				['pr000002', 'ffffffff'],
+				['pr000003', gone.id],
 			] as const) {
 				fs.writeFileSync(
 					path.join(configDir, 'executions', `${id}.json`),
@@ -341,7 +345,7 @@ describe('ShowCommand project line', () => {
 				);
 			}
 			const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-			for (const id of ['pr000001', 'pr000002']) {
+			for (const id of ['pr000001', 'pr000002', 'pr000003']) {
 				const program = new Command();
 				program.exitOverride();
 				registerShowCommand(program, () => configDir);
@@ -349,7 +353,9 @@ describe('ShowCommand project line', () => {
 			}
 			const out = log.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
 			expect(out).toContain(`Project:   alpha (${alpha.id})`);
-			expect(out).toContain('Project:   ffffffff (removed)');
+			expect(out).toContain('Project:   ffffffff');
+			expect(out).not.toContain('ffffffff (removed)');
+			expect(out).toContain(`Project:   gone-app (${gone.id}, removed)`);
 		} finally {
 			fs.rmSync(configDir, { recursive: true, force: true });
 			fixture.dispose();

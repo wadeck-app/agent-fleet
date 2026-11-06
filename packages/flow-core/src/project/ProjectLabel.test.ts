@@ -18,8 +18,14 @@ describe('projectLabelOf', () => {
 		expect(projectLabelOf({ projectId: 'a1b2c3d4' }, known)).toBe('my-app (a1b2c3d4)');
 	});
 
-	it('shows id (removed) for a project gone from the registry', () => {
-		expect(projectLabelOf({ projectId: 'a1b2c3d4' }, () => ({ kind: 'removed' }))).toBe('a1b2c3d4 (removed)');
+	it('shows name (id, removed) for a soft-deleted project', () => {
+		expect(projectLabelOf({ projectId: 'a1b2c3d4' }, () => ({ kind: 'removed', name: 'my-app' }))).toBe(
+			'my-app (a1b2c3d4, removed)'
+		);
+	});
+
+	it('shows the bare id for a project the registry never knew', () => {
+		expect(projectLabelOf({ projectId: 'a1b2c3d4' }, () => ({ kind: 'unknown' }))).toBe('a1b2c3d4');
 	});
 
 	it('shows the bare id when the registry is unavailable or no lookup is given', () => {
@@ -55,12 +61,12 @@ describe('createRegistryProjectLookup', () => {
 	it('still knows a soft-deleted project', async () => {
 		const { registryDir, id } = await registryWithProject();
 		await removeProject(registryDir, id);
-		expect(createRegistryProjectLookup(registryDir)(id)).toEqual({ kind: 'known', name: 'my-app' });
+		expect(createRegistryProjectLookup(registryDir)(id)).toEqual({ kind: 'removed', name: 'my-app' });
 	});
 
-	it('reports an id that was never registered as removed', async () => {
+	it('reports an id that was never registered as unknown', async () => {
 		const { registryDir } = await registryWithProject();
-		expect(createRegistryProjectLookup(registryDir)('ffffffff')).toEqual({ kind: 'removed' });
+		expect(createRegistryProjectLookup(registryDir)('ffffffff')).toEqual({ kind: 'unknown' });
 	});
 
 	it('does not throw on an unreadable registry: unavailable, and one stderr line per lookup', () => {
