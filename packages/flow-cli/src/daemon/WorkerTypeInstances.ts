@@ -5,6 +5,7 @@ import type { FlowPlugin } from '../config/FlowPlugin.js';
 import type { PluginLoader } from '../config/PluginLoader.js';
 import { raceWithTimeout } from './BoundedWait.js';
 import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
+import { INBOUND_PLUGIN_REF, withEntryNudgeUrl } from './InboundNudgeOption.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { PLUGIN_REF } from './WorkerSourcePluginReference.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
@@ -98,8 +99,12 @@ export class WorkerTypeInstances {
 			throw noDirectory(sourceId, plugin);
 		}
 
+		// The inbound worker type reads its URL from the options; the entry's own nudgeUrl is copied in first, so the
+		// fingerprint and the plugin both see it. Built-in path only: a plugin from disk never sees more than before.
+		const effective = registered !== undefined && plugin === INBOUND_PLUGIN_REF ? withEntryNudgeUrl(entry) : entry;
+
 		// `host` is deliberately not part of the fingerprint: the first caller's findRelay is kept; harmless while there is one relay lookup per daemon.
-		const fingerprint = JSON.stringify([plugin, pluginsDir, entry.options ?? null]);
+		const fingerprint = JSON.stringify([plugin, pluginsDir, effective.options ?? null]);
 		// Re-read after every wait: another contact may have replaced the entry while this one was disposing it, and
 		// overwriting theirs would leave their instance alive and unreferenced.
 		for (;;) {
@@ -121,7 +126,7 @@ export class WorkerTypeInstances {
 
 		const created: CachedInstance = {
 			fingerprint,
-			instance: this.build(entry, plugin, pluginsDir, host, registered),
+			instance: this.build(effective, plugin, pluginsDir, host, registered),
 		};
 		this.cache.set(sourceId, created);
 		this.disposed.delete(sourceId);

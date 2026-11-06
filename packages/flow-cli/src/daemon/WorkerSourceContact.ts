@@ -1,16 +1,17 @@
-import type { WorkerRequest, WorkerSourceProvider } from 'extension-points';
+import type { WorkerSourceProvider } from 'extension-points';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { type CommandSourceOptions, CommandWorkerSource } from './CommandWorkerSource.js';
 import { buildCommandWorkerType } from './CommandWorkerTypePlugin.js';
-import { sendNudge } from './NudgeDispatch.js';
+import { InboundWorkerSource } from './InboundWorkerSource.js';
+import { buildInboundWorkerType } from './InboundWorkerTypePlugin.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { buildRelayWorkerType } from './RelayWorkerTypePlugin.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 import type { WorkerTypeHost, WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 // Re-exported: the command source moved to its own file with its worker-type plugin.
-export { CommandWorkerSource, type CommandSourceOptions };
+export { CommandWorkerSource, InboundWorkerSource, type CommandSourceOptions };
 
 /** The S1 implementations that ship with flow. */
 const BUILT_IN_INBOUND = 'built-in:inbound';
@@ -33,33 +34,6 @@ export interface SourceProviderDependencies {
 }
 
 /**
- * A source whose workers are already running and dial the daemon themselves.
- *
- * When the entry carries a `nudgeUrl`, `obtainWorker` sends a single HTTP POST to it,
- * delivering the daemon's WS address so the worker can connect immediately rather than
- * waiting for its backoff timer. The nudge is best-effort: a failure is reported and
- * ignored, because the worker reconnects via backoff regardless (D#4, D#66).
- *
- * Without a `nudgeUrl` there is no channel to the worker, which is the whole point of
- * an inbound source: trust originates from the worker choosing to present itself (D#18).
- */
-export class InboundWorkerSource implements WorkerSourceProvider {
-	constructor(private readonly nudgeUrl?: string) {}
-
-	async obtainWorker(request: WorkerRequest): Promise<void> {
-		if (this.nudgeUrl === undefined) return;
-		try {
-			await sendNudge(this.nudgeUrl, request.daemonEndpoint);
-		} catch (err) {
-			// Not fatal: the worker reconnects via backoff. Throw so the caller can log it.
-			throw new Error(
-				`nudge to "${request.sourceId}" at ${this.nudgeUrl} failed: ${normalizeError(err).message}`
-			);
-		}
-	}
-}
-
-/**
  * Builds the S1 implementation named by a source entry.
  *
  * @throws on an unrecognised provider. There is deliberately no fallback: silently
@@ -74,7 +48,9 @@ export function resolveSourceProvider(
 ): WorkerSourceProvider {
 	switch (provider) {
 		case BUILT_IN_INBOUND:
-			return new InboundWorkerSource(nudgeUrl);
+			// The same construction the inbound worker-type plugin uses.
+			// Remove this case once resolution can be async (the plugin factory is async; this function is not).
+			return buildInboundWorkerType(nudgeUrl).source;
 		case BUILT_IN_COMMAND:
 			// The same construction the command worker-type plugin uses.
 			// Remove this case once resolution can be async (the plugin factory is async; this function is not).

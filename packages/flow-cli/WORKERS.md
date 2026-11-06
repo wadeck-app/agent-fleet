@@ -87,6 +87,8 @@ flow worker --source laptop --token <worker token>     # wherever that worker li
 Nothing can reach such a worker, so nothing nudges it; it inherits the source's labels (D#30) and
 counts against its cap.
 
+The same kind is also a built-in worker type, `inbound.default` (`plugins.inbound.default`): `flow worker source add laptop --provider inbound --plugin inbound.default --option nudgeUrl=http://127.0.0.1:5555/nudge`. No `--plugins-dir` is needed. The URL comes from `options.nudgeUrl` (`${NAME}` is expanded from the daemon environment) or from the entry's own `nudgeUrl` (which workers write about themselves); two different values are refused. At declaration the URL must be http(s) and must not carry a literal credential (user info, or a sensitive query parameter such as `token`): write `${NAME}` instead. These checks apply to the plugin form only; `built-in:inbound` entries are stored as given.
+
 ### Relay worker type -- daemon side only
 
 A relay holds a connection to the daemon and launches a local worker when asked; it runs no steps itself. The daemon side ships (`RelayWorkerSource`, `provide_worker`). **No relay process ships**: until one exists, a declared relay source yields "no relay connected".

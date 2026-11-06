@@ -11,6 +11,7 @@ import { join } from 'node:path';
 
 import { validateNoLiteralCredentials } from '../config/LiteralCredentials.js';
 import { WorkerSourceCommandRule } from './WorkerSourceCommandRule.js';
+import { WorkerSourceInboundRule } from './WorkerSourceInboundRule.js';
 import { WorkerSourcePluginReference } from './WorkerSourcePluginReference.js';
 
 // Re-exported: the entry shape is owned by flow-core, which also reads the registry for non-CLI hosts.
@@ -56,6 +57,7 @@ export class WorkerSourceRegistry {
 	 */
 	private readonly pluginReference = new WorkerSourcePluginReference();
 	private readonly commandRule = new WorkerSourceCommandRule(this.pluginReference);
+	private readonly inboundRule = new WorkerSourceInboundRule(this.pluginReference);
 
 	constructor(
 		private readonly configDir: string,
@@ -255,6 +257,7 @@ export class WorkerSourceRegistry {
 		this.rejectRetiredProvider(declaration.sourceId, declaration.provider);
 		this.pluginReference.validate(declaration);
 		this.commandRule.validate(declaration);
+		this.inboundRule.validate(declaration);
 		if (declaration.options !== undefined) {
 			validateNoLiteralCredentials(declaration.options, `worker source "${declaration.sourceId}" options`);
 		}

@@ -1,12 +1,14 @@
 import { getBuiltinPlugin, registerBuiltinPlugin } from '../config/BuiltinPluginRegistry.js';
 import type { FlowPlugin } from '../config/FlowPlugin.js';
 import { COMMAND_WORKER_TYPE_REF, commandWorkerTypePlugin } from './CommandWorkerTypePlugin.js';
+import { INBOUND_WORKER_TYPE_REF, inboundWorkerTypePlugin } from './InboundWorkerTypePlugin.js';
 import { RELAY_WORKER_TYPE_REF, relayWorkerTypePlugin } from './RelayWorkerTypePlugin.js';
 
 /** Registers the worker types that ship with flow. Statically referenced, so the single-file bundle contains them. Idempotent. */
 export function registerBuiltinWorkerTypes(): void {
 	registerBuiltinPlugin(RELAY_WORKER_TYPE_REF, relayWorkerTypePlugin);
 	registerBuiltinPlugin(COMMAND_WORKER_TYPE_REF, commandWorkerTypePlugin);
+	registerBuiltinPlugin(INBOUND_WORKER_TYPE_REF, inboundWorkerTypePlugin);
 }
 
 /**
