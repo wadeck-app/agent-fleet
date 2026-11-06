@@ -4,8 +4,18 @@
 # Base: docker/sandbox-templates:claude-code-docker, pinned by digest (claude, node, docker CLI, user `agent`).
 FROM docker/sandbox-templates:claude-code-docker@sha256:4a94d9144a70df744fd9247e0c365a14cfb97024afab8db7597c8ba3e0637642
 
+# The model CLIs come from the COMMITTED lock (image/package.json + package-lock.json, copied by build-image.mjs into tools/):
+# every transitive dependency is pinned with its integrity hash, and `--ignore-scripts` means no dependency runs a lifecycle
+# script at build time. opencode-ai needs its own postinstall (it replaces bin/opencode.exe by the binary of the platform
+# package), so exactly that one script, from the lock-pinned package, is run by hand.
 # codex stays on 0.149.1: 0.164.0 fails `codex exec resume` with CODEX_HOME on the mounted dir ("list_turns is not supported yet").
-RUN npm install -g --prefix /home/agent/.local @openai/codex@0.149.1 opencode-ai@1.19.4 \
+RUN mkdir -p /home/agent/.local/lib/flow-tools /home/agent/.local/bin
+COPY --chown=agent:agent tools/package.json tools/package-lock.json /home/agent/.local/lib/flow-tools/
+RUN cd /home/agent/.local/lib/flow-tools \
+ && npm ci --ignore-scripts --omit=dev \
+ && node node_modules/opencode-ai/postinstall.mjs \
+ && ln -sf ../lib/flow-tools/node_modules/.bin/codex /home/agent/.local/bin/codex \
+ && ln -sf ../lib/flow-tools/node_modules/.bin/opencode /home/agent/.local/bin/opencode \
  && npm cache clean --force
 
 # From flow-sandbox:m7 the exec variant also needs mcp-callback-forwarder.cjs (image/mcp-callback-forwarder.cjs, copied into

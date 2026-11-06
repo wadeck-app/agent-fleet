@@ -1,0 +1,10 @@
+{
+	"name": "flow-sandbox-image-tools",
+	"version": "0.0.0",
+	"private": true,
+	"description": "The model CLIs installed in the sandbox image (Dockerfile). Pinned here and in package-lock.json, installed with npm ci --ignore-scripts. NOT a workspace of the monorepo (not matched by packages/*).",
+	"dependencies": {
+		"@openai/codex": "0.149.1",
+		"opencode-ai": "1.19.4"
+	}
+}

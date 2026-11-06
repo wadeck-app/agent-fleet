@@ -18,6 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { DockerImageId } from '../src/DockerImageId.ts';
 import { PathTranslator } from '../src/PathTranslator.ts';
 import { SbxBinaryLocator } from '../src/SbxBinaryLocator.ts';
 import { SbxCliRuntime } from '../src/SbxCliRuntime.ts';
@@ -41,6 +42,11 @@ mkdirSync(context);
 mkdirSync(output);
 cpSync(path.join(imageDirectory, 'Dockerfile'), path.join(context, 'Dockerfile'));
 cpSync(path.join(imageDirectory, 'opt-flow'), path.join(context, 'opt-flow'), { recursive: true });
+// The pinned model CLIs (Dockerfile: npm ci --ignore-scripts from this lock).
+mkdirSync(path.join(context, 'tools'));
+for (const file of ['package.json', 'package-lock.json']) {
+	cpSync(path.join(imageDirectory, file), path.join(context, 'tools', file));
+}
 // Source-controlled file of the image (the others in opt-flow are build output of BuildInnerBundles.mjs); needed from flow-sandbox:m7.
 cpSync(
 	path.join(imageDirectory, 'mcp-callback-forwarder.cjs'),
@@ -67,6 +73,7 @@ async function inBuilder(label, script) {
 			`${label} failed (exit ${result.exitCode}).\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
 		);
 	}
+	return result.stdout;
 }
 
 try {
@@ -82,7 +89,16 @@ try {
 	const contextInVm = translator.toSandbox(context, 'context');
 	const tarInVm = `${translator.toSandbox(output, 'output')}/image.tar`;
 	await inBuilder('docker build', `docker build -t '${tag}' '${contextInVm}'`);
+	// The id of what was built, then proof that the archive that is loaded holds exactly that image.
+	const imageId = DockerImageId.parse(
+		await inBuilder('read the image id', `docker image inspect --format '{{.Id}}' '${tag}'`)
+	);
 	await inBuilder('docker save', `docker save '${tag}' -o '${tarInVm}'`);
+	DockerImageId.assertInArchive(
+		imageId,
+		await inBuilder('read the archive manifest', `tar -xOf '${tarInVm}' manifest.json`),
+		tag
+	);
 	const tarPath = path.join(output, 'image.tar');
 	step(`sbx template load (${Math.round(statSync(tarPath).size / 1e6)} MB)`);
 	const binary = new SbxBinaryLocator({
@@ -112,6 +128,7 @@ try {
 	) {
 		throw new Error(`The image ${tag} is not in \`sbx template ls\` after the load:\n${listed.stdout}`);
 	}
+	step(`image id ${imageId} (the saved archive holds it)`);
 	step(`done: ${tag} is loaded. Create sandboxes with image "${tag}" and pull "never".`);
 } finally {
 	// A cleanup failure is reported loudly but never hides the build error.
