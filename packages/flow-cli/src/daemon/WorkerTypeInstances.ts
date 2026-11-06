@@ -23,11 +23,13 @@ export interface WorkerTypeTimeouts {
 
 /**
  * What the daemon lends to a BUILT-IN worker type, and only to that: a plugin loaded from a plugins directory is
- * third-party code and never receives these (a relay handle is a live socket, which the point deliberately never hands out).
+ * third-party code and never receives these (a relay handle is a live socket, and a launch token a credential, which the point deliberately never hands out).
  */
 export interface WorkerTypeHost {
 	/** The live connection of a relay source; only the relay worker type uses it. */
 	findRelay?: (sourceId: string) => RegisteredRelay | undefined;
+	/** Mints the one-shot credential a launched worker registers with; only the command worker type uses it. */
+	issueLaunchToken?: (sourceId: string) => string;
 }
 
 interface CachedInstance {

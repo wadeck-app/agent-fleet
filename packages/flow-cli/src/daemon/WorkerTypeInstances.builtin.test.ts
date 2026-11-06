@@ -286,3 +286,18 @@ describe('WorkerTypeInstances - a built-in without pluginsDir', () => {
 		expect(message).not.toContain('undefined');
 	});
 });
+
+describe('WorkerTypeInstances - the launch-token service', () => {
+	it('lends issueLaunchToken to a built-in and never to a plugin loaded from disk', async () => {
+		const host = { issueLaunchToken: () => 'minted' };
+		const { plugin, created } = builtin();
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, plugin);
+
+		await instances().get(entry(), host);
+		expect(created).toEqual([{ sourceId: 'sandbox', options: { image: 'node:22' }, host }]);
+
+		__resetBuiltinPluginsForTests();
+		await instances().get(entry({ sourceId: 'other' }), host);
+		expect(fixture.created).toEqual([{ sourceId: 'other', options: { image: 'node:22' } }]);
+	});
+});

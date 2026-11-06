@@ -66,6 +66,8 @@ The command needs no arguments -- everything arrives in its environment: `FLOW_D
 that launch alone and valid once. Both tokens printed by `add` are therefore discardable for a local
 source; keep the worker token only if you also intend to start that worker by hand.
 
+The same kind is also a built-in worker type, `command.default` (`plugins.command.default`), served from the built-in registry by the same code: `flow worker source add factory-local --provider command --plugin command.default --command "flow worker"`. No `--plugins-dir` is needed (one given is ignored, with a warning), and the launch token is lent by the daemon to built-ins only. The `built-in:command` provider string stays valid and unchanged.
+
 `--cwd` is still the worker's working directory, and `flow worker` serves the registered project
 containing it (or `FLOW_PROJECT`). Without `--cwd` that is the daemon's directory, which is usually
 not a project: start the worker from a registered folder, or set `FLOW_WORKER_PROJECTS` /

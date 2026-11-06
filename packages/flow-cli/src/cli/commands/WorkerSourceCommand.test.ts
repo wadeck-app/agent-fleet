@@ -171,6 +171,15 @@ describe('flow worker source command', () => {
 			expect(printed()).toContain('plugin     : sandbox.docker');
 		});
 
+		it('declares the command worker type as a plugin with no --plugins-dir: no warning, no directory stored', () => {
+			run('add', 'laptop', '--provider', 'command', '--plugin', 'command.default', '--command', 'flow');
+
+			expect(printed()).toContain('plugin     : command.default (built-in)');
+			expect(printed()).not.toContain('[warn]');
+			expect(storedSources()[0]).toMatchObject({ plugin: 'command.default', options: { command: 'flow' } });
+			expect(storedSources()[0]).not.toHaveProperty('pluginsDir');
+		});
+
 		it('declares a built-in plugin ref with no --plugins-dir: no warning, no directory stored', () => {
 			run('add', 'build-box', '--provider', 'relay', '--plugin', 'relay.default');
 
