@@ -307,7 +307,7 @@ describe('ExecWrapper run_end (the daemon says a run this wrapper served is over
 		if (spec.log !== undefined) expect(log.text()).toContain(spec.log);
 	});
 
-	it('is idempotent: a second run_end for the same run removes nothing again and is acked again, harmlessly', async () => {
+	it('is idempotent: a second run_end for the same run (the daemon never sends one; defensive, not a retry mechanism) removes nothing again and is acked again, harmlessly', async () => {
 		await run(assign('probe'));
 
 		daemon.handlers?.onMessage(runEnd('completed'));

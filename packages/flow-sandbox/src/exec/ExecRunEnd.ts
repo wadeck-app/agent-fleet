@@ -10,7 +10,7 @@ export interface ExecRunEndOptions {
 	log: SandboxLog;
 	/** Sends `run_end_ack` for the run; false when the daemon connection could not take it. */
 	sendAck: (executionId: string) => boolean;
-	/** Pause before the single retry of a failed removal. The daemon waits 30 s by default for the ack, so keep it short. */
+	/** Pause before the wrapper's own single retry of a failed removal (the daemon does not re-send run_end). It waits 30 s by default for the ack, so keep it short. */
 	retryDelayMs: number;
 	/** What the wrapper forgets of a run whose sandbox is gone (prepared credentials, mounts). Not called for `daemon_stopping`. */
 	afterRemoval: (executionId: string, sandbox: string | undefined) => Promise<void>;
@@ -23,12 +23,14 @@ export interface ExecRunEndOptions {
  * the workspace is gone.
  *
  * - `completed` / `failed`: the sandbox is REMOVED (SandboxLifecycle.endRun, serialized on the lifecycle queue), then acked.
- *   A failed removal is retried once after a short pause; if it fails again NO ack is sent (the workspace stays held until
- *   the daemon's wait expires, the safe direction) and the log says how to finish by hand.
+ *   A failed removal is retried once after a short pause. That is the ONLY retry: the daemon sends `run_end` once per run
+ *   and never re-sends it. If the retry fails too, NO ack is sent (the workspace stays held until the daemon's wait expires
+ *   and it logs that this worker did not acknowledge; the safe direction) and the sandbox stays until `leftover remove`.
  * - `daemon_stopping`: the sandbox is STOPPED and kept (the run may resume), then acked.
  * - A run this wrapper holds no sandbox for (its create failed, or it was already removed): nothing to remove, acked at
- *   once, because the daemon counts this worker as served and waits for it. A second `run_end` for the same run therefore
- *   removes nothing again and is acked again; an ack the daemon no longer waits for is only logged and dropped there.
+ *   once, because the daemon counts this worker as served and waits for it. A second `run_end` for the same run (the daemon
+ *   does not send one; this is only defensive) removes nothing again and is acked again: harmless, NOT a retry mechanism.
+ *   An ack the daemon no longer waits for is only warned about and dropped there.
  * - An unknown reason, or a message without a run id: logged, nothing removed, no ack (protocol drift must be visible).
  * - A step of the run still running (a sibling after a terminal failure): the removal does not wait for it. `sbx rm
  *   --force` ends its processes, its exec fails and the daemon drops what it reports after `run_end`.

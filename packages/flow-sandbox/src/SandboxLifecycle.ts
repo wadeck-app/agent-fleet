@@ -215,7 +215,7 @@ export class SandboxLifecycle {
 
 	/**
 	 * End-of-run or cancel event: removes the run's sandbox. Idempotent. A sandbox that no longer exists counts
-	 * as removed. Any other failure keeps the run known so a second event retries.
+	 * as removed. Any other failure keeps the run known so that a later `endRun` (the exec wrapper retries once on its own) can try again.
 	 */
 	endRun(executionId: string, reason: RunEndReason): Promise<void> {
 		return this.queue.run(async () => {
@@ -237,7 +237,7 @@ export class SandboxLifecycle {
 			} catch (error) {
 				if (!(error instanceof SandboxError && error.kind === 'not-found')) {
 					this.dependencies.log.warn(
-						`Could not remove sandbox "${held.name}" at the end of run "${executionId}" (${reason}): ${describeError(error)}. A second end-of-run event retries; otherwise run \`leftover remove ${held.name}\`.`
+						`Could not remove sandbox "${held.name}" at the end of run "${executionId}" (${reason}): ${describeError(error)}. If the caller does not retry, run \`leftover remove ${held.name}\`.`
 					);
 					throw error;
 				}

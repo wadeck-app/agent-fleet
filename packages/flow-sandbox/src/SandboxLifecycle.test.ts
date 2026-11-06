@@ -532,7 +532,7 @@ describe('SandboxLifecycle end of run and cancel', () => {
 		expect(life.current()).toBeUndefined();
 	});
 
-	it('keeps the run known when removal fails, so a second event retries', async () => {
+	it('keeps the run known when removal fails, so that a later endRun can try again', async () => {
 		const life = lifecycle();
 		await life.beginStep('run1', mounts);
 		runtime.failNext('remove', new SandboxError('command-failed', 'file locked'));
