@@ -54,6 +54,8 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 		env,
 		PresenceDirectory.defaultPath(os.homedir())
 	);
+	// The launch credential was read into the config: no program started from here on inherits it.
+	delete env['FLOW_WORKER_TOKEN'];
 	const log = new WrapperLog('exec', config.logFile);
 	log.info(
 		`starting: wrapper ${config.wrapperId}, source ${config.sourceId}, projects ${config.projectIds.join(',')}, labels ${config.labels.join(',')}, image ${config.image ?? '(agent default)'}`

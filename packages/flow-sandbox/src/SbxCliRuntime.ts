@@ -28,6 +28,7 @@ import type {
 } from './SbxIntrospection';
 import { SbxOutputParser } from './SbxOutputParser';
 import { SbxProcess, type SbxProcessResult } from './SbxProcess';
+import { WorkerCredentialFilter } from './WorkerCredentialFilter';
 
 export interface SbxCliRuntimeOptions {
 	/** Executable path. Default: SBX_MOCK_PATH, SBX_PATH, the Windows install directory, then PATH. */
@@ -78,7 +79,7 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 
 	constructor(private readonly options: SbxCliRuntimeOptions = {}) {
 		this.platform = options.platform ?? process.platform;
-		this.env = { ...(options.env ?? process.env), MSYS_NO_PATHCONV: '1' };
+		this.env = { ...WorkerCredentialFilter.apply(options.env ?? process.env), MSYS_NO_PATHCONV: '1' };
 		this.tempDirectory = options.tempDirectory ?? os.tmpdir();
 		this.commandTimeoutMs = options.commandTimeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
 		this.createTimeoutMs = options.createTimeoutMs ?? DEFAULT_CREATE_TIMEOUT_MS;

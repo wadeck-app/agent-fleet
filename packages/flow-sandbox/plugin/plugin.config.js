@@ -13,7 +13,7 @@
 // FLOW_SANDBOX_PRESENCE_DIR (the wrapper's own setting) is honoured when looking for a wrapper that is already alive.
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +40,8 @@ const EXAMPLES = {
 	sbxPath: 'sbxPath=C:\\Users\\me\\AppData\\Local\\DockerSandboxes\\bin\\sbx.exe',
 };
 const REQUIRED = ['projects', 'region', 'profiles'];
+const MAX_VALUE_LENGTH = 512;
+const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
 
 /** The plugin's own errors are plain: a plugin loaded from a directory cannot use flow's PluginConfigurationError class. */
 function fail(message) {
@@ -71,7 +73,7 @@ function parseOptions(raw) {
 	if (typeof raw !== 'object' || Array.isArray(raw))
 		throw fail('worker type sandbox: the source options must be key=value pairs');
 	for (const name of Object.keys(raw)) {
-		if (!(name in EXAMPLES)) {
+		if (!Object.hasOwn(EXAMPLES, name)) {
 			throw fail(
 				`worker type sandbox: Unknown option "${name}". Supported options: ${Object.keys(EXAMPLES).join(', ')}. Nothing was applied, so fix the name rather than assuming a default took effect. Example: --option ${EXAMPLES.cpus}`
 			);
@@ -79,6 +81,8 @@ function parseOptions(raw) {
 		const value = raw[name];
 		if (typeof value !== 'string') throw optionError(name, `must be a string, found ${JSON.stringify(value)}`);
 		if (value.trim() === '') throw optionError(name, 'is empty (leave the option out to use the default)');
+		if (value.length > MAX_VALUE_LENGTH) throw optionError(name, `must be at most ${MAX_VALUE_LENGTH} characters`);
+		if (CONTROL_CHARACTER.test(value)) throw optionError(name, 'must not contain a control character');
 	}
 	for (const name of REQUIRED) {
 		if (raw[name] === undefined) {
@@ -128,6 +132,8 @@ function parseOptions(raw) {
 	const parsed = { projects, region: raw.region, profileAlias, hostProfile, extraAllowedHosts: [] };
 	if (raw.image !== undefined) {
 		if (/\s/.test(raw.image)) throw optionError('image', 'must not contain whitespace');
+		if (raw.image.startsWith('-'))
+			throw optionError('image', 'must not start with "-" (it would be read as an option)');
 		parsed.image = raw.image;
 	}
 	if (raw.pull !== undefined) {
@@ -175,6 +181,9 @@ function parseOptions(raw) {
 	}
 	if (raw.sbxPath !== undefined) {
 		if (!isAbsolute(raw.sbxPath)) throw optionError('sbxPath', 'must be an absolute path');
+		if (/^(?:\\\\|\/\/)/.test(raw.sbxPath))
+			throw optionError('sbxPath', 'must be a local path, not a network path');
+		if (!isFile(raw.sbxPath)) throw optionError('sbxPath', `must be a file that exists, found ${raw.sbxPath}`);
 		parsed.sbxPath = raw.sbxPath;
 	}
 	return parsed;
@@ -209,13 +218,48 @@ function wrapperArguments(parsed, sourceId) {
 	return argv;
 }
 
+function isFile(file) {
+	try {
+		return statSync(file).isFile();
+	} catch {
+		return false;
+	}
+}
+
+let overrideAnnounced = false;
 function wrapperPath() {
+	const override = process.env.FLOW_SANDBOX_PLUGIN_WRAPPER;
+	if (override !== undefined && !overrideAnnounced) {
+		overrideAnnounced = true;
+		process.stderr.write(
+			`[sandbox plugin] WARNING: FLOW_SANDBOX_PLUGIN_WRAPPER is set, so ${override} replaces wrapper.cjs. This is for tests only: unset it in production.\n`
+		);
+	}
 	return process.env.FLOW_SANDBOX_PLUGIN_WRAPPER ?? join(PLUGIN_DIRECTORY, 'wrapper.cjs');
 }
 
+/**
+ * What the wrapper may inherit from the daemon: the minimum a process needs to run, find its profile and sbx, and reach the
+ * network. NOT the daemon's provider keys, health token or other FLOW_* variables. Matched without regard to case (Windows).
+ * What remains is listed in the README ("Plugin").
+ */
+const INHERITED = [
+	/^(?:path|pathext|systemroot|windir|comspec|temp|tmp|tmpdir|home|homedrive|homepath|userprofile|username|user|logname|lang|tz|shell|programdata|allusersprofile|appdata|localappdata|programfiles(?:\(x86\))?|processor_architecture|number_of_processors|os)$/i,
+	/^lc_/i,
+	/^aws_/i,
+	/^sbx_/i,
+	/^xdg_config_home$/i,
+	/^flow_config_dir$/i,
+	/^flow_sandbox_/i,
+	/^(?:https?_proxy|all_proxy|no_proxy|node_extra_ca_certs|ssl_cert_file|ssl_cert_dir)$/i,
+];
+
 function childEnvironment(additions, parsed) {
-	const environment = { ...process.env, ...additions };
-	delete environment.FLOW_DAEMON_MODE;
+	const environment = {};
+	for (const [name, value] of Object.entries(process.env)) {
+		if (INHERITED.some(pattern => pattern.test(name))) environment[name] = value;
+	}
+	Object.assign(environment, additions);
 	if (parsed.sbxPath !== undefined) environment.SBX_PATH = parsed.sbxPath;
 	return environment;
 }
@@ -227,9 +271,6 @@ function preflight(parsed, sourceId) {
 		throw fail(
 			`worker type sandbox: the wrapper ${wrapper} does not exist. Build the plugin with "npm run bundle --workspace flow-sandbox" and declare the source with --plugins-dir <repository>/packages/flow-sandbox/dist-plugin, then restart the daemon.`
 		);
-	}
-	if (parsed.sbxPath !== undefined && !existsSync(parsed.sbxPath)) {
-		throw optionError('sbxPath', `does not exist: ${parsed.sbxPath}`);
 	}
 	const result = spawnSync(process.execPath, [wrapper, 'preflight', ...wrapperArguments(parsed, sourceId)], {
 		env: childEnvironment(
@@ -266,11 +307,25 @@ function presenceAlive(id) {
 	}
 }
 
-function redact(text, token) {
+/**
+ * Removes the launch credential from a text, however it was cut: exactly, with whitespace or a line break inside it, and any
+ * run of 64 hexadecimal digits (the shape of every launch credential) as a second net. Used on a WHOLE buffer, never on a
+ * piece, so a credential split across chunks cannot slip through.
+ */
+function scrub(text, token) {
 	let result = text.replace(/FLOW_WORKER_TOKEN=\S+/g, 'FLOW_WORKER_TOKEN=[redacted]');
-	if (token) result = result.split(token).join('[redacted]');
-	return result;
+	if (token) {
+		const pattern = token
+			.split('')
+			.map(character => character.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&'))
+			.join('\\s*');
+		result = result.replace(new RegExp(pattern, 'g'), '[redacted]');
+	}
+	return result.replace(/[0-9a-fA-F](?:\s*[0-9a-fA-F]){63,}/g, '[redacted]');
 }
+
+/** Replaced by a test to make a spawn fail; the daemon never changes it. */
+let spawnProcess = spawn;
 
 function createInstance(context) {
 	const sourceId = context.sourceId;
@@ -282,14 +337,15 @@ function createInstance(context) {
 	let exited = true;
 	let spawnedWith;
 	let failure;
-	let stderrTail = [];
+	let stderrRaw = '';
+	let pendingLine = '';
 	let disposing;
 
 	function describeFailure(found) {
 		const how = found.signal ? `was ended by ${found.signal}` : `exited with code ${found.code}`;
 		return (
 			`worker source "${sourceId}": the sandbox wrapper started by an earlier ask ${how} after that ask returned, so no worker joined. ` +
-			`Its last output: ${redact(found.tail, found.token) || '(none)'} ` +
+			`Its last output: ${found.tail || '(none)'} ` +
 			`Fix the cause shown above (it is also in the daemon log as "[source ${sourceId}]" lines); the next ask starts a new wrapper.`
 		);
 	}
@@ -333,7 +389,7 @@ function createInstance(context) {
 					return;
 				}
 				const token = request.authToken;
-				const started = spawn(process.execPath, [wrapperPath(), ...wrapperArguments(parsed, sourceId)], {
+				const started = spawnProcess(process.execPath, [wrapperPath(), ...wrapperArguments(parsed, sourceId)], {
 					env: childEnvironment(
 						{
 							FLOW_DAEMON_WS_URL: request.daemonEndpoint,
@@ -346,46 +402,54 @@ function createInstance(context) {
 					stdio: ['ignore', 'ignore', 'pipe'],
 					windowsHide: true,
 				});
+				// Handlers BEFORE anything can throw: Node reports a failed spawn as an 'error' event after spawn() returned, and an
+				// 'error' event nobody listens to is an uncaught exception IN THE DAEMON.
+				const mine = () => child === started;
+				stderrRaw = '';
+				pendingLine = '';
+				started.on('error', error => {
+					if (!mine()) return;
+					failure = { code: 'start-error', tail: scrub(error.message, token), token };
+					exited = true;
+				});
+				started.stderr?.on('data', data => {
+					if (!mine()) return;
+					stderrRaw = (stderrRaw + data.toString()).slice(-STDERR_TAIL_CHARACTERS * 2);
+					// Forwarded line by line, each line scrubbed whole: a credential cut between two chunks is rejoined first.
+					pendingLine += data.toString();
+					const lines = pendingLine.split('\n');
+					pendingLine = lines.pop() ?? '';
+					for (const line of lines)
+						if (line !== '') process.stderr.write(`[source ${sourceId}] ${scrub(line, token)}\n`);
+				});
+				started.on('exit', (code, signal) => {
+					if (!mine()) return;
+					exited = true;
+					if (pendingLine !== '') process.stderr.write(`[source ${sourceId}] ${scrub(pendingLine, token)}\n`);
+					pendingLine = '';
+					if (disposing === undefined && (code !== 0 || signal)) {
+						const lines = scrub(stderrRaw, token)
+							.split('\n')
+							.filter(line => line.trim() !== '');
+						failure = {
+							code,
+							signal,
+							tail: lines.slice(-STDERR_TAIL_LINES).join(' | ').slice(-STDERR_TAIL_CHARACTERS),
+							token,
+						};
+					}
+				});
 				if (started.pid === undefined) {
 					throw new Error(
-						`worker source "${sourceId}": the wrapper process could not be started (no pid); check that ${wrapperPath()} is readable.`
+						`worker source "${sourceId}": the wrapper process could not be started (no pid); check that node (${process.execPath}) and ${wrapperPath()} can be run by the daemon's user.`
 					);
 				}
 				child = started;
 				exited = false;
 				spawnedWith = token;
-				stderrTail = [];
-				started.stderr.on('data', data => {
-					const text = redact(data.toString(), token);
-					process.stderr.write(
-						text
-							.split('\n')
-							.filter(line => line !== '')
-							.map(line => `[source ${sourceId}] ${line}\n`)
-							.join('')
-					);
-					stderrTail = [...stderrTail, ...text.split('\n').filter(line => line !== '')].slice(
-						-STDERR_TAIL_LINES
-					);
-				});
-				started.on('error', error => {
-					failure = { code: 'start-error', tail: error.message, token: spawnedWith };
-					exited = true;
-				});
-				started.on('exit', (code, signal) => {
-					exited = true;
-					if (disposing === undefined && (code !== 0 || signal)) {
-						failure = {
-							code,
-							signal,
-							tail: stderrTail.join(' | ').slice(-STDERR_TAIL_CHARACTERS),
-							token: spawnedWith,
-						};
-					}
-				});
 				// The wrapper's lifetime is its own (it leaves when the daemon connection closes); the daemon must not wait for it.
 				started.unref();
-				started.stderr.unref?.();
+				started.stderr?.unref?.();
 			},
 		},
 		// No `run` hook in v1: the wrapper declares run-events and removes its sandbox when the daemon says a run ended.
@@ -396,7 +460,13 @@ function createInstance(context) {
 					const total = Number(process.env.FLOW_SANDBOX_PLUGIN_DISPOSE_MS ?? DISPOSE_BOUND_MS);
 					// The wrapper leaves by itself once the daemon closes its socket; ask politely, then insist, within the bound.
 					await waitExit(total * 0.6);
-					if (!exited) child.kill();
+					// Windows has no polite signal: child.kill() is TerminateProcess on the wrapper alone, which skips its own
+					// cleanup and leaves its descendants. taskkill /T ends the whole tree; POSIX gets SIGTERM, which the wrapper handles.
+					if (!exited) {
+						if (process.platform === 'win32')
+							spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
+						else child.kill();
+					}
 					await waitExit(total * 0.3);
 					if (!exited) child.kill('SIGKILL');
 					await waitExit(total * 0.1);
@@ -423,4 +493,11 @@ export const manifest = {
 };
 
 /** For the tests of this plugin; not part of the plugin contract. */
-export const internals = { parseOptions, wrapperId, wrapperArguments };
+export const internals = {
+	parseOptions,
+	wrapperId,
+	wrapperArguments,
+	setSpawn(implementation) {
+		spawnProcess = implementation ?? spawn;
+	},
+};

@@ -70,11 +70,10 @@ describe('the sandbox plugin artifact', () => {
 			[
 				"const fs = require('node:fs');",
 				"if (process.argv[2] === 'preflight') process.exit(0);",
-				'fs.writeFileSync(process.env.STUB_RECORD, JSON.stringify({ argv: process.argv.slice(2), token: process.env.FLOW_WORKER_TOKEN, endpoint: process.env.FLOW_DAEMON_WS_URL, source: process.env.FLOW_WORKER_SOURCE_ID }));',
+				`fs.writeFileSync(${JSON.stringify(record)}, JSON.stringify({ argv: process.argv.slice(2), token: process.env.FLOW_WORKER_TOKEN, endpoint: process.env.FLOW_DAEMON_WS_URL, source: process.env.FLOW_WORKER_SOURCE_ID }));`,
 				'setTimeout(() => process.exit(0), 200);',
 			].join('\n')
 		);
-		process.env['STUB_RECORD'] = record;
 		process.env['FLOW_SANDBOX_PLUGIN_WRAPPER'] = stub;
 		const logged: string[] = [];
 		const instances = new WorkerTypeInstances(new PluginLoader(), (_level, message) => logged.push(message));
@@ -119,7 +118,6 @@ describe('the sandbox plugin artifact', () => {
 			await instance.dispose();
 		} finally {
 			await instances.disposeAll();
-			delete process.env['STUB_RECORD'];
 			delete process.env['FLOW_SANDBOX_PLUGIN_WRAPPER'];
 		}
 	}, 60_000);

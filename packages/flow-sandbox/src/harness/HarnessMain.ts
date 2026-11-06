@@ -41,6 +41,8 @@ const HARNESS_VERSION = 'sandbox-harness-m4';
  */
 export async function runHarness(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<void> {
 	const config = new HarnessConfigParser().parse(argv, env, PresenceDirectory.defaultPath(os.homedir()));
+	// The launch credential was read into the config: no program started from here on inherits it.
+	delete env['FLOW_WORKER_TOKEN'];
 	const log = new WrapperLog('harness', config.logFile);
 	log.info(
 		`starting: wrapper ${config.wrapperId}, source ${config.sourceId}, projects ${config.projectIds.join(',')}, labels ${config.labels.join(',')}, image ${config.image ?? '(agent default)'}`

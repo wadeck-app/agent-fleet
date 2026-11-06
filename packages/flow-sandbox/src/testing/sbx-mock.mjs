@@ -163,7 +163,9 @@ const stdinText = readsStdin ? readStdin() : '';
 
 const callRecord = { argv, msysNoPathconv: process.env.MSYS_NO_PATHCONV ?? null, stdin: stdinText };
 function recordCall(extra = {}) {
-	fs.appendFileSync(callsPath, `${JSON.stringify({ ...callRecord, ...extra })}\n`);
+	// workerEnv: names of FLOW_WORKER_* variables in the environment of THIS mock process (a test checks none leaked to an sbx child).
+	const workerEnv = Object.keys(process.env).filter(name => /^FLOW_WORKER_/i.test(name));
+	fs.appendFileSync(callsPath, `${JSON.stringify({ ...callRecord, workerEnv, ...extra })}\n`);
 }
 
 if (argv[0] === 'version') {

@@ -5,6 +5,7 @@ import { SbxBinaryLocator } from '../SbxBinaryLocator';
 import { SbxCliRuntime } from '../SbxCliRuntime';
 import { SbxPrerequisiteCheck } from '../SbxPrerequisiteCheck';
 import { SbxProcess } from '../SbxProcess';
+import { WorkerCredentialFilter } from '../WorkerCredentialFilter';
 import { WrapperLog } from '../WrapperLog';
 import { HarnessConfigParser } from '../harness/HarnessConfig';
 import { runExecWrapper } from './ExecMain';
@@ -33,14 +34,14 @@ export async function runWrapperEntry(argv: readonly string[], env: NodeJS.Proce
 		templateListing: async () => {
 			const binary = new SbxBinaryLocator({
 				binaryPath: undefined,
-				env,
+				env: WorkerCredentialFilter.apply(env),
 				platform: process.platform,
 				nodeExecutable: process.execPath,
 			}).locate();
 			const result = await new SbxProcess().run({
 				binary,
 				args: ['template', 'ls'],
-				env,
+				env: WorkerCredentialFilter.apply(env),
 				timeoutMs: 60_000,
 			});
 			if (result.exitCode !== 0) {

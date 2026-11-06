@@ -4,6 +4,7 @@ import { StringDecoder } from 'node:string_decoder';
 
 import type { CommandRunRequest, CommandRunResult, CommandRunner } from './CommandRunner';
 import { SandboxError } from './SandboxError';
+import { WorkerCredentialFilter } from './WorkerCredentialFilter';
 
 /** Output kept per stream; a command that prints more is killed (a credential document is a few hundred bytes). */
 const MAX_OUTPUT_CHARACTERS = 1024 * 1024;
@@ -15,7 +16,7 @@ export class NodeCommandRunner implements CommandRunner {
 			let child: ChildProcessByStdio<null, Readable, Readable>;
 			try {
 				child = spawn(request.command, [...request.args], {
-					env: request.env ?? process.env,
+					env: WorkerCredentialFilter.apply(request.env ?? process.env),
 					shell: false,
 					windowsHide: true,
 					stdio: ['ignore', 'pipe', 'pipe'],

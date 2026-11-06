@@ -1,8 +1,10 @@
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { PassThrough } from 'node:stream';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The plugin is plain JavaScript that a user's daemon loads from a directory (see plugin/plugin.config.js): it is imported
 // by file URL here, exactly like the daemon's loader does, never through the TypeScript sources.
@@ -34,6 +36,7 @@ interface PluginModule {
 		parseOptions(raw: unknown): Record<string, unknown>;
 		wrapperId(sourceId: string): string;
 		wrapperArguments(parsed: Record<string, unknown>, sourceId: string): string[];
+		setSpawn(implementation: unknown): void;
 	};
 }
 
@@ -60,32 +63,27 @@ beforeEach(() => {
 		stub,
 		[
 			"const fs = require('node:fs');",
-			'const env = process.env;',
-			"fs.appendFileSync(env.STUB_LOG, JSON.stringify({ argv: process.argv.slice(2), env: { FLOW_DAEMON_WS_URL: env.FLOW_DAEMON_WS_URL, FLOW_WORKER_SOURCE_ID: env.FLOW_WORKER_SOURCE_ID, FLOW_WORKER_TOKEN: env.FLOW_WORKER_TOKEN, SBX_PATH: env.SBX_PATH } }) + '\\n');",
+			'const env = process.env; const here = __dirname; const mode = (fs.existsSync(here + "/mode") ? fs.readFileSync(here + "/mode", "utf8") : "").trim();',
+			'fs.appendFileSync(here + "/stub.log", JSON.stringify({ argv: process.argv.slice(2), env: { FLOW_DAEMON_WS_URL: env.FLOW_DAEMON_WS_URL, FLOW_WORKER_SOURCE_ID: env.FLOW_WORKER_SOURCE_ID, FLOW_WORKER_TOKEN: env.FLOW_WORKER_TOKEN, SBX_PATH: env.SBX_PATH }, keys: Object.keys(env) }) + \'\\n\');',
 			"if (process.argv[2] === 'preflight') {",
-			"  if (env.STUB_MODE === 'preflight-fails') { process.stderr.write('sbx 0.1.0 is installed but 0.49.2 is required: install it from the release page\\n'); process.exit(1); }",
+			"  if (mode === 'preflight-fails') { process.stderr.write('sbx 0.1.0 is installed but 0.49.2 is required: install it from the release page\\n'); process.exit(1); }",
 			'  process.exit(0);',
 			'}',
-			"if (env.STUB_MODE === 'crash') { process.stderr.write('boom ' + env.FLOW_WORKER_TOKEN + ' (credential in the message)\\n'); process.exit(3); }",
+			"const half = Math.floor((env.FLOW_WORKER_TOKEN || '').length / 2);",
+			"if (mode === 'split-chunks') { process.stderr.write('boom ' + env.FLOW_WORKER_TOKEN.slice(0, half)); setTimeout(() => { process.stderr.write(env.FLOW_WORKER_TOKEN.slice(half) + ' end\\n'); process.exit(3); }, 150); return; }",
+			"if (mode === 'split-lines') { process.stderr.write('boom ' + env.FLOW_WORKER_TOKEN.slice(0, half) + '\\n' + env.FLOW_WORKER_TOKEN.slice(half) + ' end\\n'); process.exit(3); }",
+			"if (mode === 'crash') { process.stderr.write('boom ' + env.FLOW_WORKER_TOKEN + ' (credential in the message)\\n'); process.exit(3); }",
 			'setInterval(() => undefined, 1000);',
 		].join('\n')
 	);
-	process.env['STUB_LOG'] = stubLog;
 	process.env['FLOW_SANDBOX_PLUGIN_WRAPPER'] = stub;
 	process.env['FLOW_SANDBOX_PLUGIN_DISPOSE_MS'] = '600';
-	delete process.env['STUB_MODE'];
 	// The default presence directory of the machine must not influence a test.
 	process.env['FLOW_SANDBOX_PRESENCE_DIR'] = path.join(root, 'presence');
 });
 
 afterEach(() => {
-	for (const key of [
-		'STUB_LOG',
-		'STUB_MODE',
-		'FLOW_SANDBOX_PLUGIN_WRAPPER',
-		'FLOW_SANDBOX_PLUGIN_DISPOSE_MS',
-		'FLOW_SANDBOX_PRESENCE_DIR',
-	]) {
+	for (const key of ['FLOW_SANDBOX_PLUGIN_WRAPPER', 'FLOW_SANDBOX_PLUGIN_DISPOSE_MS', 'FLOW_SANDBOX_PRESENCE_DIR']) {
 		delete process.env[key];
 	}
 	fs.rmSync(root, { recursive: true, force: true });
@@ -114,6 +112,10 @@ function launches(): { argv: string[]; env: Record<string, string> }[] {
 		.filter(line => line !== '')
 		.map(line => JSON.parse(line) as { argv: string[]; env: Record<string, string> })
 		.filter(launch => launch.argv[0] !== 'preflight');
+}
+
+function setMode(mode: string): void {
+	fs.writeFileSync(path.join(root, 'mode'), mode);
 }
 
 async function waitFor(condition: () => boolean, what: string): Promise<void> {
@@ -241,6 +243,54 @@ describe('sandbox plugin: options are flat strings and parsed strictly', () => {
 			example: 'acceptSshAgentForwarding=true',
 		},
 		{
+			label: 'a name from the prototype chain (toString)',
+			options: JSON.parse('{"projects":"a1","region":"us-east-1","profiles":"c=p","toString":"x"}') as Record<
+				string,
+				string
+			>,
+			fragment: 'Unknown option "toString"',
+			example: 'cpus',
+		},
+		{
+			label: 'the name __proto__',
+			options: JSON.parse('{"projects":"a1","region":"us-east-1","profiles":"c=p","__proto__":"x"}') as Record<
+				string,
+				string
+			>,
+			fragment: 'Unknown option "__proto__"',
+			example: 'cpus',
+		},
+		{
+			label: 'an image that is an option (leading dash)',
+			options: { ...GOOD, image: '--pull' },
+			fragment: 'must not start with "-"',
+			example: 'image=flow-sandbox:m7',
+		},
+		{
+			label: 'a value over 512 characters',
+			options: { ...GOOD, image: 'a'.repeat(513) },
+			fragment: 'at most 512 characters',
+			example: 'image=flow-sandbox:m7',
+		},
+		{
+			label: 'a control character in a value',
+			options: { ...GOOD, region: 'us-east-1\u0007' },
+			fragment: 'control character',
+			example: 'region=us-east-1',
+		},
+		{
+			label: 'an sbx path that is a directory',
+			options: { ...GOOD, sbxPath: os.tmpdir() },
+			fragment: 'must be a file',
+			example: 'sbxPath=',
+		},
+		{
+			label: 'an sbx path on a network share',
+			options: { ...GOOD, sbxPath: '\\\\server\\share\\sbx.exe' },
+			fragment: 'network path',
+			example: 'sbxPath=',
+		},
+		{
 			label: 'a relative sbx path',
 			options: { ...GOOD, sbxPath: 'sbx.exe' },
 			fragment: 'absolute',
@@ -331,7 +381,7 @@ describe('sandbox plugin: the factory refuses to build with a plain message that
 		{
 			label: 'a failed environment check (sbx missing, wrong version, not signed in, image unknown)',
 			setup: () => {
-				process.env['STUB_MODE'] = 'preflight-fails';
+				setMode('preflight-fails');
 			},
 			options: GOOD,
 			fragment: '0.49.2 is required',
@@ -381,7 +431,7 @@ describe('sandbox plugin: obtainWorker', () => {
 	});
 
 	it('re-throws the failure of a wrapper that died after the previous ask, redacted, once; the ask after that starts a new one', async () => {
-		process.env['STUB_MODE'] = 'crash';
+		setMode('crash');
 		const instance = await build();
 
 		await instance.source.obtainWorker(request());
@@ -397,10 +447,108 @@ describe('sandbox plugin: obtainWorker', () => {
 		expect(failure?.message).not.toContain('launch-secret-token');
 		expect(launches()).toHaveLength(1);
 
-		delete process.env['STUB_MODE'];
+		setMode('');
 		await instance.source.obtainWorker(request());
 		await waitFor(() => launches().length === 2, 'a new wrapper');
 		await instance.dispose();
+	});
+});
+
+describe('sandbox plugin: what the wrapper process is given and how it fails', () => {
+	it('gives the wrapper an allow-listed environment: no provider key or other secret of the daemon, only what it needs', async () => {
+		const planted = {
+			ANTHROPIC_API_KEY: 'k1',
+			OPENAI_API_KEY: 'k2',
+			FLOW_HEALTH_TOKEN: 'h',
+			SOME_SECRET: 's',
+			GITHUB_TOKEN: 'g',
+			FLOW_DAEMON_MODE: '1',
+		};
+		Object.assign(process.env, planted);
+		process.env['AWS_PROFILE'] = 'kept';
+		try {
+			const instance = await build({ ...GOOD, sbxPath: process.execPath });
+			await instance.source.obtainWorker(request());
+			await waitFor(() => launches().length === 1, 'the wrapper to start');
+
+			const names = (
+				JSON.parse(fs.readFileSync(stubLog, 'utf8').trim().split('\n').at(-1) as string) as { keys: string[] }
+			).keys;
+			for (const name of Object.keys(planted)) expect(names, name).not.toContain(name);
+			expect(names).toEqual(
+				expect.arrayContaining([
+					'FLOW_WORKER_TOKEN',
+					'FLOW_DAEMON_WS_URL',
+					'FLOW_WORKER_SOURCE_ID',
+					'SBX_PATH',
+					'AWS_PROFILE',
+				])
+			);
+			expect(names.some(name => /^path$/i.test(name))).toBe(true);
+			await instance.dispose();
+		} finally {
+			for (const name of [...Object.keys(planted), 'AWS_PROFILE']) delete process.env[name];
+		}
+	});
+
+	it('rejects the ask, in plain words and without an uncaught error, when the process cannot be spawned', async () => {
+		const plugin = await load();
+		const emitter = new EventEmitter() as EventEmitter & { pid?: number; stderr: PassThrough; unref(): void };
+		emitter.stderr = new PassThrough();
+		emitter.unref = () => undefined;
+		plugin.internals.setSpawn(() => {
+			// Node reports a failed spawn as an 'error' event AFTER spawn() returned, with pid undefined.
+			setImmediate(() => emitter.emit('error', new Error('spawn ENOENT')));
+			return emitter;
+		});
+		const instance = await plugin.manifest.implementations['worker-type']!['exec']!.provider({
+			sourceId: 'sandbox-1',
+			options: GOOD,
+		});
+
+		await expect(instance.source.obtainWorker(request())).rejects.toThrow('could not be started');
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// The error event found a listener (an unhandled one would have thrown from emit and failed this run).
+		expect(emitter.listenerCount('error')).toBeGreaterThan(0);
+	});
+
+	it.each([
+		{ mode: 'split-chunks', label: 'a credential split across two chunks' },
+		{ mode: 'split-lines', label: 'a credential split across two lines' },
+	])('never shows $label in the failure', async ({ mode }) => {
+		setMode(mode);
+		const instance = await build();
+		await instance.source.obtainWorker(request());
+		await waitFor(() => launches().length === 1, 'the wrapper to start');
+		await new Promise(resolve => setTimeout(resolve, 500));
+
+		const failure = await instance.source.obtainWorker(request()).then(
+			() => undefined,
+			(error: Error) => error
+		);
+
+		expect(failure?.message).toContain('exited with code 3');
+		expect(failure?.message).toContain('boom');
+		const flat = (failure?.message ?? '').replace(/\s+/g, '');
+		expect(flat).not.toContain('launch-secret-token');
+		expect(flat).not.toContain('launch-secr');
+		expect(flat).not.toContain('et-token');
+	});
+
+	it('says on stderr, once per start, that FLOW_SANDBOX_PLUGIN_WRAPPER replaced the wrapper', async () => {
+		const written: string[] = [];
+		const spy = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: string | Uint8Array) => {
+			written.push(String(chunk));
+			return true;
+		}) as typeof process.stderr.write);
+		try {
+			await build();
+		} finally {
+			spy.mockRestore();
+		}
+
+		expect(written.join('')).toContain('FLOW_SANDBOX_PLUGIN_WRAPPER');
 	});
 });
 
