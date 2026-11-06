@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	__resetBuiltinPluginsForTests,
@@ -62,6 +62,16 @@ describe('built-in plugin registry (module level)', () => {
 
 		expect(listBuiltinPlugins()).toEqual([]);
 		expect(() => registerBuiltinPlugin('sandbox', makePlugin())).not.toThrow();
+	});
+
+	it('the reset refuses to run outside a test run, naming the variables it checked', () => {
+		vi.stubEnv('VITEST', '');
+		vi.stubEnv('NODE_ENV', 'production');
+		try {
+			expect(() => __resetBuiltinPluginsForTests()).toThrow(/test-only.*VITEST.*NODE_ENV/);
+		} finally {
+			vi.unstubAllEnvs();
+		}
 	});
 
 	describe('loadPlugin falls back to import', () => {

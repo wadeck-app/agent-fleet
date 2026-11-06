@@ -20,6 +20,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isRelativePath(moduleName: string): boolean {
 	return (
+		moduleName === '.' ||
+		moduleName === '..' ||
 		moduleName.startsWith('./') ||
 		moduleName.startsWith('../') ||
 		moduleName.startsWith('.\\') ||
@@ -68,6 +70,11 @@ export class PluginModuleLoader<TPlugin> {
 		if (isAbsolute(moduleName)) {
 			return ModuleImporter.importFile(moduleName);
 		}
+		// Measured with this repo's bundle options (bundle, platform node, target node22, format cjs, external []): esbuild
+		// leaves a non-literal import() untouched, so it is a real runtime ESM import. In the single-file bundle a bare name
+		// therefore resolves from the directory of the bundle upward -- not from the cwd, not through NODE_PATH -- and fails
+		// with ERR_MODULE_NOT_FOUND when no node_modules sits above the bundle. Only registered built-ins and absolute paths
+		// work there. The experiment is described in the commit message that added this comment.
 		const importPackage = this.options.importPackage ?? ((packageName: string) => import(packageName));
 		return importPackage(moduleName);
 	}

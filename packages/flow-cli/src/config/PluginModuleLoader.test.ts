@@ -135,7 +135,7 @@ describe('PluginModuleLoader', () => {
 		});
 
 		it('rejects a relative path with the fix, and imports nothing', async () => {
-			for (const relative of ['./plugin.mjs', '../plugin.mjs', '.\\plugin.mjs']) {
+			for (const relative of ['.', '..', './plugin.mjs', '../plugin.mjs', '.\\plugin.mjs', '..\\plugin.mjs']) {
 				const error = await failureOf(relative);
 
 				expect(error.message).toContain(`"${relative}"`);
@@ -143,6 +143,43 @@ describe('PluginModuleLoader', () => {
 				expect(error.message).toMatch(/absolute path/);
 			}
 			expect(importedPackages).toEqual([]);
+		});
+	});
+
+	// No injection: the default importer is a real import(), resolved from this package like any bare specifier.
+	describe('the default package importer', () => {
+		function realLoader(): PluginModuleLoader<FlowPlugin> {
+			return new PluginModuleLoader<FlowPlugin>({
+				label: 'flow',
+				registry,
+				isValid: isFlowPlugin,
+				shape: FLOW_PLUGIN_SHAPE,
+			});
+		}
+
+		it('really imports an installed package, then rejects it for its shape', async () => {
+			// esbuild is a devDependency of flow-cli: resolvable, and certainly not a flow plugin.
+			const error = await realLoader()
+				.load('esbuild')
+				.then(
+					() => undefined,
+					(caught: unknown) => caught as Error
+				);
+
+			expect(error?.message).toMatch(
+				/Cannot load flow plugin module "esbuild": Module "esbuild" does not export a valid plugin/
+			);
+		});
+
+		it('keeps ERR_MODULE_NOT_FOUND as cause for a package that is not installed', async () => {
+			const error = await realLoader()
+				.load('flow-plugin-that-is-not-installed')
+				.then(
+					() => undefined,
+					(caught: unknown) => caught as NodeJS.ErrnoException
+				);
+
+			expect((error?.cause as NodeJS.ErrnoException).code).toMatch(/ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND/);
 		});
 	});
 

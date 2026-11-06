@@ -32,8 +32,17 @@ export function getBuiltinPlugin(moduleName: string): FlowPlugin | undefined {
 	return registry.lookup(moduleName);
 }
 
-/** TEST ONLY: empties the registry so a test does not see what another registered. */
+/**
+ * TEST ONLY: empties the registry so a test does not see what another registered. Production code must never call it:
+ * it would drop every built-in. It throws outside a test run (neither VITEST nor NODE_ENV=test is set) so a misuse is loud.
+ * @throws when called outside a test run
+ */
 export function __resetBuiltinPluginsForTests(): void {
+	if (!process.env['VITEST'] && process.env['NODE_ENV'] !== 'test') {
+		throw new Error(
+			'__resetBuiltinPluginsForTests is test-only: neither VITEST nor NODE_ENV=test is set, refusing to drop every registered built-in plugin.'
+		);
+	}
 	registry.clear();
 }
 
