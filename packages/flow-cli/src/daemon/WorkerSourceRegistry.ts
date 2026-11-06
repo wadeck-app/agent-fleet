@@ -7,10 +7,10 @@ import {
 } from 'flow-core';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { join } from 'node:path';
 
 import { validateNoLiteralCredentials } from '../config/LiteralCredentials.js';
-import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
+import { WorkerSourcePluginReference } from './WorkerSourcePluginReference.js';
 
 // Re-exported: the entry shape is owned by flow-core, which also reads the registry for non-CLI hosts.
 export type { WorkerSourceEntry };
@@ -33,26 +33,6 @@ export interface WorkerSourceDeclaration {
 }
 
 /**
- * The declaration with its plugin ref in the plain `<pluginId>.<implName>` form: the type reference
- * `plugins.<pluginId>.<implName>` is accepted too and stored without its prefix. Left alone when stripping would not
- * give a valid ref, so the usual error names what the user wrote.
- */
-function withPlainPluginRef(declaration: WorkerSourceDeclaration): WorkerSourceDeclaration {
-	const { plugin } = declaration;
-	if (plugin?.startsWith('plugins.') !== true) {
-		return declaration;
-	}
-	const plain = plugin.slice('plugins.'.length);
-	return PLUGIN_REF.test(plain) ? { ...declaration, plugin: plain } : declaration;
-}
-
-/**
- * `<pluginId>.<implName>`: plain names, because both become path segments below `pluginsDir` (`plugin-<pluginId>/`),
- * so no separator or dot may get through.
- */
-export const PLUGIN_REF = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
-
-/**
  * The sources a user has declared, persisted under the flow config directory.
  *
  * Carries **intent and discovery only**. It is never authoritative for availability:
@@ -73,6 +53,8 @@ export class WorkerSourceRegistry {
 	 * @param onRemoved told, in this process only, of each source `remove` or `pruneDead` drops. The daemon uses it to
 	 *        dispose the plugin instance of that source; the CLI process has none to dispose (see WORKERS.md).
 	 */
+	private readonly pluginReference = new WorkerSourcePluginReference();
+
 	constructor(
 		private readonly configDir: string,
 		private readonly onRemoved?: (sourceId: string) => void
@@ -93,8 +75,9 @@ export class WorkerSourceRegistry {
 		/** Advice that does not stop the declaration; the caller shows each one to the user. */
 		warnings: string[];
 	} {
-		const declaration = withPlainPluginRef(requested);
-		this.validate(declaration);
+		// Validated as typed so its errors name what the user wrote; stored in the plain form.
+		this.validate(requested);
+		const declaration = this.pluginReference.normalize(requested);
 
 		const sources = this.read();
 		if (sources.some(s => s.sourceId === declaration.sourceId)) {
@@ -132,11 +115,7 @@ export class WorkerSourceRegistry {
 	 */
 	private warningsFor(declaration: WorkerSourceDeclaration): string[] {
 		const { sourceId, plugin, pluginsDir } = declaration;
-		if (
-			plugin === undefined ||
-			pluginsDir === undefined ||
-			findBuiltinWorkerType(`plugins.${plugin}`) === undefined
-		) {
+		if (plugin === undefined || pluginsDir === undefined || !this.pluginReference.isBuiltinRef(plugin)) {
 			return [];
 		}
 		return [
@@ -272,51 +251,10 @@ export class WorkerSourceRegistry {
 			}
 		}
 		this.rejectRetiredProvider(declaration.sourceId, declaration.provider);
-		this.validatePlugin(declaration);
+		this.pluginReference.validate(declaration);
 		this.validateCommandOptions(declaration);
 		if (declaration.options !== undefined) {
 			validateNoLiteralCredentials(declaration.options, `worker source "${declaration.sourceId}" options`);
-		}
-	}
-
-	/**
-	 * Checks the plugin ref and its directory are consistent, at declaration time: a plugin source that cannot be
-	 * loaded would otherwise only fail inside the daemon, where the person who declared it is not looking.
-	 */
-	private validatePlugin(declaration: WorkerSourceDeclaration): void {
-		const { sourceId, provider, plugin, pluginsDir } = declaration;
-		if (plugin === undefined && pluginsDir === undefined) {
-			return;
-		}
-		if (plugin === undefined) {
-			throw new Error(
-				`Worker source "${sourceId}" declares pluginsDir "${String(pluginsDir)}" without a plugin. ` +
-					'Pass --plugin <pluginId>.<implName>, or drop --plugins-dir.'
-			);
-		}
-		if (!PLUGIN_REF.test(plugin)) {
-			throw new Error(
-				`Worker source "${sourceId}": plugin must be "<pluginId>.<implName>" (letters, digits, "_" and "-", one dot), got ${JSON.stringify(plugin)}.`
-			);
-		}
-		if (provider.startsWith('built-in:')) {
-			throw new Error(
-				`Worker source "${sourceId}" names a plugin ("${plugin}") and the built-in provider "${provider}": a source is one or the other. ` +
-					'Drop --plugin/--plugins-dir to use the built-in provider, or pass a free label as --provider (for example the plugin id) to use the plugin.'
-			);
-		}
-		// A built-in is served from the registry, so it needs no directory; anything else is loaded from one.
-		if (pluginsDir === undefined && findBuiltinWorkerType(`plugins.${plugin}`) === undefined) {
-			throw new Error(
-				`Worker source "${sourceId}" names plugin "${plugin}" but no pluginsDir: the daemon would not know where to load it from. ` +
-					'Pass --plugins-dir <absolute directory that contains plugin-<pluginId>/>.'
-			);
-		}
-		if (pluginsDir !== undefined && !isAbsolute(pluginsDir)) {
-			throw new Error(
-				`Worker source "${sourceId}": pluginsDir must be an absolute path, got "${pluginsDir}". ` +
-					'The daemon runs from another directory, so a relative path would point somewhere else.'
-			);
 		}
 	}
 

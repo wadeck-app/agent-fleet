@@ -96,7 +96,7 @@ flow worker source add build-box --provider relay --plugin relay.default      # 
 flow worker source add build-box --provider built-in:relay                    # legacy provider string, unchanged
 ```
 
-- `--plugin relay.default` (or `plugins.relay.default`, stored as `relay.default`) is a **built-in** worker type: no `--plugins-dir` is needed. `--provider` is a free label.
+- `--plugin relay.default` (or `plugins.relay.default`, stored as `relay.default`; the `plugins.` form is understood only for built-ins) is a **built-in** worker type: no `--plugins-dir` is needed. `--provider` is a free label.
 - A `--plugins-dir` given with a built-in ref is **ignored**; `source add` prints a `[warn]` and the daemon log says so on every build. To use your own copy from a directory, give it another plugin id.
 - **The registry answers before any directory**, for sources and for `PluginProviderLoader`. A stale or planted same-named copy therefore cannot replace a built-in. Which one answered is logged, and `PluginProviderLoader` warns in both directions when a directory is given.
 - Entries written before this (`built-in:relay`, or `relay.default` with a directory) keep loading unchanged.

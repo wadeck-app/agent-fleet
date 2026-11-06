@@ -252,13 +252,25 @@ describe('WorkerTypeInstances - a built-in without pluginsDir', () => {
 		);
 	});
 
-	it('still refuses a ref that is not a built-in without a directory, as a wiring mistake', async () => {
+	it('refuses a ref that is not a built-in without a directory, telling the user how to fix the entry', async () => {
 		const { pluginsDir: _omitted, ...withoutDir } = entry();
 
 		const message = await messageOf(instances().get(withoutDir));
 
-		expect(message).toContain('has no plugin or no pluginsDir');
-		expect(message).toContain('please report it');
+		expect(message).toBe(
+			`worker source "sandbox": plugin "${SHADOWED_REF}" is not a built-in worker type of flow and has no pluginsDir, so the daemon would not know where to load it from. ` +
+				'"flow worker source add" would have refused this entry. Fix: flow worker source remove sandbox, then declare it again with --plugins-dir <absolute directory that contains plugin-<pluginId>/>.'
+		);
+	});
+
+	it('reports an entry without a plugin as a wiring mistake', async () => {
+		const { plugin: _omitted, ...withoutPlugin } = entry();
+
+		const message = await messageOf(instances().get(withoutPlugin));
+
+		expect(message).toBe(
+			'worker source "sandbox" has no plugin, so there is no worker-type instance to build. This is a wiring mistake in the daemon, not a configuration error -- please report it.'
+		);
 	});
 
 	it('names no directory in a built-in failure either', async () => {

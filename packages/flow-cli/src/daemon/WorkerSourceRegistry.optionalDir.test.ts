@@ -82,10 +82,38 @@ describe('WorkerSourceRegistry - a built-in ref needs no pluginsDir', () => {
 		expect(warnings[0]).toContain('ignores the pluginsDir');
 	});
 
-	it('still rejects a ref that is not a built-in without a directory, also in the plugins.<ref> form', () => {
-		expect(() => new WorkerSourceRegistry(dir).declare(declaration('plugins.sandbox.docker', false))).toThrow(
-			'Worker source "build-box" names plugin "sandbox.docker" but no pluginsDir: the daemon would not know where to load it from. ' +
+	// The `plugins.` prefix is understood only for a built-in: for any other ref the old rule and message stand.
+	it.each([
+		['plugins.foo.bar', true],
+		['plugins.foo.bar', false],
+		['plugins.sandbox.docker', false],
+	])('keeps the old refusal for %s (directory given: %s), naming what was typed', (typed, withDir) => {
+		expect(() => new WorkerSourceRegistry(dir).declare(declaration(typed, withDir))).toThrow(
+			`Worker source "build-box": plugin must be "<pluginId>.<implName>" (letters, digits, "_" and "-", one dot), got "${typed}".`
+		);
+		expect(new WorkerSourceRegistry(dir).list()).toEqual([]);
+	});
+
+	it('names what the user typed, not the stripped ref, when a built-in is refused for another reason', () => {
+		expect(() =>
+			new WorkerSourceRegistry(dir).declare({
+				...declaration('plugins.relay.default', false),
+				provider: 'built-in:relay',
+			})
+		).toThrow('names a plugin ("plugins.relay.default") and the built-in provider "built-in:relay"');
+	});
+
+	// The built-in lookup is an exact match: a near miss is not a built-in, so it gets the rule of any other ref.
+	it.each(['relay.defualt', 'Relay.Default'])('treats the typo %s as a plugin that needs a directory', typed => {
+		expect(() => new WorkerSourceRegistry(dir).declare(declaration(typed, false))).toThrow(
+			`Worker source "build-box" names plugin "${typed}" but no pluginsDir: the daemon would not know where to load it from. ` +
 				'Pass --plugins-dir <absolute directory that contains plugin-<pluginId>/>.'
+		);
+	});
+
+	it('refuses a trailing space as a malformed ref, showing the space in the quoted value', () => {
+		expect(() => new WorkerSourceRegistry(dir).declare(declaration('relay.default ', false))).toThrow(
+			'Worker source "build-box": plugin must be "<pluginId>.<implName>" (letters, digits, "_" and "-", one dot), got "relay.default ".'
 		);
 	});
 });

@@ -6,10 +6,9 @@ import type { PluginLoader } from '../config/PluginLoader.js';
 import { raceWithTimeout } from './BoundedWait.js';
 import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
-import { PLUGIN_REF, type WorkerSourceEntry } from './WorkerSourceRegistry.js';
-
-/** The extension point a worker-type plugin implements. */
-const WORKER_TYPE_POINT = 'worker-type';
+import { PLUGIN_REF } from './WorkerSourcePluginReference.js';
+import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
+import { WORKER_TYPE_POINT, failureOf, noDirectory, wiringMistake } from './WorkerTypeFailures.js';
 
 const DEFAULT_BUILD_TIMEOUT_MS = 30_000;
 export const DEFAULT_DISPOSE_TIMEOUT_MS = 30_000;
@@ -82,7 +81,7 @@ export class WorkerTypeInstances {
 	async get(entry: WorkerSourceEntry, host: WorkerTypeHost = {}): Promise<WorkerTypeInstance> {
 		const { plugin, pluginsDir, sourceId } = entry;
 		if (plugin === undefined) {
-			throw missingPluginOrDirectory(sourceId);
+			throw wiringMistake(sourceId, 'has no plugin, so there is no worker-type instance to build');
 		}
 		if (!PLUGIN_REF.test(plugin)) {
 			// A hand-edited registry file: the ref is a file name below pluginsDir, so it must not be able to leave it.
@@ -94,7 +93,7 @@ export class WorkerTypeInstances {
 		// A built-in needs no directory; anything else is loaded from one, so one without it cannot be built.
 		const registered = this.lookupBuiltin(`plugins.${plugin}`);
 		if (registered === undefined && pluginsDir === undefined) {
-			throw missingPluginOrDirectory(sourceId);
+			throw noDirectory(sourceId, plugin);
 		}
 
 		// `host` is deliberately not part of the fingerprint: the first caller's findRelay is kept; harmless while there is one relay lookup per daemon.
@@ -294,7 +293,7 @@ export class WorkerTypeInstances {
 			}
 			if (pluginsDir === undefined) {
 				// Unreachable through get(), which refuses it; kept so a future caller fails here, loudly.
-				throw missingPluginOrDirectory(entry.sourceId);
+				throw wiringMistake(entry.sourceId, 'reached the plugins directory load without a pluginsDir');
 			}
 			this.log(
 				'info',
@@ -312,50 +311,6 @@ export class WorkerTypeInstances {
 			throw failureOf(entry, plugin, pluginsDir, registered !== undefined, getErrorMessage(err), err);
 		}
 	}
-}
-
-function missingPluginOrDirectory(sourceId: string): Error {
-	return new Error(
-		`worker source "${sourceId}" has no plugin or no pluginsDir, so there is no worker-type instance to build. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
-	);
-}
-
-/** The load error matching what answered: a built-in is flow's own code, so the on-disk advice would send the user to fix nothing. */
-function failureOf(
-	entry: WorkerSourceEntry,
-	plugin: string,
-	pluginsDir: string | undefined,
-	isBuiltin: boolean,
-	cause: string,
-	original?: unknown
-): Error {
-	if (!isBuiltin && pluginsDir !== undefined) {
-		return loadFailure(entry, plugin, pluginsDir, cause, original);
-	}
-	return new Error(
-		`Cannot load worker source "${entry.sourceId}": "${plugin}" is a built-in worker type of flow and failed: ${cause}. ` +
-			'This is a bug in flow, not in your configuration: please report this error.',
-		original === undefined ? undefined : { cause: original }
-	);
-}
-
-/** The error for a plugin that could not be loaded: source, plugin, cause, and the fix that really works. */
-function loadFailure(
-	entry: WorkerSourceEntry,
-	plugin: string,
-	pluginsDir: string,
-	cause: string,
-	original?: unknown
-): Error {
-	const [pluginId = plugin] = plugin.split('.');
-	return new Error(
-		`Cannot load worker source "${entry.sourceId}": worker-type plugin "${plugin}" from "${pluginsDir}" failed: ${cause}. ` +
-			`Fix: make sure "${pluginsDir}" holds plugin-${pluginId}/plugin.config.js (plain self-contained JS, no node_modules beside it) ` +
-			`that declares implementation "${plugin.slice(pluginId.length + 1)}" for "${WORKER_TYPE_POINT}" and whose factory resolves, ` +
-			'then restart the daemon: Node keeps a module that failed to import (or was edited) as it first loaded it. ' +
-			`To drop the source: flow worker source remove ${entry.sourceId}.`,
-		original === undefined ? undefined : { cause: original }
-	);
 }
 
 /** Replaces `${NAME}` in every string of the options with the daemon's environment; an unset NAME is an error. */

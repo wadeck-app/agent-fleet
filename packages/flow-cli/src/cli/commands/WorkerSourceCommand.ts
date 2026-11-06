@@ -114,7 +114,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 		)
 		.option(
 			'--plugins-dir <path>',
-			'Absolute directory containing plugin-<pluginId>/ (plain, self-contained JS); not needed for a built-in plugin such as relay.default, and ignored (with a warning) if given'
+			'Absolute directory containing plugin-<pluginId>/; not needed for a built-in plugin such as relay.default'
 		)
 		.option(
 			'--option <key=value>',
