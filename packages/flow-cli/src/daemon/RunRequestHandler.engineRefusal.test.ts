@@ -13,8 +13,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { ExecutionStore } from '../storage/ExecutionStore';
-import { CommandHandler } from './CommandHandler';
-import { registerFolderAsProject } from './CommandHandlerTestHarness';
+import type { CommandHandler } from './CommandHandler';
+import { TrackedCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
 const WHEN = "'yes'";
 
@@ -90,7 +90,7 @@ describe('RunRequestHandler -- a run refused by the scheduler after its record e
 			allocate: vi.fn().mockResolvedValue({ path: path.join(tmpDir, 'plugin-ws'), id: 'p:1' }),
 			release: vi.fn().mockResolvedValue(undefined),
 		};
-		handler = new CommandHandler(
+		handler = new TrackedCommandHandler(
 			path.join(tmpDir, 'daemon'),
 			pool as never,
 			pool as never,

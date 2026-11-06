@@ -2,8 +2,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { CommandHandler } from './CommandHandler';
-import { registerFolderAsProject } from './CommandHandlerTestHarness';
+import type { CommandHandler } from './CommandHandler';
+import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
 const FLOW_YAML = `\
 id: idem-flow
@@ -64,7 +64,7 @@ describe('a run sent twice with the same request id (the client retried after a 
 			allocate: vi.fn().mockResolvedValue({ path: path.join(tmpDir, 'plugin-ws'), id: 'p:1' }),
 			release: vi.fn().mockResolvedValue(undefined),
 		};
-		handler = new CommandHandler(
+		handler = newCommandHandler(
 			path.join(tmpDir, 'daemon'),
 			pool as never,
 			pool as never,

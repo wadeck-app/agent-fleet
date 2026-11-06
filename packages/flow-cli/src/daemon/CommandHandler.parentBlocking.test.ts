@@ -2,8 +2,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { CommandHandler } from './CommandHandler';
-import { registerFolderAsProject } from './CommandHandlerTestHarness';
+import type { CommandHandler } from './CommandHandler';
+import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
 vi.mock('flow-engine', async importOriginal => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
@@ -122,7 +122,7 @@ afterEach(() => {
 });
 
 function makeHandler(workerPool = createMockWorkerPool()): CommandHandler {
-	return new CommandHandler(
+	return newCommandHandler(
 		daemonDir,
 		workerPool as never,
 		workerPool as never,

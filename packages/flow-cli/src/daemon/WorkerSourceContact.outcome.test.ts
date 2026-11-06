@@ -17,17 +17,14 @@ const entry = (sourceId: string, provider: string, options?: Record<string, unkn
 });
 
 describe('contactDeclaredSources - the outcome of each ask', () => {
-	it('tells the outcome sink the raw error of a source that failed, without the report prefix', async () => {
+	it('tells the outcome sink that a source failed, and nothing about why', async () => {
 		const outcome = { failed: vi.fn(), succeeded: vi.fn() };
 
 		await contactDeclaredSources([entry('broken', 'built-in:command', {})], 'ws://x', () => {}, {
 			contactOutcome: outcome,
 		});
 
-		expect(outcome.failed).toHaveBeenCalledExactlyOnceWith(
-			'broken',
-			'source "broken" uses built-in:command but declares no command to run. Add options.command to the source entry.'
-		);
+		expect(outcome.failed).toHaveBeenCalledExactlyOnceWith('broken');
 		expect(outcome.succeeded).not.toHaveBeenCalled();
 	});
 
@@ -65,13 +62,13 @@ describe('DaemonSourceContact - keeps the last contact error of each source', ()
 
 		daemonContact.contactSources(4101);
 		await vi.waitFor(() => {
-			expect(daemonContact.contactErrors.since('sandbox', typeOf, 0, t => t)).toHaveLength(1);
+			expect(daemonContact.contactErrors.since('sandbox', typeOf, 0)).toHaveLength(1);
 		});
 
 		sourceEntries[0] = entry('laptop', 'built-in:inbound');
 		daemonContact.contactSources(4101);
 		await vi.waitFor(() => {
-			expect(daemonContact.contactErrors.since('sandbox', typeOf, 0, t => t)).toEqual([]);
+			expect(daemonContact.contactErrors.since('sandbox', typeOf, 0)).toEqual([]);
 		});
 	});
 
@@ -81,12 +78,12 @@ describe('DaemonSourceContact - keeps the last contact error of each source', ()
 		const typeOf = (id: string | undefined) => (id === 'laptop' ? 'sandbox' : undefined);
 		daemonContact.contactSources(4101);
 		await vi.waitFor(() => {
-			expect(daemonContact.contactErrors.since('sandbox', typeOf, 0, t => t)).toHaveLength(1);
+			expect(daemonContact.contactErrors.since('sandbox', typeOf, 0)).toHaveLength(1);
 		});
 
 		sourceEntries.length = 0;
 		daemonContact.contactSources(4101);
 
-		expect(daemonContact.contactErrors.since('sandbox', typeOf, 0, t => t)).toEqual([]);
+		expect(daemonContact.contactErrors.since('sandbox', typeOf, 0)).toEqual([]);
 	});
 });

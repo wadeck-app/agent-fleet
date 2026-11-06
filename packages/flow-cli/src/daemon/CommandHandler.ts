@@ -14,7 +14,7 @@ import type { WebSocket } from 'ws';
 import type { ClientCommand, DaemonResponse, InjectedStep, StepProgressDetail } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
-import { BoundStepWait, DEFAULT_BOUND_STEP_WAIT_MS, type WorkerTypeRouting } from './BoundStepWait.js';
+import { BoundStepWait, type WorkerTypeRouting } from './BoundStepWait.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
 import { ExecutionCanceller } from './ExecutionCanceller.js';
@@ -29,7 +29,6 @@ import type { RunProject } from './RunProjectResolver.js';
 import { RunRequestHandler } from './RunRequestHandler.js';
 import { RunStepPreparer } from './RunStepPreparer.js';
 import { SchedulerIdleState } from './SchedulerIdleState.js';
-import { SourceContactErrors } from './SourceContactErrors.js';
 import { StepDispatcher } from './StepDispatcher.js';
 import { DEFAULT_MAX_INJECTED_STEPS, DEFAULT_MAX_STEPS_PER_EXECUTION, StepInjection } from './StepInjection.js';
 import { StepOutcomes } from './StepOutcomes.js';
@@ -37,16 +36,8 @@ import { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import { DEFAULT_STEP_SILENCE_LIMIT_MS, WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
-import { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 
 export { DEFAULT_STEP_SILENCE_LIMIT_MS, MAX_REDISPATCHES } from './WorkerAssignmentSupervisor.js';
-
-/** No source declares a worker type, and the daemon's default `worker.boundStepWaitSeconds`. */
-const DEFAULT_WORKER_ROUTING: WorkerTypeRouting = {
-	contactErrors: new SourceContactErrors(),
-	workerTypes: new WorkerTypeCatalog({ list: () => [] }),
-	boundStepWaitMs: DEFAULT_BOUND_STEP_WAIT_MS,
-};
 
 /** Same as the daemon's defaults (`worker.runEventsEnabled`, `worker.ackTimeoutSeconds`). */
 const DEFAULT_RUN_END_SETTINGS: RunEndSettings = { enabled: true, ackTimeoutMs: 30_000 };
@@ -88,13 +79,13 @@ export class CommandHandler {
 		daemonDir: string,
 		registry: WorkerRegistry,
 		provisioner: WorkerProvisioner,
-		hookDispatcher?: HookDispatcher,
-		executionStore?: ExecutionStore,
-		logWriter?: LogWriter,
+		hookDispatcher: HookDispatcher | undefined,
+		executionStore: ExecutionStore | undefined,
+		logWriter: LogWriter | undefined,
 		allowAbsolutePaths: boolean = false,
 		maxInjectedSteps: number = DEFAULT_MAX_INJECTED_STEPS,
 		maxStepsPerExecution: number = DEFAULT_MAX_STEPS_PER_EXECUTION,
-		workspaceProvider?: WorkspaceProvider,
+		workspaceProvider: WorkspaceProvider | undefined,
 		/**
 		 * Accepted and unused, on purpose.
 		 *
@@ -105,10 +96,9 @@ export class CommandHandler {
 		 * (`WorkerCommand`). The parameter stays only so the daemon's existing call site keeps
 		 * its shape; nothing here may start using it.
 		 */
-		_daemonSideApprovalProviderUnused?: ApprovalProvider,
-		resolvePerFlowWorkspaceProvider?: (
-			section: NonNullable<FlowPluginOverrides['workspace']>
-		) => Promise<WorkspaceProvider>,
+		_daemonSideApprovalProviderUnused: ApprovalProvider | undefined,
+		resolvePerFlowWorkspaceProvider:
+			((section: NonNullable<FlowPluginOverrides['workspace']>) => Promise<WorkspaceProvider>) | undefined,
 		/**
 		 * Asks every declared source for a worker (D#66).
 		 *
@@ -116,14 +106,14 @@ export class CommandHandler {
 		 * registry, the published endpoint -- which this class deliberately knows nothing
 		 * about. Optional so the many tests that never exercise provisioning stay unchanged.
 		 */
-		requestFromDeclaredSources?: (workerTypes?: ReadonlySet<string>) => void,
+		requestFromDeclaredSources: ((workerTypes?: ReadonlySet<string>) => void) | undefined,
 		/**
 		 * S9 policy deciding the fate of a step needing a human (D#39).
 		 *
 		 * Injectable so a test can bound the wait instead of waiting it out, and so the
 		 * extension point can be served from config without touching this class.
 		 */
-		interactivityPolicy?: InteractivityPolicyProvider,
+		interactivityPolicy: InteractivityPolicyProvider | undefined,
 		/**
 		 * Silence after which an executing step is treated as stuck (`queue.stepSilenceLimit`).
 		 *
@@ -147,12 +137,14 @@ export class CommandHandler {
 		/** Whether and how long workers that served a run are given to acknowledge its end (`worker.*` settings). */
 		runEndSettings: RunEndSettings = DEFAULT_RUN_END_SETTINGS,
 		/** Told, after the acknowledgements, that a run ended, so the worker type that owns the source can clean up. */
-		runEndedListener?: RunEndedListener,
+		runEndedListener: RunEndedListener | undefined,
 		/**
 		 * What restricts a run to a worker type (the flow's `workerType`): the declared sources the types come from, and
-		 * `worker.boundStepWaitSeconds`. Without it no type is declared, so a flow naming one is refused at run start.
+		 * `worker.boundStepWaitSeconds`, and where the contact failures of the sources are kept. REQUIRED: a caller that
+		 * dropped it would silently lose the contact information in a bound step's failure. A test that needs no routing
+		 * passes `emptyWorkerRouting()` (CommandHandlerTestHarness).
 		 */
-		workerRouting: WorkerTypeRouting = DEFAULT_WORKER_ROUTING
+		workerRouting: WorkerTypeRouting
 	) {
 		this.executionStore =
 			executionStore ?? new ExecutionStore(executionsDirOf(daemonDir), undefined, daemonSecrets.masks);

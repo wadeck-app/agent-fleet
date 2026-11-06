@@ -1,126 +1,128 @@
 import { describe, expect, it } from 'vitest';
 
-import { SourceContactErrors, describeContactError } from './SourceContactErrors.js';
+import { SourceContactErrors } from './SourceContactErrors.js';
 import type { WorkerTypeLookup } from './WorkerTypeCatalog.js';
 
-const identity = (text: string): string => text;
+const at = (hh: number, mm: number, ss: number): number => Date.UTC(2026, 10, 6, hh, mm, ss);
 const typeOf: WorkerTypeLookup = sourceId =>
 	({ 'sbx-1': 'sandbox', 'sbx-2': 'sandbox', 'gpu-1': 'gpu' })[sourceId ?? ''];
 
-function store(start = 1_000) {
-	const clock = { now: start };
-	return { clock, errors: new SourceContactErrors(() => clock.now) };
+function store(logsDir: string | undefined = 'C:/logs') {
+	const clock = { now: at(17, 0, 0) };
+	return { clock, errors: new SourceContactErrors(logsDir, () => clock.now) };
 }
 
-describe('SourceContactErrors', () => {
-	it('keeps the last contact error of a source and reports it newer than a start, labelled with the source', () => {
+describe('SourceContactErrors - metadata only', () => {
+	it('says when the latest contact failed, how many times in a row since when, and where the error is', () => {
 		const { clock, errors } = store();
-		clock.now = 2_000;
-		errors.failed('sbx-1', 'wrapper failed to start');
+		clock.now = at(17, 1, 20);
+		errors.failed('sbx-1');
+		clock.now = at(17, 1, 50);
+		errors.failed('sbx-1');
+		clock.now = at(17, 2, 11);
+		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, 1_500, identity)).toEqual([
-			'reported by source "sbx-1": wrapper failed to start',
+		expect(errors.since('sandbox', typeOf, 0)).toEqual([
+			'Last contact with source "sbx-1" failed at 2026-11-06T17:02:11Z (3 consecutive failures since 17:01:20Z); the error is in the daemon log (flow logs, or C:/logs).',
 		]);
 	});
 
-	it('excludes an error older than the start of the wait', () => {
+	it('leaves out the streak for a single failure', () => {
 		const { clock, errors } = store();
-		clock.now = 1_000;
-		errors.failed('sbx-1', 'old failure');
+		clock.now = at(17, 2, 11);
+		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, 1_001, identity)).toEqual([]);
+		expect(errors.since('sandbox', typeOf, 0)).toEqual([
+			'Last contact with source "sbx-1" failed at 2026-11-06T17:02:11Z; the error is in the daemon log (flow logs, or C:/logs).',
+		]);
 	});
 
-	it('includes an error recorded at the very start of the wait', () => {
-		const { errors } = store(1_000);
-		errors.failed('sbx-1', 'now');
+	it('says only "flow logs" when the logs directory is not known', () => {
+		const clock = { now: at(17, 0, 0) };
+		const errors = new SourceContactErrors(undefined, () => clock.now);
+		clock.now = at(17, 2, 11);
+		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, 1_000, identity)).toHaveLength(1);
+		expect(errors.since('sandbox', typeOf, 0)).toEqual([
+			'Last contact with source "sbx-1" failed at 2026-11-06T17:02:11Z; the error is in the daemon log (flow logs).',
+		]);
 	});
 
-	it('excludes the errors of sources of another type', () => {
+	it('counts the failures in a row up and keeps when the first of them happened', () => {
 		const { clock, errors } = store();
-		clock.now = 2_000;
-		errors.failed('gpu-1', 'gpu farm down');
-		errors.failed('stray', 'not a source of any type');
+		clock.now = at(17, 1, 0);
+		errors.failed('sbx-1');
+		clock.now = at(17, 5, 0);
+		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, 0, identity)).toEqual([]);
+		expect(errors.since('sandbox', typeOf, 0)[0]).toContain('(2 consecutive failures since 17:01:00Z)');
+		expect(errors.since('sandbox', typeOf, 0)[0]).toContain('failed at 2026-11-06T17:05:00Z');
 	});
 
-	it('forgets the error of a source once an ask of it succeeds', () => {
+	it('starts the count again after a success', () => {
 		const { clock, errors } = store();
-		clock.now = 2_000;
-		errors.failed('sbx-1', 'wrapper failed to start');
+		clock.now = at(17, 1, 0);
+		errors.failed('sbx-1');
+		errors.failed('sbx-1');
 
 		errors.succeeded('sbx-1');
+		expect(errors.since('sandbox', typeOf, 0)).toEqual([]);
 
-		expect(errors.since('sandbox', typeOf, 0, identity)).toEqual([]);
+		clock.now = at(17, 9, 0);
+		errors.failed('sbx-1');
+		expect(errors.since('sandbox', typeOf, 0)[0]).not.toContain('consecutive');
+		expect(errors.since('sandbox', typeOf, 0)[0]).toContain('failed at 2026-11-06T17:09:00Z');
 	});
 
-	it('keeps only the last error of a source, and lists every source of the type', () => {
+	it('excludes a failure older than the start of the wait, and includes one at that very time', () => {
 		const { clock, errors } = store();
-		clock.now = 2_000;
-		errors.failed('sbx-1', 'first');
-		clock.now = 3_000;
-		errors.failed('sbx-1', 'second');
-		errors.failed('sbx-2', 'other source');
+		clock.now = at(17, 1, 0);
+		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, 0, identity)).toEqual([
-			'reported by source "sbx-1": second',
-			'reported by source "sbx-2": other source',
-		]);
+		expect(errors.since('sandbox', typeOf, at(17, 1, 1))).toEqual([]);
+		expect(errors.since('sandbox', typeOf, at(17, 1, 0))).toHaveLength(1);
 	});
 
-	it('passes the text through the masker it is given', () => {
+	it('excludes the failures of sources of another type, or of no type', () => {
 		const { clock, errors } = store();
-		clock.now = 2_000;
-		errors.failed('sbx-1', 'login with S3CRET failed');
+		clock.now = at(17, 2, 0);
+		errors.failed('gpu-1');
+		errors.failed('stray');
 
-		expect(errors.since('sandbox', typeOf, 0, text => text.replaceAll('S3CRET', '***'))).toEqual([
-			'reported by source "sbx-1": login with *** failed',
-		]);
-	});
-});
-
-describe('describeContactError', () => {
-	it('flattens a multi-line error to one line', () => {
-		expect(describeContactError('first\n  second\r\nthird\t\tfourth', identity)).toBe('first second third fourth');
+		expect(errors.since('sandbox', typeOf, 0)).toEqual([]);
 	});
 
-	it('strips URL user info and query values, keeping scheme, host and path', () => {
-		expect(describeContactError('GET https://user:pw@api.example.com/v1/auth?token=abc&x=1 failed', identity)).toBe(
-			'GET https://api.example.com/v1/auth?… failed'
-		);
+	it('lists every source of the type, each with its own streak', () => {
+		const { clock, errors } = store();
+		clock.now = at(17, 2, 0);
+		errors.failed('sbx-1');
+		errors.failed('sbx-2');
+		errors.failed('sbx-2');
+
+		const sentences = errors.since('sandbox', typeOf, 0);
+		expect(sentences).toHaveLength(2);
+		expect(sentences[0]).toContain('"sbx-1"');
+		expect(sentences[1]).toContain('"sbx-2"');
+		expect(sentences[1]).toContain('2 consecutive failures');
 	});
 
-	it('redacts credential-named key=value pairs even outside a URL', () => {
-		expect(describeContactError('login failed: token=abc123 and api_key=zzz and mode=fast', identity)).toBe(
-			'login failed: token=<redacted> and api_key=<redacted> and mode=fast'
-		);
+	it('forgets the sources that are no longer declared', () => {
+		const { clock, errors } = store();
+		clock.now = at(17, 2, 0);
+		errors.failed('sbx-1');
+		errors.failed('sbx-2');
+
+		errors.retainOnly(['sbx-1']);
+
+		expect(errors.since('sandbox', typeOf, 0)).toHaveLength(1);
+		expect(errors.since('sandbox', typeOf, 0)[0]).toContain('"sbx-1"');
 	});
 
-	it('applies the masker after the structural clean-up', () => {
-		expect(describeContactError('ssh S3CRET@host failed', text => text.replaceAll('S3CRET', '***'))).toBe(
-			'ssh ***@host failed'
-		);
-	});
+	it('hands a bound-step wait the same sentences through sinceFor', () => {
+		const { clock, errors } = store();
+		clock.now = at(17, 2, 0);
+		errors.failed('sbx-1');
 
-	it('never prints the raw text when the masker throws', () => {
-		expect(
-			describeContactError('has S3CRET', () => {
-				throw new Error('masker broke');
-			})
-		).toBe('[secret-masking-failed]');
-	});
-
-	it('caps the text at 300 characters, ending with an ellipsis', () => {
-		const text = describeContactError('x'.repeat(1000), identity);
-
-		expect(text).toHaveLength(300);
-		expect(text.endsWith('…')).toBe(true);
-	});
-
-	it('leaves a short plain message as it is', () => {
-		expect(describeContactError('credential endpoint down', identity)).toBe('credential endpoint down');
+		expect(errors.sinceFor('sandbox', typeOf)(0)).toEqual(errors.since('sandbox', typeOf, 0));
 	});
 });

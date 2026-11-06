@@ -22,8 +22,8 @@ export interface BoundStepWaitRequest {
 	/** Worker types the declared sources stand for, to say what the run could have been bound to. */
 	knownTypes: string[];
 	/**
-	 * The last contact errors, ready to print, of the sources of that type that are newer than the given time (the moment
-	 * the step started waiting). Asked for only when the step fails; without it the message names none.
+	 * One sentence per source of that type whose latest contact failure is not older than the given time (the moment the
+	 * step started waiting): metadata only, never the text of an error. Asked for only when the step fails.
 	 */
 	contactErrorsSince?: ((sinceMs: number) => string[]) | undefined;
 }
@@ -178,6 +178,6 @@ function describeFailure(
 		`${known}. ` +
 		`Check that a source of that type is declared (flow worker source list) and that its plugin can start workers (see the daemon log). ` +
 		`If starting one takes longer than ${String(Math.round(boundMs / 1000))}s, raise worker.boundStepWaitSeconds in the daemon config.` +
-		(contactErrors.length === 0 ? '' : ` Last contact error: ${contactErrors.join('; ')}.`)
+		(contactErrors.length === 0 ? '' : ` ${contactErrors.join(' ')}`)
 	);
 }

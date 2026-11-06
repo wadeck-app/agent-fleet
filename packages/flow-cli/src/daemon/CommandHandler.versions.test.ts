@@ -4,8 +4,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import type { ExecutionState } from '../ipc/Protocol';
-import { CommandHandler } from './CommandHandler';
-import { registerFolderAsProject } from './CommandHandlerTestHarness';
+import type { CommandHandler } from './CommandHandler';
+import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
 const { mockAllocate } = vi.hoisted(() => ({
 	mockAllocate: vi.fn(),
@@ -52,7 +52,7 @@ describe('CommandHandler flow versions', () => {
 			canProvision: vi.fn().mockReturnValue(false),
 			planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 		};
-		const handler = new CommandHandler(daemonDir, pool as never, pool as never);
+		const handler = newCommandHandler(daemonDir, pool as never, pool as never);
 		handlers.push(handler);
 		return handler;
 	}
@@ -267,7 +267,7 @@ No decision was made -- this step is unanswered, not denied.`;
 				canProvision: vi.fn().mockReturnValue(false),
 				planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 			};
-			const handler = new CommandHandler(daemonDir, pool as never, pool as never);
+			const handler = newCommandHandler(daemonDir, pool as never, pool as never);
 			handlers.push(handler);
 			interventionFlow('1.0.0', 'Title of version 1');
 			const started = (await runFile(handler)) as { executionId: string };

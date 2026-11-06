@@ -9,10 +9,10 @@ import * as path from 'node:path';
 import type { WebSocket } from 'ws';
 
 import { ExecutionStore } from '../storage/ExecutionStore';
-import { CommandHandler } from './CommandHandler';
-import { registerFolderAsProject } from './CommandHandlerTestHarness';
-import type { DaemonRuntime } from './DaemonRuntime';
+import type { CommandHandler } from './CommandHandler';
+import { TrackedCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 import { DaemonIdleShutdown } from './DaemonIdleShutdown';
+import type { DaemonRuntime } from './DaemonRuntime';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler';
 import { WorkerRegistry } from './WorkerRegistry';
 
@@ -87,7 +87,7 @@ describe('CommandHandler.handleCancel -- ends one execution without stopping the
 		runEnded = vi.fn().mockResolvedValue(undefined);
 		hooks = { dispatch: vi.fn().mockResolvedValue(undefined) };
 		const logWriter = { write: vi.fn(), writeExecution: vi.fn() };
-		handler = new CommandHandler(
+		handler = new TrackedCommandHandler(
 			path.join(tmpDir, 'daemon'),
 			registry,
 			{
@@ -150,7 +150,13 @@ describe('CommandHandler.handleCancel -- ends one execution without stopping the
 	}
 
 	function connect(features: string[] = []): FakeSocket {
-		const ws = { readyState: 1, OPEN: 1, send: vi.fn(), terminate: vi.fn(), close: vi.fn() } as unknown as FakeSocket;
+		const ws = {
+			readyState: 1,
+			OPEN: 1,
+			send: vi.fn(),
+			terminate: vi.fn(),
+			close: vi.fn(),
+		} as unknown as FakeSocket;
 		registry.register(ws, { pid: 1, sourceId: 'sbx-source', features }, { ephemeral: true });
 		return ws;
 	}
@@ -176,7 +182,11 @@ describe('CommandHandler.handleCancel -- ends one execution without stopping the
 	}
 
 	function cancel(executionId: string, project?: string) {
-		return handler.handleCancel({ type: 'cancel', executionId, ...(project === undefined ? {} : { projectId: project }) });
+		return handler.handleCancel({
+			type: 'cancel',
+			executionId,
+			...(project === undefined ? {} : { projectId: project }),
+		});
 	}
 
 	it('refuses an id that is unknown, and one that is not an execution id, without listing anything', () => {
@@ -199,7 +209,9 @@ describe('CommandHandler.handleCancel -- ends one execution without stopping the
 
 	it('refuses a completed execution, naming completed', async () => {
 		const worker = connect();
-		const id = await start(`id: one-flow\n${HEADER}steps:\n  - id: s1\n    name: S1\n    type: script\n    script: echo one\n`);
+		const id = await start(
+			`id: one-flow\n${HEADER}steps:\n  - id: s1\n    name: S1\n    type: script\n    script: echo one\n`
+		);
 		report(worker, 'step_completed', id, 's1', { output: {} });
 		expect(store.read(id).status).toBe('completed');
 

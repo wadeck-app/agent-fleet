@@ -4,16 +4,44 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
+import { DEFAULT_BOUND_STEP_WAIT_MS, type WorkerTypeRouting } from './BoundStepWait';
 import { CommandHandler } from './CommandHandler';
+import { SourceContactErrors } from './SourceContactErrors';
+import { WorkerTypeCatalog } from './WorkerTypeCatalog';
 
 // Every handler a test builds, so afterEach can cancel its pending demand re-check. That timer is a
 // real one (unref'd, 250ms) and, left running, fires during a LATER test -- after `mockReset` has
 // wiped the registry mocks -- and throws from inside a timer, which vitest reports as an unhandled error.
 const startedHandlers: CommandHandler[] = [];
 
+type HandlerArguments = ConstructorParameters<typeof CommandHandler>;
+/** Position of `workerRouting`, the last constructor parameter. */
+const ROUTING_INDEX = 19;
+
+/** No source declares a worker type; a fresh store per handler, nothing shared between tests. */
+export function emptyWorkerRouting(): WorkerTypeRouting {
+	return {
+		workerTypes: new WorkerTypeCatalog({ list: () => [] }),
+		boundStepWaitMs: DEFAULT_BOUND_STEP_WAIT_MS,
+		contactErrors: new SourceContactErrors(),
+	};
+}
+
+/** CommandHandler requires every argument; a test names the ones it cares about and gets `undefined` / an empty routing for the rest. */
+export function completeArguments(args: Partial<HandlerArguments>): HandlerArguments {
+	const complete: unknown[] = Array.from({ length: ROUTING_INDEX + 1 }, (_, index) => args[index]);
+	complete[ROUTING_INDEX] ??= emptyWorkerRouting();
+	return complete as HandlerArguments;
+}
+
+/** A plain CommandHandler (not tracked for cleanup) for a test that manages its own handlers. */
+export function newCommandHandler(...args: Partial<HandlerArguments>): CommandHandler {
+	return new CommandHandler(...completeArguments(args));
+}
+
 export class TrackedCommandHandler extends CommandHandler {
-	constructor(...args: ConstructorParameters<typeof CommandHandler>) {
-		super(...args);
+	constructor(...args: Partial<HandlerArguments>) {
+		super(...completeArguments(args));
 		startedHandlers.push(this);
 	}
 }

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { PluginLoader } from '../config/PluginLoader';
 import {
 	TrackedCommandHandler,
 	createMockWorkerPool,
@@ -10,9 +11,12 @@ import {
 	registerCommandHandlerHooks,
 	tmpDir,
 } from './CommandHandlerTestHarness';
+import { DaemonSourceContact } from './DaemonSourceContact';
+import { LaunchTokenIssuer } from './LaunchTokenIssuer';
 import { SourceContactErrors } from './SourceContactErrors';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry';
 import { WorkerTypeCatalog } from './WorkerTypeCatalog';
+import { WorkerTypeInstances } from './WorkerTypeInstances';
 
 const { mockAllocate, mockRelease, hoistedState } = vi.hoisted(() => ({
 	mockAllocate: vi.fn().mockResolvedValue({ path: '/tmp/test-workspace', id: 'ws-test-id' }),
@@ -135,24 +139,25 @@ describe('CommandHandler - a bound step that no worker of its type served', () =
 		vi.useRealTimers();
 	});
 
-	it('names the last contact error of a source of that type, reported after the step started waiting', async () => {
-		const errors = new SourceContactErrors();
+	it('names the failed contact with a source of that type, after the step started waiting, and where the error is', async () => {
+		const errors = new SourceContactErrors('C:/logs');
 		const handler = daemon(errors);
 		await startRun(handler);
 		vi.advanceTimersByTime(1_000);
-		errors.failed('sbx-1', 'wrapper failed to start');
+		errors.failed('sbx-1');
+		errors.failed('sbx-1');
 
 		vi.advanceTimersByTime(121_000);
 		handler.tryDispatch();
 
-		expect(lastFailureReason()).toContain(
-			'Last contact error: reported by source "sbx-1": wrapper failed to start.'
+		expect(lastFailureReason()).toMatch(
+			/ Last contact with source "sbx-1" failed at \d{4}-\d\d-\d\dT[\d:]+Z \(2 consecutive failures since [\d:]+Z\); the error is in the daemon log \(flow logs, or C:\/logs\)\.$/
 		);
 	});
 
-	it('does not name an error from before the step started waiting', async () => {
+	it('does not name a failure from before the step started waiting', async () => {
 		const errors = new SourceContactErrors();
-		errors.failed('sbx-1', 'stale failure from an earlier run');
+		errors.failed('sbx-1');
 		vi.advanceTimersByTime(5_000);
 		const handler = daemon(errors);
 		await startRun(handler);
@@ -161,49 +166,66 @@ describe('CommandHandler - a bound step that no worker of its type served', () =
 		handler.tryDispatch();
 
 		expect(lastFailureReason()).toContain('worker type "sandbox"');
-		expect(lastFailureReason()).not.toContain('Last contact error');
+		expect(lastFailureReason()).not.toContain('Last contact');
 	});
 
-	it('does not name the error of a source of another type', async () => {
+	it('does not name the failure of a source of another type', async () => {
 		const errors = new SourceContactErrors();
 		const handler = daemon(errors);
 		await startRun(handler);
 		vi.advanceTimersByTime(1_000);
-		errors.failed('gpu-1', 'gpu farm is down');
+		errors.failed('gpu-1');
 
 		vi.advanceTimersByTime(121_000);
 		handler.tryDispatch();
 
-		expect(lastFailureReason()).not.toContain('gpu farm');
+		expect(lastFailureReason()).not.toContain('gpu-1');
 	});
 
-	it('does not name an error that a later successful ask cleared', async () => {
+	it('does not name a failure that a later successful ask cleared', async () => {
 		const errors = new SourceContactErrors();
 		const handler = daemon(errors);
 		await startRun(handler);
 		vi.advanceTimersByTime(1_000);
-		errors.failed('sbx-1', 'wrapper failed to start');
+		errors.failed('sbx-1');
 		errors.succeeded('sbx-1');
 
 		vi.advanceTimersByTime(121_000);
 		handler.tryDispatch();
 
-		expect(lastFailureReason()).not.toContain('Last contact error');
+		expect(lastFailureReason()).not.toContain('Last contact');
 	});
 
-	it('prints the error on one line, without user info or query values, and capped', async () => {
-		const errors = new SourceContactErrors();
-		const handler = daemon(errors);
+	// The wiring the daemon builds: DaemonSourceContact records the failure of the real ask, its store is the one the
+	// routing hands to the dispatcher, and the log location comes from the logs directory it was given.
+	it('names the failure DaemonSourceContact recorded for a real ask that failed', async () => {
+		const sources = [
+			{
+				sourceId: 'sbx-1',
+				provider: 'built-in:command',
+				options: {},
+				labels: [],
+				maxWorkers: 1,
+				tokenHash: 'h',
+				createdAt: '2026-11-06T00:00:00.000Z',
+			},
+		];
+		const sourceContact = new DaemonSourceContact(
+			'C:/daemon-logs',
+			{ list: () => sources, pruneDead: () => [] as string[] } as never,
+			{ find: () => undefined } as never,
+			new LaunchTokenIssuer(),
+			new WorkerTypeInstances(new PluginLoader(), () => {})
+		);
+		const handler = daemon(sourceContact.contactErrors);
 		await startRun(handler);
-		vi.advanceTimersByTime(1_000);
-		errors.failed('sbx-1', `GET https://u:pw@creds.example.com/v1?token=abc\nline two ${'x'.repeat(500)}`);
 
-		vi.advanceTimersByTime(121_000);
+		sourceContact.contactSources(4101);
+		await vi.advanceTimersByTimeAsync(1_000);
+		await vi.advanceTimersByTimeAsync(121_000);
 		handler.tryDispatch();
 
-		const reason = lastFailureReason();
-		expect(reason).toContain('GET https://creds.example.com/v1?… line two xxx');
-		expect(reason).not.toMatch(/pw|abc|\n/);
-		expect(reason.length).toBeLessThan(1_300);
+		expect(lastFailureReason()).toContain('the error is in the daemon log (flow logs, or C:/daemon-logs).');
+		expect(lastFailureReason()).not.toContain('declares no command');
 	});
 });

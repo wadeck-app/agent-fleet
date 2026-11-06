@@ -4,8 +4,8 @@ import * as path from 'node:path';
 
 import { WORKER_FEATURE_SECRETS } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
-import { CommandHandler } from './CommandHandler';
-import { registerFolderAsProject } from './CommandHandlerTestHarness';
+import type { CommandHandler } from './CommandHandler';
+import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 import { DaemonSecrets } from './DaemonSecrets';
 
 // Built at runtime from parts: a literal would trip secret scanners on the source file.
@@ -99,7 +99,7 @@ describe('CommandHandler secrets', () => {
 			canProvision: vi.fn().mockReturnValue(false),
 			planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 		};
-		const handler = new CommandHandler(
+		const handler = newCommandHandler(
 			daemonDir,
 			pool as never,
 			pool as never,

@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { CommandHandler } from './CommandHandler';
-import { registerFolderAsProject } from './CommandHandlerTestHarness';
+import { completeArguments, registerFolderAsProject } from './CommandHandlerTestHarness';
 
 // Characterization tests written before CommandHandler was split into collaborators: they pin the
 // behaviour of paths the other CommandHandler test files do not reach.
@@ -11,8 +11,8 @@ import { registerFolderAsProject } from './CommandHandlerTestHarness';
 const startedHandlers: CommandHandler[] = [];
 
 class TrackedCommandHandler extends CommandHandler {
-	constructor(...args: ConstructorParameters<typeof CommandHandler>) {
-		super(...args);
+	constructor(...args: Partial<ConstructorParameters<typeof CommandHandler>>) {
+		super(...completeArguments(args));
 		startedHandlers.push(this);
 	}
 }

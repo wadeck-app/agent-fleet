@@ -12,7 +12,7 @@ import type { WorkerTypeInstances } from './WorkerTypeInstances.js';
 /** Asks the declared worker sources for capacity, and forgets the ones whose process is gone. */
 export class DaemonSourceContact {
 	/** The last error each source reported when asked for a worker, read when a bound step finds no worker of its type. */
-	readonly contactErrors = new SourceContactErrors();
+	readonly contactErrors: SourceContactErrors;
 
 	constructor(
 		private readonly logsDir: string,
@@ -20,7 +20,9 @@ export class DaemonSourceContact {
 		private readonly relayRegistry: RelayRegistry,
 		private readonly launchTokens: LaunchTokenIssuer,
 		private readonly workerTypes: WorkerTypeInstances
-	) {}
+	) {
+		this.contactErrors = new SourceContactErrors(logsDir);
+	}
 
 	/**
 	 * Drops entries whose declaring worker is gone.

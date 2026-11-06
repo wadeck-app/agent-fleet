@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BoundStepWait } from './BoundStepWait.js';
 
-/** The failure of a bound step that no worker of its type served carries the last contact errors of the sources of that type. */
+/** The failure of a bound step that no worker of its type served carries the contact failures of the sources of that type. */
 
 const BASE =
 	'Step "s1" belongs to a run bound to worker type "sandbox" (the flow\'s workerType field), ' +
@@ -39,16 +39,21 @@ function failure(contactErrorsSince?: (sinceMs: number) => string[]): { reason: 
 
 describe('BoundStepWait - contact errors in the failure', () => {
 	it('appends the last contact errors, asked for with the time the step started waiting', () => {
-		const { reason, sinceSeen } = failure(() => ['reported by source "sbx-1": wrapper failed to start']);
+		const { reason, sinceSeen } = failure(() => ['Last contact with source "sbx-1" failed at T1.']);
 
-		expect(reason).toBe(`${BASE} Last contact error: reported by source "sbx-1": wrapper failed to start.`);
+		expect(reason).toBe(`${BASE} Last contact with source "sbx-1" failed at T1.`);
 		expect(sinceSeen).toEqual([1_000]);
 	});
 
 	it('joins the errors of several sources', () => {
-		const { reason } = failure(() => ['reported by source "a": one', 'reported by source "b": two']);
+		const { reason } = failure(() => [
+			'Last contact with source "a" failed at T1.',
+			'Last contact with source "b" failed at T2.',
+		]);
 
-		expect(reason).toBe(`${BASE} Last contact error: reported by source "a": one; reported by source "b": two.`);
+		expect(reason).toBe(
+			`${BASE} Last contact with source "a" failed at T1. Last contact with source "b" failed at T2.`
+		);
 	});
 
 	it('leaves the message exactly as it was when there is no error', () => {

@@ -3,7 +3,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
-import { CommandHandler } from './CommandHandler';
+import type { CommandHandler } from './CommandHandler';
+import { newCommandHandler } from './CommandHandlerTestHarness';
 
 const { mockAllocate } = vi.hoisted(() => ({
 	mockAllocate: vi.fn(),
@@ -74,7 +75,7 @@ describe('CommandHandler project resolution', () => {
 			canProvision: vi.fn().mockReturnValue(false),
 			planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 		};
-		const handler = new CommandHandler(daemonDir, pool as never, pool as never);
+		const handler = newCommandHandler(daemonDir, pool as never, pool as never);
 		handlers.push(handler);
 		return handler;
 	}
@@ -298,7 +299,7 @@ describe('CommandHandler run origin', () => {
 			canProvision: vi.fn().mockReturnValue(false),
 			planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 		};
-		handler = new CommandHandler(daemonDir, pool as never, pool as never);
+		handler = newCommandHandler(daemonDir, pool as never, pool as never);
 	});
 
 	afterEach(() => {
@@ -310,13 +311,31 @@ describe('CommandHandler run origin', () => {
 	const records = (): Record<string, unknown>[] =>
 		fs
 			.readdirSync(path.join(daemonDir, 'executions'))
-			.map(file => JSON.parse(fs.readFileSync(path.join(daemonDir, 'executions', file), 'utf8')) as Record<string, unknown>);
+			.map(
+				file =>
+					JSON.parse(fs.readFileSync(path.join(daemonDir, 'executions', file), 'utf8')) as Record<
+						string,
+						unknown
+					>
+			);
 
 	it('records on the execution the origin the client sent with the run', async () => {
 		await registry.register('alpha');
-		const origin = { tool: 'flow', at: '2026-10-31T12:00:00.000Z', projectId: 'abcd1234', projectName: 'beta', cwd: 'C:/work/beta' };
+		const origin = {
+			tool: 'flow',
+			at: '2026-10-31T12:00:00.000Z',
+			projectId: 'abcd1234',
+			projectName: 'beta',
+			cwd: 'C:/work/beta',
+		};
 
-		const result = await handler.handleRun({ type: 'run', flowFile, cwd: registry.makeFolder('x'), projectRef: 'alpha', origin } as never);
+		const result = await handler.handleRun({
+			type: 'run',
+			flowFile,
+			cwd: registry.makeFolder('x'),
+			projectRef: 'alpha',
+			origin,
+		} as never);
 
 		expect(result.type).toBe('execution_started');
 		expect(records()).toEqual([expect.objectContaining({ origin })]);
@@ -333,7 +352,13 @@ describe('CommandHandler run origin', () => {
 	it('refuses a malformed origin before any workspace or record exists', async () => {
 		await registry.register('alpha');
 
-		const result = await handler.handleRun({ type: 'run', flowFile, cwd: registry.makeFolder('x'), projectRef: 'alpha', origin: { tool: 3 } } as never);
+		const result = await handler.handleRun({
+			type: 'run',
+			flowFile,
+			cwd: registry.makeFolder('x'),
+			projectRef: 'alpha',
+			origin: { tool: 3 },
+		} as never);
 
 		expect(result).toMatchObject({ type: 'error', code: 'INVALID_ORIGIN' });
 		expect((result as { message: string }).message).toContain('origin');

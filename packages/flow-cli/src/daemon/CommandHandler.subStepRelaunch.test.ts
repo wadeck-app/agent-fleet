@@ -3,8 +3,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
-import { CommandHandler } from './CommandHandler';
-import { registerFolderAsProject } from './CommandHandlerTestHarness';
+import type { CommandHandler } from './CommandHandler';
+import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
 vi.mock('flow-engine', async importOriginal => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
@@ -123,7 +123,7 @@ function assignsSent(pool: ReturnType<typeof createPool>): Assign[] {
 async function startFlow(
 	pool: ReturnType<typeof createPool>
 ): Promise<{ handler: CommandHandler; executionId: string }> {
-	const handler = new CommandHandler(
+	const handler = newCommandHandler(
 		daemonDir,
 		pool as never,
 		pool as never,

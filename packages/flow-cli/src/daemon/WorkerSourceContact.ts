@@ -159,13 +159,14 @@ export async function contactDeclaredSources(
 				});
 				dependencies.contactOutcome?.succeeded(entry.sourceId);
 			} catch (err) {
+				// Read once, for the report and the daemon log only: the outcome sink gets the fact of the failure, never the text.
 				const message = messageOf(err);
-				// Recording the error must never cost the report: a sink that throws is itself reported.
+				// Recording the failure must never cost the report: a sink that throws is itself reported.
 				try {
-					dependencies.contactOutcome?.failed(entry.sourceId, message);
+					dependencies.contactOutcome?.failed(entry.sourceId);
 				} catch (recordingError) {
 					report(
-						`could not record the contact error of source "${entry.sourceId}": ${messageOf(recordingError)}`
+						`could not record the contact failure of source "${entry.sourceId}": ${messageOf(recordingError)}`
 					);
 				}
 				report(`could not obtain a worker from source "${entry.sourceId}": ${message}`);

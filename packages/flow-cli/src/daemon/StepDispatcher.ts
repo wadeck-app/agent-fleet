@@ -316,9 +316,7 @@ export class StepDispatcher {
 			workerType,
 			connectedOfType: this.registry.summarize().filter(worker => typeOf(worker.sourceId) === workerType).length,
 			knownTypes: this.knownTypesOrNone(executionId),
-			contactErrorsSince: this.contactErrors.sinceFor(workerType, typeOf, text =>
-				this.daemonSecrets.masks.maskAll(text)
-			),
+			contactErrorsSince: this.contactErrors.sinceFor(workerType, typeOf),
 		});
 		if (decision.action === 'wait') {
 			return false;

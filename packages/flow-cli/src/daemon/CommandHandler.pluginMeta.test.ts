@@ -4,7 +4,7 @@ import * as path from 'node:path';
 
 import { PLUGIN_META_MARKER_FILE } from '../storage/PluginMetaOwnership';
 import { CommandHandler } from './CommandHandler';
-import { registerFolderAsProject } from './CommandHandlerTestHarness';
+import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
 const FLOW_YAML = `\
 id: meta-flow
@@ -70,7 +70,7 @@ describe('CommandHandler records the plugin workspace .meta it created', () => {
 			allocate: vi.fn().mockResolvedValue({ path: handlePath, id: 'p:1' }),
 			release: vi.fn().mockResolvedValue(undefined),
 		};
-		const handler = new CommandHandler(
+		const handler = newCommandHandler(
 			path.join(tmpDir, 'daemon'),
 			pool as never,
 			pool as never,
