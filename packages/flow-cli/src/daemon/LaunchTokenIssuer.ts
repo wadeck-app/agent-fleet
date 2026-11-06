@@ -6,6 +6,14 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
  */
 export const DEFAULT_LAUNCH_TOKEN_TTL_MS = 120_000;
 
+/**
+ * How many credentials of one source may be outstanding (minted, not yet spent, not yet expired) at once. Every ask for a
+ * worker mints one, so a source whose workers never register would otherwise pile them up; 32 is far above any honest burst
+ * of parallel steps asking for workers within the 120 s a credential lives, and small enough to bound the memory and the
+ * number of valid secrets.
+ */
+export const MAX_OUTSTANDING_LAUNCH_TOKENS_PER_SOURCE = 32;
+
 interface OutstandingToken {
 	sourceId: string;
 	token: string;
@@ -33,9 +41,23 @@ export class LaunchTokenIssuer {
 		private readonly now: () => number = Date.now
 	) {}
 
-	/** Mints a token for one launch of `sourceId`. */
+	/**
+	 * Mints a token for one launch of `sourceId`.
+	 *
+	 * @throws when the source already has {@link MAX_OUTSTANDING_LAUNCH_TOKENS_PER_SOURCE} outstanding; the message never
+	 *         carries a token
+	 */
 	issue(sourceId: string): string {
 		this.prune();
+		if (
+			this.outstanding.filter(candidate => candidate.sourceId === sourceId).length >=
+			MAX_OUTSTANDING_LAUNCH_TOKENS_PER_SOURCE
+		) {
+			throw new Error(
+				`source "${sourceId}" already has ${String(MAX_OUTSTANDING_LAUNCH_TOKENS_PER_SOURCE)} launch credentials outstanding (each is spent when its worker registers and expires after ${String(Math.round(this.ttlMs / 1000))} s), so no new one is minted. ` +
+					"The workers it launched are not registering: check the source's launch and its logs, or wait for the credentials to expire."
+			);
+		}
 		const token = randomBytes(32).toString('hex');
 		this.outstanding.push({ sourceId, token, expiresAt: this.now() + this.ttlMs });
 		return token;

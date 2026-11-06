@@ -7,6 +7,7 @@ import { raceWithTimeout } from './BoundedWait.js';
 import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
 import type { ForkWorkerInputs } from './ForkWorkerTypePlugin.js';
 import { INBOUND_PLUGIN_REF, entryNudgeUrlToCopy } from './InboundNudgeOption.js';
+import { LaunchCredentialSource } from './LaunchCredentialSource.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { PLUGIN_REF } from './WorkerSourcePluginReference.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
@@ -327,7 +328,8 @@ export class WorkerTypeInstances {
 				pluginsDir
 			);
 			assertWorkerTypeInstance(built);
-			return built;
+			// A plugin from a directory is given a launch credential per ask by the daemon, never the minting service.
+			return host.issueLaunchToken === undefined ? built : withLaunchCredential(built, host.issueLaunchToken);
 		} catch (err) {
 			throw failureOf(entry, plugin, pluginsDir, registered !== undefined, getErrorMessage(err), err);
 		}
@@ -364,6 +366,14 @@ function resolveEnvVars(sourceId: string, value: unknown, keyPath = ''): unknown
 
 function describeDuration(ms: number): string {
 	return ms < 1000 ? `${String(ms)}ms` : `${String(Math.round(ms / 1000))}s`;
+}
+
+function withLaunchCredential(instance: WorkerTypeInstance, issue: (sourceId: string) => string): WorkerTypeInstance {
+	return {
+		source: new LaunchCredentialSource(instance.source, issue),
+		...(instance.run === undefined ? {} : { run: instance.run }),
+		dispose: () => instance.dispose(),
+	};
 }
 
 function assertWorkerTypeInstance(candidate: unknown): asserts candidate is WorkerTypeInstance {

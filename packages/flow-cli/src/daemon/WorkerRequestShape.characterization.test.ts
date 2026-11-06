@@ -47,7 +47,9 @@ const entry = (overrides: Record<string, unknown>) => ({
 });
 
 describe('the request a source is asked to obtain a worker with - characterization', () => {
-	it('is exactly { daemonEndpoint, sourceId, projects: [] } for a plugin loaded from disk, even when the daemon can mint tokens', async () => {
+	// CHANGED by M6.0 (was: exactly { daemonEndpoint, sourceId, projects: [] } and nothing minted): a plugin loaded from disk now gets
+	// a launch credential per ask in request.authToken. The built-in cases below are unchanged.
+	it('is { daemonEndpoint, sourceId, projects: [], authToken } for a plugin loaded from disk when the daemon can mint tokens', async () => {
 		const issueLaunchToken = vi.fn(() => 'minted');
 		const workerTypes = new WorkerTypeInstances(new PluginLoader(), () => {});
 
@@ -60,9 +62,9 @@ describe('the request a source is asked to obtain a worker with - characterizati
 		await workerTypes.disposeAll();
 
 		expect(fixture.obtained.map(item => item.request)).toEqual([
-			{ daemonEndpoint: ENDPOINT, sourceId: 'box', projects: [] },
+			{ daemonEndpoint: ENDPOINT, sourceId: 'box', projects: [], authToken: 'minted' },
 		]);
-		expect(issueLaunchToken).not.toHaveBeenCalled();
+		expect(issueLaunchToken).toHaveBeenCalledExactlyOnceWith('box');
 	});
 
 	it('is the same for a built-in worker type, which gets the token service through its host instead', async () => {
