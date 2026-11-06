@@ -65,6 +65,11 @@ function preparer(modelEnvironment: Record<string, string> = {}): ExecSandboxPre
 	});
 }
 
+/** Mounts whose second (meta) mount is missing: the step after the credential access throws. */
+function mountsWithoutMeta(): RunMounts {
+	return Object.create(mounts, { sandboxMounts: { value: () => [mounts.sandboxMounts()[0]] } }) as RunMounts;
+}
+
 describe('ExecSandboxPreparer', () => {
 	it('opens only the credential endpoint and the Bedrock host for this sandbox (no bridge port)', async () => {
 		await preparer().prepare(SANDBOX, mounts);
@@ -95,6 +100,16 @@ describe('ExecSandboxPreparer', () => {
 	it('does not copy the proxy variables (sbx exec keeps the sandbox environment)', async () => {
 		const prepared = await preparer().prepare(SANDBOX, mounts);
 		expect(Object.keys(prepared.envFor('model')).some(name => /proxy/i.test(name))).toBe(false);
+	});
+
+	it('rolls the credential access back when preparing fails after it was attached, so a retry works', async () => {
+		await expect(preparer().prepare(SANDBOX, mountsWithoutMeta())).rejects.toThrow(
+			'RunMounts must have two mounts'
+		);
+
+		expect(runtime.state(SANDBOX).networkRules.size).toBe(0);
+		expect([...runtime.state(SANDBOX).secrets.values()]).toEqual([]);
+		await expect(preparer().prepare(SANDBOX, mounts)).resolves.toBeDefined();
 	});
 
 	it('detach removes the credential access', async () => {

@@ -90,6 +90,11 @@ function preparer(modelEnvironment: Record<string, string> = {}): CredentialedSa
 	});
 }
 
+/** Mounts whose second (meta) mount is missing: the step after the credential access throws. */
+function mountsWithoutMeta(): RunMounts {
+	return Object.create(mounts, { sandboxMounts: { value: () => [mounts.sandboxMounts()[0]] } }) as RunMounts;
+}
+
 describe('CredentialedSandboxPreparer', () => {
 	it('opens the bridge port and the Bedrock host for this sandbox only', async () => {
 		await preparer().prepare(SANDBOX, mounts, 45678);
@@ -177,6 +182,28 @@ describe('CredentialedSandboxPreparer', () => {
 		expect(tokens.verify('x'.repeat(48)).ok).toBe(false);
 		expect(runtime.state(SANDBOX).networkRules.size).toBe(0);
 		expect([...runtime.state(SANDBOX).secrets.values()]).toEqual([]);
+	});
+
+	it('rolls everything back, token included, when preparing fails after the VM environment was read, so a retry works', async () => {
+		await expect(preparer().prepare(SANDBOX, mountsWithoutMeta(), 45678)).rejects.toThrow(
+			'RunMounts must have two mounts'
+		);
+
+		const verdict = tokens.verify('x'.repeat(48));
+		expect(verdict.ok === false && verdict.reason).toContain('no bridge token is expected');
+		expect(runtime.state(SANDBOX).networkRules.size).toBe(0);
+		expect([...runtime.state(SANDBOX).secrets.values()]).toEqual([]);
+		await expect(preparer().prepare(SANDBOX, mounts, 45678)).resolves.toBeDefined();
+	});
+
+	it('logs, and does not swallow, a failure of its own rollback', async () => {
+		runtime.failNext('removeSecret', new SandboxError('command-failed', 'secret store down'));
+
+		await expect(preparer().prepare(SANDBOX, mountsWithoutMeta(), 45678)).rejects.toThrow(
+			'RunMounts must have two mounts'
+		);
+
+		expect(log.text()).toContain('secret store down');
 	});
 
 	it('detach revokes the token and removes what was added', async () => {

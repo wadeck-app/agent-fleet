@@ -1,4 +1,5 @@
 import { CredentialGlueInstaller } from '../CredentialGlueInstaller';
+import { describeError } from '../ErrorText';
 import type { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import type { RunMounts } from '../RunMounts';
 import { SandboxCredentialAccess } from '../SandboxCredentialAccess';
@@ -62,14 +63,25 @@ export class ExecSandboxPreparer {
 			...(options.extraAllowedHosts === undefined ? {} : { extraAllowedHosts: options.extraAllowedHosts }),
 		});
 
-		const [, meta] = mounts.sandboxMounts();
-		if (meta === undefined) throw new Error('RunMounts must have two mounts');
-		const store = new ToolStoreRedirect({
-			translator: mounts.translator,
-			workspaceMetaDir: meta.hostPath,
-			platform: options.platform,
-			codexDisablePlugins: true,
-		}).prepare('claude');
+		let store: ReturnType<ToolStoreRedirect['prepare']>;
+		try {
+			const [, meta] = mounts.sandboxMounts();
+			if (meta === undefined) throw new Error('RunMounts must have two mounts');
+			store = new ToolStoreRedirect({
+				translator: mounts.translator,
+				workspaceMetaDir: meta.hostPath,
+				platform: options.platform,
+				codexDisablePlugins: true,
+			}).prepare('claude');
+		} catch (error) {
+			// The credential access was attached above: undo it so a retry does not meet "already has a credential grant".
+			await access.detach().catch(detachError => {
+				options.log.warn(
+					`Could not undo the credential access of "${sandbox}" after a failure: ${describeError(detachError)}`
+				);
+			});
+			throw error;
+		}
 
 		const modelEnvironment: Record<string, string> = {
 			...access.env,

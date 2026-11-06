@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { CredentialGlueInstaller } from '../CredentialGlueInstaller';
+import { describeError } from '../ErrorText';
 import type { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { PrivateSecretFile } from '../PrivateSecretFile';
 import type { RunMounts } from '../RunMounts';
@@ -85,32 +86,41 @@ export class CredentialedSandboxPreparer implements SandboxPreparer {
 			secretFile?.dispose();
 			await access.detach().catch((detachError: unknown) => {
 				options.log.warn(
-					`Could not undo the credential access of "${sandbox}" after a failure: ${detachError instanceof Error ? detachError.message : String(detachError)}`
+					`Could not undo the credential access of "${sandbox}" after a failure: ${describeError(detachError)}`
 				);
 			});
 			throw error;
 		}
 
 		let proxyEnvironment: Record<string, string>;
+		let store: ReturnType<ToolStoreRedirect['prepare']>;
 		try {
 			const vmEnvironment = await options.runtime.exec({ sandbox, command: ['env'] });
 			proxyEnvironment = VmProxyEnvironment.parse(sandbox, vmEnvironment.stdout);
+			const [, meta] = mounts.sandboxMounts();
+			if (meta === undefined) throw new Error('RunMounts must have two mounts');
+			store = new ToolStoreRedirect({
+				translator: mounts.translator,
+				workspaceMetaDir: meta.hostPath,
+				platform: options.platform,
+				codexDisablePlugins: true,
+			}).prepare('claude');
 		} catch (error) {
+			// Everything attached above is undone; a failing undo step is logged, the original error is rethrown.
 			options.tokens.revoke();
 			secretFile?.dispose();
-			await options.runtime.removeSecret({ sandbox, placeholder }).catch(() => undefined);
-			await access.detach().catch(() => undefined);
+			await options.runtime.removeSecret({ sandbox, placeholder }).catch(removeError => {
+				options.log.warn(
+					`Could not remove the bridge secret of "${sandbox}" after a failure: ${describeError(removeError)}`
+				);
+			});
+			await access.detach().catch(detachError => {
+				options.log.warn(
+					`Could not undo the credential access of "${sandbox}" after a failure: ${describeError(detachError)}`
+				);
+			});
 			throw error;
 		}
-
-		const [, meta] = mounts.sandboxMounts();
-		if (meta === undefined) throw new Error('RunMounts must have two mounts');
-		const store = new ToolStoreRedirect({
-			translator: mounts.translator,
-			workspaceMetaDir: meta.hostPath,
-			platform: options.platform,
-			codexDisablePlugins: true,
-		}).prepare('claude');
 
 		const modelEnvironment: Record<string, string> = {
 			...proxyEnvironment,
