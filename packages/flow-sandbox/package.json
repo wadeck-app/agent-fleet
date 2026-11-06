@@ -13,6 +13,8 @@
 		"clean": "rimraf dist dist-types"
 	},
 	"dependencies": {
+		"flow-cli": "file:../flow-cli",
+		"flow-engine": "file:../flow-engine",
 		"ws": "^8.0.0"
 	},
 	"devDependencies": {

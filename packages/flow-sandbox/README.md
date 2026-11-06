@@ -21,6 +21,8 @@ sbx location: `binaryPath` option, `SBX_MOCK_PATH`, `SBX_PATH`, `%LOCALAPPDATA%\
 
 `npm run test --workspace=flow-sandbox`. Tests run `SbxCliRuntime` against `src/testing/sbx-mock.mjs` through real child processes (state and call log in `SBX_MOCK_STATE_DIR`, failures via `SBX_MOCK_SCENARIO`). `FakeSandboxRuntime` and `SbxCliRuntime` share `testing/SandboxRuntimeContract.ts`.
 
+Needs `bash` on PATH (Git for Windows on Windows): `CredentialProcessScript.test.ts` and `CredentialGlueInstaller.test.ts` run the real bash scripts. Without it they fail in `beforeAll` (`testing/BashRequirement.ts`) with that message; they never skip. No test needs the real `sbx`, AWS, Docker or the network beyond loopback; `src/exec/McpInjectionInvariant.test.ts` stages the image's `mcp-server.cjs` itself, so no build step comes before the tests.
+
 ## Mock fidelity
 
 Real captures (sbx 0.49.2, `fixtures/sbx-0.49.2/`, written by `scripts/CaptureSbxFixtures.mjs`: read-only commands, plus one throw-away `flow-sbx-capture-*` sandbox with one scoped rule so `ls-json` and `policy-ls-json` are populated; it refuses to write them empty): version, `ls --json`, `diagnose --json`, `policy ls --json`, `settings ls --json`, `--help` of the verbs used, "sandbox not found" errors. The mock validates flags against the captured help and `SbxMockFidelity.test.ts` compares its output with the captures.

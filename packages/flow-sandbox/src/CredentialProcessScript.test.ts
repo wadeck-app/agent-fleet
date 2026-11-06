@@ -1,13 +1,17 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { CREDENTIAL_TOKEN_VARIABLE, CredentialProcessScript } from './CredentialProcessScript';
 import { NodeCommandRunner } from './NodeCommandRunner';
+import { BashRequirement } from './testing/BashRequirement';
 import { failure } from './testing/ExpectedFailures';
 
 const roots: string[] = [];
+
+// Several tests run a real bash: a machine without it must fail with the reason, not skip.
+beforeAll(() => BashRequirement.assertAvailable());
 
 afterEach(() => {
 	for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });

@@ -120,7 +120,10 @@ describe('SbxProcess', () => {
 	});
 
 	it('refuses to start when the signal is already aborted', async () => {
-		const marker = path.join(os.tmpdir(), `sbx-process-marker-${Date.now()}`);
+		// In a directory the afterEach removes: should the abort check regress, the marker is created and must not leak.
+		const markerDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'sbx-process-'));
+		directories.push(markerDirectory);
+		const marker = path.join(markerDirectory, 'marker');
 		const binary = script(`import fs from "node:fs"; fs.writeFileSync(${JSON.stringify(marker)}, "ran");`);
 		const controller = new AbortController();
 		controller.abort();

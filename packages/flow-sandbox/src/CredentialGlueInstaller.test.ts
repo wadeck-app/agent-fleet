@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { CredentialGlueInstaller } from './CredentialGlueInstaller';
 import { CredentialProcessScript } from './CredentialProcessScript';
@@ -10,8 +10,12 @@ import { FakeClock } from './FakeClock';
 import { type FakeExecHandler, FakeSandboxRuntime } from './FakeSandboxRuntime';
 import { SandboxError } from './SandboxError';
 import type { ExecRequest } from './SandboxRuntime';
+import { BashRequirement } from './testing/BashRequirement';
 
 const roots: string[] = [];
+
+// One test runs the real bash: a machine without it must fail with the reason, not skip.
+beforeAll(() => BashRequirement.assertAvailable());
 
 afterEach(() => {
 	for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
