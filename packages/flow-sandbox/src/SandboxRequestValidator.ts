@@ -113,7 +113,7 @@ export class SandboxRequestValidator {
 			throw invalid('setSecret needs at least one host.');
 		}
 		for (const host of request.hosts) {
-			if (!HOST_WITHOUT_PORT.test(host) || NetworkResourceRule.isCatchAllHost(host)) {
+			if (!HOST_WITHOUT_PORT.test(host) || NetworkResourceRule.hostProblem(host) !== undefined) {
 				throw invalid(
 					`Secret host "${host}" is not valid. sbx takes a host WITHOUT a port (for example "localhost", not ` +
 						'"localhost:19001") and a catch-all pattern would send the secret to every site.'

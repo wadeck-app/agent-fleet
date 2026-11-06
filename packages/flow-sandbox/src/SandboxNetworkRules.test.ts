@@ -94,6 +94,17 @@ describe('SandboxNetworkRules.resourcesFor', () => {
 			['no tool', { tools: [] }, 'needs at least one model tool'],
 			['an unknown tool', { tools: ['gemini'] }, 'Model tool "gemini" is not supported'],
 			['a catch-all extra host', { extraAllowedHosts: ['**:443'] }, 'catch-all patterns are refused'],
+			// A wildcard may only stand for the subdomains of a domain: nothing broader reaches the sandbox.
+			['a wildcard-only domain', { extraAllowedHosts: ['*.*:443'] }, 'wildcard'],
+			[
+				'a wildcard over a whole top-level domain',
+				{ extraAllowedHosts: ['*.com:443'] },
+				'would open every host under "com"',
+			],
+			['a double star domain', { extraAllowedHosts: ['**.com:443'] }, 'wildcard'],
+			['a wildcard inside a label', { extraAllowedHosts: ['a*.example.org:443'] }, 'wildcard'],
+			['a port above 65535', { extraAllowedHosts: ['example.org:65536'] }, 'port 65536 is not valid'],
+			['port zero', { extraAllowedHosts: ['example.org:0'] }, 'port 0 is not valid'],
 			[
 				'an extra host without port',
 				{ extraAllowedHosts: ['example.org'] },
