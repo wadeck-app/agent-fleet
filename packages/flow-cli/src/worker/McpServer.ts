@@ -3,11 +3,22 @@ import * as net from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 import type { InjectedStep } from '../ipc/Protocol';
+import { DEFAULT_CALLBACK_IDLE_TIMEOUT_MS, McpCallbackConnection } from './McpCallbackConnection';
 
 export interface McpServerConfig {
 	name: string;
 	command: string[];
 	env?: Record<string, string>;
+}
+
+/** Concurrent callback connections accepted; the legitimate helper opens one at a time. */
+const DEFAULT_MAX_CALLBACK_CONNECTIONS = 8;
+
+export interface McpServerOptions {
+	/** Overrides the idle timeout of a callback connection (tests use a short one). */
+	idleTimeoutMs?: number;
+	/** Overrides the concurrent connection cap. */
+	maxConnections?: number;
 }
 
 /** Path to the CJS stdio MCP server script, resolved relative to this module. */
@@ -38,7 +49,8 @@ export class McpServer {
 
 	constructor(
 		private readonly executionId: string,
-		private readonly onInjectSteps: (steps: InjectedStep[]) => Promise<void>
+		private readonly onInjectSteps: (steps: InjectedStep[]) => Promise<void>,
+		private readonly options: McpServerOptions = {}
 	) {}
 
 	/**
@@ -68,45 +80,16 @@ export class McpServer {
 	private startTcpServer(): Promise<number> {
 		return new Promise((resolve, reject) => {
 			const server = net.createServer(socket => {
-				let buf = '';
-				socket.on('data', chunk => {
-					buf += chunk.toString('utf8');
-					// Fix 4: process ALL newline-delimited JSON objects in the buffer
-					let nl: number;
-					while ((nl = buf.indexOf('\n')) !== -1) {
-						const line = buf.slice(0, nl);
-						buf = buf.slice(nl + 1);
-						if (!line.trim()) continue;
-						let payload: { token: string; executionId: string; steps: InjectedStep[] };
-						try {
-							payload = JSON.parse(line) as typeof payload;
-						} catch {
-							process.stderr.write('[McpServer] TCP: invalid JSON payload\n');
-							continue;
-						}
-						// Fix 2: verify auth token
-						if (payload.token !== this.callbackToken) {
-							process.stderr.write('[McpServer] TCP: rejected -- invalid token\n');
-							socket.destroy();
-							return;
-						}
-						// Fix 1: verify executionId
-						if (payload.executionId !== this.executionId) {
-							process.stderr.write(
-								`[McpServer] TCP: rejected -- executionId mismatch (got ${payload.executionId}, expected ${this.executionId})\n`
-							);
-							socket.destroy();
-							return;
-						}
-						this.onInjectSteps(payload.steps).catch(err => {
-							process.stderr.write(`[McpServer] onInjectSteps error: ${String(err)}\n`);
-						});
-					}
-				});
-				socket.on('error', err => {
-					process.stderr.write(`[McpServer] TCP socket error: ${String(err)}\n`);
+				new McpCallbackConnection(socket, {
+					token: this.callbackToken,
+					executionId: this.executionId,
+					onInjectSteps: this.onInjectSteps,
+					idleTimeoutMs: this.options.idleTimeoutMs ?? DEFAULT_CALLBACK_IDLE_TIMEOUT_MS,
+					log: message => process.stderr.write(`[McpServer] ${message}\n`),
 				});
 			});
+			// Beyond the limit Node drops the incoming connection: the peer sees it closed.
+			server.maxConnections = this.options.maxConnections ?? DEFAULT_MAX_CALLBACK_CONNECTIONS;
 			server.once('error', reject);
 			server.listen(0, '127.0.0.1', () => {
 				const addr = server.address();
