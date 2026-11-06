@@ -171,7 +171,10 @@ export class HarnessConfigParser {
 		}
 
 		const hostHome = env['FLOW_SANDBOX_HOST_HOME'];
-		const awsEnvironment: NodeJS.ProcessEnv = { ...env };
+		// The aws CLI needs none of the FLOW_* launch variables (the worker token lets whoever has it speak as this worker).
+		const awsEnvironment: NodeJS.ProcessEnv = Object.fromEntries(
+			Object.entries(env).filter(([name]) => !name.startsWith('FLOW_'))
+		);
 		if (hostHome !== undefined && hostHome !== '') {
 			awsEnvironment['HOME'] = hostHome;
 			awsEnvironment['USERPROFILE'] = hostHome;

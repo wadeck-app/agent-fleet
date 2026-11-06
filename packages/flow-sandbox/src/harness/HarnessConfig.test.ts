@@ -93,6 +93,20 @@ describe('HarnessConfigParser', () => {
 		expect(config.awsEnvironment['PATH']).toBe('/usr/bin');
 	});
 
+	// The aws CLI (and whatever it spawns, a credential helper) must not receive the daemon's launch credentials.
+	it('keeps the daemon launch variables, the worker token first, out of the aws CLI environment', () => {
+		const config = parse(BASE, {
+			...ENV,
+			FLOW_SANDBOX_HOST_HOME: '/real/home',
+			FLOW_OTHER: 'x',
+			AWS_REGION: 'eu-west-1',
+		});
+
+		expect(Object.keys(config.awsEnvironment).filter(name => name.startsWith('FLOW_'))).toEqual([]);
+		expect(config.awsEnvironment['AWS_REGION']).toBe('eu-west-1');
+		expect(config.workerToken).toBe('tok');
+	});
+
 	it.each(['FLOW_DAEMON_WS_URL', 'FLOW_WORKER_SOURCE_ID', 'FLOW_WORKER_TOKEN'])(
 		'names %s and the way to start the harness when it is missing',
 		name => {
