@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 
+import { BoundedText } from './BoundedText';
 import { SandboxError } from './SandboxError';
 import type { SbxBinary } from './SbxBinaryLocator';
 
@@ -53,8 +54,9 @@ export class SbxProcess {
 
 			const stdoutDecoder = new StringDecoder('utf8');
 			const stderrDecoder = new StringDecoder('utf8');
-			let stdout = '';
-			let stderr = '';
+			// Bounded: the caller gets every chunk through onStdout/onStderr; the result keeps the head and the tail only.
+			const stdout = new BoundedText();
+			const stderr = new BoundedText();
 			let settled = false;
 			let failure: SandboxError | undefined;
 
@@ -85,12 +87,12 @@ export class SbxProcess {
 
 			child.stdout?.on('data', (data: Buffer) => {
 				const text = stdoutDecoder.write(data);
-				stdout += text;
+				stdout.append(text);
 				if (text !== '') request.onStdout?.(text);
 			});
 			child.stderr?.on('data', (data: Buffer) => {
 				const text = stderrDecoder.write(data);
-				stderr += text;
+				stderr.append(text);
 				if (text !== '') request.onStderr?.(text);
 			});
 
@@ -111,17 +113,15 @@ export class SbxProcess {
 								`sbx was terminated by a signal (${binary.displayPath}).`,
 								{
 									exitCode: null,
-									stderr,
+									stderr: stderr.toString(),
 								}
 							)
 						);
 						return;
 					}
-					resolve({
-						exitCode: code,
-						stdout: stdout + stdoutDecoder.end(),
-						stderr: stderr + stderrDecoder.end(),
-					});
+					stdout.append(stdoutDecoder.end());
+					stderr.append(stderrDecoder.end());
+					resolve({ exitCode: code, stdout: stdout.toString(), stderr: stderr.toString() });
 				});
 			});
 

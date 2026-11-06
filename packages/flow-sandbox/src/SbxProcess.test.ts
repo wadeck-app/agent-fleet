@@ -42,6 +42,30 @@ describe('SbxProcess', () => {
 		expect(await new SbxProcess().run(request(binary))).toEqual({ exitCode: 5, stdout: 'out', stderr: 'err' });
 	});
 
+	// A step that prints gigabytes must not grow the host's memory: the caller gets every chunk, the result keeps head and tail.
+	it.each(['stdout', 'stderr'] as const)(
+		'keeps only the head and the tail of a huge %s in the result, streaming all of it',
+		async stream => {
+			const binary = script(
+				`const line = "0123456789".repeat(100) + "\\n"; for (let i = 0; i < 4000; i++) process.${stream}.write(i === 0 ? "FIRST" + line : i === 3999 ? line + "LAST" : line);`
+			);
+			let streamed = 0;
+
+			const result = await new SbxProcess().run(
+				request(binary, {
+					[stream === 'stdout' ? 'onStdout' : 'onStderr']: (chunk: string) => (streamed += chunk.length),
+				})
+			);
+
+			const text = result[stream];
+			expect(streamed).toBeGreaterThan(4_000_000);
+			expect(text.length).toBeLessThan(1_100_000);
+			expect(text.startsWith('FIRST')).toBe(true);
+			expect(text.endsWith('LAST')).toBe(true);
+			expect(text).toMatch(/\[truncated: \d+ characters omitted/);
+		}
+	);
+
 	it('writes string and binary stdin and closes it', async () => {
 		const binary = script(
 			'let d=""; process.stdin.on("data", c => d += c); process.stdin.on("end", () => process.stdout.write(d.toUpperCase()));'
