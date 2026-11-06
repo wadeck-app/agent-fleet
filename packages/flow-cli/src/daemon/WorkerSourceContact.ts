@@ -122,6 +122,15 @@ async function providerOf(
 	return (await workerTypes.get(entry, host)).source;
 }
 
+/** The message of whatever was thrown; a value whose message cannot be read must not reject the whole contact. */
+function messageOf(err: unknown): string {
+	try {
+		return String(normalizeError(err).message);
+	} catch {
+		return 'an error whose message could not be read';
+	}
+}
+
 /**
  * Asks every declared source to produce a worker, at daemon startup (D#54).
  *
@@ -150,8 +159,16 @@ export async function contactDeclaredSources(
 				});
 				dependencies.contactOutcome?.succeeded(entry.sourceId);
 			} catch (err) {
-				dependencies.contactOutcome?.failed(entry.sourceId, normalizeError(err).message);
-				report(`could not obtain a worker from source "${entry.sourceId}": ${normalizeError(err).message}`);
+				const message = messageOf(err);
+				// Recording the error must never cost the report: a sink that throws is itself reported.
+				try {
+					dependencies.contactOutcome?.failed(entry.sourceId, message);
+				} catch (recordingError) {
+					report(
+						`could not record the contact error of source "${entry.sourceId}": ${messageOf(recordingError)}`
+					);
+				}
+				report(`could not obtain a worker from source "${entry.sourceId}": ${message}`);
 			}
 		})
 	);

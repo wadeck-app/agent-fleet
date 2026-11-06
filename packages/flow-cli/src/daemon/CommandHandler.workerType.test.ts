@@ -11,6 +11,7 @@ import {
 	registerCommandHandlerHooks,
 	tmpDir,
 } from './CommandHandlerTestHarness';
+import { SourceContactErrors } from './SourceContactErrors';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry';
 import { WorkerTypeCatalog } from './WorkerTypeCatalog';
 
@@ -160,7 +161,11 @@ function daemonWith(
 		undefined,
 		undefined,
 		undefined,
-		{ workerTypes: CATALOG, boundStepWaitMs: options.boundStepWaitMs ?? 120_000 }
+		{
+			workerTypes: CATALOG,
+			boundStepWaitMs: options.boundStepWaitMs ?? 120_000,
+			contactErrors: new SourceContactErrors(),
+		}
 	);
 	return { handler, pool, sent };
 }

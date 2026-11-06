@@ -74,4 +74,19 @@ describe('DaemonSourceContact - keeps the last contact error of each source', ()
 			expect(daemonContact.contactErrors.since('sandbox', typeOf, 0, t => t)).toEqual([]);
 		});
 	});
+
+	it('forgets the error of a source that is no longer declared', async () => {
+		const sourceEntries = [entry('laptop', 'built-in:command', {})];
+		const daemonContact = contact(sourceEntries);
+		const typeOf = (id: string | undefined) => (id === 'laptop' ? 'sandbox' : undefined);
+		daemonContact.contactSources(4101);
+		await vi.waitFor(() => {
+			expect(daemonContact.contactErrors.since('sandbox', typeOf, 0, t => t)).toHaveLength(1);
+		});
+
+		sourceEntries.length = 0;
+		daemonContact.contactSources(4101);
+
+		expect(daemonContact.contactErrors.since('sandbox', typeOf, 0, t => t)).toEqual([]);
+	});
 });

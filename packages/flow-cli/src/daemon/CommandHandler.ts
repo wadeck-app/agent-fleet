@@ -29,6 +29,7 @@ import type { RunProject } from './RunProjectResolver.js';
 import { RunRequestHandler } from './RunRequestHandler.js';
 import { RunStepPreparer } from './RunStepPreparer.js';
 import { SchedulerIdleState } from './SchedulerIdleState.js';
+import { SourceContactErrors } from './SourceContactErrors.js';
 import { StepDispatcher } from './StepDispatcher.js';
 import { DEFAULT_MAX_INJECTED_STEPS, DEFAULT_MAX_STEPS_PER_EXECUTION, StepInjection } from './StepInjection.js';
 import { StepOutcomes } from './StepOutcomes.js';
@@ -42,6 +43,7 @@ export { DEFAULT_STEP_SILENCE_LIMIT_MS, MAX_REDISPATCHES } from './WorkerAssignm
 
 /** No source declares a worker type, and the daemon's default `worker.boundStepWaitSeconds`. */
 const DEFAULT_WORKER_ROUTING: WorkerTypeRouting = {
+	contactErrors: new SourceContactErrors(),
 	workerTypes: new WorkerTypeCatalog({ list: () => [] }),
 	boundStepWaitMs: DEFAULT_BOUND_STEP_WAIT_MS,
 };

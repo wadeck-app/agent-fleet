@@ -110,7 +110,7 @@ describe('describeContactError', () => {
 			describeContactError('has S3CRET', () => {
 				throw new Error('masker broke');
 			})
-		).toBe('<masking failed>');
+		).toBe('[secret-masking-failed]');
 	});
 
 	it('caps the text at 300 characters, ending with an ellipsis', () => {

@@ -53,6 +53,7 @@ export class DaemonSourceContact {
 		// `flow worker source remove` runs in another process and cannot reach the instances held here: the daemon
 		// notices a source is gone from the registry file, here, and lets go of what it held for it.
 		void this.workerTypes.retainOnly(declared.map(entry => entry.sourceId));
+		this.contactErrors.retainOnly(declared.map(entry => entry.sourceId));
 		const asked =
 			workerTypes === undefined
 				? declared

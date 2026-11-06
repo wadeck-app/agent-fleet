@@ -59,7 +59,7 @@ export class StepDispatcher {
 		private readonly workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'> = NO_DECLARED_WORKER_TYPES,
 		private readonly boundStepWait: BoundStepWait = new BoundStepWait(),
 		/** Where the last contact error of each source is kept; read, masked, when a bound step fails. */
-		private readonly contactErrors?: WorkerTypeRouting['contactErrors']
+		private readonly contactErrors: WorkerTypeRouting['contactErrors']
 	) {
 		this.router = new StepRouter(undefined, undefined, workerTypes);
 	}
@@ -316,7 +316,7 @@ export class StepDispatcher {
 			workerType,
 			connectedOfType: this.registry.summarize().filter(worker => typeOf(worker.sourceId) === workerType).length,
 			knownTypes: this.knownTypesOrNone(executionId),
-			contactErrorsSince: this.contactErrors?.sinceFor(workerType, typeOf, text =>
+			contactErrorsSince: this.contactErrors.sinceFor(workerType, typeOf, text =>
 				this.daemonSecrets.masks.maskAll(text)
 			),
 		});

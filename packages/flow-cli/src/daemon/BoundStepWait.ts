@@ -8,7 +8,7 @@ export interface WorkerTypeRouting {
 	/** `worker.boundStepWaitSeconds`, in milliseconds. */
 	boundStepWaitMs: number;
 	/** Where the last contact error of each source is kept, to say why no worker of the type came. */
-	contactErrors?: Pick<SourceContactErrors, 'sinceFor'>;
+	contactErrors: Pick<SourceContactErrors, 'sinceFor'>;
 }
 
 /** What routing found about a step of a run bound to a worker type that no idle worker could take. */
