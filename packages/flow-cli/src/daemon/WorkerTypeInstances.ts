@@ -32,7 +32,11 @@ export interface WorkerTypeHost {
 	findRelay?: (sourceId: string) => RegisteredRelay | undefined;
 	/** Mints the one-shot credential a launched worker registers with; only the command worker type uses it. */
 	issueLaunchToken?: (sourceId: string) => string;
-	/** What the daemon builds its own fork fallback from; only the fork worker type uses it (and refuses a declared source without it). */
+	/**
+	 * What the fork worker type is built from. CURRENTLY UNUSED IN PRODUCTION: the daemon builds its fork fallback with
+	 * buildForkWorkerType directly (DaemonForkWorkers), so nothing sets this; the registered plugin only refuses a declared
+	 * source, because a declared entry never carries it.
+	 */
 	fork?: ForkWorkerInputs;
 }
 

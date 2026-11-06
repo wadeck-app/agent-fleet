@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,6 +27,7 @@ const { ForkWorkerSource } = await import('./ForkWorkerSource.js');
 const { createDaemonForkWorkers } = await import('./DaemonForkWorkers.js');
 const { PluginConfigurationError } = await import('./PluginConfigurationError.js');
 const { WorkerSourceRegistry } = await import('./WorkerSourceRegistry.js');
+const { contactDeclaredSources } = await import('./WorkerSourceContact.js');
 const { WorkerTypeInstances } = await import('./WorkerTypeInstances.js');
 
 const request = { daemonEndpoint: 'loopback', sourceId: 'built-in:fork', projects: [] as string[] };
@@ -142,7 +144,7 @@ describe('fork worker-type plugin', () => {
 });
 
 describe('the daemon fork collaborator', () => {
-	it('builds the fork source from the daemon inputs: the ws port is read at spawn time, the log goes to the daemon log, text is masked', async () => {
+	it('builds the fork source from the daemon inputs: the ws port is read at spawn time and the claude path is passed', async () => {
 		let boundPort = 111;
 		const maskText = vi.fn((text: string) => `masked:${text}`);
 		const workers = createDaemonForkWorkers({
@@ -159,6 +161,34 @@ describe('the daemon fork collaborator', () => {
 		const env = (spawnMock.mock.calls[0]![2] as { env: Record<string, string> }).env;
 		expect(env['FLOW_WS_PORT']).toBe('222');
 		expect(workers.source).toBeInstanceOf(ForkWorkerSource);
+	});
+
+	it('masks the stderr tail of a dying worker with the masker the daemon lent, before it reaches the daemon log', async () => {
+		const child = Object.assign(new EventEmitter(), {
+			pid: 51,
+			killed: false,
+			kill: vi.fn(),
+			stderr: new EventEmitter(),
+		});
+		spawnMock.mockReturnValue(child);
+		const maskText = vi.fn((text: string) => text.replace('hunter2', '***'));
+		const workers = createDaemonForkWorkers({
+			port: 1,
+			wsPort: () => 2,
+			claudePath: undefined,
+			logsDir: 'C:/logs',
+			maskText,
+		});
+
+		await workers.source.obtainWorker(request);
+		child.stderr.emit('data', Buffer.from('token=hunter2 failed\n'));
+		child.emit('exit', 1, null);
+		child.emit('close', 1, null);
+
+		expect(maskText).toHaveBeenCalled();
+		const logged = writeDaemonLogMock.mock.calls.map(call => String(call[2])).join('\n');
+		expect(logged).toContain('token=*** failed');
+		expect(logged).not.toContain('hunter2');
 	});
 
 	it('writes worker lifecycle lines to the daemon log of its logs directory', async () => {
@@ -240,5 +270,32 @@ describe('a fork source cannot be declared', () => {
 				declaration({ plugin: 'fixture-sandbox.sandbox', pluginsDir: FIXTURE_PLUGINS_DIR })
 			).warnings
 		).toEqual([]);
+	});
+});
+
+describe('a stored source whose provider is built-in:fork', () => {
+	it('is reported with what is wrong and what to do, not as an unknown provider', async () => {
+		const reported: string[] = [];
+
+		await contactDeclaredSources(
+			[
+				{
+					sourceId: 'forked',
+					provider: 'built-in:fork',
+					labels: [],
+					maxWorkers: 1,
+					tokenHash: 'h',
+					createdAt: '2026-11-06T00:00:00.000Z',
+				},
+			],
+			'ws://127.0.0.1:4101',
+			message => reported.push(message),
+			{}
+		);
+
+		expect(reported).toEqual([
+			'could not obtain a worker from source "forked": fork is the daemon\'s own fallback and cannot be a declared source (its stored provider is built-in:fork). ' +
+				'Fix: flow worker source remove forked; to add capacity declare a built-in:command source that launches "flow worker", or a built-in:inbound source for a worker you start yourself.',
+		]);
 	});
 });

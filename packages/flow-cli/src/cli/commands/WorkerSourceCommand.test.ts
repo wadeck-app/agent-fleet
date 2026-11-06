@@ -223,6 +223,15 @@ describe('flow worker source command', () => {
 			expect(fs.existsSync(registryFile())).toBe(false);
 		});
 
+		it('refuses --provider built-in:fork too, at the command', () => {
+			expect(() => run('add', 'forked', '--provider', 'built-in:fork')).toThrow('exit 1');
+
+			expect(errors()).toContain(
+				'Worker source "forked": fork is the daemon\'s own fallback and cannot be declared as a source.'
+			);
+			expect(fs.existsSync(registryFile())).toBe(false);
+		});
+
 		it('declares a built-in plugin ref with no --plugins-dir: no warning, no directory stored', () => {
 			run('add', 'build-box', '--provider', 'relay', '--plugin', 'relay.default');
 

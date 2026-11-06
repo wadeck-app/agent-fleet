@@ -7,6 +7,7 @@ import { InboundWorkerSource } from './InboundWorkerSource.js';
 import { buildInboundWorkerType } from './InboundWorkerTypePlugin.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { buildRelayWorkerType } from './RelayWorkerTypePlugin.js';
+import { FORK_PROVIDER_NAME, storedForkProviderMessage } from './WorkerSourceForkRule.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 import type { WorkerTypeHost, WorkerTypeInstances } from './WorkerTypeInstances.js';
 
@@ -85,6 +86,10 @@ async function providerOf(
 	dependencies: SourceProviderDependencies
 ): Promise<WorkerSourceProvider> {
 	if (entry.plugin === undefined) {
+		// Said apart from "unknown provider": the user must remove the source, not fix a typo.
+		if (entry.provider === FORK_PROVIDER_NAME) {
+			throw new Error(storedForkProviderMessage(entry.sourceId));
+		}
 		return resolveSourceProvider(
 			entry.provider,
 			(entry.options ?? {}) as CommandSourceOptions,
