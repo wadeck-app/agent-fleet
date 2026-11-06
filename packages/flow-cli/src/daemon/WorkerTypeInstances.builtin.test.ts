@@ -184,3 +184,54 @@ describe('WorkerTypeInstances - registry before pluginsDir', () => {
 		).toBe(true);
 	});
 });
+
+describe('WorkerTypeInstances - a built-in that fails to load', () => {
+	const DISK_ADVICE = /plugin\.config\.js|To drop the source|plugins directory holds/;
+
+	async function failureOf(plugin: FlowPlugin, timeouts: WorkerTypeTimeouts = {}): Promise<string> {
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, plugin);
+		return messageOf(instances(timeouts).get(entry()));
+	}
+
+	it('reports a failing factory as a bug of flow, with the source and the cause, and no advice for plugins on disk', async () => {
+		const message = await failureOf({
+			extensionPoint: 'worker-type',
+			create: () => Promise.reject(new Error('boom')),
+		});
+
+		expect(message).toBe(
+			`Cannot load worker source "sandbox": "${SHADOWED_REF}" is a built-in worker type of flow and failed: Error: boom. ` +
+				'This is a bug in flow, not in your configuration: please report this error.'
+		);
+		expect(message).not.toMatch(DISK_ADVICE);
+	});
+
+	it('reports a contract violation the same way', async () => {
+		const message = await failureOf(builtin({ dispose: undefined }).plugin);
+
+		expect(message).toContain('is a built-in worker type of flow and failed');
+		expect(message).toContain('dispose()');
+		expect(message).toContain('please report this error');
+		expect(message).not.toMatch(DISK_ADVICE);
+	});
+
+	it('reports a build that never finishes the same way', async () => {
+		const message = await failureOf(
+			{ extensionPoint: 'worker-type', create: () => new Promise<never>(() => {}) },
+			{
+				buildTimeoutMs: 20,
+			}
+		);
+
+		expect(message).toContain('is a built-in worker type of flow and failed: did not finish loading within 20ms');
+		expect(message).toContain('please report this error');
+		expect(message).not.toMatch(DISK_ADVICE);
+	});
+
+	it('keeps the advice for plugins on disk when the directory answered', async () => {
+		const message = await messageOf(instances().get(entry({ plugin: 'fixture-sandbox.missing' })));
+
+		expect(message).toContain('plugin.config.js');
+		expect(message).not.toContain('built-in worker type of flow');
+	});
+});

@@ -220,7 +220,9 @@ export class WorkerTypeInstances {
 	): Promise<WorkerTypeInstance> {
 		// Outside the load error below: an unset variable is the user's to fix, and says which one.
 		const options = resolveEnvVars(entry.sourceId, entry.options);
-		const loading = this.load(entry, plugin, pluginsDir, options, host);
+		// Asked once: which kind answered decides both how it is loaded and which advice a failure carries.
+		const registered = this.lookupBuiltin(`plugins.${plugin}`);
+		const loading = this.load(entry, plugin, pluginsDir, options, host, registered);
 		let built: WorkerTypeInstance | undefined;
 		const outcome = await raceWithTimeout(
 			loading.then(instance => {
@@ -237,10 +239,11 @@ export class WorkerTypeInstances {
 					() => undefined
 				)
 			);
-			throw loadFailure(
+			throw failureOf(
 				entry,
 				plugin,
 				pluginsDir,
+				registered !== undefined,
 				`did not finish loading within ${describeDuration(this.buildTimeoutMs)}`
 			);
 		}
@@ -267,11 +270,11 @@ export class WorkerTypeInstances {
 		plugin: string,
 		pluginsDir: string,
 		options: unknown,
-		host: WorkerTypeHost
+		host: WorkerTypeHost,
+		registered: FlowPlugin | undefined
 	): Promise<WorkerTypeInstance> {
 		try {
 			const typeRef = `plugins.${plugin}`;
-			const registered = this.lookupBuiltin(typeRef);
 			if (registered !== undefined) {
 				this.log(
 					'info',
@@ -287,7 +290,7 @@ export class WorkerTypeInstances {
 				`worker source "${entry.sourceId}": plugin "${plugin}" answered by the plugins directory "${pluginsDir}" (not a built-in).`
 			);
 			const built = await this.loader.loadProvider(
-				`plugins.${plugin}`,
+				typeRef,
 				WORKER_TYPE_POINT,
 				{ sourceId: entry.sourceId, options },
 				pluginsDir
@@ -295,9 +298,28 @@ export class WorkerTypeInstances {
 			assertWorkerTypeInstance(built);
 			return built;
 		} catch (err) {
-			throw loadFailure(entry, plugin, pluginsDir, getErrorMessage(err), err);
+			throw failureOf(entry, plugin, pluginsDir, registered !== undefined, getErrorMessage(err), err);
 		}
 	}
+}
+
+/** The load error matching what answered: a built-in is flow's own code, so the on-disk advice would send the user to fix nothing. */
+function failureOf(
+	entry: WorkerSourceEntry,
+	plugin: string,
+	pluginsDir: string,
+	isBuiltin: boolean,
+	cause: string,
+	original?: unknown
+): Error {
+	if (!isBuiltin) {
+		return loadFailure(entry, plugin, pluginsDir, cause, original);
+	}
+	return new Error(
+		`Cannot load worker source "${entry.sourceId}": "${plugin}" is a built-in worker type of flow and failed: ${cause}. ` +
+			'This is a bug in flow, not in your configuration: please report this error.',
+		original === undefined ? undefined : { cause: original }
+	);
 }
 
 /** The error for a plugin that could not be loaded: source, plugin, cause, and the fix that really works. */
