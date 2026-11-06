@@ -5,6 +5,7 @@ import type { FlowPlugin } from '../config/FlowPlugin.js';
 import type { PluginLoader } from '../config/PluginLoader.js';
 import { raceWithTimeout } from './BoundedWait.js';
 import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
+import type { ForkWorkerInputs } from './ForkWorkerTypePlugin.js';
 import { INBOUND_PLUGIN_REF, entryNudgeUrlToCopy } from './InboundNudgeOption.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { PLUGIN_REF } from './WorkerSourcePluginReference.js';
@@ -31,6 +32,8 @@ export interface WorkerTypeHost {
 	findRelay?: (sourceId: string) => RegisteredRelay | undefined;
 	/** Mints the one-shot credential a launched worker registers with; only the command worker type uses it. */
 	issueLaunchToken?: (sourceId: string) => string;
+	/** What the daemon builds its own fork fallback from; only the fork worker type uses it (and refuses a declared source without it). */
+	fork?: ForkWorkerInputs;
 }
 
 interface CachedInstance {

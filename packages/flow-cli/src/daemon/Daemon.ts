@@ -15,6 +15,7 @@ import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
 import { CommandHandler } from './CommandHandler';
+import { createDaemonForkWorkers } from './DaemonForkWorkers.js';
 import { buildDaemonHealth } from './DaemonHealth';
 import { DaemonIdleShutdown, IDLE_WATCHDOG_INTERVAL_MS } from './DaemonIdleShutdown.js';
 import { writeDaemonLog } from './DaemonLog.js';
@@ -26,7 +27,6 @@ import { DaemonStartupTasks } from './DaemonStartupTasks.js';
 import { DaemonWorkerListener } from './DaemonWorkerListener.js';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler.js';
 import { ExclusiveFileLock } from './ExclusiveFileLock.js';
-import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { findLiveDaemon } from './LiveDaemonProbe.js';
 import { RelayRegistry } from './RelayRegistry.js';
@@ -262,14 +262,14 @@ async function startOwningDaemon(
 				// forked worker handed a port the listener moved away from can never register.
 				// It falls back to the getter only if a fork somehow precedes the bind, where
 				// the old behaviour is still the best guess available.
-				const forkSource = new ForkWorkerSource(port, () => listener.boundPort ?? wsServer.port, claudePath, {
-					// A forked worker's exit and last stderr lines: the only trace of why it died.
-					log: (level, message) => {
-						writeDaemonLog(logsDir, level, message);
-					},
+				const forkWorkers = createDaemonForkWorkers({
+					port,
+					wsPort: () => listener.boundPort ?? wsServer.port,
+					claudePath,
+					logsDir,
 					maskText: text => daemonSecrets.masks.maskAll(text),
 				});
-				terminateForkedWorkers = graceMs => forkSource.terminateRemaining(graceMs);
+				terminateForkedWorkers = forkWorkers.terminate;
 				// A source dropped by this process (pruneDead) lets go of its plugin instance at once; one removed by
 				// `flow worker source remove` (another process) is noticed at the next contact.
 				const sourceRegistry = new WorkerSourceRegistry(resolvedDaemonDir, sourceId => {
@@ -291,7 +291,7 @@ async function startOwningDaemon(
 				const workerProvisioner = new WorkerProvisioner(
 					config.queue.concurrency,
 					workerRegistry,
-					forkSource,
+					forkWorkers.source,
 					new SharedTokenAuthenticator(resolvedDaemonDir, sourceRegistry, launchTokens),
 					sourceRegistry,
 					undefined,

@@ -25,6 +25,8 @@ Two things to know. It receives an **allow-listed environment** (T-08) -- not yo
 your ssh agent. And it can never serve a `user_intervention` step: its bundle carries no approval
 plugin, so it always reports `interactive=false`.
 
+It is also a built-in worker type, `fork.default` (`plugins.fork.default`), built by the daemon from its own ports, log and masker. It is **not declarable**: `flow worker source add` refuses `--plugin fork.default` and `--provider built-in:fork`, because fork is the daemon's fallback, not a source. To add capacity declare a `built-in:command` source (or `command.default`) or an inbound source.
+
 ### Terminal
 
 ```

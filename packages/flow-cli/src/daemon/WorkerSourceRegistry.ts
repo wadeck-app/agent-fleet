@@ -11,6 +11,7 @@ import { join } from 'node:path';
 
 import { validateNoLiteralCredentials } from '../config/LiteralCredentials.js';
 import { WorkerSourceCommandRule } from './WorkerSourceCommandRule.js';
+import { WorkerSourceForkRule } from './WorkerSourceForkRule.js';
 import { WorkerSourceInboundRule } from './WorkerSourceInboundRule.js';
 import { WorkerSourcePluginReference } from './WorkerSourcePluginReference.js';
 
@@ -60,6 +61,7 @@ export class WorkerSourceRegistry {
 	private readonly pluginReference = new WorkerSourcePluginReference();
 	private readonly commandRule = new WorkerSourceCommandRule(this.pluginReference);
 	private readonly inboundRule = new WorkerSourceInboundRule(this.pluginReference);
+	private readonly forkRule = new WorkerSourceForkRule(this.pluginReference);
 
 	constructor(
 		private readonly configDir: string,
@@ -257,6 +259,7 @@ export class WorkerSourceRegistry {
 			}
 		}
 		this.rejectRetiredProvider(declaration.sourceId, declaration.provider);
+		this.forkRule.validate(declaration);
 		this.pluginReference.validate(declaration);
 		this.commandRule.validate(declaration);
 		this.inboundRule.validate(declaration);

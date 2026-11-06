@@ -214,6 +214,15 @@ describe('flow worker source command', () => {
 			expect(storedSources()[0]).not.toHaveProperty('pluginsDir');
 		});
 
+		it('refuses to declare fork, exits 1 and says what to declare instead', () => {
+			expect(() => run('add', 'forked', '--provider', 'fork', '--plugin', 'fork.default')).toThrow('exit 1');
+
+			expect(errors()).toContain(
+				'fork is the daemon\'s own fallback and cannot be declared as a source. The daemon forks a worker itself when a step has nobody to run it. To add capacity, declare a built-in:command source that launches "flow worker", or a built-in:inbound source for a worker you start yourself.'
+			);
+			expect(fs.existsSync(registryFile())).toBe(false);
+		});
+
 		it('declares a built-in plugin ref with no --plugins-dir: no warning, no directory stored', () => {
 			run('add', 'build-box', '--provider', 'relay', '--plugin', 'relay.default');
 

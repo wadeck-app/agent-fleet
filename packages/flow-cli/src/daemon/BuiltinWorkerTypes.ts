@@ -1,6 +1,7 @@
 import { getBuiltinPlugin, registerBuiltinPlugin } from '../config/BuiltinPluginRegistry.js';
 import type { FlowPlugin } from '../config/FlowPlugin.js';
 import { COMMAND_WORKER_TYPE_REF, commandWorkerTypePlugin } from './CommandWorkerTypePlugin.js';
+import { FORK_WORKER_TYPE_REF, forkWorkerTypePlugin } from './ForkWorkerTypePlugin.js';
 import { INBOUND_WORKER_TYPE_REF, inboundWorkerTypePlugin } from './InboundWorkerTypePlugin.js';
 import { RELAY_WORKER_TYPE_REF, relayWorkerTypePlugin } from './RelayWorkerTypePlugin.js';
 
@@ -9,6 +10,7 @@ export function registerBuiltinWorkerTypes(): void {
 	registerBuiltinPlugin(RELAY_WORKER_TYPE_REF, relayWorkerTypePlugin);
 	registerBuiltinPlugin(COMMAND_WORKER_TYPE_REF, commandWorkerTypePlugin);
 	registerBuiltinPlugin(INBOUND_WORKER_TYPE_REF, inboundWorkerTypePlugin);
+	registerBuiltinPlugin(FORK_WORKER_TYPE_REF, forkWorkerTypePlugin);
 }
 
 /**
