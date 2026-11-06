@@ -154,19 +154,6 @@ describe('a bound step and the workers of its type that are connected', () => {
 		vi.useRealTimers();
 	});
 
-	// CHARACTERIZATION (before Q-I): a connected worker of the type holds the bound open even when it refuses the step.
-	it('keeps waiting past the bound while a connected worker of the type refuses the step (it lacks the label)', async () => {
-		const refusing = sandboxWorker('w-1', []);
-		const { handler, sent } = daemonWith([refusing], [refusing]);
-		await startRun(handler);
-
-		vi.advanceTimersByTime(600_000);
-		handler.tryDispatch();
-
-		expect(sent).toEqual([]);
-		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
-	});
-
 	it('hands the step to a connected worker of the type that has the label', async () => {
 		const accepting = sandboxWorker('w-2', ['gpu']);
 		const { handler, sent } = daemonWith([accepting], [accepting]);
@@ -187,5 +174,84 @@ describe('a bound step and the workers of its type that are connected', () => {
 		expect(sent).toEqual([]);
 		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
 		expect(lastFailureReason()).toBe('');
+	});
+});
+
+describe('a bound step fails fast when no connected worker of its type can accept it', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('no longer lets a connected worker that refuses the step hold the bound open, and names it and why', async () => {
+		const refusing = sandboxWorker('w-1', []);
+		const { handler, sent } = daemonWith([refusing], [refusing]);
+		await startRun(handler);
+
+		vi.advanceTimersByTime(121_000);
+		handler.tryDispatch();
+
+		expect(sent).toEqual([]);
+		expect(mockExecStore.markStepFailed).toHaveBeenCalledTimes(1);
+		expect(lastFailureReason()).toContain('worker type "sandbox"');
+		expect(lastFailureReason()).toContain(
+			'Workers of that type are connected but refuse this step: w-1 (it lacks the label "gpu").'
+		);
+	});
+
+	it('does not fail before the bound: a refusing worker may be replaced by one that accepts', async () => {
+		const refusing = sandboxWorker('w-1', []);
+		const { handler } = daemonWith([refusing], [refusing]);
+		await startRun(handler);
+
+		vi.advanceTimersByTime(119_000);
+		handler.tryDispatch();
+
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+	});
+
+	it('still keeps waiting while a busy worker that would accept the step is connected, even next to a refusing one', async () => {
+		const refusing = sandboxWorker('w-1', []);
+		const busyAccepting = sandboxWorker('w-3', ['gpu'], 'sbx-2');
+		const { handler, sent } = daemonWith([refusing], [refusing, busyAccepting]);
+		await startRun(handler);
+
+		vi.advanceTimersByTime(600_000);
+		handler.tryDispatch();
+
+		expect(sent).toEqual([]);
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+	});
+
+	it('lists every refusing worker of the type, and none of another type', async () => {
+		const first = sandboxWorker('w-1', []);
+		const second = sandboxWorker('w-2', ['arm'], 'sbx-2');
+		const host = {
+			...sandboxWorker('host-1', []),
+			worker: { ...sandboxWorker('host-1', []).worker, sourceId: undefined },
+		};
+		const { handler } = daemonWith([first, second], [first, second, host as never]);
+		await startRun(handler);
+
+		vi.advanceTimersByTime(121_000);
+		handler.tryDispatch();
+
+		expect(lastFailureReason()).toContain(
+			'refuse this step: w-1 (it lacks the label "gpu"); w-2 (it lacks the label "gpu").'
+		);
+		expect(lastFailureReason()).not.toContain('host-1');
+	});
+
+	it('hands the step to the worker that accepts it as soon as it is idle, whatever the others do', async () => {
+		const refusing = sandboxWorker('w-1', []);
+		const accepting = sandboxWorker('w-2', ['gpu'], 'sbx-2');
+		const { handler, sent } = daemonWith([refusing, accepting], [refusing, accepting]);
+
+		await startRun(handler);
+
+		expect(sent).toEqual(['w-2']);
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
 	});
 });

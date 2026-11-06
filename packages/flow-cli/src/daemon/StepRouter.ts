@@ -11,6 +11,7 @@ import type { WebSocket } from 'ws';
 import { flowConfigDir } from '../config/FlowConfigDir.js';
 import { workerSatisfiesLabels } from './LabelMatcher.js';
 import { workerSatisfiesShell } from './ShellMatcher.js';
+import { explainDefaultRefusal } from './WorkerRefusal.js';
 import type { RegisteredWorker } from './WorkerRegistry.js';
 import type { WorkerTypeCatalog, WorkerTypeLookup } from './WorkerTypeCatalog.js';
 
@@ -163,6 +164,21 @@ export class StepRouter {
 		// The provider is author-written, so an id it returns is not guaranteed to be one
 		// we offered; an unknown one is dropped rather than trusted.
 		return first !== undefined ? byWorkerId.get(first.workerId)?.ws : eligible[0]?.ws;
+	}
+
+	/**
+	 * Why a connected worker does not take a step, or undefined when it does: for a failure message only. It asks the same
+	 * acceptance (S4) as {@link select}, so it changes who may receive a step in no way; the reason is fixed words and the
+	 * labels or shell the flow declared, never text a plugin wrote.
+	 */
+	refusalOf(step: StepPlacement, worker: WorkerCandidate): string | undefined {
+		if (this.acceptsSafely(step, worker as RegisteredWorker)) {
+			return undefined;
+		}
+		const isDefault = this.acceptance instanceof DefaultWorkerAcceptance;
+		return (
+			(isDefault ? explainDefaultRefusal(step, worker) : undefined) ?? 'the worker-acceptance plugin refused it'
+		);
 	}
 
 	/**

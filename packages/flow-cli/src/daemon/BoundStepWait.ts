@@ -36,6 +36,11 @@ export interface BoundStepWaitRequest {
 	 * step started waiting): metadata only, never the text of an error. Asked for only when the step fails.
 	 */
 	contactErrorsSince?: ((sinceMs: number) => string[]) | undefined;
+	/**
+	 * The connected workers of that type that do NOT accept the step, one `<worker id> (<reason>)` each: they are not counted
+	 * in `connectedOfType`, and a failure names them. Fixed words and declared names only, never a plugin's text.
+	 */
+	refusals?: string[] | undefined;
 }
 
 export type BoundStepWaitDecision = { action: 'wait' } | { action: 'fail'; reason: string };
@@ -172,6 +177,19 @@ function keyOf(executionId: string, stepId: string): string {
 	return `${executionId}:${stepId}`;
 }
 
+/** At most five refusing workers are named; the rest are counted. */
+const MAX_NAMED_REFUSALS = 5;
+
+function describeRefusals(refusals: string[]): string {
+	if (refusals.length === 0) {
+		return '';
+	}
+	const named = refusals.slice(0, MAX_NAMED_REFUSALS);
+	const rest = refusals.length - named.length;
+	const list = rest > 0 ? `${named.join('; ')}; and ${String(rest)} more` : named.join('; ');
+	return ` Workers of that type are connected but refuse this step: ${list}.`;
+}
+
 function describeFailure(
 	request: BoundStepWaitRequest,
 	waitedMs: number,
@@ -188,6 +206,7 @@ function describeFailure(
 		`${known}. ` +
 		`Check that a source of that type is declared (flow worker source list) and that its plugin can start workers (see the daemon log). ` +
 		`If starting one takes longer than ${String(Math.round(boundMs / 1000))}s, raise worker.boundStepWaitSeconds in the daemon config.` +
+		describeRefusals(request.refusals ?? []) +
 		(contactErrors.length === 0 ? '' : ` ${contactErrors.join(' ')}`)
 	);
 }

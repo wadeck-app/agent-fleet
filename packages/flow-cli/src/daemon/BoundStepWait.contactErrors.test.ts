@@ -61,3 +61,60 @@ describe('BoundStepWait - contact errors in the failure', () => {
 		expect(failure().reason).toBe(BASE);
 	});
 });
+
+describe('BoundStepWait - connected workers of the type that refuse the step', () => {
+	function failureWith(refusals: string[] | undefined, connectedOfType = 0) {
+		let now = 1_000;
+		const wait = new BoundStepWait(120_000, () => now);
+		const request = {
+			executionId: 'e1',
+			stepId: 's1',
+			workerType: 'sandbox',
+			connectedOfType,
+			knownTypes: ['sandbox'],
+			...(refusals === undefined ? {} : { refusals }),
+		};
+		wait.decide(request);
+		now += 121_000;
+		return wait.decide(request);
+	}
+
+	it('names the workers and why each refuses, after the usual text', () => {
+		const decision = failureWith(['w-1 (it lacks the label "gpu")', 'w-2 (it cannot run the shell "bash")']);
+
+		expect(decision).toEqual({
+			action: 'fail',
+			reason: `${BASE} Workers of that type are connected but refuse this step: w-1 (it lacks the label "gpu"); w-2 (it cannot run the shell "bash").`,
+		});
+	});
+
+	it('lists at most five and counts the rest', () => {
+		const refusals = Array.from({ length: 8 }, (_, index) => `w-${String(index)} (it lacks the label "gpu")`);
+
+		const decision = failureWith(refusals);
+
+		expect(decision.action === 'fail' && decision.reason).toContain('w-4 (it lacks the label "gpu"); and 3 more.');
+		expect(decision.action === 'fail' && decision.reason).not.toContain('w-5');
+	});
+
+	it('leaves the message exactly as before when no connected worker of the type refuses', () => {
+		expect(failureWith([])).toEqual({ action: 'fail', reason: BASE });
+		expect(failureWith(undefined)).toEqual({ action: 'fail', reason: BASE });
+	});
+
+	it('does not fail while a worker of the type that accepts the step is connected', () => {
+		let now = 1_000;
+		const wait = new BoundStepWait(120_000, () => now);
+		const request = {
+			executionId: 'e1',
+			stepId: 's1',
+			workerType: 'sandbox',
+			connectedOfType: 1,
+			knownTypes: ['sandbox'],
+		};
+		wait.decide(request);
+		now += 600_000;
+
+		expect(wait.decide(request)).toEqual({ action: 'wait' });
+	});
+});

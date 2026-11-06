@@ -16,6 +16,7 @@ import type { ReadyStep, ReadyStepQueue } from './ReadyStepQueue.js';
 import { StepRouter } from './StepRouter.js';
 import type { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
+import { tallyAcceptance } from './WorkerRefusal.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 import type { WorkerTypeLookup } from './WorkerTypeCatalog.js';
 
@@ -121,7 +122,7 @@ export class StepDispatcher {
 			if (
 				idleWorker === undefined &&
 				placement.boundWorkerType !== undefined &&
-				this.failIfNoWorkerOfBoundType(step, placement.boundWorkerType, typeOf ?? NO_TYPE)
+				this.failIfNoWorkerOfBoundType(step, placement, typeOf ?? NO_TYPE)
 			) {
 				continue;
 			}
@@ -292,19 +293,24 @@ export class StepDispatcher {
 	}
 
 	/**
-	 * Fails a step of a bound run that no idle worker of its type could take, once no worker of that type has been
-	 * connected for the bound. A step never runs on another worker, so leaving it queued would hide a missing worker type
-	 * forever; a connected worker of the type that is merely busy keeps it queued (see {@link BoundStepWait}).
+	 * Fails a step of a bound run that no idle worker of its type could take, once no connected worker of that type that
+	 * ACCEPTS it has been there for the bound (a busy one keeps it queued; one that refuses it does not: see {@link BoundStepWait}).
 	 *
 	 * @returns true when the step was failed and must not be re-queued.
 	 */
-	private failIfNoWorkerOfBoundType(step: ReadyStep, workerType: string, typeOf: WorkerTypeLookup): boolean {
+	private failIfNoWorkerOfBoundType(step: ReadyStep, placement: StepPlacement, typeOf: WorkerTypeLookup): boolean {
+		const workerType = placement.boundWorkerType;
+		if (workerType === undefined) {
+			throw new Error(`step ${step.stepId} is not bound to a worker type`);
+		}
 		const { executionId } = step.executionContext;
+		const { accepting, refusals } = tallyAcceptance(this.router, placement, this.registry.summarize(), typeOf);
 		const decision = this.routing.wait.decide({
 			executionId,
 			stepId: step.stepId,
 			workerType,
-			connectedOfType: this.registry.summarize().filter(worker => typeOf(worker.sourceId) === workerType).length,
+			connectedOfType: accepting,
+			refusals,
 			knownTypes: this.knownTypesOrNone(executionId),
 			contactErrorsSince: this.routing.contactErrors.sinceFor(workerType, typeOf),
 		});
