@@ -125,6 +125,46 @@ describe('PluginProviderLoader', () => {
 			).rejects.toThrow(/"plugins\.sandbox\.default".*"worker-type".*"workspace"/);
 		});
 
+		it.each([
+			['nothing', undefined],
+			['null', null],
+			['an object without dispose', { run: () => {} }],
+			['an object whose dispose is not a function', { dispose: 'later' }],
+		])('fails at load time, naming the type reference, when create() returns %s', async (_label, returned) => {
+			registerBuiltinPlugin('plugins.sandbox.default', {
+				extensionPoint: 'worker-type',
+				create: async () => returned as never,
+			});
+
+			await expect(
+				new PluginProviderLoader({ loadProvider: vi.fn() }).loadProvider(
+					'plugins.sandbox.default',
+					'worker-type',
+					{}
+				)
+			).rejects.toThrow(/"plugins.sandbox.default".*dispose/);
+		});
+
+		it('wraps a throw from create() with the type reference and keeps it as cause', async () => {
+			const failure = new Error('docker is not running');
+			registerBuiltinPlugin('plugins.sandbox.default', {
+				extensionPoint: 'worker-type',
+				create: async () => {
+					throw failure;
+				},
+			});
+
+			const error = await new PluginProviderLoader({ loadProvider: vi.fn() })
+				.loadProvider('plugins.sandbox.default', 'worker-type', {})
+				.then(
+					() => undefined,
+					(caught: unknown) => caught as Error
+				);
+
+			expect(error?.message).toMatch(/"plugins.sandbox.default".*docker is not running/);
+			expect(error?.cause).toBe(failure);
+		});
+
 		it('an explicit pluginsDir keeps meaning "use that copy": the legacy path wins over the registry', async () => {
 			registerBuiltinPlugin('plugins.legacy.default', {
 				extensionPoint: 'workspace',

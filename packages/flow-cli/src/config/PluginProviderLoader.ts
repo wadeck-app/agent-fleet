@@ -1,4 +1,5 @@
 import { getBuiltinPlugin } from './BuiltinPluginRegistry';
+import type { FlowPlugin } from './FlowPlugin';
 import type { PluginLoader } from './PluginLoader';
 
 /**
@@ -26,6 +27,34 @@ export class PluginProviderLoader {
 					`Move it to a "${registered.extensionPoint}" entry of the configuration.`
 			);
 		}
-		return registered.create(options);
+		return this.createInstance(typeRef, registered, options);
+	}
+
+	// Checked here, at load time: a missing dispose would otherwise only surface at teardown, when nothing can be fixed.
+	private async createInstance(
+		typeRef: string,
+		plugin: FlowPlugin,
+		options: Record<string, unknown>
+	): Promise<unknown> {
+		let instance: unknown;
+		try {
+			instance = await plugin.create(options);
+		} catch (cause) {
+			const reason = cause instanceof Error ? cause.message : String(cause);
+			const error = new Error(`Plugin "${typeRef}" failed to create its instance: ${reason}`);
+			error.cause = cause;
+			throw error;
+		}
+		if (
+			typeof instance !== 'object' ||
+			instance === null ||
+			typeof (instance as { dispose?: unknown }).dispose !== 'function'
+		) {
+			throw new Error(
+				`Plugin "${typeRef}" create() must return an object with a "dispose" function (the owner calls it at teardown), ` +
+					`got ${instance === null ? 'null' : typeof instance === 'object' ? 'an object without dispose' : typeof instance}.`
+			);
+		}
+		return instance;
 	}
 }
