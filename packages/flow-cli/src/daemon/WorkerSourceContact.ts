@@ -30,6 +30,8 @@ export interface SourceProviderDependencies {
 	 * minted and the command is responsible for its own credential.
 	 */
 	issueLaunchToken?: (sourceId: string) => string;
+	/** Gives back a credential minted by `issueLaunchToken` when the launch it was for failed. */
+	revokeLaunchToken?: (sourceId: string, token: string) => void;
 	/** Builds and keeps the worker-type instance of each plugin source; without it a plugin source cannot be served. */
 	workerTypes?: Pick<WorkerTypeInstances, 'get'>;
 }
@@ -55,7 +57,12 @@ export function resolveSourceProvider(
 		case BUILT_IN_COMMAND:
 			// The same construction the command worker-type plugin uses.
 			// Remove this case once resolution can be async (the plugin factory is async; this function is not).
-			return buildCommandWorkerType(options, dependencies.issueLaunchToken).source;
+			return buildCommandWorkerType(
+				options,
+				dependencies.issueLaunchToken,
+				undefined,
+				dependencies.revokeLaunchToken
+			).source;
 		case BUILT_IN_RELAY: {
 			const { findRelay } = dependencies;
 			if (findRelay === undefined) {
@@ -107,6 +114,7 @@ async function providerOf(
 	const host: WorkerTypeHost = {
 		...(dependencies.findRelay === undefined ? {} : { findRelay: dependencies.findRelay }),
 		...(dependencies.issueLaunchToken === undefined ? {} : { issueLaunchToken: dependencies.issueLaunchToken }),
+		...(dependencies.revokeLaunchToken === undefined ? {} : { revokeLaunchToken: dependencies.revokeLaunchToken }),
 	};
 	return (await workerTypes.get(entry, host)).source;
 }

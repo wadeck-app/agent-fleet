@@ -20,6 +20,8 @@ function state() {
 		failDispose: false,
 		hangDispose: false,
 		failRunEnded: false,
+		failObtain: false,
+		failObtainEmbeddingRequest: false,
 	};
 	return globalThis.__workerTypeFixture;
 }
@@ -31,6 +33,12 @@ function makeInstance(context) {
 		source: {
 			obtainWorker: async request => {
 				recorded.obtained.push({ sourceId: context.sourceId, request });
+				if (recorded.failObtainEmbeddingRequest) {
+					throw new Error(`obtain failed for ${JSON.stringify(request)}`);
+				}
+				if (recorded.failObtain) {
+					throw new Error('fixture obtain failure: docker is not running');
+				}
 			},
 		},
 		run: {

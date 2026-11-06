@@ -52,7 +52,8 @@ const messageOf = (promise: Promise<unknown>): Promise<string> =>
 
 describe('WorkerTypeInstances - loading', () => {
 	it('loads the implementation from an absolute plugins directory and hands it the source id and options', async () => {
-		const instance = await instances.get(entry());
+		// The plugin gets a launch credential per ask, so the daemon lends the means to mint one.
+		const instance = await instances.get(entry(), { issueLaunchToken: () => 'minted' });
 
 		expect(fixture.created).toEqual([{ sourceId: 'sandbox', options: { image: 'node:22' } }]);
 		await instance.source.obtainWorker({ daemonEndpoint: 'ws://x', sourceId: 'sandbox', projects: [] });

@@ -12,6 +12,7 @@ import type { RegisteredRelay } from './RelayRegistry.js';
 import { PLUGIN_REF } from './WorkerSourcePluginReference.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 import { WORKER_TYPE_POINT, failureOf, noDirectory, wiringMistake } from './WorkerTypeFailures.js';
+import { describeDuration, resolveEnvVars } from './WorkerTypeOptions.js';
 
 const DEFAULT_BUILD_TIMEOUT_MS = 30_000;
 export const DEFAULT_DISPOSE_TIMEOUT_MS = 30_000;
@@ -26,13 +27,17 @@ export interface WorkerTypeTimeouts {
 
 /**
  * What the daemon lends to a BUILT-IN worker type, and only to that: a plugin loaded from a plugins directory is
- * third-party code and never receives these (a relay handle is a live socket, and a launch token a credential, which the point deliberately never hands out).
+ * third-party code and never receives these services (a relay handle is a live socket, and the token service mints
+ * credentials). What a disk plugin does get is one launch credential per ask, in request.authToken, minted by the daemon
+ * around its source (LaunchCredentialSource).
  */
 export interface WorkerTypeHost {
 	/** The live connection of a relay source; only the relay worker type uses it. */
 	findRelay?: (sourceId: string) => RegisteredRelay | undefined;
 	/** Mints the one-shot credential a launched worker registers with; only the command worker type uses it. */
 	issueLaunchToken?: (sourceId: string) => string;
+	/** Gives a credential back when the launch it was minted for failed. */
+	revokeLaunchToken?: (sourceId: string, token: string) => void;
 	/**
 	 * What the fork worker type is built from. CURRENTLY UNUSED IN PRODUCTION: the daemon builds its fork fallback with
 	 * buildForkWorkerType directly (DaemonForkWorkers), so nothing sets this; the registered plugin only refuses a declared
@@ -329,48 +334,16 @@ export class WorkerTypeInstances {
 			);
 			assertWorkerTypeInstance(built);
 			// A plugin from a directory is given a launch credential per ask by the daemon, never the minting service.
-			return host.issueLaunchToken === undefined ? built : withLaunchCredential(built, host.issueLaunchToken);
+			return withLaunchCredential(built, host);
 		} catch (err) {
 			throw failureOf(entry, plugin, pluginsDir, registered !== undefined, getErrorMessage(err), err);
 		}
 	}
 }
 
-/** Replaces `${NAME}` in every string of the options with the daemon's environment; an unset NAME is an error. */
-function resolveEnvVars(sourceId: string, value: unknown, keyPath = ''): unknown {
-	if (typeof value === 'string') {
-		return value.replace(/\$\{([^}]+)\}/g, (_reference, name: string) => {
-			const resolved = process.env[name];
-			if (resolved === undefined) {
-				throw new Error(
-					`worker source "${sourceId}": option "${keyPath}" references environment variable "${name}", which is not set in the daemon's environment. ` +
-						'Set it where the daemon is started and restart the daemon, or declare the source again without it.'
-				);
-			}
-			return resolved;
-		});
-	}
-	if (Array.isArray(value)) {
-		return value.map((item: unknown, index) => resolveEnvVars(sourceId, item, `${keyPath}[${String(index)}]`));
-	}
-	if (typeof value === 'object' && value !== null) {
-		return Object.fromEntries(
-			Object.entries(value).map(([key, item]) => [
-				key,
-				resolveEnvVars(sourceId, item, keyPath === '' ? key : `${keyPath}.${key}`),
-			])
-		);
-	}
-	return value;
-}
-
-function describeDuration(ms: number): string {
-	return ms < 1000 ? `${String(ms)}ms` : `${String(Math.round(ms / 1000))}s`;
-}
-
-function withLaunchCredential(instance: WorkerTypeInstance, issue: (sourceId: string) => string): WorkerTypeInstance {
+function withLaunchCredential(instance: WorkerTypeInstance, host: WorkerTypeHost): WorkerTypeInstance {
 	return {
-		source: new LaunchCredentialSource(instance.source, issue),
+		source: new LaunchCredentialSource(instance.source, host.issueLaunchToken, host.revokeLaunchToken),
 		...(instance.run === undefined ? {} : { run: instance.run }),
 		dispose: () => instance.dispose(),
 	};

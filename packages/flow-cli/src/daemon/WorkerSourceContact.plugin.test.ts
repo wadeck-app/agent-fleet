@@ -33,7 +33,12 @@ const pluginEntry = (sourceId: string, overrides: Partial<WorkerSourceEntry> = {
 });
 
 const contact = (entries: WorkerSourceEntry[], dependencies: Parameters<typeof contactDeclaredSources>[3] = {}) =>
-	contactDeclaredSources(entries, 'ws://127.0.0.1:1', message => reported.push(message), dependencies);
+	// A plugin from disk is given a launch credential per ask, so the daemon must be able to mint one (without an
+	// issuer the ask fails: see LaunchCredentialRevocation.test.ts).
+	contactDeclaredSources(entries, 'ws://127.0.0.1:1', message => reported.push(message), {
+		issueLaunchToken: () => 'minted',
+		...dependencies,
+	});
 
 describe('contactDeclaredSources - plugin sources', () => {
 	it('asks the plugin instance for a worker, with no project (the daemon passes none)', async () => {
@@ -41,7 +46,10 @@ describe('contactDeclaredSources - plugin sources', () => {
 
 		expect(reported).toEqual([]);
 		expect(fixture.obtained).toEqual([
-			{ sourceId: 'sandbox', request: { daemonEndpoint: 'ws://127.0.0.1:1', sourceId: 'sandbox', projects: [] } },
+			{
+				sourceId: 'sandbox',
+				request: { daemonEndpoint: 'ws://127.0.0.1:1', sourceId: 'sandbox', projects: [], authToken: 'minted' },
+			},
 		]);
 	});
 

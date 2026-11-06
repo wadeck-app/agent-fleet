@@ -9,7 +9,8 @@ export interface WorkerRequest {
 	 * The daemon mints one per `obtainWorker` call for a source loaded from a plugins
 	 * directory: bound to this `sourceId`, spent on first use, valid for 120 s. It is a
 	 * credential: **never log the request** (or this field), and pass it to the worker
-	 * through its environment, not its command line.
+	 * through its environment, not its command line. If the daemon cannot mint one, the ask fails
+	 * with a message instead of reaching the plugin without it.
 	 *
 	 * Required for any source whose workers are not loopback children of this daemon.
 	 * Omitted only when the daemon itself created the worker locally and can therefore

@@ -22,10 +22,11 @@ type IssueLaunchToken = (sourceId: string) => string;
 export function buildCommandWorkerType(
 	options: CommandSourceOptions,
 	issueLaunchToken?: IssueLaunchToken,
-	kind?: string
+	kind?: string,
+	revokeLaunchToken?: (sourceId: string, token: string) => void
 ): WorkerTypeInstance {
 	return {
-		source: new CommandWorkerSource(options, issueLaunchToken, kind),
+		source: new CommandWorkerSource(options, issueLaunchToken, kind, revokeLaunchToken),
 		dispose: () => Promise.resolve(),
 	};
 }
@@ -49,7 +50,8 @@ export const commandWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 				buildCommandWorkerType(
 					checkedOptions(sourceId, context['options']),
 					checkedHost(context['host']),
-					COMMAND_PLUGIN_REF
+					COMMAND_PLUGIN_REF,
+					checkedRevoke(context['host'])
 				)
 			);
 		} catch (err) {
@@ -76,6 +78,17 @@ function checkedHost(host: unknown): IssueLaunchToken | undefined {
 		);
 	}
 	return issueLaunchToken as IssueLaunchToken | undefined;
+}
+
+/** @throws when the revoke service the daemon lent is not a function */
+function checkedRevoke(host: unknown): ((sourceId: string, token: string) => void) | undefined {
+	const revoke = (host as { revokeLaunchToken?: unknown } | undefined)?.revokeLaunchToken;
+	if (revoke !== undefined && typeof revoke !== 'function') {
+		throw new Error(
+			`the command worker type needs host.revokeLaunchToken to be a function when given, got ${typeName(revoke)}.${WIRING}`
+		);
+	}
+	return revoke as ((sourceId: string, token: string) => void) | undefined;
 }
 
 /** @throws when the declared options have the wrong shape; absent options are fine (the missing command is reported on use) */

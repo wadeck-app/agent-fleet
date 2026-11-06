@@ -40,7 +40,9 @@ export class CommandWorkerSource implements WorkerSourceProvider {
 		private readonly options: CommandSourceOptions,
 		private readonly issueLaunchToken?: (sourceId: string) => string,
 		/** How the source is named in its errors: the provider string or the plugin ref it was declared with. */
-		private readonly kind: string = BUILT_IN_COMMAND
+		private readonly kind: string = BUILT_IN_COMMAND,
+		/** Gives the credential back when the launch fails, so it does not wait out its lifetime against the cap. */
+		private readonly revokeLaunchToken?: (sourceId: string, token: string) => void
 	) {}
 
 	// eslint-disable-next-line @typescript-eslint/require-await -- async by interface contract
@@ -52,24 +54,33 @@ export class CommandWorkerSource implements WorkerSourceProvider {
 			);
 		}
 
-		// violations-suppress: cli/no-spawn-without-windows-hide the command may launch an interactive worker the user watches; windowsHide would strip the console it prints into (d032e7e)
-		const child = spawn(command, this.options.args ?? [], {
-			...(this.options.cwd !== undefined ? { cwd: this.options.cwd } : {}),
-			env: childEnv({
-				// Everything the launched worker needs to configure itself. See the class doc for
-				// why the credential is minted here rather than read from the registry.
-				FLOW_DAEMON_WS_URL: request.daemonEndpoint,
-				FLOW_WORKER_SOURCE_ID: request.sourceId,
-				FLOW_WORKER_PROJECTS: request.projects.join(','),
-				...(this.issueLaunchToken !== undefined
-					? { FLOW_WORKER_TOKEN: this.issueLaunchToken(request.sourceId) }
-					: {}),
-			}),
-			stdio: ['ignore', 'ignore', 'pipe'],
-			shell: true,
-		});
+		const token = this.issueLaunchToken?.(request.sourceId);
+		const giveBack = (): void => {
+			if (token !== undefined) this.revokeLaunchToken?.(request.sourceId, token);
+		};
+		let child: ReturnType<typeof spawn>;
+		try {
+			// violations-suppress: cli/no-spawn-without-windows-hide the command may launch an interactive worker the user watches; windowsHide would strip the console it prints into (d032e7e)
+			child = spawn(command, this.options.args ?? [], {
+				...(this.options.cwd !== undefined ? { cwd: this.options.cwd } : {}),
+				env: childEnv({
+					// Everything the launched worker needs to configure itself. See the class doc for
+					// why the credential is minted here rather than read from the registry.
+					FLOW_DAEMON_WS_URL: request.daemonEndpoint,
+					FLOW_WORKER_SOURCE_ID: request.sourceId,
+					FLOW_WORKER_PROJECTS: request.projects.join(','),
+					...(token !== undefined ? { FLOW_WORKER_TOKEN: token } : {}),
+				}),
+				stdio: ['ignore', 'ignore', 'pipe'],
+				shell: true,
+			});
+		} catch (err) {
+			giveBack();
+			throw err;
+		}
 
 		if (child.pid === undefined) {
+			giveBack();
 			throw new Error(`source "${request.sourceId}": the command produced no pid, so no worker will join`);
 		}
 		// The daemon does not own this worker's lifetime -- the source does (D#41).

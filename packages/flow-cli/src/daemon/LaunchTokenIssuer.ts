@@ -64,6 +64,17 @@ export class LaunchTokenIssuer {
 	}
 
 	/**
+	 * Gives a credential back because its launch failed, so it neither waits out its lifetime nor counts against the cap.
+	 * Idempotent: an unknown, spent or expired token is a no-op, and a token of another source is not touched.
+	 */
+	revoke(sourceId: string, token: string): void {
+		const index = this.outstanding.findIndex(
+			candidate => candidate.sourceId === sourceId && sameSecret(candidate.token, token)
+		);
+		if (index !== -1) this.outstanding.splice(index, 1);
+	}
+
+	/**
 	 * Spends a token, returning whether it was valid for that source.
 	 *
 	 * A wrong source does not spend the token: refusing a replay elsewhere must not cost the worker

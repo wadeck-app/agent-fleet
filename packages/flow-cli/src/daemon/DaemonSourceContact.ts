@@ -72,6 +72,10 @@ export class DaemonSourceContact {
 				// token -- only its hash is stored (T-09) -- so it is given a credential
 				// minted for that launch alone.
 				issueLaunchToken: (sourceId: string) => this.launchTokens.issue(sourceId),
+				// A launch that failed gives its credential back, so a source that fails every time cannot fill the cap.
+				revokeLaunchToken: (sourceId: string, token: string) => {
+					this.launchTokens.revoke(sourceId, token);
+				},
 				workerTypes: this.workerTypes,
 			}
 		).catch((err: unknown) => {

@@ -127,12 +127,8 @@ describe('a plugin from disk receives a launch credential', () => {
 		expect(fixture.created).toEqual([{ sourceId: 'box', options: undefined }]);
 	});
 
-	it('gives it no credential when the daemon cannot mint one', async () => {
-		await contactDeclaredSources([diskEntry()], ENDPOINT, message => reports.push(message), { workerTypes });
-
-		expect(tokens()).toEqual([]);
-		expect(fixture.obtained).toHaveLength(1);
-	});
+	// Was: 'gives it no credential when the daemon cannot mint one' (silent). Now an actionable wiring error, tested in
+	// LaunchCredentialRevocation.test.ts.
 
 	it('never writes the credential to a log or to a report, also when the cap refuses', async () => {
 		for (let i = 0; i < MAX_OUTSTANDING_LAUNCH_TOKENS_PER_SOURCE + 2; i++) {

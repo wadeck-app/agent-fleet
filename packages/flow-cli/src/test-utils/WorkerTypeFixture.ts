@@ -17,6 +17,10 @@ export interface WorkerTypeFixtureState {
 	/** dispose() never settles. */
 	hangDispose: boolean;
 	failRunEnded: boolean;
+	/** obtainWorker() rejects with its own message. */
+	failObtain: boolean;
+	/** obtainWorker() rejects with a message that embeds the whole request (as a careless plugin would). */
+	failObtainEmbeddingRequest: boolean;
 }
 
 /** The fixture's recorder, reset to empty. Call in `beforeEach`: the plugin module itself is cached by the importer. */
@@ -30,6 +34,8 @@ export function resetWorkerTypeFixture(): WorkerTypeFixtureState {
 		failDispose: false,
 		hangDispose: false,
 		failRunEnded: false,
+		failObtain: false,
+		failObtainEmbeddingRequest: false,
 	};
 	(globalThis as { __workerTypeFixture?: WorkerTypeFixtureState }).__workerTypeFixture = fresh;
 	return fresh;
