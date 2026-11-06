@@ -104,9 +104,16 @@ export class StepOutcomes {
 	}
 
 	/** Called by Daemon when a worker reports step_failed. */
-	onStepFailed(executionId: string, stepId: string, rawError: string, rawOutputs?: Record<string, unknown>): void {
+	onStepFailed(
+		executionId: string,
+		stepId: string,
+		rawError: string,
+		rawOutputs?: Record<string, unknown>,
+		/** `engine` when the worker declared the failure deterministic: no retry, no goto, no parent relaunch. */
+		origin: FailureOrigin = 'step'
+	): void {
 		this.guardSchedulerErrors(executionId, stepId, () =>
-			this.settleFailure(executionId, stepId, rawError, 'step', rawOutputs)
+			this.settleFailure(executionId, stepId, rawError, origin, rawOutputs)
 		);
 	}
 

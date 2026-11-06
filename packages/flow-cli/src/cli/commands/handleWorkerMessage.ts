@@ -9,6 +9,12 @@ import type {
 	WorkerReady,
 	WorkerToDaemon,
 } from '../../ipc/Protocol';
+import {
+	StepResultTooLargeError,
+	declaredOutputNames,
+	describeTruncation,
+	fitStepCompleted,
+} from '../../worker/StepResultFrame';
 import type { WorkerAdapter } from '../../worker/WorkerAdapter';
 import type { WorkerDisplay } from '../../worker/WorkerDisplay';
 // violations-suppress-end: ts/no-deep-relative
@@ -50,14 +56,17 @@ export async function handleWorkerMessage(
 			busyTracker.busy = true;
 			try {
 				const { output, meta, io } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
-				sendForAssignment({
-					type: 'step_completed',
-					executionId: executionContext.executionId,
-					stepId,
-					output,
-					meta,
-					io,
-				});
+				// Throws StepResultTooLargeError (with the meta) when a declared output cannot fit: reported below as a
+				// failure the daemon does not retry.
+				const completed = fitStepCompleted(
+					assignmentId,
+					{ type: 'step_completed', executionId: executionContext.executionId, stepId, output, meta, io },
+					declaredOutputNames(stepConfig)
+				);
+				if (completed.truncated !== undefined) {
+					console.error(`[warn] ${describeTruncation(stepId, completed.truncated)}`);
+				}
+				sendForAssignment(completed);
 				display.stepCompleted(stepId, Date.now() - startedAt);
 			} catch (err) {
 				const error = normalizeError(err).message;
@@ -66,6 +75,7 @@ export async function handleWorkerMessage(
 				const stderr = (err as { stderr?: string }).stderr;
 				const io = (err as { io?: StepIoCapture }).io;
 				const meta = (err as { meta?: StepMeta }).meta;
+				const origin = err instanceof StepResultTooLargeError ? err.origin : undefined;
 				sendForAssignment({
 					type: 'step_failed',
 					executionId: executionContext.executionId,
@@ -76,6 +86,7 @@ export async function handleWorkerMessage(
 					stderr,
 					io,
 					meta,
+					...(origin !== undefined && { origin }),
 				});
 				display.stepFailed(stepId, error, Date.now() - startedAt);
 			} finally {

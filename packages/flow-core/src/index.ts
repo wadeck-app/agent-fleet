@@ -65,6 +65,7 @@ export type {
 	ExecutionState,
 	VersionChoice,
 	ExecutionStatus,
+	FrameTruncation,
 	RecordedValue,
 	StepIoRecord,
 	StepState,

@@ -3,7 +3,7 @@ import type { AttemptEndReason, StepMeta } from 'flow-engine/types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import type { ExecutionState, StepIoCapture, StepStatus } from '../ipc/Protocol';
+import type { ExecutionState, FrameTruncation, StepIoCapture, StepStatus } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { AtomicRecordWriter } from './AtomicRecordWriter';
 import { AttemptLedger } from './AttemptLedger';
@@ -25,6 +25,8 @@ export interface StepResultIo {
 	/** Absent when the worker predates step recording: the outputs are then recorded alone. */
 	capture: StepIoCapture | undefined;
 	outputs: Record<string, unknown>;
+	/** What the worker cut to fit one message; kept on the step so `flow show` can say the diagnostics are incomplete. */
+	truncated?: FrameTruncation[];
 }
 
 /** What the daemon knows about how a failed attempt ended, beyond the message. */
@@ -378,6 +380,9 @@ export class ExecutionStore {
 			outputs: result.outputs,
 			usedByOthers,
 		});
+		if (result.truncated !== undefined) {
+			step.frameTruncated = result.truncated;
+		}
 	}
 
 	private filePath(executionId: string): string {

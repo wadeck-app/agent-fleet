@@ -1,5 +1,6 @@
 import type { Origin } from '@wadeck-app/project-sdk';
 import type { RunEndReason } from 'extension-points';
+import type { FrameTruncation } from 'flow-core';
 import type { FlowStep, LiveLogEntry, StepMeta } from 'flow-engine/types';
 
 /**
@@ -418,6 +419,11 @@ export type WorkerToDaemon =
 			meta?: StepMeta;
 			/** Absent from a worker older than step recording: the daemon then records the outputs only. */
 			io?: StepIoCapture;
+			/**
+			 * What the worker cut from `output`/`io` so this message fits the daemon's frame limit (see
+			 * `fitStepCompleted`). Absent when nothing was cut; declared output variables are never listed.
+			 */
+			truncated?: FrameTruncation[];
 	  }
 	| {
 			type: 'step_failed';
@@ -435,6 +441,12 @@ export type WorkerToDaemon =
 			 * without metrics, never with a zero cost.
 			 */
 			meta?: StepMeta;
+			/**
+			 * `engine` when the failure is deterministic and re-running the step cannot help (its result does not
+			 * fit a frame): the daemon then skips `retry`, `onFailure.goto` and the sub-step relaunch, as for a
+			 * failure it decided itself. Absent: an ordinary step failure.
+			 */
+			origin?: 'engine';
 	  }
 	| { type: 'inject_steps'; assignmentId: string; executionId: string; steps: InjectedStep[] }
 	/** Answer to `run_end`: the worker is done with the run. Not bound to an assignment: it concerns the whole run. */
@@ -459,4 +471,4 @@ export type AssignmentScopedMessage =
 
 // Persisted-execution and worker-listing shapes live in flow-core, the single source of truth shared with
 // every reader of them; re-exported here so the daemon keeps importing them from its own protocol.
-export type { ExecutionState, ExecutionStatus, StepState, StepStatus, WorkerSummary } from 'flow-core';
+export type { ExecutionState, ExecutionStatus, FrameTruncation, StepState, StepStatus, WorkerSummary } from 'flow-core';

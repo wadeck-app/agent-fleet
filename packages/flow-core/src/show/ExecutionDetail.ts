@@ -188,6 +188,12 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 		if (step.error) {
 			lines.push(`      error: ${step.error}`);
 		}
+		if (step.frameTruncated !== undefined && step.frameTruncated.length > 0) {
+			const dropped = step.frameTruncated.reduce((sum, t) => sum + t.originalBytes - t.keptBytes, 0);
+			lines.push(
+				`      diagnostics truncated (${dropped} bytes dropped): ${step.frameTruncated.map(t => t.field).join(', ')} (the worker cut them to fit the 1 MiB message limit; declared outputs are intact)`
+			);
+		}
 		lines.push(...renderStepCostLines(step, '      '));
 		if (options.io === true) {
 			lines.push(...renderStepIoLines(step));

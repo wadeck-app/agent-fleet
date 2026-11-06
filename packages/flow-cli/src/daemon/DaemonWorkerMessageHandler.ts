@@ -120,14 +120,26 @@ export class DaemonWorkerMessageHandler {
 	private handleStepCompleted(ws: WebSocket, message: Extract<WorkerToDaemon, { type: 'step_completed' }>): void {
 		const { commandHandler, executionStore, logWriter } = this.runtime();
 		try {
-			const { assignmentId, executionId, stepId, output, meta, io } = message;
+			const { assignmentId, executionId, stepId, output, meta, io, truncated } = message;
 			if (!commandHandler.verifyAssignment(ws, assignmentId, executionId, stepId)) {
 				return;
 			}
 			// The outcome is accepted from here on, so the assignment is closed and
 			// the same result cannot be replayed.
 			commandHandler.settleAssignment(assignmentId);
-			executionStore.markStepCompleted(executionId, stepId, meta, { capture: io, outputs: output });
+			executionStore.markStepCompleted(executionId, stepId, meta, {
+				capture: io,
+				outputs: output,
+				...(truncated !== undefined && truncated.length > 0 && { truncated }),
+			});
+			if (truncated !== undefined && truncated.length > 0) {
+				const dropped = truncated.reduce((sum, t) => sum + t.originalBytes - t.keptBytes, 0);
+				logWriter.writeExecution(
+					executionId,
+					`Step ${stepId}: the worker cut ${String(dropped)} bytes of its result to fit the message limit (${truncated.map(t => t.field).join(', ')}); the declared outputs are intact. Later steps reading these fields see the cut text.`,
+					'warning'
+				);
+			}
 			commandHandler.onStepCompleted(executionId, stepId, output, meta);
 			logWriter.writeExecution(executionId, `Step ${stepId} completed`);
 			commandHandler.dispatchHook(executionId, 'onStepEnd', { executionId, stepId });
@@ -173,6 +185,7 @@ export class DaemonWorkerMessageHandler {
 				stderr,
 				io,
 				meta,
+				origin,
 			} = message;
 			// The worker already masked it; this is the daemon's own pass, before hooks and logs see it.
 			const error = daemonSecrets.masks.mask(executionId, reportedError);
@@ -189,9 +202,14 @@ export class DaemonWorkerMessageHandler {
 				stderr,
 				{ capture: io, outputs: output ?? {} },
 				// Undefined meta is recorded as such (attempt without metrics), never as a zero cost
-				{ meta }
+				// A failure the worker declared deterministic is recorded as the engine's, like one the daemon decides itself
+				{ meta, ...(origin === 'engine' && { engineEndReason: 'engine_failed' as const }) }
 			);
-			commandHandler.onStepFailed(executionId, stepId, error, output);
+			if (origin === undefined) {
+				commandHandler.onStepFailed(executionId, stepId, error, output);
+			} else {
+				commandHandler.onStepFailed(executionId, stepId, error, output, origin);
+			}
 			// markExecutionFailed is now called inside onStepFailed only when the failure is terminal
 			logWriter.writeExecution(executionId, `Step ${stepId} failed: ${error}`, 'error');
 			commandHandler.dispatchHook(executionId, 'onStepFailed', { executionId, stepId, error });

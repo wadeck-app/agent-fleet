@@ -43,6 +43,16 @@ export interface StepIoRecord {
 }
 
 /**
+ * One field of a finished step's result that the worker cut, to fit the daemon's per-message limit. `field` is a dotted
+ * path (`output.stdout`, `io.stdout`, `io.inputs.prompt`); the sizes are UTF-8 bytes of the text.
+ */
+export interface FrameTruncation {
+	field: string;
+	originalBytes: number;
+	keptBytes: number;
+}
+
+/**
  * What started an attempt of a step: its first start, a `retry`, a `loop` (`onFailure.goto` or a sub-step round restart,
  * i.e. any re-run that is not a retry), a `relaunch` of a parent after a failed sub-step, or a `resume` of an unanswered
  * intervention.
@@ -126,6 +136,8 @@ export interface StepState {
 	stderr?: string;
 	/** Resolved inputs, outputs and stdout/stderr tails of the current attempt; see {@link StepIoRecord}. */
 	io?: StepIoRecord;
+	/** What the worker cut from the current attempt's result to fit one message; `flow show` flags it. Absent when nothing was cut. */
+	frameTruncated?: FrameTruncation[];
 	/** Execution metadata reported by the worker on step_completed (cost/tokens/duration). */
 	meta?: StepMeta;
 	/** Number of times the step was started (retries, onFailure loops, resumes); absent on records written before this existed. */

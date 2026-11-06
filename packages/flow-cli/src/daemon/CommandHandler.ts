@@ -7,7 +7,7 @@ import {
 	executionsDirOf,
 	logsDirOf,
 } from 'flow-core';
-import type { FlowPluginOverrides } from 'flow-engine';
+import type { FailureOrigin, FlowPluginOverrides } from 'flow-engine';
 import type { StepMeta } from 'flow-engine/types';
 import type { WebSocket } from 'ws';
 
@@ -285,8 +285,14 @@ export class CommandHandler {
 	}
 
 	/** Called by Daemon when a worker reports step_failed. */
-	onStepFailed(executionId: string, stepId: string, rawError: string, rawOutputs?: Record<string, unknown>): void {
-		this.pipeline.outcomes.onStepFailed(executionId, stepId, rawError, rawOutputs);
+	onStepFailed(
+		executionId: string,
+		stepId: string,
+		rawError: string,
+		rawOutputs?: Record<string, unknown>,
+		origin?: FailureOrigin
+	): void {
+		this.pipeline.outcomes.onStepFailed(executionId, stepId, rawError, rawOutputs, origin);
 	}
 
 	/** Resumes an execution kept alive after an unanswered `user_intervention` step; see {@link StepOutcomes.handleResume}. */

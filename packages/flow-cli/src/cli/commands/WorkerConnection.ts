@@ -9,6 +9,7 @@ import type { McpServerConfig } from '../../worker/McpServer';
 import type { ReconnectNotifier } from '../../worker/ReconnectNotifier';
 import { WorkerAdapter } from '../../worker/WorkerAdapter';
 import type { WorkerDisplay } from '../../worker/WorkerDisplay';
+import { serializeWorkerFrame } from '../../worker/WorkerFrame';
 import {
 	buildStepRunnerConfig,
 	reconnectDelayMs,
@@ -81,7 +82,8 @@ export class WorkerConnection {
 
 		const send = (message: WorkerToDaemon): void => {
 			if (ws.readyState === ws.OPEN) {
-				ws.send(JSON.stringify(message));
+				// Throws on a frame the daemon would answer by closing the socket, instead of losing the connection silently
+				ws.send(serializeWorkerFrame(message));
 			}
 		};
 

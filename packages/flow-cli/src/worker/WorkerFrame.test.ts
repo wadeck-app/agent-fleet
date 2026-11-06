@@ -84,6 +84,39 @@ describe('serializeWorkerFrame', () => {
 		expect(parsed['meta']).toEqual(meta);
 	});
 
+	// A log line is sent from inside the running step: throwing there would kill the step over a chatty tool result.
+	describe('log frames', () => {
+		const logFrame = (message: string): never =>
+			({
+				type: 'log',
+				...ids,
+				entry: { id: 'l1', timestamp: 1, level: 'info', message, eventType: 'tool_result' },
+			}) as never;
+
+		it('cuts an oversized log message to its tail, within the limit, instead of throwing', () => {
+			const serialized = serializeWorkerFrame(logFrame('a'.repeat(MAX_WORKER_FRAME_BYTES) + 'LAST-LINE'));
+
+			const parsed = JSON.parse(serialized) as { entry: { message: string } };
+			expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThanOrEqual(MAX_WORKER_FRAME_BYTES);
+			expect(parsed.entry.message).toMatch(/^\[truncated by the worker/);
+			expect(parsed.entry.message.endsWith('LAST-LINE')).toBe(true);
+		});
+
+		it('measures bytes: multi-byte text over the limit is cut, not sent', () => {
+			const serialized = serializeWorkerFrame(
+				logFrame(String.fromCharCode(0xe9).repeat(MAX_WORKER_FRAME_BYTES * 0.6))
+			);
+
+			expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThanOrEqual(MAX_WORKER_FRAME_BYTES);
+		});
+
+		it('leaves a log frame within the limit untouched', () => {
+			const frame = logFrame('hello');
+
+			expect(serializeWorkerFrame(frame)).toBe(JSON.stringify(frame));
+		});
+	});
+
 	it('throws when even the shrunk step_failed is over the limit', () => {
 		const frame = { type: 'step_failed', ...ids, error: 'x'.repeat(MAX_WORKER_FRAME_BYTES) } as never;
 

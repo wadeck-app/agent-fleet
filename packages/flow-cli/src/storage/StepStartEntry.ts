@@ -53,6 +53,7 @@ export function startStepEntry(previous: StepState | undefined, params: StepStar
 		stdout: undefined,
 		stderr: undefined,
 		io: undefined,
+		frameTruncated: undefined,
 		completedAt: undefined,
 		// A step that now runs is no longer "not run"
 		skippedReason: undefined,

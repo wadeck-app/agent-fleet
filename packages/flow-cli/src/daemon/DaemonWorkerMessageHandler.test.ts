@@ -217,6 +217,74 @@ describe('DaemonWorkerMessageHandler -- step_failed metrics', () => {
 	});
 });
 
+describe('DaemonWorkerMessageHandler -- results cut or refused by the worker for size', () => {
+	function makeSizeHandler() {
+		const commandHandler = {
+			verifyAssignment: vi.fn().mockReturnValue(true),
+			settleAssignment: vi.fn(),
+			onStepFailed: vi.fn(),
+			onStepCompleted: vi.fn(),
+			isExecutionActive: vi.fn().mockReturnValue(true),
+			tryDispatch: vi.fn(),
+			dispatchHook: vi.fn(),
+		};
+		const executionStore = {
+			markStepFailed: vi.fn(),
+			markStepCompleted: vi.fn(),
+			read: vi.fn().mockReturnValue({ steps: {} }),
+		};
+		const logWriter = { writeExecution: vi.fn() };
+		const daemonSecrets = { masks: { mask: (_executionId: string, text: string) => text } };
+		const handler = new DaemonWorkerMessageHandler(
+			'/logs',
+			() => ({ commandHandler, executionStore, logWriter, daemonSecrets }) as unknown as DaemonRuntime,
+			() => {}
+		);
+		return { handler, commandHandler, executionStore, logWriter };
+	}
+
+	const truncated = [{ field: 'output.stdout', originalBytes: 1_370_000, keptBytes: 1_000_000 }];
+
+	it('records what the worker cut with the completed step, and says it in the execution log', () => {
+		const { handler, executionStore, logWriter } = makeSizeHandler();
+
+		handler.handleMessage(ws, { type: 'step_completed', ...base, output: {}, truncated } as never);
+
+		expect(executionStore.markStepCompleted.mock.calls[0]![3]).toMatchObject({ truncated });
+		const warning = logWriter.writeExecution.mock.calls.find(call => call[2] === 'warning');
+		expect(warning![1]).toContain('370000 bytes');
+		expect(warning![1]).toContain('output.stdout');
+	});
+
+	it('records nothing about truncation, and logs no warning, for a result that was not cut', () => {
+		const { handler, executionStore, logWriter } = makeSizeHandler();
+
+		handler.handleMessage(ws, { type: 'step_completed', ...base, output: {} } as never);
+
+		expect(executionStore.markStepCompleted.mock.calls[0]![3]).not.toHaveProperty('truncated');
+		expect(logWriter.writeExecution.mock.calls.filter(call => call[2] === 'warning')).toHaveLength(0);
+	});
+
+	it("settles an engine-origin failure as the engine's: no retry rule applies, and the cost is kept", () => {
+		const { handler, commandHandler, executionStore } = makeSizeHandler();
+		const meta = { duration_ms: 360000, cost: { usd: 0.4 } };
+
+		handler.handleMessage(ws, { type: 'step_failed', ...base, error: 'too big', origin: 'engine', meta } as never);
+
+		expect(commandHandler.onStepFailed).toHaveBeenCalledWith('e1', 's1', 'too big', undefined, 'engine');
+		expect(executionStore.markStepFailed.mock.calls[0]![6]).toEqual({ meta, engineEndReason: 'engine_failed' });
+	});
+
+	it('settles an ordinary failure with the step rules, as before', () => {
+		const { handler, commandHandler, executionStore } = makeSizeHandler();
+
+		handler.handleMessage(ws, { type: 'step_failed', ...base, error: 'boom', meta: { duration_ms: 1 } } as never);
+
+		expect(commandHandler.onStepFailed).toHaveBeenCalledWith('e1', 's1', 'boom', undefined);
+		expect(executionStore.markStepFailed.mock.calls[0]![6]).toEqual({ meta: { duration_ms: 1 } });
+	});
+});
+
 describe('DaemonWorkerMessageHandler -- run_end_ack', () => {
 	it('hands the acknowledgement to the command handler with the connection it came from', () => {
 		const commandHandler = { onRunEndAck: vi.fn(), verifyAssignment: vi.fn() };

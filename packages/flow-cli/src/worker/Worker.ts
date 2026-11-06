@@ -7,6 +7,7 @@ import { WebSocket } from 'ws';
 
 import type { AssignmentScopedMessage, DaemonToWorker, StepIoCapture, WorkerToDaemon } from '../ipc/Protocol';
 import type { McpServerConfig } from './McpServer';
+import { StepResultTooLargeError, declaredOutputNames, describeTruncation, fitStepCompleted } from './StepResultFrame';
 import { WorkerAdapter } from './WorkerAdapter';
 import { installWorkerCrashHandlers } from './WorkerCrashHandlers';
 import { serializeWorkerFrame } from './WorkerFrame';
@@ -86,14 +87,17 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 			sendForAssignment({ type: 'step_started', executionId: executionContext.executionId, stepId });
 			try {
 				const { output, meta, io } = await adapter.execute(stepConfig, executionContext, sendForAssignment);
-				sendForAssignment({
-					type: 'step_completed',
-					executionId: executionContext.executionId,
-					stepId,
-					output,
-					meta,
-					io,
-				});
+				// Throws StepResultTooLargeError (with the meta) when a declared output cannot fit: reported below as a
+				// failure the daemon does not retry.
+				const completed = fitStepCompleted(
+					assignmentId,
+					{ type: 'step_completed', executionId: executionContext.executionId, stepId, output, meta, io },
+					declaredOutputNames(stepConfig)
+				);
+				if (completed.truncated !== undefined) {
+					process.stderr.write(`[worker] ${describeTruncation(stepId, completed.truncated)}\n`);
+				}
+				sendForAssignment(completed);
 			} catch (err) {
 				const error = normalizeError(err).message;
 				const output = (err as { stepOutputs?: Record<string, unknown> }).stepOutputs;
@@ -101,6 +105,7 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 				const stderr = (err as { stderr?: string }).stderr;
 				const io = (err as { io?: StepIoCapture }).io;
 				const meta = (err as { meta?: StepMeta }).meta;
+				const origin = err instanceof StepResultTooLargeError ? err.origin : undefined;
 				sendForAssignment({
 					type: 'step_failed',
 					executionId: executionContext.executionId,
@@ -111,6 +116,7 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 					stderr,
 					io,
 					meta,
+					...(origin !== undefined && { origin }),
 				});
 			}
 			send({ type: 'ready', ...READY });

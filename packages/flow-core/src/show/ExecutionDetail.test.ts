@@ -145,6 +145,30 @@ describe('ExecutionDetail', () => {
 			expect(out).toContain('a  [completed]  1.0s  attempts: 3 (total 4m51s)');
 		});
 
+		// The worker cut the step's stdout to fit the daemon's message limit: the reader must not take what is left for everything.
+		it('flags a step whose diagnostics the worker truncated, with the bytes dropped and the fields', () => {
+			const record = minimal('cut00000');
+			Object.assign(record.steps.a, {
+				frameTruncated: [
+					{ field: 'output.stdout', originalBytes: 1370000, keptBytes: 1000000 },
+					{ field: 'io.stderr', originalBytes: 500, keptBytes: 100 },
+				],
+			});
+			writeExec('cut00000', record);
+
+			const out = renderExecutionDetail(resolveExecution(tmpDir, 'cut00000'), { tail: 10, full: false });
+
+			expect(out).toContain('diagnostics truncated (370400 bytes dropped): output.stdout, io.stderr');
+		});
+
+		it('prints nothing about truncation for a step that was not cut', () => {
+			writeExec('nocut000', minimal('nocut000'));
+
+			const out = renderExecutionDetail(resolveExecution(tmpDir, 'nocut000'), { tail: 10, full: false });
+
+			expect(out).not.toContain('truncated');
+		});
+
 		it('prints the recorded inputs and outputs of a step only with --io, and says so for an older record', () => {
 			const record = minimal('iorecord');
 			Object.assign(record.steps.a, {

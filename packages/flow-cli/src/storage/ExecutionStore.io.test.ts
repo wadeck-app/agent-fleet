@@ -124,3 +124,45 @@ describe('ExecutionStore step io', () => {
 		expect(readRecord().steps['a']!.io!.outputs['x']!.truncated).toBe(false);
 	});
 });
+
+describe('ExecutionStore frame truncation', () => {
+	let dir: string;
+	let store: ExecutionStore;
+	const readStep = () =>
+		(JSON.parse(fs.readFileSync(path.join(dir, `${EXEC_ID}.json`), 'utf8')) as ReturnType<ExecutionStore['read']>)
+			.steps['a']!;
+	const truncated = [{ field: 'output.stdout', originalBytes: 2000, keptBytes: 1000 }];
+
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), 'exec-store-frame-'));
+		store = new ExecutionStore(dir, 30, new ExecutionMasks());
+		store.create({ executionId: EXEC_ID, flowFile: 'f.yml', flowId: 'f', stepIds: ['a'] });
+	});
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true });
+	});
+
+	it('keeps what the worker cut on the completed step', () => {
+		store.markStepRunning(EXEC_ID, 'a');
+		store.markStepCompleted(EXEC_ID, 'a', undefined, { capture: undefined, outputs: {}, truncated });
+
+		expect(readStep().frameTruncated).toEqual(truncated);
+	});
+
+	// The next attempt replaces the record of the previous one: a stale "truncated" would describe a result that is gone.
+	it('forgets it when the step starts again', () => {
+		store.markStepRunning(EXEC_ID, 'a');
+		store.markStepCompleted(EXEC_ID, 'a', undefined, { capture: undefined, outputs: {}, truncated });
+		store.markStepRunning(EXEC_ID, 'a');
+
+		expect(readStep()).not.toHaveProperty('frameTruncated');
+	});
+
+	it('records nothing for a result that was not cut', () => {
+		store.markStepRunning(EXEC_ID, 'a');
+		store.markStepCompleted(EXEC_ID, 'a', undefined, { capture: undefined, outputs: {} });
+
+		expect(readStep()).not.toHaveProperty('frameTruncated');
+	});
+});
