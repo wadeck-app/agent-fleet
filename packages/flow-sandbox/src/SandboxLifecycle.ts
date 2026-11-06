@@ -191,6 +191,29 @@ export class SandboxLifecycle {
 	}
 
 	/**
+	 * A process of the step was killed by stopping the sandbox (the only way to end a process in the VM). Unlike a
+	 * timeout the step goes on and may exec again, so it stays active; `ensureRunning` restarts the VM first.
+	 */
+	stopForKill(executionId: string): Promise<void> {
+		return this.queue.run(async () => {
+			const held = this.held;
+			if (held === undefined || held.executionId !== executionId || held.status !== 'running') return;
+			this.clearIdle(held);
+			await this.stopHeld(held, 'process kill');
+		});
+	}
+
+	/** Before an exec of the active step: restarts the sandbox if a kill stopped it (capacity is asked again). */
+	ensureRunning(executionId: string): Promise<void> {
+		return this.queue.run(async () => {
+			const held = this.held;
+			if (held === undefined || held.executionId !== executionId || !held.stepActive || held.status !== 'stopped')
+				return;
+			await this.restart(held);
+		});
+	}
+
+	/**
 	 * End-of-run or cancel event: removes the run's sandbox. Idempotent. A sandbox that no longer exists counts
 	 * as removed. Any other failure keeps the run known so a second event retries.
 	 */

@@ -24,10 +24,12 @@ export interface SbxProcessLauncherOptions {
 	mcpRules: McpCallbackRules;
 	log: SandboxLog;
 	/**
-	 * Stops the sandbox so every process in it dies (the lifecycle's `stopAfterStepTimeout`): a host-side abort of
-	 * `sbx exec` does NOT end the process in the VM. The next `exec` restarts the sandbox.
+	 * Stops the sandbox so every process in it dies (the lifecycle's `stopForKill`): a host-side abort of
+	 * `sbx exec` does NOT end the process in the VM.
 	 */
 	stopSandbox: () => Promise<void>;
+	/** Called before every process starts: restarts the sandbox if a kill stopped it (the lifecycle's `ensureRunning`), so the lifecycle never loses track of a running VM. */
+	ensureRunning: () => Promise<void>;
 	/** How long to wait for a caller that left stdin open before starting without input. Default 250 ms. */
 	inputWaitMs?: number;
 }
@@ -57,7 +59,7 @@ let nextSyntheticPid = FIRST_SYNTHETIC_PID;
  * - pid: synthetic (from {@link FIRST_SYNTHETIC_PID}), never a host pid; it only means something to this launcher.
  * - kill / killTree / killTreeAndWait: the process cannot be reached from the host, so the SANDBOX is stopped (about
  *   0.6 s; every process in the VM dies, SIGTERM is as hard as SIGKILL, no grace period for traps) and the host `exec`
- *   is aborted. One step runs at a time per sandbox, so no sibling step is hit; the next `exec` restarts the VM.
+ *   is aborted. One step runs at a time per sandbox, so no sibling step is hit; the next process restarts the VM through the lifecycle (`ensureRunning`).
  *   `killTree` is asynchronous in effect (it returns before the stop finished); the exit-time kill of the engine
  *   (`killAllRunningScripts` at process exit) therefore cannot wait for it: the wrapper's own shutdown stops the
  *   sandbox, and a hard crash leaves the VM to sbx's idle stop.
@@ -165,6 +167,8 @@ export class SbxProcessLauncher implements ProcessLauncher {
 		let program = command;
 		let outcome: { exit: { code: number | null; signal: NodeJS.Signals | null } } | { failure: Error };
 		try {
+			// A kill of an earlier process stopped the VM: the lifecycle restarts it (and its idle timer, capacity) first.
+			await this.options.ensureRunning();
 			// Let the caller attach its listeners and write its stdin before anything is started.
 			const input = await child.takeInput(this.inputWaitMs);
 			if (input === undefined && child.stdin !== null) {

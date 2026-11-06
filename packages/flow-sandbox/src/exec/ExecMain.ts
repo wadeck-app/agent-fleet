@@ -148,7 +148,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 			region: config.region,
 			modelEnvironment: config.modelEnvironment,
 		}),
-		createExecutor: async ({ sandbox, mounts, stopSandbox, declaredEnvironmentNames }) => {
+		createExecutor: async ({ sandbox, mounts, stopSandbox, ensureRunning, declaredEnvironmentNames }) => {
 			await lookup.prime(sandbox);
 			const launcher = new SbxProcessLauncher({
 				runtime,
@@ -171,6 +171,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 				mcpRules,
 				log,
 				stopSandbox,
+				ensureRunning,
 			});
 			// The same engine as `flow worker`: WorkerAdapter + StepRunner, with the sandbox launcher as the one injection point.
 			const adapter = new WorkerAdapter(mcpServers => {

@@ -31,8 +31,10 @@ export interface StepExecutorContext {
 	mounts: RunMounts;
 	/** Environment names the step declares; any other variable that merely copies the host environment must not reach the VM. */
 	declaredEnvironmentNames: ReadonlySet<string>;
-	/** Stops the run's sandbox so a process in the VM dies (the lifecycle's `stopAfterStepTimeout`). */
+	/** Stops the run's sandbox so a process in the VM dies (the lifecycle's `stopForKill`: the step stays active). */
 	stopSandbox: () => Promise<void>;
+	/** Restarts the sandbox before an exec if a kill stopped it (the lifecycle's `ensureRunning`). */
+	ensureRunning: () => Promise<void>;
 }
 
 export interface ExecWrapperDependencies {
@@ -172,7 +174,8 @@ export class ExecWrapper {
 					sandbox,
 					mounts,
 					declaredEnvironmentNames: assignment.declaredEnvironmentNames,
-					stopSandbox: () => lifecycle.stopAfterStepTimeout(ids.executionId),
+					stopSandbox: () => lifecycle.stopForKill(ids.executionId),
+					ensureRunning: () => lifecycle.ensureRunning(ids.executionId),
 				});
 				timings.prepared = now();
 				reported = await this.runStep(executor, assignment);

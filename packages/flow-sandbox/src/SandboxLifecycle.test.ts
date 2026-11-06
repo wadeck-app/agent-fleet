@@ -209,6 +209,34 @@ describe('SandboxLifecycle creation', () => {
 	});
 });
 
+describe('SandboxLifecycle after a process kill', () => {
+	// The launcher ends a process by stopping the VM; the step goes on and may exec again (which restarts the VM).
+	it.each([
+		{ ending: 'the idle timer', end: (life: SandboxLifecycle) => advance(life, 5 * MINUTE) },
+		{ ending: 'the wrapper shutdown', end: (life: SandboxLifecycle) => life.shutdown() },
+	])(
+		'keeps the VM, the capacity slot and the idle timer accounted: kill, exec again, step end, $ending',
+		async spec => {
+			const capacity = new SandboxCapacity(runtime, 1);
+			const life = lifecycle({}, capacity);
+			await life.beginStep('run1', mounts);
+
+			await life.stopForKill('run1');
+			expect(runtime.state(NAME).status).toBe('stopped');
+			await life.ensureRunning('run1');
+			// What a later exec does to the VM, as sbx exec would: it runs.
+			expect(runtime.state(NAME).status).toBe('running');
+			expect(life.current()).toMatchObject({ status: 'running', stepActive: true });
+			await life.endStep('run1');
+			await spec.end(life);
+
+			expect(runtime.state(NAME).status).toBe('stopped');
+			// The slot is free again: another sandbox can run under a cap of 1.
+			await expect(capacity.acquire('flow-sbx-w1-other')).resolves.toBeUndefined();
+		}
+	);
+});
+
 describe('SandboxLifecycle options', () => {
 	it('refuses an invalid wrapper id and idle delay', () => {
 		const cases: [string, Partial<SandboxLifecycleOptions>, string][] = [

@@ -29,6 +29,7 @@ let hostTemp: string;
 let elsewhere: string;
 let log: RecordingSandboxLog;
 let events: string[];
+let ensureCalls: number;
 let stopImplementation: () => Promise<void>;
 let harness: MockSbxHarness | undefined;
 let lookup: VmExecutableLookup;
@@ -48,6 +49,7 @@ beforeEach(() => {
 	for (const directory of [workspace, meta, hostTemp, elsewhere]) fs.mkdirSync(directory);
 	log = new RecordingSandboxLog();
 	events = [];
+	ensureCalls = 0;
 	stopImplementation = () => Promise.resolve();
 	harness = undefined;
 });
@@ -86,6 +88,10 @@ function launcherFor(
 		stopSandbox: () => {
 			events.push('stop');
 			return stopImplementation();
+		},
+		ensureRunning: () => {
+			ensureCalls += 1;
+			return Promise.resolve();
 		},
 		...(options.inputWaitMs === undefined ? {} : { inputWaitMs: options.inputWaitMs }),
 	});
@@ -175,6 +181,16 @@ describe('SbxProcessLauncher spawn against the fake runtime', () => {
 		// STEP_VAR is declared by the step in this test (same value as the host's on purpose); the token is not.
 		expect(forwarded).toEqual({ STEP_VAR: 'host-value', OTHER: '1' });
 		expect(log.text()).not.toContain('launch-token');
+	});
+
+	it('asks the lifecycle to make sure the sandbox runs before every process (a kill may have stopped it)', async () => {
+		const runtime = await fakeRuntime(() => ({ exitCode: 0, stdout: '', stderr: '' }));
+		const launcher = launcherFor(runtime);
+
+		await collect(launcher.spawn('true', [], pipes));
+		await collect(launcher.spawn('true', [], pipes));
+
+		expect(ensureCalls).toBe(2);
 	});
 
 	it('gives a synthetic pid that is never a host pid', async () => {
