@@ -6,7 +6,7 @@ import type { WebSocket } from 'ws';
 import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { ExecutionStore } from '../storage/ExecutionStore';
 import type { LogWriter } from '../storage/LogWriter';
-import { BoundStepWait } from './BoundStepWait.js';
+import { BoundStepWait, type WorkerTypeRouting } from './BoundStepWait.js';
 import type { DaemonSecrets } from './DaemonSecrets.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
@@ -57,7 +57,9 @@ export class StepDispatcher {
 		private readonly interactivityPolicy: InteractivityPolicyProvider,
 		private readonly failStep: (executionId: string, stepId: string, reason: string) => void,
 		private readonly workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'> = NO_DECLARED_WORKER_TYPES,
-		private readonly boundStepWait: BoundStepWait = new BoundStepWait()
+		private readonly boundStepWait: BoundStepWait = new BoundStepWait(),
+		/** Where the last contact error of each source is kept; read, masked, when a bound step fails. */
+		private readonly contactErrors?: WorkerTypeRouting['contactErrors']
 	) {
 		this.router = new StepRouter(undefined, undefined, workerTypes);
 	}
@@ -314,6 +316,9 @@ export class StepDispatcher {
 			workerType,
 			connectedOfType: this.registry.summarize().filter(worker => typeOf(worker.sourceId) === workerType).length,
 			knownTypes: this.knownTypesOrNone(executionId),
+			contactErrorsSince: this.contactErrors?.sinceFor(workerType, typeOf, text =>
+				this.daemonSecrets.masks.maskAll(text)
+			),
 		});
 		if (decision.action === 'wait') {
 			return false;

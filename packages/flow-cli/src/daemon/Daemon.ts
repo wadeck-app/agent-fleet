@@ -342,6 +342,7 @@ async function startOwningDaemon(
 					{
 						workerTypes: new WorkerTypeCatalog(sourceRegistry),
 						boundStepWaitMs: config.worker.boundStepWaitSeconds * 1000,
+						contactErrors: sourceContact.contactErrors,
 					}
 				);
 				runtime = {

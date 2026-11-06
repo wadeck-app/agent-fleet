@@ -7,6 +7,7 @@ import { InboundWorkerSource } from './InboundWorkerSource.js';
 import { buildInboundWorkerType } from './InboundWorkerTypePlugin.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { buildRelayWorkerType } from './RelayWorkerTypePlugin.js';
+import type { ContactOutcome } from './SourceContactErrors.js';
 import { FORK_PROVIDER_NAME, storedForkProviderMessage } from './WorkerSourceForkRule.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 import type { WorkerTypeHost, WorkerTypeInstances } from './WorkerTypeInstances.js';
@@ -30,6 +31,8 @@ export interface SourceProviderDependencies {
 	 * minted and the command is responsible for its own credential.
 	 */
 	issueLaunchToken?: (sourceId: string) => string;
+	/** Told how each ask of a source ended, so the last error of a source can be shown when no worker of its type came. */
+	contactOutcome?: ContactOutcome;
 	/** Gives back a credential minted by `issueLaunchToken` when the launch it was for failed. */
 	revokeLaunchToken?: (sourceId: string, token: string) => void;
 	/** Builds and keeps the worker-type instance of each plugin source; without it a plugin source cannot be served. */
@@ -145,7 +148,9 @@ export async function contactDeclaredSources(
 					sourceId: entry.sourceId,
 					projects: [],
 				});
+				dependencies.contactOutcome?.succeeded(entry.sourceId);
 			} catch (err) {
+				dependencies.contactOutcome?.failed(entry.sourceId, normalizeError(err).message);
 				report(`could not obtain a worker from source "${entry.sourceId}": ${normalizeError(err).message}`);
 			}
 		})

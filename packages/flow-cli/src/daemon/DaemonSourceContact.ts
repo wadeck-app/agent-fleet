@@ -3,6 +3,7 @@ import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 import { writeDaemonLog } from './DaemonLog.js';
 import type { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import type { RelayRegistry } from './RelayRegistry.js';
+import { SourceContactErrors } from './SourceContactErrors.js';
 import { contactDeclaredSources } from './WorkerSourceContact.js';
 import type { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 import { workerTypeOfSource } from './WorkerTypeCatalog.js';
@@ -10,6 +11,9 @@ import type { WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 /** Asks the declared worker sources for capacity, and forgets the ones whose process is gone. */
 export class DaemonSourceContact {
+	/** The last error each source reported when asked for a worker, read when a bound step finds no worker of its type. */
+	readonly contactErrors = new SourceContactErrors();
+
 	constructor(
 		private readonly logsDir: string,
 		private readonly sourceRegistry: WorkerSourceRegistry,
@@ -77,6 +81,7 @@ export class DaemonSourceContact {
 					this.launchTokens.revoke(sourceId, token);
 				},
 				workerTypes: this.workerTypes,
+				contactOutcome: this.contactErrors,
 			}
 		).catch((err: unknown) => {
 			process.stderr.write(`[daemon] contacting worker sources failed: ${getErrorMessage(err)}\n`);

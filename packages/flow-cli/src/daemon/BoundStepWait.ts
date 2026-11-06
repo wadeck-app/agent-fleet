@@ -1,4 +1,5 @@
 import { RetryBackoff } from './RetryBackoff.js';
+import type { SourceContactErrors } from './SourceContactErrors.js';
 import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 
 /** What the daemon needs to restrict a run to a worker type: where types come from, and how long a missing one is waited for. */
@@ -6,6 +7,8 @@ export interface WorkerTypeRouting {
 	workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'>;
 	/** `worker.boundStepWaitSeconds`, in milliseconds. */
 	boundStepWaitMs: number;
+	/** Where the last contact error of each source is kept, to say why no worker of the type came. */
+	contactErrors?: Pick<SourceContactErrors, 'sinceFor'>;
 }
 
 /** What routing found about a step of a run bound to a worker type that no idle worker could take. */
@@ -18,6 +21,11 @@ export interface BoundStepWaitRequest {
 	connectedOfType: number;
 	/** Worker types the declared sources stand for, to say what the run could have been bound to. */
 	knownTypes: string[];
+	/**
+	 * The last contact errors, ready to print, of the sources of that type that are newer than the given time (the moment
+	 * the step started waiting). Asked for only when the step fails; without it the message names none.
+	 */
+	contactErrorsSince?: ((sinceMs: number) => string[]) | undefined;
 }
 
 export type BoundStepWaitDecision = { action: 'wait' } | { action: 'fail'; reason: string };
@@ -81,7 +89,8 @@ export class BoundStepWait {
 		}
 
 		this.forget(key);
-		return { action: 'fail', reason: describeFailure(request, waitedMs, this.waitMs) };
+		const contactErrors = request.contactErrorsSince?.(since) ?? [];
+		return { action: 'fail', reason: describeFailure(request, waitedMs, this.waitMs, contactErrors) };
 	}
 
 	/** The step was handed to a worker: it is no longer waiting. */
@@ -153,7 +162,12 @@ function keyOf(executionId: string, stepId: string): string {
 	return `${executionId}:${stepId}`;
 }
 
-function describeFailure(request: BoundStepWaitRequest, waitedMs: number, boundMs: number): string {
+function describeFailure(
+	request: BoundStepWaitRequest,
+	waitedMs: number,
+	boundMs: number,
+	contactErrors: string[]
+): string {
 	const known =
 		request.knownTypes.length === 0
 			? 'no worker source with a plugin is declared, so no worker type exists yet'
@@ -163,6 +177,7 @@ function describeFailure(request: BoundStepWaitRequest, waitedMs: number, boundM
 		`but no worker of that type was connected in the ${String(Math.round(waitedMs / 1000))}s it waited, and a step of a bound run never runs on another worker. ` +
 		`${known}. ` +
 		`Check that a source of that type is declared (flow worker source list) and that its plugin can start workers (see the daemon log). ` +
-		`If starting one takes longer than ${String(Math.round(boundMs / 1000))}s, raise worker.boundStepWaitSeconds in the daemon config.`
+		`If starting one takes longer than ${String(Math.round(boundMs / 1000))}s, raise worker.boundStepWaitSeconds in the daemon config.` +
+		(contactErrors.length === 0 ? '' : ` Last contact error: ${contactErrors.join('; ')}.`)
 	);
 }
