@@ -12,6 +12,10 @@ export interface MockSbxCall {
 	stdin: string;
 	/** Content of the `--env-file` at the time of the call (exec only). */
 	envFileContent?: string | null;
+	/** Epoch milliseconds of the call. */
+	at?: number;
+	/** `rm` only: for each mount of the removed sandbox, whether it still existed on the host when the call arrived. */
+	mountsExistAtRm?: Record<string, boolean>;
 }
 
 export const MOCK_SBX_PATH = fileURLToPath(new URL('./sbx-mock.mjs', import.meta.url));

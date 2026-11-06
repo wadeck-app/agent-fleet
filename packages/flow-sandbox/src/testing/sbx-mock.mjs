@@ -17,7 +17,9 @@
  *   SBX_MOCK_STATE_DIR   REQUIRED. Directory holding state.json (sandboxes) and calls.jsonl (one line per invocation).
  *   SBX_MOCK_SCENARIO    Comma separated: not-signed-in, policy-uninitialized, daemon-down, ssh-off,
  *                        network-deny-all, network-allow-all, version:<x.y.z>, diagnose-garbage, diagnose-without-auth,
- *                        daemon-unhealthy, policy-garbage, settings-garbage, ssh-setting-missing, ssh-setting-string.
+ *                        daemon-unhealthy, policy-garbage, settings-garbage, ssh-setting-missing, ssh-setting-string,
+ *                        bash-canned (SYNTHETIC: `bash` in exec prints SBX_MOCK_BASH_STDOUT instead of running a script, and
+ *                        answers the executable lookup; the mock has no VM and no bash).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -161,7 +163,7 @@ const execFlags = separator === -1 ? argv : argv.slice(0, separator);
 const readsStdin = (argv[0] === 'exec' && execFlags.includes('-i')) || (argv[0] === 'secret' && argv[1] === 'set');
 const stdinText = readsStdin ? readStdin() : '';
 
-const callRecord = { argv, msysNoPathconv: process.env.MSYS_NO_PATHCONV ?? null, stdin: stdinText };
+const callRecord = { argv, msysNoPathconv: process.env.MSYS_NO_PATHCONV ?? null, stdin: stdinText, at: Date.now() };
 function recordCall(extra = {}) {
 	// workerEnv: names of FLOW_WORKER_* variables in the environment of THIS mock process (a test checks none leaked to an sbx child).
 	const workerEnv = Object.keys(process.env).filter(name => /^FLOW_WORKER_/i.test(name));
@@ -337,6 +339,18 @@ function runPseudoCommand(sandbox, command, cwd, env) {
 			process.stdout.write('hanging\n');
 			setInterval(() => {}, 1000);
 			return undefined;
+		case 'bash':
+			// SYNTHETIC (scenario bash-canned): no VM, no bash. The executable lookup (`bash -c <script> flow-lookup <names>`)
+			// finds every name; any other bash call (a step's script) prints the canned text and succeeds WITHOUT running it.
+			if (hasScenario('bash-canned')) {
+				if (rest[0] === '-c' && rest[2] === 'flow-lookup') {
+					for (const program of rest.slice(3)) process.stdout.write(`${program}=/usr/local/bin/${program}\n`);
+					return 0;
+				}
+				process.stdout.write(`${process.env.SBX_MOCK_BASH_STDOUT ?? 'mock-sandbox-output'}\n`);
+				return 0;
+			}
+		// falls through: without the scenario there is no bash, like any unknown program
 		default:
 			process.stderr.write(`bash: ${name}: command not found\n`);
 			return 127;
@@ -450,7 +464,17 @@ switch (verbMatch ?? argv[0]) {
 		break;
 	}
 	case 'rm': {
-		recordCall();
+		// What still exists on the host when the removal arrives: the mounts of the sandbox (a test checks the order against the daemon).
+		recordCall({
+			mountsExistAtRm: Object.fromEntries(
+				argv
+					.slice(1)
+					.filter(word => !word.startsWith('-'))
+					.flatMap(sandboxName =>
+						(state.sandboxes[sandboxName]?.workspaces ?? []).map(mount => [mount, fs.existsSync(mount)])
+					)
+			),
+		});
 		const { values, positionals } = parseArgs(argv.slice(1), flagsFromHelp('help-rm'));
 		if (!values['--force'] && !values['-f'])
 			fail('error: confirmation required; use --force for non-interactive use'); // synthetic text
