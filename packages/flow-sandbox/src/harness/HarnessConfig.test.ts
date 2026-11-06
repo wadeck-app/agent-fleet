@@ -116,6 +116,8 @@ describe('HarnessConfigParser', () => {
 		['a bad wrapper id', [...BASE, '--wrapper-id', 'Bad_Id'], '--wrapper-id'],
 		['a bad pull', [...BASE, '--pull', 'sometimes'], '--pull'],
 		['a zero cpus', [...BASE, '--cpus', '0'], '--cpus'],
+		['a fractional cpus', [...BASE, '--cpus', '1.5'], '--cpus must be a whole number'],
+		['a fractional max-sandboxes', [...BASE, '--max-sandboxes', '1.5'], '--max-sandboxes must be a whole number'],
 		['idle minutes that are too long', [...BASE, '--idle-minutes', '99999'], '--idle-minutes'],
 		['a model env without a value', [...BASE, '--model-env', 'NOVALUE'], '--model-env'],
 		['an unknown option', [...BASE, '--cpu', '2'], 'Unknown option'],

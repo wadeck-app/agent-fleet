@@ -67,6 +67,14 @@ function requireEnvironment(env: NodeJS.ProcessEnv, name: string, fail: Failer):
 	return value;
 }
 
+/** A whole number of at least 1 (sbx takes whole CPUs; a cap of 1.5 sandboxes means nothing). */
+function positiveInteger(raw: string | undefined, fallback: number, name: string, fail: Failer): number {
+	const value = positiveNumber(raw, fallback, name, fail);
+	if (!Number.isInteger(value))
+		return fail(`${name} must be a whole number of at least 1, got ${JSON.stringify(raw)}.`);
+	return value;
+}
+
 function positiveNumber(raw: string | undefined, fallback: number, name: string, fail: Failer): number {
 	if (raw === undefined) return fallback;
 	const value = Number(raw);
@@ -183,10 +191,10 @@ export class HarnessConfigParser {
 			agent: (values['agent'] as string | undefined) ?? 'claude',
 			image: values['image'] as string | undefined,
 			pull: pull as HarnessConfig['pull'],
-			cpus: positiveNumber(values['cpus'] as string | undefined, SANDBOX_OPTION_DEFAULTS.cpus, '--cpus', fail),
+			cpus: positiveInteger(values['cpus'] as string | undefined, SANDBOX_OPTION_DEFAULTS.cpus, '--cpus', fail),
 			memory: (values['memory'] as string | undefined) ?? SANDBOX_OPTION_DEFAULTS.memory,
 			idleStopMinutes,
-			maxConcurrentSandboxes: positiveNumber(
+			maxConcurrentSandboxes: positiveInteger(
 				values['max-sandboxes'] as string | undefined,
 				SANDBOX_OPTION_DEFAULTS.maxConcurrentSandboxes,
 				'--max-sandboxes',

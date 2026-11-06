@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { AwsCredentialExporter } from '../AwsCredentialExporter';
+import { CleanupStack } from '../CleanupStack';
 import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { LeftoverSandboxes } from '../LeftoverSandboxes';
 import { NodeCommandRunner } from '../NodeCommandRunner';
@@ -85,133 +86,139 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 		);
 	}
 	presence.publish(config.wrapperId, undefined);
-	const runtime = new SbxCliRuntime();
-	await requirePrerequisites(runtime, log, config.acceptSshAgentForwarding);
-	const leftovers = new LeftoverSandboxes(runtime, new SystemClock(), log, presence);
-	await leftovers.reportAtStart();
-	await leftovers.reapOwn(config.wrapperId, new Set());
-
-	const secretsDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sbx-exec-secrets-'));
-	const endpoint = new HostCredentialEndpoint({
-		source: new AwsCredentialExporter({
-			commandRunner: new EnvironmentCommandRunner(new NodeCommandRunner(), config.awsEnvironment),
-		}),
-		profiles: { [config.profileAlias]: config.hostProfile },
-		log,
-		wallClock: () => new Date(),
-	});
-	await endpoint.start();
-
-	const lifecycle = new SandboxLifecycle(
-		{
-			wrapperId: config.wrapperId,
-			agent: config.agent,
-			cpus: config.cpus,
-			memory: config.memory,
-			idleStopMinutes: config.idleStopMinutes,
-			...(config.image === undefined ? {} : { image: config.image }),
-			...(config.pull === undefined ? {} : { pull: config.pull }),
-		},
-		{
-			runtime,
-			scheduler: new SystemScheduler(),
-			log,
-			capacity: new SandboxCapacity(runtime, config.maxConcurrentSandboxes),
-			presence,
-		}
-	);
-
-	const lookup = new VmExecutableLookup(runtime);
-	const mcpRules = new McpCallbackRules(runtime, log);
-	const hostEnvironment = new VmEnvironmentFilter(process.env);
-
-	let finish: () => void = () => undefined;
-	const finished = new Promise<void>(resolve => (finish = resolve));
-	const wrapper = new ExecWrapper({
-		registration: new RelayRegistration({
-			attachedProjectIds: config.projectIds,
-			attachedProjects: config.projectPaths,
-			labels: config.labels,
-			authToken: config.workerToken,
-			sourceId: config.sourceId,
-			pid: process.pid,
-			version: EXEC_VERSION,
-		}),
-		lifecycle,
-		preparer: new ExecSandboxPreparer({
-			runtime,
-			endpoint,
-			log,
-			platform: process.platform,
-			secretsDirectory,
-			profileAlias: config.profileAlias,
-			region: config.region,
-			modelEnvironment: config.modelEnvironment,
-		}),
-		createExecutor: async ({ sandbox, mounts, stopSandbox, ensureRunning, declaredEnvironmentNames }) => {
-			await lookup.prime(sandbox);
-			const launcher = new SbxProcessLauncher({
-				runtime,
-				sandbox,
-				translator: new StepCommandTranslator({
-					mounts,
-					stager: new VmFileStager({
-						runtime,
-						log,
-						hostTempDirectory: os.tmpdir(),
-						hostNodePath: process.execPath,
-						platform: process.platform,
-					}),
-					environment: hostEnvironment,
-					hostNodePath: process.execPath,
-					log,
-					declaredEnvironmentNames,
-				}),
-				lookup,
-				mcpRules,
-				log,
-				stopSandbox,
-				ensureRunning,
-			});
-			// The same engine as `flow worker`: WorkerAdapter + StepRunner, with the sandbox launcher as the one injection point.
-			const adapter = new WorkerAdapter(mcpServers => {
-				const stepRunnerConfig = {
-					interactive: false,
-					processLauncher: launcher,
-					...(mcpServers.length > 0 ? { mcpServers } : {}),
-				} as StepRunnerConfig;
-				return new StepRunner(stepRunnerConfig);
-			});
-			const executor: StepExecutor = {
-				execute: (stepConfig, executionContext, send) =>
-					adapter.execute(
-						stepConfig as unknown as Parameters<WorkerAdapter['execute']>[0],
-						executionContext as unknown as Parameters<WorkerAdapter['execute']>[1],
-						send as unknown as Parameters<WorkerAdapter['execute']>[2]
-					) as unknown as ReturnType<StepExecutor['execute']>,
-			};
-			return executor;
-		},
-		log,
-		createDaemon: handlers => new DaemonLink({ url: config.daemonUrl, log, ...handlers }),
-		createMounts: (workspaceDir, workspaceMetaDir) =>
-			new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log }),
-		now: () => Date.now(),
-		onFinished: () => finish(),
-	});
-
-	for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-		process.on(signal, () => {
-			void wrapper.shutdown(`received ${signal}`).then(() => finish());
-		});
-	}
+	// Everything acquired from here on is released by this stack, whatever fails later (prerequisites, startup, run).
+	const cleanup = new CleanupStack(log);
+	cleanup.add('withdraw the presence file', () => presence.withdraw(config.wrapperId));
 	try {
+		const runtime = new SbxCliRuntime();
+		await requirePrerequisites(runtime, log, config.acceptSshAgentForwarding);
+		const leftovers = new LeftoverSandboxes(runtime, new SystemClock(), log, presence);
+		await leftovers.reportAtStart();
+		await leftovers.reapOwn(config.wrapperId, new Set());
+
+		const secretsDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sbx-exec-secrets-'));
+		cleanup.add('remove the secrets directory', () =>
+			fs.rmSync(secretsDirectory, { recursive: true, force: true })
+		);
+		const endpoint = new HostCredentialEndpoint({
+			source: new AwsCredentialExporter({
+				commandRunner: new EnvironmentCommandRunner(new NodeCommandRunner(), config.awsEnvironment),
+			}),
+			profiles: { [config.profileAlias]: config.hostProfile },
+			log,
+			wallClock: () => new Date(),
+		});
+		await endpoint.start();
+		cleanup.add('stop the credential endpoint', () => endpoint.stop());
+
+		const lifecycle = new SandboxLifecycle(
+			{
+				wrapperId: config.wrapperId,
+				agent: config.agent,
+				cpus: config.cpus,
+				memory: config.memory,
+				idleStopMinutes: config.idleStopMinutes,
+				...(config.image === undefined ? {} : { image: config.image }),
+				...(config.pull === undefined ? {} : { pull: config.pull }),
+			},
+			{
+				runtime,
+				scheduler: new SystemScheduler(),
+				log,
+				capacity: new SandboxCapacity(runtime, config.maxConcurrentSandboxes),
+				presence,
+			}
+		);
+
+		const lookup = new VmExecutableLookup(runtime);
+		const mcpRules = new McpCallbackRules(runtime, log);
+		const hostEnvironment = new VmEnvironmentFilter(process.env);
+
+		let finish: () => void = () => undefined;
+		const finished = new Promise<void>(resolve => (finish = resolve));
+		const wrapper = new ExecWrapper({
+			registration: new RelayRegistration({
+				attachedProjectIds: config.projectIds,
+				attachedProjects: config.projectPaths,
+				labels: config.labels,
+				authToken: config.workerToken,
+				sourceId: config.sourceId,
+				pid: process.pid,
+				version: EXEC_VERSION,
+			}),
+			lifecycle,
+			preparer: new ExecSandboxPreparer({
+				runtime,
+				endpoint,
+				log,
+				platform: process.platform,
+				secretsDirectory,
+				profileAlias: config.profileAlias,
+				region: config.region,
+				modelEnvironment: config.modelEnvironment,
+			}),
+			createExecutor: async ({ sandbox, mounts, stopSandbox, ensureRunning, declaredEnvironmentNames }) => {
+				await lookup.prime(sandbox);
+				const launcher = new SbxProcessLauncher({
+					runtime,
+					sandbox,
+					translator: new StepCommandTranslator({
+						mounts,
+						stager: new VmFileStager({
+							runtime,
+							log,
+							hostTempDirectory: os.tmpdir(),
+							hostNodePath: process.execPath,
+							platform: process.platform,
+						}),
+						environment: hostEnvironment,
+						hostNodePath: process.execPath,
+						log,
+						declaredEnvironmentNames,
+					}),
+					lookup,
+					mcpRules,
+					log,
+					stopSandbox,
+					ensureRunning,
+				});
+				// The same engine as `flow worker`: WorkerAdapter + StepRunner, with the sandbox launcher as the one injection point.
+				const adapter = new WorkerAdapter(mcpServers => {
+					const stepRunnerConfig = {
+						interactive: false,
+						processLauncher: launcher,
+						...(mcpServers.length > 0 ? { mcpServers } : {}),
+					} as StepRunnerConfig;
+					return new StepRunner(stepRunnerConfig);
+				});
+				const executor: StepExecutor = {
+					execute: (stepConfig, executionContext, send) =>
+						adapter.execute(
+							stepConfig as unknown as Parameters<WorkerAdapter['execute']>[0],
+							executionContext as unknown as Parameters<WorkerAdapter['execute']>[1],
+							send as unknown as Parameters<WorkerAdapter['execute']>[2]
+						) as unknown as ReturnType<StepExecutor['execute']>,
+				};
+				return executor;
+			},
+			log,
+			createDaemon: handlers => new DaemonLink({ url: config.daemonUrl, log, ...handlers }),
+			createMounts: (workspaceDir, workspaceMetaDir) =>
+				new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log }),
+			now: () => Date.now(),
+			onFinished: () => finish(),
+		});
+
+		for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+			process.on(signal, () => {
+				void wrapper.shutdown(`received ${signal}`).then(() => finish());
+			});
+		}
+		cleanup.add('shut the wrapper down', () => wrapper.shutdown('exit'));
 		await wrapper.start();
 		await finished;
 	} finally {
-		await wrapper.shutdown('exit');
-		await endpoint.stop();
-		fs.rmSync(secretsDirectory, { recursive: true, force: true });
+		await cleanup.runAll();
 		log.info(
 			'exec wrapper stopped; a sandbox of the run, if any, is left STOPPED: `leftover list`, then `leftover remove <name>`.'
 		);
