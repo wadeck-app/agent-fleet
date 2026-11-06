@@ -16,6 +16,14 @@ export type ProcessSignal = 'SIGTERM' | 'SIGKILL';
 
 export interface ProcessLauncher {
 	/**
+	 * True when the processes this launcher starts run somewhere the worker's own environment must not reach (a sandbox, a
+	 * VM): launch tokens, cloud profiles and other host-only variables stay out of them by construction. Callers that
+	 * would hand a process the worker's whole environment then pass only an allow-list plus what the step declares.
+	 * Optional and additive: absent or false is the host, which is unchanged.
+	 */
+	readonly isolatesEnvironment?: boolean;
+
+	/**
 	 * `child_process.spawn`. Both forms exist because callers use both: with `shell: true` and a whole
 	 * command line the argument list is omitted.
 	 */

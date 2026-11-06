@@ -95,7 +95,9 @@ export async function executeScriptStep(
 		env: renderedEnv,
 		streaming: true,
 		stepId: step.id,
-		isolateEnv: false,
+		// A script step runs with the worker's whole environment on the host. A launcher that runs it elsewhere (a sandbox)
+		// declares so, and then only an allow-list plus the step's declared env and secrets reach the process.
+		isolateEnv: scriptExecutor.isolatesEnvironment === true,
 		strict: step.strict,
 		shellKind: step.shell,
 		// Seconds in the flow file, milliseconds for the executor. No default limit: see ScriptFlowStep.timeout.

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { OutputExtractor } from '../processing/OutputExtractor';
 import type { TemplateContext } from '../processing/TemplateRenderer';
@@ -36,17 +36,11 @@ async function spawnEnvOf(start: () => Promise<unknown>): Promise<Record<string,
 	const child = createFakeChild();
 	launcher.queueChild(child);
 	const done = start();
-	await waitForSpawn();
+	await vi.waitFor(() => expect(launcher.callsOf('spawn')).toHaveLength(1));
 	child.emit('close', 0);
 	await done;
 	const [call] = launcher.callsOf('spawn');
 	return call!.options.env as Record<string, string>;
-}
-
-async function waitForSpawn(): Promise<void> {
-	for (let i = 0; i < 100 && launcher.callsOf('spawn').length === 0; i++) {
-		await new Promise(resolve => setTimeout(resolve, 5));
-	}
 }
 
 const stepRun = (scriptExecutor: ScriptExecutor) =>

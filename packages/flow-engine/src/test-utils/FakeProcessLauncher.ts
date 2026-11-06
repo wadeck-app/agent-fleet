@@ -37,6 +37,12 @@ export class FakeProcessLauncher implements ProcessLauncher {
 	/** Answers of `lookupExecutable`, keyed by the exact command line. */
 	public readonly lookups = new Map<string, string>();
 	private readonly queuedChildren: ChildProcess[] = [];
+	/** What the launcher declares about the environment of the processes it starts (see ProcessLauncher). */
+	public readonly isolatesEnvironment: boolean;
+
+	constructor(options: { isolatesEnvironment?: boolean } = {}) {
+		this.isolatesEnvironment = options.isolatesEnvironment ?? false;
+	}
 
 	public queueChild(child: ChildProcess): void {
 		this.queuedChildren.push(child);

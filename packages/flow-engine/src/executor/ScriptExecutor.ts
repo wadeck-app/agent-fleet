@@ -136,6 +136,11 @@ export class ScriptExecutor {
 	/** Every process this executor starts or ends goes through the launcher (default: the host). */
 	constructor(private readonly launcher: ProcessLauncher = new DefaultProcessLauncher()) {}
 
+	/** Whether the launcher runs processes where the worker's own environment must not reach (see ProcessLauncher). */
+	get isolatesEnvironment(): boolean {
+		return this.launcher.isolatesEnvironment === true;
+	}
+
 	/**
 	 * Execute a script and return the result
 	 *

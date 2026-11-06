@@ -8,6 +8,9 @@ import type { ProcessLauncher, ProcessSignal } from './ProcessLauncher';
 import { killProcessTree, signalProcesses, snapshotDescendants } from './ProcessTreeKiller';
 
 export class DefaultProcessLauncher implements ProcessLauncher {
+	/** The host: a process it starts shares the worker's environment. */
+	public readonly isolatesEnvironment = false;
+
 	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
 	public spawn(command: string, args: readonly string[], options: SpawnOptions): ChildProcess;
 	// violations-suppress: cli/no-spawn-without-windows-hide declaration only, the caller decides the options (windowsHide must not be forced, see d032e7e)
