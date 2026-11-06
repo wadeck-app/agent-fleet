@@ -50,6 +50,7 @@ const STEPS = [{ id: 'extra', type: 'script', script: 'echo injected' }];
 let root: string;
 let children: ChildProcess[];
 let servers: McpServer[];
+let relays: net.Server[];
 /** The `[McpServer] ...` lines the engine's callback server wrote to stderr: its way to say it dropped a connection. */
 let engineStderr: ObservedList<string>;
 
@@ -57,6 +58,7 @@ beforeEach(() => {
 	root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'flow-mcp-invariant-')));
 	children = [];
 	servers = [];
+	relays = [];
 	const ownLines = new ObservedList<string>();
 	engineStderr = ownLines;
 	const write = process.stderr.write.bind(process.stderr);
@@ -74,6 +76,7 @@ afterEach(async () => {
 	vi.restoreAllMocks();
 	for (const child of children) child.kill();
 	for (const server of servers) await server.stop().catch(() => undefined);
+	for (const relay of relays) relay.close();
 	fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -167,6 +170,28 @@ function rawCallback(
 	return { closed, isClosed: () => ended, end: () => socket.destroy() };
 }
 
+/**
+ * A TCP relay to the engine's callback server that records every connection the ENGINE side closed: the event a
+ * protocol violation produces (the server destroys the socket), observed without relying on any log text.
+ */
+async function startClosingRelay(enginePort: number): Promise<{ port: number; closedByEngine: ObservedList<true> }> {
+	const closedByEngine = new ObservedList<true>();
+	const server = net.createServer(client => {
+		const engineSide = net.connect(enginePort, '127.0.0.1');
+		engineSide.on('close', () => {
+			closedByEngine.push(true);
+			client.destroy();
+		});
+		engineSide.on('error', () => undefined);
+		client.on('error', () => engineSide.destroy());
+		client.pipe(engineSide);
+		engineSide.pipe(client);
+	});
+	await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+	relays.push(server);
+	return { port: (server.address() as net.AddressInfo).port, closedByEngine };
+}
+
 function sha256(file: string): string {
 	return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
@@ -210,9 +235,11 @@ describe('the path from the sandbox to the engine: forwarder, unmodified mcp-ser
 
 	it('does not carry a forged token or execution id: the engine drops the connection and injects nothing', async () => {
 		const engine = await startEngineServer('run-1');
+		// The forwarder dials this relay, which dials the engine and reports each connection the ENGINE side closed.
+		const relay = await startClosingRelay(engine.port);
 		const wrongToken = startMcp(installImageFiles(), {
 			FLOW_MCP_UPSTREAM_HOST: '127.0.0.1',
-			FLOW_MCP_UPSTREAM_PORT: String(engine.port),
+			FLOW_MCP_UPSTREAM_PORT: String(relay.port),
 			FLOW_MCP_CALLBACK_TOKEN: 'not-the-token',
 			FLOW_EXECUTION_ID: 'run-1',
 		});
@@ -220,18 +247,14 @@ describe('the path from the sandbox to the engine: forwarder, unmodified mcp-ser
 		await wrongToken.request('tools/call', { name: 'provideSteps', arguments: { steps: STEPS } });
 		const wrongExecution = startMcp(path.join(root, 'opt-flow', 'mcp-callback-forwarder.cjs'), {
 			FLOW_MCP_UPSTREAM_HOST: '127.0.0.1',
-			FLOW_MCP_UPSTREAM_PORT: String(engine.port),
+			FLOW_MCP_UPSTREAM_PORT: String(relay.port),
 			FLOW_MCP_CALLBACK_TOKEN: engine.token,
 			FLOW_EXECUTION_ID: 'another-run',
 		});
 		await wrongExecution.request('initialize', {});
 		await wrongExecution.request('tools/call', { name: 'provideSteps', arguments: { steps: STEPS } });
-		// The engine says it dropped each connection: both were processed, and neither injected anything.
-		await engineStderr.waitFor(
-			lines =>
-				lines.some(line => line.includes('rejected -- invalid token')) &&
-				lines.some(line => line.includes('rejected -- executionId mismatch'))
-		);
+		// The engine closed both connections (a protocol violation destroys the socket); neither injected anything.
+		await relay.closedByEngine.waitForCount(2);
 		expect(engine.injected.items).toEqual([]);
 	});
 
