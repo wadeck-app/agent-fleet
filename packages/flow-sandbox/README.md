@@ -151,14 +151,56 @@ Run: same source declaration as M4 with `scripts/ExecWrapper.mjs` (same options,
 | `McpCallbackRules`                          | per-process `localhost:<port>` rule scoped to the sandbox, removed before the process reports its end                                                                                      |
 | `ExecWrapper`, `ExecAssignment`, `ExecMain` | worker registration (reuses `DaemonLink`, `RelayRegistration`, `InsideMessageGuard`, `SandboxLifecycle`, `RunMounts`), per-run `ExecSandboxPreparer` (M2 credentials, no bridge, no token) |
 
+### Plugin `sandbox.exec` (the way to declare the sandbox worker)
+
+**Status: written and unit-tested against flow's real plugin loader with a stub wrapper. No run with a real daemon, sbx or a sandbox has been done with it** (no live check exists for the plugin yet). Treat every statement below about a real machine as unverified.
+
+Build the artifact from the checkout (it is not published, there is no CI step for it):
+
+```
+npm run bundle --workspace flow-sandbox
+```
+
+It writes `packages/flow-sandbox/dist-plugin/` (ignored by git): `plugin-sandbox/plugin.config.js` (about 17 KB, plain JS, read by the daemon), `plugin-sandbox/wrapper.cjs` (about 920 KB: the exec wrapper with the engine and the sandbox layer, started with node) and `plugin-sandbox/mcp-server.cjs` (flow's MCP server; the engine looks for it next to the wrapper). Rebuild after changing flow-cli: the wrapper embeds its engine.
+
+Declare the source once (the plugin ref `sandbox.exec` gives the worker type `sandbox`; `--provider` is only a label; `<id>` is any source id, for example `sandbox-1`):
+
+```
+flow worker source add sandbox-1 --provider sandbox --plugin sandbox.exec \
+  --plugins-dir <absolute path of packages/flow-sandbox/dist-plugin> \
+  --option projects=<project ids> --option region=us-east-1 --option profiles=claude=<aws profile> \
+  --option image=flow-sandbox:m7 --option pull=never
+```
+
+Then restart the daemon (a plugin is loaded once per daemon) and write the flow with `workerType: sandbox` at flow level (see "Routing and isolation" below: this is what keeps injected steps in the sandbox). The daemon builds the source at its first contact with it.
+
+| Option (flat string, `--option key=value`)                    | Required | Meaning                                                                                                                                         |
+| ------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projects`                                                    | yes      | project registry ids, comma separated (`flow project list`); the daemon hands a plugin source no projects                                       |
+| `region`                                                      | yes      | AWS region of the Bedrock endpoint, `us-east-1`                                                                                                 |
+| `profiles`                                                    | yes      | `alias=host profile`, split at the FIRST `=` (a profile may contain `=`, never a comma); exactly one alias in this version                      |
+| `image`, `pull`                                               | no       | template image (`flow-sandbox:m7`, built by `image/build-image.mjs`) and `always`, `missing` or `never` (`never` for a locally loaded template) |
+| `cpus`, `memory`, `maxConcurrentSandboxes`, `idleStopMinutes` | no       | defaults 2, `2g`, 4, 5                                                                                                                          |
+| `extraAllowedHosts`                                           | no       | extra `host:port` rules for every sandbox, comma separated; `*.example.org:443` is allowed, wider wildcards are refused                         |
+| `acceptSshAgentForwarding`                                    | no       | `true` when you knowingly run with sbx's ssh agent forwarding on                                                                                |
+| `sbxPath`                                                     | no       | absolute path of `sbx` (the wrapper gets it as `SBX_PATH`)                                                                                      |
+
+Options are parsed strictly and nothing is ignored: an unknown name, an empty value, an empty list item, a duplicate project, a profile entry without `alias=profile`, a value the format cannot express (a profile name with a comma) each fail when the source is built, with a message that names the option and gives an example. One thing cannot be detected by the plugin: the same `--option key` given twice (flow's CLI keeps the last one before the plugin sees the options). A credential must never be an option (flow refuses sensitive keys unless written `${ENV_VAR}`, which the daemon expands from its own environment; the AWS credentials come from your AWS profile through the host credential endpoint, not from options).
+
+What happens when the daemon asks the source for a worker: it starts `node wrapper.cjs` with the launch credential in `FLOW_WORKER_TOKEN` (environment only), one wrapper per source (an alive one is never doubled), with a hidden window on Windows. If that wrapper dies after the ask returned, the next ask fails once with its exit code and the end of its stderr (the credential redacted); this is how a startup failure reaches `flow worker list` and the bound-wait message. When the source is built, `wrapper.cjs preflight` checks the options, sbx (version, signed in) and the image (best effort); the daemon wraps any failure in its generic "Cannot load worker source ..." text, the cause after "failed:" is the plugin's own message. Stopping the daemon (or removing the source) waits for the wrapper to leave, then ends it, within about 25 s.
+
+Needs on the daemon's machine: Git Bash (the exec variant resolves `bash` on the host), `sbx` at the pinned version, and `sbx login` done by you (the plugin never signs in). Claude steps only; Codex and OpenCode steps are refused. Outbound HTTP(S) from the sandbox is filtered; raw TCP by IP is not. On Windows the secret files are as private as your temp folder (no owner-only ACL is set, see "Limits").
+
+Two environment variables exist for tests only and must not be set in production: `FLOW_SANDBOX_PLUGIN_WRAPPER` (a script that stands in for `wrapper.cjs`) and `FLOW_SANDBOX_PLUGIN_DISPOSE_MS`.
+
 ### Routing and isolation against injected steps (read this before relying on the sandbox)
 
 A flow reaches the exec wrapper in one of two ways, and only one of them isolates.
 
-| Routing                                                           | How it is declared                                                                                                                                                                                                                                          | Injected steps (a model calls `provideSteps`)                                                                         |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Labels** (what the prototype scripts and live checks use today) | source: `flow worker source add <id> --provider built-in:command --labels sandbox ...`; flow: steps with `labels: [sandbox]`                                                                                                                                | **NOT isolated.** An injected step carries no labels, so the daemon may run it on a host worker, outside the sandbox. |
-| **Worker type** (the target)                                      | source: `flow worker source add <id> --plugin sandbox.<implementation> --plugins-dir <absolute dir> ...` (once the sandbox plugin bundle exists, milestones M6.3 and M6.4; not available yet); flow: `workerType: sandbox` at flow level, next to `labels:` | Isolated: every step of the run, injected ones included, runs only on workers whose source plugin id is `sandbox`.    |
+| Routing                                                           | How it is declared                                                                                                                                                                                                                                                  | Injected steps (a model calls `provideSteps`)                                                                         |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Labels** (what the prototype scripts and live checks use today) | source: `flow worker source add <id> --provider built-in:command --labels sandbox ...`; flow: steps with `labels: [sandbox]`                                                                                                                                        | **NOT isolated.** An injected step carries no labels, so the daemon may run it on a host worker, outside the sandbox. |
+| **Worker type** (the target)                                      | source: `flow worker source add <id> --plugin sandbox.<implementation> --plugins-dir <absolute dir> ...` (the plugin `sandbox.exec`, see "Plugin" above; written, not yet run against a real sandbox); flow: `workerType: sandbox` at flow level, next to `labels:` | Isolated: every step of the run, injected ones included, runs only on workers whose source plugin id is `sandbox`.    |
 
 What the flow must contain: `workerType: sandbox`, a string of letters, digits, `_` and `-` (the flow validator checks the shape; a name no declared source provides is refused at run start, listing the known types). The type of a worker is the plugin id of its source's `--plugin <pluginId>.<implName>`; a source declared with `--provider` only, as today, has no type, so **a flow bound with `workerType: sandbox` cannot use the prototype sources at all**: its steps wait `worker.boundStepWaitSeconds` (120 s by default) and fail naming the type.
 

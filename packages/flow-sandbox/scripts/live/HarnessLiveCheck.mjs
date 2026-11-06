@@ -6,7 +6,7 @@
  *
  * Routing here is by LABELS (`labels: [sandbox]`, a `built-in:command` source), which does NOT isolate against steps a
  * model injects (they carry no labels). The strict form, `workerType: sandbox` in the flow with a source declared by
- * `--plugin sandbox.<impl>`, needs the sandbox plugin bundle (M6.3/M6.4), which this script cannot declare yet: adding
+ * `--plugin sandbox.<impl>`, needs the sandbox plugin (`npm run bundle --workspace flow-sandbox`), which this script does not declare yet (a plugin live check is a separate task): adding
  * `workerType` to its flow alone would make every step wait for a worker type that does not exist and fail.
  *
  * What it does:
