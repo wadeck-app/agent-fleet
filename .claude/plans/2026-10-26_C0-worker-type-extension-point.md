@@ -1,0 +1,64 @@
+# C0 decision note: `worker-type` extension point (rev 2, after flow-owner "changes")
+
+**Status:** proposal for flow-owner review. No code written. Binding input: section 9 of `2026-10-25_docker-sandbox-worker.md`. Context: `.claude/specs/2026-10-25_docker-sandbox-worker/worker-type-extension-point.md`.
+**Verification:** file:line claims were re-read at the working tree; where a line differs slightly from flow-owner's, the real one is given. Unconfirmed claims are marked `[UNVERIFIED]`.
+
+## 1. Contract (decision)
+
+New extension point `worker-type/v1.ts` in `packages/extension-points`. Versioning: point versions live in `packages/extension-points/extension-points.json` (`versions: [{version, status, since}]`), not in `manifest.ts`. Adding the point = type file + re-export in `src/index.ts` + an entry in that json; `PLUGIN-004/005` (`.violations/rules/plugin-rules.ts:265,279`) read the same json. `worker-source` v1 is untouched.
+
+```ts
+type WorkerTypeFactory = (context: { sourceId: string; options: unknown }) => Promise<WorkerTypeInstance>;
+interface WorkerTypeInstance {
+  source: WorkerSourceProvider;               // v1, unchanged: obtainWorker() returns no handle
+  run?: { onRunEnded(event: RunEndEvent): Promise<void> };
+  dispose(): Promise<void>;
+}
+```
+
+- The daemon asks a plugin worker type for three things: obtain a worker, be told a run ended (after the ack, see 2), dispose. No plugin-to-worker channel and no socket handle (H1, H2, T-01): the daemon sends run-end over the worker's own socket.
+- **Plugin ref location:** the worker SOURCE entry in the global registry (`worker-sources.json`), never project config (`PLUGIN_POINTS` is closed and project-scoped, `ProjectFlowConfig.ts:33`; the daemon reads only its launch project, `tryResolvePlugins.ts:67`). The entry stores the ref (`plugin: "<id>.<impl>"`) AND `pluginsDir`.
+- **Loading:** `PluginLoader` returns built-in manifests only when no `pluginsDir` is given (`PluginLoader.ts:158-165`); a given dir must be absolute (`:202-209`). A third-party plugin must be self-contained plain JS (no `node_modules` beside the bundle), imported by `import(pathToFileURL(...))` (`:145`, `:178`; flow-owner cited `:176`). The earlier cite `PluginLoader.ts:352-370` was wrong.
+- **Schema impact:** new fields touch `flow-core/src/worker/WorkerSources.ts` (`WorkerSourceEntry`, `parseWorkerSourceFile`) and its readers; `WorkerSourceRegistry.declare` (`:72-85`) builds the entry from the declaration.- **Credentials:** worker-source `options` have no literal-credential check (confirmed: `declare` writes `declaration.options` as is). Apply `validateNoLiteralCredentials` (`ConfigLoader.ts:45`, currently module-private) in `declare`, so the sandbox plugin's `options` cannot carry a literal secret.
+- **Instance lifecycle:** `contactDeclaredSources` rebuilds the provider on every contact (`WorkerSourceContact.ts:183-192`, on unmet demand). A `dispose`/`onRunEnded` instance therefore needs a new per-source instance cache (none exists). `WorkerSourceRegistry.remove` (`:95-104`) is file-only; `flow worker source remove` must also trigger `dispose` and evict the cache entry.
+- **Entry validation:** `parseWorkerSourceFile` does no per-entry validation (`WorkerSources.ts:99-106`), so `declare` (or contact time) rejects "plugin without pluginsDir" with an actionable message. UI readers go through `readDeclaredWorkerSources` into a `Pick` of 4 fields (`WorkerSources.ts:64,133-143`): `options` and `pluginsDir` stay OUT of that `Pick`. No production reader of `WorkerSourceEntry`/`parseWorkerSourceFile` exists outside flow-core and flow-cli.
+- **Unchanged:** registration goes through `admitExternalWorker` (auth, source lookup, `maxWorkers`); the bridge's `ready` must carry `attachedProjectIds` and features `project-id`, `secrets`, `sub-step-session-resume` (`WorkerProvisioner.ts:152`); `contactDeclaredSources` passes `projects: []`, so the plugin must not rely on `request.projects`; unknown providers still throw (`WorkerSourceContact.ts:160`).
+
+## 2. Protocol feature and run-end (decision)
+
+- `WORKER_FEATURE_RUN_EVENTS = 'run-events'` in `ipc/Protocol.ts` next to the others. It is NOT added to the shared `WORKER_FEATURES` (`worker/WorkerLaunch.ts:173-177`): only the sandbox bridge declares it in its own `ready`. New `DaemonToWorker` variant `run_end { executionId, reason: 'completed' | 'failed' | 'daemon_stopping' }` (`DaemonToWorker` is at `Protocol.ts:168-183`; the spec's `143-157` was wrong) and worker-to-daemon `run_end_ack`. `cancelled` is dropped: `ClientCommand` has only run/resume (`Protocol.ts:95-138`). `Worker.ts` has an exhaustive `never` switch (`:125`), so the new variant forces an edit there.
+- **Recipients:** only workers that declared the feature AND served a step of that run. Served-set: `executionId -> Set<ws>`, recorded in `WorkerAssignmentSupervisor.watchHandedOver` (`:90`, called after a successful send, `StepDispatcher.ts:169`), not in `AssignmentLedger` (it drops settled assignments). Read it BEFORE `onExecutionEnded` (forgetExecution runs before release, `StepOutcomes.ts:280-284`). Sockets are removed on `handleClose` (`DaemonWorkerMessageHandler.ts:91-112`) and from pending ack waits. Delivery uses a new scoped `WorkerRegistry.sendToRunWorkers`; there is still no send-to-everyone (`WorkerRegistry.ts:244-247`, test `:173`).
+- **`RunEndEvent` doc (normative):** "In-flight steps may still report after `run_end`; their results are dropped." The settle wait is bounded by the ack timeout (30 s default, cap 120 s) while a sibling may legitimately run up to `stepSilenceLimitSeconds` (1800 default), so after the bound `run_end` goes out with a sibling possibly still running.
+- **Semantics (changed):** `cleanupExecution` can run while siblings still execute: `isTerminal()` is true as soon as `hasFailed()` (`FlowScheduler.ts:374-381`, in flow-engine), and `settleFailure` purges the queue, marks the execution failed and cleans up at once (`StepOutcomes.ts:117-135`). So `run_end` waits for the served workers' outstanding assignments to settle, bounded by the ack timeout. Results arriving later are partly recorded (store, log, hook) then dropped at the scheduler (`StepOutcomes.ts:54,100`, "late message after cleanup"); this is documented, not changed. On the success path the store says `completed` after cleanup ran (`DaemonWorkerMessageHandler.ts:127` vs `:140`): `run_end` can precede the `completed` status, so nothing may assert on that order.
+- **Ack policy:** global config keys under the daemon `worker.*` section (`GLOBAL_ONLY_KEYS`, `ProjectFlowConfig.ts:50-60`), not env vars: a kill switch for the whole feature and `ackTimeoutSeconds` (default 30, floor 1, cap 120). Each new key gets a default in `FlowConfigLoader.DEFAULT` (`FlowConfig.ts:146-148`; `worker` has only `wsPort`/`bindAddress`/`tls` today) and range validation in the loader. All `run_end` waits run in parallel, so daemon stop is bounded by ONE timeout, not N. A worker that never settles is logged only, not disconnected: disconnecting a started assignment yields `worker_lost` on a dead execution, `failStalledSteps` already disconnects wedged workers at `stepSilenceLimitSeconds`, and the real cancel is the plugin removing the sandbox after the timeout. Flow: wait for acks, call `run.onRunEnded`, release the workspace. On timeout release anyway with an error log naming worker, source, execution and the manual fix. One retry after ~2 s if release fails (Windows EBUSY). A dead socket (`send` returns false, `WorkerRegistry.ts:232-236`) drops that worker from the awaited set at once.
+- **Daemon stop:** send `run_end(daemon_stopping)` BEFORE `broadcastToEphemeral`/`disconnectExternal` (`Daemon.ts:245-247`). The shutdown hook is sync but `shutdownFlush` (`:258`) is a promise `stop()` awaits: the ack wait rides on it. Set the 'stopping' flag first; `run_end` is idempotent per run because the hook can run twice after the idle path (`DaemonIdleShutdown.ts:174-192`). The idle path never has active runs.
+- **Crash / stop reconcile:** served-set and workspaces are memory-only, and `reconcileInterruptedExecutions` (`Daemon.ts:~305`) runs before any worker connects, so it cannot send `run_end`. The sandbox plugin must reap its own orphan sandboxes at start and at contact time (to add to the plan's `LeftoverSandboxes` row: the report at start-up becomes a reap of sandboxes whose run is not live).
+- Invariants respected: `assign`/`assignmentId` binding; `idle` never sent; `done` only to forked workers; frame limit `ipc/WorkerFrameLimit.ts:8`; the wire is unchanged for workers that do not declare the feature.
+
+## 3. Acceptance rule (decision, separate later change)
+
+- **Binding:** a flow-level field resolved at run start in `RunRequestHandler` and stored in `ExecutionRegistry` next to `setProject` (`RunRequestHandler.ts:~134`). `StepPlacement` gets an optional bound type filled in `placementFor` (`StepDispatcher.ts:252-268`), which covers injected steps (flow labels are merged only in `RunStepPreparer.ts:83-101`; `StepInjection.injectSteps` enqueues without them).
+- **Check:** `WorkerCandidate` has `sourceId` but no type (`worker-acceptance/v1.ts`), so a source-to-type lookup is added. The check sits in `StepRouter.select` before S4/S3: S4 is documented as not a security boundary (`StepRouter.ts:29-30`) and S3 only orders (`:79`).
+- **Failure, never host:** an unplaced step just stays queued today (`StepDispatcher.ts:~88-91`). A bound run gets a bounded wait that FAILS the step: new key `worker.boundStepWaitSeconds`, default 120 (not `stepSilenceLimitSeconds`: the stall watch starts at hand-over, not at queueing), reusing the `failIfNobodyCanAnswer` pattern (`StepDispatcher.ts:~223-252`: key per `executionId:stepId`, deleted on fail AND on dispatch). Re-dispatch over 3 already fails (`WorkerAssignmentSupervisor.ts:312-318`).
+- No isolation claim until this lands; labels (`--labels sandbox` + flow `labels: [sandbox]`) serve the M4 harness and first benchmark.
+
+## 4. Pinned invariants (unchanged)
+
+Verified: no send-to-everyone; `done` only to ephemeral workers (`Daemon.ts:245`, `DaemonIdleShutdown.ts:180`); `idle` never sent (`Protocol.ts:180`); re-dispatch max 3 before start and `worker_lost` after (`WorkerAssignmentSupervisor.ts:262-322`); 1 MiB frame; workers without `project-id` refused. `[UNVERIFIED]` (taken from section 9): `ready` after a step as free signal; `step_progress` semantics; secrets only to workers declaring `secrets` (doc at `Protocol.ts:81-86`, dispatch code unread); `windowsHide` must not be used for forked workers (only `WorkerSelfUpdate.ts:198-205` seen); which tests pin each invariant.
+
+## 5. Rollout and proofs
+
+1. **P1, C4** independent.
+2. **Characterization tests first (no behavior change):**
+   - sibling still in flight at terminal failure (cleanup runs, sibling result later dropped);
+   - late result after cleanup (recorded partly, dropped at the scheduler);
+   - requeue after cleanup: FIXED by flow-owner in commit `88f4acc6` (an `isActive` guard in `WorkerAssignmentSupervisor.ts:290-298` and in `StepDispatcher.tryDispatch`, plus a fix so a late sibling result no longer cleans up a resumable execution, `StepOutcomes.ts`); the regression test is `CommandHandler.afterTerminalFailure.test.ts`;
+   - settle wait expired, plugin removes the sandbox, worker socket closes, `handleWorkerDisconnect` runs: a STARTED assignment gets `failStep(..., 'worker_lost')` on an already cleaned-up execution (`WorkerAssignmentSupervisor.ts:278-287`), a not-started one is dropped with an "execution is already over" log (`:290-298`, which has an `isActive` guard at the working tree). Pin both;
+   - store-`completed` ordering vs cleanup (`DaemonWorkerMessageHandler.ts:127/140`);
+   - no send-to-all; injected steps get no flow labels; `cleanupExecution` fire-and-forget release; `send` false on a closed socket; unknown provider throws; plugin loaded from an absolute dir as plain JS.
+3. **flow-owner OK**, then **C2a** behind the kill switch: `worker-type/v1`, json entry, feature constant, `run_end`/ack, served-set, scoped send, wait-for-settle + ack-before-release, stop-path events. Proves: old workers and non-serving feature workers get nothing; ack gates release; timeout releases with the named error; dead socket handled; stop delivers once; switch off equals step 2.
+4. **C2b:** source `plugin` + `pluginsDir`, `WorkerSources.ts` schema, literal-credential check, instance cache, `source remove` dispose. Proves: load error names source, plugin, fix; cache reuse across contacts; remove disposes.
+5. **C2c:** acceptance rule as its own change (bound run, injected step, bounded wait fails, 3 re-dispatches, never host).
+6. **C1** additive, then **C3** one kind per change (relay first, fork last; fork stays a static built-in).
+
+**Status:** edits applied, awaiting flow-owner OK
