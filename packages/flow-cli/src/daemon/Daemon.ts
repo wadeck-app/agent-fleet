@@ -30,6 +30,7 @@ import { ForkWorkerSource } from './ForkWorkerSource.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { findLiveDaemon } from './LiveDaemonProbe.js';
 import { RelayRegistry } from './RelayRegistry.js';
+import { registerBuiltinWorkerTypes } from './RelayWorkerTypePlugin.js';
 import { runEndSettingsOf } from './RunEndCoordinator.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { removeStaleDaemonFiles } from './StaleDaemonFiles.js';
@@ -111,6 +112,8 @@ async function startOwningDaemon(
 	const pluginProviders = await tryResolvePlugins();
 	const perFlowWorkspaceResolver = await PluginResolver.create().createPerFlowWorkspaceResolver();
 
+	// Before any worker-type instance is asked for: the built-in worker types answer ahead of a plugins directory.
+	registerBuiltinWorkerTypes();
 	/** One worker-type instance per plugin source for the life of this daemon; disposed at stop (shutDownWorkers). */
 	const workerTypes = new WorkerTypeInstances(new PluginLoader(), (level, message) => {
 		writeDaemonLog(logsDir, level, message);

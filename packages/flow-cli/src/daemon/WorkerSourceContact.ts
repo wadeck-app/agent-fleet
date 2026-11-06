@@ -4,9 +4,9 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { sendNudge } from './NudgeDispatch.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
-import { RelayWorkerSource } from './RelayWorkerSource.js';
+import { buildRelayWorkerType } from './RelayWorkerTypePlugin.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
-import type { WorkerTypeInstances } from './WorkerTypeInstances.js';
+import type { WorkerTypeHost, WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 /** The S1 implementations that ship with flow. */
 const BUILT_IN_INBOUND = 'built-in:inbound';
@@ -158,7 +158,8 @@ export function resolveSourceProvider(
 					`provider ${BUILT_IN_RELAY} needs the daemon's relay registry, which was not supplied. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
 				);
 			}
-			return new RelayWorkerSource(findRelay);
+			// The same construction the relay worker-type plugin uses: one path for both ways of declaring a relay.
+			return buildRelayWorkerType(findRelay).source;
 		}
 		default:
 			throw new Error(
@@ -189,7 +190,9 @@ async function providerOf(
 			`source declares plugin "${entry.plugin}" but the daemon was not wired to load worker-type plugins. This is a wiring mistake in the daemon, not a configuration error -- please report it.`
 		);
 	}
-	return (await workerTypes.get(entry)).source;
+	// Lent to built-in worker types only (WorkerTypeInstances): a plugin loaded from disk never sees it.
+	const host: WorkerTypeHost = dependencies.findRelay === undefined ? {} : { findRelay: dependencies.findRelay };
+	return (await workerTypes.get(entry, host)).source;
 }
 
 /**
