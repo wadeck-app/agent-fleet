@@ -26,6 +26,20 @@ export interface WorkerRequest {
 }
 
 /**
+ * What `obtainWorker` may resolve with. Optional and additive: a source that resolves with nothing
+ * (as every source written before this existed does) is still valid.
+ */
+export interface WorkerObtainResult {
+	/**
+	 * Return `{ launched: false }` when no new worker was started (for example one is already
+	 * running), so the daemon can give the unused launch credential back. Any other value,
+	 * including `undefined` and `{ launched: true }`, keeps the credential valid for the worker
+	 * that is starting.
+	 */
+	launched?: boolean;
+}
+
+/**
  * Obtains live workers for one source (extension point S1).
  *
  * The single method covers both families of source, and the engine never learns
@@ -47,8 +61,13 @@ export interface WorkerSourceProvider {
 	 * worker has registered -- the caller bounds its own wait and treats a worker that
 	 * never arrives as absent capacity.
 	 *
+	 * Return `{ launched: false }` when no new worker was started so the daemon can give the
+	 * unused launch credential back (see {@link WorkerObtainResult}). The daemon asks again
+	 * while demand stays unmet, and each ask is given a credential that lives 120 s.
+	 *
 	 * @throws when the worker cannot be obtained at all, so the caller can report which
 	 *         source failed rather than silently seeing no capacity appear.
 	 */
-	obtainWorker(request: WorkerRequest): Promise<void>;
+	// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- sources written before the result existed resolve with nothing
+	obtainWorker(request: WorkerRequest): Promise<WorkerObtainResult | void>;
 }

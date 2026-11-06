@@ -152,7 +152,8 @@ describe('LaunchTokenIssuer - cap on outstanding credentials per source', () => 
 
 		expect(() => issuer.issue('box')).toThrow(
 			`source "box" already has ${String(MAX_OUTSTANDING_LAUNCH_TOKENS_PER_SOURCE)} launch credentials outstanding (each is spent when its worker registers and expires after 120 s), so no new one is minted. ` +
-				"The workers it launched are not registering: check the source's launch and its logs, or wait for the credentials to expire."
+				'A credential is issued per ask, each lasting 120 s, so a source that is asked repeatedly while it starts no worker (for example because its worker is already running) fills the cap: such a source should return { launched: false } from obtainWorker to give the credential back. ' +
+				"If it did launch workers, they are not registering: check the source's launch and its logs, or wait for the credentials to expire."
 		);
 	});
 

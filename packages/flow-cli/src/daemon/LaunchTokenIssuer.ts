@@ -55,7 +55,9 @@ export class LaunchTokenIssuer {
 		) {
 			throw new Error(
 				`source "${sourceId}" already has ${String(MAX_OUTSTANDING_LAUNCH_TOKENS_PER_SOURCE)} launch credentials outstanding (each is spent when its worker registers and expires after ${String(Math.round(this.ttlMs / 1000))} s), so no new one is minted. ` +
-					"The workers it launched are not registering: check the source's launch and its logs, or wait for the credentials to expire."
+					'A credential is issued per ask, each lasting ' +
+					`${String(Math.round(this.ttlMs / 1000))} s, so a source that is asked repeatedly while it starts no worker (for example because its worker is already running) fills the cap: such a source should return { launched: false } from obtainWorker to give the credential back. ` +
+					"If it did launch workers, they are not registering: check the source's launch and its logs, or wait for the credentials to expire."
 			);
 		}
 		const token = randomBytes(32).toString('hex');

@@ -21,6 +21,8 @@ export interface WorkerTypeFixtureState {
 	failObtain: boolean;
 	/** obtainWorker() rejects with a message that embeds the whole request (as a careless plugin would). */
 	failObtainEmbeddingRequest: boolean;
+	/** When set, obtainWorker() resolves with exactly this value (otherwise with undefined, as plugins written before the signal do). */
+	obtainReturns?: { value: unknown };
 }
 
 /** The fixture's recorder, reset to empty. Call in `beforeEach`: the plugin module itself is cached by the importer. */

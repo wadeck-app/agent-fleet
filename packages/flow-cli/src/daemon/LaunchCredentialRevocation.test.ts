@@ -241,6 +241,103 @@ describe('a launch that fails gives its credential back', () => {
 	});
 });
 
+describe('a plugin that started no worker returns { launched: false }', () => {
+	async function askOnce(): Promise<string> {
+		const workerTypes = new WorkerTypeInstances(new PluginLoader(), () => {});
+		const reports: string[] = [];
+		await contactDeclaredSources([diskEntry], ENDPOINT, message => reports.push(message), {
+			workerTypes,
+			issueLaunchToken: id => issuer.issue(id),
+			revokeLaunchToken: (id, token) => issuer.revoke(id, token),
+		});
+		await workerTypes.disposeAll();
+		expect(reports).toEqual([]);
+		return (fixture.obtained.at(-1)!.request as { authToken: string }).authToken;
+	}
+
+	it('revokes the credential it was given', async () => {
+		fixture.obtainReturns = { value: { launched: false } };
+
+		const token = await askOnce();
+
+		expect(issuer.consume('box', token)).toBe(false);
+	});
+
+	it('40 consecutive asks never reach the cap', async () => {
+		fixture.obtainReturns = { value: { launched: false } };
+		const workerTypes = new WorkerTypeInstances(new PluginLoader(), () => {});
+		const reports: string[] = [];
+
+		for (let i = 0; i < 40; i++) {
+			await contactDeclaredSources([diskEntry], ENDPOINT, message => reports.push(message), {
+				workerTypes,
+				issueLaunchToken: id => issuer.issue(id),
+				revokeLaunchToken: (id, token) => issuer.revoke(id, token),
+			});
+		}
+		await workerTypes.disposeAll();
+
+		expect(reports).toEqual([]);
+		expect(fixture.obtained).toHaveLength(40);
+		// Nothing is left outstanding: all 32 slots are still free.
+		for (let i = 0; i < MAX_OUTSTANDING_LAUNCH_TOKENS_PER_SOURCE; i++) issuer.issue('box');
+		expect(() => issuer.issue('box')).toThrow(/outstanding/);
+	});
+
+	it.each([
+		['undefined', undefined],
+		['{ launched: true }', { launched: true }],
+		['{}', {}],
+		['a string', 'launched'],
+		['null', null],
+		['a number', 0],
+		['{ launched: "false" }', { launched: 'false' }],
+	])('keeps the credential valid when it returns %s', async (_label, value) => {
+		fixture.obtainReturns = { value };
+
+		const token = await askOnce();
+
+		expect(issuer.consume('box', token)).toBe(true);
+	});
+
+	it('does not revoke twice, nor at all, for a command that starts', async () => {
+		spawnMock.mockReturnValue({ pid: 7, unref: vi.fn(), on: vi.fn(), stderr: { on: vi.fn() } });
+		const revoked: unknown[] = [];
+
+		await new CommandWorkerSource(
+			{ command: 'flow' },
+			() => 'tok',
+			undefined,
+			(...args) => revoked.push(args)
+		).obtainWorker(request);
+
+		expect(revoked).toEqual([]);
+	});
+
+	it('the wrapper revokes exactly once', async () => {
+		const revoke = vi.fn();
+		const wrapper = new LaunchCredentialSource(
+			{ obtainWorker: () => Promise.resolve({ launched: false }) },
+			() => 'tok',
+			revoke
+		);
+
+		await wrapper.obtainWorker(request);
+
+		expect(revoke).toHaveBeenCalledExactlyOnceWith('box', 'tok');
+	});
+});
+
+describe('the cap message', () => {
+	it('says credentials are issued per ask, last 120 s, and points to { launched: false }', () => {
+		for (let i = 0; i < MAX_OUTSTANDING_LAUNCH_TOKENS_PER_SOURCE; i++) issuer.issue('box');
+
+		expect(() => issuer.issue('box')).toThrow(
+			/issued per ask.*120 s.*return \{ launched: false \}.*check the source's launch and its logs/s
+		);
+	});
+});
+
 describe('a disk plugin without a token issuer', () => {
 	it('fails the ask with an actionable wiring message instead of silently getting no credential', async () => {
 		const workerTypes = new WorkerTypeInstances(new PluginLoader(), () => {});

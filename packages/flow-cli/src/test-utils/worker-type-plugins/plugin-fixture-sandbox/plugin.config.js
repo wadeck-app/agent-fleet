@@ -39,6 +39,9 @@ function makeInstance(context) {
 				if (recorded.failObtain) {
 					throw new Error('fixture obtain failure: docker is not running');
 				}
+				if (recorded.obtainReturns !== undefined) {
+					return recorded.obtainReturns.value;
+				}
 			},
 		},
 		run: {

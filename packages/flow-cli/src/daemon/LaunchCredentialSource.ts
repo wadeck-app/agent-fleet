@@ -1,4 +1,4 @@
-import type { WorkerRequest, WorkerSourceProvider } from 'extension-points';
+import type { WorkerObtainResult, WorkerRequest, WorkerSourceProvider } from 'extension-points';
 
 const REDACTED = '<redacted>';
 
@@ -25,7 +25,8 @@ export class LaunchCredentialSource implements WorkerSourceProvider {
 		private readonly revoke?: (sourceId: string, token: string) => void
 	) {}
 
-	async obtainWorker(request: WorkerRequest): Promise<void> {
+	// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- mirrors the contract: sources may resolve with nothing
+	async obtainWorker(request: WorkerRequest): Promise<WorkerObtainResult | void> {
 		if (this.issue === undefined) {
 			throw new Error(
 				`worker source "${request.sourceId}" is a plugin loaded from a directory, which gets a launch credential for each worker it is asked for, but the daemon was not wired to mint one. ` +
@@ -33,12 +34,18 @@ export class LaunchCredentialSource implements WorkerSourceProvider {
 			);
 		}
 		const token = this.issue(request.sourceId);
+		let result: WorkerObtainResult | void;
 		try {
-			await this.inner.obtainWorker({ ...request, authToken: token });
+			result = await this.inner.obtainWorker({ ...request, authToken: token });
 		} catch (err) {
 			this.revoke?.(request.sourceId, token);
 			throw redacted(err, token);
 		}
+		// Only the exact boolean false gives the credential back; anything else (undefined, true, junk) leaves it for the worker that is starting.
+		if (typeof result === 'object' && result !== null && result.launched === false) {
+			this.revoke?.(request.sourceId, token);
+		}
+		return result;
 	}
 }
 
