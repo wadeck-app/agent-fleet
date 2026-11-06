@@ -14,12 +14,17 @@ import { WorkerTypeInstances } from './WorkerTypeInstances.js';
 
 let fixture: WorkerTypeFixtureState;
 let logged: { level: string; message: string }[];
+
+// Only errors: the info lines saying which source answered are pinned in WorkerTypeInstances.builtin.test.ts.
+const recordErrors = (level: string, message: string): void => {
+	if (level === 'error') logged.push({ level, message });
+};
 let instances: WorkerTypeInstances;
 
 beforeEach(() => {
 	fixture = resetWorkerTypeFixture();
 	logged = [];
-	instances = new WorkerTypeInstances(new PluginLoader(), (level, message) => logged.push({ level, message }));
+	instances = new WorkerTypeInstances(new PluginLoader(), recordErrors);
 });
 
 function entry(overrides: Partial<WorkerSourceEntry> = {}): WorkerSourceEntry {
@@ -205,11 +210,7 @@ describe('WorkerTypeInstances - disposing', () => {
 	});
 
 	it('gives up on a dispose that never settles, logs it, and forgets the instance', async () => {
-		const patient = new WorkerTypeInstances(
-			new PluginLoader(),
-			(level, message) => logged.push({ level, message }),
-			{ disposeTimeoutMs: 20 }
-		);
+		const patient = new WorkerTypeInstances(new PluginLoader(), recordErrors, { disposeTimeoutMs: 20 });
 		await patient.get(entry());
 		fixture.hangDispose = true;
 

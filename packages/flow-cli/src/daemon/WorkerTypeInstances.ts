@@ -1,8 +1,11 @@
 import type { RunEndEvent, WorkerTypeInstance } from 'extension-points';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
+import { getBuiltinPlugin } from '../config/BuiltinPluginRegistry.js';
+import type { FlowPlugin } from '../config/FlowPlugin.js';
 import type { PluginLoader } from '../config/PluginLoader.js';
 import { raceWithTimeout } from './BoundedWait.js';
+import type { RegisteredRelay } from './RelayRegistry.js';
 import { PLUGIN_REF, type WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
 /** The extension point a worker-type plugin implements. */
@@ -17,6 +20,15 @@ export interface WorkerTypeTimeouts {
 	buildTimeoutMs?: number;
 	/** Disposing one instance, including waiting for its build if that is still running. */
 	disposeTimeoutMs?: number;
+}
+
+/**
+ * What the daemon lends to a BUILT-IN worker type, and only to that: a plugin loaded from a plugins directory is
+ * third-party code and never receives these (a relay handle is a live socket, which the point deliberately never hands out).
+ */
+export interface WorkerTypeHost {
+	/** The live connection of a relay source; only the relay worker type uses it. */
+	findRelay?: (sourceId: string) => RegisteredRelay | undefined;
 }
 
 interface CachedInstance {
@@ -50,7 +62,13 @@ export class WorkerTypeInstances {
 	constructor(
 		private readonly loader: Pick<PluginLoader, 'loadProvider'>,
 		private readonly log: (level: 'info' | 'error', message: string) => void,
-		timeouts: WorkerTypeTimeouts = {}
+		timeouts: WorkerTypeTimeouts = {},
+		/**
+		 * Looks up a built-in by type reference ("plugins.<id>.<impl>"). Asked BEFORE the plugins directory: a built-in
+		 * carries the daemon's host services and is the code shipped with this daemon, so a same-named copy left in a
+		 * plugins directory (stale, or planted) must not replace it. Which of the two answered is logged on every build.
+		 */
+		private readonly lookupBuiltin: (typeRef: string) => FlowPlugin | undefined = getBuiltinPlugin
 	) {
 		this.buildTimeoutMs = timeouts.buildTimeoutMs ?? DEFAULT_BUILD_TIMEOUT_MS;
 		this.disposeTimeoutMs = timeouts.disposeTimeoutMs ?? DEFAULT_DISPOSE_TIMEOUT_MS;
@@ -61,7 +79,7 @@ export class WorkerTypeInstances {
 	 *
 	 * @throws an error naming the source, the plugin, the cause and the fix when the plugin cannot be loaded
 	 */
-	async get(entry: WorkerSourceEntry): Promise<WorkerTypeInstance> {
+	async get(entry: WorkerSourceEntry, host: WorkerTypeHost = {}): Promise<WorkerTypeInstance> {
 		const { plugin, pluginsDir, sourceId } = entry;
 		if (plugin === undefined || pluginsDir === undefined) {
 			throw new Error(
@@ -96,7 +114,7 @@ export class WorkerTypeInstances {
 			await this.dispose(sourceId);
 		}
 
-		const created: CachedInstance = { fingerprint, instance: this.build(entry, plugin, pluginsDir) };
+		const created: CachedInstance = { fingerprint, instance: this.build(entry, plugin, pluginsDir, host) };
 		this.cache.set(sourceId, created);
 		this.disposed.delete(sourceId);
 		created.instance.catch(() => {
@@ -193,10 +211,15 @@ export class WorkerTypeInstances {
 		}
 	}
 
-	private async build(entry: WorkerSourceEntry, plugin: string, pluginsDir: string): Promise<WorkerTypeInstance> {
+	private async build(
+		entry: WorkerSourceEntry,
+		plugin: string,
+		pluginsDir: string,
+		host: WorkerTypeHost
+	): Promise<WorkerTypeInstance> {
 		// Outside the load error below: an unset variable is the user's to fix, and says which one.
 		const options = resolveEnvVars(entry.sourceId, entry.options);
-		const loading = this.load(entry, plugin, pluginsDir, options);
+		const loading = this.load(entry, plugin, pluginsDir, options, host);
 		let built: WorkerTypeInstance | undefined;
 		const outcome = await raceWithTimeout(
 			loading.then(instance => {
@@ -223,13 +246,45 @@ export class WorkerTypeInstances {
 		return built;
 	}
 
+	private async createBuiltin(
+		registered: FlowPlugin,
+		typeRef: string,
+		sourceId: string,
+		options: unknown,
+		host: WorkerTypeHost
+	): Promise<unknown> {
+		if (registered.extensionPoint !== WORKER_TYPE_POINT) {
+			throw new Error(
+				`built-in "${typeRef}" serves the extension point "${registered.extensionPoint}", not "${WORKER_TYPE_POINT}", so source "${sourceId}" cannot use it`
+			);
+		}
+		return registered.create({ sourceId, options, host });
+	}
+
 	private async load(
 		entry: WorkerSourceEntry,
 		plugin: string,
 		pluginsDir: string,
-		options: unknown
+		options: unknown,
+		host: WorkerTypeHost
 	): Promise<WorkerTypeInstance> {
 		try {
+			const typeRef = `plugins.${plugin}`;
+			const registered = this.lookupBuiltin(typeRef);
+			if (registered !== undefined) {
+				this.log(
+					'info',
+					`worker source "${entry.sourceId}": plugin "${plugin}" answered by the built-in registry; the plugins directory "${pluginsDir}" is ignored for it. ` +
+						`To use a copy from that directory, give it another plugin id.`
+				);
+				const built = await this.createBuiltin(registered, typeRef, entry.sourceId, options, host);
+				assertWorkerTypeInstance(built);
+				return built;
+			}
+			this.log(
+				'info',
+				`worker source "${entry.sourceId}": plugin "${plugin}" answered by the plugins directory "${pluginsDir}" (not a built-in).`
+			);
 			const built = await this.loader.loadProvider(
 				`plugins.${plugin}`,
 				WORKER_TYPE_POINT,

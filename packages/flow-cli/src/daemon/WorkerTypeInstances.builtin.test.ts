@@ -1,0 +1,186 @@
+import type { WorkerTypeInstance } from 'extension-points';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { __resetBuiltinPluginsForTests, registerBuiltinPlugin } from '../config/BuiltinPluginRegistry.js';
+import type { FlowPlugin } from '../config/FlowPlugin.js';
+import { PluginLoader } from '../config/PluginLoader.js';
+import {
+	FIXTURE_PLUGINS_DIR,
+	type WorkerTypeFixtureState,
+	resetWorkerTypeFixture,
+} from '../test-utils/WorkerTypeFixture.js';
+import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
+import { WorkerTypeInstances, type WorkerTypeTimeouts } from './WorkerTypeInstances.js';
+
+/**
+ * Which source answers a worker-type reference: the built-in registry first, else the plugins directory. The decision
+ * and its reason are in WorkerTypeInstances; these tests pin it.
+ */
+
+// The fixture on disk is `fixture-sandbox.sandbox`; a built-in registered under the same reference must win over it.
+const SHADOWED_REF = 'fixture-sandbox.sandbox';
+
+let fixture: WorkerTypeFixtureState;
+let logged: { level: string; message: string }[];
+
+beforeEach(() => {
+	fixture = resetWorkerTypeFixture();
+	logged = [];
+	__resetBuiltinPluginsForTests();
+});
+
+afterEach(() => {
+	__resetBuiltinPluginsForTests();
+});
+
+function entry(overrides: Partial<WorkerSourceEntry> = {}): WorkerSourceEntry {
+	return {
+		sourceId: 'sandbox',
+		provider: 'fixture',
+		plugin: SHADOWED_REF,
+		pluginsDir: FIXTURE_PLUGINS_DIR,
+		options: { image: 'node:22' },
+		labels: [],
+		maxWorkers: 1,
+		tokenHash: 'h',
+		createdAt: '2026-10-27T00:00:00.000Z',
+		...overrides,
+	};
+}
+
+function instances(timeouts: WorkerTypeTimeouts = {}): WorkerTypeInstances {
+	return new WorkerTypeInstances(new PluginLoader(), (level, message) => logged.push({ level, message }), timeouts);
+}
+
+function builtin(overrides: Partial<WorkerTypeInstance> = {}, extensionPoint = 'worker-type') {
+	const created: unknown[] = [];
+	const disposed: string[] = [];
+	const plugin: FlowPlugin = {
+		extensionPoint,
+		create: context => {
+			created.push(context);
+			return Promise.resolve({
+				source: { obtainWorker: () => Promise.resolve() },
+				dispose: () => {
+					disposed.push('disposed');
+					return Promise.resolve();
+				},
+				...overrides,
+			} as WorkerTypeInstance);
+		},
+	};
+	return { plugin, created, disposed };
+}
+
+const messageOf = (promise: Promise<unknown>): Promise<string> =>
+	promise.then(
+		() => {
+			throw new Error('expected a rejection');
+		},
+		(err: unknown) => (err as Error).message
+	);
+
+describe('WorkerTypeInstances - registry before pluginsDir', () => {
+	it('is answered by the built-in registry even when pluginsDir holds a copy of the same reference', async () => {
+		const { plugin, created } = builtin();
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, plugin);
+
+		await instances().get(entry());
+
+		expect(created).toHaveLength(1);
+		// The on-disk copy was never loaded.
+		expect(fixture.created).toEqual([]);
+	});
+
+	it('says in the log that the built-in answered and that the pluginsDir copy was ignored', async () => {
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, builtin().plugin);
+
+		await instances().get(entry());
+
+		const line = logged.find(item => item.message.includes('built-in registry'));
+		expect(line?.level).toBe('info');
+		expect(line?.message).toContain('"sandbox"');
+		expect(line?.message).toContain(SHADOWED_REF);
+		expect(line?.message).toContain(FIXTURE_PLUGINS_DIR);
+		expect(line?.message).toMatch(/ignored/);
+	});
+
+	it('falls back to the pluginsDir when nothing is registered, and logs that the directory answered', async () => {
+		await instances().get(entry());
+
+		expect(fixture.created).toHaveLength(1);
+		const line = logged.find(item => item.message.includes('plugins directory'));
+		expect(line?.level).toBe('info');
+		expect(line?.message).toContain('"sandbox"');
+		expect(line?.message).toContain(FIXTURE_PLUGINS_DIR);
+	});
+
+	it('hands the daemon host services to a built-in only, never to a plugin loaded from disk', async () => {
+		const host = { findRelay: () => undefined };
+		const { plugin, created } = builtin();
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, plugin);
+
+		await instances().get(entry(), host);
+		expect(created).toEqual([{ sourceId: 'sandbox', options: { image: 'node:22' }, host }]);
+
+		__resetBuiltinPluginsForTests();
+		await instances().get(entry({ sourceId: 'other' }), host);
+		expect(fixture.created).toEqual([{ sourceId: 'other', options: { image: 'node:22' } }]);
+	});
+
+	it('refuses a built-in registered for another extension point, naming the source and the plugin', async () => {
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, builtin({}, 'permission-prompt').plugin);
+
+		const message = await messageOf(instances().get(entry()));
+
+		expect(message).toContain('"sandbox"');
+		expect(message).toContain(SHADOWED_REF);
+		expect(message).toContain('permission-prompt');
+	});
+
+	it('enforces the worker-type instance contract on a built-in too', async () => {
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, builtin({ dispose: undefined }).plugin);
+
+		const message = await messageOf(instances().get(entry()));
+
+		expect(message).toContain('"sandbox"');
+		expect(message).toContain('dispose()');
+	});
+
+	it('bounds the build of a built-in by the same build timeout as a plugin from disk', async () => {
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, {
+			extensionPoint: 'worker-type',
+			create: () => new Promise<never>(() => {}),
+		});
+
+		const message = await messageOf(instances({ buildTimeoutMs: 20 }).get(entry()));
+
+		expect(message).toContain('did not finish loading within 20ms');
+	});
+
+	it('disposes a built-in once, however many times it is disposed', async () => {
+		const { plugin, disposed } = builtin();
+		registerBuiltinPlugin(`plugins.${SHADOWED_REF}`, plugin);
+		const owner = instances();
+		await owner.get(entry());
+
+		await Promise.all([owner.dispose('sandbox'), owner.dispose('sandbox'), owner.disposeAll()]);
+
+		expect(disposed).toEqual(['disposed']);
+	});
+
+	it('gives up on a built-in whose dispose hangs after the dispose bound, and logs it', async () => {
+		registerBuiltinPlugin(
+			`plugins.${SHADOWED_REF}`,
+			builtin({ dispose: () => new Promise<never>(() => {}) }).plugin
+		);
+		const owner = instances({ disposeTimeoutMs: 20 });
+		await owner.get(entry());
+
+		await owner.dispose('sandbox');
+
+		expect(
+			logged.some(item => item.level === 'error' && item.message.includes('did not finish disposing within 20ms'))
+		).toBe(true);
+	});
+});

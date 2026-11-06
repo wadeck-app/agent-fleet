@@ -54,11 +54,16 @@ class TrackedLoader {
 
 let fixture: WorkerTypeFixtureState;
 let logged: { level: string; message: string }[];
+
+// Only errors: the info lines saying which source answered are pinned in WorkerTypeInstances.builtin.test.ts.
+const recordErrors = (level: string, message: string): void => {
+	if (level === 'error') logged.push({ level, message });
+};
 let loader: TrackedLoader;
 let instances: WorkerTypeInstances;
 
 function newInstances(timeouts: { buildTimeoutMs: number; disposeTimeoutMs: number }): WorkerTypeInstances {
-	return new WorkerTypeInstances(loader, (level, message) => logged.push({ level, message }), timeouts);
+	return new WorkerTypeInstances(loader, recordErrors, timeouts);
 }
 
 beforeEach(() => {
