@@ -4,7 +4,9 @@ import { isFlowPlugin } from './FlowPlugin';
 
 describe('isFlowPlugin', () => {
 	it('accepts an object with an extension point and an async create function', () => {
-		expect(isFlowPlugin({ extensionPoint: 'worker-type', create: async () => ({ dispose: async () => {} }) })).toBe(true);
+		expect(isFlowPlugin({ extensionPoint: 'worker-type', create: async () => ({ dispose: async () => {} }) })).toBe(
+			true
+		);
 	});
 
 	it.each([

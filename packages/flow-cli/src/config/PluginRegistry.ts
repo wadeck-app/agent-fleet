@@ -20,7 +20,9 @@ export class PluginRegistry<TPlugin> {
 	register(name: string, plugin: TPlugin, aliases: string[] = []): void {
 		const { label, isValid, shape } = this.options;
 		if (!isValid(plugin)) {
-			throw new Error(`[${label}] Plugin for "${name}" does not conform to the plugin contract (expected ${shape}).`);
+			throw new Error(
+				`[${label}] Plugin for "${name}" does not conform to the plugin contract (expected ${shape}).`
+			);
 		}
 		const names = [name, ...aliases];
 		for (const candidate of names) {
