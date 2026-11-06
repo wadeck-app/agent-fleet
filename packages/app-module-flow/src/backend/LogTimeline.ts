@@ -1,4 +1,4 @@
-import { type LogRecordStep, attemptOf } from 'flow-core';
+import { type LogRecordStep, attemptOf, isSkippedStep } from 'flow-core';
 
 // Lines about the run itself (started, step completed, failed...), not about one step: LogWriter.writeExecution.
 const RUN_EVENTS_STEP = '__execution';
@@ -49,8 +49,8 @@ export interface LogStepRow {
 	order: number | null;
 	depth: number;
 	parentId: string | null;
-	/** The recorded status; 'unknown' for a step that logged but is not in the record. */
-	status: LogRecordStep['status'] | 'unknown';
+	/** The recorded status, 'skipped' for a step that did not run (stored as completed); 'unknown' for a step that logged but is not in the record. */
+	status: LogRecordStep['status'] | 'skipped' | 'unknown';
 	attempts: number;
 	lineCount: number;
 	startOffsetMs: number | null;
@@ -171,7 +171,7 @@ function recordRow(
 		order: layout.order.get(step.stepId) ?? null,
 		depth: layout.depth.get(step.stepId)!,
 		parentId: step.parent ?? null,
-		status: step.status,
+		status: isSkippedStep(step) ? 'skipped' : step.status,
 		attempts: Math.max(step.attempts ?? 0, input.attemptStarts[step.stepId]?.length ?? 0),
 		lineCount: input.stepLineCounts[step.stepId] ?? 0,
 		startOffsetMs,

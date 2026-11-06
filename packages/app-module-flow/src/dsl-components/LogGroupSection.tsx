@@ -16,6 +16,7 @@ const STATUS_BADGE: Record<LogStepStatus, 'default' | 'info' | 'success' | 'dang
 	unknown: 'default',
 	running: 'info',
 	completed: 'success',
+	skipped: 'default',
 	failed: 'danger',
 };
 

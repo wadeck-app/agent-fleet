@@ -127,6 +127,7 @@ sections:
                                 pending: default,
                                 retry: warning,
                                 'ok, recovered': warning,
+                                skipped: default,
                             }
                       - { key: 'duration', label: 'Duration', nowrap: true, muted: true }
                       - { key: 'costLabel', label: 'Cost', nowrap: true }

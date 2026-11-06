@@ -88,6 +88,7 @@ const mockExecStore = {
 	exists: vi.fn().mockReturnValue(false),
 	markStepRunning: vi.fn(),
 	markStepCompleted: vi.fn(),
+	markStepSkipped: vi.fn(),
 	markStepFailed: vi.fn(),
 	markStepsPending: vi.fn(),
 	markExecutionCompleted: vi.fn(),
@@ -287,7 +288,7 @@ describe('CommandHandler step outcome edge cases', () => {
 		);
 	});
 
-	it('marks the steps the scheduler skipped as completed when the execution ends', async () => {
+	it('settles the steps the scheduler skipped as skipped, with a reason, when the execution ends', async () => {
 		const handler = makeHandler();
 		const executionId = await startFlow(handler, TWO_STEP_FLOW);
 		mockExecStore.exists.mockReturnValue(true);
@@ -296,7 +297,12 @@ describe('CommandHandler step outcome edge cases', () => {
 		handler.onStepCompleted(executionId, 's1', {});
 		handler.onStepCompleted(executionId, 's2', {});
 
-		expect(mockExecStore.markStepCompleted).toHaveBeenCalledWith(executionId, 's2');
+		expect(mockExecStore.markStepSkipped).toHaveBeenCalledWith(
+			executionId,
+			's2',
+			expect.stringContaining('did not run')
+		);
+		expect(mockExecStore.markStepCompleted).not.toHaveBeenCalledWith(executionId, 's2');
 		expect(mockExecStore.markStepCompleted).not.toHaveBeenCalledWith(executionId, 's1');
 	});
 

@@ -400,11 +400,58 @@ describe('ExecutionDetail origin line', () => {
 	};
 
 	it('prints "Started from:" with the formatted origin when the record has one', () => {
-		const origin = { tool: 'flow', at: '2026-10-04T14:00:00.000Z', projectId: 'abcd1234', projectName: 'beta', cwd: 'C:/work/beta' };
+		const origin = {
+			tool: 'flow',
+			at: '2026-10-04T14:00:00.000Z',
+			projectId: 'abcd1234',
+			projectName: 'beta',
+			cwd: 'C:/work/beta',
+		};
 		expect(render({ ...baseRecord, origin })).toContain(`Started from: ${formatOrigin(origin)}`);
 	});
 
 	it('prints nothing about an origin for a record without one (older records)', () => {
 		expect(render(baseRecord)).not.toContain('Started from');
+	});
+});
+
+describe('renderExecutionDetail skipped steps', () => {
+	const record = {
+		executionId: 'skip0001',
+		flowFile: 'f.yml',
+		flowId: 'f',
+		status: 'completed' as const,
+		currentSteps: [],
+		startedAt: '2026-10-04T14:00:00.000Z',
+		completedAt: '2026-10-04T14:00:05.000Z',
+		steps: {
+			ran: {
+				status: 'completed' as const,
+				startedAt: '2026-10-04T14:00:00.000Z',
+				completedAt: '2026-10-04T14:00:01.000Z',
+				attempts: 1,
+			},
+			byReason: { status: 'completed' as const, skippedReason: "when 'inputs.dev' was false" },
+			legacy: { status: 'completed' as const, completedAt: '2026-10-04T14:00:05.000Z' },
+		},
+	};
+	const lines = renderExecutionDetail(
+		{ record, filePath: '/e/skip0001.json' },
+		{ tail: DEFAULT_TAIL_CHARS, full: false }
+	).split('\n');
+
+	it('labels a skipped step [skipped] instead of [completed], and a step that ran keeps [completed]', () => {
+		expect(lines.find(l => l.startsWith('  ran '))).toContain('[completed]');
+		expect(lines.find(l => l.startsWith('  byReason '))).toContain('[skipped]');
+		expect(lines.find(l => l.startsWith('  legacy '))).toContain('[skipped]');
+	});
+
+	it('prints the reason, and says so when a record written before reasons existed has none', () => {
+		expect(lines).toContain("      skipped: when 'inputs.dev' was false");
+		expect(lines).toContain('      skipped: did not run (no reason recorded)');
+	});
+
+	it('prints no attempts for a skipped step', () => {
+		expect(lines.find(l => l.startsWith('  byReason '))).not.toContain('attempts');
 	});
 });

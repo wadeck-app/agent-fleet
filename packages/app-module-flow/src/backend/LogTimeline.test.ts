@@ -236,3 +236,22 @@ describe('buildLogTimeline failures', () => {
 		).toThrow(/completedAt of step 's'/);
 	});
 });
+
+describe('buildLogTimeline skipped steps', () => {
+	it('gives a completed step that never started the status skipped, and keeps completed for one that ran', () => {
+		const { steps } = buildLogTimeline(
+			input({
+				recordSteps: [
+					{ stepId: 'ran', status: 'completed', startedAt: T(5), completedAt: T(10) },
+					{ stepId: 'bywhen', status: 'completed', skippedReason: "when 'x' was false" },
+					{ stepId: 'legacy', status: 'completed', completedAt: T(60) },
+				],
+			})
+		);
+		expect(steps.map(s => [s.stepId, s.status])).toEqual([
+			['ran', 'completed'],
+			['bywhen', 'skipped'],
+			['legacy', 'skipped'],
+		]);
+	});
+});

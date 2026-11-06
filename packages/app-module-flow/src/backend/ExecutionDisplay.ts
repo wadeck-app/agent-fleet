@@ -3,6 +3,7 @@ import {
 	type ExecutionStatus,
 	type ExecutionSummary,
 	type FlowSummary,
+	SKIPPED_LABEL,
 	type StepRetryPolicy,
 	type StepView,
 	executionLogsPath,
@@ -49,17 +50,19 @@ export function toExecutionRow(summary: ExecutionSummary) {
  * undefined when it is unknown (see retryLabel).
  */
 export function toStepRow(step: StepView, policy: StepRetryPolicy | undefined) {
+	const skipped = step.skipped === true;
 	const recovered = step.status === 'completed' && step.error !== undefined;
 	const expandable = hasAttemptRows(step);
 	return {
 		...step,
-		statusLabel: outcomeLabel(stepStatusTag(step.status), { recovered }),
+		// A step that did not run is stored as completed: it says skipped, not ok, and has no retries to count.
+		statusLabel: skipped ? SKIPPED_LABEL : outcomeLabel(stepStatusTag(step.status), { recovered }),
 		costLabel: withCostHint(step.costLabel ?? '-', expandable),
 		// Row panel (DataTable expansionCondition/expansion): the attempts, only for a step that ran 2+ times or has an unknown cost.
 		expandable,
 		attemptRows: expandable ? toAttemptRows(step.attemptHistory ?? []) : [],
 		costNotes: expandable ? costNotes(step.attemptHistory ?? []) : '',
-		retryLabel: retryLabel(step, policy),
+		retryLabel: skipped ? '-' : retryLabel(step, policy),
 	};
 }
 

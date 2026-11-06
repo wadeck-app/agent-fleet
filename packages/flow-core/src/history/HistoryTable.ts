@@ -1,5 +1,6 @@
 import { versionColumnOf, versionDetailLineOf } from '../definitions/RecordedVersion.js';
 import type { ExecutionState } from '../execution/ExecutionState.js';
+import { SKIPPED_LABEL, skipReasonOf } from '../execution/StepSkip.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { renderStepCostLines, renderTotalCostLine } from '../show/StepCostLines.js';
 import { type ExecutionFilterOptions, filterExecutions } from './ExecutionFilter.js';
@@ -45,10 +46,16 @@ export function renderDetailView(exec: ExecutionState, projectLookup?: ProjectLo
 		}
 		const name = step.injected ? `${stepId}*` : stepId;
 		const dur = step.startedAt ? formatDuration(step.startedAt, step.completedAt ?? null) : '-';
-		lines.push('  ' + padTruncate(name, COL_STEP) + padTruncate(step.status, COL_STATUS) + dur);
+		const skipReason = skipReasonOf(step);
+		lines.push(
+			'  ' +
+				padTruncate(name, COL_STEP) +
+				padTruncate(skipReason === undefined ? step.status : SKIPPED_LABEL, COL_STATUS) +
+				dur
+		);
 		// Same wording as `flow show`: a step that never ran says why, instead of a bare "completed".
-		if (step.skippedReason) {
-			lines.push(`      skipped: ${step.skippedReason}`);
+		if (skipReason !== undefined) {
+			lines.push(`      skipped: ${skipReason}`);
 		}
 		lines.push(...renderStepCostLines(step, '      '));
 	}

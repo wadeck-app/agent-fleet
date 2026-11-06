@@ -81,6 +81,13 @@ export {
 	summarizeStepCost,
 } from './execution/StepCost.js';
 
+export {
+	NO_REASON_RECORDED,
+	SKIPPED_LABEL,
+	countSkippedSteps,
+	isSkippedStep,
+	skipReasonOf,
+} from './execution/StepSkip.js';
 export { createRemoteDaemonClient, isUnknownCommandError, outdatedDaemonMessage } from './daemon/RemoteDaemonClient.js';
 export { DEFAULT_HISTORY_LIMIT, RECOVERED_STATUS, filterExecutions } from './history/ExecutionFilter.js';
 export type { ExecutionFilterOptions, FilteredExecutions } from './history/ExecutionFilter.js';

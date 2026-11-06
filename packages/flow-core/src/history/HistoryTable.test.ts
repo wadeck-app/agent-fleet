@@ -435,3 +435,30 @@ describe('renderDetailView project line', () => {
 		expect(out).toContain('Total cost: $0.0075');
 	});
 });
+
+describe('renderDetailView skipped steps', () => {
+	const exec = makeExec({
+		executionId: 'skip0001',
+		steps: {
+			ran: {
+				status: 'completed',
+				startedAt: '2026-08-16T12:00:00.000Z',
+				completedAt: '2026-08-16T12:00:01.000Z',
+			},
+			byReason: { status: 'completed', skippedReason: "when 'inputs.dev' was false" },
+			legacy: { status: 'completed', completedAt: '2026-08-16T12:00:05.000Z' },
+		},
+	});
+	const lines = buildHistoryTable([exec], { id: 'skip0001' }).split('\n');
+
+	it('shows skipped in the STATUS column, not completed', () => {
+		expect(lines.find(l => l.startsWith('  ran '))).toContain('completed');
+		expect(lines.find(l => l.startsWith('  byReason '))).toMatch(/byReason\s+skipped\s+-/);
+		expect(lines.find(l => l.startsWith('  legacy '))).toMatch(/legacy\s+skipped\s+-/);
+	});
+
+	it('prints the reason, or says none was recorded', () => {
+		expect(lines).toContain("      skipped: when 'inputs.dev' was false");
+		expect(lines).toContain('      skipped: did not run (no reason recorded)');
+	});
+});

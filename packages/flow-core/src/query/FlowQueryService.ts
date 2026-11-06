@@ -278,6 +278,7 @@ export class FlowQueryService {
 			steps: Object.entries(record.steps).map(([stepId, step]) => ({
 				stepId,
 				status: step.status,
+				...(step.skippedReason !== undefined ? { skippedReason: step.skippedReason } : {}),
 				...(step.startedAt !== undefined ? { startedAt: step.startedAt } : {}),
 				...(step.completedAt !== undefined ? { completedAt: step.completedAt } : {}),
 				...(step.attempts !== undefined ? { attempts: step.attempts } : {}),

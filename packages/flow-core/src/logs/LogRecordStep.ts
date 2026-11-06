@@ -4,6 +4,8 @@ import type { StepStatus } from '../execution/ExecutionState.js';
 export interface LogRecordStep {
 	stepId: string;
 	status: StepStatus;
+	/** Why the step did not run; a `completed` step without a start time and without it is skipped too (see StepSkip). */
+	skippedReason?: string;
 	startedAt?: string;
 	completedAt?: string;
 	/** Times the step was started; absent on records written before the field existed. */

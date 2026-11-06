@@ -7,7 +7,16 @@ export const LOG_LEVELS = ['debug', 'info', 'warning', 'error'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
 // Statuses of a recorded step, plus the ones of the run itself (the "Run events" row carries the status of the run).
-const STEP_STATUSES = ['pending', 'running', 'completed', 'failed', 'queued', 're-queued', 'unknown'] as const;
+const STEP_STATUSES = [
+	'pending',
+	'running',
+	'completed',
+	'skipped',
+	'failed',
+	'queued',
+	're-queued',
+	'unknown',
+] as const;
 export type LogStepStatus = (typeof STEP_STATUSES)[number];
 
 /** Step id of the lines about the run itself (flow-core LogWriter.writeExecution). */

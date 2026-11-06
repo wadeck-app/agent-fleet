@@ -86,6 +86,12 @@ export class ExecutionRegistry {
 		return this.stepDefinitions.get(executionId)?.get(stepId)?.type;
 	}
 
+	/** The `when` condition and the `parent` the flow declares for a step; undefined for a step the registry does not know. */
+	stepSkipFacts(executionId: string, stepId: string): { when?: string; parent?: string } | undefined {
+		const step = this.stepDefinitions.get(executionId)?.get(stepId);
+		return step === undefined ? undefined : { when: step.when, parent: step.parent };
+	}
+
 	stepCount(executionId: string): number {
 		return this.stepCounts.get(executionId) ?? 0;
 	}

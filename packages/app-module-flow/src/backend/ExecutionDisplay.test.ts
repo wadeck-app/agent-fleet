@@ -101,3 +101,24 @@ describe('toStepRow cost notes', () => {
 		expect(toStepRow(STEP, undefined).costNotes).toBe('');
 	});
 });
+
+describe('toStepRow skipped step', () => {
+	const SKIPPED: StepView = {
+		...STEP,
+		duration: '-',
+		skipped: true,
+		skippedReason: "when 'inputs.dev' was false",
+	};
+
+	it('says skipped, not ok, and shows no retry count', () => {
+		const row = toStepRow(SKIPPED, undefined);
+		expect(row.statusLabel).toBe('skipped');
+		expect(row.retryLabel).toBe('-');
+	});
+
+	it('keeps ok and the retry count for a step that ran', () => {
+		const row = toStepRow({ ...STEP, attempts: 1 }, { retryBudget: 0 });
+		expect(row.statusLabel).toBe('ok');
+		expect(row.retryLabel).toBe('0 retry');
+	});
+});

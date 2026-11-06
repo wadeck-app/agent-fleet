@@ -407,7 +407,7 @@ ${'word '.repeat(40)}`,
 		fixture.addExecution({
 			executionId: 'abc124',
 			steps: {
-				build: { status: 'completed' },
+				build: { status: 'completed', startedAt: '2026-08-16T10:00:00.000Z' },
 				flaky: { status: 'completed', error: 'boom', attempts: 3 },
 				test: { status: 'failed', error: 'e'.repeat(80) },
 				ship: { status: 'pending' },

@@ -48,6 +48,7 @@ describe('toExecutionSummary', () => {
 			projectLabel: '/work/app (-)',
 			stepCount: 2,
 			failedStepCount: 1,
+			skippedStepCount: 0,
 			versionLabel: '-',
 		});
 	});
@@ -341,5 +342,31 @@ describe('project fields of the views', () => {
 		const summary = toExecutionSummary(record());
 		expect(summary).not.toHaveProperty('projectId');
 		expect(summary).not.toHaveProperty('projectLabel');
+	});
+});
+
+describe('skipped steps', () => {
+	const skipping = record({
+		steps: {
+			build: {
+				status: 'completed',
+				startedAt: '2026-08-16T12:00:00.000Z',
+				completedAt: '2026-08-16T12:00:10.000Z',
+				attempts: 1,
+			},
+			dev_only: { status: 'completed', skippedReason: "when 'inputs.dev' was false" },
+			legacy: { status: 'completed', completedAt: '2026-08-16T12:00:10.000Z' },
+		},
+	});
+
+	it('counts them apart in the summary', () => {
+		expect(toExecutionSummary(skipping)).toMatchObject({ stepCount: 3, failedStepCount: 0, skippedStepCount: 2 });
+	});
+
+	it('marks them in the step views with the reason, and leaves a step that ran unmarked', () => {
+		const steps = toExecutionDetail({ record: skipping, filePath: 'f' }, 'T').steps;
+		expect(steps[0]).not.toHaveProperty('skipped');
+		expect(steps[1]).toMatchObject({ skipped: true, skippedReason: "when 'inputs.dev' was false", duration: '-' });
+		expect(steps[2]).toMatchObject({ skipped: true, skippedReason: 'did not run (no reason recorded)' });
 	});
 });

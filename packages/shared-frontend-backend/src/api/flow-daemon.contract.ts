@@ -82,6 +82,8 @@ export const FlowExecutionSummarySchema = z.object({
 	versionLabel: z.string().optional(),
 	stepCount: z.number(),
 	failedStepCount: z.number(),
+	/** Steps that did not run (stored as completed); optional: older daemons do not send it. */
+	skippedStepCount: z.number().optional(),
 });
 
 export const FlowExecutionsResponseSchema = z.object({
@@ -115,6 +117,9 @@ export const FlowStepAttemptSchema = z.object({
 export const FlowStepSchema = z.object({
 	stepId: z.string(),
 	status: z.string(),
+	/** True when the step did not run (its stored status is still `completed`); `skippedReason` says why. */
+	skipped: z.boolean().optional(),
+	skippedReason: z.string().optional(),
 	injected: z.boolean(),
 	startedAt: z.string().optional(),
 	completedAt: z.string().optional(),

@@ -337,9 +337,22 @@ export class StepOutcomes {
 		const state = this.executionStore.read(executionId);
 		for (const [sid, stepState] of Object.entries(state.steps)) {
 			if (stepState.status === 'pending') {
-				this.executionStore.markStepCompleted(executionId, sid);
+				// Still pending when the run is over: the scheduler settled it without dispatching it.
+				const reason = this.skipReasonOf(executionId, sid);
+				this.executionStore.markStepSkipped(executionId, sid, reason);
+				this.logWriter.writeExecution(executionId, `Step ${sid} skipped: ${reason}`, 'info');
 			}
 		}
+	}
+
+	/** Why a step the scheduler settled without running did not run: its false `when`, else a skipped parent or dependency. */
+	private skipReasonOf(executionId: string, stepId: string): string {
+		const facts = this.executions.stepSkipFacts(executionId, stepId);
+		if (facts?.when !== undefined) {
+			return `when "${facts.when}" was false`;
+		}
+		const parent = facts?.parent === undefined ? '' : `parent '${facts.parent}' or `;
+		return `did not run: the scheduler skipped it (it has no condition of its own; ${parent}a step it depends on was skipped)`;
 	}
 
 	/**

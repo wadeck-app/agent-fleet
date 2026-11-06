@@ -10,6 +10,7 @@ const STATUS_DOT: Record<LogStepStatus, string> = {
 	unknown: 'bg-muted-bg border border-border',
 	running: 'bg-info-text',
 	completed: 'bg-success',
+	skipped: 'bg-muted-bg border border-border',
 	failed: 'bg-danger',
 };
 // @formatter:on

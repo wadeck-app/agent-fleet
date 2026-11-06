@@ -88,7 +88,7 @@ describe('GET /executions/:id retryLabel', () => {
 	});
 
 	it('says the retries are unknown for a record written before attempts existed', async () => {
-		addRun('rt5', { plain: { status: 'completed' } }, true);
+		addRun('rt5', { plain: { status: 'completed', startedAt: '2026-08-16T10:00:00.000Z' } }, true);
 		expect(await labelsOf('rt5')).toEqual(['retries unknown']);
 	});
 

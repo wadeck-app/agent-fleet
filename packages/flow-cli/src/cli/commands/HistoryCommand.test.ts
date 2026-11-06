@@ -1,4 +1,6 @@
 import { Command } from 'commander';
+// violations-suppress-end: ts/no-deep-relative
+import { executionsDirOf } from 'flow-core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -7,8 +9,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { ExecutionStore } from '../../storage/ExecutionStore';
 import { RegisteredProjectFixture } from '../../test-utils/RegisteredProjectFixture';
-// violations-suppress-end: ts/no-deep-relative
-import { executionsDirOf } from 'flow-core';
 import { registerHistoryCommand } from './HistoryCommand';
 
 // Filtering, pagination and rendering are covered in flow-core (history/*.test.ts); this file only
@@ -88,7 +88,10 @@ describe('flow history command', () => {
 
 	describe('--id on an execution written by the store', () => {
 		const store = (): ExecutionStore => new ExecutionStore(executionsDirOf(configDir));
-		const stepRow = (stepId: string): string => printed().split('\n').find(line => line.trim().startsWith(stepId)) ?? '';
+		const stepRow = (stepId: string): string =>
+			printed()
+				.split('\n')
+				.find(line => line.trim().startsWith(stepId)) ?? '';
 
 		it('lists the steps of an execution ended by flow cancel, failed and skipped ones with their reason', () => {
 			const s = store();
@@ -103,7 +106,7 @@ describe('flow history command', () => {
 			expect(stepRow('wait')).toContain('failed');
 			expect(printed()).toContain("Step 'wait' failed:");
 			expect(printed()).toContain('Error:  cancelled by user');
-			expect(stepRow('after')).toContain('completed');
+			expect(stepRow('after')).toContain('skipped');
 			expect(printed()).toContain('skipped: cancelled by user');
 		});
 
@@ -302,7 +305,10 @@ describe('flow history --id with a qualified id', () => {
 		fs.mkdirSync(path.join(configDir, 'executions'));
 		fs.writeFileSync(
 			path.join(configDir, 'executions', 'aaa11111.json'),
-			JSON.stringify({ ...exec('aaa11111', 'flow-a', 'completed', '2026-08-16T10:00:00.000Z'), projectId: alphaId })
+			JSON.stringify({
+				...exec('aaa11111', 'flow-a', 'completed', '2026-08-16T10:00:00.000Z'),
+				projectId: alphaId,
+			})
 		);
 		logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 		errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -322,7 +328,8 @@ describe('flow history --id with a qualified id', () => {
 		registerHistoryCommand(program, () => configDir);
 		program.parse(['node', 'test', 'history', ...args]);
 	};
-	const printed = (spy: ReturnType<typeof vi.spyOn>): string => spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+	const printed = (spy: ReturnType<typeof vi.spyOn>): string =>
+		spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
 
 	it('shows the detail of <project>/<id>', () => {
 		run('--id', 'alpha/aaa');

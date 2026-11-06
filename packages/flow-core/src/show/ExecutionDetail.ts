@@ -6,6 +6,7 @@ import { versionDetailLineOf } from '../definitions/RecordedVersion.js';
 import { FlowCoreError, errorMessage } from '../errors.js';
 import { looksLikeExecutionId } from '../execution/ExecutionId.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
+import { SKIPPED_LABEL, skipReasonOf } from '../execution/StepSkip.js';
 import { formatDuration, formatStartedUtc } from '../history/ExecutionFormat.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { renderStepCostLines, renderTotalCostLine } from './StepCostLines.js';
@@ -170,8 +171,10 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	for (const [stepId, step] of Object.entries(record.steps)) {
 		const name = step.injected ? `${stepId}*` : stepId;
 		const model = modelOf(step);
+		const skipReason = skipReasonOf(step);
+		// A step that did not run shows "skipped", never "completed", and no attempts: it had none.
 		lines.push(
-			`  ${name}  [${step.status}]  ${stepDuration(step)}${model ? `  model: ${model}` : ''}${step.wave === undefined ? '' : `  wave: ${step.wave}`}${attemptsLabel(step)}`
+			`  ${name}  [${skipReason === undefined ? step.status : SKIPPED_LABEL}]  ${stepDuration(step)}${model ? `  model: ${model}` : ''}${step.wave === undefined ? '' : `  wave: ${step.wave}`}${skipReason === undefined ? attemptsLabel(step) : ''}`
 		);
 		for (const [i, relaunch] of (step.relaunches ?? []).entries()) {
 			const firstLine = relaunch.feedback.split('\n').find(l => l.trim() !== '') ?? '';
@@ -179,8 +182,8 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 				`      relaunch ${i + 1} (sub-step failed) ${formatStartedUtc(relaunch.at)}: ${firstLine.slice(0, 160)}`
 			);
 		}
-		if (step.skippedReason) {
-			lines.push(`      skipped: ${step.skippedReason}`);
+		if (skipReason !== undefined) {
+			lines.push(`      skipped: ${skipReason}`);
 		}
 		if (step.error) {
 			lines.push(`      error: ${step.error}`);

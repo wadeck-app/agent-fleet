@@ -1,6 +1,7 @@
 import { versionColumnOf, versionNoteOf } from '../definitions/RecordedVersion.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
 import { type CostTotal, formatStepCost, sumStepCosts, summarizeStepCost } from '../execution/StepCost.js';
+import { countSkippedSteps, skipReasonOf } from '../execution/StepSkip.js';
 import { formatDuration } from '../history/ExecutionFormat.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import type { ResolvedExecution } from '../show/ExecutionDetail.js';
@@ -32,11 +33,18 @@ export interface ExecutionSummary {
 	versionLabel: string;
 	stepCount: number;
 	failedStepCount: number;
+	/** Steps that did not run (stored as `completed`; see StepSkip). Counted in `stepCount`, apart from the ones that ran. */
+	skippedStepCount: number;
 }
 
 export interface StepView {
 	stepId: string;
+	/** The stored status: a step that did not run is still `completed` here, `skipped` says it. */
 	status: string;
+	/** True when the step did not run (a false `when`, a failed dependency, a cancelled run). Absent otherwise. */
+	skipped?: true;
+	/** Why it did not run; present exactly when `skipped` is. */
+	skippedReason?: string;
 	injected: boolean;
 	startedAt?: string;
 	completedAt?: string;
@@ -98,6 +106,7 @@ export function toExecutionSummary(record: ExecutionState, projectLookup?: Proje
 		versionLabel: versionColumnOf(record),
 		stepCount: steps.length,
 		failedStepCount: steps.filter(step => step.status === 'failed').length,
+		skippedStepCount: countSkippedSteps(steps),
 	};
 }
 
@@ -106,9 +115,11 @@ function toStepView(stepId: string, step: StepState): StepView {
 	const cost = summarizeStepCost(step);
 	const label = formatStepCost(cost);
 	const attemptHistory = toStepAttemptViews(step, cost);
+	const skipReason = skipReasonOf(step);
 	return {
 		stepId,
 		status: step.status,
+		...(skipReason !== undefined ? { skipped: true as const, skippedReason: skipReason } : {}),
 		injected: step.injected === true,
 		...(step.startedAt !== undefined ? { startedAt: step.startedAt } : {}),
 		...(step.completedAt !== undefined ? { completedAt: step.completedAt } : {}),
