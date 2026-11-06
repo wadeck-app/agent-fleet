@@ -64,6 +64,18 @@ export class WrapperPresence implements PresencePublisher, LiveRunCheck {
 		return record !== undefined && this.isProcessAlive(record.pid);
 	}
 
+	/** True when at least one presence file belongs to a live process. */
+	hasLiveWrapper(): boolean {
+		if (!fs.existsSync(this.directory)) return false;
+		return fs
+			.readdirSync(this.directory)
+			.filter(file => WRAPPER_FILE.test(file))
+			.some(file => {
+				const record = this.read(path.join(this.directory, file));
+				return record !== undefined && this.isProcessAlive(record.pid);
+			});
+	}
+
 	isRunAlive(executionId: string): boolean {
 		if (!fs.existsSync(this.directory)) return false;
 		return fs

@@ -15,6 +15,7 @@ import { SandboxLifecycle } from '../SandboxLifecycle';
 import type { SandboxLog } from '../SandboxLog';
 import { SbxCliRuntime } from '../SbxCliRuntime';
 import { SbxPrerequisiteCheck } from '../SbxPrerequisiteCheck';
+import { StaleTempSweep } from '../StaleTempSweep';
 import { SystemClock } from '../SystemClock';
 import { SystemScheduler } from '../SystemScheduler';
 import { WrapperPresence } from '../WrapperPresence';
@@ -78,6 +79,8 @@ export async function runHarness(argv: readonly string[], env: NodeJS.ProcessEnv
 			`A harness with wrapper id "${config.wrapperId}" is already running (presence file in ${config.presenceDirectory}). Only one wrapper per id may run; this launch exits. Use another --wrapper-id for a second harness.`
 		);
 	}
+	// What a hard-killed earlier wrapper left in the temp directory (secret directories) goes now, each removal logged.
+	new StaleTempSweep({ tempDirectory: os.tmpdir(), presence, clock: new SystemClock(), log }).run();
 	presence.publish(config.wrapperId, undefined);
 	// Everything acquired from here on is released by this stack, whatever fails later (prerequisites, startup, run).
 	const cleanup = new CleanupStack(log);
@@ -96,7 +99,9 @@ export async function runHarness(argv: readonly string[], env: NodeJS.ProcessEnv
 		await leftovers.reportAtStart();
 		await leftovers.reapOwn(config.wrapperId, new Set());
 
-		const secretsDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sbx-harness-secrets-'));
+		const secretsDirectory = fs.mkdtempSync(
+			path.join(os.tmpdir(), `flow-sbx-harness-secrets-${config.wrapperId}-`)
+		);
 		cleanup.add('remove the secrets directory', () =>
 			fs.rmSync(secretsDirectory, { recursive: true, force: true })
 		);

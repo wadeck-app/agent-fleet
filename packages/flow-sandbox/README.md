@@ -44,6 +44,7 @@ No drift check in `scripts/check-mock-drift.js`: it probes a CLI in PATH against
 
 - `PathTranslator` is lexical; symlinks and junctions are rejected by `RunMounts` (M3).
 - `start` is an `exec true` (sbx has no start verb).
+- Windows ignores the file mode `0600` of the secret and env files (`PrivateSecretFile`, `PrivateEnvFile`, the wrapper secrets directory): on Windows they are as private as the temp directory of the account (the default `%TEMP%` is readable by the account, SYSTEM and administrators only). Residual, NOT closed: no owner-only ACL is set (that needs the Windows ACL tool, which was not used here), and a wrapper does not check that `%TEMP%` is private; do not point `TEMP` at a shared folder. A wrapper killed hard leaves its `flow-sbx-<exec|harness>-secrets-<wrapperId>-*` and `flow-sandbox-env-*` directories behind; at startup `StaleTempSweep` removes those older than 24 h whose wrapper is not running (env directories only while no wrapper runs), logging each removal.
 - Host abort of `exec` does not stop the process in the VM; call `stop`.
 
 ## M2: credentials, network rules, tool stores

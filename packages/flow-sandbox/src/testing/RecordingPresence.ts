@@ -18,6 +18,10 @@ export class RecordingPresence implements PresencePublisher, LiveRunCheck {
 		return this.aliveWrappers.has(wrapperId);
 	}
 
+	hasLiveWrapper(): boolean {
+		return this.aliveWrappers.size > 0;
+	}
+
 	isRunAlive(executionId: string): boolean {
 		return this.aliveRuns.has(executionId);
 	}

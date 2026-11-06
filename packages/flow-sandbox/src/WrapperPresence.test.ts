@@ -31,10 +31,12 @@ describe('WrapperPresence', () => {
 		expect(presence().isRunAlive('run1')).toBe(true);
 		expect(presence().isRunAlive('run2')).toBe(false);
 		expect(presence().isWrapperAlive('w2')).toBe(false);
+		expect(presence().hasLiveWrapper()).toBe(true);
 
 		alive.clear();
 
 		expect(presence().isWrapperAlive('w1')).toBe(false);
+		expect(presence().hasLiveWrapper()).toBe(false);
 		expect(presence().isRunAlive('run1')).toBe(false);
 	});
 
