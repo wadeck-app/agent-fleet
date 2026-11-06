@@ -4,12 +4,20 @@ import type { PluginLoader } from './PluginLoader';
 
 /**
  * Loads the provider a `type: plugins.<id>.<impl>` entry names. The registry is asked first, under the type reference
- * itself; when nothing is registered there (always the case today: no builtin is migrated), the manifest system answers,
- * unchanged. An explicit pluginsDir keeps its meaning "use that copy" and skips the registry, like it skips the
- * built-in manifests.
+ * itself, whether or not a pluginsDir is given -- the same precedence as WorkerTypeInstances: a built-in is the code
+ * shipped with flow, and a same-named copy left in a directory (stale, or planted) must not silently replace it.
+ * When nothing is registered, the manifest system answers, unchanged.
+ *
+ * With a pluginsDir the choice is never silent: it is reported at warn level whichever side answered.
  */
 export class PluginProviderLoader {
-	constructor(private readonly legacy: Pick<PluginLoader, 'loadProvider'>) {}
+	constructor(
+		private readonly legacy: Pick<PluginLoader, 'loadProvider'>,
+		/** Defaults to stderr: a precedence decision that nobody can see is the bug this guards against. */
+		private readonly log: (level: 'warn', message: string) => void = (_level, message) => {
+			process.stderr.write(`[flow] warning: ${message}\n`);
+		}
+	) {}
 
 	async loadProvider(
 		typeRef: string,
@@ -17,14 +25,26 @@ export class PluginProviderLoader {
 		options: Record<string, unknown>,
 		pluginsDir?: string
 	): Promise<unknown> {
-		const registered = pluginsDir === undefined ? getBuiltinPlugin(typeRef) : undefined;
+		const registered = getBuiltinPlugin(typeRef);
 		if (registered === undefined) {
+			if (pluginsDir !== undefined) {
+				this.log(
+					'warn',
+					`plugin "${typeRef}" is not a built-in of flow, so it is loaded from the pluginsDir "${pluginsDir}". A built-in registered under this reference later would take precedence over that directory.`
+				);
+			}
 			return this.legacy.loadProvider(typeRef, extensionPoint, options, pluginsDir);
 		}
 		if (registered.extensionPoint !== extensionPoint) {
 			throw new Error(
 				`Plugin "${typeRef}" serves the extension point "${registered.extensionPoint}", not "${extensionPoint}". ` +
 					`Move it to a "${registered.extensionPoint}" entry of the configuration.`
+			);
+		}
+		if (pluginsDir !== undefined) {
+			this.log(
+				'warn',
+				`plugin "${typeRef}" is a built-in of flow, so it is served from the built-in registry and the pluginsDir "${pluginsDir}" you gave is ignored. To use a copy from that directory, give it another plugin id.`
 			);
 		}
 		return this.createInstance(typeRef, registered, options);

@@ -165,21 +165,59 @@ describe('PluginProviderLoader', () => {
 			expect(error?.cause).toBe(failure);
 		});
 
-		it('an explicit pluginsDir keeps meaning "use that copy": the legacy path wins over the registry', async () => {
-			registerBuiltinPlugin('plugins.legacy.default', {
-				extensionPoint: 'workspace',
-				create: async () => ({ dispose: async () => {} }),
-			});
+		// Was: "an explicit pluginsDir keeps meaning 'use that copy': the legacy path wins over the registry". The
+		// precedence is now the same as WorkerTypeInstances: a registered built-in answers first, and says so loudly.
+		it('a registered built-in answers ahead of an explicit pluginsDir, and says the directory is ignored', async () => {
+			const create = vi.fn(async () => ({ dispose: async () => {} }));
+			registerBuiltinPlugin('plugins.legacy.default', { extensionPoint: 'workspace', create });
 			writeLegacyPlugin('legacy');
+			const messages: { level: string; message: string }[] = [];
+			const legacy = { loadProvider: vi.fn() };
 
-			const provider = await new PluginProviderLoader(new PluginLoader()).loadProvider(
+			await new PluginProviderLoader(legacy, (level, message) => messages.push({ level, message })).loadProvider(
 				'plugins.legacy.default',
 				'workspace',
 				{},
 				dir
 			);
 
+			expect(create).toHaveBeenCalledOnce();
+			expect(legacy.loadProvider).not.toHaveBeenCalled();
+			expect(messages).toEqual([
+				{
+					level: 'warn',
+					message:
+						`plugin "plugins.legacy.default" is a built-in of flow, so it is served from the built-in registry and the pluginsDir "${dir}" you gave is ignored. ` +
+						'To use a copy from that directory, give it another plugin id.',
+				},
+			]);
+		});
+
+		it('says the directory answered when nothing is registered under the reference', async () => {
+			writeLegacyPlugin('legacy');
+			const messages: { level: string; message: string }[] = [];
+
+			const provider = await new PluginProviderLoader(new PluginLoader(), (level, message) =>
+				messages.push({ level, message })
+			).loadProvider('plugins.legacy.default', 'workspace', {}, dir);
+
 			expect(provider).toEqual({ builtFrom: {} });
+			expect(messages).toEqual([
+				{
+					level: 'warn',
+					message: `plugin "plugins.legacy.default" is not a built-in of flow, so it is loaded from the pluginsDir "${dir}". A built-in registered under this reference later would take precedence over that directory.`,
+				},
+			]);
+		});
+
+		it('says nothing when no directory is named: there is no choice to report', async () => {
+			const messages: string[] = [];
+
+			await new PluginProviderLoader(new PluginLoader(), (_level, message) =>
+				messages.push(message)
+			).loadProvider('plugins.none.default', 'workspace', {});
+
+			expect(messages).toEqual([]);
 		});
 	});
 });
