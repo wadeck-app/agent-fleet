@@ -1,3 +1,4 @@
+import { flowConfigDir } from 'flow-cli/src/config/FlowConfigDir';
 import { WorkerAdapter } from 'flow-cli/src/worker/WorkerAdapter';
 import { StepRunner, type StepRunnerConfig } from 'flow-engine';
 import fs from 'node:fs';
@@ -29,12 +30,14 @@ import { HarnessConfigParser } from '../harness/HarnessConfig';
 import { RelayRegistration } from '../harness/RelayRegistration';
 import { ExecSandboxPreparer } from './ExecSandboxPreparer';
 import { ExecWrapper, type StepExecutor } from './ExecWrapper';
+import { FlowSourceLookup } from './FlowSourceLookup';
 import { McpCallbackRules } from './McpCallbackRules';
 import { SbxProcessLauncher } from './SbxProcessLauncher';
 import { StepCommandTranslator } from './StepCommandTranslator';
 import { VmEnvironmentFilter } from './VmEnvironmentFilter';
 import { VmExecutableLookup } from './VmExecutableLookup';
 import { VmFileStager } from './VmFileStager';
+import { WorkerTypePreflight } from './WorkerTypePreflight';
 
 /** Version string the wrapper reports to the daemon (`flow worker list`). */
 const EXEC_VERSION = 'sandbox-exec-m7';
@@ -55,6 +58,12 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 	log.info(
 		`starting: wrapper ${config.wrapperId}, source ${config.sourceId}, projects ${config.projectIds.join(',')}, labels ${config.labels.join(',')}, image ${config.image ?? '(agent default)'}`
 	);
+	// What the wrapper can know about its routing: how its source was declared (never the flow). One line, a warning unless the source has a plugin ref.
+	new WorkerTypePreflight({
+		sourceId: config.sourceId,
+		lookup: () => new FlowSourceLookup(flowConfigDir()).find(config.sourceId),
+		log,
+	}).run();
 	// The daemon may start a second wrapper while the first one is still starting: the wrapper id is the lock.
 	const presence = new WrapperPresence(config.presenceDirectory, isProcessAlive, process.pid);
 	if (presence.isWrapperAlive(config.wrapperId)) {
