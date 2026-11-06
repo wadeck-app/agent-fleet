@@ -173,6 +173,18 @@ class FlowWorld {
 		});
 	}
 
+	/**
+	 * Runs a flow, then waits until the daemon has released its workspace: that happens after the end-of-run notice, the wrapper's
+	 * removal of the sandbox and its ack, so everything the tests look at afterwards (sbx calls, log lines) exists.
+	 */
+	async runAndRelease(file: string): Promise<ExecutionRecord> {
+		const released = (): number => this.log().split('Released workspace').length - 1;
+		const before = released();
+		const record = await this.run(file);
+		await waitFor('the daemon to release the run workspace', 40_000, () => released() > before || undefined);
+		return record;
+	}
+
 	sbxCalls(): MockSbxCall[] {
 		const file = path.join(this.mockState, 'calls.jsonl');
 		if (!fs.existsSync(file)) return [];
@@ -245,7 +257,7 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		await world.registerProject();
 		world.declareSource('sandbox-1', artifactDirectory, MOCK_SBX_PATH);
 		await world.startDaemon();
-		first = await world.run(world.writeFlow('bound-one', true));
+		first = await world.runAndRelease(world.writeFlow('bound-one', true));
 	}, 150_000);
 
 	it('serves a bound run through the sandbox worker and issues the sbx commands in order, rm last', () => {
@@ -289,7 +301,7 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 	});
 
 	it('starts a second run on a fresh sandbox, served by the same wrapper, and removes that one too', async () => {
-		const second = await world.run(world.writeFlow('bound-two', true));
+		const second = await world.runAndRelease(world.writeFlow('bound-two', true));
 
 		const calls = world.sbxCalls();
 		const created = sandboxesCreated(calls);
@@ -318,7 +330,7 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		// Routing code (StepRouter): a step without labels or workerType is accepted by any idle worker attached to the project, and
 		// workers someone launched are preferred to one the daemon would fork. So the sandbox worker is chosen here. This is exactly
 		// why an injected step (no labels) needs a run bound with `workerType: sandbox`.
-		const record = await world.run(world.writeFlow('unbound', false));
+		const record = await world.runAndRelease(world.writeFlow('unbound', false));
 
 		expect(record.status).toBe('completed');
 		expect(record.steps?.['probe']?.sourceId).toBe('sandbox-1');
