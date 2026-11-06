@@ -28,6 +28,19 @@ describe('validateFlowFile', () => {
 		expect(result.exit).toBe(0);
 	});
 
+	it('surfaces SCRIPT_BODY_INTERPOLATION as a warning (exit 0) with the env: fix', () => {
+		const tmpFile = path.join(tmpDir, 'interpolation.yml');
+		fs.writeFileSync(
+			tmpFile,
+			fs.readFileSync(SIMPLE_FLOW, 'utf8').replace('echo "hello"', 'echo "${{ inputs.message }}"')
+		);
+		const result = validateFlowFile(tmpFile, store);
+		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
+		const warning = result.warnings.find(w => w.includes('inputs.message'));
+		expect(warning).toContain("'step-one'");
+		expect(warning).toContain('env:');
+	});
+
 	it('returns exit 1 with errors for a flow with invalid dependencies', () => {
 		const result = validateFlowFile(INVALID_FLOW, store);
 		expect(result.exit).toBe(1);

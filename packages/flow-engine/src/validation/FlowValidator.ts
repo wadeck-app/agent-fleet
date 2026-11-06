@@ -33,6 +33,7 @@ import { GraphValidator } from './GraphValidator';
 import { LogicalValidator } from './LogicalValidator';
 // Import specialized validators
 import { SchemaValidator } from './SchemaValidator';
+import { ScriptInterpolationValidator } from './ScriptInterpolationValidator';
 import { SecretValidator } from './SecretValidator';
 import { SemanticValidator } from './SemanticValidator';
 import { SimulationValidator } from './SimulationValidator';
@@ -65,6 +66,7 @@ export class FlowValidator implements IssueCollector {
 	// Specialized validators
 	private schemaValidator: SchemaValidator;
 	private secretValidator: SecretValidator;
+	private scriptInterpolationValidator: ScriptInterpolationValidator;
 	private graphValidator: GraphValidator;
 	private semanticValidator: SemanticValidator;
 	private templateValidator: TemplateValidator;
@@ -87,6 +89,7 @@ export class FlowValidator implements IssueCollector {
 		// Initialize specialized validators with this as IssueCollector
 		this.schemaValidator = new SchemaValidator(this, validTaskStatuses, knownWorkerTypes);
 		this.secretValidator = new SecretValidator(this);
+		this.scriptInterpolationValidator = new ScriptInterpolationValidator(this);
 		this.graphValidator = new GraphValidator(this, flowRegistry);
 		this.semanticValidator = new SemanticValidator(this, this.graphValidator, flowRegistry);
 		this.templateValidator = new TemplateValidator(this);
@@ -110,6 +113,7 @@ export class FlowValidator implements IssueCollector {
 
 		// Secrets: validated before any early exit so their errors are always reported
 		this.secretValidator.validateSecrets(flow);
+		this.scriptInterpolationValidator.validate(flow);
 
 		// Early exit if critical errors prevent semantic validation
 		if (!this.canProceedToSemantics()) {

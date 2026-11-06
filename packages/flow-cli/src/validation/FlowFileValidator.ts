@@ -29,6 +29,7 @@ const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([
 	ValidationCode.SUB_STEP_SIBLING_DEPENDENCY,
 	ValidationCode.SUB_STEP_WAVES_SINGLE_WAVE,
 	ValidationCode.WAVE_REDUNDANT_DEPENDS,
+	ValidationCode.SCRIPT_BODY_INTERPOLATION,
 ]);
 
 // Same reserved key as FlowRegistry.loadProjectFlows

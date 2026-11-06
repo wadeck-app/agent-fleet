@@ -9,6 +9,12 @@
 | T-03 | Misconfigured workspace plugin corrupts source files | Accepted (opt-in) | `none` provider uses `process.cwd()` — user's explicit choice. `worktree` provider exposes only allocated path. |
 | T-06 | Cross-task intervention spoofing via web UI          | **OPEN**          | Orchestrator approval plugin must not ship until this is resolved.                                              |
 
+## Flow execution
+
+| ID   | Threat                                                                                  | Status                     | Mitigation                                                                                                                                                                     |
+| ---- | --------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| F-01 | Untrusted input in a `script:` body runs as shell code (`${{ inputs.* }}` is raw text) | **Partly mitigated** (warn) | `flow validate` warns `SCRIPT_BODY_INTERPOLATION`; values passed through `env:` stay data. No run-time quoting: a flow that ignores the warning stays injectable (bash proven). |
+
 ## CLI distribution
 
 | ID   | Threat                                             | Status    | Mitigation                                                          |

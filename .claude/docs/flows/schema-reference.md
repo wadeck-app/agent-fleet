@@ -547,6 +547,22 @@ Executes a shell script or command in the workspace.
         script: curl -s -H "Authorization: Bearer $API_TOKEN" https://example.invalid/
     ```
 
+#### Interpolating values into `script`
+
+- **Rule**: `${{ ... }}` in a script body is raw text substitution; the shell then parses the result. A value containing `$(...)`, backticks, quotes or `;` is executed or mangled. The same value passed through `env:` stays data.
+- **Validation**: warning `SCRIPT_BODY_INTERPOLATION` for `inputs.X` (except number/integer/boolean/percentage/password inputs) and for `steps.X.outputs.*` of non-script steps (model, user_intervention, subflow, event). Outputs of script steps, `context.*` and `env:` values are not flagged.
+- **Fix**: pass the value through `env:` and read `$NAME` (quoted) in the script. Interpolate only values you control (a path, a flag).
+- **Example**:
+    ```yaml
+    - type: script
+      id: log-task
+      name: 'Log task'
+      shell: bash
+      env:
+        TASK: '${{ inputs.task }}'
+      script: printf '%s\n' "$TASK"
+    ```
+
 #### Other Properties
 
 See [Common Step Properties](#common-step-properties) for `context`, `output`, `depends`, `when`, `skipOnLoop`, `retry`, `onFailure`, `contract`.
