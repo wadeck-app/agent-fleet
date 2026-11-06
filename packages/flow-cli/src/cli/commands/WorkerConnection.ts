@@ -117,7 +117,7 @@ export class WorkerConnection {
 	private scheduleReconnect(attempt: number): void {
 		const { notifiers } = this.config;
 		// Three ways to learn the daemon is back, whichever arrives first:
-		// 1. An HTTP nudge from the daemon (NudgeServer): delivers the wsUrl directly, works remotely.
+		// 1. An HTTP nudge from the daemon (NudgeServer): hurries the reconnect; the address must match the trusted one.
 		// 2. A filesystem event (DaemonWatchNotifier): local-only, worker reads worker.port itself.
 		// 3. The backoff timer: always fires regardless of the above two, so a missed notification
 		//    costs only latency.

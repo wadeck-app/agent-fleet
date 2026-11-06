@@ -14,6 +14,7 @@ import { WorkerDisplay } from '../../worker/WorkerDisplay';
 import {
 	buildRegistration,
 	probeShellCapabilities,
+	resolveDaemonWsUrl,
 	resolveExtraProjects,
 	resolveSourceId,
 	resolveWorkerToken,
@@ -139,9 +140,10 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 	});
 
 	// The nudge server lets the daemon notify this worker the moment its WS listener is
-	// bound -- no backoff wait. Works for local and remote workers alike, because the daemon
-	// sends an HTTP POST to the URL rather than relying on a shared filesystem.
-	const nudgeServer = new NudgeServer();
+	// bound -- no backoff wait. The daemon
+	// sends an HTTP POST to the URL (no shared filesystem needed), but the address it carries must match the one this worker trusts.
+	// Pinned to the address the worker would dial on its own: a nudge can only hurry a reconnect, never redirect it.
+	const nudgeServer = new NudgeServer(() => resolveDaemonWsUrl(daemonDir, config.worker.wsPort));
 	let nudgeUrl: string | undefined;
 	try {
 		nudgeUrl = await nudgeServer.start();

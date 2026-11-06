@@ -184,6 +184,13 @@ That watch is local-only. Deliberately, because the alternatives are worse:
 
 - **An HTTP nudge to the worker** requires the worker to listen: an inbound surface on every
   machine, TLS for any non-loopback bind, a reachable address per worker, and NAT breaks it.
+  The nudge a worker does publish (loopback only) is a hint, never an instruction: it is refused unless it
+  is `application/json`, has no `Origin`, targets the worker's own `127.0.0.1:<port>` Host, and its `wsUrl` equals the
+  address the worker would dial itself (`worker.wsPort`, `FLOW_DAEMON_WS_URL` or the `worker.port` file; same
+  scheme, host and port, no user info). The worker then dials that address, not the nudged text. A refused nudge
+  is logged once as `[nudge] refused ...`; the worker keeps reconnecting by backoff. Known gap: with
+  `worker.wsPort` set and the daemon bound elsewhere (port taken), the nudge is refused; align the port. Remote
+  workers need an explicit allow-list or shared secret (not built). See threat F-02.
 - **The daemon initiating the work connection** is worse still: the worker would have to
   authenticate the daemon, and a rogue daemon feeding steps to a worker is arbitrary code execution
   on that machine.

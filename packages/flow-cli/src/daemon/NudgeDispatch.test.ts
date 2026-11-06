@@ -5,7 +5,7 @@ import { sendNudge } from './NudgeDispatch.js';
 
 describe('sendNudge', () => {
 	it('delivers wsUrl to a running NudgeServer', async () => {
-		const server = new NudgeServer();
+		const server = new NudgeServer(() => 'ws://127.0.0.1:5050');
 		const nudgeUrl = await server.start();
 
 		const received: (string | undefined)[] = [];
@@ -23,7 +23,7 @@ describe('sendNudge', () => {
 	});
 
 	it('rejects on a non-2xx response', async () => {
-		const server = new NudgeServer();
+		const server = new NudgeServer(() => 'ws://127.0.0.1:5050');
 		const nudgeUrl = await server.start();
 		// No callback registered → server returns 200 but with no listener (still 200 because
 		// the server itself handles the request). This tests the happy path indirectly, but the
