@@ -5,7 +5,7 @@ import type { FlowPlugin } from '../config/FlowPlugin.js';
 import type { PluginLoader } from '../config/PluginLoader.js';
 import { raceWithTimeout } from './BoundedWait.js';
 import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
-import { INBOUND_PLUGIN_REF, withEntryNudgeUrl } from './InboundNudgeOption.js';
+import { INBOUND_PLUGIN_REF, entryNudgeUrlToCopy } from './InboundNudgeOption.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { PLUGIN_REF } from './WorkerSourcePluginReference.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
@@ -101,10 +101,11 @@ export class WorkerTypeInstances {
 
 		// The inbound worker type reads its URL from the options; the entry's own nudgeUrl is copied in first, so the
 		// fingerprint and the plugin both see it. Built-in path only: a plugin from disk never sees more than before.
-		const effective = registered !== undefined && plugin === INBOUND_PLUGIN_REF ? withEntryNudgeUrl(entry) : entry;
+		const entryNudgeUrl =
+			registered !== undefined && plugin === INBOUND_PLUGIN_REF ? entryNudgeUrlToCopy(entry) : undefined;
 
 		// `host` is deliberately not part of the fingerprint: the first caller's findRelay is kept; harmless while there is one relay lookup per daemon.
-		const fingerprint = JSON.stringify([plugin, pluginsDir, effective.options ?? null]);
+		const fingerprint = JSON.stringify([plugin, pluginsDir, entry.options ?? null, entryNudgeUrl ?? null]);
 		// Re-read after every wait: another contact may have replaced the entry while this one was disposing it, and
 		// overwriting theirs would leave their instance alive and unreferenced.
 		for (;;) {
@@ -126,7 +127,7 @@ export class WorkerTypeInstances {
 
 		const created: CachedInstance = {
 			fingerprint,
-			instance: this.build(effective, plugin, pluginsDir, host, registered),
+			instance: this.build(entry, plugin, pluginsDir, host, registered, entryNudgeUrl),
 		};
 		this.cache.set(sourceId, created);
 		this.disposed.delete(sourceId);
@@ -229,10 +230,16 @@ export class WorkerTypeInstances {
 		plugin: string,
 		pluginsDir: string | undefined,
 		host: WorkerTypeHost,
-		registered: FlowPlugin | undefined
+		registered: FlowPlugin | undefined,
+		entryNudgeUrl: string | undefined
 	): Promise<WorkerTypeInstance> {
 		// Outside the load error below: an unset variable is the user's to fix, and says which one.
-		const options = resolveEnvVars(entry.sourceId, entry.options);
+		const expanded = resolveEnvVars(entry.sourceId, entry.options);
+		// Copied after the expansion on purpose: entry data is never expanded (see entryNudgeUrlToCopy).
+		const options =
+			entryNudgeUrl === undefined
+				? expanded
+				: { ...(expanded as Record<string, unknown> | undefined), nudgeUrl: entryNudgeUrl };
 		const loading = this.load(entry, plugin, pluginsDir, options, host, registered);
 		let built: WorkerTypeInstance | undefined;
 		const outcome = await raceWithTimeout(

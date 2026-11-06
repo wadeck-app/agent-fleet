@@ -2,6 +2,7 @@ import type { WorkerRequest, WorkerSourceProvider } from 'extension-points';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { sendNudge } from './NudgeDispatch.js';
+import { redactNudgeUrl } from './NudgeUrlCheck.js';
 
 /**
  * A source whose workers are already running and dial the daemon themselves.
@@ -22,10 +23,11 @@ export class InboundWorkerSource implements WorkerSourceProvider {
 		try {
 			await sendNudge(this.nudgeUrl, request.daemonEndpoint);
 		} catch (err) {
-			// Not fatal: the worker reconnects via backoff. Throw so the caller can log it.
-			throw new Error(
-				`nudge to "${request.sourceId}" at ${this.nudgeUrl} failed: ${normalizeError(err).message}`
-			);
+			// Not fatal: the worker reconnects via backoff. Throw so the caller can log it. The URL may carry a secret
+			// (user info, query values), and the cause may quote it too: both are redacted.
+			const shown = redactNudgeUrl(this.nudgeUrl);
+			const cause = normalizeError(err).message.split(this.nudgeUrl).join(shown);
+			throw new Error(`nudge to "${request.sourceId}" at ${shown} failed: ${cause}`);
 		}
 	}
 }

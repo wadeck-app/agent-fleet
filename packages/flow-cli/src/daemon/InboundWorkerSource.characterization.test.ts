@@ -140,7 +140,7 @@ describe('a declared built-in:inbound source - characterization', () => {
 	it.each([
 		[
 			'not a url?token=abc123',
-			'nudgeUrl "not a url?token=abc123" must be an http(s) URL, e.g. http://127.0.0.1:5555/nudge.',
+			'nudgeUrl carries a credential (query parameter "token"). Write ${NAME} instead of the literal value and set NAME in the daemon environment.',
 		],
 		['ftp://host/x', 'nudgeUrl "ftp://host/x" must be an http(s) URL, e.g. http://127.0.0.1:5555/nudge.'],
 		[

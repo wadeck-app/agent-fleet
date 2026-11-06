@@ -2,6 +2,7 @@ import type { WorkerTypeInstance } from 'extension-points';
 
 import type { FlowPlugin } from '../config/FlowPlugin.js';
 import { InboundWorkerSource } from './InboundWorkerSource.js';
+import { nudgeUrlProblem } from './NudgeUrlCheck.js';
 
 /** The type reference the inbound worker type is registered under (see BuiltinPluginRegistry). */
 export const INBOUND_WORKER_TYPE_REF = 'plugins.inbound.default';
@@ -25,7 +26,11 @@ export function buildInboundWorkerType(nudgeUrl?: string): WorkerTypeInstance {
  * Plugin form of the inbound worker type, served from the built-in registry.
  *
  * Its only input is `options.nudgeUrl`. The entry's own top-level `nudgeUrl` (which workers write about themselves)
- * is copied into the options by WorkerTypeInstances, so the plugin never sees the entry.
+ * is copied into the options by WorkerTypeInstances after the options were expanded (entry data is never
+ * expanded), so the plugin never sees the entry.
+ *
+ * The URL is checked again here, after expansion: http(s) only, no user info, no query key named like a credential.
+ * That check is a false positive for a harmless `?key=abc`: write `${NAME}` instead.
  */
 export const inboundWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 	extensionPoint: 'worker-type',
@@ -45,6 +50,20 @@ export const inboundWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 				new Error(
 					`the inbound worker type needs options.nudgeUrl to be a string (an http(s) URL), got ${typeof nudgeUrl}. ` +
 						`Fix: flow worker source remove ${sourceId}, then declare it again with a URL.`
+				)
+			);
+		}
+		// The options are expanded by now, so any text left is literal. The value is never echoed: it may hold a secret.
+		const problem = nudgeUrl === undefined ? undefined : nudgeUrlProblem(nudgeUrl, false);
+		if (problem !== undefined) {
+			const what =
+				problem.kind === 'credential'
+					? `carries a credential (${problem.where})`
+					: 'is not an http(s) URL (the value is not shown: it may hold a secret)';
+			return Promise.reject(
+				new Error(
+					`the inbound worker type got a nudgeUrl that ${what}. ` +
+						`Fix: flow worker source remove ${sourceId}, then declare it again with an http(s) URL; write \${NAME} instead of a literal credential.`
 				)
 			);
 		}

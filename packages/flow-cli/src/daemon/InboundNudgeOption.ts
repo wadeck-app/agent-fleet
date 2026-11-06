@@ -12,24 +12,25 @@ export function nudgeUrlConflict(sourceId: string, entryUrl: string, optionsUrl:
 }
 
 /**
- * The entry as the inbound worker type must see it: the entry's top-level `nudgeUrl` (workers write it about
- * themselves, so it stays where it is) copied into `options.nudgeUrl` when the options have none. Only that field is
- * copied; the plugin never receives the rest of the entry.
+ * The entry's own top-level `nudgeUrl` (workers write it about themselves), when it must be copied into
+ * `options.nudgeUrl`: the options have none. Only that field is copied; the plugin never receives the rest of the entry.
+ *
+ * It is copied AFTER the daemon expanded the options, never before: entry data is not the user's declaration of
+ * `${NAME}`, and expanding it would let whoever wrote the entry read the daemon's environment.
  *
  * @throws when both are set to different values
  */
-export function withEntryNudgeUrl(entry: WorkerSourceEntry): WorkerSourceEntry {
+export function entryNudgeUrlToCopy(entry: WorkerSourceEntry): string | undefined {
 	const entryUrl = entry.nudgeUrl;
 	if (entryUrl === undefined) {
-		return entry;
+		return undefined;
 	}
-	const options = entry.options ?? {};
-	const optionsUrl: unknown = options['nudgeUrl'];
+	const optionsUrl: unknown = entry.options?.['nudgeUrl'];
 	if (optionsUrl === undefined) {
-		return { ...entry, options: { ...options, nudgeUrl: entryUrl } };
+		return entryUrl;
 	}
 	if (optionsUrl !== entryUrl) {
 		throw nudgeUrlConflict(entry.sourceId, entryUrl, String(optionsUrl));
 	}
-	return entry;
+	return undefined;
 }
