@@ -1,7 +1,7 @@
 import type { RunMounts } from '../RunMounts';
-import { SandboxError } from '../SandboxError';
 import type { SandboxLog } from '../SandboxLog';
-import { type JsonObject, isJsonObject, isNonEmptyString } from '../harness/HarnessMessages';
+import { AssignmentFields } from '../harness/AssignmentFields';
+import { type JsonObject, isJsonObject } from '../harness/HarnessMessages';
 import type { ExecStepType } from './ExecSandboxPreparer';
 
 export interface PreparedAssignment {
@@ -41,15 +41,18 @@ export class ExecAssignment {
 	) {}
 
 	prepare(raw: JsonObject): PreparedAssignment {
-		const { assignmentId, stepId, stepConfig, executionContext } = this.parse(raw);
-		const stepType = this.requireStepType(stepConfig, stepId);
+		const { assignmentId, stepId, stepConfig, executionContext } = AssignmentFields.parse(raw, {
+			notAssign: 'ExecAssignment can only prepare an "assign" message.',
+			cannotPlace: 'the step cannot be placed in the sandbox.',
+		});
+		const stepType = AssignmentFields.requireStepType(stepConfig, stepId);
 		const { mounts, log } = this.options;
 		mounts.toSandboxPath(String(executionContext['workspaceDir']), 'workspaceDir');
 		mounts.toSandboxPath(String(executionContext['outputsDir']), 'outputsDir');
 
 		const context: JsonObject = { ...executionContext };
 		const cwd = executionContext['cwd'];
-		if (typeof cwd === 'string' && !this.isInsideMounts(cwd)) {
+		if (typeof cwd === 'string' && !AssignmentFields.isInsideMounts(mounts, cwd)) {
 			context['cwd'] = executionContext['workspaceDir'];
 			log.info(
 				`context.cwd "${cwd}" is outside the sandbox mounts; the step sees the workspace "${String(executionContext['workspaceDir'])}" instead (the project directory is not mounted).`
@@ -58,9 +61,12 @@ export class ExecAssignment {
 		if (typeof executionContext['flowWorkingDir'] === 'string') {
 			this.requireMounted(executionContext['flowWorkingDir'], 'flowWorkingDir');
 		}
-		const step: JsonObject = { ...stepConfig, env: this.mergeEnv(stepConfig, stepType) };
+		const step: JsonObject = {
+			...stepConfig,
+			env: AssignmentFields.mergeEnv(stepConfig, this.options.injectedEnv(stepType), log),
+		};
 		if (typeof stepConfig['workingDir'] === 'string') this.requireMounted(stepConfig['workingDir'], 'workingDir');
-		this.warnAboutWindowsPaths(stepConfig, stepId);
+		AssignmentFields.warnAboutWindowsPaths(mounts, stepConfig, stepId, log);
 		return {
 			assignmentId,
 			stepId,
@@ -80,89 +86,7 @@ export class ExecAssignment {
 		return names;
 	}
 
-	private parse(raw: JsonObject): {
-		assignmentId: string;
-		stepId: string;
-		stepConfig: JsonObject;
-		executionContext: JsonObject;
-	} {
-		if (raw['type'] !== 'assign') {
-			throw new SandboxError('invalid-argument', 'ExecAssignment can only prepare an "assign" message.');
-		}
-		const { assignmentId, stepId, stepConfig, executionContext } = raw;
-		if (!isNonEmptyString(assignmentId) || !isNonEmptyString(stepId)) {
-			throw new SandboxError('invalid-argument', 'The "assign" message has no assignmentId or stepId.');
-		}
-		if (!isJsonObject(stepConfig) || !isJsonObject(executionContext)) {
-			throw new SandboxError(
-				'invalid-argument',
-				`The "assign" message of step "${stepId}" has no stepConfig or executionContext.`
-			);
-		}
-		for (const field of ['executionId', 'workspaceDir', 'outputsDir']) {
-			if (!isNonEmptyString(executionContext[field])) {
-				throw new SandboxError(
-					'invalid-argument',
-					`The executionContext of step "${stepId}" has no ${field}: the step cannot be placed in the sandbox.`
-				);
-			}
-		}
-		return { assignmentId, stepId, stepConfig, executionContext };
-	}
-
-	private requireStepType(stepConfig: JsonObject, stepId: string): ExecStepType {
-		const type = stepConfig['type'];
-		if (type === 'model' || type === 'script') return type;
-		throw new SandboxError(
-			'invalid-argument',
-			`Step "${stepId}" has type ${JSON.stringify(type)}, which a sandbox worker cannot run: only "model" and "script" steps are supported (a user_intervention step needs a person; route it to a worker without the "sandbox" label).`
-		);
-	}
-
-	private isInsideMounts(hostPath: string): boolean {
-		try {
-			this.options.mounts.translator.toSandbox(hostPath, 'cwd');
-			return true;
-		} catch (error) {
-			if (error instanceof SandboxError && error.kind === 'path-outside-mounts') return false;
-			throw error;
-		}
-	}
-
 	private requireMounted(value: string, label: string): void {
 		if (WINDOWS_ABSOLUTE.test(value)) this.options.mounts.toSandboxPath(value, label);
-	}
-
-	private mergeEnv(stepConfig: JsonObject, stepType: ExecStepType): Record<string, string> {
-		const own = isJsonObject(stepConfig['env']) ? stepConfig['env'] : {};
-		const injected = this.options.injectedEnv(stepType);
-		for (const [name, value] of Object.entries(injected)) {
-			if (own[name] !== undefined && own[name] !== value) {
-				this.options.log.warn(
-					`step env ${name} is set by the sandbox wrapper; the value from the flow is ignored.`
-				);
-			}
-		}
-		const merged: Record<string, string> = {};
-		for (const [name, value] of Object.entries(own)) {
-			if (typeof value === 'string') merged[name] = value;
-		}
-		return { ...merged, ...injected };
-	}
-
-	private warnAboutWindowsPaths(stepConfig: JsonObject, stepId: string): void {
-		const { translator } = this.options.mounts;
-		const env = isJsonObject(stepConfig['env'])
-			? (Object.fromEntries(
-					Object.entries(stepConfig['env']).filter(([, value]) => typeof value === 'string')
-				) as Record<string, string>)
-			: {};
-		const warnings = [
-			...translator.findWindowsPathsInEnv(env),
-			...(typeof stepConfig['script'] === 'string'
-				? translator.findWindowsPathsInScript(stepConfig['script'])
-				: []),
-		];
-		for (const warning of warnings) this.options.log.warn(`step "${stepId}": ${warning.message}`);
 	}
 }
