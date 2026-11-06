@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { BoundStepWait } from './BoundStepWait.js';
 
@@ -62,44 +62,89 @@ describe('BoundStepWait - contact errors in the failure', () => {
 	});
 });
 
+const REFUSED_BASE = BASE.replace(
+	'but no worker of that type was connected in the 121s it waited',
+	'but no worker of that type that accepts this step was available in the 121s it waited'
+);
+
 describe('BoundStepWait - connected workers of the type that refuse the step', () => {
-	function failureWith(refusals: string[] | undefined, connectedOfType = 0) {
+	function failureWith(
+		refusals: (() => string[]) | undefined,
+		contactErrorsSince?: () => string[]
+	): ReturnType<BoundStepWait['decide']> {
 		let now = 1_000;
 		const wait = new BoundStepWait(120_000, () => now);
 		const request = {
 			executionId: 'e1',
 			stepId: 's1',
 			workerType: 'sandbox',
-			connectedOfType,
+			connectedOfType: 0,
 			knownTypes: ['sandbox'],
 			...(refusals === undefined ? {} : { refusals }),
+			...(contactErrorsSince === undefined ? {} : { contactErrorsSince }),
 		};
 		wait.decide(request);
 		now += 121_000;
 		return wait.decide(request);
 	}
 
-	it('names the workers and why each refuses, after the usual text', () => {
-		const decision = failureWith(['w-1 (it lacks the label "gpu")', 'w-2 (it cannot run the shell "bash")']);
+	it('says no worker that ACCEPTS the step was available (not that none was connected), then names the workers and why', () => {
+		const decision = failureWith(() => ['w-1 (it lacks the label "gpu")', 'w-2 (it cannot run the shell "bash")']);
 
 		expect(decision).toEqual({
 			action: 'fail',
-			reason: `${BASE} Workers of that type are connected but refuse this step: w-1 (it lacks the label "gpu"); w-2 (it cannot run the shell "bash").`,
+			reason: `${REFUSED_BASE} Workers of that type are connected but refuse this step: w-1 (it lacks the label "gpu"); w-2 (it cannot run the shell "bash").`,
+		});
+		expect(decision.action === 'fail' && decision.reason).not.toContain('was connected in the');
+	});
+
+	it('puts the base first, then the refusals, then the contact sentence', () => {
+		const decision = failureWith(
+			() => ['w-1 (it lacks the label "gpu")'],
+			() => ['Last contact with source "sbx-1" failed at T1.']
+		);
+
+		expect(decision).toEqual({
+			action: 'fail',
+			reason: `${REFUSED_BASE} Workers of that type are connected but refuse this step: w-1 (it lacks the label "gpu"). Last contact with source "sbx-1" failed at T1.`,
 		});
 	});
 
 	it('lists at most five and counts the rest', () => {
 		const refusals = Array.from({ length: 8 }, (_, index) => `w-${String(index)} (it lacks the label "gpu")`);
 
-		const decision = failureWith(refusals);
+		const decision = failureWith(() => refusals);
 
 		expect(decision.action === 'fail' && decision.reason).toContain('w-4 (it lacks the label "gpu"); and 3 more.');
 		expect(decision.action === 'fail' && decision.reason).not.toContain('w-5');
 	});
 
 	it('leaves the message exactly as before when no connected worker of the type refuses', () => {
-		expect(failureWith([])).toEqual({ action: 'fail', reason: BASE });
+		expect(failureWith(() => [])).toEqual({ action: 'fail', reason: BASE });
 		expect(failureWith(undefined)).toEqual({ action: 'fail', reason: BASE });
+	});
+
+	it('works out the refusals only when the step fails, never while it waits', () => {
+		let now = 1_000;
+		const wait = new BoundStepWait(120_000, () => now);
+		const refusals = vi.fn(() => ['w-1 (it lacks the label "gpu")']);
+		const request = {
+			executionId: 'e1',
+			stepId: 's1',
+			workerType: 'sandbox',
+			connectedOfType: 0,
+			knownTypes: ['sandbox'],
+			refusals,
+		};
+
+		wait.decide(request);
+		now += 60_000;
+		wait.decide(request);
+		expect(refusals).not.toHaveBeenCalled();
+
+		now += 61_000;
+		wait.decide(request);
+		expect(refusals).toHaveBeenCalledOnce();
 	});
 
 	it('does not fail while a worker of the type that accepts the step is connected', () => {

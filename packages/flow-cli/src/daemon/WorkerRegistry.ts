@@ -206,6 +206,14 @@ export class WorkerRegistry {
 	 * Returns all of them rather than the first, because which one may run a given step is
 	 * a routing decision this class deliberately knows nothing about (see `StepRouter`).
 	 */
+	/** Every live worker as registered, idle or busy: what the acceptance rules are asked about. */
+	listConnected(): RegisteredWorker[] {
+		return [...this.workers.values()];
+	}
+
+	/**
+	 * Every idle worker with the connection to reach it (see {@link listConnected} for all of them).
+	 */
 	listIdle(): { ws: WebSocket; worker: RegisteredWorker }[] {
 		const idle: { ws: WebSocket; worker: RegisteredWorker }[] = [];
 		for (const [ws, worker] of this.workers) {

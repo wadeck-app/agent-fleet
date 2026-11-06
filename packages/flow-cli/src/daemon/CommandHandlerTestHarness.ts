@@ -84,6 +84,8 @@ export function createMockWorkerPool() {
 		broadcast: vi.fn(),
 		register: vi.fn(),
 		summarize: vi.fn().mockReturnValue([]),
+		// What a test says is connected through summarize() is what the acceptance rules are asked about.
+		listConnected: vi.fn((): unknown[] => pool.summarize() as unknown[]),
 		// WorkerProvisioner surface
 		canProvision: vi.fn().mockReturnValue(false),
 		planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),

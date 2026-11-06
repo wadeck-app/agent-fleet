@@ -171,8 +171,8 @@ export class StepRouter {
 	 * acceptance (S4) as {@link select}, so it changes who may receive a step in no way; the reason is fixed words and the
 	 * labels or shell the flow declared, never text a plugin wrote.
 	 */
-	refusalOf(step: StepPlacement, worker: WorkerCandidate): string | undefined {
-		if (this.acceptsSafely(step, worker as RegisteredWorker)) {
+	refusalOf(step: StepPlacement, worker: RegisteredWorker): string | undefined {
+		if (this.acceptsSafely(step, worker)) {
 			return undefined;
 		}
 		const isDefault = this.acceptance instanceof DefaultWorkerAcceptance;

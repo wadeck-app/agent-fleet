@@ -304,12 +304,12 @@ export class StepDispatcher {
 			throw new Error(`step ${step.stepId} is not bound to a worker type`);
 		}
 		const { executionId } = step.executionContext;
-		const { accepting, refusals } = tallyAcceptance(this.router, placement, this.registry.summarize(), typeOf);
+		const { anyAccepts, refusals } = tallyAcceptance(this.router, placement, this.registry.listConnected(), typeOf);
 		const decision = this.routing.wait.decide({
 			executionId,
 			stepId: step.stepId,
 			workerType,
-			connectedOfType: accepting,
+			connectedOfType: anyAccepts ? 1 : 0,
 			refusals,
 			knownTypes: this.knownTypesOrNone(executionId),
 			contactErrorsSince: this.routing.contactErrors.sinceFor(workerType, typeOf),

@@ -197,6 +197,10 @@ describe('a bound step fails fast when no connected worker of its type can accep
 		expect(mockExecStore.markStepFailed).toHaveBeenCalledTimes(1);
 		expect(lastFailureReason()).toContain('worker type "sandbox"');
 		expect(lastFailureReason()).toContain(
+			'no worker of that type that accepts this step was available in the 120s it waited'
+		);
+		expect(lastFailureReason()).not.toContain('was connected in the');
+		expect(lastFailureReason()).toContain(
 			'Workers of that type are connected but refuse this step: w-1 (it lacks the label "gpu").'
 		);
 	});
@@ -252,6 +256,61 @@ describe('a bound step fails fast when no connected worker of its type can accep
 		await startRun(handler);
 
 		expect(sent).toEqual(['w-2']);
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+	});
+});
+
+describe('a worker that flips between accepting and refusing', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('starts the clock at the first pass after it flips to refusing, and a worker accepting again resets it', async () => {
+		const flipper = sandboxWorker('w-1', ['gpu']);
+		const { handler, sent } = daemonWith([], [flipper]);
+		await startRun(handler);
+
+		// Accepting but busy: the step waits, however long.
+		vi.advanceTimersByTime(100_000);
+		handler.tryDispatch();
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+
+		// It now refuses (the clock starts at this pass) and does not fail before the bound.
+		flipper.worker.labels = [];
+		handler.tryDispatch();
+		vi.advanceTimersByTime(119_000);
+		handler.tryDispatch();
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+
+		// Accepting again: the clock is forgotten.
+		flipper.worker.labels = ['gpu'];
+		handler.tryDispatch();
+		flipper.worker.labels = [];
+		handler.tryDispatch();
+		vi.advanceTimersByTime(119_000);
+		handler.tryDispatch();
+		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
+
+		// Refusing for a full bound after the last flip: now it fails.
+		vi.advanceTimersByTime(2_000);
+		handler.tryDispatch();
+		expect(sent).toEqual([]);
+		expect(mockExecStore.markStepFailed).toHaveBeenCalledTimes(1);
+		expect(lastFailureReason()).toContain('w-1 (it lacks the label "gpu")');
+	});
+
+	it('asks the acceptance of each worker of the type only until one accepts', async () => {
+		const busyAccepting = sandboxWorker('w-1', ['gpu']);
+		const second = sandboxWorker('w-2', ['gpu'], 'sbx-2');
+		const { handler } = daemonWith([], [busyAccepting, second]);
+		await startRun(handler);
+
+		vi.advanceTimersByTime(1_000);
+		handler.tryDispatch();
+
 		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
 	});
 });

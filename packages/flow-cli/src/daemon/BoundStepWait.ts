@@ -37,10 +37,10 @@ export interface BoundStepWaitRequest {
 	 */
 	contactErrorsSince?: ((sinceMs: number) => string[]) | undefined;
 	/**
-	 * The connected workers of that type that do NOT accept the step, one `<worker id> (<reason>)` each: they are not counted
-	 * in `connectedOfType`, and a failure names them. Fixed words and declared names only, never a plugin's text.
+	 * The connected workers of that type that do NOT accept the step, one `<worker id> (<reason>)` each (worked out only when
+	 * the step fails): they are not counted in `connectedOfType`, and a failure names them. Fixed words and declared names only, never a plugin's text.
 	 */
-	refusals?: string[] | undefined;
+	refusals?: (() => string[]) | undefined;
 }
 
 export type BoundStepWaitDecision = { action: 'wait' } | { action: 'fail'; reason: string };
@@ -105,7 +105,10 @@ export class BoundStepWait {
 
 		this.forget(key);
 		const contactErrors = request.contactErrorsSince?.(since) ?? [];
-		return { action: 'fail', reason: describeFailure(request, waitedMs, this.waitMs, contactErrors) };
+		return {
+			action: 'fail',
+			reason: describeFailure(request, waitedMs, this.waitMs, contactErrors, request.refusals?.() ?? []),
+		};
 	}
 
 	/** The step was handed to a worker: it is no longer waiting. */
@@ -194,7 +197,8 @@ function describeFailure(
 	request: BoundStepWaitRequest,
 	waitedMs: number,
 	boundMs: number,
-	contactErrors: string[]
+	contactErrors: string[],
+	refusals: string[]
 ): string {
 	const known =
 		request.knownTypes.length === 0
@@ -202,11 +206,11 @@ function describeFailure(
 			: `known worker types: ${request.knownTypes.join(', ')}`;
 	return (
 		`Step "${request.stepId}" belongs to a run bound to worker type "${request.workerType}" (the flow's workerType field), ` +
-		`but no worker of that type was connected in the ${String(Math.round(waitedMs / 1000))}s it waited, and a step of a bound run never runs on another worker. ` +
+		`but no worker of that type ${refusals.length === 0 ? 'was connected' : 'that accepts this step was available'} in the ${String(Math.round(waitedMs / 1000))}s it waited, and a step of a bound run never runs on another worker. ` +
 		`${known}. ` +
 		`Check that a source of that type is declared (flow worker source list) and that its plugin can start workers (see the daemon log). ` +
 		`If starting one takes longer than ${String(Math.round(boundMs / 1000))}s, raise worker.boundStepWaitSeconds in the daemon config.` +
-		describeRefusals(request.refusals ?? []) +
+		describeRefusals(refusals) +
 		(contactErrors.length === 0 ? '' : ` ${contactErrors.join(' ')}`)
 	);
 }

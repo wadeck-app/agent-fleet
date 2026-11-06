@@ -45,6 +45,7 @@ describe('StepDispatcher - the wait of a step of a bound run is forgotten', () =
 		const registry = {
 			listIdle: () => idle,
 			summarize: () => [],
+			listConnected: () => [],
 			describe: () => ({ workerId: 'sandbox', sourceId: 'sbx-1', features: [] as string[] }),
 			markBusy: vi.fn(),
 			send: vi.fn(() => true),
