@@ -327,6 +327,8 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 	});
 
 	it('an unbound flow is kept off the sandbox worker: its type is exclusive, the step runs on a host worker', async () => {
+		// ROUTING FACT PINNED HERE: if this assertion ever fails, the exclusivity of the sandbox type changed. Update it together with
+		// the README section "Routing and isolation" (the paragraph on the exclusive worker type) and the plugin declaration steps.
 		// The plugin declares `exclusive: true`, so the daemon offers its worker only to runs bound with `workerType: sandbox` and does
 		// not ask the source for a worker for an unbound run: the demand is covered by a host worker the daemon forks.
 		const callsBefore = world.sbxCalls().length;
