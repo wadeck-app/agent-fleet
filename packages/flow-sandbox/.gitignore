@@ -2,3 +2,5 @@
 image/opt-flow/
 # The root .gitignore ignores every package-lock.json; this one pins the CLIs installed in the image (Dockerfile).
 !image/package-lock.json
+# The sandbox plugin artifact built by `npm run bundle` (scripts/BundlePlugin.mjs)
+dist-plugin/

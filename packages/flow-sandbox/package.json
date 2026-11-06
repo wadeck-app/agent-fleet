@@ -6,6 +6,7 @@
 	"main": "./src/SandboxRuntime.ts",
 	"scripts": {
 		"build": "tsc --build tsconfig.json",
+		"bundle": "node --import tsx scripts/BundlePlugin.mjs",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
