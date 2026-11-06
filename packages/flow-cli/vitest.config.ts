@@ -25,6 +25,7 @@ function resolveJsToTs(): Plugin {
 // rewrote dist/ and deleted bundles under the other file and under the unit tests).
 const BUNDLING_TESTS = [
 	'src/__tests__/CliSmoke.integration.test.ts',
+	'src/__tests__/DaemonChildEnvironment.integration.test.ts',
 	'src/__tests__/DaemonSingleton.integration.test.ts',
 	'src/__tests__/DaemonShutdown.integration.test.ts',
 	'src/__tests__/BundledDaemonQueueIsolation.integration.test.ts',

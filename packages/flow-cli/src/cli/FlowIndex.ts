@@ -16,6 +16,7 @@ import { resolveDaemonPort } from '../daemon/resolveDaemonPort.js';
 import { resolveIdleCheckInterval } from '../daemon/resolveIdleCheckInterval.js';
 import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
 import { describeCommandLine } from './CommandLineLog';
+import { consumeDaemonModeFlag } from './DaemonModeFlag';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { registerCancelCommand } from './commands/CancelCommand';
 import { buildCliCommand } from './commands/CliCommand.js';
@@ -98,9 +99,15 @@ async function registerDaemonCommands(program: Command): Promise<void> {
 		});
 }
 
+/** Set by main() from the environment it started with; the variable itself is removed there (DaemonModeFlag). */
+let startedAsDaemon = false;
+
 async function main(): Promise<void> {
+	// Taken out of the environment at once: everything this process starts inherits that environment, and a child that
+	// carries the variable is a daemon whatever its arguments (a queue subscriber's `flow run` exited 0 doing nothing).
+	startedAsDaemon = consumeDaemonModeFlag(process.env);
 	// Daemon-only mode: spawned by `flow start`, keeps the daemon running without any CLI command.
-	if (process.env['FLOW_DAEMON_MODE'] === '1') {
+	if (startedAsDaemon) {
 		const { config, legacyWarning } = FlowConfigLoader.loadForDaemon(DAEMON_DIR);
 		// Printed by the daemon itself, since this is the process whose behaviour the ignored
 		// file would have changed.
@@ -220,7 +227,7 @@ const isEntryPoint =
 
 if (isEntryPoint) {
 	main().catch((error: unknown) => {
-		if (process.env['FLOW_DAEMON_MODE'] === '1') {
+		if (startedAsDaemon) {
 			// A detached daemon has no terminal: the command that spawned it learns why it died from this record and the log.
 			recordDaemonStartError(DAEMON_DIR, error);
 		}
