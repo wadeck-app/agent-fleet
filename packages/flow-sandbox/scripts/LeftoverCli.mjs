@@ -7,7 +7,7 @@
  *
  * Usage (from the repository root):
  *   node --import tsx packages/flow-sandbox/scripts/LeftoverCli.mjs list
- *   node --import tsx packages/flow-sandbox/scripts/LeftoverCli.mjs remove flow-sbx-w1-exec0001
+ *   node --import tsx packages/flow-sandbox/scripts/LeftoverCli.mjs remove flow-sbx-w1-exec0001 [--force]
  *
  * Env:
  *   FLOW_SANDBOX_PRESENCE_DIR  where wrappers publish their presence files
@@ -16,11 +16,12 @@
  *
  * Exit code: 0 done, 1 refused or failed, 2 usage error.
  */
+import fs from 'node:fs';
 import os from 'node:os';
-import path from 'node:path';
 
 import { LeftoverCommand } from '../src/LeftoverCommand.ts';
 import { LeftoverSandboxes } from '../src/LeftoverSandboxes.ts';
+import { PresenceDirectory } from '../src/PresenceDirectory.ts';
 import { SbxCliRuntime } from '../src/SbxCliRuntime.ts';
 import { SystemClock } from '../src/SystemClock.ts';
 import { WrapperPresence } from '../src/WrapperPresence.ts';
@@ -35,8 +36,12 @@ function isProcessAlive(pid) {
 	}
 }
 
-const presenceDirectory =
-	process.env.FLOW_SANDBOX_PRESENCE_DIR ?? path.join(os.homedir(), '.config', 'flow', 'sandbox-presence');
+// The same resolution as the wrappers (--presence-dir, then the variable, then the default): one source of truth.
+const presenceDirectory = PresenceDirectory.resolve(
+	undefined,
+	process.env,
+	PresenceDirectory.defaultPath(os.homedir())
+);
 const log = {
 	info: message => console.error(`info: ${message}`),
 	warn: message => console.error(`warn: ${message}`),
@@ -47,9 +52,13 @@ const leftovers = new LeftoverSandboxes(
 	log,
 	new WrapperPresence(presenceDirectory, isProcessAlive, process.pid)
 );
-const command = new LeftoverCommand(leftovers, {
-	out: line => console.log(line),
-	err: line => console.error(line),
-});
+const command = new LeftoverCommand(
+	leftovers,
+	{
+		out: line => console.log(line),
+		err: line => console.error(line),
+	},
+	{ directory: presenceDirectory, exists: () => fs.existsSync(presenceDirectory) }
+);
 
 process.exitCode = await command.run(process.argv.slice(2));

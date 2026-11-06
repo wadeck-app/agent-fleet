@@ -1,7 +1,7 @@
-import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { requireAwsRegion } from '../AwsRegion';
+import { PresenceDirectory } from '../PresenceDirectory';
 import { RunSandboxName } from '../RunSandboxName';
 import { SandboxError } from '../SandboxError';
 import { MAX_IDLE_STOP_MINUTES, SANDBOX_OPTION_DEFAULTS } from '../SandboxOptionsParser';
@@ -47,7 +47,7 @@ function usage(script: string): string {
 		'  [--cpus <n>] [--memory <2g>] [--idle-minutes <n>] [--max-sandboxes <n>] [--presence-dir <dir>] [--log-file <file>]',
 		'  [--project-path <folder> ...] [--model-env NAME=VALUE ...] [--accept-ssh-agent-forwarding]',
 		'Environment (set by the daemon for a built-in:command source): FLOW_DAEMON_WS_URL, FLOW_WORKER_SOURCE_ID, FLOW_WORKER_TOKEN.',
-		'Optional: FLOW_SANDBOX_HOST_HOME (home directory given to the aws CLI), SBX_PATH.',
+		'Optional: FLOW_SANDBOX_HOST_HOME (home directory given to the aws CLI), FLOW_SANDBOX_PRESENCE_DIR (default of --presence-dir, shared with the leftover CLI), SBX_PATH.',
 	].join('\n');
 }
 
@@ -200,7 +200,11 @@ export class HarnessConfigParser {
 				'--max-sandboxes',
 				fail
 			),
-			presenceDirectory: path.resolve((values['presence-dir'] as string | undefined) ?? defaultPresenceDirectory),
+			presenceDirectory: PresenceDirectory.resolve(
+				values['presence-dir'] as string | undefined,
+				env,
+				defaultPresenceDirectory
+			),
 			logFile: values['log-file'] as string | undefined,
 			acceptSshAgentForwarding: values['accept-ssh-agent-forwarding'] === true,
 			modelEnvironment,

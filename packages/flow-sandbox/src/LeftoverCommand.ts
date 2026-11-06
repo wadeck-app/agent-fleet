@@ -1,6 +1,12 @@
 import { type LeftoverSandboxes, formatAge } from './LeftoverSandboxes';
 import { SandboxError } from './SandboxError';
 
+/** The presence directory the check of "is that run alive?" reads; if it does not exist, nothing is known about the wrappers. */
+export interface PresenceDirectoryStatus {
+	directory: string;
+	exists(): boolean;
+}
+
 export interface CommandOutput {
 	out(line: string): void;
 	err(line: string): void;
@@ -12,10 +18,12 @@ export const LEFTOVER_EXIT_USAGE = 2;
 
 const USAGE = [
 	'Usage: leftover list',
-	'       leftover remove <sandbox-name>',
+	'       leftover remove <sandbox-name> [--force]',
 	'',
 	'list    shows the plugin sandboxes (name flow-sbx-<wrapperId>-<executionId>) with status and age.',
-	'remove  removes exactly that sandbox; refused when its run or wrapper is alive or the name has no marker.',
+	'remove  removes exactly that sandbox; refused when its run or wrapper is alive or the name has no marker,',
+	'        and when the presence directory does not exist (--force overrides that one refusal).',
+	'The presence directory is FLOW_SANDBOX_PRESENCE_DIR, else ~/.config/flow/sandbox-presence: the one the wrappers use.',
 	'Exit codes: 0 done, 1 refused or failed, 2 usage error.',
 ];
 
@@ -23,15 +31,17 @@ const USAGE = [
 export class LeftoverCommand {
 	constructor(
 		private readonly leftovers: LeftoverSandboxes,
-		private readonly output: CommandOutput
+		private readonly output: CommandOutput,
+		private readonly presence: PresenceDirectoryStatus
 	) {}
 
 	async run(args: readonly string[]): Promise<number> {
 		const [verb, ...rest] = args;
 		if (verb === 'list' && rest.length === 0) return this.guard(() => this.list());
-		if (verb === 'remove' && rest.length === 1 && rest[0] !== undefined && !rest[0].startsWith('-')) {
+		const force = rest.length === 2 && rest[1] === '--force';
+		if (verb === 'remove' && (rest.length === 1 || force) && rest[0] !== undefined && !rest[0].startsWith('-')) {
 			const name = rest[0];
-			return this.guard(() => this.remove(name));
+			return this.guard(() => this.remove(name, force));
 		}
 		this.output.err(
 			verb === undefined
@@ -43,6 +53,7 @@ export class LeftoverCommand {
 	}
 
 	private async list(): Promise<number> {
+		this.warnIfPresenceMissing();
 		const leftovers = await this.leftovers.list();
 		if (leftovers.length === 0) {
 			this.output.out('No plugin sandboxes.');
@@ -63,10 +74,26 @@ export class LeftoverCommand {
 		return LEFTOVER_EXIT_OK;
 	}
 
-	private async remove(name: string): Promise<number> {
+	private async remove(name: string, force: boolean): Promise<number> {
+		if (!this.presence.exists()) {
+			this.warnIfPresenceMissing();
+			if (!force) {
+				this.output.err(
+					`Refusing to remove "${name}": without the presence files a live wrapper cannot be told from a dead one. Point FLOW_SANDBOX_PRESENCE_DIR at the directory your wrappers use, or add --force if you know no wrapper serves this run.`
+				);
+				return LEFTOVER_EXIT_FAILED;
+			}
+		}
 		await this.leftovers.remove(name);
 		this.output.out(`Removed ${name}.`);
 		return LEFTOVER_EXIT_OK;
+	}
+
+	private warnIfPresenceMissing(): void {
+		if (this.presence.exists()) return;
+		this.output.err(
+			`warning: the presence directory ${this.presence.directory} does not exist, so no wrapper is known to be alive. Wrong directory? Set FLOW_SANDBOX_PRESENCE_DIR to the one your wrappers use (--presence-dir).`
+		);
 	}
 
 	private async guard(action: () => Promise<number>): Promise<number> {

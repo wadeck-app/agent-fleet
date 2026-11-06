@@ -9,6 +9,7 @@ import { CleanupStack } from '../CleanupStack';
 import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { LeftoverSandboxes } from '../LeftoverSandboxes';
 import { NodeCommandRunner } from '../NodeCommandRunner';
+import { PresenceDirectory } from '../PresenceDirectory';
 import { RunMounts } from '../RunMounts';
 import { SandboxCapacity } from '../SandboxCapacity';
 import { SandboxLifecycle } from '../SandboxLifecycle';
@@ -72,7 +73,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 	const config = new HarnessConfigParser('ExecWrapper.mjs').parse(
 		argv,
 		env,
-		path.join(os.homedir(), '.config', 'flow', 'sandbox-presence')
+		PresenceDirectory.defaultPath(os.homedir())
 	);
 	const log = new ExecLog(config.logFile);
 	log.info(

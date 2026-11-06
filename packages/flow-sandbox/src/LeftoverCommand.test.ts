@@ -14,6 +14,7 @@ let presence: RecordingPresence;
 let out: string[];
 let err: string[];
 let command: LeftoverCommand;
+let presenceExists: boolean;
 
 async function seed(name: string): Promise<void> {
 	await runtime.create({ name, agent: 'shell', mounts: [{ hostPath: '/w' }], cpus: 1, memory: '1g' });
@@ -25,10 +26,12 @@ beforeEach(() => {
 	presence = new RecordingPresence();
 	out = [];
 	err = [];
-	command = new LeftoverCommand(new LeftoverSandboxes(runtime, clock, new RecordingSandboxLog(), presence), {
-		out: line => out.push(line),
-		err: line => err.push(line),
-	});
+	presenceExists = true;
+	command = new LeftoverCommand(
+		new LeftoverSandboxes(runtime, clock, new RecordingSandboxLog(), presence),
+		{ out: line => out.push(line), err: line => err.push(line) },
+		{ directory: '/p/presence', exists: () => presenceExists }
+	);
 });
 
 describe('LeftoverCommand list', () => {
@@ -104,6 +107,34 @@ describe('LeftoverCommand remove', () => {
 
 		expect(err.join('\n')).toContain('"remove" takes exactly one exact sandbox name');
 		expect(runtime.callsTo('remove')).toHaveLength(0);
+	});
+});
+
+describe('LeftoverCommand when the presence directory does not exist', () => {
+	// Without it every wrapper looks dead: a sandbox of a live run could be removed. Wrong directory = loud, never silent.
+	it.each([
+		{
+			label: 'remove is refused',
+			args: ['remove', 'flow-sbx-w1-run1'],
+			code: LEFTOVER_EXIT_FAILED,
+			removed: false,
+		},
+		{
+			label: 'remove --force goes ahead and warns',
+			args: ['remove', 'flow-sbx-w1-run1', '--force'],
+			code: LEFTOVER_EXIT_OK,
+			removed: true,
+		},
+		{ label: 'list warns', args: ['list'], code: LEFTOVER_EXIT_OK, removed: false },
+	])('$label', async ({ args, code, removed }) => {
+		await seed('flow-sbx-w1-run1');
+		presenceExists = false;
+
+		expect(await command.run(args)).toBe(code);
+
+		expect(err.join('\n')).toContain('/p/presence does not exist');
+		expect(err.join('\n')).toContain('FLOW_SANDBOX_PRESENCE_DIR');
+		expect(runtime.has('flow-sbx-w1-run1')).toBe(!removed);
 	});
 });
 

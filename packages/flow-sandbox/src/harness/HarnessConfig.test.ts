@@ -127,6 +127,30 @@ describe('HarnessConfigParser', () => {
 		expect(() => parse(argv)).toThrow('Usage: node');
 	});
 
+	// One resolution for the wrappers and the leftover CLI (PresenceDirectory): option, then FLOW_SANDBOX_PRESENCE_DIR, then default.
+	it.each([
+		{
+			label: 'the option wins over the variable',
+			argv: ['--presence-dir', '/from-option'],
+			env: { FLOW_SANDBOX_PRESENCE_DIR: '/from-env' },
+			expected: '/from-option',
+		},
+		{
+			label: 'the variable wins over the default',
+			argv: [],
+			env: { FLOW_SANDBOX_PRESENCE_DIR: '/from-env' },
+			expected: '/from-env',
+		},
+		{
+			label: 'an empty variable counts as unset',
+			argv: [],
+			env: { FLOW_SANDBOX_PRESENCE_DIR: '' },
+			expected: '/presence',
+		},
+	])('presence directory: $label', ({ argv, env, expected }) => {
+		expect(parse([...BASE, ...argv], { ...ENV, ...env }).presenceDirectory).toBe(path.resolve(expected));
+	});
+
 	it('names the script the operator runs in the usage and in a missing-variable error', () => {
 		const exec = new HarnessConfigParser('ExecWrapper.mjs');
 		expect(() => exec.parse(['--bad'], ENV, '/presence')).toThrow('scripts/ExecWrapper.mjs');

@@ -7,6 +7,7 @@ import { CleanupStack } from '../CleanupStack';
 import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { LeftoverSandboxes } from '../LeftoverSandboxes';
 import { NodeCommandRunner } from '../NodeCommandRunner';
+import { PresenceDirectory } from '../PresenceDirectory';
 import { RunMounts } from '../RunMounts';
 import { SandboxCapacity } from '../SandboxCapacity';
 import { SandboxLifecycle } from '../SandboxLifecycle';
@@ -63,11 +64,7 @@ class HarnessLog implements SandboxLog {
  * prerequisite rejects with a message that says what to do.
  */
 export async function runHarness(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<void> {
-	const config = new HarnessConfigParser().parse(
-		argv,
-		env,
-		path.join(os.homedir(), '.config', 'flow', 'sandbox-presence')
-	);
+	const config = new HarnessConfigParser().parse(argv, env, PresenceDirectory.defaultPath(os.homedir()));
 	const log = new HarnessLog(config.logFile);
 	log.info(
 		`starting: wrapper ${config.wrapperId}, source ${config.sourceId}, projects ${config.projectIds.join(',')}, labels ${config.labels.join(',')}, image ${config.image ?? '(agent default)'}`
