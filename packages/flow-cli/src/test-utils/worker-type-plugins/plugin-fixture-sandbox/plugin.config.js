@@ -7,6 +7,8 @@
 //   hangs    whose factory never settles
 //   throws   whose factory rejects
 //   configerror  whose factory rejects with an error NAMED PluginConfigurationError (a plain Error: a plugin from disk cannot import the class)
+//   exclusive  like sandbox, but the instance declares exclusive: true
+//   badexclusive  like sandbox, but exclusive is the string 'yes' (refused)
 //   invalid  whose factory returns something that is not a worker-type instance
 
 function state() {
@@ -26,10 +28,11 @@ function state() {
 	return globalThis.__workerTypeFixture;
 }
 
-function makeInstance(context) {
+function makeInstance(context, extra = {}) {
 	const recorded = state();
 	recorded.created.push(context);
 	return {
+		...extra,
 		source: {
 			obtainWorker: async request => {
 				recorded.obtained.push({ sourceId: context.sourceId, request });
@@ -97,6 +100,14 @@ export const manifest = {
 					error.name = 'PluginConfigurationError';
 					throw error;
 				},
+			},
+			exclusive: {
+				version: 1,
+				provider: async context => makeInstance(context, { exclusive: true }),
+			},
+			badexclusive: {
+				version: 1,
+				provider: async context => makeInstance(context, { exclusive: 'yes' }),
 			},
 			invalid: {
 				version: 1,

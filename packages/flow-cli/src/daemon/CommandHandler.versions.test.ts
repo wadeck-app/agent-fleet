@@ -44,6 +44,7 @@ describe('CommandHandler flow versions', () => {
 		const pool = {
 			describe: vi.fn().mockReturnValue({ workerId: 'w', sourceId: 'built-in:fork', features: [] }),
 			remove: vi.fn(),
+			listConnected: vi.fn((): unknown[] => []),
 			listIdle: vi.fn(() => []),
 			markBusy: vi.fn(),
 			hasBusyWorkers: vi.fn().mockReturnValue(false),
@@ -241,6 +242,7 @@ No decision was made -- this step is unanswered, not denied.`;
 			const pool = {
 				describe: vi.fn().mockReturnValue({ workerId: 'w', sourceId: 'built-in:fork', features: [] }),
 				remove: vi.fn(),
+				listConnected: vi.fn((): unknown[] => []),
 				listIdle: vi.fn(() => [
 					{
 						ws: {},

@@ -3,6 +3,9 @@ import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 /** Answers "which type is the worker that came from this source": undefined for a worker of no type. */
 export type WorkerTypeLookup = (sourceId: string | undefined) => string | undefined;
 
+/** Answers "do the workers of this source serve only runs bound to their type". */
+export type ExclusiveLookup = (sourceId: string | undefined) => boolean;
+
 /**
  * The worker types the declared sources stand for.
  *
@@ -16,7 +19,30 @@ export type WorkerTypeLookup = (sourceId: string | undefined) => string | undefi
  * or none, is refused). The type derived from it is therefore as trustworthy as the admission check.
  */
 export class WorkerTypeCatalog {
-	constructor(private readonly sources: { list(): WorkerSourceEntry[] }) {}
+	/**
+	 * @param exclusivity says whether a declared source serves only runs bound to its type (see
+	 *        `WorkerTypeInstances.isExclusive`, which is fail-closed). Required: a catalog without it would make every
+	 *        type routable by unbound runs.
+	 */
+	constructor(
+		private readonly sources: { list(): WorkerSourceEntry[] },
+		private readonly exclusivity: { isExclusive(entry: WorkerSourceEntry): boolean }
+	) {}
+
+	/**
+	 * Answers "do the workers of this source serve only runs bound to their type", over the sources as declared right now
+	 * (one read, like {@link typeLookup}). False for a worker with no source and for a source that is no longer declared:
+	 * nothing declares anything about it any more (a documented limit, see WORKERS.md).
+	 */
+	exclusiveLookup(): ExclusiveLookup {
+		const exclusiveSources = new Set<string>();
+		for (const entry of this.sources.list()) {
+			if (this.exclusivity.isExclusive(entry)) {
+				exclusiveSources.add(entry.sourceId);
+			}
+		}
+		return sourceId => sourceId !== undefined && exclusiveSources.has(sourceId);
+	}
 
 	/**
 	 * A lookup over the sources as declared right now. Read once per call, so a routing pass answers consistently and

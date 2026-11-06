@@ -49,6 +49,7 @@ describe('CommandHandler project resolution', () => {
 		const pool = {
 			describe: vi.fn().mockReturnValue({ workerId: 'w', sourceId: 'built-in:fork', features: [] }),
 			remove: vi.fn(),
+			listConnected: vi.fn((): unknown[] => []),
 			listIdle: vi.fn(() => [
 				{
 					ws: {},
@@ -291,6 +292,7 @@ describe('CommandHandler run origin', () => {
 		const pool = {
 			describe: vi.fn().mockReturnValue({ workerId: 'w', sourceId: 'built-in:fork', features: [] }),
 			remove: vi.fn(),
+			listConnected: vi.fn((): unknown[] => []),
 			listIdle: vi.fn(() => []),
 			markBusy: vi.fn(),
 			hasBusyWorkers: vi.fn().mockReturnValue(false),

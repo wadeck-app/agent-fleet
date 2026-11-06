@@ -17,7 +17,7 @@ function source(sourceId: string, plugin?: string): WorkerSourceEntry {
 }
 
 function catalogOf(...entries: WorkerSourceEntry[]): WorkerTypeCatalog {
-	return new WorkerTypeCatalog({ list: () => entries });
+	return new WorkerTypeCatalog({ list: () => entries }, { isExclusive: () => false });
 }
 
 describe('WorkerTypeCatalog', () => {
@@ -50,5 +50,47 @@ describe('WorkerTypeCatalog', () => {
 
 	it('lists no type when no plugin source is declared', () => {
 		expect(catalogOf(source('host', undefined)).knownTypes()).toEqual([]);
+	});
+});
+
+describe('WorkerTypeCatalog - exclusive types', () => {
+	const exclusiveIds = (...ids: string[]) => ({
+		isExclusive: (entry: WorkerSourceEntry) => ids.includes(entry.sourceId),
+	});
+
+	it('answers exclusive for the workers of the sources the exclusivity says are', () => {
+		const catalog = new WorkerTypeCatalog(
+			{ list: () => [source('sbx', 'sandbox.exec'), source('farm', 'gpu.farm')] },
+			exclusiveIds('sbx')
+		);
+		const isExclusive = catalog.exclusiveLookup();
+
+		expect([isExclusive('sbx'), isExclusive('farm')]).toEqual([true, false]);
+	});
+
+	// Documented limit: a connection whose source was removed keeps its sourceId but no entry says anything about it.
+	it('answers not exclusive for a worker with no source or a source that is not declared', () => {
+		const catalog = new WorkerTypeCatalog({ list: () => [source('sbx', 'sandbox.exec')] }, exclusiveIds('sbx'));
+		const isExclusive = catalog.exclusiveLookup();
+
+		expect([isExclusive(undefined), isExclusive('gone')]).toEqual([false, false]);
+	});
+
+	it('reads the sources once per lookup, not once per worker', () => {
+		let reads = 0;
+		const catalog = new WorkerTypeCatalog(
+			{
+				list: () => {
+					reads++;
+					return [source('sbx', 'sandbox.exec')];
+				},
+			},
+			exclusiveIds('sbx')
+		);
+		const isExclusive = catalog.exclusiveLookup();
+		isExclusive('sbx');
+		isExclusive('sbx');
+
+		expect(reads).toBe(1);
 	});
 });

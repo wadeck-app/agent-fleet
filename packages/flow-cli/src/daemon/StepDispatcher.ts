@@ -18,10 +18,16 @@ import type { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import { tallyAcceptance } from './WorkerRefusal.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
-import type { WorkerTypeLookup } from './WorkerTypeCatalog.js';
+import type { ExclusiveLookup, WorkerTypeLookup } from './WorkerTypeCatalog.js';
 
 /** Every worker is of no type. */
 const NO_TYPE: WorkerTypeLookup = () => undefined;
+
+/** Every worker that names a source may be of an exclusive type: what is assumed when the sources cannot be read. */
+const ANY_SOURCE_EXCLUSIVE: ExclusiveLookup = sourceId => sourceId !== undefined;
+
+/** The most workers named in the hint about an exclusive type. */
+const MAX_EXCLUSIVE_WORKERS_NAMED = 5;
 
 /** Hands queued steps to the idle workers that may run them. */
 export class StepDispatcher {
@@ -57,6 +63,10 @@ export class StepDispatcher {
 
 	/** Executions already told that the declared worker sources cannot be read. */
 	private readonly unreadableSourcesReported = new Set<string>();
+	/** Executions already told that the exclusivity of the worker types cannot be read. */
+	private readonly unreadableExclusivityReported = new Set<string>();
+	/** `executionId:stepId` of the steps already told that exclusive workers are connected but do not take them. */
+	private readonly exclusiveHintReported = new Set<string>();
 
 	/** Drops the timers of the steps waiting for a worker of their type, for the daemon stop. */
 	stop(): void {
@@ -67,6 +77,12 @@ export class StepDispatcher {
 	forgetExecution(executionId: string): void {
 		this.routing.wait.forgetExecution(executionId);
 		this.unreadableSourcesReported.delete(executionId);
+		this.unreadableExclusivityReported.delete(executionId);
+		for (const key of [...this.exclusiveHintReported]) {
+			if (key.startsWith(`${executionId}:`)) {
+				this.exclusiveHintReported.delete(key);
+			}
+		}
 		for (const key of this.interactiveWaitSince.keys()) {
 			if (key.startsWith(`${executionId}:`)) {
 				this.interactiveWaitSince.delete(key);
@@ -89,6 +105,8 @@ export class StepDispatcher {
 		let unplacedForHost = 0;
 		/** Worker types the unplaced steps of bound runs wait for. */
 		const waitingForTypes = new Set<string>();
+		/** Read at most once per pass, and only if a step that is not bound needs it. */
+		let exclusiveOfPass: ExclusiveLookup | undefined;
 
 		while (this.queue.length > 0) {
 			const step = this.queue.shift()!;
@@ -115,7 +133,11 @@ export class StepDispatcher {
 			}
 
 			const typeOf = placement.boundWorkerType === undefined ? undefined : this.typeLookupFor(step);
-			const idleWorker = this.router.select(placement, this.registry.listIdle(), typeOf);
+			const exclusive =
+				placement.boundWorkerType === undefined
+					? (exclusiveOfPass ??= this.exclusiveLookupFor(step))
+					: undefined;
+			const idleWorker = this.router.select(placement, this.registry.listIdle(), typeOf, exclusive);
 			if (idleWorker === undefined && placement.requiresUserInterface && this.failIfNobodyCanAnswer(step)) {
 				continue;
 			}
@@ -132,6 +154,9 @@ export class StepDispatcher {
 				}
 				this.dispatchTo(idleWorker, step);
 			} else {
+				if (exclusive !== undefined) {
+					this.hintAboutExclusiveWorkers(step, placement, exclusive);
+				}
 				unplaced.push(step);
 				if (placement.boundWorkerType === undefined) {
 					unplacedForHost++;
@@ -332,6 +357,55 @@ export class StepDispatcher {
 			this.reportUnreadableSources(step.executionContext.executionId, err);
 			return NO_TYPE;
 		}
+	}
+
+	/**
+	 * Which workers are of an exclusive type. When that cannot be read, every worker that names a source counts as
+	 * exclusive (fail-closed) and the cause is written once to the execution's log.
+	 */
+	private exclusiveLookupFor(step: ReadyStep): ExclusiveLookup {
+		try {
+			return this.routing.workerTypes.exclusiveLookup();
+		} catch (err) {
+			const { executionId } = step.executionContext;
+			if (!this.unreadableExclusivityReported.has(executionId)) {
+				this.unreadableExclusivityReported.add(executionId);
+				this.logWriter.writeExecution(
+					executionId,
+					`Cannot read the declared worker sources, so workers that come from a source are not offered steps of a run that is not bound to a worker type (they may be of an exclusive type): ${normalizeError(err).message}. Fix or remove the worker sources file (see: flow worker source list).`,
+					'warning'
+				);
+			}
+			return ANY_SOURCE_EXCLUSIVE;
+		}
+	}
+
+	/**
+	 * Once per step of an unbound run that found no worker: names the connected workers of an exclusive type that would
+	 * have taken it, and the fix. Without it the step just waits (or runs on a forked host worker) and nothing says why a
+	 * connected sandbox worker stays idle.
+	 */
+	private hintAboutExclusiveWorkers(step: ReadyStep, placement: StepPlacement, isExclusive: ExclusiveLookup): void {
+		const key = `${step.executionContext.executionId}:${step.stepId}`;
+		if (this.exclusiveHintReported.has(key)) {
+			return;
+		}
+		const skipped = this.registry
+			.listConnected()
+			.filter(worker => isExclusive(worker.sourceId) && this.router.refusalOf(placement, worker) === undefined);
+		if (skipped.length === 0) {
+			return;
+		}
+		this.exclusiveHintReported.add(key);
+		const typeOf = this.typeLookupFor(step);
+		const types = [...new Set(skipped.map(worker => typeOf(worker.sourceId) ?? 'unknown'))].sort();
+		const names = skipped.slice(0, MAX_EXCLUSIVE_WORKERS_NAMED).map(worker => worker.workerId);
+		const more = skipped.length - names.length;
+		this.logWriter.writeExecution(
+			step.executionContext.executionId,
+			`Step '${step.stepId}' is not run by the connected worker(s) ${names.join(', ')}${more > 0 ? ` and ${String(more)} more` : ''}: they are of an exclusive worker type (${types.join(', ')}) and serve only runs bound to it. Bind the flow with workerType: ${types[0] ?? 'unknown'} to run it there; otherwise it waits for a host worker (one is forked when none is connected).`,
+			'warning'
+		);
 	}
 
 	private knownTypesOrNone(executionId: string): string[] {

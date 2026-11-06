@@ -75,9 +75,12 @@ function source(sourceId: string, plugin: string): WorkerSourceEntry {
 	} as WorkerSourceEntry;
 }
 
-const CATALOG = new WorkerTypeCatalog({
-	list: () => [source('sbx-1', 'sandbox.docker'), source('gpu-1', 'gpu.farm')],
-});
+const CATALOG = new WorkerTypeCatalog(
+	{
+		list: () => [source('sbx-1', 'sandbox.docker'), source('gpu-1', 'gpu.farm')],
+	},
+	{ isExclusive: () => false }
+);
 
 /** A daemon with only a host worker connected: nothing of the bound type ever shows up. */
 function daemon(contactErrors: SourceContactErrors) {

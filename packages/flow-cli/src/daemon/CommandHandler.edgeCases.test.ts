@@ -107,6 +107,7 @@ function createWorkerPool(idle: boolean) {
 	const pool = {
 		describe: vi.fn().mockReturnValue({ workerId: 'w-test', sourceId: 'built-in:fork' }),
 		remove: vi.fn(),
+		listConnected: vi.fn((): unknown[] => []),
 		listIdle: vi.fn((): unknown[] =>
 			idle
 				? [

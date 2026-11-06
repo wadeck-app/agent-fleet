@@ -125,3 +125,41 @@ describe('DaemonSourceContact - asking only the sources of some worker types', (
 		expect(fixture.disposed).toEqual([]);
 	});
 });
+
+describe('DaemonSourceContact - exclusive worker types', () => {
+	const declareExclusive = (sourceId: string): void => {
+		registry.declare({
+			sourceId,
+			provider: 'fixture',
+			plugin: 'fixture-sandbox.exclusive',
+			pluginsDir: FIXTURE_PLUGINS_DIR,
+			labels: [],
+			maxWorkers: 1,
+		});
+	};
+
+	// Same marker technique as above: a later contact on another port proves the earlier one has been handled.
+	it('does not ask an exclusive source for a worker on behalf of demand no run is bound for, but builds its instance', async () => {
+		declareExclusive('sbx');
+		declarePlugin('plain');
+
+		contact.contactSources(4101);
+		await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toContain('plain'));
+		contact.contactSources(4102, new Set(['fixture-sandbox']));
+		await vi.waitFor(() => expect(endpointsObtained()).toContain('ws://127.0.0.1:4102'));
+
+		expect(fixture.created.map(entry => entry.sourceId).sort()).toEqual(['plain', 'sbx']);
+		const asked = fixture.obtained.map(
+			entry => `${entry.sourceId}@${(entry.request as { daemonEndpoint: string }).daemonEndpoint}`
+		);
+		expect(asked).not.toContain('sbx@ws://127.0.0.1:4101');
+	});
+
+	it('asks an exclusive source for a worker when the demand is for its type', async () => {
+		declareExclusive('sbx');
+
+		contact.contactSources(4101, new Set(['fixture-sandbox']));
+
+		await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toEqual(['sbx']));
+	});
+});

@@ -29,6 +29,7 @@ function createMockWorkerPool() {
 		describe: vi.fn().mockReturnValue({ workerId: 'w-test', sourceId: 'built-in:fork' }),
 		remove: vi.fn(),
 		getIdle: vi.fn().mockReturnValue(undefined),
+		listConnected: vi.fn((): unknown[] => []),
 		listIdle: vi.fn((): unknown[] => {
 			const ws: unknown = pool.getIdle();
 			return ws === undefined

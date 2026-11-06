@@ -13,10 +13,13 @@ import { workerSatisfiesLabels } from './LabelMatcher.js';
 import { workerSatisfiesShell } from './ShellMatcher.js';
 import { explainDefaultRefusal } from './WorkerRefusal.js';
 import type { RegisteredWorker } from './WorkerRegistry.js';
-import type { WorkerTypeCatalog, WorkerTypeLookup } from './WorkerTypeCatalog.js';
+import type { ExclusiveLookup, WorkerTypeCatalog, WorkerTypeLookup } from './WorkerTypeCatalog.js';
 
 /** No worker has a type: what a router built without a catalog knows. */
-const NO_WORKER_TYPES: Pick<WorkerTypeCatalog, 'typeLookup'> = { typeLookup: () => () => undefined };
+const NO_WORKER_TYPES: Pick<WorkerTypeCatalog, 'typeLookup' | 'exclusiveLookup'> = {
+	typeLookup: () => () => undefined,
+	exclusiveLookup: () => () => false,
+};
 
 /** An idle worker together with the connection to reach it. */
 export interface RoutingCandidate {
@@ -136,7 +139,7 @@ export class StepRouter {
 	constructor(
 		private readonly acceptance: WorkerAcceptanceProvider = new DefaultWorkerAcceptance(),
 		private readonly distribution: StepDistributionProvider = new DefaultStepDistribution(),
-		private readonly workerTypes: Pick<WorkerTypeCatalog, 'typeLookup'> = NO_WORKER_TYPES
+		private readonly workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'exclusiveLookup'> = NO_WORKER_TYPES
 	) {}
 
 	/**
@@ -147,11 +150,20 @@ export class StepRouter {
 	 * @param typeOf which type a worker is of, when the caller already has the answer (and reports its own failure to
 	 *        get it); otherwise it is asked of the catalog this router was built with.
 	 *
-	 * A step bound to a worker type is first narrowed to the workers of that type -- before S4 and S3, which can
-	 * neither widen the set back nor be consulted about the others.
+	 * @param isExclusive which workers are of an exclusive type, when the caller already has the answer; otherwise it is
+	 *        asked of the catalog this router was built with. Only read for a step that is not bound.
+	 *
+	 * A step bound to a worker type is first narrowed to the workers of that type; a step that is not bound is first
+	 * stripped of the workers of an exclusive type (they serve only runs bound to their type) -- before S4 and S3, which
+	 * can neither widen the set back nor be consulted about the others.
 	 */
-	select(step: StepPlacement, allCandidates: RoutingCandidate[], typeOf?: WorkerTypeLookup): WebSocket | undefined {
-		const candidates = this.ofBoundType(step, allCandidates, typeOf);
+	select(
+		step: StepPlacement,
+		allCandidates: RoutingCandidate[],
+		typeOf?: WorkerTypeLookup,
+		isExclusive?: ExclusiveLookup
+	): WebSocket | undefined {
+		const candidates = this.servableBy(step, allCandidates, typeOf, isExclusive);
 		const byWorkerId = new Map(candidates.map(candidate => [candidate.worker.workerId, candidate]));
 
 		const eligible = candidates.filter(candidate => this.acceptsSafely(step, candidate.worker));
@@ -182,18 +194,22 @@ export class StepRouter {
 	}
 
 	/**
-	 * The candidates whose type is the one the step's run is bound to; all of them for a run that is not bound.
+	 * The candidates whose type is the one the step's run is bound to; for a run that is not bound, those that are not of
+	 * an exclusive type (a worker with no source is never exclusive).
 	 *
 	 * A lookup that throws (the source registry cannot be read) leaves no worker of any type: the step stays unplaced
-	 * and the reason is reported, rather than the failure aborting the dispatch loop of every execution.
+	 * and the reason is reported, rather than the failure aborting the dispatch loop of every execution. For a step that
+	 * is not bound the same failure keeps off every worker that names a source (fail-closed: it may be exclusive) and
+	 * leaves the workers that name none.
 	 */
-	private ofBoundType(
+	private servableBy(
 		step: StepPlacement,
 		candidates: RoutingCandidate[],
-		given?: WorkerTypeLookup
+		given?: WorkerTypeLookup,
+		givenExclusive?: ExclusiveLookup
 	): RoutingCandidate[] {
 		if (step.boundWorkerType === undefined) {
-			return candidates;
+			return this.withoutExclusive(step, candidates, givenExclusive);
 		}
 		let typeOf: WorkerTypeLookup;
 		try {
@@ -205,6 +221,24 @@ export class StepRouter {
 			return [];
 		}
 		return candidates.filter(candidate => typeOf(candidate.worker.sourceId) === step.boundWorkerType);
+	}
+
+	private withoutExclusive(
+		step: StepPlacement,
+		candidates: RoutingCandidate[],
+		given?: ExclusiveLookup
+	): RoutingCandidate[] {
+		let isExclusive: ExclusiveLookup;
+		try {
+			isExclusive = given ?? this.workerTypes.exclusiveLookup();
+		} catch (err) {
+			process.stderr.write(
+				`[StepRouter] cannot tell which workers are of an exclusive worker type for step ${step.stepId}, so only workers that name no source may take it for now: ${normalizeError(err).message}
+`
+			);
+			return candidates.filter(candidate => candidate.worker.sourceId === undefined);
+		}
+		return candidates.filter(candidate => !isExclusive(candidate.worker.sourceId));
 	}
 
 	/**

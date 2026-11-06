@@ -97,9 +97,12 @@ function source(sourceId: string, plugin: string): WorkerSourceEntry {
 	} as WorkerSourceEntry;
 }
 
-const CATALOG = new WorkerTypeCatalog({
-	list: () => [source('sbx-1', 'sandbox.docker'), source('gpu-1', 'gpu.farm')],
-});
+const CATALOG = new WorkerTypeCatalog(
+	{
+		list: () => [source('sbx-1', 'sandbox.docker'), source('gpu-1', 'gpu.farm')],
+	},
+	{ isExclusive: () => false }
+);
 
 /** An idle worker: `sourceId` absent is a host worker (one that belongs to no declared source). */
 function idleWorker(name: string, props: { sourceId?: string; hasUserInterface?: boolean } = {}) {

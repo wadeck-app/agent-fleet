@@ -22,6 +22,7 @@ interface Instance {
 	source: { obtainWorker(request: WorkerRequest): Promise<void> };
 	dispose(): Promise<void>;
 	run?: unknown;
+	exclusive?: boolean;
 }
 interface PluginModule {
 	manifest: {
@@ -392,6 +393,16 @@ describe('sandbox plugin: the factory refuses to build with a plain message that
 		setup();
 
 		await expect(build(options)).rejects.toThrow(fragment);
+	});
+});
+
+describe('sandbox plugin: exclusivity', () => {
+	// An unbound flow must never be routed to a sandbox worker (host-only steps fail there): the daemon reads this flag.
+	it('declares its worker type exclusive', async () => {
+		const instance = await build();
+
+		expect(instance.exclusive).toBe(true);
+		await instance.dispose();
 	});
 });
 

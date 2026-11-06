@@ -65,6 +65,8 @@ interface CachedInstance {
  */
 export class WorkerTypeInstances {
 	private readonly cache = new Map<string, CachedInstance>();
+	/** What each BUILT instance declared about exclusivity, with the plugin it was built from (see {@link isExclusive}). */
+	private readonly exclusivity = new Map<string, { plugin: string; exclusive: boolean }>();
 	/** Sources whose instance was disposed, so a run that ends later can be told why nobody answers. */
 	private readonly disposed = new Set<string>();
 	/** Instances already handed to dispose(), so the two ways one can be reached (cache, late build) dispose it once. */
@@ -140,7 +142,17 @@ export class WorkerTypeInstances {
 
 		const created: CachedInstance = {
 			fingerprint,
-			instance: this.build(entry, plugin, pluginsDir, host, registered, entryNudgeUrl),
+			instance: this.build(entry, plugin, pluginsDir, host, registered, entryNudgeUrl).then(built => {
+				// Recorded before any caller sees the instance. Not when the entry was disposed or replaced meanwhile: the
+				// answer of an instance nobody holds any more must not outlive it.
+				if (this.cache.get(sourceId) === created) {
+					this.exclusivity.set(sourceId, {
+						plugin: exclusivityKey(plugin, pluginsDir),
+						exclusive: built.exclusive === true,
+					});
+				}
+				return built;
+			}),
 		};
 		this.cache.set(sourceId, created);
 		this.disposed.delete(sourceId);
@@ -176,6 +188,29 @@ export class WorkerTypeInstances {
 		await instance?.run?.onRunEnded(event);
 	}
 
+	/**
+	 * Whether the workers of a declared source may serve ONLY runs bound to their type (the instance's `exclusive`). Read
+	 * synchronously by the router, so it answers from what the built instance said and never builds anything.
+	 *
+	 * FAIL-CLOSED: a source whose instance is not built (startup, build failed or timed out, disposed, declared again with
+	 * another plugin) is exclusive when its plugin comes from a plugins directory, because it may be a sandbox and an unbound
+	 * run must never reach one. A built-in is the daemon's own code and none of them is exclusive, so it is not held back
+	 * waiting for an instance (an inbound worker connects without any contact). A source with no plugin is never exclusive.
+	 * Cost: a non-exclusive disk plugin's workers take unbound steps only once its instance is built (the startup contact
+	 * builds it) and not at all if its build fails.
+	 */
+	isExclusive(entry: WorkerSourceEntry): boolean {
+		const { plugin, pluginsDir, sourceId } = entry;
+		if (plugin === undefined) {
+			return false;
+		}
+		const known = this.exclusivity.get(sourceId);
+		if (known?.plugin === exclusivityKey(plugin, pluginsDir)) {
+			return known.exclusive;
+		}
+		return this.lookupBuiltin(`plugins.${plugin}`) === undefined;
+	}
+
 	/** Disposes the instance of one source and forgets it. Idempotent; a failing or hanging dispose is logged, never thrown. */
 	async dispose(sourceId: string): Promise<void> {
 		const cached = this.cache.get(sourceId);
@@ -183,6 +218,7 @@ export class WorkerTypeInstances {
 			return;
 		}
 		this.cache.delete(sourceId);
+		this.exclusivity.delete(sourceId);
 		this.disposed.add(sourceId);
 		await this.disposeBounded(sourceId, this.settled(cached));
 	}
@@ -341,8 +377,13 @@ export class WorkerTypeInstances {
 	}
 }
 
+function exclusivityKey(plugin: string, pluginsDir: string | undefined): string {
+	return JSON.stringify([plugin, pluginsDir]);
+}
+
 function withLaunchCredential(instance: WorkerTypeInstance, host: WorkerTypeHost): WorkerTypeInstance {
 	return {
+		...(instance.exclusive === undefined ? {} : { exclusive: instance.exclusive }),
 		source: new LaunchCredentialSource(instance.source, host.issueLaunchToken, host.revokeLaunchToken),
 		...(instance.run === undefined ? {} : { run: instance.run }),
 		dispose: () => instance.dispose(),
@@ -358,5 +399,10 @@ function assertWorkerTypeInstance(candidate: unknown): asserts candidate is Work
 	}
 	if (instance.run !== undefined && typeof instance.run.onRunEnded !== 'function') {
 		throw new Error('its instance has a "run" without an onRunEnded() function');
+	}
+	if (instance.exclusive !== undefined && typeof instance.exclusive !== 'boolean') {
+		throw new Error(
+			`its instance has an "exclusive" that is not a boolean (got ${JSON.stringify(instance.exclusive)}). Fix: set exclusive: true to serve only runs bound to the type, or remove it.`
+		);
 	}
 }

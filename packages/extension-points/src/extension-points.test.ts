@@ -209,6 +209,15 @@ describe('worker-type v1 shape', () => {
 		expect(ended).toEqual([{ executionId: 'e1', reason: 'completed' }]);
 	});
 
+	it('exclusive is optional and boolean', () => {
+		const plain: WorkerTypeInstance = {
+			source: { obtainWorker: async () => undefined },
+			dispose: async () => undefined,
+		};
+		const exclusive: WorkerTypeInstance = { ...plain, exclusive: true };
+		expect([plain.exclusive, exclusive.exclusive]).toEqual([undefined, true]);
+	});
+
 	it('run is optional', async () => {
 		const instance: WorkerTypeInstance = {
 			source: { obtainWorker: async () => undefined },

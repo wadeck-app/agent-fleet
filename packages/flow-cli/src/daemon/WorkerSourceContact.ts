@@ -37,6 +37,12 @@ export interface SourceProviderDependencies {
 	revokeLaunchToken?: (sourceId: string, token: string) => void;
 	/** Builds and keeps the worker-type instance of each plugin source; without it a plugin source cannot be served. */
 	workerTypes?: Pick<WorkerTypeInstances, 'get'>;
+	/**
+	 * True when the ask is not on behalf of a run bound to the source's type: a source whose instance declares itself
+	 * exclusive is then built but NOT asked for a worker, because its workers serve nothing else (a sandbox started for no
+	 * run would sit idle, or worse be mistaken for capacity). A source whose build fails is not asked either.
+	 */
+	skipExclusive?: boolean;
 }
 
 /**
@@ -89,12 +95,13 @@ export function resolveSourceProvider(
 
 /**
  * The provider that obtains workers for an entry: its plugin instance (built once, then reused) when it names a
- * plugin, else the built-in one. A plugin ref is never read as a provider name, so an unknown provider still throws.
+ * plugin, else the built-in one; undefined when the ask must skip an exclusive source (see `skipExclusive`). A plugin ref is
+ * never read as a provider name, so an unknown provider still throws.
  */
 async function providerOf(
 	entry: WorkerSourceEntry,
 	dependencies: SourceProviderDependencies
-): Promise<WorkerSourceProvider> {
+): Promise<WorkerSourceProvider | undefined> {
 	if (entry.plugin === undefined) {
 		// Said apart from "unknown provider": the user must remove the source, not fix a typo.
 		if (entry.provider === FORK_PROVIDER_NAME) {
@@ -119,7 +126,8 @@ async function providerOf(
 		...(dependencies.issueLaunchToken === undefined ? {} : { issueLaunchToken: dependencies.issueLaunchToken }),
 		...(dependencies.revokeLaunchToken === undefined ? {} : { revokeLaunchToken: dependencies.revokeLaunchToken }),
 	};
-	return (await workerTypes.get(entry, host)).source;
+	const instance = await workerTypes.get(entry, host);
+	return dependencies.skipExclusive === true && instance.exclusive === true ? undefined : instance.source;
 }
 
 /** The message of whatever was thrown; a value whose message cannot be read must not reject the whole contact. */
@@ -152,6 +160,9 @@ export async function contactDeclaredSources(
 		entries.map(async entry => {
 			try {
 				const provider = await providerOf(entry, dependencies);
+				if (provider === undefined) {
+					return;
+				}
 				await provider.obtainWorker({
 					daemonEndpoint,
 					sourceId: entry.sourceId,

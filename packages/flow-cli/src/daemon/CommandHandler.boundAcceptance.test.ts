@@ -77,9 +77,12 @@ function source(sourceId: string, plugin: string): WorkerSourceEntry {
 	} as WorkerSourceEntry;
 }
 
-const CATALOG = new WorkerTypeCatalog({
-	list: () => [source('sbx-1', 'sandbox.docker'), source('sbx-2', 'sandbox.docker')],
-});
+const CATALOG = new WorkerTypeCatalog(
+	{
+		list: () => [source('sbx-1', 'sandbox.docker'), source('sbx-2', 'sandbox.docker')],
+	},
+	{ isExclusive: () => false }
+);
 
 /** A connected worker of type "sandbox" (its source is declared), with the given labels. */
 function sandboxWorker(name: string, labels: string[], sourceId = 'sbx-1') {

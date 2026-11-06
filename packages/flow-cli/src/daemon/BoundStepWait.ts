@@ -14,7 +14,7 @@ export interface BoundStepRouting {
 
 /** What the daemon needs to restrict a run to a worker type: where types come from, and how long a missing one is waited for. */
 export interface WorkerTypeRouting {
-	workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'knownTypes'>;
+	workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'exclusiveLookup' | 'knownTypes'>;
 	/** `worker.boundStepWaitSeconds`, in milliseconds. */
 	boundStepWaitMs: number;
 	/** Where the last contact error of each source is kept, to say why no worker of the type came. */

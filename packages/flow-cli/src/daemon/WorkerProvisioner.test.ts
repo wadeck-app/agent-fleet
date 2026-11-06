@@ -722,3 +722,56 @@ describe('WorkerProvisioner - reporting a refusal', () => {
 		expect(stderr).not.toHaveBeenCalled();
 	});
 });
+
+describe('WorkerProvisioner - workers of an exclusive type do not use the concurrency limit', () => {
+	// Unbound demand can only be served by a host worker. With the default limit of 1, a connected sandbox worker used to
+	// leave no room, so an unbound run waited forever with nothing forked and nothing said.
+	const withExclusive = (limit: number, registry: WorkerRegistry): WorkerProvisioner =>
+		new WorkerProvisioner(
+			limit,
+			registry,
+			fakeSource(),
+			allowAll() as never,
+			sourceCaps({}) as never,
+			undefined,
+			undefined,
+			() => sourceId => sourceId === 'sbx'
+		);
+
+	it('leaves room to fork a host worker while only an exclusive worker is connected', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = withExclusive(1, registry);
+		registry.register(fakeWorker(), { pid: 1, sourceId: 'sbx' });
+
+		expect(provisioner.canProvision()).toBe(true);
+		expect(provisioner.planProvisioning(1, 0).fork).toBe(1);
+	});
+
+	it('still counts a worker that is not of an exclusive type', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = withExclusive(1, registry);
+		registry.register(fakeWorker(), { pid: 1, sourceId: 'farm' });
+		registry.register(fakeWorker(), { pid: 2 });
+
+		expect(provisioner.canProvision()).toBe(false);
+	});
+
+	it('counts every worker when the exclusivity cannot be read, so the limit still holds', () => {
+		const registry = new WorkerRegistry();
+		const provisioner = new WorkerProvisioner(
+			1,
+			registry,
+			fakeSource(),
+			allowAll() as never,
+			sourceCaps({}) as never,
+			undefined,
+			undefined,
+			() => {
+				throw new Error('registry file is corrupt');
+			}
+		);
+		registry.register(fakeWorker(), { pid: 1, sourceId: 'sbx' });
+
+		expect(provisioner.canProvision()).toBe(false);
+	});
+});

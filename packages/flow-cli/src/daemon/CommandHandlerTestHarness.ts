@@ -21,7 +21,7 @@ const ROUTING_INDEX = 19;
 /** No source declares a worker type; a fresh store per handler, nothing shared between tests. */
 export function emptyWorkerRouting(): WorkerTypeRouting {
 	return {
-		workerTypes: new WorkerTypeCatalog({ list: () => [] }),
+		workerTypes: new WorkerTypeCatalog({ list: () => [] }, { isExclusive: () => false }),
 		boundStepWaitMs: DEFAULT_BOUND_STEP_WAIT_MS,
 		contactErrors: new SourceContactErrors(),
 	};

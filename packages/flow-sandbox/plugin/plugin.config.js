@@ -362,6 +362,9 @@ function createInstance(context) {
 	}
 
 	return {
+		// The daemon never offers this worker a step of a run that is not bound to `workerType: sandbox`, and never asks this
+		// source for a worker on behalf of such a run: host-only steps (cmd, pwsh, daemon API scripts) cannot run in a sandbox.
+		exclusive: true,
 		source: {
 			async obtainWorker(request) {
 				if (disposing !== undefined) {

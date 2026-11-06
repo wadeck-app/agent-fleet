@@ -300,7 +300,8 @@ async function startOwningDaemon(
 					// debugging "why is nothing connected" needs to see.
 					message => {
 						writeDaemonLog(logsDir, 'error', message);
-					}
+					},
+					() => new WorkerTypeCatalog(sourceRegistry, workerTypes).exclusiveLookup()
 				);
 				const commandHandler = new CommandHandler(
 					resolvedDaemonDir,
@@ -340,7 +341,7 @@ async function startOwningDaemon(
 					runEndSettingsOf(config.worker),
 					workerTypes,
 					{
-						workerTypes: new WorkerTypeCatalog(sourceRegistry),
+						workerTypes: new WorkerTypeCatalog(sourceRegistry, workerTypes),
 						boundStepWaitMs: config.worker.boundStepWaitSeconds * 1000,
 						contactErrors: sourceContact.contactErrors,
 					}

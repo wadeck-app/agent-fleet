@@ -326,14 +326,15 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		for (const call of world.sbxCalls()) expect((call as { workerEnv?: string[] }).workerEnv).toEqual([]);
 	});
 
-	it('an unbound flow is NOT kept off the sandbox worker: label routing does not isolate (documented hazard)', async () => {
-		// Routing code (StepRouter): a step without labels or workerType is accepted by any idle worker attached to the project, and
-		// workers someone launched are preferred to one the daemon would fork. So the sandbox worker is chosen here. This is exactly
-		// why an injected step (no labels) needs a run bound with `workerType: sandbox`.
+	it('an unbound flow is kept off the sandbox worker: its type is exclusive, the step runs on a host worker', async () => {
+		// The plugin declares `exclusive: true`, so the daemon offers its worker only to runs bound with `workerType: sandbox` and does
+		// not ask the source for a worker for an unbound run: the demand is covered by a host worker the daemon forks.
+		const callsBefore = world.sbxCalls().length;
 		const record = await world.runAndRelease(world.writeFlow('unbound', false));
 
+		expect(record.steps?.['probe']?.sourceId).not.toBe('sandbox-1');
+		expect(world.sbxCalls()).toHaveLength(callsBefore);
 		expect(record.status).toBe('completed');
-		expect(record.steps?.['probe']?.sourceId).toBe('sandbox-1');
 	}, 120_000);
 });
 

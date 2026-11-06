@@ -32,9 +32,11 @@ describe('StepDispatcher - the wait of a step of a bound run is forgotten', () =
 		boundStepWaitMs: number,
 		catalog: {
 			typeLookup: () => (sourceId: string | undefined) => string | undefined;
+			exclusiveLookup: () => (sourceId: string | undefined) => boolean;
 			knownTypes: () => string[];
 		} = {
 			typeLookup: () => sourceId => (sourceId === 'sbx-1' ? 'sandbox' : undefined),
+			exclusiveLookup: () => () => false,
 			knownTypes: () => ['sandbox'],
 		}
 	) {
@@ -174,6 +176,7 @@ describe('StepDispatcher - the wait of a step of a bound run is forgotten', () =
 
 	describe('when the declared sources cannot be read', () => {
 		const unreadable = {
+			exclusiveLookup: () => () => false,
 			typeLookup: () => {
 				throw new Error('worker-sources.json is corrupt');
 			},

@@ -48,6 +48,20 @@ export interface WorkerTypeInstance {
 	/** Obtains workers for the source (worker-source v1, unchanged: no handle comes back). */
 	source: WorkerSourceProvider;
 	/**
+	 * `true` makes the type EXCLUSIVE: its workers serve only runs bound to its type (`workerType: <type>` in the flow)
+	 * and are never offered a step of an unbound run or of a run bound to another type, whatever labels, projects or
+	 * acceptance plugins say. Its source is not asked for a worker on behalf of unbound demand either. Declare it for a
+	 * type whose workers cannot run ordinary steps (for example a sandbox with no access to the host).
+	 *
+	 * Omitted or `false`: the workers take any step they are eligible for, as before. When present it must be a boolean:
+	 * anything else makes the build fail.
+	 *
+	 * Until the daemon has built the instance (startup, or a build that failed) it cannot know this, and treats a type
+	 * loaded from a plugins directory as exclusive: fail-closed, so an unbound run is never routed to a worker that may
+	 * be sandboxed. The cost is that a non-exclusive plugin's workers take unbound steps only once its instance is built.
+	 */
+	exclusive?: boolean;
+	/**
 	 * Called once per run this type served (once per source, however many of its workers took part), after the workers
 	 * acknowledged the end of the run (or the wait expired) and before the run's workspace is released. Bounded by the
 	 * ack timeout: a rejection or a hang is logged with the source and the execution, never blocks the release further.

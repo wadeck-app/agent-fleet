@@ -84,6 +84,8 @@ export class DaemonSourceContact {
 					this.launchTokens.revoke(sourceId, token);
 				},
 				workerTypes: this.workerTypes,
+				// Demand for no particular type is never served by a worker of an exclusive type.
+				skipExclusive: workerTypes === undefined,
 				contactOutcome: this.contactErrors,
 			}
 		).catch((err: unknown) => {
