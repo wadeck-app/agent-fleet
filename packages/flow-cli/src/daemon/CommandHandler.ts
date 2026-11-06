@@ -14,26 +14,16 @@ import type { WebSocket } from 'ws';
 import type { ClientCommand, DaemonResponse, InjectedStep, StepProgressDetail } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
-import { BoundStepWait, type WorkerTypeRouting } from './BoundStepWait.js';
+import type { WorkerTypeRouting } from './BoundStepWait.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
-import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
-import { ExecutionCanceller } from './ExecutionCanceller.js';
 import { ExecutionHooks } from './ExecutionHooks.js';
+import { ExecutionPipeline } from './ExecutionPipeline.js';
 import { ExecutionRegistry } from './ExecutionRegistry.js';
-import { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
-import { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
 import { ReadyStepQueue } from './ReadyStepQueue.js';
-import { RunDefinitionLoader } from './RunDefinitionLoader.js';
-import { RunEndCoordinator, type RunEndSettings, type RunEndedListener } from './RunEndCoordinator.js';
+import type { RunEndSettings, RunEndedListener } from './RunEndCoordinator.js';
 import type { RunProject } from './RunProjectResolver.js';
-import { RunRequestHandler } from './RunRequestHandler.js';
-import { RunStepPreparer } from './RunStepPreparer.js';
-import { SchedulerIdleState } from './SchedulerIdleState.js';
-import { StepDispatcher } from './StepDispatcher.js';
-import { DEFAULT_MAX_INJECTED_STEPS, DEFAULT_MAX_STEPS_PER_EXECUTION, StepInjection } from './StepInjection.js';
-import { StepOutcomes } from './StepOutcomes.js';
-import { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
-import { DEFAULT_STEP_SILENCE_LIMIT_MS, WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
+import { DEFAULT_MAX_INJECTED_STEPS, DEFAULT_MAX_STEPS_PER_EXECUTION } from './StepInjection.js';
+import { DEFAULT_STEP_SILENCE_LIMIT_MS } from './WorkerAssignmentSupervisor.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 
@@ -56,15 +46,12 @@ export class CommandHandler {
 	private readonly executions = new ExecutionRegistry();
 	private readonly queue = new ReadyStepQueue();
 	private readonly hooks: ExecutionHooks;
-	private readonly demand: UnmetDemandCoverage;
-	private readonly supervisor: WorkerAssignmentSupervisor;
-	private readonly dispatcher: StepDispatcher;
-	private readonly outcomes: StepOutcomes;
-	private readonly runEnd: RunEndCoordinator;
-	private readonly idleState: SchedulerIdleState;
-	private readonly injection: StepInjection;
-	private readonly runRequests: RunRequestHandler;
-	private readonly canceller: ExecutionCanceller;
+	/** The collaborators that run an execution once it is accepted; see {@link ExecutionPipeline}. */
+	private readonly pipeline: ExecutionPipeline;
+	/** Kept as a member so a test can reach the outcomes collaborator the way it did before the pipeline existed. */
+	private get outcomes(): ExecutionPipeline['outcomes'] {
+		return this.pipeline.outcomes;
+	}
 	/**
 	 * While draining, new runs are refused so in-flight executions can finish and a pending update
 	 * can restart the daemon. Refused rather than queued: execution state lives only in this
@@ -72,8 +59,6 @@ export class CommandHandler {
 	 * Not persisted: the restart that ends a drain also clears it.
 	 */
 	private draining = false;
-	/** Text added to the failure of a step lost with a disconnecting worker; set only during that disconnect. */
-	private disconnectDetails: ((executionId: string, stepId: string) => string | undefined) | undefined;
 
 	constructor(
 		daemonDir: string,
@@ -150,99 +135,29 @@ export class CommandHandler {
 			executionStore ?? new ExecutionStore(executionsDirOf(daemonDir), undefined, daemonSecrets.masks);
 		this.logWriter = logWriter ?? new LogWriter(logsDirOf(daemonDir), undefined, daemonSecrets.masks);
 		this.hooks = new ExecutionHooks(this.logWriter);
-		this.demand = new UnmetDemandCoverage(provisioner, () => this.tryDispatch(), requestFromDeclaredSources);
-		this.supervisor = new WorkerAssignmentSupervisor(
+		this.pipeline = new ExecutionPipeline({
+			daemonDir,
 			registry,
-			this.logWriter,
-			this.queue,
-			this.executions,
-			(executionId, stepId, reason, endReason) => {
-				// Only set while a disconnect is being processed (see handleWorkerDisconnect).
-				const details = this.disconnectDetails?.(executionId, stepId);
-				this.outcomes.failStep(
-					executionId,
-					stepId,
-					details === undefined ? reason : `${reason} ${details}`,
-					endReason
-				);
-			},
-			stalledStepLimitMs
-		);
-		this.runEnd = new RunEndCoordinator(
-			registry,
-			this.supervisor,
-			this.logWriter,
-			runEndSettings,
-			runEndedListener
-		);
-		this.idleState = new SchedulerIdleState(this.queue, this.executions, this.runEnd);
-		this.dispatcher = new StepDispatcher(
-			registry,
-			this.queue,
-			this.executions,
-			this.supervisor,
-			this.demand,
-			daemonSecrets,
-			this.executionStore,
-			this.hooks,
-			this.logWriter,
-			interactivityPolicy ?? new DefaultInteractivityPolicy(),
-			(executionId, stepId, reason) => this.outcomes.failStep(executionId, stepId, reason),
-			{
-				workerTypes: workerRouting.workerTypes,
-				wait: new BoundStepWait(workerRouting.boundStepWaitMs, Date.now, () => this.tryDispatch()),
-				contactErrors: workerRouting.contactErrors,
-			}
-		);
-		const workspaces = new ExecutionWorkspaces(this.logWriter, workspaceProvider, resolvePerFlowWorkspaceProvider);
-		this.outcomes = new StepOutcomes(
-			this.executions,
-			this.queue,
-			this.executionStore,
-			this.logWriter,
-			daemonSecrets,
-			workspaces,
-			this.hooks,
-			() => this.tryDispatch(),
-			executionId => {
-				this.supervisor.forgetExecution(executionId);
-				this.dispatcher.forgetExecution(executionId);
-			},
-			this.runEnd
-		);
-		this.canceller = new ExecutionCanceller({
+			provisioner,
 			executions: this.executions,
 			queue: this.queue,
-			store: this.executionStore,
-			supervisor: this.supervisor,
 			hooks: this.hooks,
-			workspaces,
+			executionStore: this.executionStore,
 			logWriter: this.logWriter,
-			disconnectWorker: worker => registry.disconnect(worker),
-			endExecution: (executionId, reason, priorError) =>
-				this.outcomes.cleanupExecution(executionId, reason, priorError),
-			tryDispatch: () => this.tryDispatch(),
-		});
-		this.injection = new StepInjection(
-			this.executions,
-			this.queue,
 			daemonSecrets,
+			workspaceProvider,
+			resolvePerFlowWorkspaceProvider,
+			requestFromDeclaredSources,
+			interactivityPolicy,
+			stalledStepLimitMs,
+			definitionResolver,
+			runEndSettings,
+			runEndedListener,
+			workerRouting,
+			allowAbsolutePaths,
 			maxInjectedSteps,
-			maxStepsPerExecution
-		);
-		this.runRequests = new RunRequestHandler(
-			new FlowFileAccessGuard(allowAbsolutePaths),
-			new RunDefinitionLoader(definitionResolver, this.logWriter, () => workerRouting.workerTypes.knownTypes()),
-			new RunStepPreparer(daemonDir, this.logWriter),
-			daemonSecrets,
-			workspaces,
-			this.executions,
-			this.queue,
-			this.hooks,
-			this.executionStore,
-			this.logWriter,
-			() => this.tryDispatch()
-		);
+			maxStepsPerExecution,
+		});
 	}
 
 	dispatchHook(
@@ -259,32 +174,32 @@ export class CommandHandler {
 
 	/** See {@link SchedulerIdleState.isQueueEmpty}. */
 	isQueueEmpty(): boolean {
-		return this.idleState.isQueueEmpty();
+		return this.pipeline.idleState.isQueueEmpty();
 	}
 
 	/** See {@link SchedulerIdleState.hasActiveExecutions}. */
 	hasActiveExecutions(): boolean {
-		return this.idleState.hasActiveExecutions();
+		return this.pipeline.idleState.hasActiveExecutions();
 	}
 
 	/** See {@link SchedulerIdleState.isExecutionActive}. */
 	isExecutionActive(executionId: string): boolean {
-		return this.idleState.isExecutionActive(executionId);
+		return this.pipeline.idleState.isExecutionActive(executionId);
 	}
 
 	/** Consulted by the daemon's idle-exit check by name; see {@link SchedulerIdleState.hasResumableInterventions}. */
 	hasResumableInterventions(): boolean {
-		return this.idleState.hasResumableInterventions();
+		return this.pipeline.idleState.hasResumableInterventions();
 	}
 
 	/** One-line snapshot for the idle-exit log entries; see {@link SchedulerIdleState.describe}. */
 	describeIdleState(): string {
-		return this.idleState.describe();
+		return this.pipeline.idleState.describe();
 	}
 
 	/** See {@link SchedulerIdleState.hasPendingRunEnds}. */
 	hasPendingRunEnds(): boolean {
-		return this.idleState.hasPendingRunEnds();
+		return this.pipeline.idleState.hasPendingRunEnds();
 	}
 
 	setDraining(draining: boolean): void {
@@ -309,37 +224,37 @@ export class CommandHandler {
 					'Retry once the update has been applied, or cancel the drain with: flow cli update --cancel-drain',
 			};
 		}
-		return this.runRequests.handleRun(cmd, hookDispatcher, resolvedProject);
+		return this.pipeline.runRequests.handleRun(cmd, hookDispatcher, resolvedProject);
 	}
 
 	/** See {@link WorkerAssignmentSupervisor.verifyAssignment}. */
 	verifyAssignment(worker: WebSocket, assignmentId: string, executionId: string, stepId: string): boolean {
-		return this.supervisor.verifyAssignment(worker, assignmentId, executionId, stepId);
+		return this.pipeline.supervisor.verifyAssignment(worker, assignmentId, executionId, stepId);
 	}
 
 	/** As {@link verifyAssignment}, for messages that name no step (inject_steps). */
 	verifyAssignmentScope(worker: WebSocket, assignmentId: string, executionId: string): boolean {
-		return this.supervisor.verifyAssignmentScope(worker, assignmentId, executionId);
+		return this.pipeline.supervisor.verifyAssignmentScope(worker, assignmentId, executionId);
 	}
 
 	/** Closes an assignment once its outcome has been accepted. */
 	settleAssignment(assignmentId: string): void {
-		this.supervisor.settleAssignment(assignmentId);
+		this.pipeline.supervisor.settleAssignment(assignmentId);
 	}
 
 	/** Records that a worker is still saying something about an assignment it holds. */
 	noteAssignmentActivity(assignmentId: string, detail?: StepProgressDetail): void {
-		this.supervisor.noteAssignmentActivity(assignmentId, detail);
+		this.pipeline.supervisor.noteAssignmentActivity(assignmentId, detail);
 	}
 
 	/** Called on a timer by `Daemon`; see {@link WorkerAssignmentSupervisor.failStalledSteps}. */
 	failStalledSteps(): void {
-		this.supervisor.failStalledSteps();
+		this.pipeline.supervisor.failStalledSteps();
 	}
 
 	/** Records that a worker has begun executing an assigned step (D#65). */
 	onStepStarted(worker: WebSocket, assignmentId: string, executionId: string, stepId: string): void {
-		this.supervisor.onStepStarted(worker, assignmentId, executionId, stepId);
+		this.pipeline.supervisor.onStepStarted(worker, assignmentId, executionId, stepId);
 	}
 
 	/**
@@ -351,60 +266,53 @@ export class CommandHandler {
 		worker: WebSocket,
 		describeLostStep?: (executionId: string, stepId: string) => string | undefined
 	): void {
-		// Scoped to this synchronous call, so details never attach to an unrelated failure.
-		this.disconnectDetails = describeLostStep;
-		this.runEnd.workerGone(worker);
-		try {
-			this.supervisor.handleWorkerDisconnect(worker);
-		} finally {
-			this.disconnectDetails = undefined;
-		}
+		this.pipeline.handleWorkerDisconnect(worker, describeLostStep);
 	}
 
 	/** A worker answered `run_end`; see {@link RunEndCoordinator.handleAck}. */
 	onRunEndAck(worker: WebSocket, executionId: string): void {
-		this.runEnd.handleAck(worker, executionId);
+		this.pipeline.runEnd.handleAck(worker, executionId);
 	}
 
 	/** Tells the workers of every run in progress that the daemon is stopping; see {@link RunEndCoordinator.announceDaemonStop}. */
 	announceDaemonStop(): Promise<void> {
-		return this.runEnd.announceDaemonStop();
+		return this.pipeline.runEnd.announceDaemonStop();
 	}
 
 	/** Called by Daemon when a worker reports step_completed. */
 	onStepCompleted(executionId: string, stepId: string, rawOutput: Record<string, unknown>, rawMeta?: StepMeta): void {
-		this.outcomes.onStepCompleted(executionId, stepId, rawOutput, rawMeta);
+		this.pipeline.outcomes.onStepCompleted(executionId, stepId, rawOutput, rawMeta);
 	}
 
 	/** Called by Daemon when a worker reports step_failed. */
 	onStepFailed(executionId: string, stepId: string, rawError: string, rawOutputs?: Record<string, unknown>): void {
-		this.outcomes.onStepFailed(executionId, stepId, rawError, rawOutputs);
+		this.pipeline.outcomes.onStepFailed(executionId, stepId, rawError, rawOutputs);
 	}
 
 	/** Resumes an execution kept alive after an unanswered `user_intervention` step; see {@link StepOutcomes.handleResume}. */
 	handleResume(executionId: string): DaemonResponse {
-		return this.outcomes.handleResume(executionId);
+		return this.pipeline.outcomes.handleResume(executionId);
 	}
 
 	/** Ends one execution in any non-terminal state without touching the others; see {@link ExecutionCanceller}. */
 	handleCancel(cmd: Extract<ClientCommand, { type: 'cancel' }>): DaemonResponse {
-		return this.canceller.cancel(cmd.executionId, cmd.projectId);
+		return this.pipeline.canceller.cancel(cmd.executionId, cmd.projectId);
 	}
 
 	/** Called by Daemon for inject_steps messages. */
 	injectSteps(executionId: string, injectedSteps: InjectedStep[]): void {
-		this.injection.injectSteps(executionId, injectedSteps);
+		this.pipeline.injection.injectSteps(executionId, injectedSteps);
 	}
 
 	/** Hands out as many queued steps as current capacity allows; see {@link StepDispatcher.tryDispatch}. */
 	tryDispatch(): void {
-		this.dispatcher.tryDispatch();
+		this.pipeline.tryDispatch();
 	}
 
 	/** Drops work scheduled for later, when the daemon is shutting down; see {@link UnmetDemandCoverage.stop}. */
 	stopBackgroundWork(): void {
-		this.demand.stop();
-		this.dispatcher.stop();
-		this.runRequests.forgetRequests();
+		this.pipeline.demand.stop();
+		this.pipeline.dispatcher.stop();
+		this.pipeline.runRequests.forgetRequests();
 	}
 }
