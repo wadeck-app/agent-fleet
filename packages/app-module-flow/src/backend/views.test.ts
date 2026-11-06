@@ -1,11 +1,13 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import {
 	DEFAULT_HISTORY_LIMIT,
+	ExecutionLookupError,
 	FLOW_ACTION_BUTTON_STYLE,
 	FLOW_CHART_INDEX_PATH,
 	FLOW_EXECUTION_ROW_CONTEXT_FIELDS,
 	LOG_LEVELS,
 	RETRY_BADGE_VARIANTS,
+	UnknownPluginError,
 	buildRunDigest,
 	executionPagePath,
 	statusTag,
@@ -802,6 +804,73 @@ describe('executions page flow filter', () => {
 	});
 });
 
+// A page that loads one record by the id of its URL. A source that fails leaves EVERY source of the page undefined (the
+// loader is all-or-nothing) and the extension slots then print their framework error, so the route answers 200 with the
+// not-found notice and the page shows either the content (`found`) or the notice (`notFound`), nothing else.
+describe('pages of one record by id show one not-found state (shared notice, content gated on `found`)', () => {
+	const pages = [
+		{ file: 'execution-detail-page.yaml', source: 'execution', listHref: '/modules/flow/executions' },
+		{ file: 'execution-logs-page.yaml', source: 'logs', listHref: '/modules/flow/executions' },
+		{ file: 'plugin-detail-page.yaml', source: 'plugin', listHref: '/modules/flow/plugins' },
+	];
+
+	/** The notice every such page carries: the same two nodes, the texts coming from the route (NotFoundNotice.ts). */
+	const noticeOf = (source: string) => ({
+		$type: 'VerticalStack',
+		$if: `$sources.${source}.notFound`,
+		gap: 'gap-3',
+		items: [
+			{ $type: 'PageHeader', title: `$sources.${source}.title`, subtitle: `$sources.${source}.message` },
+			{
+				$type: 'ButtonLink',
+				size: 'sm',
+				variant: 'secondary',
+				label: `$sources.${source}.listLabel`,
+				to: `$sources.${source}.listHref`,
+			},
+		],
+	});
+
+	it.each(pages)('$file carries the shared notice, identical on every page', ({ file, source }) => {
+		const sections = parseView(file).document['sections'] as Record<string, unknown>[];
+		expect(sections.filter(section => section['$if'] === `$sources.${source}.notFound`)).toEqual([
+			noticeOf(source),
+		]);
+	});
+
+	it.each(pages)('$file shows every other section only when the record was found', ({ file, source }) => {
+		const sections = parseView(file).document['sections'] as Record<string, unknown>[];
+		const content = sections.filter(section => section['$if'] !== `$sources.${source}.notFound`);
+		expect(content.length).toBeGreaterThan(0);
+		for (const section of content) {
+			expect(section['$if'], `a ${String(section['$type'])} of ${file} is shown for a missing record`).toBe(
+				`$sources.${source}.found`
+			);
+		}
+	});
+
+	it.each(pages)('$file reads from the notice only fields the route sends', async ({ file, source, listHref }) => {
+		const { notFoundNoticeOf } = await import('./NotFoundNotice.js');
+		const sent = notFoundNoticeOf(
+			file.startsWith('plugin') ? new UnknownPluginError('x') : new ExecutionLookupError('x', 'not-found'),
+			'x'
+		)!;
+		const read = [...JSON.stringify(noticeOf(source)).matchAll(new RegExp(`\\$sources\\.${source}\\.(\\w+)`, 'g'))]
+			.map(match => match[1]!)
+			.filter(field => field !== 'notFound');
+		expect(Object.keys(sent)).toEqual(expect.arrayContaining(read));
+		expect(sent.listHref).toBe(listHref);
+	});
+
+	it('the execution detail page puts every extension slot inside the found content', () => {
+		const { document } = parseView('execution-detail-page.yaml');
+		const sections = document['sections'] as Record<string, unknown>[];
+		const outside = sections.filter(section => section['$if'] !== '$sources.execution.found');
+		expect(JSON.stringify(outside)).not.toMatch(/ExtensionSlot|\$sources\.(links|actions|projectLinks)/);
+		expect(collectNodes(sections, 'ExtensionSlot').length).toBe(3);
+	});
+});
+
 describe('every $sources url is served by the backend', () => {
 	let registered: Set<string>;
 
@@ -921,7 +990,9 @@ describe('links read from a row or from the detail resolve to a page of the mani
 				const targets = [...collectStrings(document, 'href'), ...collectStrings(document, 'to')].filter(
 					target =>
 						// The dashboard widget has its own test below.
-						/^\$(ctx\.row|sources\.execution)\./.test(target)
+						/^\$(ctx\.row|sources\.execution)\./.test(target) &&
+						// The not-found notice link is checked with the not-found pages (it is sent by the notice, not by the detail).
+						!target.endsWith('.listHref')
 				);
 				for (const target of targets) {
 					const row = target.startsWith('$ctx.row.') ? list.items[0]! : detail;

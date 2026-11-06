@@ -22,6 +22,7 @@ import {
 
 import { replyWithError } from './ErrorReply.js';
 import { toExecutionDetailRow, toExecutionRow, toFlowRow } from './ExecutionDisplay.js';
+import { replyNotFoundOrError } from './NotFoundNotice.js';
 import { requireProjectId } from './ProjectIdQuery.js';
 import { renderStepsIoText } from './StepIoText.js';
 
@@ -174,6 +175,7 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 			);
 			// The recorded inputs and outputs come from the served record, in their own field: the step rows stay light.
 			return reply.code(200).send({
+				found: true,
 				...toExecutionDetailRow(
 					detail,
 					readRecordedRetryPolicies(served.record, definitionsDirOf(service.directories.configDir))
@@ -181,7 +183,7 @@ export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQuerySe
 				ioText: renderStepsIoText(served.record),
 			});
 		} catch (err) {
-			return replyWithError(reply, err);
+			return replyNotFoundOrError(reply, err, id);
 		}
 	});
 }

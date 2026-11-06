@@ -61,10 +61,21 @@ describe('GET /plugins/:id', () => {
 		expect((body as { optionRows: unknown[] }).optionRows).toEqual([]);
 	});
 
-	it('answers 404 with the CLI hint for an unknown plugin', async () => {
+	it('answers an unknown plugin with the not-found notice (200) that links to the plugin list', async () => {
 		const { status, body } = await callRoute(routes, 'GET /plugins/:id', { params: { id: 'nope' } });
-		expect(status).toBe(404);
-		expect((body as { error: string }).error).toContain("unknown plugin 'nope'");
+		expect(status).toBe(200);
+		expect(body).toMatchObject({
+			found: false,
+			notFound: true,
+			id: 'nope',
+			listLabel: 'See all plugins',
+			listHref: '/modules/flow/plugins',
+		});
+	});
+
+	it('marks a found plugin', async () => {
+		const { body } = await callRoute(routes, 'GET /plugins/:id', { params: { id: 'none' } });
+		expect(body).toMatchObject({ found: true });
 	});
 
 	it('answers 500 saying what is missing when the service has no manifests (configuration error, never an empty list)', async () => {

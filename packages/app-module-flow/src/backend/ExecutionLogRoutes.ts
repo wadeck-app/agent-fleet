@@ -8,9 +8,9 @@ import {
 	stripForServing,
 } from 'flow-core';
 
-import { replyWithError } from './ErrorReply.js';
 import { displayLogMessage } from './LogMessageDisplay.js';
 import { buildLogTimeline } from './LogTimeline.js';
+import { replyNotFoundOrError } from './NotFoundNotice.js';
 
 export const DEFAULT_EXECUTION_LOG_LIMIT = 100;
 export const MAX_EXECUTION_LOG_LIMIT = 1000;
@@ -82,6 +82,7 @@ export function registerExecutionLogRoutes(ctx: ModuleContext, service: FlowQuer
 			const recordedOutput = stripForServing(logs.recordedOutput);
 			return reply.code(200).send({
 				...logs,
+				found: true,
 				entries: timeline.entries,
 				steps: timeline.steps,
 				runDurationMs: timeline.runDurationMs,
@@ -95,7 +96,7 @@ export function registerExecutionLogRoutes(ctx: ModuleContext, service: FlowQuer
 				hasNotice: notice !== '',
 			});
 		} catch (err) {
-			return replyWithError(reply, err);
+			return replyNotFoundOrError(reply, err, id);
 		}
 	});
 }

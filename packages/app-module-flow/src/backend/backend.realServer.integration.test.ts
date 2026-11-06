@@ -193,8 +193,8 @@ describe('the packaged module through a real app-core server', () => {
 		expect(String(found.body['text'])).toContain('Execution: bbb222');
 
 		const missing = await get('/executions/zzz999');
-		expect(missing.status).toBe(404);
-		expect(String(missing.body['error'])).toContain('zzz999');
+		expect(missing.status).toBe(200);
+		expect(missing.body).toMatchObject({ found: false, notFound: true, id: 'zzz999' });
 	});
 
 	it('GET /executions/:id/logs reads the lines of that run from the daily log and filters them by step', async () => {
@@ -241,7 +241,7 @@ describe('the packaged module through a real app-core server', () => {
 		const one = await get('/plugins/worktree');
 		expect(one.status).toBe(200);
 		expect(one.body['typeString']).toBe('plugins.worktree.default');
-		expect((await get('/plugins/nope')).status).toBe(404);
+		expect((await get('/plugins/nope')).body).toMatchObject({ found: false, notFound: true, id: 'nope' });
 		// The option rows are what the plugin detail page renders (a DSL table takes arrays, not objects).
 		expect((one.body['optionRows'] as { name: string }[]).map(row => row.name)).toContain('baseDir');
 	});

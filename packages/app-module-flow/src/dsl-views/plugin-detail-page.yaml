@@ -8,29 +8,49 @@ $sources:
 
 $type: PageContent
 sections:
-    - $type: PageHeader
-      title: $sources.plugin.id
-      subtitle: $sources.plugin.typeString
+    # Content only for a record that exists: a missing one answers the notice below (NotFoundNotice.ts), and the same
+    # page must not print the slots or tables of a record that is not there.
+    - $type: VerticalStack
+      $if: $sources.plugin.found
+      gap: gap-4
+      items:
+          - $type: PageHeader
+            title: $sources.plugin.id
+            subtitle: $sources.plugin.typeString
 
-    - $type: HorizontalStack
+          - $type: HorizontalStack
+            gap: gap-3
+            align: items-center
+            items:
+                - { $type: Badge, label: $sources.plugin.extensionPoint, variant: info }
+
+          - $type: Section
+            title: Configuration
+            items:
+                - $type: JsonViewer
+                  row: $sources.plugin
+                  field: snippet
+
+          - $type: Section
+            title: Options
+            items:
+                - $type: DataTable
+                  rows: $sources.plugin.optionRows
+                  emptyMessage: This plugin has no option
+                  columns:
+                      - { key: 'name', label: 'Option', nowrap: true, mono: true }
+                      - { key: 'description', label: 'Description' }
+
+    # One not-found state for every page of one record by id: same two nodes, texts from the route (NotFoundNotice.ts).
+    - $type: VerticalStack
+      $if: $sources.plugin.notFound
       gap: gap-3
-      align: items-center
       items:
-          - { $type: Badge, label: $sources.plugin.extensionPoint, variant: info }
-
-    - $type: Section
-      title: Configuration
-      items:
-          - $type: JsonViewer
-            row: $sources.plugin
-            field: snippet
-
-    - $type: Section
-      title: Options
-      items:
-          - $type: DataTable
-            rows: $sources.plugin.optionRows
-            emptyMessage: This plugin has no option
-            columns:
-                - { key: 'name', label: 'Option', nowrap: true, mono: true }
-                - { key: 'description', label: 'Description' }
+          - { $type: PageHeader, title: $sources.plugin.title, subtitle: $sources.plugin.message }
+          - {
+                $type: ButtonLink,
+                size: sm,
+                variant: secondary,
+                label: $sources.plugin.listLabel,
+                to: $sources.plugin.listHref,
+            }

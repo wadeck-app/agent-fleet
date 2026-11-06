@@ -272,9 +272,23 @@ describe('GET /executions/:id/logs', () => {
 		expect(await call(query)).toEqual({ status: 400, body: { error: message } });
 	});
 
-	it('answers an unknown execution with its lookup error, not an empty page', async () => {
+	it('answers an unknown execution with the not-found notice (200, no data folder path), not an empty page', async () => {
 		const { status, body } = await call({}, 'nope');
-		expect(status).toBe(404);
-		expect(String((body as { error: string }).error)).toMatch(/nope/);
+		expect(status).toBe(200);
+		expect(body).toEqual({
+			found: false,
+			notFound: true,
+			id: 'nope',
+			title: 'Execution not found',
+			message:
+				'Execution nope was not found. It may have been removed by the retention cleanup, or the id is wrong.',
+			listLabel: 'See all executions',
+			listHref: '/modules/flow/executions',
+		});
+		expect(JSON.stringify(body)).not.toContain(fixture.configDir);
+	});
+
+	it('marks the logs of a found execution', async () => {
+		expect((await call({})).body).toMatchObject({ found: true });
 	});
 });

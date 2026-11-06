@@ -2,6 +2,7 @@ import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import type { FlowQueryService } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
+import { replyNotFoundOrError } from './NotFoundNotice.js';
 
 /** `GET /plugins` and `GET /plugins/:id` (`flow plugins list` / `flow plugins show`). The detail also carries `optionRows`: the same options as `{ name, description }` rows, since a DSL table renders arrays, not objects. */
 export function registerPluginRoutes(ctx: ModuleContext, service: FlowQueryService): void {
@@ -22,9 +23,9 @@ export function registerPluginRoutes(ctx: ModuleContext, service: FlowQueryServi
 				name,
 				description: optionDescription,
 			}));
-			return reply.code(200).send({ ...description, optionRows });
+			return reply.code(200).send({ ...description, optionRows, found: true });
 		} catch (err) {
-			return replyWithError(reply, err);
+			return replyNotFoundOrError(reply, err, id);
 		}
 	});
 }

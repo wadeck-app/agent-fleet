@@ -33,6 +33,9 @@ $sources:
 $type: PageContent
 sections:
     - $type: VerticalStack
+      # Content only for an execution that exists: a missing one answers the notice below (NotFoundNotice.ts), and the
+      # slots (links, actions, project link) must not render for it.
+      $if: $sources.execution.found
       gap: gap-4
       items:
           - $type: PageHeader
@@ -182,3 +185,17 @@ sections:
                   row: $sources.execution
                   field: text
                   maxHeight: 40rem
+
+    # One not-found state for every page of one record by id: same two nodes, texts from the route (NotFoundNotice.ts).
+    - $type: VerticalStack
+      $if: $sources.execution.notFound
+      gap: gap-3
+      items:
+          - { $type: PageHeader, title: $sources.execution.title, subtitle: $sources.execution.message }
+          - {
+                $type: ButtonLink,
+                size: sm,
+                variant: secondary,
+                label: $sources.execution.listLabel,
+                to: $sources.execution.listHref,
+            }

@@ -26,99 +26,119 @@ $sources:
 
 $type: PageContent
 sections:
-    - $type: PageHeader
-      title: $sources.logs.flowId
-      subtitle: $sources.logs.executionId
+    # Content only for a record that exists: a missing one answers the notice below (NotFoundNotice.ts), and the same
+    # page must not print the slots or tables of a record that is not there.
+    - $type: VerticalStack
+      $if: $sources.logs.found
+      gap: gap-4
+      items:
+          - $type: PageHeader
+            title: $sources.logs.flowId
+            subtitle: $sources.logs.executionId
 
-    - $type: HorizontalStack
+          - $type: HorizontalStack
+            gap: gap-3
+            align: items-center
+            items:
+                - $type: SearchBar
+                  urlParam: q
+                  resetUrlParams: [page]
+                  placeholder: Message text
+                # options is a source expression: it is undefined until the route answered, and CompactSelect throws on that (blank page), hence the $if.
+                - $type: CompactSelect
+                  $if: $sources.logs.stepOptions
+                  urlParam: step
+                  resetUrlParams: [page]
+                  ariaLabel: Step
+                  placeholder: All steps
+                  options: $sources.logs.stepOptions
+                - $type: CompactSelect
+                  urlParam: level
+                  resetUrlParams: [page]
+                  ariaLabel: Level
+                  placeholder: Any level
+                  options:
+                      - { value: debug, label: Debug }
+                      - { value: info, label: Info }
+                      - { value: warning, label: Warning }
+                      - { value: error, label: Error }
+
+          - { $type: Badge, $if: $sources.logs.hasNotice, label: $sources.logs.notice, variant: warning, tone: subtle }
+
+          # The lines. Design experiment flow-logs-design: `stream` (initial) is flow:LogStream, `table` the DataTable this page
+          # had before. The stream owns five more experiments (flow-logs-identity, -grouping, -navigation, -time, -density), declared
+          # in code with useAbTest, so they show in the dock only while `stream` is chosen.
+          - $type: AbTest
+            id: flow-logs-design
+            label: Log view
+            initial: stream
+            variants:
+                stream:
+                    label: Stream
+                    hint: 'Step identity, execution order, optional sections per step or attempt, step index and relative times. Five more dock rows tune it.'
+                    view:
+                        $type: flow:LogStream
+                        $if: $sources.logs.executionId
+                        entries: $sources.logs.entries
+                        steps: $sources.logs.steps
+                        runDurationMs: $sources.logs.runDurationMs
+                        emptyMessage: $sources.logs.notice
+                table:
+                    label: Table
+                    hint: 'The previous view: one DataTable row per line (time, level, step id, message), no order, no grouping.'
+                    view:
+                        $type: DataTable
+                        rows: $sources.logs.entries
+                        emptyMessage: $sources.logs.notice
+                        expansionCondition: expandable
+                        expansion:
+                            $type: flow:MarkdownText
+                            text: $ctx.row.markdown
+                            maxHeight: 30rem
+                        columns:
+                            - { key: 'timestamp', label: 'Time', format: time, dateStyle: medium, nowrap: true }
+                            - key: level
+                              label: Level
+                              nowrap: true
+                              badge: { debug: default, info: info, warning: warning, error: danger }
+                            - { key: 'stepId', label: 'Step', truncate: true, mono: true }
+                            - { key: 'preview', label: 'Message', mono: true }
+
+          - $type: HorizontalStack
+            justify: justify-between
+            align: items-center
+            gap: gap-3
+            items:
+                - $type: Pagination
+                  urlParam: page
+                  total: $sources.logs.total
+                  size: $sources.logs.limit
+
+                # options[0] is the route's default page size (checked in views.test.ts).
+                - $type: PageSizeSelect
+                  urlParam: size
+                  resetUrlParams: [page]
+                  options: [100, 200, 500]
+
+          - $type: Section
+            $if: $sources.logs.hasRecordedOutput
+            title: Recorded failure output (error, stdout and stderr kept in the execution record)
+            items:
+                - $type: JsonViewer
+                  row: $sources.logs
+                  field: recordedOutput
+                  maxHeight: 30rem
+
+    # One not-found state for every page of one record by id: same two nodes, texts from the route (NotFoundNotice.ts).
+    - $type: VerticalStack
+      $if: $sources.logs.notFound
       gap: gap-3
-      align: items-center
       items:
-          - $type: SearchBar
-            urlParam: q
-            resetUrlParams: [page]
-            placeholder: Message text
-          # options is a source expression: it is undefined until the route answered, and CompactSelect throws on that (blank page), hence the $if.
-          - $type: CompactSelect
-            $if: $sources.logs.stepOptions
-            urlParam: step
-            resetUrlParams: [page]
-            ariaLabel: Step
-            placeholder: All steps
-            options: $sources.logs.stepOptions
-          - $type: CompactSelect
-            urlParam: level
-            resetUrlParams: [page]
-            ariaLabel: Level
-            placeholder: Any level
-            options:
-                - { value: debug, label: Debug }
-                - { value: info, label: Info }
-                - { value: warning, label: Warning }
-                - { value: error, label: Error }
-
-    - { $type: Badge, $if: $sources.logs.hasNotice, label: $sources.logs.notice, variant: warning, tone: subtle }
-
-    # The lines. Design experiment flow-logs-design: `stream` (initial) is flow:LogStream, `table` the DataTable this page
-    # had before. The stream owns five more experiments (flow-logs-identity, -grouping, -navigation, -time, -density), declared
-    # in code with useAbTest, so they show in the dock only while `stream` is chosen.
-    - $type: AbTest
-      id: flow-logs-design
-      label: Log view
-      initial: stream
-      variants:
-          stream:
-              label: Stream
-              hint: 'Step identity, execution order, optional sections per step or attempt, step index and relative times. Five more dock rows tune it.'
-              view:
-                  $type: flow:LogStream
-                  $if: $sources.logs.executionId
-                  entries: $sources.logs.entries
-                  steps: $sources.logs.steps
-                  runDurationMs: $sources.logs.runDurationMs
-                  emptyMessage: $sources.logs.notice
-          table:
-              label: Table
-              hint: 'The previous view: one DataTable row per line (time, level, step id, message), no order, no grouping.'
-              view:
-                  $type: DataTable
-                  rows: $sources.logs.entries
-                  emptyMessage: $sources.logs.notice
-                  expansionCondition: expandable
-                  expansion:
-                      $type: flow:MarkdownText
-                      text: $ctx.row.markdown
-                      maxHeight: 30rem
-                  columns:
-                      - { key: 'timestamp', label: 'Time', format: time, dateStyle: medium, nowrap: true }
-                      - key: level
-                        label: Level
-                        nowrap: true
-                        badge: { debug: default, info: info, warning: warning, error: danger }
-                      - { key: 'stepId', label: 'Step', truncate: true, mono: true }
-                      - { key: 'preview', label: 'Message', mono: true }
-
-    - $type: HorizontalStack
-      justify: justify-between
-      align: items-center
-      gap: gap-3
-      items:
-          - $type: Pagination
-            urlParam: page
-            total: $sources.logs.total
-            size: $sources.logs.limit
-
-          # options[0] is the route's default page size (checked in views.test.ts).
-          - $type: PageSizeSelect
-            urlParam: size
-            resetUrlParams: [page]
-            options: [100, 200, 500]
-
-    - $type: Section
-      $if: $sources.logs.hasRecordedOutput
-      title: Recorded failure output (error, stdout and stderr kept in the execution record)
-      items:
-          - $type: JsonViewer
-            row: $sources.logs
-            field: recordedOutput
-            maxHeight: 30rem
+          - { $type: PageHeader, title: $sources.logs.title, subtitle: $sources.logs.message }
+          - {
+                $type: ButtonLink,
+                size: sm,
+                variant: secondary,
+                label: $sources.logs.listLabel,
+                to: $sources.logs.listHref,
+            }

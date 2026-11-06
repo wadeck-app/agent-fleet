@@ -1,7 +1,7 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { FlowQueryService } from 'flow-core';
 import { FlowConfigFixture, callRoute, collectRoutes } from 'flow-core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { registerExecutionRoutes } from './ExecutionRoutes.js';
 
@@ -247,13 +247,39 @@ describe('GET /executions/:id', () => {
 		expect((full.body as { text: string }).text).toContain('HEAD');
 	});
 
-	it.each([
-		['Not_An_Id', 400],
-		['nomatch', 404],
-	])('maps the lookup error for %s to %i', async (id, status) => {
-		const reply = await callRoute(routes, 'GET /executions/:id', { params: { id }, query: {} });
-		expect(reply.status).toBe(status);
-		expect((reply.body as { error: string }).error).toContain(id);
+	it('marks a found execution, so the page can tell it from the not-found notice', async () => {
+		fixture.addExecution({ executionId: 'abc123' });
+		const { body } = await callRoute(routes, 'GET /executions/:id', { params: { id: 'abc123' }, query: {} });
+		expect(body).toMatchObject({ found: true });
+	});
+
+	it.each(['nomatch', 'Not_An_Id'])(
+		'answers 200 with the not-found notice for %s, without the data folder path, so the page can render one state',
+		async id => {
+			const { status, body } = await callRoute(routes, 'GET /executions/:id', { params: { id }, query: {} });
+			expect(status).toBe(200);
+			expect(body).toEqual({
+				found: false,
+				notFound: true,
+				id,
+				title: 'Execution not found',
+				message: `Execution ${id} was not found. It may have been removed by the retention cleanup, or the id is wrong.`,
+				listLabel: 'See all executions',
+				listHref: '/modules/flow/executions',
+			});
+			expect(JSON.stringify(body)).not.toContain(fixture.configDir);
+		}
+	);
+
+	it('keeps the full path in the server log, not in the answer', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		try {
+			await callRoute(routes, 'GET /executions/:id', { params: { id: 'nomatch' }, query: {} });
+			expect(warn).toHaveBeenCalledTimes(1);
+			expect(String(warn.mock.calls[0]![0])).toContain(fixture.configDir);
+		} finally {
+			warn.mockRestore();
+		}
 	});
 
 	it('answers 409 naming the candidates for an ambiguous prefix', async () => {
