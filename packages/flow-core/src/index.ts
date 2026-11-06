@@ -207,6 +207,17 @@ export {
 	readPageOffset,
 } from './query/QueryParameters.js';
 export {
+	RECOVERED_RUN_HINT,
+	RECOVERED_STEP_HINT,
+	isRecoveredStep,
+	recoveredStepHint,
+	retryHint,
+	runStatusHint,
+	skippedHint,
+	stepStatusHint,
+} from './view/OutcomeHints.js';
+export type { RecoverableRun, RecoverableStep } from './view/OutcomeHints.js';
+export {
 	MAX_COUNTED_RETRIES,
 	NO_RETRY_LEFT,
 	RETRY_BADGE_VARIANTS,

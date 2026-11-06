@@ -35,3 +35,23 @@ describe('RunList date tooltip', () => {
 		expect(link.textContent).toContain('build');
 	});
 });
+
+describe('RunList status tooltip', () => {
+	it('explains a recovered run on its status badge and leaves a clean run without tooltip', () => {
+		render(
+			<MemoryRouter>
+				<RunList
+					runs={[
+						{ ...RUNS[0]!, executionId: 'r1', statusLabel: 'ok, recovered', statusHint: 'It recovered.' },
+						{ ...RUNS[0]!, executionId: 'r2', statusLabel: 'ok', statusHint: '' },
+					]}
+					to="/runs/{executionId}"
+					emptyMessage="none"
+					unexpectedKeys={[]}
+				/>
+			</MemoryRouter>
+		);
+		expect(screen.getByText('ok, recovered').closest('span[title]')?.getAttribute('title')).toBe('It recovered.');
+		expect(screen.getByText('ok').closest('span[title]')).toBeNull();
+	});
+});

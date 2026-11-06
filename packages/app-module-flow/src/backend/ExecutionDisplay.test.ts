@@ -1,7 +1,13 @@
-import type { ExecutionDetailView, StepView } from 'flow-core';
+import {
+	type ExecutionDetailView,
+	type ExecutionSummary,
+	RECOVERED_RUN_HINT,
+	type StepView,
+	retryHint,
+} from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
-import { toExecutionDetailRow, toStepRow } from './ExecutionDisplay.js';
+import { toExecutionDetailRow, toExecutionRow, toStepRow } from './ExecutionDisplay.js';
 
 const STEP: StepView = { stepId: 's', status: 'completed', injected: false, duration: '1s', relaunches: [] };
 
@@ -120,5 +126,81 @@ describe('toStepRow skipped step', () => {
 		const row = toStepRow({ ...STEP, attempts: 1 }, { retryBudget: 0 });
 		expect(row.statusLabel).toBe('ok');
 		expect(row.retryLabel).toBe('0 retry');
+	});
+});
+
+describe('status and retry hints (tooltips)', () => {
+	const FAILED_THEN_OK = [
+		{
+			n: 1,
+			origin: 'first' as const,
+			outcome: 'failed' as const,
+			endReason: 'x',
+			duration: '1s',
+			durationMs: 1000,
+		},
+		{
+			n: 2,
+			origin: 'retry' as const,
+			outcome: 'completed' as const,
+			endReason: 'x',
+			duration: '1s',
+			durationMs: 1000,
+		},
+	];
+	const SUMMARY = {
+		executionId: 'e',
+		flowId: 'f',
+		flowFile: 'f.yaml',
+		status: 'completed',
+		startedAt: '2026-01-01T00:00:00.000Z',
+		lastErrorRecovered: true,
+	} as unknown as ExecutionSummary;
+
+	it('explains a recovered run in the list row, with the flow-core sentence', () => {
+		expect(toExecutionRow(SUMMARY)).toMatchObject({ statusLabel: 'ok, recovered', statusHint: RECOVERED_RUN_HINT });
+	});
+
+	it('sends an empty hint (no tooltip) for a clean or a failed run', () => {
+		expect(toExecutionRow({ ...SUMMARY, lastErrorRecovered: false }).statusHint).toBe('');
+		expect(toExecutionRow({ ...SUMMARY, status: 'failed', lastErrorRecovered: false }).statusHint).toBe('');
+	});
+
+	it('explains a recovered step from its attempts, and marks it recovered even without a stored error', () => {
+		const row = toStepRow({ ...STEP, attemptHistory: FAILED_THEN_OK, attempts: 2 }, undefined);
+		expect(row.statusLabel).toBe('ok, recovered');
+		expect(row.statusHint).toBe(
+			'2 attempts: attempt 1 failed (expand the row to see the attempts), attempt 2 succeeded.'
+		);
+	});
+
+	it('sends no step hint for a clean completed step or a failed one', () => {
+		expect(toStepRow(STEP, undefined).statusHint).toBe('');
+		expect(toStepRow({ ...STEP, status: 'failed', error: 'boom' }, undefined).statusHint).toBe('');
+	});
+
+	it('says why a skipped step did not run', () => {
+		const row = toStepRow({ ...STEP, skipped: true, skippedReason: 'condition is false' }, undefined);
+		expect(row.statusLabel).toBe('skipped');
+		expect(row.statusHint).toBe('Did not run: condition is false.');
+	});
+
+	it('explains the ambiguous retry texts and nothing for a count', () => {
+		expect(toStepRow({ ...STEP }, undefined).retryHint).toBe(retryHint('retries unknown'));
+		expect(toStepRow({ ...STEP, attempts: 1 }, undefined).retryHint).toBe('');
+	});
+
+	it('gives the detail header badge the run hint and a flag for each of its two variants', () => {
+		const detail = { ...SUMMARY, steps: [] } as unknown as ExecutionDetailView;
+		expect(toExecutionDetailRow(detail, undefined)).toMatchObject({
+			statusHint: RECOVERED_RUN_HINT,
+			hasStatusHint: true,
+			lacksStatusHint: false,
+		});
+		expect(toExecutionDetailRow({ ...detail, lastErrorRecovered: false }, undefined)).toMatchObject({
+			statusHint: '',
+			hasStatusHint: false,
+			lacksStatusHint: true,
+		});
 	});
 });

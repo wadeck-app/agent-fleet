@@ -54,7 +54,8 @@ export function RunList({ runs, to, emptyMessage, unexpectedKeys }: RunListProps
 						to={runLink(to, row.executionId)}
 						className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-sm hover:bg-surface-hover"
 					>
-						<span className="shrink-0">
+						{/* A Badge has no tooltip prop: the title sits on its wrapper; empty = no title attribute. */}
+						<span className="shrink-0" title={row.statusHint === '' ? undefined : row.statusHint}>
 							<Badge
 								label={row.statusLabel}
 								variant={runStatusVariant(row.statusLabel)}

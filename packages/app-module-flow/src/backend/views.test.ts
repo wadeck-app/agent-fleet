@@ -505,6 +505,8 @@ describe('DataTable columns', () => {
 		'format',
 		'dateStyle',
 		'badge',
+		// Tooltip template of the cell ({field} filled from the row); a shell that does not know it ignores it, the cell text stays.
+		'title',
 	];
 	const BADGE_VARIANTS = ['default', 'primary', 'success', 'warning', 'danger', 'info'];
 
@@ -958,7 +960,10 @@ describe('extension slots', () => {
 
 	it.each([
 		['execution-detail-page.yaml', ['execution-actions', 'execution-links', 'execution-project-header']],
-		['executions-page.yaml', ['execution-row-actions', 'execution-row-links', 'executions-actions', 'executions-project-header']],
+		[
+			'executions-page.yaml',
+			['execution-row-actions', 'execution-row-links', 'executions-actions', 'executions-project-header'],
+		],
 		['execution-logs-page.yaml', []],
 	])(
 		'%s embeds %j in every A/B variant: choosing a design must not drop the buttons other modules add',
@@ -1207,3 +1212,39 @@ async function loadKeyCheck() {
 		knownKeys: JSON.parse(readFileSync(keysFile, 'utf8')) as Record<string, unknown>,
 	};
 }
+
+describe('tooltips that explain the status words', () => {
+	// DataTable `title` is a template filled from the row; a blank result means no tooltip.
+	it('passes the run hint to the Status cell of the executions table', () => {
+		const table = collectNodes(initialView('executions-page.yaml'), 'DataTable')[0]!;
+		const status = (table['columns'] as Record<string, unknown>[]).find(column => column['key'] === 'statusLabel');
+		expect(status).toMatchObject({ title: '{statusHint}' });
+	});
+
+	it('passes the status and retry hints to the cells of the steps table', () => {
+		const steps = collectNodes(initialView('execution-detail-page.yaml'), 'DataTable').find(
+			table => table['rows'] === '$sources.execution.steps'
+		)!;
+		const byKey = (key: string) => (steps['columns'] as Record<string, unknown>[]).find(c => c['key'] === key);
+		expect(byKey('statusLabel')).toMatchObject({ title: '{statusHint}' });
+		expect(byKey('retryLabel')).toMatchObject({ title: '{retryHint}' });
+	});
+
+	it('wraps the header badge in a Tooltip only when the run has a hint (a Badge has no title)', () => {
+		const document = initialView('execution-detail-page.yaml');
+		const tooltip = collectNodes(document, 'Tooltip')[0]!;
+		expect(tooltip).toMatchObject({
+			content: '$sources.execution.statusHint',
+			$if: '$sources.execution.hasStatusHint',
+		});
+		expect((tooltip['items'] as Record<string, unknown>[])[0]).toMatchObject({
+			$type: 'Badge',
+			label: '$sources.execution.statusText',
+		});
+		const plain = collectNodes(document, 'Badge').filter(
+			badge => badge['$if'] === '$sources.execution.lacksStatusHint'
+		);
+		expect(plain).toHaveLength(1);
+		expect(plain[0]).toMatchObject({ label: '$sources.execution.statusText' });
+	});
+});

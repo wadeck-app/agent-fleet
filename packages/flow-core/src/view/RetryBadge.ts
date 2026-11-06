@@ -9,8 +9,8 @@ import type { FlowDefinition } from 'flow-engine/types';
 export const MAX_COUNTED_RETRIES = 3;
 
 export const NO_RETRY_LEFT = 'no retry left';
-const POLICY_UNKNOWN = 'retry policy unknown';
-const RETRIES_UNKNOWN = 'retries unknown';
+export const POLICY_UNKNOWN = 'retry policy unknown';
+export const RETRIES_UNKNOWN = 'retries unknown';
 const NOT_STARTED = '-';
 
 type RetryBadgeVariant = 'success' | 'warning' | 'danger' | 'default';

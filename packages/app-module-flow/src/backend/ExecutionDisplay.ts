@@ -7,10 +7,14 @@ import {
 	type StepRetryPolicy,
 	type StepView,
 	executionLogsPath,
+	isRecoveredStep,
 	outcomeLabel,
 	requireTimestamp,
+	retryHint,
 	retryLabel,
+	runStatusHint,
 	statusTag,
+	stepStatusHint,
 	stepStatusTag,
 } from 'flow-core';
 
@@ -40,6 +44,8 @@ export function toExecutionRow(summary: ExecutionSummary) {
 		...summary,
 		startedAt: requireTimestamp(summary.startedAt),
 		statusLabel: outcomeLabel(statusTag(summary.status), { recovered: summary.lastErrorRecovered }),
+		// The tooltip of the status cell (DataTable `title: '{statusHint}'`); '' = none, a blank title is not shown.
+		statusHint: runStatusHint(summary) ?? '',
 		logsHref: executionLogsPath(summary.executionId),
 	};
 }
@@ -51,7 +57,9 @@ export function toExecutionRow(summary: ExecutionSummary) {
  */
 export function toStepRow(step: StepView, policy: StepRetryPolicy | undefined) {
 	const skipped = step.skipped === true;
-	const recovered = step.status === 'completed' && step.error !== undefined;
+	// A failed attempt in the history (or, on older records, an error left on the completed step): see isRecoveredStep.
+	const recovered = isRecoveredStep(step);
+	const retries = skipped ? '-' : retryLabel(step, policy);
 	const expandable = hasAttemptRows(step);
 	return {
 		...step,
@@ -62,7 +70,10 @@ export function toStepRow(step: StepView, policy: StepRetryPolicy | undefined) {
 		expandable,
 		attemptRows: expandable ? toAttemptRows(step.attemptHistory ?? []) : [],
 		costNotes: expandable ? costNotes(step.attemptHistory ?? []) : '',
-		retryLabel: skipped ? '-' : retryLabel(step, policy),
+		retryLabel: retries,
+		// Tooltips of the Status and Retries cells (DataTable `title`); '' = none.
+		statusHint: stepStatusHint(step) ?? '',
+		retryHint: retryHint(retries) ?? '',
 	};
 }
 
@@ -80,8 +91,14 @@ export function toExecutionDetailRow(
 			`No badge colour for the execution status '${detail.status}' (known: ${Object.keys(STATUS_VARIANTS).join(', ')}): add it to STATUS_VARIANTS.`
 		);
 	}
+	const statusHint = runStatusHint(detail) ?? '';
 	return {
 		...detail,
+		// A Badge has no tooltip: the page wraps it in a Tooltip when hasStatusHint, and shows it bare when lacksStatusHint
+		// (the DSL has no negation for $if).
+		statusHint,
+		hasStatusHint: statusHint !== '',
+		lacksStatusHint: statusHint === '',
 		// One row, so a DataTable shows the run start and end in the shell datetime format; null while the run is in progress.
 		// The version of the definition that ran sits in the same row (version, then how it was chosen), so one table is the header.
 		timing: [

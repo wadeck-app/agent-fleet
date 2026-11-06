@@ -15,6 +15,8 @@ export interface RunListRow {
 	executionId: string;
 	flowId: string;
 	statusLabel: string;
+	/** The tooltip of the status badge; empty when the status needs no explanation. */
+	statusHint: string;
 	startedAt: Date;
 }
 
@@ -70,6 +72,8 @@ export function parseRunListRows(runs: unknown): RunListRow[] {
 			executionId: text('executionId'),
 			flowId: text('flowId'),
 			statusLabel: text('statusLabel'),
+			// Optional: a source that does not send it shows no tooltip
+			statusHint: Reflect.get(run as object, 'statusHint') === undefined ? '' : text('statusHint'),
 			startedAt,
 		};
 	});

@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { RECOVERED_RUN_HINT } from '../view/OutcomeHints.js';
 import {
 	DEFAULT_TAIL_CHARS,
 	ExecutionLookupError,
@@ -142,6 +143,10 @@ describe('ExecutionDetail', () => {
 			const out = renderExecutionDetail(resolveExecution(tmpDir, 'retry000'), { tail: 10, full: false });
 			expect(out).toContain('Last error (recovered, run completed): Script exited with code 1');
 			expect(out).not.toMatch(/^Error:/m);
+			// The same sentence as the web UI tooltip, right under the line it explains
+			expect(out).toContain(
+				`Last error (recovered, run completed): Script exited with code 1\n           ${RECOVERED_RUN_HINT}\n`
+			);
 			expect(out).toContain('a  [completed]  1.0s  attempts: 3 (total 4m51s)');
 		});
 

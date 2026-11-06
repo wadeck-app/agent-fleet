@@ -9,6 +9,7 @@ import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
 import { SKIPPED_LABEL, skipReasonOf } from '../execution/StepSkip.js';
 import { formatDuration, formatStartedUtc } from '../history/ExecutionFormat.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
+import { RECOVERED_RUN_HINT } from '../view/OutcomeHints.js';
 import { renderStepCostLines, renderTotalCostLine } from './StepCostLines.js';
 import { renderStepIoLines } from './StepIoLines.js';
 
@@ -154,11 +155,13 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	lines.push(`Duration:  ${formatDuration(record.startedAt, record.completedAt)}`);
 	// lastError is the last step failure ever seen; on a completed run it is a recovered retry, not the outcome.
 	if (record.lastError) {
-		lines.push(
-			record.status === 'completed'
-				? `Last error (recovered, run completed): ${record.lastError}`
-				: `Error:     ${record.lastError}`
-		);
+		if (record.status === 'completed') {
+			lines.push(`Last error (recovered, run completed): ${record.lastError}`);
+			// Same sentence as the web UI tooltip of "ok, recovered"; indented under the value column
+			lines.push(`           ${RECOVERED_RUN_HINT}`);
+		} else {
+			lines.push(`Error:     ${record.lastError}`);
+		}
 	}
 	lines.push(`Record:    ${filePath}`);
 	if (record.status === 'running' || record.status === 'queued') {

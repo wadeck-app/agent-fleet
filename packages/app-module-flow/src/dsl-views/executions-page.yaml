@@ -123,6 +123,8 @@ sections:
                       # The badge colours a cell whose text is exactly a key; "ok, 3 tries" and the like stay plain text.
                       - key: statusLabel
                         label: Status
+                        # Tooltip: what the word means ("ok, recovered" and the like); blank = none. Text from flow-core OutcomeHints.
+                        title: '{statusHint}'
                         nowrap: true
                         badge:
                             {

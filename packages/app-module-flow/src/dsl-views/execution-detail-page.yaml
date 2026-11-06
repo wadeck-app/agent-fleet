@@ -50,8 +50,21 @@ sections:
                   wrap: true
                   align: items-center
                   items:
+                      # A Badge has no tooltip prop: a run with a hint ("completed, recovered an error") is wrapped in a Tooltip,
+                      # any other run shows the bare badge (the route sends both flags; $if has no negation).
+                      - $type: Tooltip
+                        $if: $sources.execution.hasStatusHint
+                        content: $sources.execution.statusHint
+                        items:
+                            - {
+                                  $type: Badge,
+                                  label: $sources.execution.statusText,
+                                  variant: $sources.execution.statusVariant,
+                                  tone: subtle,
+                              }
                       - {
                             $type: Badge,
+                            $if: $sources.execution.lacksStatusHint,
                             label: $sources.execution.statusText,
                             variant: $sources.execution.statusVariant,
                             tone: subtle,
@@ -120,6 +133,8 @@ sections:
                       - { key: 'stepId', label: 'Step', truncate: true, mono: true }
                       - key: statusLabel
                         label: Status
+                        # Tooltip: what the word means ("ok, recovered", "skipped"); blank = none. Text from flow-core OutcomeHints.
+                        title: '{statusHint}'
                         nowrap: true
                         badge:
                             {
@@ -136,6 +151,7 @@ sections:
                       - { key: 'costLabel', label: 'Cost', nowrap: true }
                       - key: retryLabel
                         label: Retries
+                        title: '{retryHint}'
                         nowrap: true
                         badge:
                             {
