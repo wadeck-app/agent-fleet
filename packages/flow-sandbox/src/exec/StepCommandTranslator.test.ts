@@ -89,12 +89,41 @@ async function refusal(promise: Promise<unknown>): Promise<SandboxError> {
 }
 
 describe('StepCommandTranslator program', () => {
-	it('maps the host bash resolved by the script executor to the VM bash and stages its script', async () => {
+	// Core 1f4b567a: the shell strategy asks the launcher, so the bash path the engine hands over is already the VM's. A HOST bash path
+	// means the engine resolved on the host (an old flow-cli): refused, saying so, instead of quietly mapped.
+	it('passes the VM bash path of the strategy through and stages the script', async () => {
+		const script = path.join(hostTemp, 'agent-fleet-script-2-y.sh');
+		fs.writeFileSync(script, 'echo vm');
+
+		const translated = await translator.translate(
+			request({ command: '/usr/bin/bash', args: ['-e', '-u', script], cwd: workspace })
+		);
+
+		const [, , , , , copy, ...program] = translated.command;
+		expect(program).toEqual(['/usr/bin/bash', '-e', '-u', copy]);
+		expect(translated.program).toBe('bash');
+	});
+
+	it.each([
+		['Git Bash', 'C:\\Program Files\\Git\\usr\\bin\\bash.exe'],
+		['a bash.exe elsewhere', 'D:\\tools\\bash.exe'],
+	])(
+		'refuses a host path to bash (%s): the engine must resolve the shell through the sandbox launcher',
+		async (_name, command) => {
+			const error = await refusal(translator.translate(request({ command, args: ['-c', 'echo'] })));
+
+			expect(error.message).toMatch(
+				/host path[\s\S]*resolve the shell through the sandbox launcher[\s\S]*flow-cli/
+			);
+		}
+	);
+
+	it('stages the script, filters the environment and translates the cwd for the VM bash', async () => {
 		const script = path.join(hostTemp, 'agent-fleet-script-1-x.sh');
 		fs.writeFileSync(script, 'echo hi');
 		const translated = await translator.translate(
 			request({
-				command: 'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
+				command: '/usr/bin/bash',
 				args: ['-e', '-u', script],
 				cwd: workspace,
 				env: { PATH: 'C:\\Git', HOME: 'C:\\Users\\me', STEP_VAR: '1' },
@@ -105,7 +134,7 @@ describe('StepCommandTranslator program', () => {
 		expect([shell, flag, name, count]).toEqual(['bash', '-c', 'flow-run', '1']);
 		expect(cleanup).toContain('"${files[@]}"; exit $rc');
 		expect(copy).toMatch(/^\/tmp\/flow-staged\/[0-9a-f]{16}-agent-fleet-script-1-x\.sh$/);
-		expect(program).toEqual(['bash', '-e', '-u', copy]);
+		expect(program).toEqual(['/usr/bin/bash', '-e', '-u', copy]);
 		expect(translated.program).toBe('bash');
 		expect(translated.cwd).toBe(sandboxForm(workspace));
 		expect(translated.env).toEqual({ STEP_VAR: '1' });

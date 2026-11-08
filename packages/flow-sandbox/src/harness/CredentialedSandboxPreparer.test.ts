@@ -111,13 +111,13 @@ describe('CredentialedSandboxPreparer', () => {
 		const secret = [...runtime.state(SANDBOX).secrets.values()].find(item => item.envVar === BRIDGE_TOKEN_VARIABLE);
 		expect(secret?.hosts).toEqual(['localhost']);
 		expect(secret?.placeholder).toMatch(/^flow-ph-[0-9a-f]{32}$/);
-		expect(secret?.valueCommand).toContain('cat');
+		expect(secret?.valueCommand).toMatch(/^(?:cat|type) /);
 		expect(prepared.innerEnv).toEqual({
 			FLOW_BRIDGE_URL: 'ws://host.docker.internal:45678/',
 			[BRIDGE_TOKEN_VARIABLE]: secret?.placeholder,
 		});
 		// The real token is only reachable through the private file the command reads; the bridge expects it.
-		const file = secret?.valueCommand.replace(/^cat\s+/, '').replace(/^"|"$/g, '') ?? '';
+		const file = secret?.valueCommand.replace(/^(?:cat|type)\s+/, '').replace(/^"|"$/g, '') ?? '';
 		const real = fs.readFileSync(file, 'utf8').trim();
 		expect(tokens.verify(real)).toEqual({ ok: true });
 		expect(JSON.stringify(prepared)).not.toContain(real);

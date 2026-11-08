@@ -1,3 +1,4 @@
+import { BashShellStrategy, PwshShellStrategy } from 'flow-engine';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { FakeClock } from '../FakeClock';
@@ -48,6 +49,35 @@ describe('VmExecutableLookup', () => {
 		const error = failure(() => lookup.answer('box', 'which codex'));
 		expect(error.kind).toBe('not-found');
 		expect(error.message).toMatch(/"codex" is not installed in sandbox "box".*primed: claude, node, bash/);
+	});
+
+	// Core 1f4b567a: a launcher that declares isolatesEnvironment is the ONLY source of the shell: `which bash` / `which pwsh`, whatever the host.
+	it('answers which bash from the VM table, and says why pwsh is not there (not in the image)', async () => {
+		await lookup.prime('box');
+
+		expect(lookup.answer('box', 'which bash')).toBe('/bin/bash');
+		const error = failure(() => lookup.answer('box', 'which pwsh'));
+		expect(error.kind).toBe('not-found');
+		expect(error.message).toMatch(/"pwsh" is not installed in sandbox "box"[\s\S]*shell: pwsh[\s\S]*image/);
+	});
+
+	it('primes pwsh too, so the table says "absent" instead of "never asked"', async () => {
+		await lookup.prime('box');
+
+		expect(execs[0]).toContain('pwsh');
+	});
+
+	it('lets the real shell strategies of the engine resolve through it: bash is the VM path, pwsh fails with the reason', async () => {
+		await lookup.prime('box');
+		const launcher = {
+			isolatesEnvironment: true,
+			lookupExecutable: (command: string) => lookup.answer('box', command),
+		};
+
+		expect(new BashShellStrategy(launcher as never).resolve({})).toBe('/bin/bash');
+		expect(() => new PwshShellStrategy(launcher as never).resolve({})).toThrow(
+			/pwsh not found in the sandbox launcher[\s\S]*not installed in sandbox "box"/
+		);
 	});
 
 	it('throws when nothing was primed for the sandbox', () => {

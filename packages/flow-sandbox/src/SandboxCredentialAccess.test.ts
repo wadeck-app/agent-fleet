@@ -98,7 +98,7 @@ async function get(port: number, secret: string, alias: string): Promise<number>
 
 /** The secret file named by the `cat "<path>"` command sbx will run. */
 function secretFileOf(valueCommand: string): string {
-	const match = /^cat "(.+)"$/.exec(valueCommand);
+	const match = /^(?:cat|type) "(.+)"$/.exec(valueCommand);
 	if (match?.[1] === undefined) throw new Error(`Unexpected value command: ${valueCommand}`);
 	return match[1];
 }

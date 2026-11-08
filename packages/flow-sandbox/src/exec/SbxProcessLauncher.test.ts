@@ -139,6 +139,14 @@ function collect(child: ChildProcess): Promise<Finished> {
 
 const pipes: SpawnOptions = { stdio: ['ignore', 'pipe', 'pipe'] };
 
+describe('SbxProcessLauncher declares that it runs elsewhere', () => {
+	it('isolatesEnvironment is true: the engine then resolves shells through lookupExecutable and passes no whole host environment', () => {
+		const launcher = new SbxProcessLauncher({} as never);
+
+		expect(launcher.isolatesEnvironment).toBe(true);
+	});
+});
+
 describe('SbxProcessLauncher spawn against the fake runtime', () => {
 	it('runs the command in the VM with translated cwd and filtered env, and reports the exit code', async () => {
 		const seen: { command: readonly string[]; cwd?: string; env?: Readonly<Record<string, string>> }[] = [];
@@ -244,7 +252,7 @@ describe('SbxProcessLauncher spawn against the fake runtime', () => {
 		const script = path.join(hostTemp, 'agent-fleet-script-5-zz.sh');
 		fs.writeFileSync(script, 'echo from-the-vm');
 		await collect(
-			launcherFor(runtime).spawn('C:\\Program Files\\Git\\usr\\bin\\bash.exe', ['-e', '-u', script], {
+			launcherFor(runtime).spawn('/usr/bin/bash', ['-e', '-u', script], {
 				...pipes,
 				cwd: workspace,
 			})
@@ -253,7 +261,7 @@ describe('SbxProcessLauncher spawn against the fake runtime', () => {
 		const [, , , , count, copy, ...program] = commands[1] ?? [];
 		expect(count).toBe('1');
 		expect(copy).toMatch(/^\/tmp\/flow-staged\/.*agent-fleet-script-5-zz\.sh$/);
-		expect(program).toEqual(['bash', '-e', '-u', copy]);
+		expect(program).toEqual(['/usr/bin/bash', '-e', '-u', copy]);
 	});
 
 	it('fails the process (error then close) with the reason when a hostile path is passed, and never calls exec', async () => {

@@ -14,7 +14,7 @@
  * daemon otherwise. The real user directories reach only the wrapper's sbx and aws children (FLOW_SANDBOX_HOST_*).
  *
  * Usage (repository root): SBX_LIVE=1 node --import tsx packages/flow-sandbox/scripts/live/PluginLiveCheck.mjs
- * Env: SBX_LIVE=1 (required), SBX_PATH (real sbx; default install dir), PLUGIN_IMAGE (default flow-sandbox:m6), PLUGIN_PROFILE (AWS
+ * Env: SBX_LIVE=1 (required), PLUGIN_HIDE_GIT_BASH=1 (start the daemon with Git's bash/sh removed from ITS PATH, see below), SBX_PATH (real sbx; default install dir), PLUGIN_IMAGE (default flow-sandbox:m6), PLUGIN_PROFILE (AWS
  * profile, default AWS_PROFILE), PLUGIN_REGION (default: the profile's region), PLUGIN_OUTPUT (default .claude/temp/sbx-0-51/plugin-results.json).
  * Exit code: 0 all assertions passed, 1 one failed, 2 refused to run.
  */
@@ -47,8 +47,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(here, '..', '..', '..', '..');
 const flowIndex = path.join(repositoryRoot, 'packages', 'flow-cli', 'src', 'cli', 'FlowIndex.ts');
 const tsxUrl = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href;
-const realSbx =
-	process.env.SBX_PATH ?? path.join(process.env.LOCALAPPDATA ?? '', 'DockerSandboxes', 'bin', 'sbx.exe');
+const realSbx = process.env.SBX_PATH ?? path.join(process.env.LOCALAPPDATA ?? '', 'DockerSandboxes', 'bin', 'sbx.exe');
 const image = process.env.PLUGIN_IMAGE ?? 'flow-sandbox:m6';
 const profile = process.env.PLUGIN_PROFILE ?? process.env.AWS_PROFILE;
 if (!profile) refuse('no AWS profile: set PLUGIN_PROFILE or AWS_PROFILE (the SSO session must be valid).');
@@ -78,6 +77,27 @@ const environment = {
 	SBX_TIMING_LOG: timingLog,
 };
 delete environment.SBX_MOCK_PATH;
+// PLUGIN_HIDE_GIT_BASH=1: the daemon (and so the wrapper) is started with a PATH that has no directory of Git for Windows that holds bash.exe or
+// sh.exe, and without FLOW_BASH_PATH. Only this check's environment changes; the user's PATH and Git are untouched. Proves that the script
+// shell comes from the VM (core 1f4b567a: the strategies ask the sandbox launcher), not from a Git Bash on the host.
+const hiddenFromPath = [];
+if (process.env.PLUGIN_HIDE_GIT_BASH === '1') {
+	const pathKey = Object.keys(environment).find(key => key.toLowerCase() === 'path');
+	if (pathKey === undefined) refuse('PLUGIN_HIDE_GIT_BASH=1 but the environment has no PATH.');
+	const kept = [];
+	for (const directory of (environment[pathKey] ?? '').split(path.delimiter)) {
+		const holdsShell = ['bash.exe', 'sh.exe'].some(name => fs.existsSync(path.join(directory, name)));
+		if (holdsShell && /[\\/]Git[\\/]/i.test(directory)) hiddenFromPath.push(directory);
+		else kept.push(directory);
+	}
+	environment[pathKey] = kept.join(path.delimiter);
+	for (const key of Object.keys(environment)) if (key.toUpperCase() === 'FLOW_BASH_PATH') delete environment[key];
+	if (hiddenFromPath.length === 0)
+		refuse(
+			'PLUGIN_HIDE_GIT_BASH=1 but no Git bash directory is on the PATH: nothing to hide, the check would prove nothing.'
+		);
+	console.log(`Git bash hidden from the daemon PATH: ${hiddenFromPath.join('; ')}`);
+}
 DaemonIsolationGuard.assert({ env: environment, isolatedRoot: root });
 if (path.resolve(isolation.configDir).toLowerCase() === path.resolve(os.homedir(), '.config', 'flow').toLowerCase()) {
 	refuse('the flow config dir resolves to the real one.');
@@ -105,7 +125,9 @@ async function step(name, action) {
 		console.log(`PASS  ${name} (${Date.now() - started} ms)${detail ? ` - ${detail}` : ''}`);
 	} catch (error) {
 		results.push({ name, ok: false });
-		console.log(`FAIL  ${name} (${Date.now() - started} ms)\n      ${error instanceof Error ? error.message : String(error)}`);
+		console.log(
+			`FAIL  ${name} (${Date.now() - started} ms)\n      ${error instanceof Error ? error.message : String(error)}`
+		);
 	}
 }
 function expect(condition, message) {
@@ -151,6 +173,7 @@ steps:
           echo "hostname=$(hostname)"
           echo "user=$(id -un)"
           echo "kernel=$(uname -sr)"
+          echo "bash_in_vm=$(command -v bash)"
       output:
           report:
               type: string
@@ -178,7 +201,9 @@ steps:
 const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sandbox-live-art-'));
 const claimEvents = { seen: undefined, gone: undefined };
 // Sandboxes that exist before this check: only a sandbox created after this point may be removed by it.
-const sandboxesBefore = new Set((await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).map(entry => entry.name));
+const sandboxesBefore = new Set(
+	(await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).map(entry => entry.name)
+);
 let claimWatcher;
 try {
 	console.log(`isolated root: ${root}`);
@@ -230,7 +255,9 @@ try {
 		stdio: ['ignore', log, log],
 		windowsHide: true,
 	});
-	await waitFor('the daemon to publish worker.port', 60_000, () => fs.existsSync(path.join(isolation.configDir, 'worker.port')));
+	await waitFor('the daemon to publish worker.port', 60_000, () =>
+		fs.existsSync(path.join(isolation.configDir, 'worker.port'))
+	);
 
 	// The claim folder appears when the daemon allocates the slot and disappears when it releases it: poll finely.
 	claimWatcher = setInterval(() => {
@@ -267,11 +294,22 @@ try {
 				.filter(line => line.includes('='))
 				.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
 		);
-		expect(fields.hostname && fields.hostname !== os.hostname(), `hostname ${fields.hostname} is the host's or missing`);
-		expect(fields.user && fields.user !== os.userInfo().username, `user ${fields.user} is the host user or missing`);
-		expect(/\bOK\b/.test(JSON.stringify(record.steps?.ask?.output ?? record.steps?.ask ?? {})), 'the model step did not answer OK');
+		expect(
+			fields.hostname && fields.hostname !== os.hostname(),
+			`hostname ${fields.hostname} is the host's or missing`
+		);
+		expect(
+			fields.user && fields.user !== os.userInfo().username,
+			`user ${fields.user} is the host user or missing`
+		);
+		expect(
+			/\bOK\b/.test(JSON.stringify(record.steps?.ask?.output ?? record.steps?.ask ?? {})),
+			'the model step did not answer OK'
+		);
 		expect(record.steps?.probe?.sourceId === 'sandbox-live', `probe served by ${record.steps?.probe?.sourceId}`);
-		return `vm ${fields.hostname}/${fields.user}/${fields.kernel}`;
+		expect(fields.bash_in_vm?.startsWith('/'), `bash_in_vm=${fields.bash_in_vm}: not a path of the VM`);
+		evidence.hiddenGitBashDirectories = hiddenFromPath;
+		return `vm ${fields.hostname}/${fields.user}/${fields.kernel}, script shell ${fields.bash_in_vm}${hiddenFromPath.length > 0 ? ' (Git bash hidden on the host)' : ''}`;
 	});
 
 	await step('the sandbox is removed at the end of the run, and sbx rm took N ms', async () => {
@@ -280,7 +318,9 @@ try {
 		);
 		evidence.sbxRm = { ...removal, durationMs: removal.endedAt - removal.startedAt };
 		const left = new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } });
-		const remaining = (await left.list()).filter(entry => entry.name.startsWith('flow-sbx-') && entry.status !== undefined);
+		const remaining = (await left.list()).filter(
+			entry => entry.name.startsWith('flow-sbx-') && entry.status !== undefined
+		);
 		evidence.sandboxesAfter = remaining.map(entry => entry.name);
 		expect(removal.exitCode === 0, `sbx rm exited ${removal.exitCode}`);
 		return `sbx rm --force: ${evidence.sbxRm.durationMs} ms (exit ${removal.exitCode})`;
@@ -302,7 +342,9 @@ try {
 	});
 
 	await step('every sbx command of the run, with its duration', () => {
-		const lines = timings().map(entry => `${entry.words.join(' ')}: ${entry.endedAt - entry.startedAt} ms (exit ${entry.exitCode})`);
+		const lines = timings().map(
+			entry => `${entry.words.join(' ')}: ${entry.endedAt - entry.startedAt} ms (exit ${entry.exitCode})`
+		);
 		evidence.sbxCommands = lines;
 		return `${lines.length} commands`;
 	});
@@ -332,10 +374,13 @@ try {
 			}
 		}
 	} catch (error) {
-		console.error(`CLEANUP CHECK FAILED: run "sbx ls" and remove any flow-sbx-* sandbox of this check by hand: ${error.message}`);
+		console.error(
+			`CLEANUP CHECK FAILED: run "sbx ls" and remove any flow-sbx-* sandbox of this check by hand: ${error.message}`
+		);
 	}
 	evidence.daemonLogTail = readIfExists(daemonLog).slice(-4000);
-	const output = process.env.PLUGIN_OUTPUT ?? path.join(repositoryRoot, '.claude', 'temp', 'sbx-0-51', 'plugin-results.json');
+	const output =
+		process.env.PLUGIN_OUTPUT ?? path.join(repositoryRoot, '.claude', 'temp', 'sbx-0-51', 'plugin-results.json');
 	fs.mkdirSync(path.dirname(output), { recursive: true });
 	fs.writeFileSync(output, JSON.stringify({ evidence, results }, null, 2));
 	fs.rmSync(artifactRoot, { recursive: true, force: true });

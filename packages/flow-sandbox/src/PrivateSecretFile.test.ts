@@ -46,14 +46,21 @@ describe('PrivateSecretFile', () => {
 		expect(fs.existsSync(directory)).toBe(false);
 	});
 
-	it('builds a cat command with forward slashes that never contains the secret', () => {
+	// sbx runs the value command through cmd.exe on Windows, with the PATH of the process that calls sbx: `cat` is a Git for Windows tool and
+	// failed there ("'cat' n'est pas reconnu") once Git's usr/bin was off the PATH; `type` is a cmd built-in and needs backslashes.
+	it('builds the command that prints the file without the secret: `type` with backslashes on Windows (no Git needed), `cat` elsewhere', () => {
 		const file = PrivateSecretFile.create(temp(), 'super-secret-value');
 
-		const command = file.valueCommand();
+		const windows = file.valueCommand('win32');
+		// A POSIX path for the POSIX rule (this host's temp path is a Windows one).
+		const posixFile = Object.create(file, { filePath: { value: '/tmp/flow/secret' } }) as PrivateSecretFile;
+		const posix = posixFile.valueCommand('linux');
 
-		expect(command).toBe(`cat "${file.filePath.replace(/\\/g, '/')}"`);
-		expect(command).not.toContain('\\');
-		expect(command).not.toContain('super-secret-value');
+		expect(windows).toBe(`type "${file.filePath.replace(/\//g, '\\')}"`);
+		expect(windows).not.toContain('cat');
+		expect(posix).toBe('cat "/tmp/flow/secret"');
+		expect(windows).not.toContain('super-secret-value');
+		expect(posix).not.toContain('super-secret-value');
 	});
 
 	it('refuses a path that cannot be quoted safely: a backslash outside Windows and a shell-special character, naming the allowed characters', () => {
@@ -65,11 +72,15 @@ describe('PrivateSecretFile', () => {
 
 		const backslash = failure(() => withBackslash.valueCommand('linux'));
 		expect(backslash.message).toContain('cannot be quoted safely in a shell command');
-		expect(withBackslash.valueCommand('win32')).toBe('cat "C:/Temp/flow/secret"');
+		expect(withBackslash.valueCommand('win32')).toBe('type "C:\\Temp\\flow\\secret"');
 
 		const dollar = failure(() =>
-			PrivateSecretFile.create(temp('flow-sandbox-secret-$test-'), 'abc123').valueCommand()
+			PrivateSecretFile.create(temp('flow-sandbox-secret-$test-'), 'abc123').valueCommand('linux')
 		);
+		const percent = failure(() =>
+			PrivateSecretFile.create(temp('flow-sandbox-secret-%PATH%-'), 'abc123').valueCommand('win32')
+		);
+		expect(percent.message).toContain('cannot be quoted safely in a shell command');
 		expect(dollar.kind).toBe('invalid-argument');
 		expect(dollar.message).toContain('cannot be quoted safely in a shell command');
 		expect(dollar.message).toContain('letters, digits, spaces and . _ - / :');

@@ -2,7 +2,7 @@ import { SandboxError } from '../SandboxError';
 import type { SandboxRuntime } from '../SandboxRuntime';
 
 /** Programs the engine looks up before it launches a step (claude, codex, opencode) plus the ones the translator maps. */
-export const DEFAULT_LOOKED_UP_PROGRAMS = ['claude', 'codex', 'opencode', 'node', 'bash'] as const;
+export const DEFAULT_LOOKED_UP_PROGRAMS = ['claude', 'codex', 'opencode', 'node', 'bash', 'pwsh'] as const;
 
 const LOOKUP_COMMAND = /^(?:where|where\.exe|which)\s+([A-Za-z0-9._-]+)$/;
 
@@ -76,9 +76,13 @@ export class VmExecutableLookup {
 		const name = (match[1] as string).replace(/\.(exe|cmd|bat)$/i, '');
 		const found = table.get(name);
 		if (found === undefined) {
+			const shellHint =
+				name === 'pwsh' || name === 'powershell'
+					? ` A step with shell: ${name} cannot run in the sandbox (PowerShell is not in the image); use shell: bash.`
+					: '';
 			throw new SandboxError(
 				'not-found',
-				`"${name}" is not installed in sandbox "${sandbox}" (primed: ${[...table.keys()].join(', ') || 'nothing'}). Use an image that has it (image/Dockerfile).`,
+				`"${name}" is not installed in sandbox "${sandbox}" (primed: ${[...table.keys()].join(', ') || 'nothing'}). Use an image that has it (image/Dockerfile).${shellHint}`,
 				{ sandbox }
 			);
 		}

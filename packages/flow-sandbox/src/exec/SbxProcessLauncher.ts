@@ -68,6 +68,12 @@ let nextSyntheticPid = FIRST_SYNTHETIC_PID;
  * - lookupExecutable: answered from the table primed in the VM (VmExecutableLookup).
  */
 export class SbxProcessLauncher implements ProcessLauncher {
+	/**
+	 * The processes run in the VM, where the wrapper's environment must not reach (core 1f4b567a and the engine's ProcessLauncher doc):
+	 * the shell strategies then resolve bash and pwsh ONLY through `lookupExecutable` (the VM table), so the host needs no Git Bash, and a
+	 * script step gets an allow-list plus what it declares instead of the whole worker environment.
+	 */
+	readonly isolatesEnvironment = true;
 	private readonly active = new Map<number, ActiveProcess>();
 	private readonly running = new Set<Promise<void>>();
 	private readonly inputWaitMs: number;

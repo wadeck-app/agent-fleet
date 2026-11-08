@@ -30,8 +30,8 @@ export interface TranslatedCommand {
 
 // Positional arguments only: nothing of the step is spliced into this text.
 const CLEANUP_SCRIPT = 'n=$1; shift; files=("${@:1:n}"); shift "$n"; "$@"; rc=$?; rm -f -- "${files[@]}"; exit $rc';
-/** Programs whose host path means "the same program, in the VM". */
-const SAME_NAME_IN_VM = new Set(['bash', 'sh']);
+/** Shells a `shell:` spawn option may name (resolved by the VM's own PATH). */
+const SHELLS_IN_VM = new Set(['bash', 'sh']);
 const REFUSED_PROGRAMS = new Map<string, string>([
 	['cmd', 'cmd.exe does not exist in the VM'],
 	['powershell', 'PowerShell does not exist in the VM'],
@@ -88,7 +88,7 @@ export class StepCommandTranslator {
 	private program(request: StepCommandRequest): { command: string; args: readonly string[]; display: string } {
 		const { command, args, shell } = request;
 		if (args.length === 0 && shell !== undefined && shell !== false) {
-			if (typeof shell === 'string' && !SAME_NAME_IN_VM.has(this.programName(shell))) {
+			if (typeof shell === 'string' && !SHELLS_IN_VM.has(this.programName(shell))) {
 				throw this.refused(
 					command,
 					`the shell ${JSON.stringify(shell)} is not available in the VM (only sh and bash are)`
@@ -108,7 +108,14 @@ export class StepCommandTranslator {
 			if (sameHostPath(command, this.options.hostNodePath)) {
 				return { command: 'node', args, display: 'node' };
 			}
-			if (SAME_NAME_IN_VM.has(name)) return { command: name, args, display: name };
+			// A host path to bash used to be mapped to the VM's. Since core 1f4b567a the shell strategy asks the launcher (isolatesEnvironment), so a
+			// host bash here means the engine resolved on the host: refused, no quiet mapping.
+			if (SHELLS_IN_VM.has(name)) {
+				throw this.refused(
+					command,
+					'it is a host path to a shell: the engine must resolve the shell through the sandbox launcher (update flow-cli to 2026.11.8-974 or later)'
+				);
+			}
 			throw this.refused(command, 'it is a host path and the VM has no such program');
 		}
 		return { command, args, display: name };
