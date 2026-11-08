@@ -83,6 +83,7 @@
 			"slot": "route",
 			"label": "Execution",
 			"path": "/flows/runs/:id",
+			"tab": { "group": "flow:execution", "label": "Chart", "order": 30 },
 			"view": {
 				"type": "path",
 				"value": "./src/dsl-views/execution-chart-page.yaml"

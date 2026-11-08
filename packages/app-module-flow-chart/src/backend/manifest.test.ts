@@ -19,6 +19,7 @@ interface Manifest {
 		label?: string;
 		order?: number;
 		path?: string;
+		tab?: { group: string; label: string; order: number };
 		view: { type: string; value: string };
 	}[];
 }
@@ -51,6 +52,17 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 	it('puts the flow charts index in the side menu of flow and the two chart pages as routes', () => {
 		const summary = manifest.extensionPoints.filter(p => p.kind === 'page').map(p => `${p.slot}:${p.path}`);
 		expect(summary.sort()).toEqual(['flow:nav:/flows', 'route:/flows/:flowId', 'route:/flows/runs/:id']);
+	});
+
+	// A tab of flow's group "execution" (qualified <owner id>:<group>): it shows next to Summary (10) and Logs (20) under the
+	// breadcrumb of the execution pages. flow stays in `requires` (not optionalRequires): the whole module is useless without it.
+	// Both pages take the same :params (id). An app-core shell older than the qualified groups refuses this manifest.
+	it('joins the "execution" tab group of flow as the Chart tab, after Summary and Logs', () => {
+		const tabbed = manifest.extensionPoints.filter(p => p.tab);
+		expect(tabbed.map(p => ({ path: p.path, tab: p.tab }))).toEqual([
+			{ path: '/flows/runs/:id', tab: { group: 'flow:execution', label: 'Chart', order: 30 } },
+		]);
+		expect(tabbed[0]!.tab!.group.startsWith(`${FLOW_APP_MODULE_ID}:`)).toBe(true);
 	});
 
 	it('has no page in its own nav: that would give it a tab of the top bar next to Flow', () => {
