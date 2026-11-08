@@ -63,6 +63,7 @@ export type {
 	AttemptOverflow,
 	AttemptRecord,
 	ExecutionState,
+	RunRequirementsRecord,
 	VersionChoice,
 	ExecutionStatus,
 	FrameTruncation,

@@ -1,5 +1,6 @@
 import type { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import { generateExecutionId } from 'flow-core';
+import type { RunRequirementsRecord } from 'flow-core';
 import type { ResolvedDefinition } from 'flow-core';
 import { FlowScheduler, ReadOnlyWorkspaceRules } from 'flow-engine';
 import type { FlowDefinition, SchedulerContext, SchedulerStep } from 'flow-engine';
@@ -12,6 +13,7 @@ import { SecretsResolutionFailedError } from '../secrets/SecretErrors';
 import type { ExecutionStore } from '../storage/ExecutionStore';
 import type { LogWriter } from '../storage/LogWriter';
 import type { DaemonSecrets } from './DaemonSecrets.js';
+import type { DeclaredGuarantees } from './DeclaredGuarantees.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import type { AllocatedWorkspace, ExecutionWorkspaces, WorkspaceWaiting } from './ExecutionWorkspaces.js';
@@ -22,6 +24,7 @@ import { RunIdempotencyCache } from './RunIdempotencyCache';
 import { checkRunOrigin } from './RunOriginCheck.js';
 import { RunProjectResolver } from './RunProjectResolver.js';
 import type { RunProject } from './RunProjectResolver.js';
+import { resolveRunRequirements } from './RunRequirements.js';
 import type { RunStepPreparer } from './RunStepPreparer.js';
 import { describeConditionError } from './SchedulerConditionError.js';
 import type { WorkspaceWaitSupervisor } from './WorkspaceWaitSupervisor.js';
@@ -40,6 +43,8 @@ interface AcceptedRun {
 	flow: FlowDefinition;
 	secrets: ExecutionSecrets;
 	hookDispatcher: HookDispatcher | undefined;
+	/** Resolved when the run was accepted (or read back from the record when it starts again); undefined when nothing is required. */
+	requirements: RunRequirementsRecord | undefined;
 }
 
 /** Accepts a `run` request: validates it, allocates what the execution needs, records it and starts its scheduler. */
@@ -61,7 +66,9 @@ export class RunRequestHandler {
 		private readonly tryDispatch: () => void,
 		private readonly waitSupervisor: WorkspaceWaitSupervisor,
 		private readonly projectResolver: RunProjectResolver = new RunProjectResolver(),
-		private readonly idempotency: RunIdempotencyCache<DaemonResponse> = new RunIdempotencyCache<DaemonResponse>()
+		private readonly idempotency: RunIdempotencyCache<DaemonResponse> = new RunIdempotencyCache<DaemonResponse>(),
+		/** Read before a flow is checked: which requirements the declared sources may provide. Absent, requirements are checked for syntax only. */
+		private readonly declaredGuarantees?: Pick<DeclaredGuarantees, 'refresh'>
 	) {}
 
 	/** Forgets the remembered request ids (the daemon is stopping). */
@@ -88,6 +95,8 @@ export class RunRequestHandler {
 		hookDispatcher?: HookDispatcher,
 		resolvedProject?: RunProject
 	): Promise<DaemonResponse> {
+		// The sources are asked what they may provide before the flow is checked against it (the daemon may have just started).
+		await this.declaredGuarantees?.refresh();
 		const accepted = this.accept(cmd, hookDispatcher, resolvedProject);
 		if ('response' in accepted) {
 			return accepted.response;
@@ -123,6 +132,8 @@ export class RunRequestHandler {
 		if (wait === undefined) {
 			return;
 		}
+		// Nothing read them yet after a start: a step that waits for a requirement needs them to know which source to ask.
+		await this.declaredGuarantees?.refresh();
 		const unable = (why: string): string =>
 			`The waiting execution ${executionId} could not be started again after the daemon restarted: ${why} Run it again with: flow run ${state.flowFile}`;
 		try {
@@ -170,6 +181,8 @@ export class RunRequestHandler {
 					flow,
 					secrets,
 					hookDispatcher: hooksFor(project),
+					// The record is the truth: the definition is never read again for what a run requires.
+					requirements: state.requirements,
 				},
 				executionId,
 				true
@@ -232,6 +245,15 @@ export class RunRequestHandler {
 			return { response: unmockable };
 		}
 
+		// Resolved once, here: what the run requires is then recorded and enforced as it is, whatever happens to the
+		// definition afterwards. The validator already refused a malformed `requires`; this is the guard for a path that skipped it.
+		let requirements: RunRequirementsRecord | undefined;
+		try {
+			requirements = resolveRunRequirements(flow);
+		} catch (err) {
+			return { response: { type: 'error', code: 'INVALID_REQUIREMENTS', message: normalizeError(err).message } };
+		}
+
 		// Declared secrets are resolved before an execution id, a workspace or a record exists:
 		// a secret that cannot be resolved must leave nothing behind and start no step.
 		let secrets: ExecutionSecrets;
@@ -262,6 +284,7 @@ export class RunRequestHandler {
 			flow,
 			secrets,
 			hookDispatcher,
+			requirements,
 		};
 	}
 
@@ -360,6 +383,10 @@ export class RunRequestHandler {
 			if (flow.workerType !== undefined) {
 				this.executions.bindWorkerType(executionId, flow.workerType);
 			}
+			// Same for the requirements: read per placement from the execution, so a step injected later inherits them.
+			if (accepted.requirements !== undefined) {
+				this.executions.bindRequirements(executionId, accepted.requirements);
+			}
 			if (recorded) {
 				// It has waited: the record exists and now gets its workspace; the waiting trace goes.
 				// The wait is not run time: the run starts now, and says how long it waited.
@@ -454,6 +481,8 @@ export class RunRequestHandler {
 			...(cmd.origin === undefined ? {} : { origin: cmd.origin }),
 			pluginMetaDir,
 			...(workspaceWait === undefined ? {} : { workspaceWait }),
+			// Beside the definition, not in it: the snapshot and its hash describe the flow as written.
+			...(accepted.requirements === undefined ? {} : { requirements: accepted.requirements }),
 			definition: {
 				flowVersion: resolved.version,
 				definitionHash: resolved.hash,

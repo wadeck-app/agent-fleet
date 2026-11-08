@@ -17,6 +17,14 @@ describe('FlowCapabilitiesGenerator', () => {
 		result = generator.generate();
 	});
 
+	it('documents requires at flow and step level, with syntax-only offline validation and guarantees from worker sources', () => {
+		expect(result).toContain('`requires`');
+		expect(result).toContain('flow level');
+		expect(result).toContain('syntax only');
+		expect(result).toContain('not the worker labels');
+		expect(result).toContain('`fs=confined`');
+	});
+
 	it('returns a non-empty string', () => {
 		expect(typeof result).toBe('string');
 		expect(result.length).toBeGreaterThan(0);

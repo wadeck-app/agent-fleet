@@ -53,6 +53,10 @@ export interface WorkerTypeInstance {
 	 * acceptance plugins say. Its source is not asked for a worker on behalf of unbound demand either. Declare it for a
 	 * type whose workers cannot run ordinary steps (for example a sandbox with no access to the host).
 	 *
+	 * Exception: a step whose resolved `requires` are non-empty and entirely covered by this instance's `guarantees` may
+	 * be served by an exclusive source (asking for a guarantee is an explicit opt-in); a step that requires nothing, or
+	 * something the instance does not guarantee, is still never offered to it.
+	 *
 	 * Omitted or `false`: the workers take any step they are eligible for, as before. When present it must be a boolean:
 	 * anything else makes the build fail.
 	 *
@@ -61,6 +65,19 @@ export interface WorkerTypeInstance {
 	 * be sandboxed. The cost is that a non-exclusive plugin's workers take unbound steps only once its instance is built.
 	 */
 	exclusive?: boolean;
+	/**
+	 * Additive field of worker-type v1 (an instance without it stays valid and provides no guarantee).
+	 *
+	 * The guarantees the workers of this source enforce, as `key=value` or keyword entries (for example `fs=confined`,
+	 * `env=clean`). A flow's `requires:` is matched against these, by equality, and ONLY against these: a worker's own
+	 * labels never count, because a worker declares them itself. Every entry must also be listed in the manifest's
+	 * `guarantees` for this implementation (the static declaration the daemon reads before any instance exists), or the
+	 * build fails. Advertise a guarantee only if the workers enforce it; a "soft" setting is not a guarantee.
+	 *
+	 * Until the instance is built the daemon treats the source as guaranteeing nothing (fail-closed). When present it must
+	 * be a list of valid entries: anything else makes the build fail.
+	 */
+	guarantees?: string[];
 	/**
 	 * Called once per run this type served (once per source, however many of its workers took part), after the workers
 	 * acknowledged the end of the run (or the wait expired) and before the run's workspace is released. Bounded by the

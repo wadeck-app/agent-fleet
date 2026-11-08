@@ -225,6 +225,13 @@ export interface ExecutionState {
 	 * part of the run: `startedAt` of a run that waited is the moment it got its workspace.
 	 */
 	workspaceWaitedMs?: number;
+	/**
+	 * The requirements (`requires:`) the daemon resolved when it ACCEPTED the run, enforced on every placement: `run` is the
+	 * flow-level set (injected steps inherit it), `steps` the merged set of each declared step. A resume uses this record and
+	 * never resolves the definition again. Deliberately outside the definition snapshot and its hash. Additive: absent on older
+	 * records and on a run that requires nothing.
+	 */
+	requirements?: RunRequirementsRecord;
 }
 
 /** A run that waits for a workspace. */
@@ -241,3 +248,11 @@ export interface WorkspaceWait {
 }
 
 export type VersionChoice = 'latest' | 'pinned' | 'file';
+
+/** The resolved requirements of a run, as recorded when it was accepted; see {@link ExecutionState.requirements}. */
+export interface RunRequirementsRecord {
+	/** Flow-level `requires`, sorted and without duplicates. */
+	run: string[];
+	/** Flow plus step `requires` of each declared step, sorted and without duplicates. */
+	steps: Record<string, string[]>;
+}

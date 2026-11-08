@@ -6,6 +6,7 @@ import {
 	TrackedCommandHandler,
 	createMockWorkerPool,
 	daemonDir,
+	emptyWorkerRouting,
 	mockExecStore,
 	mockLogWriter,
 	registerCommandHandlerHooks,
@@ -111,7 +112,7 @@ function daemon(contactErrors: SourceContactErrors) {
 		undefined,
 		undefined,
 		undefined,
-		{ workerTypes: CATALOG, boundStepWaitMs: 120_000, contactErrors }
+		{ ...emptyWorkerRouting(), workerTypes: CATALOG, boundStepWaitMs: 120_000, contactErrors }
 	);
 }
 

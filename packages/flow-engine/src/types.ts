@@ -584,6 +584,14 @@ export interface BaseFlowStep {
 	 */
 	labels?: string[];
 
+	/**
+	 * Requirements a worker must meet to run this step: keywords (`sandbox`) or `key=value` entries (`fs=confined`),
+	 * added to the flow-level {@link FlowDefinition.requires}. Matched as AND, by equality, against the GUARANTEES the
+	 * worker's source declares (never against the worker's self-declared labels). No worker meeting them: the step waits
+	 * `worker.boundStepWaitSeconds`, or fails at once when no declared source can provide one.
+	 */
+	requires?: string[];
+
 	/** Conditional execution expression (evaluated to boolean) */
 	when?: string;
 
@@ -1047,6 +1055,13 @@ export interface FlowDefinition {
 	 * this field exists to close.
 	 */
 	labels?: string[];
+
+	/**
+	 * Requirements every step of the run -- injected steps included -- must find met by its worker (see
+	 * {@link BaseFlowStep.requires}). Unioned with a step's own `requires:`. Enforced by the daemon on every placement,
+	 * from the set recorded when the run was accepted.
+	 */
+	requires?: string[];
 
 	/**
 	 * Worker type every step of the run -- injected steps included -- is restricted to (e.g. `sandbox`). The type is the

@@ -162,4 +162,48 @@ describe('DaemonSourceContact - exclusive worker types', () => {
 
 		await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toEqual(['sbx']));
 	});
+
+	it('asks an exclusive source for a worker when the demand names it by id (a step that requires what it guarantees)', async () => {
+		declareExclusive('sbx');
+
+		contact.contactSources(4101, undefined, new Set(['sbx']));
+
+		await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toEqual(['sbx']));
+	});
+});
+
+describe('DaemonSourceContact - asking only the sources that can provide a requirement', () => {
+	const sourcesObtained = (): string[] => fixture.obtained.map(entry => entry.sourceId);
+
+	it('contacts only the sources named, whatever their type', async () => {
+		declarePlugin('a');
+		declarePlugin('b');
+
+		contact.contactSources(4101, undefined, new Set(['b']));
+		await vi.waitFor(() => expect(sourcesObtained()).toContain('b'));
+
+		expect(sourcesObtained()).toEqual(['b']);
+	});
+
+	it('contacts nothing for a source id that is not declared', async () => {
+		declarePlugin('a');
+
+		contact.contactSources(4101, undefined, new Set(['ghost']));
+		contact.contactSources(4102, new Set(['fixture-sandbox']));
+		await vi.waitFor(() => expect(endpointsObtained()).toContain('ws://127.0.0.1:4102'));
+
+		expect(endpointsObtained()).toEqual(['ws://127.0.0.1:4102']);
+	});
+
+	it('does not dispose the instance of a source that was merely not asked', async () => {
+		declarePlugin('a');
+		declarePlugin('b');
+		contact.contactSources(4101);
+		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(2));
+
+		contact.contactSources(4101, undefined, new Set(['b']));
+		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(3));
+
+		expect(fixture.disposed).toEqual([]);
+	});
 });

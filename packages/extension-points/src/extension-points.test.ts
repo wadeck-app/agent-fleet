@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import type { ApprovalProvider, ApprovalRequest, ChoiceRequest, InputRequest } from './approval/v1.js';
+import type { PluginManifest } from './manifest.js';
 import type { StepDistributionProvider } from './step-distribution/v1.js';
 import type {
 	StepPlacement,
@@ -252,5 +253,35 @@ describe('worker-type v1 shape', () => {
 			dispose: async () => undefined,
 		};
 		expect(instance.run).toBeUndefined();
+	});
+});
+
+describe('worker-type v1 guarantees (additive field)', () => {
+	it('an instance may list the guarantees its workers enforce, and an old instance need not', () => {
+		const old: WorkerTypeInstance = {
+			source: { obtainWorker: async () => undefined },
+			dispose: async () => undefined,
+		};
+		const confined: WorkerTypeInstance = { ...old, guarantees: ['fs=confined', 'sandbox'] };
+		expect([old.guarantees, confined.guarantees]).toEqual([undefined, ['fs=confined', 'sandbox']]);
+	});
+
+	it('a manifest implementation declares the guarantees statically, next to its version', () => {
+		const manifest: PluginManifest = {
+			pluginId: 'sbx',
+			manifestVersion: '1',
+			implementations: { 'worker-type': { docker: { version: 1, guarantees: ['fs=confined'] } } },
+		};
+		expect(manifest.implementations['worker-type']?.['docker']?.guarantees).toEqual(['fs=confined']);
+	});
+
+	it('a step placement carries the resolved requirements, optional', () => {
+		const placement: StepPlacement = {
+			stepId: 's',
+			labels: [],
+			requiresUserInterface: false,
+			requires: ['fs=confined'],
+		};
+		expect(placement.requires).toEqual(['fs=confined']);
 	});
 });

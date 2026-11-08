@@ -114,6 +114,28 @@ The root object that defines a complete flow.
 - **Common Mistakes**: Not setting appropriate status for automated flows
 - **Related Fields**: Uses `TaskStatus` enum values
 
+#### `requires`
+
+- **Type**: `string[]` (optional; also valid on each step, see [Common Step Properties](#common-step-properties))
+- **Required**: No
+- **Description**: Guarantees every worker running the flow must provide.
+- **Syntax**: keyword (`sandbox`) or `key=value` (`fs=confined`); letters, digits, `.`, `_`, `-`. Every entry must hold (AND), compared by equality: no `a|b`, no ranges.
+- **Merge**: a step adds its own entries to the flow's. Steps injected into the run inherit the flow's `requires`.
+- **Guarantees come from the worker source**, not from worker labels.
+- **With `workerType`**: both keep working; both must hold. A source of an exclusive worker type may serve a step whose requirements it fully guarantees (asking for a guarantee is an opt-in); it still never serves a step that requires nothing.
+- **Checks**: `flow validate` offline is syntax-only (an unknown key is accepted). The daemon checks the key at run start, listing the declared guarantees.
+- **Unmet at run time**: the step waits `worker.boundStepWaitSeconds`, then fails. It fails at once when no declared source provides the guarantee.
+- **Example**:
+    ```yaml
+    requires: [sandbox, fs=confined]
+    steps:
+        - type: script
+          id: build
+          name: Build
+          requires: [env=clean]
+          script: npm run build
+    ```
+
 #### `hooks`
 
 - **Type**: [`FlowHooks`](#lifecycle-hooks) (optional)
@@ -1096,6 +1118,12 @@ Properties shared by all step types (part of `BaseFlowStep`).
                       value: '^https://'
     ```
 - **Common Mistakes**: Over-validating, not providing clear error messages
+
+### `requires`
+
+- **Type**: `string[]` (optional; also a [flow-level property](#requires))
+- **Description**: Guarantees the worker must provide for this step. Added to the flow's `requires`.
+- **See**: [`requires` (flow level)](#requires) for syntax and checks
 
 ---
 

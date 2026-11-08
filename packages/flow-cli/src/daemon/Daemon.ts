@@ -27,6 +27,7 @@ import { DaemonSourceContact } from './DaemonSourceContact.js';
 import { DaemonStartupTasks } from './DaemonStartupTasks.js';
 import { DaemonWorkerListener } from './DaemonWorkerListener.js';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler.js';
+import { DeclaredGuarantees } from './DeclaredGuarantees.js';
 import { ExclusiveFileLock } from './ExclusiveFileLock.js';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { findLiveDaemon } from './LiveDaemonProbe.js';
@@ -310,7 +311,7 @@ async function startOwningDaemon(
 					message => {
 						writeDaemonLog(logsDir, 'error', message);
 					},
-					() => new WorkerTypeCatalog(sourceRegistry, workerTypes).exclusiveLookup()
+					() => new WorkerTypeCatalog(sourceRegistry, workerTypes, workerTypes).exclusiveLookup()
 				);
 				const commandHandler = new CommandHandler(
 					resolvedDaemonDir,
@@ -332,7 +333,7 @@ async function startOwningDaemon(
 					// the port the listener *asked* for: a source handed that number would
 					// create a worker that dials nothing, or worse something else. The startup
 					// contact fires the moment the bind completes, so nothing is lost.
-					requestedTypes => {
+					(requestedTypes, requestedSources) => {
 						const boundWorkerPort = listener.boundPort;
 						if (boundWorkerPort === undefined) {
 							writeDaemonLog(
@@ -342,7 +343,7 @@ async function startOwningDaemon(
 							);
 							return;
 						}
-						sourceContact.contactSources(boundWorkerPort, requestedTypes);
+						sourceContact.contactSources(boundWorkerPort, requestedTypes, requestedSources);
 					},
 					undefined,
 					config.queue.stepSilenceLimitSeconds * 1000,
@@ -351,7 +352,11 @@ async function startOwningDaemon(
 					runEndSettingsOf(config.worker),
 					workerTypes,
 					{
-						workerTypes: new WorkerTypeCatalog(sourceRegistry, workerTypes),
+						workerTypes: new WorkerTypeCatalog(sourceRegistry, workerTypes, workerTypes),
+						// Read at run start and at dispatch: which requirements a flow may name and which sources can provide them.
+						declaredGuarantees: new DeclaredGuarantees(sourceRegistry, workerTypes, message => {
+							writeDaemonLog(logsDir, 'error', message);
+						}),
 						boundStepWaitMs: config.worker.boundStepWaitSeconds * 1000,
 						contactErrors: sourceContact.contactErrors,
 					}

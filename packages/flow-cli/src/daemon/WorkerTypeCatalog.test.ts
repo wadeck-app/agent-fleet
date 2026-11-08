@@ -94,3 +94,52 @@ describe('WorkerTypeCatalog - exclusive types', () => {
 		expect(reads).toBe(1);
 	});
 });
+
+describe('WorkerTypeCatalog - guarantees', () => {
+	const guaranteeing = {
+		guaranteesOf: (entry: WorkerSourceEntry) => (entry.sourceId === 'sbx' ? ['fs=confined'] : []),
+	};
+
+	it('reads the guarantees of each declared source from its built instance', () => {
+		const catalog = new WorkerTypeCatalog(
+			{ list: () => [source('sbx', 'sandbox.docker'), source('other', 'other.x')] },
+			{ isExclusive: () => false },
+			guaranteeing
+		);
+		const lookup = catalog.guaranteeLookup();
+
+		expect([lookup('sbx'), lookup('other')]).toEqual([['fs=confined'], []]);
+	});
+
+	// A worker that names no source, or a source that is not declared, has nothing vouching for it.
+	it('gives no guarantee to a worker without a source or with an undeclared source', () => {
+		const catalog = new WorkerTypeCatalog(
+			{ list: () => [source('sbx', 'sandbox.docker')] },
+			{ isExclusive: () => false },
+			guaranteeing
+		);
+		const lookup = catalog.guaranteeLookup();
+
+		expect([lookup(undefined), lookup('gone')]).toEqual([[], []]);
+	});
+
+	it('guarantees nothing when built without a guarantee source (fail-closed)', () => {
+		const lookup = catalogOf(source('sbx', 'sandbox.docker')).guaranteeLookup();
+
+		expect(lookup('sbx')).toEqual([]);
+	});
+
+	it('is read once per call, over the sources declared right now', () => {
+		let calls = 0;
+		const catalog = new WorkerTypeCatalog(
+			{ list: () => [source('sbx', 'sandbox.docker')] },
+			{ isExclusive: () => false },
+			{ guaranteesOf: () => (calls++, ['x']) }
+		);
+		const lookup = catalog.guaranteeLookup();
+		lookup('sbx');
+		lookup('sbx');
+
+		expect(calls).toBe(1);
+	});
+});

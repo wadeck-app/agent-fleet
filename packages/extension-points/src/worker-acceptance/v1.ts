@@ -42,6 +42,13 @@ export interface StepPlacement {
 	 * asking S4 or S3, and a plugin answering differently cannot bring one back.
 	 */
 	boundWorkerType?: string;
+	/**
+	 * Requirements (`key=value` or keyword entries) the step must find met: the flow's and the step's, as recorded when the
+	 * run was accepted. Informational for a plugin: the daemon has already removed every worker whose source does not
+	 * guarantee all of them before asking S4 or S3, and a plugin answering differently cannot bring one back.
+	 * Absent: the step has none.
+	 */
+	requires?: string[];
 }
 
 /** The candidate worker, as it declared itself when registering. */

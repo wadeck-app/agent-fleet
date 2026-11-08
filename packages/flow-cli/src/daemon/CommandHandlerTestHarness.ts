@@ -7,6 +7,7 @@ import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture
 import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import { DEFAULT_BOUND_STEP_WAIT_MS, type WorkerTypeRouting } from './BoundStepWait';
 import { CommandHandler } from './CommandHandler';
+import { DeclaredGuarantees } from './DeclaredGuarantees';
 import { SourceContactErrors } from './SourceContactErrors';
 import { WorkerTypeCatalog } from './WorkerTypeCatalog';
 
@@ -25,6 +26,11 @@ export function emptyWorkerRouting(): WorkerTypeRouting {
 		workerTypes: new WorkerTypeCatalog({ list: () => [] }, { isExclusive: () => false }),
 		boundStepWaitMs: DEFAULT_BOUND_STEP_WAIT_MS,
 		contactErrors: new SourceContactErrors(),
+		declaredGuarantees: new DeclaredGuarantees(
+			{ list: () => [] },
+			{ declaredGuarantees: async () => [] },
+			() => {}
+		),
 	};
 }
 

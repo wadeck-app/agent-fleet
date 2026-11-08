@@ -31,6 +31,7 @@ import type {
 import { ReadOnlyWorkspaceRules } from '../workspace/ReadOnlyWorkspaceRules';
 import { WorkspaceDeclarationParser } from '../workspace/WorkspaceDeclarationParser';
 import { WorktreeOptionRules } from '../workspace/WorktreeOptionRules';
+import { RequirementValidator } from './RequirementValidator';
 import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
 
@@ -59,8 +60,17 @@ export class SchemaValidator {
 		 * Worker types the host can run steps on, to check a flow's `workerType` against. Absent, the name is only
 		 * checked for shape: the engine alone cannot know which worker sources a machine declared.
 		 */
-		private knownWorkerTypes?: readonly string[]
-	) {}
+		private knownWorkerTypes?: readonly string[],
+		/**
+		 * Guarantee entries (`fs=confined`, `sandbox`) declared by the worker sources, to check `requires` against.
+		 * Absent: offline syntax-only validation; the exact check happens in the daemon at run start.
+		 */
+		knownGuarantees?: readonly string[]
+	) {
+		this.requirementValidator = new RequirementValidator(issueCollector, knownGuarantees);
+	}
+
+	private readonly requirementValidator: RequirementValidator;
 
 	/**
 	 * Validate flow schema
@@ -123,6 +133,9 @@ export class SchemaValidator {
 
 		// Validate the flow-level worker type binding (optional)
 		this.validateFlowWorkerType(flow);
+
+		// Validate the flow-level requirements (optional)
+		this.requirementValidator.validateFlow(flow);
 
 		// Validate steps
 		const stepIds = this.validateSteps(flow.steps);
@@ -544,6 +557,7 @@ export class SchemaValidator {
 			}
 
 			this.validateStepLabels(step);
+			this.requirementValidator.validateStep(step);
 
 			// Type-specific validation
 			this.validateStepType(step);

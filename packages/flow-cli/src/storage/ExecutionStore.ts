@@ -86,6 +86,8 @@ export class ExecutionStore {
 		workspaceWait?: ExecutionState['workspaceWait'];
 		/** Which definition ran: version, content hash, snapshot and how the version was chosen. Written once, never changed. */
 		definition?: Pick<ExecutionState, 'flowVersion' | 'definitionHash' | 'definitionSnapshot' | 'versionChoice'>;
+		/** The requirements resolved when the run was accepted; see `ExecutionState.requirements`. Written once. */
+		requirements?: ExecutionState['requirements'];
 	}): ExecutionState {
 		assertExecutionIdSafe(params.executionId);
 		const stepWaves = params.stepWaves ?? {};
@@ -106,6 +108,7 @@ export class ExecutionStore {
 			...(params.pluginMetaDir !== undefined ? { pluginMetaDir: params.pluginMetaDir } : {}),
 			...(params.workspaceWait !== undefined ? { workspaceWait: params.workspaceWait } : {}),
 			...params.definition,
+			...(params.requirements !== undefined ? { requirements: params.requirements } : {}),
 			status: 'queued',
 			currentSteps: [],
 			startedAt: new Date().toISOString(),

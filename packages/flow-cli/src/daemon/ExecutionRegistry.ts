@@ -1,3 +1,4 @@
+import type { RunRequirementsRecord } from 'flow-core';
 import type { FlowScheduler } from 'flow-engine';
 
 import type { AssignableStep, ExecutionContext } from '../ipc/Protocol';
@@ -38,6 +39,11 @@ export class ExecutionRegistry {
 	 */
 	private readonly boundWorkerTypes = new Map<string, string>();
 	/**
+	 * Requirements resolved when each run was accepted (or read back from its record when it started again). Held per
+	 * execution, like the worker type, so a step injected later inherits them.
+	 */
+	private readonly requirements = new Map<string, RunRequirementsRecord>();
+	/**
 	 * Executions kept alive (not cleaned up) after a `user_intervention` step timed out
 	 * unanswered, so a later `flow resume` can re-dispatch exactly that step.
 	 */
@@ -62,6 +68,7 @@ export class ExecutionRegistry {
 		this.stepCounts.delete(executionId);
 		this.projects.delete(executionId);
 		this.boundWorkerTypes.delete(executionId);
+		this.requirements.delete(executionId);
 		this.activeCount--;
 	}
 
@@ -121,6 +128,16 @@ export class ExecutionRegistry {
 	/** The worker type the execution is bound to, or undefined when it is not bound. */
 	boundWorkerTypeOf(executionId: string): string | undefined {
 		return this.boundWorkerTypes.get(executionId);
+	}
+
+	/** Holds the requirements recorded for the execution; every placement of its steps, injected ones included, reads them. */
+	bindRequirements(executionId: string, requirements: RunRequirementsRecord): void {
+		this.requirements.set(executionId, requirements);
+	}
+
+	/** The requirements recorded for the execution, or undefined when the run requires nothing. */
+	requirementsOf(executionId: string): RunRequirementsRecord | undefined {
+		return this.requirements.get(executionId);
 	}
 
 	markResumable(executionId: string, stepId: string): void {

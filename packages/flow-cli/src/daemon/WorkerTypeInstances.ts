@@ -7,11 +7,12 @@ import { raceWithTimeout } from './BoundedWait.js';
 import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
 import type { ForkWorkerInputs } from './ForkWorkerTypePlugin.js';
 import { INBOUND_PLUGIN_REF, entryNudgeUrlToCopy } from './InboundNudgeOption.js';
-import { LaunchCredentialSource } from './LaunchCredentialSource.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { PLUGIN_REF } from './WorkerSourcePluginReference.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 import { WORKER_TYPE_POINT, failureOf, noDirectory, wiringMistake } from './WorkerTypeFailures.js';
+import { WorkerTypeGuarantees } from './WorkerTypeGuarantees.js';
+import { assertWorkerTypeInstance, withLaunchCredential } from './WorkerTypeInstanceShape.js';
 import { describeDuration, resolveEnvVars } from './WorkerTypeOptions.js';
 
 const DEFAULT_BUILD_TIMEOUT_MS = 30_000;
@@ -67,6 +68,8 @@ export class WorkerTypeInstances {
 	private readonly cache = new Map<string, CachedInstance>();
 	/** What each BUILT instance declared about exclusivity, with the plugin it was built from (see {@link isExclusive}). */
 	private readonly exclusivity = new Map<string, { plugin: string; exclusive: boolean }>();
+	/** What each BUILT instance guarantees, checked against its manifest (see {@link guaranteesOf}). */
+	private readonly guarantees = new WorkerTypeGuarantees();
 	/** Sources whose instance was disposed, so a run that ends later can be told why nobody answers. */
 	private readonly disposed = new Set<string>();
 	/** Instances already handed to dispose(), so the two ways one can be reached (cache, late build) dispose it once. */
@@ -77,7 +80,7 @@ export class WorkerTypeInstances {
 	private readonly disposeTimeoutMs: number;
 
 	constructor(
-		private readonly loader: Pick<PluginLoader, 'loadProvider'>,
+		private readonly loader: Pick<PluginLoader, 'loadProvider' | 'readDeclaredGuarantees'>,
 		private readonly log: (level: 'info' | 'error', message: string) => void,
 		timeouts: WorkerTypeTimeouts = {},
 		/**
@@ -150,6 +153,12 @@ export class WorkerTypeInstances {
 						plugin: exclusivityKey(plugin, pluginsDir),
 						exclusive: built.exclusive === true,
 					});
+					// Already checked against the manifest by the build; only the normal form is stored.
+					this.guarantees.record(
+						sourceId,
+						exclusivityKey(plugin, pluginsDir),
+						[...new Set(built.guarantees ?? [])].sort()
+					);
 				}
 				return built;
 			}),
@@ -211,6 +220,34 @@ export class WorkerTypeInstances {
 		return this.lookupBuiltin(`plugins.${plugin}`) === undefined;
 	}
 
+	/**
+	 * What the workers of a declared source guarantee, from its BUILT instance only (a worker's labels never count).
+	 * Synchronous and never builds anything, like {@link isExclusive}.
+	 *
+	 * FAIL-CLOSED: no guarantee until the instance is built, none after a failed build, a dispose, or a re-declaration
+	 * with another plugin, and none for a source without a plugin or for a built-in worker type.
+	 */
+	guaranteesOf(entry: WorkerSourceEntry): string[] {
+		return entry.plugin === undefined
+			? []
+			: this.guarantees.of(entry.sourceId, exclusivityKey(entry.plugin, entry.pluginsDir));
+	}
+
+	/**
+	 * The guarantees the manifest of a source's plugin declares it MAY enforce (the upper bound of
+	 * {@link guaranteesOf}), read without building an instance. This is what lets the daemon know which source to ask
+	 * for a worker, and which requirements a flow can name, before any worker exists. Empty for a source without a plugin
+	 * and for a built-in worker type.
+	 *
+	 * @throws an error naming the source and the plugin when the manifest cannot be read or declares malformed entries.
+	 */
+	async declaredGuarantees(entry: WorkerSourceEntry): Promise<string[]> {
+		if (entry.plugin === undefined || this.lookupBuiltin(`plugins.${entry.plugin}`) !== undefined) {
+			return [];
+		}
+		return WorkerTypeGuarantees.readDeclared(this.loader, entry, this.buildTimeoutMs);
+	}
+
 	/** Disposes the instance of one source and forgets it. Idempotent; a failing or hanging dispose is logged, never thrown. */
 	async dispose(sourceId: string): Promise<void> {
 		const cached = this.cache.get(sourceId);
@@ -219,6 +256,7 @@ export class WorkerTypeInstances {
 		}
 		this.cache.delete(sourceId);
 		this.exclusivity.delete(sourceId);
+		this.guarantees.forget(sourceId);
 		this.disposed.add(sourceId);
 		await this.disposeBounded(sourceId, this.settled(cached));
 	}
@@ -352,6 +390,8 @@ export class WorkerTypeInstances {
 				);
 				const built = await this.createBuiltin(registered, typeRef, entry.sourceId, options, host);
 				assertWorkerTypeInstance(built);
+				// A built-in worker type declares no guarantee in a manifest, so it may advertise none.
+				WorkerTypeGuarantees.check(built, []);
 				return built;
 			}
 			if (pluginsDir === undefined) {
@@ -369,6 +409,10 @@ export class WorkerTypeInstances {
 				pluginsDir
 			);
 			assertWorkerTypeInstance(built);
+			WorkerTypeGuarantees.check(
+				built,
+				await this.loader.readDeclaredGuarantees(typeRef, WORKER_TYPE_POINT, pluginsDir)
+			);
 			// A plugin from a directory is given a launch credential per ask by the daemon, never the minting service.
 			return withLaunchCredential(built, host);
 		} catch (err) {
@@ -379,30 +423,4 @@ export class WorkerTypeInstances {
 
 function exclusivityKey(plugin: string, pluginsDir: string | undefined): string {
 	return JSON.stringify([plugin, pluginsDir]);
-}
-
-function withLaunchCredential(instance: WorkerTypeInstance, host: WorkerTypeHost): WorkerTypeInstance {
-	return {
-		...(instance.exclusive === undefined ? {} : { exclusive: instance.exclusive }),
-		source: new LaunchCredentialSource(instance.source, host.issueLaunchToken, host.revokeLaunchToken),
-		...(instance.run === undefined ? {} : { run: instance.run }),
-		dispose: () => instance.dispose(),
-	};
-}
-
-function assertWorkerTypeInstance(candidate: unknown): asserts candidate is WorkerTypeInstance {
-	const instance = candidate as Partial<WorkerTypeInstance> | null | undefined;
-	if (typeof instance?.source?.obtainWorker !== 'function' || typeof instance.dispose !== 'function') {
-		throw new Error(
-			'its factory must resolve to { source: { obtainWorker() }, dispose() } (and optionally run: { onRunEnded() })'
-		);
-	}
-	if (instance.run !== undefined && typeof instance.run.onRunEnded !== 'function') {
-		throw new Error('its instance has a "run" without an onRunEnded() function');
-	}
-	if (instance.exclusive !== undefined && typeof instance.exclusive !== 'boolean') {
-		throw new Error(
-			`its instance has an "exclusive" that is not a boolean (got ${JSON.stringify(instance.exclusive)}). Fix: set exclusive: true to serve only runs bound to the type, or remove it.`
-		);
-	}
 }

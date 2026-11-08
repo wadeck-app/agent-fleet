@@ -37,6 +37,12 @@ class TrackedLoader {
 	readonly inflight = new Set<Promise<void>>();
 	private readonly real = new PluginLoader();
 
+	readDeclaredGuarantees(
+		...args: Parameters<PluginLoader['readDeclaredGuarantees']>
+	): ReturnType<PluginLoader['readDeclaredGuarantees']> {
+		return this.real.readDeclaredGuarantees(...args);
+	}
+
 	loadProvider(...args: Parameters<PluginLoader['loadProvider']>): ReturnType<PluginLoader['loadProvider']> {
 		const loading = this.real.loadProvider(...args);
 		// A factory that never settles never writes to the fixture either: nothing to wait for.

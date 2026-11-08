@@ -2,6 +2,7 @@
 // stayed a runtime lookup and the standalone bundle -- which has no node_modules -- could not
 // resolve it, crashing the daemon of any project that declares plugins.
 import extensionPointsRegistry from 'extension-points/extension-points.json';
+import { RequirementSyntax } from 'flow-engine';
 import { readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -29,6 +30,7 @@ interface PluginImplementation {
 	provider?: (options: unknown) => unknown;
 	entrypoint?: string;
 	export?: string;
+	guarantees?: unknown;
 }
 
 interface PluginManifest {
@@ -75,12 +77,23 @@ export class PluginLoader {
 		this.registryPath = options.registryPath;
 	}
 
-	async loadProvider(
+	/**
+	 * The static `guarantees` a plugin implementation declares in its manifest (worker-type only), read WITHOUT calling
+	 * its provider: nothing of the plugin runs. An implementation that declares none yields an empty list.
+	 *
+	 * @throws when the manifest or the implementation cannot be found, or the declaration is not a list of valid
+	 *         `key=value` / keyword entries.
+	 */
+	async readDeclaredGuarantees(typeRef: string, extensionPoint: string, pluginsDir?: string): Promise<string[]> {
+		const { impl } = await this.findImplementation(typeRef, extensionPoint, pluginsDir);
+		return RequirementSyntax.normalise(impl.guarantees, `Plugin ${typeRef}: manifest guarantees`);
+	}
+
+	private async findImplementation(
 		typeRef: string,
 		extensionPoint: string,
-		options: Record<string, unknown>,
 		pluginsDir?: string
-	): Promise<unknown> {
+	): Promise<{ pluginId: string; implName: string; impl: PluginImplementation }> {
 		const { pluginId, implName } = parseTypeRef(typeRef);
 
 		const manifest = await this.loadManifest(pluginId, pluginsDir);
@@ -114,6 +127,16 @@ export class PluginLoader {
 			);
 		}
 		this.assertVersionSupported(extensionPoint, impl.version);
+		return { pluginId, implName, impl };
+	}
+
+	async loadProvider(
+		typeRef: string,
+		extensionPoint: string,
+		options: Record<string, unknown>,
+		pluginsDir?: string
+	): Promise<unknown> {
+		const { pluginId, implName, impl } = await this.findImplementation(typeRef, extensionPoint, pluginsDir);
 
 		// TS manifest path: provider factory
 		if (impl.provider) {

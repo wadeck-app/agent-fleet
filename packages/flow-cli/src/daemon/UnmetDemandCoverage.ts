@@ -27,6 +27,8 @@ export class UnmetDemandCoverage {
 	private unmetDemandSince: number | undefined;
 	/** Bound worker types whose sources were already asked for a worker while their steps keep waiting */
 	private readonly requestedBoundTypes = new Set<string>();
+	/** Sources asked for a worker because a step waits for a requirement they can provide, while that step keeps waiting */
+	private readonly requestedRequirementSources = new Set<string>();
 	/** Pending re-run of dispatch while S8 waits; nothing else would trigger one */
 	private demandRecheck: ReturnType<typeof setTimeout> | undefined;
 	/** Delay and stderr line for a dispatch pass of the re-check that threw. */
@@ -41,7 +43,10 @@ export class UnmetDemandCoverage {
 	constructor(
 		private readonly provisioner: WorkerProvisioner,
 		private readonly rerunDispatch: () => void,
-		private readonly requestFromDeclaredSources?: (workerTypes?: ReadonlySet<string>) => void
+		private readonly requestFromDeclaredSources?: (
+			workerTypes?: ReadonlySet<string>,
+			sourceIds?: ReadonlySet<string>
+		) => void
 	) {}
 
 	/**
@@ -51,8 +56,15 @@ export class UnmetDemandCoverage {
 	 * @param boundTypes worker types that unplaced steps of bound runs wait for. A host worker can never run those
 	 *        steps, so they are not counted in `unmetDemand`: nothing is planned or forked for them, only the sources
 	 *        of their type are asked, once while they wait. Their deadline is the dispatcher's, not a re-check's.
+	 * @param requirementSources ids of the declared sources that can provide what unplaced steps require. Same rule as
+	 *        `boundTypes`: not counted in `unmetDemand` (a host worker guarantees nothing), only these sources are asked,
+	 *        once while the steps wait, and the deadline is the dispatcher's.
 	 */
-	cover(unmetDemand: number, boundTypes: ReadonlySet<string> = new Set()): void {
+	cover(
+		unmetDemand: number,
+		boundTypes: ReadonlySet<string> = new Set(),
+		requirementSources: ReadonlySet<string> = new Set()
+	): void {
 		const newBoundTypes = new Set([...boundTypes].filter(type => !this.requestedBoundTypes.has(type)));
 		for (const type of [...this.requestedBoundTypes]) {
 			if (!boundTypes.has(type)) {
@@ -61,6 +73,19 @@ export class UnmetDemandCoverage {
 		}
 		for (const type of newBoundTypes) {
 			this.requestedBoundTypes.add(type);
+		}
+
+		const newSources = new Set([...requirementSources].filter(id => !this.requestedRequirementSources.has(id)));
+		for (const id of [...this.requestedRequirementSources]) {
+			if (!requirementSources.has(id)) {
+				this.requestedRequirementSources.delete(id);
+			}
+		}
+		for (const id of newSources) {
+			this.requestedRequirementSources.add(id);
+		}
+		if (newSources.size > 0) {
+			this.requestFromDeclaredSources?.(undefined, newSources);
 		}
 
 		if (unmetDemand === 0) {

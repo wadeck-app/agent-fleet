@@ -3,6 +3,9 @@ import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 /** Answers "which type is the worker that came from this source": undefined for a worker of no type. */
 export type WorkerTypeLookup = (sourceId: string | undefined) => string | undefined;
 
+/** Answers "what do the workers of this source guarantee": nothing for a worker of no source, or of one no longer declared. */
+export type GuaranteeLookup = (sourceId: string | undefined) => string[];
+
 /** Answers "do the workers of this source serve only runs bound to their type". */
 export type ExclusiveLookup = (sourceId: string | undefined) => boolean;
 
@@ -26,7 +29,14 @@ export class WorkerTypeCatalog {
 	 */
 	constructor(
 		private readonly sources: { list(): WorkerSourceEntry[] },
-		private readonly exclusivity: { isExclusive(entry: WorkerSourceEntry): boolean }
+		private readonly exclusivity: { isExclusive(entry: WorkerSourceEntry): boolean },
+		/**
+		 * where the guarantees of a declared source come from (see `WorkerTypeInstances.guaranteesOf`, which is fail-closed).
+		 * Absent, no source guarantees anything: a requirement can then never be met, which is the safe answer to a missing wiring.
+		 */
+		private readonly guarantees?: {
+			guaranteesOf(entry: WorkerSourceEntry): string[];
+		}
 	) {}
 
 	/**
@@ -42,6 +52,19 @@ export class WorkerTypeCatalog {
 			}
 		}
 		return sourceId => sourceId !== undefined && exclusiveSources.has(sourceId);
+	}
+
+	/**
+	 * What the workers of each source declared right now guarantee, from the source's built instance and never from a
+	 * worker's own labels. One read per call, like {@link typeLookup}. Nothing for a worker with no source, for a source
+	 * no longer declared, and for any source when the catalog has no guarantee source.
+	 */
+	guaranteeLookup(): GuaranteeLookup {
+		const guaranteesOfSource = new Map<string, string[]>();
+		for (const entry of this.sources.list()) {
+			guaranteesOfSource.set(entry.sourceId, this.guarantees?.guaranteesOf(entry) ?? []);
+		}
+		return sourceId => (sourceId === undefined ? [] : (guaranteesOfSource.get(sourceId) ?? []));
 	}
 
 	/**

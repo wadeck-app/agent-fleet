@@ -8,6 +8,7 @@
 //   throws   whose factory rejects
 //   configerror  whose factory rejects with an error NAMED PluginConfigurationError (a plain Error: a plugin from disk cannot import the class)
 //   exclusive  like sandbox, but the instance declares exclusive: true
+//   exclusiveconfined  exclusive, and guarantees exclusive-only (manifest and instance)
 //   badexclusive  like sandbox, but exclusive is the string 'yes' (refused)
 //   invalid  whose factory returns something that is not a worker-type instance
 
@@ -108,6 +109,35 @@ export const manifest = {
 			badexclusive: {
 				version: 1,
 				provider: async context => makeInstance(context, { exclusive: 'yes' }),
+			},
+			confined: {
+				version: 1,
+				guarantees: ['sandbox', 'fs=confined', 'env=clean'],
+				provider: async context => makeInstance(context, { guarantees: ['fs=confined', 'env=clean'] }),
+			},
+			exclusiveconfined: {
+				version: 1,
+				guarantees: ['exclusive-only'],
+				provider: async context => makeInstance(context, { exclusive: true, guarantees: ['exclusive-only'] }),
+			},
+			overclaim: {
+				version: 1,
+				guarantees: ['fs=confined'],
+				provider: async context => makeInstance(context, { guarantees: ['fs=confined', 'net=filtered'] }),
+			},
+			badguarantees: {
+				version: 1,
+				guarantees: ['fs=confined'],
+				provider: async context => makeInstance(context, { guarantees: 'fs=confined' }),
+			},
+			badmanifestguarantees: {
+				version: 1,
+				guarantees: ['fs = confined'],
+				provider: async context => makeInstance(context),
+			},
+			undeclaredguarantees: {
+				version: 1,
+				provider: async context => makeInstance(context, { guarantees: ['fs=confined'] }),
 			},
 			invalid: {
 				version: 1,

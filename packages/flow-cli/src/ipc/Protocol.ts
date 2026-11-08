@@ -210,6 +210,14 @@ export type DaemonToWorker =
 			stepId: string;
 			stepConfig: AssignableStep;
 			executionContext: ExecutionContext;
+			/**
+			 * Additive, optional. The requirements the daemon resolved for this step (the flow's and the step's, sorted, as
+			 * `key=value` or keyword entries) and routed it by: the worker's source guarantees all of them. Absent when the
+			 * step requires nothing. A worker or wrapper that can verify a guarantee itself may refuse the step when it does
+			 * not hold (defence in depth: the daemon already routed by the guarantees of the worker's authenticated source,
+			 * never by its labels); a worker that ignores the field behaves as before.
+			 */
+			requires?: string[];
 	  }
 	// { type: 'idle' } is never sent by the daemon in v1 but is kept for forward compatibility.
 	// Worker handles it as a no-op.

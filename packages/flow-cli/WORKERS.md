@@ -148,6 +148,26 @@ workerType: sandbox # flow level, next to `labels:`
 - **A connection keeps the source it was admitted with.** A later `ready` naming another source, or none, is refused and the connection closed, so a worker cannot change its own type.
 - Not set: behavior is unchanged.
 
+### Requiring guarantees (`requires:`)
+
+```yaml
+requires: [fs=confined] # flow level; a step may add its own `requires:`
+```
+
+Additive to `workerType:` (both must hold). Field reference: `.claude/docs/flows/schema-reference.md`.
+
+- **Guarantees come from the source, never from worker labels.** A plugin declares them in two places, `guarantees: string[]` (entries `key=value` or keyword):
+    - `implementations['worker-type'].<impl>.guarantees` in `plugin.config.js`: the static upper bound, read without building an instance. It tells the daemon which source to ask for a worker and which requirements a flow may name.
+    - `WorkerTypeInstance.guarantees`: what the built instance enforces. Routing reads only this. An entry missing from the manifest list makes the build fail; a malformed list does too.
+    - **Fail-closed.** No built instance, no declaration, a failed build, a dispose, or a built-in worker type: no guarantee. Existing plugins are unaffected (`worker-type/v1` stays valid).
+- **Hard filter in `StepRouter`, before S4 and S3.** A worker whose source does not guarantee every entry never receives the step, whatever an acceptance plugin answers. Matching is AND by equality only; no ordering (`clean=run` does not satisfy `clean=step`).
+- **Resolved once, at accept time.** The flow set merged into each step's is stored in the execution record (`requirements: { run, steps }`), outside the definition snapshot and its hash. A waiting run that starts again after a restart uses the record, never the definition. A step injected at run time gets the run's set plus its own `requires`, read at each placement.
+- **Run start check.** The daemon reads the declarations (`DeclaredGuarantees`) then refuses an unknown entry (`VALIDATION_FAILED`, with `Did you mean`). If a source's declaration cannot be read, the code is `REQUIREMENT_SOURCES_UNREADABLE` and names it. `flow validate` offline checks the syntax only.
+- **Unmet at run time.** The step waits `worker.boundStepWaitSeconds` (own clock, separate from `workerType`'s), then fails naming the requirements and the closest workers and sources. It fails at once when no declared source declares all the entries (one source has to vouch for the whole set), or, for a run bound with `workerType:`, when the only ones that do are of another type.
+- **Demand**: such a step never causes a host worker to be forked (a host worker guarantees nothing); only the sources that declare the whole set are asked, by source id, once while it waits.
+- **Exclusive types and `requires`.** Asking for guarantees is an explicit opt-in, like binding by `workerType`. A step whose resolved requirements are non-empty and entirely guaranteed by an exclusive source MAY be served by it (injected steps included, they inherit the run's set); the source is asked by id when such a step waits. `exclusive` still keeps the source off steps that require nothing and off steps whose requirements it does not fully guarantee. Unchanged for `workerType`-bound runs.
+- **`assign` message**: carries the resolved set of the step as `requires?: string[]` (sorted; absent when empty), so a worker or wrapper that can verify a guarantee may refuse the step. The daemon does not require it to; a worker that ignores the field behaves as before.
+
 ## Three rules that explain most surprises
 
 1. **Declared is not available** (D#4). A declared source with nothing attached is intent, not

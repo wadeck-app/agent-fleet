@@ -95,6 +95,22 @@ describe('ExecutionStore', () => {
 		});
 	});
 
+	describe('create() with requirements', () => {
+		it('records the resolved requirement set, which survives later updates and is not part of the definition fields', () => {
+			const requirements = { run: ['fs=confined'], steps: { a: ['env=clean', 'fs=confined'] } };
+
+			store.create({ executionId: EXEC_ID, flowFile: 'f.yml', flowId: 'my-flow', stepIds: ['a'], requirements });
+			store.markStepRunning(EXEC_ID, 'a');
+
+			expect(store.read(EXEC_ID).requirements).toEqual(requirements);
+		});
+
+		it('writes no requirements field when the run has none (record shape of older daemons)', () => {
+			store.create({ executionId: EXEC_ID, flowFile: 'f.yml', flowId: 'my-flow', stepIds: ['a'] });
+
+			expect(store.read(EXEC_ID)).not.toHaveProperty('requirements');
+		});
+	});
 	describe('read()', () => {
 		it('reads back the created state', () => {
 			store.create({

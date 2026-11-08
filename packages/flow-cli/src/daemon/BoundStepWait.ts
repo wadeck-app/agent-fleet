@@ -1,3 +1,5 @@
+import type { DeclaredGuarantees } from './DeclaredGuarantees.js';
+import { type RequirementWaitRequest, describeRequirementFailure } from './RequirementWaitFailure.js';
 import { RetryBackoff } from './RetryBackoff.js';
 import type { SourceContactErrors } from './SourceContactErrors.js';
 import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
@@ -10,15 +12,24 @@ export interface BoundStepRouting {
 	wait: BoundStepWait;
 	/** Where the contact failures of the sources are kept. */
 	contactErrors: WorkerTypeRouting['contactErrors'];
+	/**
+	 * What the declared sources may provide, to decide the fate of a step with requirements. Absent (a dispatcher built
+	 * before requirements existed): such a step is failed with a wiring error, never placed.
+	 */
+	declaredGuarantees?: Pick<DeclaredGuarantees, 'entries' | 'providersOfAll' | 'shortfalls' | 'unread'>;
 }
 
 /** What the daemon needs to restrict a run to a worker type: where types come from, and how long a missing one is waited for. */
 export interface WorkerTypeRouting {
-	workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'exclusiveLookup' | 'knownTypes'>;
+	/** `guaranteeLookup` is what a requirement is matched against (the real catalog has it); without it no worker meets one. */
+	workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'exclusiveLookup' | 'knownTypes'> &
+		Partial<Pick<WorkerTypeCatalog, 'guaranteeLookup'>>;
 	/** `worker.boundStepWaitSeconds`, in milliseconds. */
 	boundStepWaitMs: number;
 	/** Where the last contact error of each source is kept, to say why no worker of the type came. */
 	contactErrors: Pick<SourceContactErrors, 'sinceFor'>;
+	/** What the declared sources may provide: read at run start (which requirements exist) and at dispatch. */
+	declaredGuarantees: Pick<DeclaredGuarantees, 'entries' | 'providersOfAll' | 'shortfalls' | 'unread' | 'refresh'>;
 }
 
 /** What routing found about a step of a run bound to a worker type that no idle worker could take. */
@@ -89,8 +100,45 @@ export class BoundStepWait {
 	}
 
 	decide(request: BoundStepWaitRequest): BoundStepWaitDecision {
-		const key = keyOf(request.executionId, request.stepId);
-		if (request.connectedOfType > 0) {
+		return this.bounded(
+			keyOf(request.executionId, request.stepId),
+			request.connectedOfType > 0,
+			(since, waitedMs) =>
+				describeFailure(
+					request,
+					waitedMs,
+					this.waitMs,
+					request.contactErrorsSince?.(since) ?? [],
+					request.refusals?.() ?? []
+				)
+		);
+	}
+
+	/**
+	 * The same bounded wait for a step with requirements (`requires:`), with a clock of its own so a step that is also
+	 * bound to a worker type keeps both: the clock runs only while NO worker that meets the requirements and accepts the
+	 * step is connected.
+	 */
+	decideRequirement(request: RequirementWaitRequest): BoundStepWaitDecision {
+		return this.bounded(
+			requirementKeyOf(request.executionId, request.stepId),
+			request.connectedServing > 0,
+			(since, waitedMs) =>
+				describeRequirementFailure(request, waitedMs, this.waitMs, request.contactErrorsSince?.(since) ?? [])
+		);
+	}
+
+	/** The step with requirements was handed to a worker: it is no longer waiting. */
+	clearRequirement(executionId: string, stepId: string): void {
+		this.forget(requirementKeyOf(executionId, stepId));
+	}
+
+	private bounded(
+		key: string,
+		hasCapacity: boolean,
+		describe: (sinceMs: number, waitedMs: number) => string
+	): BoundStepWaitDecision {
+		if (hasCapacity) {
 			this.forget(key);
 			return { action: 'wait' };
 		}
@@ -104,11 +152,7 @@ export class BoundStepWait {
 		}
 
 		this.forget(key);
-		const contactErrors = request.contactErrorsSince?.(since) ?? [];
-		return {
-			action: 'fail',
-			reason: describeFailure(request, waitedMs, this.waitMs, contactErrors, request.refusals?.() ?? []),
-		};
+		return { action: 'fail', reason: describe(since, waitedMs) };
 	}
 
 	/** The step was handed to a worker: it is no longer waiting. */
@@ -174,6 +218,11 @@ export class BoundStepWait {
 		timer.unref?.();
 		this.deadlines.set(key, timer);
 	}
+}
+
+/** Apart from the key of the worker type wait: a step can wait for both, each with its own clock. */
+function requirementKeyOf(executionId: string, stepId: string): string {
+	return `${executionId}:${stepId}#requires`;
 }
 
 function keyOf(executionId: string, stepId: string): string {

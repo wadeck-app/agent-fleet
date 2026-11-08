@@ -45,7 +45,8 @@ export interface ExecutionPipelineDependencies {
 	workspaceProviders: WorkspaceProviderSource | undefined;
 	resolvePerFlowWorkspaceProvider:
 		((section: NonNullable<FlowPluginOverrides['workspace']>) => Promise<WorkspaceProvider>) | undefined;
-	requestFromDeclaredSources: ((workerTypes?: ReadonlySet<string>) => void) | undefined;
+	requestFromDeclaredSources:
+		((workerTypes?: ReadonlySet<string>, sourceIds?: ReadonlySet<string>) => void) | undefined;
 	interactivityPolicy: InteractivityPolicyProvider | undefined;
 	stalledStepLimitMs: number;
 	definitionResolver: FlowDefinitionResolver;
@@ -129,6 +130,7 @@ export class ExecutionPipeline {
 				workerTypes: workerRouting.workerTypes,
 				wait: new BoundStepWait(workerRouting.boundStepWaitMs, Date.now, () => this.tryDispatch()),
 				contactErrors: workerRouting.contactErrors,
+				declaredGuarantees: workerRouting.declaredGuarantees,
 			}
 		);
 		const workspaces = new ExecutionWorkspaces(
@@ -179,7 +181,12 @@ export class ExecutionPipeline {
 		);
 		this.runRequests = new RunRequestHandler(
 			new FlowFileAccessGuard(deps.allowAbsolutePaths),
-			new RunDefinitionLoader(deps.definitionResolver, logWriter, () => workerRouting.workerTypes.knownTypes()),
+			new RunDefinitionLoader(
+				deps.definitionResolver,
+				logWriter,
+				() => workerRouting.workerTypes.knownTypes(),
+				workerRouting.declaredGuarantees
+			),
 			new RunStepPreparer(deps.daemonDir, logWriter),
 			daemonSecrets,
 			workspaces,
@@ -189,7 +196,10 @@ export class ExecutionPipeline {
 			executionStore,
 			logWriter,
 			() => this.tryDispatch(),
-			this.waitSupervisor
+			this.waitSupervisor,
+			undefined,
+			undefined,
+			workerRouting.declaredGuarantees
 		);
 	}
 

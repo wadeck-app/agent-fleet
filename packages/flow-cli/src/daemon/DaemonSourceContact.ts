@@ -47,9 +47,10 @@ export class DaemonSourceContact {
 	// dial a port nothing is listening on would produce a worker that cannot join, which
 	// is why the caller checks the bind first.
 	//
+	// `sourceIds` narrows it to those sources (demand for a requirement only they can provide), over `workerTypes`.
 	// `workerTypes` narrows who is asked to the sources of those worker types (demand that only they can serve); the
 	// registry is still reconciled against every declared source, so a source not asked is not mistaken for a removed one.
-	contactSources(boundPort: number, workerTypes?: ReadonlySet<string>): void {
+	contactSources(boundPort: number, workerTypes?: ReadonlySet<string>, sourceIds?: ReadonlySet<string>): void {
 		this.pruneDeadSources();
 		const declared = this.sourceRegistry.list();
 		// `flow worker source remove` runs in another process and cannot reach the instances held here: the daemon
@@ -57,12 +58,14 @@ export class DaemonSourceContact {
 		void this.workerTypes.retainOnly(declared.map(entry => entry.sourceId));
 		this.contactErrors.retainOnly(declared.map(entry => entry.sourceId));
 		const asked =
-			workerTypes === undefined
-				? declared
-				: declared.filter(entry => {
-						const type = workerTypeOfSource(entry);
-						return type !== undefined && workerTypes.has(type);
-					});
+			sourceIds !== undefined
+				? declared.filter(entry => sourceIds.has(entry.sourceId))
+				: workerTypes === undefined
+					? declared
+					: declared.filter(entry => {
+							const type = workerTypeOfSource(entry);
+							return type !== undefined && workerTypes.has(type);
+						});
 		void contactDeclaredSources(
 			asked,
 			`ws://127.0.0.1:${String(boundPort)}`,
@@ -85,7 +88,8 @@ export class DaemonSourceContact {
 				},
 				workerTypes: this.workerTypes,
 				// Demand for no particular type is never served by a worker of an exclusive type.
-				skipExclusive: workerTypes === undefined,
+				// Nor by demand for named sources: the dispatcher names only the sources that can serve the step it waits for.
+				skipExclusive: workerTypes === undefined && sourceIds === undefined,
 				contactOutcome: this.contactErrors,
 			}
 		).catch((err: unknown) => {

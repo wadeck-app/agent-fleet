@@ -53,7 +53,8 @@ export class RunDefinitionLoader {
 	constructor(
 		private readonly resolver: FlowDefinitionResolver,
 		private readonly logWriter: LogWriter,
-		private readonly knownWorkerTypes?: () => string[]
+		private readonly knownWorkerTypes?: () => string[],
+		private readonly guarantees?: { entries(): string[]; unread(): string[] }
 	) {}
 
 	load(cmd: RunCommandMessage, flowFile: string): LoadedDefinition {
@@ -76,7 +77,9 @@ export class RunDefinitionLoader {
 	 */
 	loadSnapshot(snapshotRef: string, choice: VersionChoice): LoadedDefinition {
 		try {
-			return this.validated(this.resolver.forSnapshotRef(snapshotRef, choice));
+			// Requirements are not checked against the sources here: the run was accepted with them, the sources may not be
+			// read yet at startup, and the dispatcher fails a step that nothing can serve.
+			return this.validated(this.resolver.forSnapshotRef(snapshotRef, choice), false);
 		} catch (err) {
 			if (err instanceof FlowVersionError) {
 				return refuse(versionRefusalCode(err.kind), getErrorMessage(err));
@@ -134,11 +137,11 @@ export class RunDefinitionLoader {
 		return { ok: true, resolved };
 	}
 
-	private validated(resolved: ResolvedDefinition): LoadedDefinition {
-		return this.validationRefusal(resolved.flow) ?? { ok: true, resolved };
+	private validated(resolved: ResolvedDefinition, checkRequirements = true): LoadedDefinition {
+		return this.validationRefusal(resolved.flow, checkRequirements) ?? { ok: true, resolved };
 	}
 
-	private validationRefusal(flow: FlowDefinition): LoadedDefinition | undefined {
+	private validationRefusal(flow: FlowDefinition, checkRequirements = true): LoadedDefinition | undefined {
 		let knownWorkerTypes: string[] | undefined;
 		if ((flow as { workerType?: unknown }).workerType !== undefined && this.knownWorkerTypes !== undefined) {
 			try {
@@ -153,15 +156,35 @@ export class RunDefinitionLoader {
 		}
 		// The validator annotates the flow it is given (`_autoDiscoveredInputs`). It gets a copy: the hash, the snapshot text and the
 		// definition that runs must all describe the object as written, or a stored snapshot never matches its hash again.
-		const result = new FlowValidator(undefined, [], knownWorkerTypes).validate(structuredClone(flow));
+		const usesRequirements = hasRequirements(flow);
+		const knownGuarantees = checkRequirements && usesRequirements ? this.guarantees?.entries() : undefined;
+		const result = new FlowValidator(undefined, [], knownWorkerTypes, knownGuarantees).validate(
+			structuredClone(flow)
+		);
 		if (result.valid) {
 			return undefined;
 		}
-		return refuse(
-			'VALIDATION_FAILED',
-			JSON.stringify(result.issues.filter((i: { severity: string }) => i.severity === 'error'))
-		);
+		const errors = JSON.stringify(result.issues.filter((i: { severity: string }) => i.severity === 'error'));
+		const unread = knownGuarantees === undefined ? [] : (this.guarantees?.unread() ?? []);
+		if (unread.length > 0) {
+			// A requirement may look unknown only because the source that provides it could not be read: say so.
+			return refuse(
+				'REQUIREMENT_SOURCES_UNREADABLE',
+				`The flow's requires could not be checked against every declared worker source: the guarantees declared by ${unread.join(', ')} could not be read (see the daemon log). ` +
+					`Fix the plugin manifest of these sources (flow worker source list), then run the flow again. Issues found: ${errors}`
+			);
+		}
+		return refuse('VALIDATION_FAILED', errors);
 	}
+}
+
+/** Whether the flow or one of its steps declares `requires`. Asked before validation, so it trusts nothing about the shape. */
+function hasRequirements(flow: FlowDefinition): boolean {
+	const steps: unknown = flow.steps;
+	return (
+		flow.requires !== undefined ||
+		(Array.isArray(steps) && steps.some(step => (step as { requires?: unknown } | null)?.requires !== undefined))
+	);
 }
 
 function refuse(code: string, message: string): { ok: false; response: DaemonResponse } {

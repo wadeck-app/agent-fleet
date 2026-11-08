@@ -8,23 +8,19 @@ import type { ExecutionStore } from '../storage/ExecutionStore';
 import type { LogWriter } from '../storage/LogWriter';
 import type { BoundStepRouting } from './BoundStepWait.js';
 import type { DaemonSecrets } from './DaemonSecrets.js';
+import { DispatchLookups, NO_TYPE } from './DispatchLookups.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
-import { assertStepLabels } from './LabelMatcher.js';
 import { ReRunKindTracker } from './ReRunKindTracker.js';
 import type { ReadyStep, ReadyStepQueue } from './ReadyStepQueue.js';
+import { RequirementShortage } from './RequirementShortage.js';
+import { StepPlacementBuilder } from './StepPlacementBuilder.js';
 import { StepRouter } from './StepRouter.js';
 import type { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import { tallyAcceptance } from './WorkerRefusal.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
-import type { ExclusiveLookup, WorkerTypeLookup } from './WorkerTypeCatalog.js';
-
-/** Every worker is of no type. */
-const NO_TYPE: WorkerTypeLookup = () => undefined;
-
-/** Every worker that names a source may be of an exclusive type: what is assumed when the sources cannot be read. */
-const ANY_SOURCE_EXCLUSIVE: ExclusiveLookup = sourceId => sourceId !== undefined;
+import type { ExclusiveLookup, GuaranteeLookup, WorkerTypeLookup } from './WorkerTypeCatalog.js';
 
 /** The most workers named in the hint about an exclusive type. */
 const MAX_EXCLUSIVE_WORKERS_NAMED = 5;
@@ -33,6 +29,12 @@ const MAX_EXCLUSIVE_WORKERS_NAMED = 5;
 export class StepDispatcher {
 	/** Chooses which live worker a step goes to (S3, S4), after narrowing a bound run to its worker type */
 	private readonly router: StepRouter;
+	/** Describes a step for routing (labels, shell, project, bound worker type, requirements) */
+	private readonly placements: StepPlacementBuilder;
+	/** Decides the fate of a step with requirements that found no idle worker; absent when the daemon wired no declared guarantees */
+	private readonly shortage: RequirementShortage | undefined;
+	/** What is read from the declared sources, answering the safe way when they cannot be read */
+	private readonly lookups: DispatchLookups;
 	/** Tells a retry from another re-run when a step starts again, for the attempt history */
 	private readonly reRunKinds = new ReRunKindTracker();
 	/** When each interactive step started waiting, so an S9 policy can bound its own wait */
@@ -59,12 +61,14 @@ export class StepDispatcher {
 		private readonly routing: BoundStepRouting
 	) {
 		this.router = new StepRouter(undefined, undefined, routing.workerTypes);
+		this.placements = new StepPlacementBuilder(executions);
+		this.lookups = new DispatchLookups(routing.workerTypes, logWriter);
+		this.shortage =
+			routing.declaredGuarantees === undefined
+				? undefined
+				: new RequirementShortage(this.router, routing.declaredGuarantees, routing.wait, routing.contactErrors);
 	}
 
-	/** Executions already told that the declared worker sources cannot be read. */
-	private readonly unreadableSourcesReported = new Set<string>();
-	/** Executions already told that the exclusivity of the worker types cannot be read. */
-	private readonly unreadableExclusivityReported = new Set<string>();
 	/** `executionId:stepId` of the steps already told that exclusive workers are connected but do not take them. */
 	private readonly exclusiveHintReported = new Set<string>();
 
@@ -76,8 +80,7 @@ export class StepDispatcher {
 	/** Forgets the waits of an execution that is over. */
 	forgetExecution(executionId: string): void {
 		this.routing.wait.forgetExecution(executionId);
-		this.unreadableSourcesReported.delete(executionId);
-		this.unreadableExclusivityReported.delete(executionId);
+		this.lookups.forgetExecution(executionId);
 		for (const key of [...this.exclusiveHintReported]) {
 			if (key.startsWith(`${executionId}:`)) {
 				this.exclusiveHintReported.delete(key);
@@ -105,8 +108,12 @@ export class StepDispatcher {
 		let unplacedForHost = 0;
 		/** Worker types the unplaced steps of bound runs wait for. */
 		const waitingForTypes = new Set<string>();
+		/** Declared sources that can provide what the unplaced steps with requirements wait for. */
+		const waitingForSources = new Set<string>();
 		/** Read at most once per pass, and only if a step that is not bound needs it. */
 		let exclusiveOfPass: ExclusiveLookup | undefined;
+		/** Read at most once per pass, and only if a step with requirements needs it. */
+		let guaranteesOfPass: GuaranteeLookup | undefined;
 
 		while (this.queue.length > 0) {
 			const step = this.queue.shift()!;
@@ -124,7 +131,7 @@ export class StepDispatcher {
 
 			let placement: StepPlacement;
 			try {
-				placement = this.placementFor(step);
+				placement = this.placements.describe(step);
 			} catch (err) {
 				// A step whose routing cannot even be described is never placeable, so
 				// leaving it queued would stall the flow with no explanation.
@@ -132,12 +139,20 @@ export class StepDispatcher {
 				continue;
 			}
 
-			const typeOf = placement.boundWorkerType === undefined ? undefined : this.typeLookupFor(step);
-			const exclusive =
+			const typeOf =
 				placement.boundWorkerType === undefined
-					? (exclusiveOfPass ??= this.exclusiveLookupFor(step))
+					? undefined
+					: this.lookups.typeLookup(step.executionContext.executionId);
+			const exclusive =
+				placement.boundWorkerType === undefined && placement.requires === undefined
+					? (exclusiveOfPass ??= this.lookups.exclusiveLookup(step.executionContext.executionId))
 					: undefined;
-			const idleWorker = this.router.select(placement, this.registry.listIdle(), typeOf, exclusive);
+			// Read at most once per pass, and only for a step that requires something.
+			const guarantees =
+				placement.requires === undefined
+					? undefined
+					: (guaranteesOfPass ??= this.lookups.guaranteeLookup(step.executionContext.executionId));
+			const idleWorker = this.router.select(placement, this.registry.listIdle(), typeOf, exclusive, guarantees);
 			if (idleWorker === undefined && placement.requiresUserInterface && this.failIfNobodyCanAnswer(step)) {
 				continue;
 			}
@@ -148,29 +163,48 @@ export class StepDispatcher {
 			) {
 				continue;
 			}
+			/** The declared sources worth asking for a worker, for a step that waits for a requirement. */
+			let sourcesToAsk: ReadonlySet<string> = new Set();
+			if (idleWorker === undefined && guarantees !== undefined) {
+				const assessed = this.assessShortage(step, placement, typeOf, guarantees);
+				if (assessed === undefined) {
+					continue;
+				}
+				sourcesToAsk = assessed;
+			}
 			if (idleWorker) {
 				if (placement.boundWorkerType !== undefined) {
 					this.routing.wait.clear(step.executionContext.executionId, step.stepId);
 				}
-				this.dispatchTo(idleWorker, step);
+				if (placement.requires !== undefined) {
+					this.routing.wait.clearRequirement(step.executionContext.executionId, step.stepId);
+				}
+				this.dispatchTo(idleWorker, step, placement.requires);
 			} else {
 				if (exclusive !== undefined) {
 					this.hintAboutExclusiveWorkers(step, placement, exclusive);
 				}
 				unplaced.push(step);
-				if (placement.boundWorkerType === undefined) {
-					unplacedForHost++;
-				} else {
+				for (const sourceId of sourcesToAsk) {
+					waitingForSources.add(sourceId);
+				}
+				if (placement.boundWorkerType !== undefined) {
 					waitingForTypes.add(placement.boundWorkerType);
+				} else if (placement.requires === undefined) {
+					unplacedForHost++;
 				}
 			}
 		}
 
 		this.queue.unshift(...unplaced);
-		this.demand.cover(unplacedForHost, waitingForTypes);
+		if (waitingForSources.size > 0) {
+			this.demand.cover(unplacedForHost, waitingForTypes, waitingForSources);
+		} else {
+			this.demand.cover(unplacedForHost, waitingForTypes);
+		}
 	}
 
-	private dispatchTo(idleWorker: WebSocket, step: ReadyStep): void {
+	private dispatchTo(idleWorker: WebSocket, step: ReadyStep, requires: string[] | undefined): void {
 		const scheduler = this.executions.scheduler(step.executionContext.executionId);
 
 		// Before dispatching, sync sub-step errors and sub-step outputs from the scheduler
@@ -241,6 +275,7 @@ export class StepDispatcher {
 			stepId: step.stepId,
 			stepConfig: step.stepConfig,
 			executionContext,
+			...(requires === undefined ? {} : { requires }),
 		});
 		if (sent) {
 			this.supervisor.watchHandedOver(assignmentId);
@@ -336,7 +371,7 @@ export class StepDispatcher {
 			workerType,
 			connectedOfType: anyAccepts ? 1 : 0,
 			refusals,
-			knownTypes: this.knownTypesOrNone(executionId),
+			knownTypes: this.lookups.knownTypes(executionId),
 			contactErrorsSince: this.routing.contactErrors.sinceFor(workerType, typeOf),
 		});
 		if (decision.action === 'wait') {
@@ -347,37 +382,39 @@ export class StepDispatcher {
 	}
 
 	/**
-	 * Which type each worker is of, read from the declared sources. When they cannot be read no worker has a type: the
-	 * step stays unplaced and fails after the bound, and the cause is written once to the execution's log.
+	 * Decides what happens to a step with requirements that found no idle worker (see {@link RequirementShortage}).
+	 *
+	 * @returns the declared sources to ask for a worker while it waits, or undefined when the step was failed and must not
+	 *          be re-queued.
 	 */
-	private typeLookupFor(step: ReadyStep): WorkerTypeLookup {
-		try {
-			return this.routing.workerTypes.typeLookup();
-		} catch (err) {
-			this.reportUnreadableSources(step.executionContext.executionId, err);
-			return NO_TYPE;
+	private assessShortage(
+		step: ReadyStep,
+		placement: StepPlacement,
+		typeOf: WorkerTypeLookup | undefined,
+		guaranteesOf: GuaranteeLookup
+	): ReadonlySet<string> | undefined {
+		const { executionId } = step.executionContext;
+		if (this.shortage === undefined) {
+			this.failStep(
+				executionId,
+				step.stepId,
+				`Step "${step.stepId}" requires ${(placement.requires ?? []).join(', ')} but this daemon was started without the declared guarantees of its worker sources, so no worker can be chosen for it. ` +
+					'This is a wiring mistake in the daemon, not a configuration error -- please report it.'
+			);
+			return undefined;
 		}
-	}
-
-	/**
-	 * Which workers are of an exclusive type. When that cannot be read, every worker that names a source counts as
-	 * exclusive (fail-closed) and the cause is written once to the execution's log.
-	 */
-	private exclusiveLookupFor(step: ReadyStep): ExclusiveLookup {
-		try {
-			return this.routing.workerTypes.exclusiveLookup();
-		} catch (err) {
-			const { executionId } = step.executionContext;
-			if (!this.unreadableExclusivityReported.has(executionId)) {
-				this.unreadableExclusivityReported.add(executionId);
-				this.logWriter.writeExecution(
-					executionId,
-					`Cannot read the declared worker sources, so workers that come from a source are not offered steps of a run that is not bound to a worker type (they may be of an exclusive type): ${normalizeError(err).message}. Fix or remove the worker sources file (see: flow worker source list).`,
-					'warning'
-				);
-			}
-			return ANY_SOURCE_EXCLUSIVE;
+		const decision = this.shortage.assess({
+			executionId,
+			placement,
+			connected: this.registry.listConnected(),
+			guaranteesOf,
+			typeOf: typeOf ?? this.lookups.typeLookup(step.executionContext.executionId),
+		});
+		if (decision.action === 'fail') {
+			this.failStep(executionId, step.stepId, decision.reason);
+			return undefined;
 		}
+		return decision.sources;
 	}
 
 	/**
@@ -397,7 +434,7 @@ export class StepDispatcher {
 			return;
 		}
 		this.exclusiveHintReported.add(key);
-		const typeOf = this.typeLookupFor(step);
+		const typeOf = this.lookups.typeLookup(step.executionContext.executionId);
 		const types = [...new Set(skipped.map(worker => typeOf(worker.sourceId) ?? 'unknown'))].sort();
 		const names = skipped.slice(0, MAX_EXCLUSIVE_WORKERS_NAMED).map(worker => worker.workerId);
 		const more = skipped.length - names.length;
@@ -406,58 +443,5 @@ export class StepDispatcher {
 			`Step '${step.stepId}' is not run by the connected worker(s) ${names.join(', ')}${more > 0 ? ` and ${String(more)} more` : ''}: they are of an exclusive worker type (${types.join(', ')}) and serve only runs bound to it. Bind the flow with workerType: ${types[0] ?? 'unknown'} to run it there; otherwise it waits for a host worker (one is forked when none is connected).`,
 			'warning'
 		);
-	}
-
-	private knownTypesOrNone(executionId: string): string[] {
-		try {
-			return this.routing.workerTypes.knownTypes();
-		} catch (err) {
-			this.reportUnreadableSources(executionId, err);
-			return [];
-		}
-	}
-
-	/** Once per execution: the same unreadable file would otherwise be reported on every dispatch pass. */
-	private reportUnreadableSources(executionId: string, err: unknown): void {
-		if (this.unreadableSourcesReported.has(executionId)) {
-			return;
-		}
-		this.unreadableSourcesReported.add(executionId);
-		this.logWriter.writeExecution(
-			executionId,
-			`Cannot read the declared worker sources, so no connected worker counts as being of the bound worker type and its steps cannot be placed: ${normalizeError(err).message}. Fix or remove the worker sources file (see: flow worker source list).`,
-			'warning'
-		);
-	}
-
-	/**
-	 * Describes a step for routing.
-	 *
-	 * @throws when the step's `labels` are not a list. Schema validation already refuses
-	 *         such a flow before it starts (D#7), so this covers the path that skips it --
-	 *         a step injected at runtime. Reported as a step failure by the caller, because
-	 *         an unmatchable label set means no worker is ever eligible and presenting that
-	 *         as "waiting for capacity" would hide the mistake forever.
-	 */
-	private placementFor(step: ReadyStep): StepPlacement {
-		const labels = (step.stepConfig as { labels?: unknown }).labels;
-		assertStepLabels(labels, step.stepId);
-		// Only `type: script` steps carry `shell:` (Proposal 1); every other step type has
-		// no such field, which `workerSatisfiesShell` already treats as "no constraint".
-		const shellKind = (step.stepConfig as { shell?: 'bash' | 'cmd' | 'pwsh' }).shell;
-		const project = this.executions.projectOf(step.executionContext.executionId);
-		// Read per placement, from the execution and not from the step: a step injected later carries none of the flow's
-		// fields, and the binding must hold for it too.
-		const boundWorkerType = this.executions.boundWorkerTypeOf(step.executionContext.executionId);
-		return {
-			stepId: step.stepId,
-			labels: labels ?? [],
-			// The step type is the only signal for this: there is no step-level
-			// `interactive` field, by design (D#60).
-			requiresUserInterface: step.stepConfig.type === 'user_intervention',
-			...(project !== undefined ? { projectId: project.projectId, projectRoot: project.projectRoot } : {}),
-			...(shellKind !== undefined ? { shellKind } : {}),
-			...(boundWorkerType !== undefined ? { boundWorkerType } : {}),
-		};
 	}
 }
