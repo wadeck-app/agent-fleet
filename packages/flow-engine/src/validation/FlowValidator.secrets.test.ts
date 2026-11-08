@@ -9,7 +9,7 @@ function makeFlow(overrides: Record<string, unknown>): FlowDefinition {
 		id: 'secret-flow',
 		name: 'Secret flow',
 		description: 'Test',
-		workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+		workspace: 'in-place',
 		inputs: { API_TOKEN: { type: 'password', default: 'env://API_TOKEN' } },
 		steps: [
 			{

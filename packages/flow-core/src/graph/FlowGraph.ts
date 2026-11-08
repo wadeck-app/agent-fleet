@@ -69,5 +69,12 @@ export interface FlowGraphResult {
 	/** Where the drawn definition was read from: the snapshot recorded with the run, or the flow file as it is now. */
 	definition: FlowGraphDefinitionSource;
 	/** Set when the graph carries step states. */
-	execution?: { executionId: string; status: string; startedAt: string; completedAt: string | null };
+	execution?: {
+		executionId: string;
+		status: string;
+		startedAt: string;
+		completedAt: string | null;
+		/** Present only while the run is queued because its workspace pool has no free slot (see ExecutionState.workspaceWait). */
+		workspaceWait?: { since: string; message: string };
+	};
 }

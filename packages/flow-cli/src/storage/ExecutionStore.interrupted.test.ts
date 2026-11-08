@@ -19,6 +19,29 @@ describe('ExecutionStore -- interrupted and terminal executions', () => {
 
 	afterEach(() => removeTempDirectory(dir));
 
+	describe('reconcileInterruptedExecutions() and waiting executions', () => {
+		it('leaves a waiting execution queued and lists it, oldest first, for the daemon to start again', () => {
+			for (const id of ['bbbb2222', 'aaaa1111']) {
+				store.create({ executionId: id, flowFile: 'flows/my.yaml', flowId: 'my', stepIds: ['a'] });
+				store.update(id, {
+					workspaceWait: { since: 'x', message: 'all slots claimed', run: {} },
+					startedAt: id === 'aaaa1111' ? '2026-01-02T00:00:00.000Z' : '2026-01-01T00:00:00.000Z',
+				});
+			}
+			store.create({ executionId: 'cccc3333', flowFile: 'flows/my.yaml', flowId: 'my', stepIds: ['a'] });
+			transitions.length = 0;
+
+			const count = store.reconcileInterruptedExecutions();
+
+			expect(count).toBe(1);
+			expect(store.read('bbbb2222').status).toBe('queued');
+			expect(store.read('aaaa1111').status).toBe('queued');
+			expect(store.read('cccc3333').status).toBe('failed');
+			expect(store.waitingExecutionIdsAtStart()).toEqual(['bbbb2222', 'aaaa1111']);
+			expect(transitions.map(t => t.state.executionId)).toEqual(['cccc3333']);
+		});
+	});
+
 	describe('reconcileInterruptedExecutions()', () => {
 		it('fails a running execution, its running step, and settles pending steps as not run', () => {
 			store.create({

@@ -21,6 +21,8 @@ export interface ExecutionContext {
 	workspaceDir: string;
 	/** Engine-generated output files directory (<workspaceDir>.meta/outputs) -- never inside workspaceDir */
 	outputsDir: string;
+	/** True when the workspace is shared and the flow must not modify it (advisory: see ReadOnlyWorkspaceRules). */
+	workspaceReadOnly?: boolean;
 	/** Original CWD from which `flow run` was invoked -- used as ${{ context.cwd }} in templates */
 	cwd: string;
 	/**

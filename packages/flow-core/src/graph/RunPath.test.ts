@@ -169,3 +169,20 @@ describe('isEdgeTraversed', () => {
 		expect(isEdgeTraversed(edge('plan', 'implement', 'sequence'), FAILED_AT_TEST)).toBe(true);
 	});
 });
+
+describe('computeRunPath of a run waiting for a workspace', () => {
+	it('says the steps wait because the run waits for a workspace, not just "not started yet"', () => {
+		const steps = Object.fromEntries(BUILD_FLOW.steps.map(step => [step.id, { status: 'pending' as const }]));
+		const waiting = {
+			...RUNNING_AT_IMPLEMENT,
+			status: 'queued' as const,
+			steps,
+			workspaceWait: { since: '2026-10-25T10:00:00.000Z', message: 'all slots claimed', run: {} },
+		};
+		const path = computeRunPath(BUILD_FLOW, waiting);
+		expect(path['plan']).toMatchObject({
+			outcome: 'waiting',
+			reason: 'Not started: the run waits for a free workspace.',
+		});
+	});
+});

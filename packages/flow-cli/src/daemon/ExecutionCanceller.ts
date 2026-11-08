@@ -8,6 +8,7 @@ import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import type { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
+import type { WaitingRuns } from './WaitingRuns.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 
 /** The `lastError` of a cancelled execution and the `error`/`skippedReason` of each of its steps. */
@@ -21,6 +22,8 @@ export interface ExecutionCancellerParts {
 	supervisor: Pick<WorkerAssignmentSupervisor, 'heldAssignments' | 'settleAssignment'>;
 	hooks: Pick<ExecutionHooks, 'remove'>;
 	workspaces: Pick<ExecutionWorkspaces, 'release'>;
+	/** The runs waiting for a workspace: cancelling one stops its wait in the workspace provider. */
+	waitingRuns: Pick<WaitingRuns, 'cancel'>;
 	logWriter: Pick<LogWriter, 'writeExecution'>;
 	/** Drops a worker's connection (the daemon's way to abandon a step it cannot stop; see `WorkerRegistry.disconnect`). */
 	disconnectWorker: (worker: WebSocket) => void;
@@ -97,7 +100,8 @@ export class ExecutionCanceller {
 				store.markStepSkipped(executionId, stepId, CANCELLED_BY_USER);
 			}
 		}
-		store.update(executionId, { lastError: CANCELLED_BY_USER, endReason: 'cancelled' });
+		// A run that waited for a workspace no longer does: the wait is part of what is cancelled.
+		store.update(executionId, { lastError: CANCELLED_BY_USER, endReason: 'cancelled', workspaceWait: undefined });
 		// Fails the steps still running with the `lastError` above and publishes the usual execution-failed event.
 		store.markExecutionFailed(executionId);
 	}
@@ -105,6 +109,8 @@ export class ExecutionCanceller {
 	private release(executionId: string): void {
 		const { executions, supervisor } = this.parts;
 		const reason = new Error(CANCELLED_BY_USER);
+		// After the record says cancelled: the wait then ends in a refusal that the supervisor leaves alone.
+		this.parts.waitingRuns.cancel(executionId);
 		if (executions.isActive(executionId)) {
 			// Before the workers are dropped: the end of the run reads which workers served it.
 			this.parts.endExecution(executionId, 'failed', reason);

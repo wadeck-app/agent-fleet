@@ -10,7 +10,10 @@ describe('BUILTIN_PLUGIN_MANIFESTS', () => {
 		expect(Object.keys(BUILTIN_PLUGIN_MANIFESTS).sort()).toEqual([
 			'cli-approval',
 			'file-approval',
+			'in-place',
 			'none',
+			'pool',
+			'readonly',
 			'worktree',
 		]);
 	});

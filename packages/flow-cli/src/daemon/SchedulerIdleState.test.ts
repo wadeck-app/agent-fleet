@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { SchedulerIdleState } from './SchedulerIdleState.js';
 
 function idleState(
-	state: { queued?: number; active?: number; activeIds?: string[]; resumable?: number; pendingRunEnds?: boolean } = {}
+	state: {
+		queued?: number;
+		active?: number;
+		activeIds?: string[];
+		resumable?: number;
+		pendingRunEnds?: boolean;
+		waiting?: number;
+	} = {}
 ) {
 	return new SchedulerIdleState(
 		{ length: state.queued ?? 0 },
@@ -12,7 +19,8 @@ function idleState(
 			isActive: (executionId: string) => (state.activeIds ?? []).includes(executionId),
 			resumableCount: () => state.resumable ?? 0,
 		},
-		{ hasPending: () => state.pendingRunEnds ?? false }
+		{ hasPending: () => state.pendingRunEnds ?? false },
+		{ count: () => state.waiting ?? 0 }
 	);
 }
 
@@ -24,6 +32,7 @@ describe('SchedulerIdleState', () => {
 		expect(state.hasActiveExecutions()).toBe(false);
 		expect(state.hasResumableInterventions()).toBe(false);
 		expect(state.hasPendingRunEnds()).toBe(false);
+		expect(state.hasWaitingRuns()).toBe(false);
 	});
 
 	it('reports each condition on its own', () => {
@@ -31,6 +40,14 @@ describe('SchedulerIdleState', () => {
 		expect(idleState({ active: 2 }).hasActiveExecutions()).toBe(true);
 		expect(idleState({ resumable: 1 }).hasResumableInterventions()).toBe(true);
 		expect(idleState({ pendingRunEnds: true }).hasPendingRunEnds()).toBe(true);
+		expect(idleState({ waiting: 1 }).hasWaitingRuns()).toBe(true);
+	});
+
+	it('does not count a run waiting for a workspace as an active execution (it has no scheduler), but names it', () => {
+		const state = idleState({ active: 0, waiting: 2 });
+
+		expect(state.hasActiveExecutions()).toBe(false);
+		expect(state.hasWaitingRuns()).toBe(true);
 	});
 
 	it('does not let a kept-alive execution count as an active one', () => {
@@ -48,9 +65,11 @@ describe('SchedulerIdleState', () => {
 	});
 
 	it('describes everything the idle check consults on one line', () => {
-		expect(idleState({ queued: 3, active: 2, resumable: 1, pendingRunEnds: true }).describe()).toBe(
-			'queue=3 activeExecutions=2 resumableInterventions=1 pendingRunEnds=1+'
+		expect(idleState({ queued: 3, active: 2, resumable: 1, pendingRunEnds: true, waiting: 4 }).describe()).toBe(
+			'queue=3 activeExecutions=2 resumableInterventions=1 pendingRunEnds=1+ waitingForWorkspace=4'
 		);
-		expect(idleState().describe()).toBe('queue=0 activeExecutions=0 resumableInterventions=0 pendingRunEnds=0');
+		expect(idleState().describe()).toBe(
+			'queue=0 activeExecutions=0 resumableInterventions=0 pendingRunEnds=0 waitingForWorkspace=0'
+		);
 	});
 });

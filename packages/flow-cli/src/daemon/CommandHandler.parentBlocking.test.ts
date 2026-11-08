@@ -5,21 +5,6 @@ import * as path from 'node:path';
 import type { CommandHandler } from './CommandHandler';
 import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = vi.fn().mockResolvedValue({
-				path: '/tmp/test-workspace',
-				metaDir: '/tmp/test-workspace.meta',
-				id: 'ws-test-id',
-			});
-			release = vi.fn().mockResolvedValue(undefined);
-		},
-	};
-});
-
 /** Stands in for both WorkerRegistry and WorkerProvisioner, which CommandHandler now takes. */
 function createMockWorkerPool() {
 	// listIdle() is derived from getIdle() so a test only has to say which socket is idle.

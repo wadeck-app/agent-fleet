@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { PLUGIN_META_MARKER_FILE } from '../storage/PluginMetaOwnership';
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import { CommandHandler } from './CommandHandler';
 import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
@@ -11,10 +12,7 @@ id: meta-flow
 version: "1.0.0"
 name: Meta Flow
 description: One script step
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: only
@@ -81,7 +79,7 @@ describe('CommandHandler records the plugin workspace .meta it created', () => {
 			false,
 			undefined,
 			undefined,
-			provider as never
+			new FixedWorkspaceProviders(provider as never)
 		);
 		const flowFile = path.join(tmpDir, 'meta-flow.yml');
 		fs.writeFileSync(flowFile, FLOW_YAML);

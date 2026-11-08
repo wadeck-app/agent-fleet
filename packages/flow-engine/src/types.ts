@@ -378,7 +378,14 @@ export interface ValidationRule {
 }
 
 /**
- * Workspace configuration for a flow
+ * What a flow's `workspace:` holds: a provider name (`in-place`), or an object with a `provider` key and that provider's
+ * options. The removed legacy block (`mode`, `gitStrategy`...) can still appear in an unvalidated definition; the
+ * validator refuses it (see WorkspaceDeclarationParser).
+ */
+export type WorkspaceDeclaration = string | ({ provider?: string } & Record<string, unknown>);
+
+/**
+ * Workspace configuration of the native workspace manager (removed together with it)
  */
 export interface WorkspaceConfig {
 	/** Workspace isolation mode */
@@ -1000,8 +1007,8 @@ export interface FlowDefinition {
 	/** Flow description */
 	description: string;
 
-	/** Workspace requirements */
-	workspace: WorkspaceConfig;
+	/** Where the steps run: a provider name or `{ provider, ...options }` */
+	workspace: WorkspaceDeclaration;
 
 	/** Input variables expected from task (shorthand or extended format) */
 	inputs: Record<string, InputSpec>;
@@ -1098,8 +1105,8 @@ export interface FlowMetadata {
 	/** Input variables with metadata (normalized form including auto-discovered inputs) */
 	inputs: Record<string, NormalizedInputDefinition>;
 
-	/** Workspace requirements */
-	workspace: WorkspaceConfig;
+	/** Where the steps run: a provider name or `{ provider, ...options }` */
+	workspace: WorkspaceDeclaration;
 
 	/** Optional status transitions configuration */
 	statusTransitions?: StatusTransitions;

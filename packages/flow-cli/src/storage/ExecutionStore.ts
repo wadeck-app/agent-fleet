@@ -42,6 +42,7 @@ export class ExecutionStore {
 	private readonly atomicWriter = new AtomicRecordWriter();
 	/** Steps reopened by `markExecutionResumed` whose next start is a `resume`. Resume only exists within one daemon process. */
 	private readonly resumedSteps = new Set<string>();
+	private waitingAtStart: string[] = [];
 
 	constructor(
 		private readonly executionsDir: string,
@@ -81,6 +82,8 @@ export class ExecutionStore {
 		origin?: ExecutionState['origin'];
 		/** `.meta` of a plugin workspace the daemon created for this run; deleted with the record once it expires. */
 		pluginMetaDir?: string;
+		/** Set when the run waits for a workspace at the time it is recorded; see `ExecutionState.workspaceWait`. */
+		workspaceWait?: ExecutionState['workspaceWait'];
 		/** Which definition ran: version, content hash, snapshot and how the version was chosen. Written once, never changed. */
 		definition?: Pick<ExecutionState, 'flowVersion' | 'definitionHash' | 'definitionSnapshot' | 'versionChoice'>;
 	}): ExecutionState {
@@ -101,6 +104,7 @@ export class ExecutionStore {
 			...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
 			...(params.origin !== undefined ? { origin: params.origin } : {}),
 			...(params.pluginMetaDir !== undefined ? { pluginMetaDir: params.pluginMetaDir } : {}),
+			...(params.workspaceWait !== undefined ? { workspaceWait: params.workspaceWait } : {}),
 			...params.definition,
 			status: 'queued',
 			currentSteps: [],
@@ -335,15 +339,29 @@ export class ExecutionStore {
 
 	/**
 	 * Called once when the daemon starts, before it accepts work: fails every record a previous daemon left
-	 * `queued`/`running` (see InterruptedExecutionReconciler). Idempotent. Returns how many were reconciled.
+	 * `queued`/`running` (see InterruptedExecutionReconciler), except the ones waiting for a workspace. Idempotent. Returns how many were reconciled.
 	 */
 	reconcileInterruptedExecutions(): number {
-		return new InterruptedExecutionReconciler(this.executionsDir, {
+		const reconciler = new InterruptedExecutionReconciler(this.executionsDir, {
 			read: id => this.read(id),
 			write: state => this.write(state),
 			notify: transition => this.notify(transition),
 			mask: (id, text) => this.masks.mask(id, text),
-		}).reconcile();
+		});
+		const count = reconciler.reconcile();
+		this.waitingAtStart = reconciler.waitingExecutionIds();
+		return count;
+	}
+
+	/**
+	 * The executions the last {@link reconcileInterruptedExecutions} found waiting for a workspace, oldest first: they are not
+	 * interrupted, the daemon starts them again in this order.
+	 */
+	waitingExecutionIdsAtStart(): string[] {
+		return this.waitingAtStart
+			.map(id => this.read(id))
+			.sort((a, b) => a.startedAt.localeCompare(b.startedAt) || a.executionId.localeCompare(b.executionId))
+			.map(state => state.executionId);
 	}
 
 	/**

@@ -1,5 +1,5 @@
 import { FlowCoreError, FlowVersionError } from 'flow-core';
-import type { FlowDefinitionResolver, ResolvedDefinition } from 'flow-core';
+import type { FlowDefinitionResolver, ResolvedDefinition, VersionChoice } from 'flow-core';
 import { FlowValidator } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
@@ -59,6 +59,24 @@ export class RunDefinitionLoader {
 	load(cmd: RunCommandMessage, flowFile: string): LoadedDefinition {
 		try {
 			return cmd.registered === true ? this.loadRegistered(cmd, flowFile) : this.loadFile(cmd, flowFile);
+		} catch (err) {
+			if (err instanceof FlowVersionError) {
+				return refuse(versionRefusalCode(err.kind), getErrorMessage(err));
+			}
+			if (err instanceof FlowCoreError) {
+				return refuse('FLOW_SNAPSHOT_ERROR', getErrorMessage(err));
+			}
+			throw err;
+		}
+	}
+
+	/**
+	 * The definition a run was accepted with, read back from its snapshot (a waiting run that starts again after a daemon
+	 * restart): the file or registry may have changed since, and the run must be the one that was accepted.
+	 */
+	loadSnapshot(snapshotRef: string, choice: VersionChoice): LoadedDefinition {
+		try {
+			return this.validated(this.resolver.forSnapshotRef(snapshotRef, choice));
 		} catch (err) {
 			if (err instanceof FlowVersionError) {
 				return refuse(versionRefusalCode(err.kind), getErrorMessage(err));
@@ -133,7 +151,9 @@ export class RunDefinitionLoader {
 				);
 			}
 		}
-		const result = new FlowValidator(undefined, [], knownWorkerTypes).validate(flow);
+		// The validator annotates the flow it is given (`_autoDiscoveredInputs`). It gets a copy: the hash, the snapshot text and the
+		// definition that runs must all describe the object as written, or a stored snapshot never matches its hash again.
+		const result = new FlowValidator(undefined, [], knownWorkerTypes).validate(structuredClone(flow));
 		if (result.valid) {
 			return undefined;
 		}

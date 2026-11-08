@@ -134,6 +134,24 @@ export function formatTrigger(flow: FlowDefinition): string {
 	return '';
 }
 
+/**
+ * The workspace of a flow on one line: the provider and its options (`pool  dir:D:/pool  count:4`). A declaration that is
+ * neither a name nor an object with a provider is shown as such: `flow validate` says what to write.
+ */
+export function formatWorkspace(workspace: unknown): string {
+	if (typeof workspace === 'string') {
+		return workspace;
+	}
+	if (workspace === null || typeof workspace !== 'object' || Array.isArray(workspace)) {
+		return '(missing or invalid: run flow validate)';
+	}
+	const { provider, ...options } = workspace as Record<string, unknown>;
+	if (typeof provider !== 'string') {
+		return '(no provider: run flow validate)';
+	}
+	return [provider, ...Object.entries(options).map(([key, value]) => `${key}:${JSON.stringify(value)}`)].join('  ');
+}
+
 /** The table `flow show <file>` prints, as one string (leading and trailing blank line included). */
 export function renderFlowSummary(flow: FlowDefinition): string {
 	const steps = flow.steps;
@@ -147,15 +165,7 @@ export function renderFlowSummary(flow: FlowDefinition): string {
 		out.push(flow.description);
 	}
 
-	const ws = flow.workspace;
-	const wsParts: string[] = [ws.mode];
-	if (ws.gitStrategy) {
-		wsParts.push(`git:${ws.gitStrategy}`);
-	}
-	if (ws.reusePolicy) {
-		wsParts.push(`reuse:${ws.reusePolicy}`);
-	}
-	out.push(`workspace: ${wsParts.join('  ')}`);
+	out.push(`workspace: ${formatWorkspace(flow.workspace)}`);
 	out.push(`inputs:    ${formatInputs(flow.inputs)}`);
 	const status = formatStatus(flow);
 	if (status) {

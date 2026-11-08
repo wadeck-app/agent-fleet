@@ -462,3 +462,48 @@ describe('renderDetailView skipped steps', () => {
 		expect(lines).toContain('      skipped: did not run (no reason recorded)');
 	});
 });
+
+describe('buildHistoryTable waiting for a workspace', () => {
+	const wait = {
+		since: '2026-10-25T10:00:00.000Z',
+		message: 'Waiting for a free workspace: 2/2 slots are claimed by: abcd1234.',
+		run: {},
+	};
+	const waiting = makeExec({
+		executionId: 'wwwwwwww',
+		flowId: 'task-wait',
+		status: 'queued',
+		startedAt: '2026-10-25T10:00:00.000Z',
+		completedAt: null,
+		workspaceWait: wait,
+	});
+
+	it('shows the short wording in the STATUS column, not queued', () => {
+		const row = buildHistoryTable([waiting], {})
+			.split('\n')
+			.find(l => l.startsWith('wwwwwwww'))!;
+		expect(row).toContain('waiting ws');
+		expect(row).not.toContain('queued');
+	});
+
+	it('does not say "running" in the DURATION column or the detail view: the run has not started', () => {
+		const row = buildHistoryTable([waiting], {})
+			.split('\n')
+			.find(l => l.startsWith('wwwwwwww'))!;
+		expect(row).not.toContain('running');
+		expect(row.trimEnd().endsWith('waiting')).toBe(true);
+		expect(buildHistoryTable([waiting], { id: 'wwww' })).toContain('Duration:  waiting');
+	});
+
+	it('still says running for a started run without completion time', () => {
+		const started = makeExec({ executionId: 'rrrrrrrr', status: 'running', completedAt: null });
+		expect(buildHistoryTable([started], { id: 'rrrr' })).toContain('Duration:  running');
+	});
+
+	it('prints the full wording, since and the reason in the detail view', () => {
+		const out = buildHistoryTable([waiting], { id: 'wwww' });
+		expect(out).toContain('Status:    waiting for workspace');
+		expect(out).toContain('Waiting:   since 2026-10-25 10:00:00 UTC');
+		expect(out).toContain(`Reason:    ${wait.message}`);
+	});
+});

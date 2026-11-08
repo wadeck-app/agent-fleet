@@ -89,4 +89,58 @@ describe('InterruptedExecutionReconciler -- work bound at daemon start', () => {
 		expect(fs.existsSync(path.join(dir, 'absent'))).toBe(false);
 		stderr.mockRestore();
 	});
+
+	describe('executions waiting for a workspace', () => {
+		function writeWaiting(id: string, ageMs: number): string {
+			const filePath = path.join(dir, `${id}.json`);
+			const state = {
+				executionId: id,
+				flowFile: 'flows/a.yaml',
+				flowId: 'a',
+				status: 'queued',
+				currentSteps: [],
+				startedAt: new Date(Date.now() - ageMs).toISOString(),
+				completedAt: null,
+				steps: { s1: { status: 'pending' } },
+				workspaceWait: {
+					since: new Date(Date.now() - ageMs).toISOString(),
+					message: 'all slots claimed',
+					run: {},
+				},
+			};
+			fs.writeFileSync(filePath, JSON.stringify(state), 'utf8');
+			const when = new Date(Date.now() - ageMs);
+			fs.utimesSync(filePath, when, when);
+			return filePath;
+		}
+
+		it('does not interrupt a waiting execution (it has done no work) and reports it to be started again', () => {
+			writeWaiting('wait0001', 0);
+			writeRecord('live0001', 'running', 0);
+			const instance = reconciler();
+
+			expect(instance.reconcile()).toBe(1);
+			expect(instance.waitingExecutionIds()).toEqual(['wait0001']);
+			expect(JSON.parse(fs.readFileSync(path.join(dir, 'wait0001.json'), 'utf8')).status).toBe('queued');
+		});
+
+		it('refreshes the file time of a waiting record, so the next start still reads it', () => {
+			const filePath = writeWaiting('wait0001', 3 * DAY_MS);
+
+			reconciler().reconcile();
+
+			expect(Date.now() - fs.statSync(filePath).mtimeMs).toBeLessThan(60_000);
+			reads.length = 0;
+			expect(reconciler().reconcile()).toBe(0);
+			expect(reads).toEqual(['wait0001']);
+		});
+
+		it('lists nothing when nothing waits', () => {
+			writeRecord('done0001', 'completed', 0);
+			const instance = reconciler();
+			instance.reconcile();
+
+			expect(instance.waitingExecutionIds()).toEqual([]);
+		});
+	});
 });

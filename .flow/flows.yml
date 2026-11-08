@@ -3,7 +3,9 @@ includes:
     - flows-custom.yml
 
 ticket-auto-process:
-    version: '1.0.0'
+    version: '1.0.1'
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     name: 'Auto-process ticket'
     trigger:
         type: event
@@ -21,7 +23,9 @@ ticket-auto-process:
           prompt: 'Ticket received for integration. Confirm you are ready to proceed.'
 
 ticket-intake:
-    version: '1.0.0'
+    version: '1.0.1'
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     name: 'Generate action plan for new ticket'
     trigger:
         type: event
@@ -155,7 +159,9 @@ ticket-intake:
               "
 
 ticket-respond-to-comment:
-    version: '1.0.0'
+    version: '1.0.1'
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     name: 'Revise action plan based on user feedback'
     trigger:
         type: event
@@ -218,15 +224,15 @@ ticket-respond-to-comment:
           script: node -e "const http=require('http'),fid=process.env.FLOW_ID,u=new URL(process.env.BACKEND_URL+'/api/tickets/'+process.env.TICKET_ID+'/comments'),b=JSON.stringify({content:process.env.COMMENT,author:'worker-ai:'+fid});const req=http.request({hostname:u.hostname,port:+(u.port||80),path:u.pathname,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},r=>{r.on('data',()=>{});r.on('end',()=>process.exit(0));});req.on('error',e=>{console.error(e.message);process.exit(1);});req.write(b);req.end();"
 
 simple-implement:
-    version: '1.0.0'
+    version: '1.0.1'
     name: '(Dummy) Simple Implementation'
     description: 'Ask Claude to implement something'
+    # Implements code: each run gets its own git worktree outside the project (baseDir must be outside it).
+    # To reuse a fixed set of folders instead, switch to a pool: workspace: pool (or { provider: pool, ...options }).
     workspace:
-        mode: isolated
-        #    gitStrategy: feature-branch
-        gitStrategy: main-only
-        #    reusePolicy: never
-        reusePolicy: always
+        provider: worktree
+        baseDir: ../worktrees
+        prefix: flow-
     statusTransitions:
         onSuccess: review
         onFailure: changes_requested
@@ -1186,13 +1192,11 @@ data-build-pipeline:
 # Example 1: Missing Dependency Error
 # ❌ ERROR: step2 uses step1.outputs.result but does not depend on step1
 validation-error-missing-dependency:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Validation Error: Missing Dependency'
     description: 'Demonstrates variable usage without proper dependency declaration'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         number: string
     steps:
@@ -1218,13 +1222,11 @@ validation-error-missing-dependency:
 # Example 2: Undefined Output Warning
 # ⚠️ WARNING: References output fields not defined in step's output config
 validation-error-undefined-output:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Validation Error: Undefined Output'
     description: 'Demonstrates referencing outputs that are not declared'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         task: string
     steps:
@@ -1251,13 +1253,11 @@ validation-error-undefined-output:
 # Example 3: Missing Transitive Dependency
 # ❌ ERROR: step3 uses step1 output but only depends on step2 (which doesn't depend on step1)
 validation-error-transitive-missing:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Validation Error: Missing Transitive Dependency'
     description: 'Demonstrates missing transitive dependency in variable usage'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         value: string
     steps:
@@ -1294,13 +1294,11 @@ validation-error-transitive-missing:
 # Example 4: Correct Usage (For Comparison)
 # ✅ VALID: All dependencies properly declared
 validation-correct-example:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Validation: Correct Example'
     description: 'Demonstrates correct variable usage with proper dependencies'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         number: string
     steps:
@@ -1393,13 +1391,11 @@ test-user-intervention:
 # ============================================================================
 
 idea-refiner:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Idea Refiner: Transform Ideas into Flows and Tickets'
     description: 'Analyzes an idea, recommends/generates flows, and creates structured tickets'
-    workspace:
-        mode: shared
-        gitStrategy: main-only
-        reusePolicy: always
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     statusTransitions:
         onSuccess: approved
         onFailure: todo
@@ -1631,13 +1627,11 @@ idea-refiner:
 
 # Text Types Examples
 example-blog-post:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Example: Blog Post Generator'
     description: 'Demonstrates text, url, and markdown types'
-    workspace:
-        mode: shared
-        gitStrategy: any
-        reusePolicy: if-available
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         topic:
             type: text
@@ -1666,13 +1660,11 @@ example-blog-post:
 
 # Number Types Examples
 example-performance-metrics:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Example: Performance Metrics Analyzer'
     description: 'Demonstrates integer, percentage, and duration types'
-    workspace:
-        mode: shared
-        gitStrategy: any
-        reusePolicy: if-available
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         max_iterations:
             type: integer
@@ -1702,13 +1694,11 @@ example-performance-metrics:
 
 # Selection Types Examples
 example-deployment-workflow:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Example: Deployment Workflow'
     description: 'Demonstrates enum, multi-enum, and priority types'
-    workspace:
-        mode: isolated
-        gitStrategy: feature-branch
-        reusePolicy: never
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         environment:
             type: enum
@@ -1776,13 +1766,11 @@ example-file-processor:
 
 # Date and DateTime Types Examples
 example-event-scheduler:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Example: Event Scheduler'
     description: 'Demonstrates date and datetime types'
-    workspace:
-        mode: shared
-        gitStrategy: any
-        reusePolicy: if-available
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         event_date:
             type: date
@@ -1811,13 +1799,11 @@ example-event-scheduler:
 
 # Regex Type Example
 example-log-analyzer:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Example: Log Analyzer'
     description: 'Demonstrates regex type for pattern matching'
-    workspace:
-        mode: shared
-        gitStrategy: any
-        reusePolicy: if-available
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         log_pattern:
             type: regex
@@ -1842,13 +1828,11 @@ example-log-analyzer:
 
 # Array Type Example
 example-batch-processor:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Example: Batch Processor'
     description: 'Demonstrates array type for lists'
-    workspace:
-        mode: shared
-        gitStrategy: any
-        reusePolicy: if-available
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         file_list:
             type: array
@@ -1871,13 +1855,11 @@ example-batch-processor:
 
 # KeyValue Type Example
 example-config-generator:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Example: Configuration Generator'
     description: 'Demonstrates keyvalue type for settings'
-    workspace:
-        mode: shared
-        gitStrategy: any
-        reusePolicy: if-available
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         environment_vars:
             type: keyvalue
@@ -1899,13 +1881,11 @@ example-config-generator:
 
 # Password Type Example
 example-credential-setup:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Example: Credential Setup'
     description: 'Demonstrates password type (secure input)'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: never
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         api_key:
             type: password
@@ -1927,13 +1907,11 @@ example-credential-setup:
 
 # Combined Example: All Types Together
 example-comprehensive:
-    version: '1.0.0'
+    version: '1.0.1'
     name: 'Example: Comprehensive Input Types'
     description: 'Demonstrates multiple input types in one flow'
-    workspace:
-        mode: isolated
-        gitStrategy: feature-branch
-        reusePolicy: never
+    # Scripts, demonstrations or read-only analysis: run directly in the project folder.
+    workspace: in-place
     inputs:
         # Text types
         description:

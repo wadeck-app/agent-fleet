@@ -39,7 +39,12 @@ plugins:
 		}).resolveAll();
 
 		expect(result.workspaceProvider).toBeDefined();
-		const handle = await result.workspaceProvider!.allocate({ taskId: 'test-task' });
+		const handle = await result.workspaceProvider!.allocate({
+			taskId: 'test-task',
+			executionId: 'test-task',
+			projectDir: process.cwd(),
+			flow: { id: 'f', version: '1.0.0' },
+		});
 		expect(handle.id).toBe('none:test-task');
 		await result.workspaceProvider!.release(handle);
 	});

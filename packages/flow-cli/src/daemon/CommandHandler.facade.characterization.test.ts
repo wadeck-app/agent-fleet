@@ -24,17 +24,6 @@ vi.mock('node:os', async importOriginal => {
 	return { ...actual, homedir: vi.fn().mockImplementation(() => actual.homedir()) };
 });
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = mockAllocate;
-			release = mockRelease;
-		},
-	};
-});
-
 registerCommandHandlerHooks({ mockAllocate, mockRelease, hoistedState });
 
 /**
@@ -164,7 +153,7 @@ describe('CommandHandler as a facade - characterization', () => {
 		expect(handler.isExecutionActive('unknown')).toBe(false);
 		expect(handler.describeIdleState()).not.toBe(idleDescription);
 		expect(idleDescription).toMatchInlineSnapshot(
-			`"queue=0 activeExecutions=0 resumableInterventions=0 pendingRunEnds=0"`
+			`"queue=0 activeExecutions=0 resumableInterventions=0 pendingRunEnds=0 waitingForWorkspace=0"`
 		);
 	});
 

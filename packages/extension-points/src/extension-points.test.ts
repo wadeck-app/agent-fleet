@@ -42,10 +42,38 @@ describe('extension-points interfaces compile correctly', () => {
 	});
 
 	it('WorkspaceRequest allows optional hint', () => {
-		const withHint: WorkspaceRequest = { taskId: 'task-1', hint: 'my-prefix' };
-		const withoutHint: WorkspaceRequest = { taskId: 'task-2' };
+		const base = { projectDir: '/p', flow: { id: 'f', version: '1.0.0' } };
+		const withHint: WorkspaceRequest = { taskId: 'task-1', executionId: 'task-1', hint: 'my-prefix', ...base };
+		const withoutHint: WorkspaceRequest = { taskId: 'task-2', executionId: 'task-2', ...base };
 		expect(withHint.taskId).toBe('task-1');
 		expect(withoutHint.hint).toBeUndefined();
+	});
+
+	it('WorkspaceRequest accepts the optional onWaiting and signal', () => {
+		const messages: string[] = [];
+		const request: WorkspaceRequest = {
+			taskId: 't',
+			executionId: 't',
+			projectDir: '/p',
+			flow: { id: 'f', version: '1.0.0' },
+			onWaiting: info => messages.push(info.message),
+			signal: new AbortController().signal,
+		};
+		request.onWaiting?.({ message: 'all slots are claimed' });
+		expect(messages).toEqual(['all slots are claimed']);
+	});
+
+	it('WorkspaceHandle accepts the optional metaDir, readOnly and notes', () => {
+		const minimal: WorkspaceHandle = { path: '/tmp/ws', id: 'x' };
+		const full: WorkspaceHandle = {
+			path: '/tmp/ws',
+			id: 'x',
+			metaDir: '/tmp/meta',
+			readOnly: true,
+			notes: ['dirty'],
+		};
+		expect(minimal.metaDir).toBeUndefined();
+		expect(full.notes).toEqual(['dirty']);
 	});
 
 	it('ApprovalProvider shape is satisfied by a mock implementation', () => {

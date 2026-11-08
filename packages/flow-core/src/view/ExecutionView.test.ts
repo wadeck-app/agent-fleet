@@ -370,3 +370,23 @@ describe('skipped steps', () => {
 		expect(steps[2]).toMatchObject({ skipped: true, skippedReason: 'did not run (no reason recorded)' });
 	});
 });
+
+describe('toExecutionSummary waiting for a workspace', () => {
+	const wait = { since: '2026-08-16T12:00:00.000Z', message: '2/2 slots claimed', run: { type: 'run', secret: 'x' } };
+
+	it('exposes the flag, since and the reason, without the run request kept for a restart', () => {
+		const summary = toExecutionSummary(record({ status: 'queued', completedAt: null, workspaceWait: wait }));
+		expect(summary).toMatchObject({
+			status: 'queued',
+			waitingForWorkspace: true,
+			workspaceWait: { since: wait.since, message: wait.message },
+		});
+		expect(JSON.stringify(summary)).not.toContain('secret');
+	});
+
+	it('adds nothing to an ordinary queued run', () => {
+		const summary = toExecutionSummary(record({ status: 'queued', completedAt: null }));
+		expect(summary).not.toHaveProperty('waitingForWorkspace');
+		expect(summary).not.toHaveProperty('workspaceWait');
+	});
+});

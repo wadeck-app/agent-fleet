@@ -82,6 +82,21 @@ describe('FlowQueryService.getFlowGraph', () => {
 		expect(result.graph.edges).toHaveLength(2);
 	});
 
+	it('by execution id: tells since when and why a queued run waits for a workspace, nothing for one that does not', () => {
+		writeExec('wait1234', {
+			status: 'queued',
+			workspaceWait: { since: '2026-08-16T12:00:00.000Z', message: '2/2 slots claimed', run: { secret: 'x' } },
+		});
+		writeExec('plain123', { status: 'queued' });
+
+		const waiting = service.getFlowGraph({ executionId: 'wait1234' });
+		expect(waiting.execution?.workspaceWait).toEqual({
+			since: '2026-08-16T12:00:00.000Z',
+			message: '2/2 slots claimed',
+		});
+		expect(service.getFlowGraph({ executionId: 'plain123' }).execution).not.toHaveProperty('workspaceWait');
+	});
+
 	it('by execution id prefix', () => {
 		writeExec('abc12345', {});
 

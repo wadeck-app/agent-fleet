@@ -4,6 +4,7 @@ import * as path from 'node:path';
 
 import { WORKER_FEATURE_SECRETS } from '../ipc/Protocol';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import type { CommandHandler } from './CommandHandler';
 import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 import { DaemonSecrets } from './DaemonSecrets';
@@ -15,16 +16,13 @@ const { mockAllocate } = vi.hoisted(() => ({
 	mockAllocate: vi.fn(),
 }));
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = mockAllocate;
-			release = vi.fn().mockResolvedValue(undefined);
-		},
-	};
-});
+// What the daemon asks its workspace provider for: the assertions "no workspace was allocated" read this mock.
+const workspaceProviders = (): FixedWorkspaceProviders =>
+	new FixedWorkspaceProviders({
+		allocate: (...allocateArguments: unknown[]) =>
+			(mockAllocate as (...a: unknown[]) => unknown)(...allocateArguments),
+		release: () => Promise.resolve(),
+	} as never);
 
 const FLOW_YAML = `\
 id: secret-flow
@@ -109,7 +107,7 @@ describe('CommandHandler secrets', () => {
 			false,
 			undefined,
 			undefined,
-			undefined,
+			workspaceProviders(),
 			undefined,
 			undefined,
 			undefined,

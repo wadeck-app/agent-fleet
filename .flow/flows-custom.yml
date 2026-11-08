@@ -1,13 +1,15 @@
 payment-race-condition-fix:
-    version: 1.0.0
+    version: 1.0.1
     name: Payment Race Condition Fix
     description: >-
         Diagnose and fix race condition in payment processing when concurrent requests update the same record. Includes
         analysis, solution design, implementation, and testing.
+    # Implements code: each run gets its own git worktree outside the project (baseDir must be outside it).
+    # To reuse a fixed set of folders instead, switch to a pool: workspace: pool (or { provider: pool, ...options }).
     workspace:
-        mode: isolated
-        gitStrategy: feature-branch
-        reusePolicy: never
+        provider: worktree
+        baseDir: ../worktrees
+        prefix: flow-
     inputs:
         - id: paymentFlowPath
           name: Payment Flow File Path
@@ -67,15 +69,17 @@ payment-race-condition-fix:
               title: Approve Payment Race Condition Fix
               description: Review the design and test results above. Approve to proceed with merge.
 generic-storage-management-debugger:
-    version: 1.0.0
+    version: 1.0.1
     name: Generic Storage Management Debugger Page
     description: >-
         Design and implement a debugger/viewer page for managing and inspecting storage data globally across all entities,
         with JSON and CSV export support.
+    # Implements code: each run gets its own git worktree outside the project (baseDir must be outside it).
+    # To reuse a fixed set of folders instead, switch to a pool: workspace: pool (or { provider: pool, ...options }).
     workspace:
-        mode: shared
-        gitStrategy: feature-branch
-        reusePolicy: never
+        provider: worktree
+        baseDir: ../worktrees
+        prefix: flow-
     inputs:
         debugFeatures:
             type: multi-enum
@@ -133,15 +137,17 @@ generic-storage-management-debugger:
               resetOnSuccess: true
               addComment: true
 storage-viewer-management-debugger:
-    version: 1.0.0
+    version: 1.0.1
     name: Storage Viewer and Management Debugger Page
     description: >-
         Design and implement a global storage viewer/debugger page to inspect, query, and export storage data across all
         entities with JSON and CSV export capabilities.
+    # Implements code: each run gets its own git worktree outside the project (baseDir must be outside it).
+    # To reuse a fixed set of folders instead, switch to a pool: workspace: pool (or { provider: pool, ...options }).
     workspace:
-        mode: isolated
-        gitStrategy: feature-branch
-        reusePolicy: never
+        provider: worktree
+        baseDir: ../worktrees
+        prefix: flow-
     inputs:
         storageScope:
             type: enum

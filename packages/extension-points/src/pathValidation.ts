@@ -1,4 +1,6 @@
 import { execSync } from 'node:child_process';
+import { lstatSync, statSync } from 'node:fs';
+import type { Stats } from 'node:fs';
 import { normalize, parse, resolve, sep } from 'node:path';
 
 const UNIX_SYSTEM_DIRS = ['/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64', '/boot', '/sys', '/proc', '/dev', '/var'];
@@ -48,12 +50,13 @@ export function validateWorkspacePath(taskId: string, baseDir: string): void {
 	}
 }
 
-function getActiveWorktreePaths(): string[] {
+function getActiveWorktreePaths(projectDir: string): string[] {
 	try {
 		const output = execSync('git worktree list --porcelain', {
 			encoding: 'utf8',
 			stdio: ['ignore', 'pipe', 'ignore'],
 			windowsHide: true,
+			cwd: projectDir,
 		});
 		const paths: string[] = [];
 		for (const line of output.split('\n')) {
@@ -68,7 +71,16 @@ function getActiveWorktreePaths(): string[] {
 	}
 }
 
-export function validateBaseDir(baseDir: string): void {
+/**
+ * @param projectDir Absolute folder of the project the run belongs to. Never defaulted to the working directory: the
+ * daemon serves many projects, so its own cwd says nothing about the run.
+ */
+export function validateBaseDir(baseDir: string, projectDir: string): void {
+	if (!projectDir || projectDir.trim() === '') {
+		throw new Error(
+			'Invalid projectDir: must not be empty (the workspace request must carry the project folder of the run)'
+		);
+	}
 	if (!baseDir || baseDir.trim() === '') {
 		throw new Error('Invalid baseDir: must not be empty');
 	}
@@ -83,13 +95,13 @@ export function validateBaseDir(baseDir: string): void {
 		throw new Error(`Invalid baseDir "${resolved}": must not be a system directory`);
 	}
 
-	const projectRoot = resolve(process.cwd());
+	const projectRoot = resolve(projectDir);
 	if (projectRoot.startsWith(resolved + sep) || projectRoot.startsWith(resolved + '/')) {
 		throw new Error(`Invalid baseDir "${resolved}": must not be an ancestor of the project root "${projectRoot}"`);
 	}
 
 	// Reject if baseDir is nested inside an existing git worktree (would create nested worktrees)
-	const worktreePaths = getActiveWorktreePaths();
+	const worktreePaths = getActiveWorktreePaths(projectRoot);
 	for (const worktreePath of worktreePaths) {
 		if (
 			resolved === worktreePath ||
@@ -121,4 +133,56 @@ export function validateBranchNamePrefix(prefix: string | undefined): void {
 	if (!GIT_REF_ALLOWLIST.test(prefix)) {
 		throw new Error(`Invalid branch name prefix "${prefix}": only [a-zA-Z0-9._-] characters are allowed`);
 	}
+}
+
+/**
+ * The folder a workspace option names (`dir`...), checked: a relative path is resolved against the project of the run (never
+ * the working directory of the daemon), and it must be an existing directory that is not a drive root, not a system
+ * directory and not a symbolic link or junction. Absent, the project folder itself.
+ *
+ * @param optionName How the flow author calls the option, for the messages (`dir`).
+ */
+export function resolveWorkspaceFolder(value: unknown, projectDir: string, optionName: string): string {
+	if (!projectDir || projectDir.trim() === '') {
+		throw new Error(
+			'Invalid projectDir: must not be empty (the workspace request must carry the project folder of the run)'
+		);
+	}
+	if (value === undefined) {
+		return assertDirectory(resolve(projectDir), optionName, 'the project folder');
+	}
+	if (typeof value !== 'string' || value.trim() === '') {
+		throw new Error(
+			`Workspace option "${optionName}" must be a non-empty string (a folder path), got ${JSON.stringify(value)}.`
+		);
+	}
+	const resolved = resolve(projectDir, normalize(value));
+	if (isDriveRoot(resolved)) {
+		throw new Error(`Workspace option "${optionName}" must not be the filesystem root ("${resolved}").`);
+	}
+	if (isSystemDir(resolved)) {
+		throw new Error(`Workspace option "${optionName}" must not be a system directory ("${resolved}").`);
+	}
+	assertDirectory(resolved, optionName, `"${value}"`);
+	if (lstatSync(resolved).isSymbolicLink()) {
+		throw new Error(
+			`Workspace option "${optionName}" ("${resolved}") is a symbolic link or junction, which is not accepted. Name the real folder instead.`
+		);
+	}
+	return resolved;
+}
+
+function assertDirectory(folder: string, optionName: string, label: string): string {
+	let stats: Stats;
+	try {
+		stats = statSync(folder);
+	} catch {
+		throw new Error(
+			`Workspace option "${optionName}": ${label} does not exist ("${folder}"). Create the folder or fix the path (a relative path is relative to the project folder).`
+		);
+	}
+	if (!stats.isDirectory()) {
+		throw new Error(`Workspace option "${optionName}": "${folder}" is not a directory.`);
+	}
+	return folder;
 }

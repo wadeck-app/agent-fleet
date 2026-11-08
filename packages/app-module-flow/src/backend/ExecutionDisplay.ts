@@ -6,6 +6,7 @@ import {
 	SKIPPED_LABEL,
 	type StepRetryPolicy,
 	type StepView,
+	WAITING_FOR_WORKSPACE_LABEL,
 	executionLogsPath,
 	isRecoveredStep,
 	outcomeLabel,
@@ -43,7 +44,9 @@ export function toExecutionRow(summary: ExecutionSummary) {
 	return {
 		...summary,
 		startedAt: requireTimestamp(summary.startedAt),
-		statusLabel: outcomeLabel(statusTag(summary.status), { recovered: summary.lastErrorRecovered }),
+		statusLabel: outcomeLabel(statusTag(summary.status, summary.waitingForWorkspace === true), {
+			recovered: summary.lastErrorRecovered,
+		}),
 		// The tooltip of the status cell (DataTable `title: '{statusHint}'`); '' = none, a blank title is not shown.
 		statusHint: runStatusHint(summary) ?? '',
 		logsHref: executionLogsPath(summary.executionId),
@@ -92,6 +95,7 @@ export function toExecutionDetailRow(
 		);
 	}
 	const statusHint = runStatusHint(detail) ?? '';
+	const waiting = detail.waitingForWorkspace === true;
 	return {
 		...detail,
 		// A Badge has no tooltip: the page wraps it in a Tooltip when hasStatusHint, and shows it bare when lacksStatusHint
@@ -111,8 +115,15 @@ export function toExecutionDetailRow(
 			},
 		],
 		// A recovered error is not a success to read past: the badge says it and turns to warning.
-		statusText: detail.lastErrorRecovered ? 'completed, recovered an error' : detail.status,
-		statusVariant: detail.lastErrorRecovered ? 'warning' : statusVariant,
+		// A run that waits for a workspace is stored as queued: the badge says what it waits for and turns to warning.
+		statusText: waiting
+			? WAITING_FOR_WORKSPACE_LABEL
+			: detail.lastErrorRecovered
+				? 'completed, recovered an error'
+				: detail.status,
+		statusVariant: waiting || detail.lastErrorRecovered ? 'warning' : statusVariant,
+		// The reason as visible text (the page shows it under the header when not empty; '' = the run does not wait).
+		workspaceWaitText: detail.workspaceWait?.message ?? '',
 		logsHref: executionLogsPath(detail.executionId),
 		steps: detail.steps.map(step => toStepRow(step, policies?.[step.stepId])),
 	};

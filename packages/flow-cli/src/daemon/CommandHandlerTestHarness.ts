@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import { DEFAULT_BOUND_STEP_WAIT_MS, type WorkerTypeRouting } from './BoundStepWait';
 import { CommandHandler } from './CommandHandler';
 import { SourceContactErrors } from './SourceContactErrors';
@@ -27,9 +28,24 @@ export function emptyWorkerRouting(): WorkerTypeRouting {
 	};
 }
 
+/** Position of `workspaceProviders`. */
+const WORKSPACE_PROVIDERS_INDEX = 9;
+/** Position of `resolvePerFlowWorkspaceProvider`. */
+const PER_FLOW_RESOLVER_INDEX = 11;
+
+/**
+ * The stub provider (`mockAllocate`/`mockRelease` of the file) given to every handler that does not name its own
+ * `workspaceProviders`; set by {@link registerCommandHandlerHooks}. Absent: the handler uses the real built-in providers.
+ */
+let defaultWorkspaceProviders: FixedWorkspaceProviders | undefined;
+
 /** CommandHandler requires every argument; a test names the ones it cares about and gets `undefined` / an empty routing for the rest. */
 export function completeArguments(args: Partial<HandlerArguments>): HandlerArguments {
 	const complete: unknown[] = Array.from({ length: ROUTING_INDEX + 1 }, (_, index) => args[index]);
+	// A test that gives a per-flow resolver is about the real providers (built-ins and config instances): no stub then.
+	if (args[PER_FLOW_RESOLVER_INDEX] === undefined) {
+		complete[WORKSPACE_PROVIDERS_INDEX] ??= defaultWorkspaceProviders;
+	}
 	complete[ROUTING_INDEX] ??= emptyWorkerRouting();
 	return complete as HandlerArguments;
 }
@@ -100,10 +116,7 @@ id: test-flow
 version: "1.0.0"
 name: Test Flow
 description: Test
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: s1
@@ -117,10 +130,7 @@ id: two-step-flow
 version: "1.0.0"
 name: Two Step Flow
 description: Two steps
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: s1
@@ -140,10 +150,7 @@ id: retry-flow
 version: "1.0.0"
 name: Retry Flow
 description: Flow with retry
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: s1
@@ -160,10 +167,7 @@ id: test
 version: "1.0.0"
 name: x
 description: x
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: s1
@@ -179,10 +183,7 @@ id: test-flow
 version: "1.0.0"
 name: Test Flow
 description: Test
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: s1
@@ -255,6 +256,11 @@ export function registerCommandHandlerHooks({
 	mockRelease,
 	hoistedState,
 }: CommandHandlerHarnessMocks): void {
+	defaultWorkspaceProviders = new FixedWorkspaceProviders({
+		allocate: (...allocateArguments: unknown[]) =>
+			(mockAllocate as (...a: unknown[]) => unknown)(...allocateArguments),
+		release: (...releaseArguments: unknown[]) => (mockRelease as (...a: unknown[]) => unknown)(...releaseArguments),
+	} as never);
 	beforeEach(async () => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-handler-test-'));
 		daemonDir = path.join(tmpDir, 'daemon');
@@ -263,7 +269,8 @@ export function registerCommandHandlerHooks({
 		registeredProject = await projectRegistry.register('harness-project', { folder: tmpDir });
 		vi.clearAllMocks();
 		vi.mocked(os.homedir).mockReturnValue(hoistedState.actualHomedir);
-		mockAllocate.mockResolvedValue({ path: '/tmp/test-workspace', id: 'ws-test-id' });
+		// Under the real temp dir: the daemon creates the .meta/outputs folder next to the handle's path.
+		mockAllocate.mockResolvedValue({ path: path.join(tmpDir, 'test-workspace'), id: 'ws-test-id' });
 		mockRelease.mockResolvedValue(undefined);
 	});
 

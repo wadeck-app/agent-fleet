@@ -11,6 +11,7 @@
  * Used by the idea-to-tickets system to determine if existing flows can be reused.
  */
 import type { FlowDefinition, VariableType } from '../types';
+import { WorkspaceDeclarationParser } from '../workspace/WorkspaceDeclarationParser';
 import { FlowAnalyzer, type FlowCapabilities, type FlowPattern } from './FlowAnalyzer';
 
 /**
@@ -551,7 +552,7 @@ export class FlowRecommendationEngine {
 		if (requirements.keywords.includes('code') && !capabilities.isolated) {
 			suggestions.push({
 				type: 'change-workspace',
-				description: 'Change workspace mode to isolated for code modifications',
+				description: 'Use an exclusive workspace (worktree or pool) for code modifications',
 				priority: 'recommended',
 			});
 		}
@@ -590,7 +591,7 @@ export class FlowRecommendationEngine {
 		}
 
 		reasons.push(
-			`The flow "${flow.name}" has ${flow.steps.length} steps and ${flow.workspace.mode} workspace mode.`
+			`The flow "${flow.name}" has ${flow.steps.length} steps and the "${WorkspaceDeclarationParser.providerNameOf(flow.workspace)}" workspace.`
 		);
 
 		return reasons.join(' ');

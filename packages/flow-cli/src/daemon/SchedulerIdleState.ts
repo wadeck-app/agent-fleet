@@ -1,6 +1,7 @@
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
 import type { RunEndCoordinator } from './RunEndCoordinator.js';
+import type { WaitingRuns } from './WaitingRuns.js';
 
 /**
  * What the scheduler still holds, as the daemon's idle-exit check and its diagnostics read it.
@@ -15,7 +16,8 @@ export class SchedulerIdleState {
 	constructor(
 		private readonly queue: Pick<ReadyStepQueue, 'length'>,
 		private readonly executions: Pick<ExecutionRegistry, 'activeExecutionCount' | 'isActive' | 'resumableCount'>,
-		private readonly runEnd: Pick<RunEndCoordinator, 'hasPending'>
+		private readonly runEnd: Pick<RunEndCoordinator, 'hasPending'>,
+		private readonly waitingRuns: Pick<WaitingRuns, 'count'>
 	) {}
 
 	isQueueEmpty(): boolean {
@@ -53,12 +55,20 @@ export class SchedulerIdleState {
 	}
 
 	/**
+	 * Whether any run waits for a workspace (a pool with no free slot). It is no active execution (no scheduler, worker or
+	 * permit), but the daemon holds it: exiting or restarting for an update would leave it unstarted until the next start.
+	 */
+	hasWaitingRuns(): boolean {
+		return this.waitingRuns.count() > 0;
+	}
+
+	/**
 	 * One-line snapshot of everything the idle check consults, for the daemon's idle-exit log entries.
 	 *
 	 * Added after an idle-exit race with `flow resume` was reported but could not be conclusively reproduced. If it
 	 * recurs, this line in the daemon log answers "what did the idle check actually see" directly.
 	 */
 	describe(): string {
-		return `queue=${String(this.queue.length)} activeExecutions=${String(this.executions.activeExecutionCount())} resumableInterventions=${String(this.executions.resumableCount())} pendingRunEnds=${this.runEnd.hasPending() ? '1+' : '0'}`;
+		return `queue=${String(this.queue.length)} activeExecutions=${String(this.executions.activeExecutionCount())} resumableInterventions=${String(this.executions.resumableCount())} pendingRunEnds=${this.runEnd.hasPending() ? '1+' : '0'} waitingForWorkspace=${String(this.waitingRuns.count())}`;
 	}
 }

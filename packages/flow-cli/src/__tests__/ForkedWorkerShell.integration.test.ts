@@ -100,10 +100,7 @@ describe('forked worker shell routing (end to end)', () => {
 		if (!requireBashOrSkip('ForkedWorkerShell')) return;
 		// The documented flow, with the network call replaced by an echo that fails: the point is
 		// that the step is assigned, runs with the secret, and fails in the script, not in routing.
-		const yaml = SECRET_EXAMPLE_FLOW_YAML.replace(/curl .*/, 'echo "got $API_TOKEN"; exit 3').replace(
-			'mode: isolated',
-			'mode: manual'
-		);
+		const yaml = SECRET_EXAMPLE_FLOW_YAML.replace(/curl .*/, 'echo "got $API_TOKEN"; exit 3');
 		const { status, persisted } = await runFlow(yaml, { API_TOKEN: 'env://SHELL_E2E_TOKEN' });
 		expect(status).toBe('failed');
 		// The step really received the secret (the placeholder shows which one), and the value is nowhere.

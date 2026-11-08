@@ -132,6 +132,7 @@ sections:
                                 FAILED: danger,
                                 running: info,
                                 waiting: default,
+                                'waiting ws': warning,
                                 retry: warning,
                                 'ok, recovered': warning,
                             }

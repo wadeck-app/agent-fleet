@@ -1,3 +1,4 @@
+import { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import { type DaemonHandle, createDaemon } from '@wadeck-app/singleton-daemon-kit';
 import { executionsDirOf, logsDirOf } from 'flow-core';
 import * as fs from 'node:fs';
@@ -41,6 +42,7 @@ import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
 import { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 import { WorkerTypeInstances } from './WorkerTypeInstances.js';
 import { createDaemonCommands } from './createDaemonCommands.js';
+import { loadFlowHooks } from './loadFlowHooks.js';
 import { resolveClaudePath } from './resolveClaudePath.js';
 import { startPeriodicUpdateCheck } from './startPeriodicUpdateCheck.js';
 import { tryResolvePlugins } from './tryResolvePlugins.js';
@@ -110,6 +112,13 @@ async function startOwningDaemon(
 	// Resolve plugins before createDaemon - onStart is synchronous so async must happen here
 	const pluginProviders = await tryResolvePlugins();
 	const perFlowWorkspaceResolver = await PluginResolver.create().createPerFlowWorkspaceResolver();
+	if (pluginProviders.workspaceProvider !== undefined) {
+		writeDaemonLog(
+			logsDir,
+			'info',
+			'[warn] The config declares plugins.workspace, which is no longer a default for flows: every flow must declare its own "workspace:" (a flow without it is refused). Remove plugins.workspace from the config, or give the instance a name under plugins.instances and write "workspace: <name>" in the flows that use it.'
+		);
+	}
 
 	/** One worker-type instance per plugin source for the life of this daemon; disposed at stop (shutDownWorkers). */
 	const workerTypes = new WorkerTypeInstances(new PluginLoader(), (level, message) => {
@@ -313,7 +322,8 @@ async function startOwningDaemon(
 					config.security.allowAbsolutePaths,
 					config.limits.maxInjectedSteps,
 					config.limits.maxStepsPerExecution,
-					pluginProviders.workspaceProvider,
+					// Every flow declares its own workspace; the config no longer supplies a default provider.
+					undefined,
 					pluginProviders.approvalProvider,
 					perFlowWorkspaceResolver,
 					// D#66: asked again whenever demand appears, not only at startup.
@@ -357,6 +367,13 @@ async function startOwningDaemon(
 					daemonSecrets,
 					workerTypes,
 				};
+
+				// The runs that waited for a workspace when the previous daemon stopped were left alone by the reconcile above.
+				startupTasks.resumeWaitingExecutions(
+					executionStore,
+					commandHandler,
+					project => new HookDispatcher(loadFlowHooks(project.project))
+				);
 
 				// Nothing else would notice a wedged worker: it keeps its socket open and answers
 				// pings, so only the absence of output over time says anything. Swept rather than

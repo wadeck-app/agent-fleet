@@ -1,12 +1,13 @@
 import type { WorkspaceHandle, WorkspaceProvider } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
-import { WorkspaceAllocationError, WorkspaceGitSetupError, WorkspaceManager, redactGitText } from 'flow-engine';
-import type { FlowDefinition, FlowPluginOverrides } from 'flow-engine';
-import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
+import { redactGitText, redactSecrets } from 'flow-engine';
+import type { FlowDefinition } from 'flow-engine';
+import { getErrorMessage, normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { DaemonResponse } from '../ipc/Protocol';
 import type { LogWriter } from '../storage/LogWriter';
 import { PluginMetaOwnership } from '../storage/PluginMetaOwnership';
+import type { WorkspaceProviderSource } from '../workspace/WorkspaceProviders';
 
 /** Where an execution runs and where its outputs are written. */
 export type AllocatedWorkspace =
@@ -14,96 +15,206 @@ export type AllocatedWorkspace =
 			ok: true;
 			workspaceDir: string;
 			workspaceMetaDir: string;
+			/** True when the folder is shared and the flow must not modify it (advisory). */
+			readOnly: boolean;
 			/** Set only when the daemon created `workspaceMetaDir` itself (plugin provider): it may then be pruned with the record. */
 			pluginMetaDir?: string;
 	  }
 	| { ok: false; response: DaemonResponse };
 
+/** A run that has no workspace yet because the provider has none free: the allocation goes on in the background. */
+export interface WorkspaceWaiting {
+	/** Why it waits, as the provider first said it. */
+	message: string;
+	/** Settles when the wait ends: the workspace, or the reason it could not be given (also when cancelled). */
+	settled: Promise<AllocatedWorkspace>;
+	/** Stops waiting; `settled` then resolves to a refusal with the code `WORKSPACE_WAIT_CANCELLED`. */
+	cancel: () => void;
+	/** Told each later reason (the provider repeats it every minute). */
+	onUpdate: (listener: (message: string) => void) => void;
+}
+
+export type BegunAllocation =
+	{ state: 'ready'; allocated: AllocatedWorkspace } | { state: 'waiting'; waiting: WorkspaceWaiting };
+
 /** Pause before the single retry of a failed release. */
 const RELEASE_RETRY_DELAY_MS = 2_000;
 
-/** Allocates the workspace of an execution (plugin provider or native manager) and releases it when it is over. */
+/** Allocates the workspace of an execution through the provider its flow declares, and releases it when it is over. */
 export class ExecutionWorkspaces {
-	/** Per-execution plugin workspace handles (only when a workspace provider is used) */
+	/** Per-execution workspace handles */
 	private readonly pluginHandles = new Map<
 		string,
 		{ handle: WorkspaceHandle; provider: WorkspaceProvider; metaDir: string }
 	>();
 	private readonly metaOwnership = new PluginMetaOwnership();
-	/** Per-execution WorkspaceManager handles for the non-plugin path */
-	private readonly nativeManagers = new Map<string, { manager: WorkspaceManager; workspaceId: string }>();
 
 	constructor(
 		private readonly logWriter: LogWriter,
-		private readonly workspaceProvider?: WorkspaceProvider,
-		private readonly resolvePerFlowWorkspaceProvider?: (
-			section: NonNullable<FlowPluginOverrides['workspace']>
-		) => Promise<WorkspaceProvider>
+		private readonly providers: WorkspaceProviderSource
 	) {}
 
 	/**
-	 * Allocates the workspace for a run that has been accepted so far.
+	 * Allocates the workspace for a run that has been accepted so far, waiting for it when the provider has none free yet.
 	 *
-	 * A failure comes back as the refusal to send; nothing stays allocated then.
+	 * A failure comes back as the refusal to send, carrying the message of the provider; nothing stays allocated then.
+	 *
+	 * @param projectDir Folder of the project the run belongs to, handed to the provider.
 	 */
-	async allocate(cwd: string, flow: FlowDefinition, executionId: string): Promise<AllocatedWorkspace> {
-		// Resolve per-flow workspace provider override if the flow declares one
-		let effectiveWorkspaceProvider: WorkspaceProvider | undefined = this.workspaceProvider;
-		if (flow.plugins?.workspace && this.resolvePerFlowWorkspaceProvider) {
-			try {
-				effectiveWorkspaceProvider = await this.resolvePerFlowWorkspaceProvider(flow.plugins.workspace);
-			} catch (err) {
-				this.logWriter.writeExecution('__workspace', `PER_FLOW_WORKSPACE_ERROR: ${String(err)}`, 'error');
-				return {
+	async allocate(flow: FlowDefinition, executionId: string, projectDir: string): Promise<AllocatedWorkspace> {
+		const begun = await this.begin(flow, executionId, projectDir);
+		return begun.state === 'ready' ? begun.allocated : begun.waiting.settled;
+	}
+
+	/**
+	 * Starts the allocation. Resolves as soon as it is known whether the run can start now (`ready`, or refused) or must wait for a
+	 * free workspace (`waiting`): in that case the allocation goes on in the background and `waiting.settled` tells how it ends.
+	 */
+	async begin(flow: FlowDefinition, executionId: string, projectDir: string): Promise<BegunAllocation> {
+		let provider: WorkspaceProvider;
+		let warnings: string[];
+		try {
+			({ provider, warnings } = await this.providers.providerFor(flow));
+		} catch (err) {
+			this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR: ${String(err)}`, 'error');
+			return {
+				state: 'ready',
+				allocated: {
 					ok: false,
 					response: {
 						type: 'error',
 						code: 'WORKSPACE_ERROR',
-						message: `Failed to resolve per-flow workspace provider: ${String(err)}`,
+						message: redactGitText(normalizeError(err).message),
 					},
-				};
-			}
+				},
+			};
 		}
-
-		if (effectiveWorkspaceProvider) {
-			return this.allocateWithProvider(effectiveWorkspaceProvider, executionId);
+		for (const warning of warnings) {
+			this.logWriter.writeExecution(executionId, warning, 'warning');
 		}
-		return this.allocateNative(cwd, flow, executionId);
+		return this.allocateWithProvider(provider, flow, executionId, projectDir);
 	}
 
-	private async allocateWithProvider(provider: WorkspaceProvider, executionId: string): Promise<AllocatedWorkspace> {
-		let handle: WorkspaceHandle;
-		try {
-			handle = await provider.allocate({ taskId: executionId });
-		} catch (err) {
-			this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
+	private async allocateWithProvider(
+		provider: WorkspaceProvider,
+		flow: FlowDefinition,
+		executionId: string,
+		projectDir: string
+	): Promise<BegunAllocation> {
+		const cancellation = new AbortController();
+		let firstReason: ((message: string) => void) | undefined;
+		const reasons = new Promise<string>(resolve => {
+			firstReason = resolve;
+		});
+		let reasonSeen = false;
+		const updateListeners: ((message: string) => void)[] = [];
+		const allocation = provider
+			.allocate({
+				taskId: executionId,
+				executionId,
+				projectDir,
+				flow: { id: flow.id, version: flow.version },
+				signal: cancellation.signal,
+				onWaiting: info => {
+					if (!reasonSeen) {
+						reasonSeen = true;
+						firstReason?.(info.message);
+						return;
+					}
+					for (const listener of updateListeners) {
+						listener(info.message);
+					}
+				},
+			})
+			.then(
+				handle => this.finishAllocation(provider, executionId, handle),
+				(err: unknown): AllocatedWorkspace => this.refuseAllocation(err, cancellation.signal.aborted)
+			);
+		const first = await Promise.race([
+			allocation.then(allocated => ({ allocated })),
+			reasons.then(message => ({ message })),
+		]);
+		if ('allocated' in first) {
+			return { state: 'ready', allocated: first.allocated };
+		}
+		return {
+			state: 'waiting',
+			waiting: {
+				message: first.message,
+				settled: allocation,
+				cancel: () => cancellation.abort(),
+				onUpdate: listener => {
+					updateListeners.push(listener);
+				},
+			},
+		};
+	}
+
+	private refuseAllocation(err: unknown, cancelled: boolean): AllocatedWorkspace {
+		if (cancelled) {
 			return {
 				ok: false,
 				response: {
 					type: 'error',
-					code: 'WORKSPACE_ERROR',
-					message: `Failed to allocate workspace via plugin provider: ${redactGitText(getErrorMessage(err))}`,
+					code: 'WORKSPACE_WAIT_CANCELLED',
+					message: 'The wait for a workspace was cancelled; no workspace was claimed.',
 				},
 			};
 		}
-		const workspaceMetaDir = handle.path + '.meta';
+		// A provider whose git setup failed says so with this code and a message that is complete already.
+		if ((err as { code?: unknown } | null)?.code === 'WORKSPACE_GIT_FAILED') {
+			const message = redactSecrets(normalizeError(err).message);
+			this.logWriter.writeExecution('__workspace', `WORKSPACE_GIT_FAILED: ${message}`, 'error');
+			return { ok: false, response: { type: 'error', code: 'WORKSPACE_GIT_FAILED', message } };
+		}
+		this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
+		return {
+			ok: false,
+			response: {
+				type: 'error',
+				code: 'WORKSPACE_ERROR',
+				message: `Failed to allocate the workspace: ${redactGitText(normalizeError(err).message)}`,
+			},
+		};
+	}
+
+	/** The handle is in hand: prepares the `.meta` of the execution and registers the handle for the release. */
+	private finishAllocation(
+		provider: WorkspaceProvider,
+		executionId: string,
+		handle: WorkspaceHandle
+	): AllocatedWorkspace {
+		// Only a path that belongs to this execution alone can use the sibling `.meta`; a shared path brings its own metaDir.
+		const workspaceMetaDir = handle.metaDir ?? handle.path + '.meta';
 		let owned: boolean;
 		try {
 			owned = this.metaOwnership.create(workspaceMetaDir, executionId);
 			this.pluginHandles.set(executionId, { handle, provider, metaDir: workspaceMetaDir });
 		} catch (setupErr) {
-			// Meta dir creation failed - release the handle before propagating
+			// Meta dir creation failed - release the handle before refusing the run
 			void provider.release(handle).catch((releaseErr: unknown) => {
 				process.stderr.write(
 					`[CommandHandler] Failed to release plugin workspace "${handle.path}" after setup error for ${executionId}: ${String(releaseErr)}. Remove it by hand if nothing uses it.\n`
 				);
 			});
-			throw setupErr;
+			this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(setupErr)}`, 'error');
+			return {
+				ok: false,
+				response: {
+					type: 'error',
+					code: 'WORKSPACE_ERROR',
+					message: `The workspace "${handle.path}" was allocated but its metadata folder "${workspaceMetaDir}" cannot be prepared: ${normalizeError(setupErr).message}. Check that the folder is writable.`,
+				},
+			};
+		}
+		for (const note of handle.notes ?? []) {
+			this.logWriter.writeExecution(executionId, note, 'warning');
 		}
 		return {
 			ok: true,
 			workspaceDir: handle.path,
 			workspaceMetaDir,
+			readOnly: handle.readOnly === true,
 			...(owned ? { pluginMetaDir: workspaceMetaDir } : {}),
 		};
 	}
@@ -111,39 +222,6 @@ export class ExecutionWorkspaces {
 	/** `.meta` directories of the plugin workspaces in use now (owned or not): the record pruner must not delete them. */
 	activeMetaDirs(): string[] {
 		return [...this.pluginHandles.values()].map(entry => entry.metaDir);
-	}
-
-	private async allocateNative(cwd: string, flow: FlowDefinition, executionId: string): Promise<AllocatedWorkspace> {
-		// Warnings of the manager (manual directory without git, with uncommitted changes) go to the log of this execution.
-		const manager = new WorkspaceManager(cwd, {
-			onWarning: message => this.logWriter.writeExecution(executionId, message, 'warning'),
-		});
-		let workspace: Awaited<ReturnType<typeof manager.allocate>>;
-		try {
-			workspace = await manager.allocate({
-				taskId: executionId,
-				config: flow.workspace,
-				existingPath: cwd,
-			});
-		} catch (err) {
-			if (err instanceof WorkspaceGitSetupError) {
-				// The message already carries what was attempted, git's (redacted) words and the fix: the run is not started.
-				this.logWriter.writeExecution('__workspace', `${err.code}: ${err.message}`, 'error');
-				return { ok: false, response: { type: 'error', code: err.code, message: err.message } };
-			}
-			this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
-			const detail = err instanceof WorkspaceAllocationError ? ` ${redactGitText(err.message)}` : '';
-			return {
-				ok: false,
-				response: {
-					type: 'error',
-					code: 'WORKSPACE_ERROR',
-					message: `Failed to allocate workspace. Ensure the flow workspace directory is writable.${detail}`,
-				},
-			};
-		}
-		this.nativeManagers.set(executionId, { manager, workspaceId: workspace.id });
-		return { ok: true, workspaceDir: workspace.path, workspaceMetaDir: workspace.metaDir };
 	}
 
 	/** Releases a plugin workspace when the execution could not be recorded after it was allocated. */
@@ -171,16 +249,6 @@ export class ExecutionWorkspaces {
 				);
 			});
 		}
-
-		const nativeWs = this.nativeManagers.get(executionId);
-		if (nativeWs) {
-			this.nativeManagers.delete(executionId);
-			void nativeWs.manager.release(nativeWs.workspaceId, executionId).catch((err: unknown) => {
-				process.stderr.write(
-					`[CommandHandler] Failed to release workspace ${nativeWs.workspaceId} (under .flow/workspaces) for ${executionId}: ${String(err)}. Remove its directory by hand if nothing uses it.\n`
-				);
-			});
-		}
 	}
 
 	/**
@@ -197,22 +265,12 @@ export class ExecutionWorkspaces {
 	 */
 	async releaseWithRetry(executionId: string, retryDelayMs: number = RELEASE_RETRY_DELAY_MS): Promise<void> {
 		const pluginWs = this.pluginHandles.get(executionId);
-		const nativeWs = this.nativeManagers.get(executionId);
 		this.pluginHandles.delete(executionId);
-		this.nativeManagers.delete(executionId);
 		if (pluginWs) {
 			await this.releaseTwice(
 				executionId,
 				pluginWs.handle.path,
 				() => pluginWs.provider.release(pluginWs.handle),
-				retryDelayMs
-			);
-		}
-		if (nativeWs) {
-			await this.releaseTwice(
-				executionId,
-				nativeWs.workspaceId,
-				() => nativeWs.manager.release(nativeWs.workspaceId, executionId),
 				retryDelayMs
 			);
 		}

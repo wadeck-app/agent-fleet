@@ -90,7 +90,7 @@ describe('validateFlowFile versions', () => {
 		...(version === undefined ? {} : { version }),
 		name: 'Versioned',
 		description: 'd',
-		workspace: { mode: 'manual', gitStrategy: 'any', reusePolicy: 'if-available' },
+		workspace: 'in-place',
 		steps: [{ id: 's', name: 'S', type: 'script', script }],
 	});
 	const write = (flow: object): string => {
@@ -184,7 +184,7 @@ describe('validateFlowFile sub-step dependency warning', () => {
 			version: '1.0.0',
 			name: 'sub dep',
 			description: 'd',
-			workspace: { mode: 'shared', gitStrategy: 'none', reusePolicy: 'if-available' },
+			workspace: 'in-place',
 			steps: [
 				{
 					id: 'impl',
@@ -225,7 +225,7 @@ describe('validateFlowFile subStepStrategy and waves', () => {
 			version: '1.0.0',
 			name: 'waves flow',
 			description: 'd',
-			workspace: { mode: 'shared', gitStrategy: 'none', reusePolicy: 'if-available' },
+			workspace: 'in-place',
 			steps,
 		});
 	const impl = (strategy: string): Record<string, unknown> => ({
@@ -280,5 +280,57 @@ describe('validateFlowFile subStepStrategy and waves', () => {
 		const result = validate(flowYaml([impl('waves'), sub('a', { wave: 1 }), sub('b', { wave: 1 })]));
 		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
 		expect(result.warnings.join('\n')).toContain('wait-all');
+	});
+});
+
+describe('validateFlowFile workspace', () => {
+	const flowWith = (workspace: unknown): string => {
+		const file = path.join(tmpDir, 'ws.yml');
+		fs.writeFileSync(
+			file,
+			yaml.dump({
+				id: 'ws-flow',
+				version: '1.0.0',
+				name: 'Ws',
+				description: 'd',
+				workspace,
+				steps: [{ id: 's', name: 'S', type: 'script', script: 'echo hi' }],
+			})
+		);
+		return file;
+	};
+
+	it('surfaces the deprecation of "mode: manual" as a warning that says what to write', () => {
+		const result = validateFlowFile(flowWith({ mode: 'manual', gitStrategy: 'any', reusePolicy: 'never' }), store);
+
+		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
+		expect(result.warnings.some(w => w.includes('workspace: in-place'))).toBe(true);
+	});
+
+	it('surfaces the deprecation of the "none" alias', () => {
+		const result = validateFlowFile(flowWith('none'), store);
+
+		if (result.exit !== 0) throw new Error('Expected exit 0');
+		expect(result.warnings.some(w => w.includes('"none"'))).toBe(true);
+	});
+
+	it('does not warn about a current provider', () => {
+		expect(validateFlowFile(flowWith('in-place'), store)).toMatchObject({ exit: 0, warnings: [] });
+	});
+
+	it('assesses the version on the file as written: the validator annotates the flow it checks', () => {
+		const file = flowWith('in-place');
+		const result = validateFlowFile(file, store);
+		if (result.exit !== 0) throw new Error('Expected exit 0');
+		const asWritten = yaml.load(fs.readFileSync(file, 'utf8'), { schema: yaml.JSON_SCHEMA });
+		// What a run would store for this file: the same hash, so the validation can tell a changed content from the same one.
+		store.save({
+			flowId: 'ws-flow',
+			version: '1.0.0',
+			hash: hashDefinition(asWritten),
+			text: fs.readFileSync(file, 'utf8'),
+		});
+
+		expect(validateFlowFile(file, store)).toMatchObject({ exit: 0 });
 	});
 });

@@ -6,10 +6,7 @@ export const WAVES_EXAMPLE_FLOW_YAML = `version: '1.0.0'
 id: implement-with-waves
 name: Implement, then check in waves
 description: A model implements; cheap script checks run first, then model reviewers (each with a validator), then e2e
-workspace:
-  mode: isolated
-  gitStrategy: main-only
-  reusePolicy: never
+workspace: in-place
 inputs: {}
 steps:
   - id: implement

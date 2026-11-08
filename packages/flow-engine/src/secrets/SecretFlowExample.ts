@@ -6,10 +6,7 @@ export const SECRET_EXAMPLE_FLOW_YAML = `version: '1.0.0'
 id: call-protected-api
 name: Call a protected API
 description: Calls an HTTP API with a bearer token that is never written in the flow
-workspace:
-  mode: isolated
-  gitStrategy: main-only
-  reusePolicy: never
+workspace: in-place
 inputs:
   API_TOKEN:
     type: password

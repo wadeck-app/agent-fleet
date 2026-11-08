@@ -1,3 +1,4 @@
+import { ReadOnlyWorkspaceRules } from 'flow-engine';
 import type { SchedulerStep } from 'flow-engine';
 import type { FlowStep } from 'flow-engine';
 
@@ -35,6 +36,8 @@ export class StepInjection {
 
 		const allKnownIds = new Set([...this.executions.knownStepIds(executionId), ...injectedSteps.map(s => s.id)]);
 
+		const readOnly = this.executions.context(executionId)?.workspaceReadOnly === true;
+
 		// Separate steps into those to skip (existing non-in-flight) and those to inject.
 		// Idempotent: a step that already exists and is not in-flight is a no-op (loop re-run scenario).
 		const stepsToInject: InjectedStep[] = [];
@@ -51,6 +54,14 @@ export class StepInjection {
 			// A step added while the flow runs was not scanned for secrets at start: refuse it
 			// rather than run it with an empty value.
 			this.daemonSecrets.assertInjectable(executionId, injected as unknown as FlowStep);
+			// The workspace is read-only (advisory): a step added later is held to the same rule as the steps of the flow.
+			if (readOnly) {
+				const writing = ReadOnlyWorkspaceRules.findWritingSteps([injected as unknown as FlowStep]);
+				if (writing.length > 0) {
+					const conflict = ReadOnlyWorkspaceRules.describeConflict(writing);
+					throw new Error(`provideSteps: ${conflict.message} ${conflict.suggestion}`);
+				}
+			}
 			if (injected.parent !== undefined && !allKnownIds.has(injected.parent)) {
 				throw new Error(`Parent step '${injected.parent}' does not exist in execution ${executionId}`);
 			}
@@ -82,7 +93,10 @@ export class StepInjection {
 
 		const context = this.executions.context(executionId)!;
 		// Pass `parent` through -- FlowScheduler.inject() registers parent-child relationships natively
-		const newReady = scheduler.inject(stepsToInject as SchedulerStep[]);
+		const narrowed = readOnly
+			? ReadOnlyWorkspaceRules.apply(stepsToInject as unknown as FlowStep[])
+			: stepsToInject;
+		const newReady = scheduler.inject(narrowed as SchedulerStep[]);
 		this.queue.enqueueItems(newReady, context);
 	}
 }

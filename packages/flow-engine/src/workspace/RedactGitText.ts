@@ -55,3 +55,11 @@ export function redactGitText(text: string): string {
 	}
 	return kept.join('\n');
 }
+
+/**
+ * Masks secrets and nothing else: lines are kept whole. For a message flow wrote itself (its advice follows a long
+ * path), where {@link redactGitText} would cut the line and lose the fix.
+ */
+export function redactSecrets(text: string): string {
+	return text.split(/\r?\n/).map(maskSecrets).join('\n');
+}

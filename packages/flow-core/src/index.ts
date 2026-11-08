@@ -70,6 +70,7 @@ export type {
 	StepIoRecord,
 	StepState,
 	StepStatus,
+	WorkspaceWait,
 } from './execution/ExecutionState.js';
 export {
 	type AttemptCost,
@@ -217,6 +218,13 @@ export {
 	stepStatusHint,
 } from './view/OutcomeHints.js';
 export type { RecoverableRun, RecoverableStep } from './view/OutcomeHints.js';
+export {
+	WAITING_FOR_WORKSPACE_LABEL,
+	WAITING_FOR_WORKSPACE_TAG,
+	isWaitingForWorkspace,
+	statusLabelOf,
+	workspaceWaitLines,
+} from './view/WorkspaceWaitText.js';
 export {
 	MAX_COUNTED_RETRIES,
 	NO_RETRY_LEFT,

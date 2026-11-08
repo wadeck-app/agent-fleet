@@ -18,9 +18,11 @@ export { FlowGenerator } from './generation/FlowGenerator';
 export type { FlowGenerationResult, FlowConstraints } from './generation/FlowGenerator';
 export { FlowRecommendationEngine } from './analysis/FlowRecommendationEngine';
 export type { IdeaRequirements } from './analysis/FlowRecommendationEngine';
-export { redactGitText } from './workspace/RedactGitText';
-export type { WorkspaceManagerOptions } from './workspace/WorkspaceManager';
-export { WorkspaceAllocationError, WorkspaceGitSetupError, WorkspaceManager } from './workspace/WorkspaceManager';
+export { redactGitText, redactSecrets } from './workspace/RedactGitText';
+export { BUILTIN_WORKSPACE_PROVIDERS, WorkspaceDeclarationParser } from './workspace/WorkspaceDeclarationParser';
+export type { WorkspaceParseResult, WorkspaceSpec } from './workspace/WorkspaceDeclarationParser';
+export { ReadOnlyWorkspaceRules } from './workspace/ReadOnlyWorkspaceRules';
+export { pruneWorkspaceDirAtStartup } from './workspace/WorkspacePruner';
 export { buildSubStepFeedback, FlowScheduler } from './orchestration/FlowScheduler';
 export type {
 	FailureOrigin,
@@ -39,7 +41,7 @@ export { DEFAULT_STEP_RECORD_LIMITS } from './record/StepRecordLimits';
 export type { StepRecordLimits } from './record/StepRecordLimits';
 export { SecretUsageAnalyzer } from './secrets/SecretUsageAnalyzer';
 export type { SecretDeclaration, SecretSourceKind } from './secrets/SecretUsageAnalyzer';
-export type { FlowDefinition, FlowPluginOverrides, FlowStep } from './types';
+export type { FlowDefinition, FlowPluginOverrides, FlowStep, WorkspaceDeclaration } from './types';
 export type { McpServer } from './processing/ModelProvider';
 export type { ModelProviderName } from './types';
 export { BashShellStrategy } from './executor/shell/BashShellStrategy';

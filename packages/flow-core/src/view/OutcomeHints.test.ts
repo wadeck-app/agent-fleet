@@ -35,6 +35,13 @@ describe('runStatusHint', () => {
 		expect(runStatusHint({ status: 'completed', lastErrorRecovered: true })).toBe(RECOVERED_RUN_HINT);
 		expect(runStatusHint({ status: 'completed', lastErrorRecovered: false })).toBeUndefined();
 		expect(runStatusHint({ status: 'failed', lastErrorRecovered: false })).toBeUndefined();
+		expect(
+			runStatusHint({
+				status: 'queued',
+				lastErrorRecovered: false,
+				workspaceWait: { message: 'all 2 slots claimed' },
+			})
+		).toBe('all 2 slots claimed');
 	});
 });
 

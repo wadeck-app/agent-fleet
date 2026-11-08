@@ -65,19 +65,19 @@ describe('flow plugins list', () => {
 });
 
 describe('flow plugins config', () => {
-	it('prints snippet for none containing the type string', async () => {
+	it('prints snippet for none as the deprecated alias of in-place', async () => {
 		const output = await captureStdout(() => {
 			makeProgram().parse(['plugins', 'config', 'none'], { from: 'user' });
 		});
-		expect(output).toContain('plugins.none.default');
-		expect(output).toContain('workspace');
+		expect(output).toContain('Deprecated alias of in-place');
+		expect(output).toContain('workspace: in-place');
 	});
 
 	it('prints snippet for worktree with baseDir option', async () => {
 		const output = await captureStdout(() => {
 			makeProgram().parse(['plugins', 'config', 'worktree'], { from: 'user' });
 		});
-		expect(output).toContain('plugins.worktree.default');
+		expect(output).toContain('workspace: { provider: worktree');
 		expect(output).toContain('baseDir');
 	});
 

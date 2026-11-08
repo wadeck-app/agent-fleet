@@ -204,3 +204,43 @@ describe('status and retry hints (tooltips)', () => {
 		});
 	});
 });
+
+describe('a run that waits for a workspace', () => {
+	const message =
+		'Waiting for a free workspace: 2/2 slots are claimed by: abcd1234. Cancel it with: flow cancel wait0000';
+	const WAITING = {
+		executionId: 'wait0000',
+		flowId: 'f',
+		status: 'queued',
+		startedAt: '2026-01-01T00:00:00.000Z',
+		completedAt: null,
+		lastErrorRecovered: false,
+		waitingForWorkspace: true,
+		workspaceWait: { since: '2026-01-01T00:00:00.000Z', message },
+		steps: [],
+	} as unknown as ExecutionDetailView;
+	const QUEUED = { ...WAITING, waitingForWorkspace: undefined, workspaceWait: undefined } as ExecutionDetailView;
+
+	it('shows the short waiting ws word with the reason as the tooltip, apart from an ordinary queued run', () => {
+		const row = toExecutionRow(WAITING as unknown as ExecutionSummary);
+		expect(row.statusLabel).toBe('waiting ws');
+		expect(row.statusHint).toBe(message);
+		const queued = toExecutionRow(QUEUED as unknown as ExecutionSummary);
+		expect(queued.statusLabel).toBe('waiting');
+		expect(queued.statusHint).toBe('');
+	});
+
+	it('words the detail badge in full, in warning, and sends the reason as text for the page', () => {
+		const row = toExecutionDetailRow(WAITING, undefined);
+		expect(row.statusText).toBe('waiting for workspace');
+		expect(row.statusVariant).toBe('warning');
+		expect(row.workspaceWaitText).toBe(message);
+		expect(row.hasStatusHint).toBe(true);
+	});
+
+	it('keeps the queued wording and sends no reason for a queued run that does not wait', () => {
+		const row = toExecutionDetailRow(QUEUED, undefined);
+		expect(row.statusText).toBe('queued');
+		expect(row.workspaceWaitText).toBe('');
+	});
+});

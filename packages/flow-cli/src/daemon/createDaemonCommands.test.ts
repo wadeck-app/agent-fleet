@@ -1,5 +1,5 @@
 import { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
-import { WorkspaceManager } from 'flow-engine';
+import { pruneWorkspaceDirAtStartup } from 'flow-engine';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -8,16 +8,21 @@ import { projectConfigFile } from '../config/ProjectFlowConfig';
 import { RegisteredProjectFixture } from '../test-utils/RegisteredProjectFixture';
 import { createDaemonCommands } from './createDaemonCommands';
 
+vi.mock('flow-engine', async importOriginal => ({
+	...((await importOriginal()) as Record<string, unknown>),
+	pruneWorkspaceDirAtStartup: vi.fn(),
+}));
+
 describe('createDaemonCommands run', () => {
 	let fixture: RegisteredProjectFixture;
 	let handleRun: ReturnType<typeof vi.fn>;
-	let prune: ReturnType<typeof vi.spyOn>;
+	const prune = vi.mocked(pruneWorkspaceDirAtStartup);
 	let run: (payload: unknown) => Promise<unknown>;
 
 	beforeEach(() => {
 		fixture = new RegisteredProjectFixture().useAsProcessEnv();
 		handleRun = vi.fn().mockResolvedValue({ type: 'execution_started', executionId: 'x' });
-		prune = vi.spyOn(WorkspaceManager, 'pruneOldWorkspaceDir').mockImplementation(() => undefined);
+		prune.mockClear();
 		const config = { workspace: { retainDays: 7, maxWorkspaces: 3 } } as FlowConfig;
 		const commands = createDaemonCommands(config, () => ({ commandHandler: { handleRun } }) as never);
 		run = commands['run'] as (payload: unknown) => Promise<unknown>;

@@ -42,7 +42,9 @@ function showFlowFile(file: string, opts: { json?: boolean }, versions: Definiti
 
 	const flow = raw as FlowDefinition;
 	if (!Array.isArray(flow.steps) || !flow.workspace) {
-		console.error(`Invalid flow: missing required fields 'steps' or 'workspace' in ${file}`);
+		console.error(
+			`Invalid flow: missing required fields 'steps' or 'workspace' in ${file}. Add for instance "workspace: in-place" (providers: in-place, pool, readonly, worktree).`
+		);
 		process.exit(1);
 	}
 

@@ -63,6 +63,9 @@ export function versionConflictMessage(version: string, existing: KnownVersion, 
 	);
 }
 
+/** `<flowId>/<version>-<hash12>.yml`: no path traversal, one folder level. */
+const SNAPSHOT_REF = /^([A-Za-z0-9._-]+)\/(.+)-([0-9a-f]{12})\.yml$/;
+
 function listVersions(known: readonly KnownVersion[]): string {
 	return known.length === 0 ? '(none)' : known.map(entry => `${entry.version} (${entry.hash})`).join(', ');
 }
@@ -132,6 +135,22 @@ export class FlowDefinitionResolver {
 			);
 		}
 		return resolved;
+	}
+
+	/**
+	 * The definition a stored snapshot holds, for a run that starts again (after a daemon restart) with exactly the
+	 * definition it was accepted with, whatever happened to the file or registry since.
+	 */
+	forSnapshotRef(ref: string, choice: VersionChoice): ResolvedDefinition {
+		const match = SNAPSHOT_REF.exec(ref);
+		if (match === null) {
+			throw new FlowVersionError(
+				`'${ref}' is not the reference of a definition snapshot (expected <flowId>/<version>-<hash12>.yml).`,
+				'snapshot-corrupt'
+			);
+		}
+		const [, flowId, version, hash12] = match as unknown as [string, string, string, string];
+		return this.fromSnapshot(flowId, [{ version, hash: hash12, ref, firstSeen: '' }], version, choice);
 	}
 
 	private adopt(request: FileRequest, choice: VersionChoice): ResolvedDefinition {

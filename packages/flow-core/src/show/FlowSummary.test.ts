@@ -1,14 +1,22 @@
 import type { FlowDefinition } from 'flow-engine/types';
 import { describe, expect, it } from 'vitest';
 
-import { formatInputs, formatStatus, formatTrigger, renderFlowSummary, stepDepends, stepType } from './FlowSummary.js';
+import {
+	formatInputs,
+	formatStatus,
+	formatTrigger,
+	formatWorkspace,
+	renderFlowSummary,
+	stepDepends,
+	stepType,
+} from './FlowSummary.js';
 
 const flow = {
 	id: 'simple-flow',
 	version: '1.0.0',
 	name: 'Simple Test Flow',
 	description: 'A simple flow for unit testing',
-	workspace: { mode: 'manual', gitStrategy: 'any', reusePolicy: 'if-available' },
+	workspace: 'in-place',
 	inputs: { message: { type: 'string', required: true } },
 	steps: [
 		{
@@ -35,7 +43,7 @@ describe('renderFlowSummary', () => {
 		expect(out).toContain('simple-flow  v1.0.0');
 		expect(out).toContain('Simple Test Flow');
 		expect(out).toContain('A simple flow for unit testing');
-		expect(out).toContain('workspace: manual  git:any  reuse:if-available');
+		expect(out).toContain('workspace: in-place');
 		expect(out).toContain('inputs:    message (string, required)');
 	});
 
@@ -171,5 +179,19 @@ describe('renderFlowSummary waves', () => {
 			steps: [{ id: 'z', type: 'script', script: 'x', parent: 'p', wave: 0 }],
 		} as unknown as FlowDefinition;
 		expect(renderFlowSummary(zero)).toContain('wave:0');
+	});
+});
+
+describe('formatWorkspace', () => {
+	it('shows a provider name as is', () => {
+		expect(formatWorkspace('readonly')).toBe('readonly');
+	});
+
+	it('shows the provider then its options', () => {
+		expect(formatWorkspace({ provider: 'pool', dir: 'D:/pool', count: 4 })).toBe('pool  dir:"D:/pool"  count:4');
+	});
+
+	it.each([undefined, null, 3, ['x'], { dir: 'x' }])('points to flow validate for %j', value => {
+		expect(formatWorkspace(value)).toContain('flow validate');
 	});
 });

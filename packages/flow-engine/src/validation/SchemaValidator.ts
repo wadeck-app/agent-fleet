@@ -15,21 +15,20 @@
 import type {
 	FlowDefinition,
 	FlowStep,
-	GitStrategy,
 	InputDefinition,
 	InputSpec,
 	ModelFlowStep,
 	NormalizedInputDefinition,
-	ReusePolicy,
 	ScriptFlowStep,
 	StatusTransitions,
 	SubFlowStep,
 	UserInterventionStep,
 	VariableType,
-	WorkspaceConfig,
-	WorkspaceMode,
 	WorkspaceStrategy,
 } from '../types';
+import { ReadOnlyWorkspaceRules } from '../workspace/ReadOnlyWorkspaceRules';
+import { WorkspaceDeclarationParser } from '../workspace/WorkspaceDeclarationParser';
+import { WorktreeOptionRules } from '../workspace/WorktreeOptionRules';
 import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
 
@@ -104,7 +103,7 @@ export class SchemaValidator {
 		}
 
 		// Validate workspace config
-		this.validateWorkspaceConfig(flow.workspace);
+		this.validateWorkspaceDeclaration(flow);
 
 		// Validate execution config (optional)
 		this.validateExecutionConfig(flow);
@@ -130,110 +129,74 @@ export class SchemaValidator {
 	}
 
 	/**
-	 * Validate workspace configuration
+	 * Validate the workspace declaration (a provider name or `{ provider, ...options }`).
+	 *
+	 * Only the shape is checked here: whether the provider exists depends on the user's configuration (named instances)
+	 * and is checked when the run starts. A `readonly` workspace is refused for a flow whose model steps ask for tools
+	 * that can modify it.
 	 */
-	private validateWorkspaceConfig(config: Partial<WorkspaceConfig> | undefined): void {
-		if (!config) {
+	private validateWorkspaceDeclaration(flow: FlowDefinition): void {
+		if ((flow.workspace === undefined || flow.workspace === null) && flow.plugins?.workspace !== undefined) {
+			// Deprecated spelling: the provider comes from plugins.workspace. Still run, but say what to write instead.
 			this.issueCollector.addIssue({
-				severity: 'error',
-				code: ValidationCode.MISSING_FIELD,
-				message: 'Flow must have workspace configuration',
-				location: { field: 'workspace' },
-				suggestion: 'Add workspace configuration with mode, gitStrategy, and reusePolicy',
+				severity: 'warning',
+				code: ValidationCode.WORKSPACE_DEPRECATED,
+				message:
+					'"plugins.workspace" is deprecated and will be removed: declare the workspace with "workspace:" instead.',
+				location: { field: 'plugins.workspace' },
+				suggestion:
+					'Write "workspace: <instance name>" for an instance of the config, or "workspace: { provider: <name>, ...options }".',
 			});
 			return;
 		}
-
-		// Validate mode
-		const validModes: WorkspaceMode[] = ['isolated', 'shared', 'manual'];
-		if (!config.mode) {
+		const parsed = WorkspaceDeclarationParser.parse(flow.workspace);
+		if (!parsed.ok) {
+			for (const issue of parsed.issues) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code:
+						flow.workspace === undefined || flow.workspace === null
+							? ValidationCode.MISSING_FIELD
+							: ValidationCode.INVALID_VALUE,
+					message: issue.message,
+					location: { field: issue.field },
+					suggestion: issue.suggestion,
+				});
+			}
+			return;
+		}
+		for (const warning of parsed.warnings) {
 			this.issueCollector.addIssue({
-				severity: 'error',
-				code: ValidationCode.MISSING_FIELD,
-				message: 'Workspace must have a mode',
-				location: { field: 'workspace.mode' },
-				suggestion: `Choose one of: ${validModes.join(', ')}`,
-				context: { related: validModes },
-			});
-		} else if (!validModes.includes(config.mode)) {
-			this.issueCollector.addIssue({
-				severity: 'error',
-				code: ValidationCode.INVALID_VALUE,
-				message: `Invalid workspace mode: ${config.mode}`,
-				location: { field: 'workspace.mode' },
-				suggestion: `Must be one of: ${validModes.join(', ')}`,
-				context: {
-					actual: config.mode,
-					expected: validModes,
-					related: validModes,
-				},
+				severity: 'warning',
+				code: ValidationCode.WORKSPACE_DEPRECATED,
+				message: warning,
+				location: { field: 'workspace' },
 			});
 		}
-
-		// Validate git strategy
-		const validStrategies: GitStrategy[] = ['main-only', 'feature-branch', 'any', 'worktree', 'none'];
-		if (!config.gitStrategy) {
-			this.issueCollector.addIssue({
-				severity: 'error',
-				code: ValidationCode.MISSING_FIELD,
-				message: 'Workspace must have a git strategy',
-				location: { field: 'workspace.gitStrategy' },
-				suggestion: `Choose one of: ${validStrategies.join(', ')}`,
-				context: { related: validStrategies },
-			});
-		} else if (!validStrategies.includes(config.gitStrategy)) {
-			this.issueCollector.addIssue({
-				severity: 'error',
-				code: ValidationCode.INVALID_VALUE,
-				message: `Invalid git strategy: ${config.gitStrategy}`,
-				location: { field: 'workspace.gitStrategy' },
-				suggestion: `Must be one of: ${validStrategies.join(', ')}`,
-				context: {
-					actual: config.gitStrategy,
-					expected: validStrategies,
-					related: validStrategies,
-				},
-			});
+		if (parsed.spec.provider === 'worktree') {
+			for (const issue of WorktreeOptionRules.check(parsed.spec.options)) {
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: issue.missing ? ValidationCode.MISSING_FIELD : ValidationCode.INVALID_VALUE,
+					message: issue.message,
+					location: { field: issue.field },
+					suggestion: issue.suggestion,
+				});
+			}
 		}
-
-		// Validate reuse policy
-		const validPolicies: ReusePolicy[] = ['never', 'if-available', 'always'];
-		if (!config.reusePolicy) {
-			this.issueCollector.addIssue({
-				severity: 'error',
-				code: ValidationCode.MISSING_FIELD,
-				message: 'Workspace must have a reuse policy',
-				location: { field: 'workspace.reusePolicy' },
-				suggestion: `Choose one of: ${validPolicies.join(', ')}`,
-				context: { related: validPolicies },
-			});
-		} else if (!validPolicies.includes(config.reusePolicy)) {
-			this.issueCollector.addIssue({
-				severity: 'error',
-				code: ValidationCode.INVALID_VALUE,
-				message: `Invalid reuse policy: ${config.reusePolicy}`,
-				location: { field: 'workspace.reusePolicy' },
-				suggestion: `Must be one of: ${validPolicies.join(', ')}`,
-				context: {
-					actual: config.reusePolicy,
-					expected: validPolicies,
-					related: validPolicies,
-				},
-			});
-		}
-
-		// Validate concurrencyKey (optional, but should be string if present)
-		if (config.concurrencyKey !== undefined && typeof config.concurrencyKey !== 'string') {
-			this.issueCollector.addIssue({
-				severity: 'error',
-				code: ValidationCode.INVALID_TYPE,
-				message: 'Workspace concurrencyKey must be a string',
-				location: { field: 'workspace.concurrencyKey' },
-				context: {
-					expected: 'string',
-					actual: typeof config.concurrencyKey,
-				},
-			});
+		if (parsed.spec.provider === 'readonly' && Array.isArray(flow.steps)) {
+			const writing = ReadOnlyWorkspaceRules.findWritingSteps(flow.steps);
+			if (writing.length > 0) {
+				const conflict = ReadOnlyWorkspaceRules.describeConflict(writing);
+				this.issueCollector.addIssue({
+					severity: 'error',
+					code: ValidationCode.WORKSPACE_READONLY_CONFLICT,
+					message: conflict.message,
+					location: { field: 'workspace' },
+					suggestion: conflict.suggestion,
+					context: { related: writing.map(step => step.stepId) },
+				});
+			}
 		}
 	}
 

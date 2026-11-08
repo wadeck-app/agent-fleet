@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import type { LogWriter } from '../storage/LogWriter';
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import { ExecutionWorkspaces } from './ExecutionWorkspaces';
 
 describe('ExecutionWorkspaces.releaseWithRetry', () => {
@@ -23,8 +24,11 @@ describe('ExecutionWorkspaces.releaseWithRetry', () => {
 			allocate: vi.fn().mockResolvedValue({ path: path.join(root, 'task-1'), id: 'p:1' }),
 			release,
 		};
-		const workspaces = new ExecutionWorkspaces({ writeExecution } as unknown as LogWriter, provider);
-		await workspaces.allocate(root, { id: 'f', version: '1.0.0' } as never, 'abcd1234');
+		const workspaces = new ExecutionWorkspaces(
+			{ writeExecution } as unknown as LogWriter,
+			new FixedWorkspaceProviders(provider)
+		);
+		await workspaces.allocate({ id: 'f', version: '1.0.0' } as never, 'abcd1234', root);
 		return workspaces;
 	}
 
@@ -90,7 +94,10 @@ describe('ExecutionWorkspaces.releaseWithRetry', () => {
 	});
 
 	it('does nothing for an execution that holds no workspace', async () => {
-		const workspaces = new ExecutionWorkspaces({ writeExecution } as unknown as LogWriter);
+		const workspaces = new ExecutionWorkspaces(
+			{ writeExecution } as unknown as LogWriter,
+			new FixedWorkspaceProviders({ allocate: vi.fn(), release: vi.fn() })
+		);
 		await expect(workspaces.releaseWithRetry('nobody')).resolves.toBeUndefined();
 	});
 

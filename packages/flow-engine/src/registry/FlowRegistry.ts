@@ -20,10 +20,11 @@ import type {
 	SubFlowStep,
 	UserInterventionStep,
 	VariableType,
-	WorkspaceConfig,
+	WorkspaceDeclaration,
 } from '../types';
 import { FlowValidator } from '../validation/FlowValidator';
 import type { ValidationResult } from '../validation/FlowValidator';
+import { WorkspaceDeclarationParser } from '../workspace/WorkspaceDeclarationParser';
 import {
 	MODEL_STEP_FIELDS,
 	SCRIPT_STEP_FIELDS,
@@ -54,7 +55,7 @@ type RawFlowStep = Partial<
  */
 interface RawFlowData extends Partial<Omit<FlowDefinition, 'id' | 'workspace' | 'steps'>> {
 	source?: string;
-	workspace?: Partial<WorkspaceConfig>;
+	workspace?: WorkspaceDeclaration;
 	steps?: RawFlowStep[];
 }
 
@@ -85,12 +86,7 @@ const DEFAULT_FLOWS: Record<string, FlowDefinition> = {
 		version: '1.0.0',
 		name: 'Simple Question & Answer',
 		description: 'Answer questions using existing codebase knowledge',
-		workspace: {
-			mode: 'shared',
-			gitStrategy: 'main-only',
-			reusePolicy: 'always',
-			concurrencyKey: 'readonly',
-		},
+		workspace: 'readonly',
 		inputs: {
 			question: 'string',
 		},
@@ -113,11 +109,7 @@ const DEFAULT_FLOWS: Record<string, FlowDefinition> = {
 		version: '1.0.0',
 		name: 'Full Development Cycle',
 		description: 'Analysis -> Validation -> Implementation -> Quality -> Review',
-		workspace: {
-			mode: 'isolated',
-			gitStrategy: 'feature-branch',
-			reusePolicy: 'never',
-		},
+		workspace: { provider: 'worktree', baseDir: '../worktrees', prefix: 'flow-' },
 		inputs: {
 			taskDescription: 'string',
 		},
@@ -481,7 +473,8 @@ export class FlowRegistry {
 			version: mergedData.version,
 			name: mergedData.name || id,
 			description: mergedData.description || '',
-			workspace: this.parseWorkspaceConfig(mergedData.workspace),
+			// Kept as written. A missing or legacy declaration is reported by the validator (SchemaValidator); no default is applied.
+			workspace: mergedData.workspace as WorkspaceDeclaration,
 			inputs: mergedData.inputs || {},
 			steps: (mergedData.steps || []).map(step => this.parseFlowStep(step)),
 			hooks: mergedData.hooks,
@@ -663,18 +656,6 @@ export class FlowRegistry {
 	}
 
 	/**
-	 * Parse workspace configuration
-	 */
-	private parseWorkspaceConfig(data: Partial<WorkspaceConfig> | undefined): WorkspaceConfig {
-		return {
-			mode: data?.mode || 'isolated',
-			gitStrategy: data?.gitStrategy || 'main-only',
-			reusePolicy: data?.reusePolicy || 'never',
-			concurrencyKey: data?.concurrencyKey,
-		};
-	}
-
-	/**
 	 * Parse a single flow step
 	 * Supports 'model', 'script', 'subflow', and 'user_intervention' step types
 	 */
@@ -810,12 +791,14 @@ export class FlowRegistry {
 	}
 
 	/**
-	 * Get flows by workspace mode
-	 * @param mode - Workspace mode to filter by
+	 * Get flows by workspace provider
+	 * @param provider - Provider name (`in-place`, `pool`, `readonly`, `worktree`...)
 	 * @returns Array of matching flows
 	 */
-	public getFlowsByWorkspaceMode(mode: 'isolated' | 'shared'): FlowDefinition[] {
-		return this.getAllFlows().filter(flow => flow.workspace.mode === mode);
+	public getFlowsByWorkspaceProvider(provider: string): FlowDefinition[] {
+		return this.getAllFlows().filter(
+			flow => WorkspaceDeclarationParser.providerNameOf(flow.workspace) === provider
+		);
 	}
 
 	/**

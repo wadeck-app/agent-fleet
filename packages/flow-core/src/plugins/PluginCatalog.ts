@@ -40,28 +40,61 @@ export class UnknownPluginError extends FlowCoreError {
 export const PLUGIN_CONFIGS: Record<string, PluginConfig> = {
 	none: {
 		extensionPoint: 'workspace',
-		snippet: `# Add to the project flow config (see flow-cli PLUGINS.md):
+		snippet: `# Deprecated alias of in-place. In the flow, write:
 
-plugins:
-  workspace:
-    instance:
-      type: plugins.none.default`,
+workspace: in-place`,
 		options: {},
+	},
+	'in-place': {
+		extensionPoint: 'workspace',
+		snippet: `# In the flow (the project folder, shared with whoever else works there):
+
+workspace: in-place
+
+# or, for another folder:
+workspace: { provider: in-place, dir: ../other-folder }`,
+		options: {
+			dir: 'Folder to run in; relative to the project folder (default: the project folder). Must exist.',
+		},
+	},
+	readonly: {
+		extensionPoint: 'workspace',
+		snippet: `# In the flow (shared folder, meant to be read only; advisory, nothing is enforced):
+
+workspace: readonly`,
+		options: {
+			dir: 'Folder to run in; relative to the project folder (default: the project folder). Must exist.',
+		},
+	},
+	pool: {
+		extensionPoint: 'workspace',
+		snippet: `# In the flow (one free slot of a pool of prepared folders; the run WAITS, without timeout, when none is free):
+
+workspace: { provider: pool, dir: D:/pool, prefix: repo-ws-, count: 4 }
+
+# or list the folders:
+workspace: { provider: pool, slots: [D:/pool/a, D:/pool/b], requireClean: true }
+
+# You create the pool first: one checkout of the repository per slot (repo-ws-1 .. repo-ws-4). The provider never creates,
+# synchronizes or deletes a slot: make the first step of the flow bring the slot to a known state.`,
+		options: {
+			dir: 'Folder that holds the slots (with prefix and count); relative to the project folder',
+			prefix: 'Slot folders are <dir>/<prefix>1 .. <prefix>N',
+			count: 'Number of slots (1 to 1000)',
+			slots: 'Explicit list of slot folders, instead of dir + prefix + count',
+			requireClean:
+				'true: skip slots with uncommitted changes and fail when none is clean (default false: a dirty slot is used and reported)',
+		},
 	},
 	worktree: {
 		extensionPoint: 'workspace',
-		snippet: `# Add to the project flow config (see flow-cli PLUGINS.md):
+		snippet: `# In the flow (a new git worktree and branch per run, removed at the end):
 
-plugins:
-  workspace:
-    instance:
-      type: plugins.worktree.default
-      options:
-        baseDir: /absolute/path/to/worktrees   # required
-        prefix: task-                           # optional, branch name prefix`,
+workspace: { provider: worktree, baseDir: ../worktrees, prefix: flow- }`,
 		options: {
-			baseDir: 'Absolute path where git worktrees are created (required)',
-			prefix: 'Prefix prepended to branch names (optional)',
+			baseDir:
+				'Folder that receives the worktrees (required); relative to the project folder, must be outside the project',
+			prefix: 'Prefix prepended to the branch and folder names (optional)',
 		},
 	},
 	'cli-approval': {

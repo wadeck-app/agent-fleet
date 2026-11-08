@@ -17,8 +17,10 @@ import { loadMockConfig } from './MockConfigLoader';
 import { parseInputArgs, parseTimeout } from './RunArgumentParser';
 import { DaemonContactError, sendToDaemon } from './RunDaemonSender';
 import { resolveRunOrigin } from './RunOrigin';
+import { runWaitingNotice } from './RunWaitingNotice';
 import { checkSecretInputs } from './SecretInputCheck';
 import { singleProjectValue } from './SingleProjectOption';
+import { formatValidationRefusal } from './ValidationRefusalText';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -178,7 +180,11 @@ export function registerRunCommand(program: Command): void {
 					if (options.json && !options.human) {
 						process.stderr.write(JSON.stringify({ code: response.code, message: response.message }) + '\n');
 					} else {
-						console.error(formatCliError(response.message));
+						console.error(
+							response.code === 'VALIDATION_FAILED'
+								? formatValidationRefusal(response.message)
+								: formatCliError(response.message)
+						);
 					}
 					process.exit(
 						response.code === 'VALIDATION_FAILED' || response.code.startsWith('FLOW_VERSION_') ? 2 : 1
@@ -191,6 +197,22 @@ export function registerRunCommand(program: Command): void {
 						formatCliError('daemon returned a response without an executionId -- try restarting the daemon')
 					);
 					process.exit(1);
+				}
+
+				// stderr, so that stdout stays the bare execution id a script reads; machine output (--json) is left unchanged.
+				if (!options.quiet && !(options.json && !options.human)) {
+					try {
+						const waitingNotice = runWaitingNotice(executionId, daemonDir);
+						if (waitingNotice !== undefined) {
+							console.error(waitingNotice);
+						}
+					} catch (err) {
+						// The run was accepted: an unreadable record must not hide its id, but it is not silent either.
+						// violations-suppress: security/no-raw-err-in-cli normalized message of an unexpected read failure
+						console.error(
+							`Warning: cannot tell whether execution ${executionId} waits for a workspace: ${getErrorMessage(err)}`
+						);
+					}
 				}
 
 				if (!options.wait) {

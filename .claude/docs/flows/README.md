@@ -85,10 +85,7 @@ flow-id:
     version: '1.0.0'
     name: 'Flow Name'
     description: 'What this flow does'
-    workspace:
-        mode: isolated|shared|manual
-        gitStrategy: main-only|feature-branch|any|worktree
-        reusePolicy: never|if-available|always
+    workspace: in-place # required: in-place | readonly | worktree | pool
     inputs:
         inputName: type # shorthand
         # or

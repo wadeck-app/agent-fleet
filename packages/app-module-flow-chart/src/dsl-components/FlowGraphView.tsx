@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { Badge } from '@wadeck-app/dsl-ui';
 import { Background, ReactFlow, ReactFlowProvider } from '@xyflow/react';
-import type { FlowGraphResult } from 'flow-core';
+import { type FlowGraphResult, WAITING_FOR_WORKSPACE_LABEL } from 'flow-core';
 import { buildGraphTree, defaultCollapsedIds, executionStepLogsPath } from 'flow-core/graph-tree';
 
 import { describeChartMode } from './ChartMode.js';
@@ -155,7 +155,12 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 					<div className="max-w-md">
 						<p className="flex items-center gap-2 text-sm font-semibold text-content">
 							<span>{mode.title}</span>
-							{execution && <Badge label={execution.status} variant={executionBadge(execution.status)} />}
+							{execution && (
+								<Badge
+									label={execution.workspaceWait ? WAITING_FOR_WORKSPACE_LABEL : execution.status}
+									variant={execution.workspaceWait ? 'warning' : executionBadge(execution.status)}
+								/>
+							)}
 						</p>
 						<p className="text-xs text-muted">{mode.hint}</p>
 					</div>
@@ -166,6 +171,12 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 				<div role="alert" className={WARNING_BANNER_CLASS}>
 					The chart could not be refreshed: {refreshError} The last known state is shown; it is retried every
 					few seconds.
+				</div>
+			)}
+
+			{execution?.workspaceWait && (
+				<div role="status" aria-label="Waiting for a workspace" className={WARNING_BANNER_CLASS}>
+					{execution.workspaceWait.message}
 				</div>
 			)}
 

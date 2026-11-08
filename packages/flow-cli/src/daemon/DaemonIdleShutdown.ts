@@ -115,7 +115,10 @@ export class DaemonIdleShutdown {
 			!commandHandler.hasResumableInterventions() &&
 			// A finished run is no longer an active execution while its workers settle and ack and its workspace is
 			// released; exiting then would cut the release off.
-			!commandHandler.hasPendingRunEnds()
+			!commandHandler.hasPendingRunEnds() &&
+			// A run waiting for a workspace has no scheduler yet but is held by the daemon; stopping (or restarting for an update)
+			// would leave it unstarted until the next start.
+			!commandHandler.hasWaitingRuns()
 		);
 	}
 

@@ -296,42 +296,37 @@ Use the \`from\` field to reference intervention response fields:
 	}
 
 	private generateWorkspaceModes(): string {
-		return `## Section 4: Workspace Modes
+		return `## Section 4: Workspace
 
-Configured via the \`workspace\` field of a \`FlowDefinition\`:
+Every flow MUST declare where its steps run with the \`workspace\` field (a flow without it is refused):
 
 \`\`\`yaml
-workspace:
-  mode: isolated | shared | manual
-  gitStrategy: main-only | feature-branch | any | worktree | none
-  reusePolicy: never | if-available | always
-  concurrencyKey: optional-group-key
+workspace: in-place
+# or, with options validated by the provider:
+workspace: { provider: pool, dir: D:/pool, prefix: repo-ws-, count: 4 }
 \`\`\`
 
-### Modes
-| Mode | Description |
-|------|-------------|
-| \`isolated\` | Each execution gets a fresh workspace; changes are isolated per run |
-| \`shared\` | All steps and executions share the same workspace |
-| \`manual\` | User specifies the workspace path explicitly |
+### Providers
+| Provider | Folder | Options |
+|----------|--------|---------|
+| \`in-place\` | The project folder, shared with whoever else works there | \`dir\` (default: the project folder) |
+| \`readonly\` | The project folder, shared and meant to be read only (advisory, nothing is enforced) | \`dir\` |
+| \`worktree\` | A new git worktree and branch per run, removed at the end | \`baseDir\` (required, outside the project), \`prefix\` |
+| \`pool\` | One free slot of a pool of prepared folders, claimed for the run and never deleted | \`dir\` + \`prefix\` + \`count\`, or \`slots\`; \`requireClean\` |
 
-### Git strategies
-| Strategy | Description |
-|----------|-------------|
-| \`main-only\` | Only the main/master branch is used |
-| \`feature-branch\` | A feature branch is created for each execution |
-| \`any\` | No constraint on branch |
-| \`worktree\` | Uses git worktrees for isolation without full clones |
-| \`none\` | No git; an empty directory |
+A named instance of the user's config can be used by its name (\`workspace: my-instance\`).
 
-A failed git setup (any strategy except \`none\`) refuses the run with \`WORKSPACE_GIT_FAILED\`; it never continues in an empty directory. A git branch \`main\` must exist for \`main-only\`, \`any\`, \`feature-branch\`.
+### Pool
+- A run claims a free slot; when every slot is claimed the run WAITS (state \`waiting for workspace\`, no timeout, first come first served) and starts when one is released. \`flow cancel\` ends the wait.
+- A slot is not synchronized by the provider: make the first step a script that does it. A dirty slot is reported in the log; \`requireClean: true\` skips dirty slots and fails when none is clean.
+- The pool is prepared by hand or script first; the provider never creates it.
 
-### Reuse policies
-| Policy | Description |
-|--------|-------------|
-| \`never\` | Always provision a fresh workspace |
-| \`if-available\` | Reuse an existing compatible workspace if one is free |
-| \`always\` | Always reuse; fail if none available |`;
+### Read-only workspace
+- Model steps without \`tools\` get \`read\`, \`glob\`, \`grep\`; a model step declaring \`write\`, \`edit\` or \`bash\` makes the flow fail at validation or start, naming the step.
+- Script steps and any \`bash\` tool can still write: it is intent, not isolation.
+
+### Removed
+The \`mode\` / \`gitStrategy\` / \`reusePolicy\` block is refused with a rewrite hint, except \`mode: manual\` which still runs as \`in-place\` with a deprecation warning. A failed provider (allocation, git) refuses the run with its message; it never continues in an empty directory.`;
 	}
 
 	private generateStatusTransitions(): string {

@@ -10,7 +10,15 @@ describe('countByStatus', () => {
 			makeExec({ executionId: 'b', status: 'completed' }),
 			makeExec({ executionId: 'c', status: 'failed' }),
 		]);
-		expect(counts).toEqual({ total: 3, queued: 0, running: 0, completed: 2, failed: 1, 're-queued': 0 });
+		expect(counts).toEqual({
+			total: 3,
+			waitingForWorkspace: 0,
+			queued: 0,
+			running: 0,
+			completed: 2,
+			failed: 1,
+			're-queued': 0,
+		});
 	});
 
 	it('is all zero for no execution', () => {
@@ -34,5 +42,16 @@ describe('countByStatus', () => {
 			typeof countByStatus
 		>[0][number];
 		expect(() => countByStatus([corrupt])).toThrow(/exploded/);
+	});
+});
+
+describe('countByStatus waiting for a workspace', () => {
+	it('keeps counting a waiting run as queued and tells how many of the queued ones wait', () => {
+		const wait = { since: '2026-10-22T10:00:00.000Z', message: 'all slots claimed', run: {} };
+		const counts = countByStatus([
+			makeExec({ executionId: 'a', status: 'queued', workspaceWait: wait }),
+			makeExec({ executionId: 'b', status: 'queued' }),
+		]);
+		expect(counts).toMatchObject({ total: 2, queued: 2, waitingForWorkspace: 1 });
 	});
 });

@@ -68,11 +68,11 @@ The root object that defines a complete flow.
 
 #### `workspace`
 
-- **Type**: [`WorkspaceConfig`](#workspace-configuration)
-- **Required**: Yes
-- **Description**: Workspace requirements and isolation strategy
-- **Example**: See [Workspace Configuration](#workspace-configuration)
-- **Common Mistakes**: Using `isolated` mode when `shared` would be more efficient
+- **Type**: provider name, or `{ provider, ...options }` (see [Workspace Configuration](#workspace-configuration))
+- **Required**: Yes (a flow without it is refused)
+- **Description**: Where the steps run: `in-place`, `readonly`, `worktree` or `pool`
+- **Example**: `workspace: in-place`
+- **Common Mistakes**: Writing the removed `mode`/`gitStrategy`/`reusePolicy` block; a `worktree` `baseDir` inside the project
 - **Related Fields**: Affects `SubFlowStep.workspaceStrategy`
 
 #### `inputs`
@@ -127,83 +127,86 @@ The root object that defines a complete flow.
 
 ## Workspace Configuration
 
-### WorkspaceConfig
+`workspace` says where the steps of a run execute. It is REQUIRED: a flow without it is refused at validation, with the providers and an example.
 
-Defines workspace isolation and Git strategy for flow execution.
+```yaml
+workspace: in-place # a provider name
+workspace: { provider: pool, dir: D:/pool, prefix: repo-ws-, count: 4 } # a provider and its options
+```
 
-#### `mode`
+A name that is not built in refers to an instance of the user config (`plugins.instances.<name>`). Options are checked by the provider: an unknown option is an error that lists the accepted ones.
 
-- **Type**: `WorkspaceMode` (`'isolated'` | `'shared'` | `'manual'`)
-- **Required**: Yes
-- **Description**: Determines workspace isolation and concurrency behavior
-- **Valid Values**:
-    - `isolated`: Each task gets a fresh workspace, destroyed after completion
-    - `shared`: Multiple compatible tasks can share a workspace
-    - `manual`: Uses current working directory (for local development/debugging)
-- **Example**:
-    ```yaml
-    workspace:
-        mode: isolated # Fresh workspace per task
-    ```
-- **Common Mistakes**: Using `manual` in production flows, `isolated` when `shared` would be faster
-- **Related Fields**: Affects `reusePolicy` behavior
+| Provider   | Folder                                                                     | Exclusive | Options                                                                  |
+| ---------- | -------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------ |
+| `in-place` | The project folder (or `dir`), shared with whoever else works there        | No        | `dir`                                                                    |
+| `readonly` | Same folder, flagged read-only (advisory)                                  | No        | `dir`                                                                    |
+| `worktree` | A new git worktree and branch per run, removed at the end                  | Yes       | `baseDir` (required), `prefix`                                           |
+| `pool`     | One free slot of a set of prepared folders, claimed for the run, never deleted | Yes   | `dir` + `prefix` + `count`, or `slots`; `requireClean`                   |
 
-#### `gitStrategy`
+Relative paths in options are relative to the PROJECT folder, never to the working directory of the daemon. Each run gets its own `outputs` folder: `<project>/.flow/runs/<executionId>.meta` for `in-place`, `readonly` and `pool`.
 
-- **Type**: `GitStrategy` (`'main-only'` | `'feature-branch'` | `'any'` | `'worktree'` | `'none'`)
-- **Required**: Yes
-- **Description**: Defines how the workspace gets its Git content
-- **Valid Values**:
-    - `main-only`: Shallow clone of the project, `main` checked out (the branch `main` must exist; it is not configurable)
-    - `feature-branch`: Clone, then a new `fleet/task-*` branch created from `main`
-    - `any`: Clone, `main` checked out
-    - `worktree`: Git worktree on a new `fleet/task-*` branch started from the current commit (the project's checked-out branch does not move)
-    - `none`: No Git; an empty directory
-- **Failure behaviour**: With any strategy except `none`, a failed Git setup refuses the run at start with code `WORKSPACE_GIT_FAILED`; the run never continues in an empty directory. The message gives the strategy, project directory, branch, Git's output (credentials removed, capped) and the fix. Detected causes: git not on PATH, project directory not a git repository, repository without commit, branch `main` missing. Nothing is left on disk.
-- **Manual mode**: `mode: manual` never fails on Git; a directory without Git, or with uncommitted changes, is a warning in the execution log.
-- **Example**:
-    ```yaml
-    workspace:
-        mode: isolated
-        gitStrategy: feature-branch # Use feature branches
-    ```
-- **Common Mistakes**: Using `any` in production, not matching strategy to workflow needs
-- **Related Fields**: Validated against current Git branch state
+### `in-place`
 
-#### `reusePolicy`
+- Runs in the project folder as it is. Warns in the execution log when the folder is not a git repository or has uncommitted changes.
+- `dir`: another existing folder. Not a drive root, not a system folder, not a link or junction.
 
-- **Type**: `ReusePolicy` (`'never'` | `'if-available'` | `'always'`)
-- **Required**: Yes
-- **Description**: Determines when workspaces can be reused
-- **Valid Values**:
-    - `never`: Always create new workspace
-    - `if-available`: Reuse if compatible workspace exists
-    - `always`: Always reuse (for development)
-- **Example**:
-    ```yaml
-    workspace:
-        mode: shared
-        gitStrategy: main-only
-        reusePolicy: if-available # Reuse when possible
-    ```
-- **Common Mistakes**: Using `never` for all flows (inefficient), `always` in production
-- **Related Fields**: Interacts with `mode` and `concurrencyKey`
+### `readonly`
 
-#### `concurrencyKey`
+- Conveys intent, enforces nothing. Model steps without `tools` get `read`, `glob`, `grep` and a prompt note; every command gets `GIT_OPTIONAL_LOCKS=0`; `workspaceReadOnly: true` is in the execution context.
+- A model step declaring `write`, `edit` or `bash` makes the flow invalid (`WORKSPACE_READONLY_CONFLICT`), naming the step. Remove those tools or use another provider.
+- Not guaranteed: script steps and a `bash` tool can still write; the sandbox mounts stay writable; another flow may write the same folder while this one reads.
+- Point it at a folder no flow writes to (typically `main`), and keep writers on `worktree` or `pool`.
 
-- **Type**: `string` (optional)
-- **Required**: No
-- **Description**: Groups compatible workspaces for sharing (when `mode: shared`)
-- **Example**:
-    ```yaml
-    workspace:
-        mode: shared
-        gitStrategy: main-only
-        reusePolicy: if-available
-        concurrencyKey: 'frontend-builds' # Group related flows
-    ```
-- **Common Mistakes**: Not using concurrency keys for resource-intensive flows
-- **Related Fields**: Only relevant when `mode: shared`
+### `worktree`
+
+- `baseDir` must be OUTSIDE the project (the project is itself a worktree): `../worktrees`, not `.flow/`. Branch and folder: `<prefix><executionId>` (`prefix`: letters, digits, `.`, `_`, `-`).
+- A failed git command refuses the run with the git message; it never continues in an empty directory.
+- A worktree has a `.git` FILE: git does not work inside the sandbox. Use a pool of clones for sandboxed runs.
+
+### `pool`
+
+- Slots: `<dir>/<prefix>1` .. `<dir>/<prefix><count>` (`count` 1 to 1000), or the folders of `slots` (relative to the project folder). Every slot must exist: the provider never creates, synchronizes or deletes one.
+- Claim: a run takes the first free slot, in order. A claim is the folder `<dir>/.flow-pool/<slot>.claim` with a `claim.json` (execution, flow, pid, daemon).
+- No free slot: the run WAITS. It is recorded as `queued` with the reason (`flow history`, `flow show`), has no scheduler, worker or concurrency permit, and counts as work in flight (the daemon does not exit or restart for an update). It starts in arrival order when a slot is released, no timeout. The log repeats the reason (slots claimed, by whom) every minute. `flow cancel <executionId>` ends the wait.
+- After a daemon restart a waiting run is started again from the definition it was accepted with (never failed as interrupted).
+- A claim whose holder is gone is taken over: execution unknown to the running daemon, dead process, pid reused by another daemon, or a claim folder left empty for over 5 s. The takeover is written in the execution log. A claim of another live process is respected.
+- `requireClean: true`: a slot with uncommitted changes is skipped; the run fails (naming the slots) if every slot is free but dirty. Default `false`: a dirty slot is used and reported, so that a first step can heal it.
+- Make the first step bring the slot to a known state:
+
+```yaml
+workspace: { provider: pool, dir: D:/pool, prefix: repo-ws-, count: 4 }
+steps:
+    - id: sync
+      name: Sync the slot
+      type: script
+      script: git fetch origin && git checkout --detach origin/main && git clean -fdx
+```
+
+- Create the pool once, by hand or script. Pointing `core.hooksPath` at an empty folder keeps an agent in one slot from planting a hook that runs elsewhere:
+
+```bash
+repo=https://example.invalid/me/repo.git # or the path of a local repository
+mkdir -p D:/pool/empty-hooks
+for n in 1 2 3 4; do
+  git clone "$repo" "D:/pool/repo-ws-$n"
+  git -C "D:/pool/repo-ws-$n" config core.hooksPath D:/pool/empty-hooks
+done
+```
+
+### Removed and deprecated
+
+| Old                                                         | Now                                                                                   |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| No `workspace:`                                             | Error. Write one of the providers above.                                              |
+| `mode: manual`                                              | Runs as `in-place` with a deprecation warning (`gitStrategy`, `reusePolicy`, `concurrencyKey` are ignored). Rewrite as `workspace: in-place`. |
+| `mode: isolated` (any `gitStrategy`), `mode: shared`        | Error with a rewrite hint. Use `worktree` (new branch per run) or `pool` (prepared clones). The clone strategies `main-only`, `any`, `feature-branch` and `gitStrategy: none` are gone. |
+| `workspace: none`                                           | Alias of `in-place`, with a warning.                                                  |
+| `plugins.workspace` in a flow                               | Still served when the flow has no `workspace:`, with a warning. Write `workspace: <instance>` or `workspace: { provider: <name>, ... }`. |
+| `plugins.workspace` in the user config as a default         | Ignored (logged at daemon start): every flow declares its own workspace.              |
+
+Editing `workspace:` changes the definition hash: bump the flow `version`.
+
+Folders created by earlier versions under `<project>/.flow/workspaces` are still pruned by `workspace.retainDays` and `workspace.maxWorkspaces` of the daemon config; nothing creates new ones.
 
 ---
 

@@ -30,7 +30,7 @@ describe('RunDefinitionLoader keeps every step field of the flow file', () => {
 				'id: fields',
 				'name: Fields',
 				'version: 1.0.0',
-				'workspace: { mode: shared, gitStrategy: main-only, reusePolicy: never }',
+				'workspace: in-place',
 				'steps:',
 				'  - id: m',
 				'    name: M',

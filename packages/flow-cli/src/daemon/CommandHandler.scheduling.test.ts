@@ -33,17 +33,6 @@ vi.mock('node:os', async importOriginal => {
 	};
 });
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = mockAllocate;
-			release = mockRelease;
-		},
-	};
-});
-
 registerCommandHandlerHooks({ mockAllocate, mockRelease, hoistedState });
 
 describe('CommandHandler — scheduling via FlowScheduler', () => {
@@ -100,10 +89,7 @@ id: when-flow
 version: "1.0.0"
 name: When Flow
 description: when test
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: a
@@ -160,10 +146,7 @@ id: two-ind
 version: "1.0.0"
 name: Two Independent
 description: test
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: s1
@@ -252,10 +235,7 @@ id: loop-flow
 version: "1.0.0"
 name: Loop Flow
 description: loop test
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: attempt

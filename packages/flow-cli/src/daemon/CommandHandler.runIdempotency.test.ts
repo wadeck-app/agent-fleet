@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import type { CommandHandler } from './CommandHandler';
 import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
@@ -10,10 +11,7 @@ id: idem-flow
 version: "1.0.0"
 name: Idem Flow
 description: One script step
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: only
@@ -75,7 +73,7 @@ describe('a run sent twice with the same request id (the client retried after a 
 			false,
 			undefined,
 			undefined,
-			provider as never
+			new FixedWorkspaceProviders(provider as never)
 		);
 		flowFile = path.join(tmpDir, 'idem-flow.yml');
 		fs.writeFileSync(flowFile, FLOW_YAML);

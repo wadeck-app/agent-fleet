@@ -13,6 +13,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { ExecutionStore } from '../storage/ExecutionStore';
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import type { CommandHandler } from './CommandHandler';
 import { TrackedCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
@@ -23,10 +24,7 @@ id: refused-flow
 version: "1.0.0"
 name: Refused Flow
 description: x has a when that is not a boolean
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: a
@@ -100,7 +98,7 @@ describe('RunRequestHandler -- a run refused by the scheduler after its record e
 			false,
 			undefined,
 			undefined,
-			provider as never
+			new FixedWorkspaceProviders(provider as never)
 		);
 		flowFile = path.join(tmpDir, 'refused-flow.yml');
 		fs.writeFileSync(flowFile, FLOW_YAML);

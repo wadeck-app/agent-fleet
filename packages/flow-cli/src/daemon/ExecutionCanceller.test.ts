@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import type { WebSocket } from 'ws';
 
 import { ExecutionStore } from '../storage/ExecutionStore';
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import type { CommandHandler } from './CommandHandler';
 import { TrackedCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 import { DaemonIdleShutdown } from './DaemonIdleShutdown';
@@ -20,10 +21,7 @@ const HEADER = `\
 version: "1.0.0"
 name: Cancel Flow
 description: x
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 `;
 
@@ -102,7 +100,7 @@ describe('CommandHandler.handleCancel -- ends one execution without stopping the
 			false,
 			undefined,
 			undefined,
-			provider as never,
+			new FixedWorkspaceProviders(provider as never),
 			undefined,
 			undefined,
 			undefined,

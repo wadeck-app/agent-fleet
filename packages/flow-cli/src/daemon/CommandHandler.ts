@@ -14,6 +14,7 @@ import type { WebSocket } from 'ws';
 import type { ClientCommand, DaemonResponse, InjectedStep, StepProgressDetail } from '../ipc/Protocol';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
+import type { WorkspaceProviderSource } from '../workspace/WorkspaceProviders';
 import type { WorkerTypeRouting } from './BoundStepWait.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { ExecutionHooks } from './ExecutionHooks.js';
@@ -70,7 +71,11 @@ export class CommandHandler {
 		allowAbsolutePaths: boolean = false,
 		maxInjectedSteps: number = DEFAULT_MAX_INJECTED_STEPS,
 		maxStepsPerExecution: number = DEFAULT_MAX_STEPS_PER_EXECUTION,
-		workspaceProvider: WorkspaceProvider | undefined,
+		/**
+		 * Where a flow's workspace provider comes from. Absent: the built-in providers plus the config instances reachable
+		 * through `resolvePerFlowWorkspaceProvider`. A test injects a stub here.
+		 */
+		workspaceProviders: WorkspaceProviderSource | undefined,
 		/**
 		 * Accepted and unused, on purpose.
 		 *
@@ -145,7 +150,7 @@ export class CommandHandler {
 			executionStore: this.executionStore,
 			logWriter: this.logWriter,
 			daemonSecrets,
-			workspaceProvider,
+			workspaceProviders,
 			resolvePerFlowWorkspaceProvider,
 			requestFromDeclaredSources,
 			interactivityPolicy,
@@ -172,6 +177,17 @@ export class CommandHandler {
 		this.hooks.remove(executionId);
 	}
 
+	/**
+	 * Starts again, in the order they arrived, the runs that were waiting for a workspace when the previous daemon stopped
+	 * (the store lists them after `reconcileInterruptedExecutions`, which leaves them alone). Resolves once each is either
+	 * started or waiting again, not when it ends.
+	 */
+	async resumeWaitingExecutions(hooksFor: (project: RunProject) => HookDispatcher | undefined): Promise<void> {
+		for (const executionId of this.executionStore.waitingExecutionIdsAtStart()) {
+			await this.pipeline.runRequests.resumeWaiting(executionId, hooksFor);
+		}
+	}
+
 	/** See {@link SchedulerIdleState.isQueueEmpty}. */
 	isQueueEmpty(): boolean {
 		return this.pipeline.idleState.isQueueEmpty();
@@ -190,6 +206,11 @@ export class CommandHandler {
 	/** Consulted by the daemon's idle-exit check by name; see {@link SchedulerIdleState.hasResumableInterventions}. */
 	hasResumableInterventions(): boolean {
 		return this.pipeline.idleState.hasResumableInterventions();
+	}
+
+	/** Consulted by the daemon's idle-exit check by name; see {@link SchedulerIdleState.hasWaitingRuns}. */
+	hasWaitingRuns(): boolean {
+		return this.pipeline.idleState.hasWaitingRuns();
 	}
 
 	/** One-line snapshot for the idle-exit log entries; see {@link SchedulerIdleState.describe}. */
@@ -317,6 +338,8 @@ export class CommandHandler {
 
 	/** Drops work scheduled for later, when the daemon is shutting down; see {@link UnmetDemandCoverage.stop}. */
 	stopBackgroundWork(): void {
+		// First: the stop releases slots (the workers go, the runs end); no waiting run may take one on its way out.
+		this.pipeline.waitSupervisor.stop();
 		this.pipeline.demand.stop();
 		this.pipeline.dispatcher.stop();
 		this.pipeline.runRequests.forgetRequests();

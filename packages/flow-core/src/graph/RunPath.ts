@@ -2,6 +2,7 @@ import type { FlowDefinition, FlowStep } from 'flow-engine/types';
 
 import { FlowCoreError } from '../errors.js';
 import type { ExecutionState, StepState } from '../execution/ExecutionState.js';
+import { isWaitingForWorkspace } from '../view/WorkspaceWaitText.js';
 
 // Which way a run went. The record only holds, per step: status, the start of its LATEST attempt, its completion,
 // the attempt count and (injected steps) its dependencies. It does not hold which dependency released a step, nor
@@ -165,7 +166,14 @@ export function computeRunPath(flow: FlowDefinition, execution: ExecutionState):
 			};
 		}
 		if (runActive) {
-			return { outcome: 'waiting', basis: 'recorded', reason: 'Not started yet.', ...extra };
+			return {
+				outcome: 'waiting',
+				basis: 'recorded',
+				reason: isWaitingForWorkspace(execution)
+					? 'Not started: the run waits for a free workspace.'
+					: 'Not started yet.',
+				...extra,
+			};
 		}
 		const blocker = blockerOf(id);
 		if (blocker !== undefined) {

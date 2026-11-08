@@ -14,11 +14,14 @@ beforeEach(() => {
 });
 
 describe('built-in plugin catalog', () => {
-	it('is the four plugins the flow CLI ships (flow-cli pins it to the real manifests)', () => {
+	it('is the plugins the flow CLI ships (flow-cli pins it to the real manifests)', () => {
 		expect(Object.keys(BUILTIN_PLUGIN_CATALOG).sort()).toEqual([
 			'cli-approval',
 			'file-approval',
+			'in-place',
 			'none',
+			'pool',
+			'readonly',
 			'worktree',
 		]);
 	});

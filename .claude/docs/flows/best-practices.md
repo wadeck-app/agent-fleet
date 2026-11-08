@@ -23,154 +23,61 @@ This guide covers design patterns, optimization strategies, and best practices f
 
 ### Decision Matrix
 
-Choose your workspace configuration based on task requirements:
+`workspace:` is required. Choose the provider by task (options and rules: [schema-reference.md](./schema-reference.md#workspace-configuration)):
 
-| Scenario                | Mode       | Git Strategy     | Reuse Policy | Rationale                                                  |
-| ----------------------- | ---------- | ---------------- | ------------ | ---------------------------------------------------------- |
-| **Code Implementation** | `isolated` | `main-only`      | `always`     | Safe isolation, allows commits, reuses workspace for speed |
-| **Feature Development** | `isolated` | `feature-branch` | `never`      | Each task gets fresh branch, no cross-contamination        |
-| **Q&A / Analysis**      | `shared`   | `main-only`      | `always`     | Read-only, fast reuse, multiple tasks can share            |
-| **Documentation**       | `shared`   | `main-only`      | `always`     | Read-only, no builds needed                                |
-| **Local Testing**       | `manual`   | `any`            | `always`     | Debug in current directory, see changes in IDE             |
-| **Critical Production** | `isolated` | `worktree`       | `never`      | Maximum isolation with git worktrees                       |
+| Scenario                          | Provider   | Rationale                                                              |
+| --------------------------------- | ---------- | ---------------------------------------------------------------------- |
+| **Code Implementation**           | `worktree` | New branch and folder per run; your working folder is untouched        |
+| **Prepared clones (heavy setup)** | `pool`     | Slots are reused across runs; a first step syncs the slot              |
+| **Q&A / Analysis**                | `readonly` | No model step declares write/edit/bash; point at a folder no flow writes |
+| **Documentation**                 | `readonly` | Read-only, no builds needed                                            |
+| **Local Testing / scripts**       | `in-place` | Runs in the project folder; see changes in your IDE                    |
 
-### Workspace Mode Deep Dive
+### Workspace Provider Deep Dive
 
-#### When to Use `isolated`
+#### When to Use `worktree`
 
-**Use Cases:**
-
-- Code modifications
-- Running builds or tests
-- Creating commits
-- File system changes
-
-**Benefits:**
-
-- Complete isolation (no conflicts with other tasks)
-- Full git access (commits, branches)
-- Safe for destructive operations
-
-**Costs:**
-
-- Slower startup (clone or worktree creation)
-- More disk space
-- Cleanup overhead
-
-**Example:**
+- **Use for**: code modifications, builds, tests, commits.
+- **Benefits**: exclusive folder per run, full git access, the branch survives the run.
+- **Costs**: a worktree and a branch are created per run; `baseDir` must be outside the project (`../worktrees`, not `.flow/`); git does not work inside the sandbox (the `.git` entry is a file).
 
 ```yaml
-workspace:
-    mode: isolated
-    gitStrategy: main-only # Safest for most tasks
-    reusePolicy: always # Reuse workspace across tasks for speed
+workspace: { provider: worktree, baseDir: ../worktrees, prefix: flow- }
 ```
 
-#### When to Use `shared`
+#### When to Use `pool`
 
-**Use Cases:**
-
-- Question answering
-- Code analysis
-- Documentation queries
-- Read-only operations
-
-**Benefits:**
-
-- Fast execution (no cloning)
-- Low overhead
-- Multiple tasks can run concurrently
-
-**Costs:**
-
-- No git modifications allowed
-- Shared state (must be stateless)
-- Requires careful concurrency handling
-
-**Example:**
+- **Use for**: prepared clones (dependencies installed, caches warm) reused across runs, sandboxed runs that need git.
+- **Benefits**: a slot is claimed for the run and never deleted, so its preparation is reused; exclusive while claimed.
+- **Costs**: you create the slots yourself; the provider never syncs them, so the first step must (`git fetch`, `git checkout --detach`, `git clean`); when every slot is claimed the run WAITS with no timeout (see [troubleshooting.md](./troubleshooting.md#workspace-errors)).
 
 ```yaml
-workspace:
-    mode: shared
-    gitStrategy: main-only
-    reusePolicy: always
-    concurrencyKey: readonly # Group with other read-only tasks
+workspace: { provider: pool, dir: D:/pool, prefix: repo-ws-, count: 4 }
 ```
 
-**⚠️ WARNING**: Never use `shared` mode for flows that:
+#### When to Use `readonly`
 
-- Modify files
-- Run builds
-- Create commits
-- Change git state
-
-#### When to Use `manual`
-
-**Use Cases:**
-
-- Local debugging
-- Flow development
-- Quick testing
-- IDE integration
-
-**Benefits:**
-
-- Instant execution (uses current directory)
-- See changes in real-time in your IDE
-- No workspace overhead
-
-**Costs:**
-
-- Affects your working directory
-- No isolation
-- Not safe for production
-
-**Example:**
+- **Use for**: question answering, code analysis, documentation queries.
+- **Benefits**: no workspace to create; steps without `tools` get `read`, `glob`, `grep`.
+- **Costs**: advisory only. Script steps and a `bash` tool can still write, and another flow may write the same folder while this one reads.
 
 ```yaml
-workspace:
-    mode: manual
-    gitStrategy: any # Use whatever branch you're on
-    reusePolicy: always
+workspace: readonly
 ```
 
-**⚠️ WARNING**: Only use `manual` for development/debugging. Never in production flows.
+**⚠️ WARNING**: A model step declaring `write`, `edit` or `bash` makes the flow invalid (`WORKSPACE_READONLY_CONFLICT`). Use `worktree` or `pool` for flows that modify files, run builds or change git state.
 
-### Git Strategy Selection
+#### When to Use `in-place`
 
-| Strategy         | When to Use         | Behavior                 | Safety     |
-| ---------------- | ------------------- | ------------------------ | ---------- |
-| `main-only`      | Most flows          | Only uses main branch    | ✅ Highest |
-| `feature-branch` | Feature development | Creates feature branches | ✅ High    |
-| `any`            | Flexible workflows  | Uses current/any branch  | ⚠️ Medium  |
-| `worktree`       | Maximum isolation   | Creates git worktrees    | ✅ Highest |
+- **Use for**: local debugging, flow development, scripts, demos.
+- **Benefits**: runs in the project folder; changes are visible in your IDE.
+- **Costs**: affects your working directory and shares it with whoever else works there; no isolation.
 
-**Recommendation**: Start with `main-only` unless you have a specific reason for other strategies.
+```yaml
+workspace: in-place
+```
 
-### Reuse Policy Guidelines
-
-| Policy         | When to Use          | Behavior                        | Performance |
-| -------------- | -------------------- | ------------------------------- | ----------- |
-| `never`        | Fresh state required | Always creates new workspace    | 🐌 Slow     |
-| `if-available` | Flexible reuse       | Reuse if available, else create | ⚡ Medium   |
-| `always`       | Maximum reuse        | Block until workspace available | ⚡ Fast     |
-
-**Recommendation**: Use `always` with `isolated` mode for best performance while maintaining isolation.
-
-### Performance Implications
-
-**Clone Time Comparison** (for a typical monorepo):
-
-- `isolated` + `never`: ~30-60 seconds per task
-- `isolated` + `always`: ~2-5 seconds (reusing workspace)
-- `shared` + `always`: ~0-1 seconds (workspace already exists)
-- `manual`: ~0 seconds (uses current directory)
-
-**Memory/Disk Impact**:
-
-- `isolated`: ~500MB-2GB per workspace
-- `shared`: ~500MB-2GB (shared across tasks)
-- `manual`: 0 (uses existing directory)
+**⚠️ WARNING**: Use `in-place` for development, debugging and flows that do not change the repository. Concurrent runs share the folder.
 
 ---
 
@@ -926,29 +833,15 @@ steps:
 
 ### Workspace Reuse
 
-**Impact**: Workspace cloning is the slowest operation in flow execution.
-
-**Optimization Strategy:**
+**Impact**: A `worktree` is created per run. A `pool` slot is claimed and reused, so work done once in the slot (dependencies, caches) is kept for the next run.
 
 ```yaml
-# ❌ Slow: Creates new workspace every time
-workspace:
-    mode: isolated
-    gitStrategy: main-only
-    reusePolicy: never # ~30-60s per task
+# Per run: a new worktree and branch
+workspace: { provider: worktree, baseDir: ../worktrees, prefix: flow- }
 
-# ✅ Fast: Reuses workspace across tasks
-workspace:
-    mode: isolated
-    gitStrategy: main-only
-    reusePolicy: always # ~2-5s per task (after first)
+# Reused: prepared clones; the first step brings the slot to a known state
+workspace: { provider: pool, dir: D:/pool, prefix: repo-ws-, count: 4 }
 ```
-
-**Benchmarks** (typical monorepo):
-
-- First task: ~30-60s (clone)
-- Subsequent tasks with `reusePolicy: always`: ~2-5s (reset workspace)
-- Shared workspace: ~0-1s (already exists)
 
 ### Parallel Execution
 
@@ -1031,36 +924,15 @@ Choose the right model for the task complexity:
 
 ### Concurrency Control
 
-**Use Case**: Limit parallel execution to avoid overwhelming services
+`concurrencyKey` was removed. Concurrency of runs that need a folder of their own is bounded by the workspace:
+
+- `pool`: at most `count` (or `len(slots)`) runs at once; further runs wait without timeout and start in arrival order.
+- `worktree`: one worktree per run, no limit.
+- `in-place` / `readonly`: runs share the folder, no limit.
 
 ```yaml
-workspace:
-    mode: shared
-    gitStrategy: main-only
-    reusePolicy: always
-    concurrencyKey: readonly # All flows with this key share concurrency limits
-```
-
-**Benefits:**
-
-- Prevent resource exhaustion
-- Group compatible workspaces
-- Improve throughput
-
-**Example: Read-only flows**
-
-```yaml
-# Flow 1: Q&A
-workspace:
-    mode: shared
-    concurrencyKey: readonly
-
-# Flow 2: Analysis
-workspace:
-    mode: shared
-    concurrencyKey: readonly
-
-# Both flows can share the same workspace
+# At most 2 concurrent runs; the others wait for a slot
+workspace: { provider: pool, dir: D:/pool, prefix: repo-ws-, count: 2 }
 ```
 
 ### Context Optimization
@@ -1101,24 +973,21 @@ workspace:
 
 ## 7. Testing Flows
 
-### Test in Manual Mode First
+### Test with `in-place` First
 
 **Strategy**: Develop and test flows locally before deploying
 
 ```yaml
-# During development: Use manual mode
-workspace:
-    mode: manual # Fast iteration, see changes in IDE
-    gitStrategy: any
-    reusePolicy: always
+# During development: run in the project folder
+workspace: in-place # See changes in IDE
 ```
 
 **Workflow:**
 
-1. Create flow with `manual` mode
+1. Create flow with `workspace: in-place`
 2. Test with simple inputs
 3. Iterate and fix issues
-4. Once stable, switch to `isolated` or `shared` mode
+4. Once stable, switch to `worktree` or `pool` if the flow modifies code, or `readonly` if it only reads
 
 ### Validation Examples
 
@@ -1201,7 +1070,7 @@ Before deploying a flow to production:
 - [ ] Verified outputs are extracted correctly
 - [ ] Checked trace logs for each step
 - [ ] Dependencies are correct (no missing/extra `depends`)
-- [ ] Workspace mode is appropriate for task
+- [ ] Workspace provider is appropriate for task
 - [ ] Model selection is optimal for each step
 - [ ] Error handling is tested (retry/loops)
 - [ ] Performance is acceptable (check trace durations)
@@ -1297,10 +1166,7 @@ deploy-to-production:
     name: 'Deploy Backend to Production'
     description: 'Full production deployment with approvals and smoke tests'
 
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: { provider: worktree, baseDir: ../worktrees, prefix: flow- }
 
     inputs:
         version:
@@ -1394,9 +1260,9 @@ inputs:
 
 ### Workspace Selection
 
-- **Code changes** → `isolated` + `main-only` + `always`
-- **Read-only** → `shared` + `main-only` + `always`
-- **Local debug** → `manual` + `any` + `always`
+- **Code changes** -> `worktree` (or `pool`)
+- **Read-only** -> `readonly`
+- **Local debug** -> `in-place`
 
 ### Step Design
 
@@ -1422,14 +1288,14 @@ inputs:
 
 ### Performance
 
-- **Workspace reuse** → `reusePolicy: always`
+- **Prepared clones, reused across runs** -> `pool`
 - **Parallel execution** → Minimize `depends` arrays
 - **Model selection** → Haiku for simple, Opus for complex
 - **Context optimization** → Include only necessary files
 
 ### Testing
 
-- **Start with** `manual` mode
+- **Start with** `workspace: in-place`
 - **Test with** simple inputs first
 - **Monitor** trace logs
 - **Validate** before deploying

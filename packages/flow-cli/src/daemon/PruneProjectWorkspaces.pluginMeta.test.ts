@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FlowConfig } from '../config/FlowConfig';
 import type { LogWriter } from '../storage/LogWriter';
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import { ExecutionWorkspaces } from './ExecutionWorkspaces';
 import { pruneProjectWorkspaces } from './pruneProjectWorkspaces';
 
@@ -78,14 +79,18 @@ describe('ExecutionWorkspaces plugin path (characterization)', () => {
 			allocate: vi.fn().mockResolvedValue({ path: handlePath, id: 'p:1' }),
 			release: vi.fn().mockResolvedValue(undefined),
 		};
-		const workspaces = new ExecutionWorkspaces({ writeExecution: vi.fn() } as unknown as LogWriter, provider);
+		const workspaces = new ExecutionWorkspaces(
+			{ writeExecution: vi.fn() } as unknown as LogWriter,
+			new FixedWorkspaceProviders(provider)
+		);
 
-		const result = await workspaces.allocate(root, { id: 'f', version: '1.0.0' } as never, 'exec-1');
+		const result = await workspaces.allocate({ id: 'f', version: '1.0.0' } as never, 'exec-1', root);
 
 		expect(result).toEqual({
 			ok: true,
 			workspaceDir: handlePath,
 			workspaceMetaDir: handlePath + '.meta',
+			readOnly: false,
 			pluginMetaDir: handlePath + '.meta',
 		});
 		expect(fs.existsSync(path.join(handlePath + '.meta', 'outputs'))).toBe(true);

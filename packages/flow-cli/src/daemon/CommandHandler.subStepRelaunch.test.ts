@@ -6,30 +6,12 @@ import { WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { CommandHandler } from './CommandHandler';
 import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = vi.fn().mockResolvedValue({
-				path: '/tmp/test-workspace',
-				metaDir: '/tmp/test-workspace.meta',
-				id: 'ws-test-id',
-			});
-			release = vi.fn().mockResolvedValue(undefined);
-		},
-	};
-});
-
 const FLOW_YAML = `\
 id: relaunch-flow
 version: "1.0.0"
 name: Relaunch
 description: parent with a sub-step
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: parent
@@ -201,7 +183,10 @@ describe('CommandHandler -- dispatch of a parent restarted because a sub-step fa
 		handler.tryDispatch();
 		handler.onStepFailed(executionId, 'child', 'boom', { stderr: 'E1' });
 
-		const warnings = mockLogWriter.writeExecution.mock.calls.filter(call => call[2] === 'warning');
+		// The in-place provider also warns that the temp folder is not a git repository: only the relaunch warning is under test.
+		const warnings = mockLogWriter.writeExecution.mock.calls.filter(
+			call => call[2] === 'warning' && String(call[1]).includes('is re-run because a sub-step failed')
+		);
 		expect(warnings).toHaveLength(1);
 		expect(warnings[0]?.[0]).toBe(executionId);
 		expect(String(warnings[0]?.[1])).toContain("'parent'");

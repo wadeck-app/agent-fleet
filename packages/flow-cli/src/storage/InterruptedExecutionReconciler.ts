@@ -27,17 +27,26 @@ const MTIME_SLACK_MS = 60_000;
  *
  * Bounded work: a record is only ever left `queued`/`running` by a daemon that wrote it after the previous
  * reconcile began (that one examined every record, and a settled record is not reopened without being rewritten).
+ * A record that waits for a workspace is neither interrupted nor skipped: it is reported (waitingExecutionIds) and touched.
  * So once a checkpoint exists, a record whose mtime is older than it is skipped unread: with a thousand
  * records, opening them all cost seconds before the daemon could answer. No checkpoint: every record is read.
  */
 export class InterruptedExecutionReconciler {
+	private waiting: string[] = [];
+
 	constructor(
 		private readonly executionsDir: string,
 		private readonly host: ReconcilerHost
 	) {}
 
+	/** The executions the last {@link reconcile} found waiting for a workspace: they are started again, not interrupted. */
+	waitingExecutionIds(): string[] {
+		return [...this.waiting];
+	}
+
 	/** An unreadable record is reported on stderr and skipped. Returns how many were reconciled. */
 	reconcile(): number {
+		this.waiting = [];
 		let names: string[];
 		try {
 			names = fs.readdirSync(this.executionsDir).filter(name => name.endsWith('.json'));
@@ -59,6 +68,13 @@ export class InterruptedExecutionReconciler {
 				if (current.status !== 'queued' && current.status !== 'running') {
 					continue;
 				}
+				if (current.workspaceWait !== undefined) {
+					// It waits for a free workspace and has done nothing: the daemon starts it again. The file time is refreshed so
+					// the next start (whose checkpoint is later than this one) does not skip the record unread.
+					this.touch(name);
+					this.waiting.push(current.executionId);
+					continue;
+				}
 				this.interrupt(current);
 				reconciled++;
 			} catch (err) {
@@ -69,6 +85,18 @@ export class InterruptedExecutionReconciler {
 		}
 		this.writeCheckpoint(startedAt);
 		return reconciled;
+	}
+
+	private touch(name: string): void {
+		const now = new Date();
+		try {
+			fs.utimesSync(path.join(this.executionsDir, name), now, now);
+		} catch (err) {
+			process.stderr.write(
+				`[ExecutionStore] cannot refresh the time of ${name}: ${String(err)}. If the daemon stops before it starts this waiting execution, it may not be found at the next start; re-run it with flow run.
+`
+			);
+		}
 	}
 
 	/** Epoch ms before which a record is known settled, or undefined when every record must be read. */

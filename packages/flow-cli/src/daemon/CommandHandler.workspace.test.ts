@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import type { CommandHandler } from './CommandHandler';
 import {
 	TrackedCommandHandler,
@@ -28,17 +29,6 @@ vi.mock('node:os', async importOriginal => {
 	};
 });
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = mockAllocate;
-			release = mockRelease;
-		},
-	};
-});
-
 registerCommandHandlerHooks({ mockAllocate, mockRelease, hoistedState });
 
 describe('CommandHandler — per-flow workspace override', () => {
@@ -47,14 +37,23 @@ id: override-flow
 version: "1.0.0"
 name: Override Flow
 description: test
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
 inputs: {}
 plugins:
   workspace:
     use: my-instance
+steps:
+  - id: s1
+    name: S1
+    type: script
+    script: echo hello
+`;
+
+	const FLOW_WITH_NAMED_INSTANCE = `id: named-flow
+version: "1.0.0"
+name: Named Flow
+description: test
+workspace: my-instance
+inputs: {}
 steps:
   - id: s1
     name: S1
@@ -67,10 +66,6 @@ id: inline-flow
 version: "1.0.0"
 name: Inline Flow
 description: test
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
 inputs: {}
 plugins:
   workspace:
@@ -84,8 +79,7 @@ steps:
 `;
 
 	function makeHandlerWithPerFlowResolver(
-		globalProvider: { allocate: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn> } | undefined,
-		resolveWorkspaceProvider: ((config: unknown) => Promise<unknown>) | undefined
+		resolveWorkspaceProvider: (config: unknown) => Promise<unknown>
 	): CommandHandler {
 		return new TrackedCommandHandler(
 			daemonDir,
@@ -97,57 +91,69 @@ steps:
 			false,
 			20,
 			50,
-			globalProvider as never,
+			undefined,
 			undefined,
 			resolveWorkspaceProvider as never
 		);
 	}
 
-	it('uses global workspaceProvider when flow has no plugins section', async () => {
+	it('does not call the resolver when the flow declares a built-in provider', async () => {
 		const flowFile = path.join(tmpDir, 'no-override.yml');
 		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
-
-		const globalAllocate = vi.fn().mockResolvedValue({ id: 'global-ws', path: tmpDir });
-		const globalProvider = { allocate: globalAllocate, release: vi.fn().mockResolvedValue(undefined) };
 		const resolveCb = vi.fn();
 
-		const handler = makeHandlerWithPerFlowResolver(globalProvider, resolveCb);
-		await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+		const handler = makeHandlerWithPerFlowResolver(resolveCb);
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
 
-		expect(globalAllocate).toHaveBeenCalledOnce();
+		expect(result.type).toBe('execution_started');
 		expect(resolveCb).not.toHaveBeenCalled();
 	});
 
-	it('calls resolveWorkspaceProvider callback when flow has plugins.workspace.use', async () => {
-		const flowFile = path.join(tmpDir, 'use-override.yml');
-		fs.writeFileSync(flowFile, FLOW_WITH_USE);
-
-		const perFlowAllocate = vi.fn().mockResolvedValue({ id: 'per-flow-ws', path: tmpDir });
+	it('resolves a workspace named after a config instance through the callback', async () => {
+		const flowFile = path.join(tmpDir, 'named-instance.yml');
+		fs.writeFileSync(flowFile, FLOW_WITH_NAMED_INSTANCE);
+		const perFlowAllocate = vi.fn().mockResolvedValue({ id: 'named-ws', path: tmpDir });
 		const perFlowProvider = { allocate: perFlowAllocate, release: vi.fn().mockResolvedValue(undefined) };
-		const globalAllocate = vi.fn();
-		const globalProvider = { allocate: globalAllocate, release: vi.fn() };
-
 		const resolveCb = vi.fn().mockResolvedValue(perFlowProvider);
 
-		const handler = makeHandlerWithPerFlowResolver(globalProvider, resolveCb);
+		const handler = makeHandlerWithPerFlowResolver(resolveCb);
 		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
 
 		expect(result.type).toBe('execution_started');
 		expect(resolveCb).toHaveBeenCalledOnce();
 		expect(resolveCb).toHaveBeenCalledWith(expect.objectContaining({ use: 'my-instance' }));
 		expect(perFlowAllocate).toHaveBeenCalledOnce();
-		expect(globalAllocate).not.toHaveBeenCalled();
 	});
 
-	it('calls resolveWorkspaceProvider callback when flow has plugins.workspace.instance', async () => {
+	it('calls resolveWorkspaceProvider callback for the deprecated plugins.workspace.use, with a warning in the log', async () => {
+		const flowFile = path.join(tmpDir, 'use-override.yml');
+		fs.writeFileSync(flowFile, FLOW_WITH_USE);
+		const perFlowAllocate = vi.fn().mockResolvedValue({ id: 'per-flow-ws', path: tmpDir });
+		const perFlowProvider = { allocate: perFlowAllocate, release: vi.fn().mockResolvedValue(undefined) };
+		const resolveCb = vi.fn().mockResolvedValue(perFlowProvider);
+
+		const handler = makeHandlerWithPerFlowResolver(resolveCb);
+		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(result.type).toBe('execution_started');
+		expect(resolveCb).toHaveBeenCalledOnce();
+		expect(resolveCb).toHaveBeenCalledWith(expect.objectContaining({ use: 'my-instance' }));
+		expect(perFlowAllocate).toHaveBeenCalledOnce();
+		expect(mockLogWriter.writeExecution).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.stringContaining('"plugins.workspace" is deprecated'),
+			'warning'
+		);
+	});
+
+	it('calls resolveWorkspaceProvider callback for the deprecated plugins.workspace.instance', async () => {
 		const flowFile = path.join(tmpDir, 'instance-override.yml');
 		fs.writeFileSync(flowFile, FLOW_WITH_INSTANCE);
-
 		const perFlowAllocate = vi.fn().mockResolvedValue({ id: 'inline-ws', path: tmpDir });
 		const perFlowProvider = { allocate: perFlowAllocate, release: vi.fn().mockResolvedValue(undefined) };
 		const resolveCb = vi.fn().mockResolvedValue(perFlowProvider);
 
-		const handler = makeHandlerWithPerFlowResolver(undefined, resolveCb);
+		const handler = makeHandlerWithPerFlowResolver(resolveCb);
 		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
 
 		expect(result.type).toBe('execution_started');
@@ -158,21 +164,18 @@ steps:
 		expect(perFlowAllocate).toHaveBeenCalledOnce();
 	});
 
-	it('returns WORKSPACE_ERROR when resolveWorkspaceProvider callback throws', async () => {
+	it('returns WORKSPACE_ERROR naming the cause when the resolver callback throws', async () => {
 		const flowFile = path.join(tmpDir, 'fail-resolve.yml');
 		fs.writeFileSync(flowFile, FLOW_WITH_USE);
-
-		const globalAllocate = vi.fn();
-		const globalProvider = { allocate: globalAllocate, release: vi.fn() };
 		const resolveCb = vi.fn().mockRejectedValue(new Error('instance not found'));
 
-		const handler = makeHandlerWithPerFlowResolver(globalProvider, resolveCb);
+		const handler = makeHandlerWithPerFlowResolver(resolveCb);
 		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
 
 		expect(result.type).toBe('error');
 		expect((result as { code: string }).code).toBe('WORKSPACE_ERROR');
-		expect((result as { message: string }).message).toContain('per-flow workspace provider');
-		expect(globalAllocate).not.toHaveBeenCalled();
+		expect((result as { message: string }).message).toContain('plugins.workspace');
+		expect((result as { message: string }).message).toContain('instance not found');
 	});
 });
 
@@ -191,7 +194,7 @@ describe('CommandHandler — plugin workspace provider', () => {
 			false,
 			20,
 			50,
-			provider as never
+			new FixedWorkspaceProviders(provider as never)
 		);
 	}
 
@@ -218,7 +221,7 @@ describe('CommandHandler — plugin workspace provider', () => {
 		expect(mockRelease).toHaveBeenCalledOnce();
 	});
 
-	it('Fix A: releases handle when mkdirSync throws before handle is registered', async () => {
+	it('Fix A: releases handle and refuses the run when the metadata folder cannot be prepared', async () => {
 		const flowFile = path.join(tmpDir, 'valid.yml');
 		fs.writeFileSync(flowFile, VALID_FLOW_YAML);
 
@@ -233,7 +236,11 @@ describe('CommandHandler — plugin workspace provider', () => {
 
 		const handler = makeHandlerWithProvider(mockProvider);
 
-		await expect(handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never)).rejects.toThrow();
+		// Refused with the folder and the fix, instead of an anonymous failure of the request.
+		const response = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(response).toMatchObject({ type: 'error', code: 'WORKSPACE_ERROR' });
+		expect((response as { message: string }).message).toContain('metadata folder');
 		expect(mockRelease).toHaveBeenCalledOnce();
 	});
 

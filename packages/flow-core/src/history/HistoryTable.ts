@@ -3,6 +3,13 @@ import type { ExecutionState } from '../execution/ExecutionState.js';
 import { SKIPPED_LABEL, skipReasonOf } from '../execution/StepSkip.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { renderStepCostLines, renderTotalCostLine } from '../show/StepCostLines.js';
+import {
+	WAITING_FOR_WORKSPACE_TAG,
+	isWaitingForWorkspace,
+	runDurationOf,
+	statusLabelOf,
+	workspaceWaitLines,
+} from '../view/WorkspaceWaitText.js';
 import { type ExecutionFilterOptions, filterExecutions } from './ExecutionFilter.js';
 import { formatDuration, formatStarted, formatStartedUtc, padTruncate } from './ExecutionFormat.js';
 
@@ -24,12 +31,13 @@ export function renderDetailView(exec: ExecutionState, projectLookup?: ProjectLo
 	}
 	lines.push(`Version:   ${versionDetailLineOf(exec)}`);
 	lines.push(`File:      ${exec.flowFile}`);
-	lines.push(`Status:    ${exec.status}`);
+	lines.push(`Status:    ${statusLabelOf(exec)}`);
+	lines.push(...workspaceWaitLines(exec));
 	lines.push(`Started:   ${formatStartedUtc(exec.startedAt)}`);
 	if (exec.completedAt) {
 		lines.push(`Completed: ${formatStartedUtc(exec.completedAt)}`);
 	}
-	lines.push(`Duration:  ${formatDuration(exec.startedAt, exec.completedAt)}`);
+	lines.push(`Duration:  ${runDurationOf(exec)}`);
 	lines.push('');
 	lines.push('Steps:');
 
@@ -140,9 +148,9 @@ export function buildHistoryTable(
 			padTruncate(e.executionId, COL_ID) +
 				padTruncate(e.flowId, COL_FLOW) +
 				padTruncate(versionColumnOf(e), COL_VERSION) +
-				padTruncate(e.status, COL_STATUS) +
+				padTruncate(isWaitingForWorkspace(e) ? WAITING_FOR_WORKSPACE_TAG : e.status, COL_STATUS) +
 				padTruncate(formatStarted(e.startedAt), COL_STARTED) +
-				formatDuration(e.startedAt, e.completedAt)
+				runDurationOf(e)
 		);
 	}
 

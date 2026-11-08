@@ -15,13 +15,10 @@ import type { IdeaRequirements, InputRequirement } from '../analysis/FlowRecomme
 import type {
 	FlowDefinition,
 	FlowStep,
-	GitStrategy,
 	InputSpec,
 	ModelFlowStep,
-	ReusePolicy,
 	ScriptFlowStep,
-	WorkspaceConfig,
-	WorkspaceMode,
+	WorkspaceDeclaration,
 } from '../types';
 import type { FlowValidator } from '../validation/FlowValidator';
 import type { ValidationResult } from '../validation/ValidationTypes';
@@ -30,14 +27,8 @@ import type { ValidationResult } from '../validation/ValidationTypes';
  * Flow constraints for generation
  */
 export interface FlowConstraints {
-	/** Workspace mode preference */
-	workspaceMode?: WorkspaceMode;
-
-	/** Git strategy preference */
-	gitStrategy?: GitStrategy;
-
-	/** Reuse policy preference */
-	reusePolicy?: ReusePolicy;
+	/** Workspace of the generated flow (`in-place`, `readonly`, an object with a `provider`...). Default: a git worktree for code tasks, `in-place` otherwise. */
+	workspace?: WorkspaceDeclaration;
 
 	/** Maximum number of steps */
 	maxSteps?: number;
@@ -219,18 +210,13 @@ export class FlowGenerator {
 		requirements: IdeaRequirements,
 		constraints?: FlowConstraints,
 		_pattern?: FlowPattern
-	): WorkspaceConfig {
-		// Default to isolated for code-related tasks, shared for others
-		const defaultMode: WorkspaceMode =
-			requirements.keywords.includes('code') || requirements.keywords.includes('implement')
-				? 'isolated'
-				: 'shared';
-
-		return {
-			mode: constraints?.workspaceMode || defaultMode,
-			gitStrategy: constraints?.gitStrategy || 'main-only',
-			reusePolicy: constraints?.reusePolicy || 'always',
-		};
+	): WorkspaceDeclaration {
+		if (constraints?.workspace !== undefined) {
+			return constraints.workspace;
+		}
+		// A code task gets a branch of its own; the others work in the project folder.
+		const isCodeTask = requirements.keywords.includes('code') || requirements.keywords.includes('implement');
+		return isCodeTask ? { provider: 'worktree', baseDir: '../worktrees', prefix: 'flow-' } : 'in-place';
 	}
 
 	/**

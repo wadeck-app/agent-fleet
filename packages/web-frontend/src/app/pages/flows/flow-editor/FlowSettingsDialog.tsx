@@ -21,7 +21,38 @@ import {
 import { Button } from '@framework/components/primitives/Button';
 import { useListItems } from '@framework/hooks2/form/useListItems';
 
-import type { FlowDefinition, GitStrategy, ReusePolicy, WorkspaceMode } from './types/flow-engine.types';
+import type { FlowDefinition } from './types/flow-engine.types';
+import {
+	POOL_COUNT_MAX,
+	POOL_COUNT_MIN,
+	changeWorkspaceProvider,
+	getProviderOptionKeys,
+	isCountInRange,
+	readWorkspaceDeclaration,
+	setWorkspaceOption,
+} from './workspaceDeclaration';
+
+const UNSUPPORTED_PROVIDER_VALUE = '__unsupported__';
+
+interface WorkspaceOptionField {
+	key: string;
+	label: string;
+	placeholder: string;
+	required?: boolean;
+	type?: 'text' | 'number';
+}
+
+const WORKSPACE_OPTION_FIELDS: Record<string, WorkspaceOptionField> = {
+	dir: { key: 'dir', label: 'Directory (optional)', placeholder: 'e.g., .workspaces' },
+	baseDir: { key: 'baseDir', label: 'Base directory', placeholder: 'e.g., .worktrees', required: true },
+	prefix: { key: 'prefix', label: 'Prefix (optional)', placeholder: 'e.g., run-' },
+	count: {
+		key: 'count',
+		label: 'Count (optional)',
+		placeholder: `${POOL_COUNT_MIN} to ${POOL_COUNT_MAX}`,
+		type: 'number',
+	},
+};
 
 interface FlowSettingsDialogProps {
 	open: boolean;
@@ -73,6 +104,12 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [inputItems.fstate.items]);
+
+	const workspace = readWorkspaceDeclaration(localFlow.workspace);
+	const optionFields =
+		workspace.unsupported === null && workspace.provider !== null
+			? getProviderOptionKeys(workspace.provider).map(key => WORKSPACE_OPTION_FIELDS[key])
+			: [];
 
 	const handleSave = () => {
 		onSave({
@@ -140,109 +177,91 @@ export function FlowSettingsDialog({ open, onOpenChange, flowDefinition, onSave 
 							<h3 className="text-sm font-semibold">Workspace Configuration</h3>
 
 							<div className="space-y-2">
-								<Label htmlFor="workspace-mode">Mode</Label>
+								<Label htmlFor="workspace-provider">Provider</Label>
 								<Select
-									value={localFlow.workspace.mode}
-									onValueChange={value =>
+									value={
+										workspace.unsupported ? UNSUPPORTED_PROVIDER_VALUE : (workspace.provider ?? '')
+									}
+									onValueChange={value => {
+										// The unsupported item is disabled; never rewrite the declaration for it
+										if (value === UNSUPPORTED_PROVIDER_VALUE) {
+											return;
+										}
 										setLocalFlow(prev => ({
 											...prev,
-											workspace: {
-												...prev.workspace,
-												mode: value as WorkspaceMode,
-											},
-										}))
-									}
+											workspace: changeWorkspaceProvider(prev.workspace, value),
+										}));
+									}}
 								>
-									<SelectTrigger className="w-full">
+									<SelectTrigger id="workspace-provider" className="w-full">
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="isolated">Isolated</SelectItem>
-										<SelectItem value="shared">Shared</SelectItem>
-										<SelectItem value="manual">Manual</SelectItem>
+										<SelectItem value="in-place">In place: the project folder, shared</SelectItem>
+										<SelectItem value="readonly">Read-only: shared folder, advisory</SelectItem>
+										<SelectItem value="worktree">Git worktree: a new branch per run</SelectItem>
+										<SelectItem value="pool">
+											Pool: one free prepared folder, waits when none is free
+										</SelectItem>
+										{workspace.unsupported && (
+											<SelectItem value={UNSUPPORTED_PROVIDER_VALUE} disabled>
+												(unsupported: {workspace.unsupported})
+											</SelectItem>
+										)}
 									</SelectContent>
 								</Select>
-								<p className="text-xs text-muted-foreground">
-									Isolated: Fresh workspace per execution. Shared: Reuse existing. Manual:
-									User-specified
-								</p>
+								{workspace.unsupported && (
+									<p className="text-xs text-destructive">
+										This workspace declaration ({workspace.unsupported}) cannot be edited here. It
+										is kept as is until you pick a provider.
+									</p>
+								)}
 							</div>
 
-							<div className="space-y-2">
-								<Label htmlFor="git-strategy">Git Strategy</Label>
-								<Select
-									value={localFlow.workspace.gitStrategy}
-									onValueChange={value =>
-										setLocalFlow(prev => ({
-											...prev,
-											workspace: {
-												...prev.workspace,
-												gitStrategy: value as GitStrategy,
-											},
-										}))
-									}
-								>
-									<SelectTrigger className="w-full">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="main-only">Main Only</SelectItem>
-										<SelectItem value="feature-branch">Feature Branch</SelectItem>
-										<SelectItem value="any">Any</SelectItem>
-										<SelectItem value="worktree">Worktree</SelectItem>
-									</SelectContent>
-								</Select>
-								<p className="text-xs text-muted-foreground">
-									Which Git branches are allowed for workspace checkout
-								</p>
-							</div>
+							{optionFields.map(field => {
+								const raw = workspace.options[field.key];
+								const text = raw === undefined || raw === null ? '' : String(raw);
+								const countOutOfRange =
+									field.key === 'count' && typeof raw === 'number' && !isCountInRange(raw);
+								const missingRequired = field.required && text.trim() === '';
+								return (
+									<div key={field.key} className="space-y-2">
+										<Label htmlFor={`workspace-${field.key}`}>{field.label}</Label>
+										<Input
+											id={`workspace-${field.key}`}
+											type={field.type ?? 'text'}
+											{...(field.type === 'number'
+												? { min: POOL_COUNT_MIN, max: POOL_COUNT_MAX }
+												: {})}
+											value={text}
+											onChange={e => {
+												const nextValue = e.target.value;
+												setLocalFlow(prev => ({
+													...prev,
+													workspace: setWorkspaceOption(prev.workspace, field.key, nextValue),
+												}));
+											}}
+											placeholder={field.placeholder}
+										/>
+										{missingRequired && (
+											<p className="text-xs text-destructive">
+												This option is required by this provider.
+											</p>
+										)}
+										{countOutOfRange && (
+											<p className="text-xs text-destructive">
+												Count must be between {POOL_COUNT_MIN} and {POOL_COUNT_MAX}.
+											</p>
+										)}
+									</div>
+								);
+							})}
 
-							<div className="space-y-2">
-								<Label htmlFor="reuse-policy">Reuse Policy</Label>
-								<Select
-									value={localFlow.workspace.reusePolicy}
-									onValueChange={value =>
-										setLocalFlow(prev => ({
-											...prev,
-											workspace: {
-												...prev.workspace,
-												reusePolicy: value as ReusePolicy,
-											},
-										}))
-									}
-								>
-									<SelectTrigger className="w-full">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="never">Never</SelectItem>
-										<SelectItem value="if-available">If Available</SelectItem>
-										<SelectItem value="always">Always</SelectItem>
-									</SelectContent>
-								</Select>
-								<p className="text-xs text-muted-foreground">When to reuse existing workspaces</p>
-							</div>
-
-							<div className="space-y-2">
-								<Label htmlFor="concurrency-key">Concurrency Key (optional)</Label>
-								<Input
-									id="concurrency-key"
-									value={localFlow.workspace.concurrencyKey || ''}
-									onChange={e =>
-										setLocalFlow(prev => ({
-											...prev,
-											workspace: {
-												...prev.workspace,
-												concurrencyKey: e.target.value || undefined,
-											},
-										}))
-									}
-									placeholder="Optional key for workspace locking"
-								/>
+							{optionFields.length > 0 && (
 								<p className="text-xs text-muted-foreground">
-									Optional key for workspace concurrency control
+									Relative paths are relative to the project folder.
 								</p>
-							</div>
+							)}
 						</div>
 
 						{/* Flow Inputs */}

@@ -668,6 +668,9 @@ describe('executions page layout', () => {
 		}
 		expect(badge[statusTag('completed')]).toBe('success');
 		expect(badge[statusTag('failed')]).toBe('danger');
+		// A run waiting for a workspace has its own word, coloured apart from the ordinary queued one.
+		expect(badge[statusTag('queued', true)]).toBe('warning');
+		expect(badge[statusTag('queued')]).toBe('default');
 	});
 
 	it('truncates the flow name of the flows summary', () => {
@@ -685,6 +688,14 @@ describe('execution detail page', () => {
 	it('has no A/B test left: one design, the steps table', () => {
 		expect(collectNodes(parseView('execution-detail-page.yaml').document, 'AbTest')).toEqual([]);
 		expect(collectNodes(parseView('executions-page.yaml').document, 'AbTest')).toEqual([]);
+	});
+
+	it('shows the reason a run waits for a workspace in its own section, only when the route sends one', () => {
+		const section = collectNodes(initialView('execution-detail-page.yaml'), 'Section').find(
+			node => node['title'] === 'Waiting for a workspace'
+		)!;
+		expect(section['$if']).toBe('$sources.execution.workspaceWaitText');
+		expect(JSON.stringify(section['items'])).toContain('$sources.execution.workspaceWaitText');
 	});
 
 	it('orders the header buttons [contributed links] [contributed actions] (the own Logs button is now a tab)', () => {

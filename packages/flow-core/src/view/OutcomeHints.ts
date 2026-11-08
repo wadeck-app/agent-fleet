@@ -27,10 +27,17 @@ function failedAttemptsOf(attempts: readonly StepAttemptView[] | undefined): Ste
 export interface RecoverableRun {
 	status: string;
 	lastErrorRecovered: boolean;
+	/** Present while the run waits for a workspace (see ExecutionSummary.workspaceWait). */
+	workspaceWait?: { message: string };
 }
 
-/** The hint of a run status label: set for a run that completed after an error, absent otherwise. */
+/**
+ * The hint of a run status label: why a run waits for a workspace, or that it completed after an error; absent otherwise.
+ */
 export function runStatusHint(run: RecoverableRun): string | undefined {
+	if (run.workspaceWait !== undefined) {
+		return run.workspaceWait.message;
+	}
 	return run.status === 'completed' && run.lastErrorRecovered ? RECOVERED_RUN_HINT : undefined;
 }
 

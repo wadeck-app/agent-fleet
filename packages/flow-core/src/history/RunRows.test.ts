@@ -33,3 +33,17 @@ describe('latestRuns', () => {
 		expect(() => latestRuns([makeExec({ executionId: 'bad', startedAt: 'yesterday' })], 5)).toThrow(/yesterday/);
 	});
 });
+
+describe('latestRuns waiting for a workspace', () => {
+	it('words a queued run that waits for a workspace apart from an ordinary queued one', () => {
+		const wait = { since: '2026-10-22T10:00:00.000Z', message: '2/2 slots claimed', run: {} };
+		const rows = latestRuns(
+			[
+				makeExec({ executionId: 'w', status: 'queued', workspaceWait: wait }),
+				makeExec({ executionId: 'q', status: 'queued' }),
+			],
+			5
+		);
+		expect(rows.map(r => r.statusLabel)).toEqual(['waiting ws', 'waiting']);
+	});
+});

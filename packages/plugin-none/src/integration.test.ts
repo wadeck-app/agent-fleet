@@ -26,10 +26,15 @@ describe('plugin-none integration', () => {
 	it('full allocate → release lifecycle works', async () => {
 		const impl = manifest.implementations.workspace!.default!;
 		const provider = impl.provider!({}) as {
-			allocate: (r: { taskId: string }) => Promise<{ path: string; id: string }>;
+			allocate: (r: unknown) => Promise<{ path: string; id: string }>;
 			release: (h: unknown) => Promise<void>;
 		};
-		const handle = await provider.allocate({ taskId: 'integration-test' });
+		const handle = await provider.allocate({
+			taskId: 'integration-test',
+			executionId: 'integration-test',
+			projectDir: process.cwd(),
+			flow: { id: 'f', version: '1.0.0' },
+		});
 		expect(handle.path).toBe(process.cwd());
 		expect(handle.id).toBe('none:integration-test');
 		await expect(provider.release(handle)).resolves.toBeUndefined();

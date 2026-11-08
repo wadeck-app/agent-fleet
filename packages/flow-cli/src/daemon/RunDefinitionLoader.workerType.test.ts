@@ -29,7 +29,7 @@ describe('RunDefinitionLoader - flow-level workerType', () => {
 				'version: 1.0.0',
 				'description: bound to a worker type',
 				...(workerTypeLine === '' ? [] : [workerTypeLine]),
-				'workspace: { mode: shared, gitStrategy: main-only, reusePolicy: never }',
+				'workspace: in-place',
 				'steps:',
 				'  - id: s',
 				'    name: S',
@@ -125,7 +125,7 @@ describe('RunDefinitionLoader - flow-level workerType when the declared sources 
 			const file = path.join(dir, 'flow.yml');
 			fs.writeFileSync(
 				file,
-				'id: b\nname: B\nversion: 1.0.0\ndescription: d\nworkerType: sandbox\nworkspace: { mode: shared, gitStrategy: main-only, reusePolicy: never }\nsteps:\n  - { id: s, name: S, type: script, script: "true" }\n'
+				'id: b\nname: B\nversion: 1.0.0\ndescription: d\nworkerType: sandbox\nworkspace: in-place\nsteps:\n  - { id: s, name: S, type: script, script: "true" }\n'
 			);
 			const resolver = { forFile: () => ({}) } as unknown as FlowDefinitionResolver;
 			const loader = new RunDefinitionLoader(

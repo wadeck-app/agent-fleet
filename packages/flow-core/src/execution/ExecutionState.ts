@@ -214,6 +214,30 @@ export interface ExecutionState {
 	 * with no record naming it is never pruned.
 	 */
 	pluginMetaDir?: string;
+	/**
+	 * Present ONLY while the run waits for a workspace (a pool with no free slot): the run is `queued`, has done no work,
+	 * and the daemon starts it when a slot is free, also after a daemon restart. Removed when the run starts, fails or is
+	 * cancelled. Additive: absent on every older record and on a run that did not wait.
+	 */
+	workspaceWait?: WorkspaceWait;
+	/**
+	 * How long the run waited for a workspace before it started (additive: absent on a run that did not wait). The wait is not
+	 * part of the run: `startedAt` of a run that waited is the moment it got its workspace.
+	 */
+	workspaceWaitedMs?: number;
+}
+
+/** A run that waits for a workspace. */
+export interface WorkspaceWait {
+	/** ISO time the run began to wait. */
+	since: string;
+	/** Why it waits, as the workspace provider last said it (who holds the slots). */
+	message: string;
+	/**
+	 * The `run` request as the client sent it, to start the run again after a restart of the daemon. Secret inputs are
+	 * REFERENCES (env://, file://), never values: literals are refused when the run is accepted.
+	 */
+	run: Record<string, unknown>;
 }
 
 export type VersionChoice = 'latest' | 'pinned' | 'file';

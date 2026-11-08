@@ -7,6 +7,7 @@ Comprehensive guide to diagnosing and fixing flow validation and runtime errors.
 - [Validation Errors Reference](#validation-errors-reference) - Error codes with examples
 - [Runtime Errors](#runtime-errors) - Execution failures and fixes
 - [Common Issues](#common-issues) - Frequently encountered problems
+- [Workspace Errors](#workspace-errors) - Missing/removed `workspace:`, pool waits, worktree paths
 - [Debugging Workflow](#debugging-workflow) - Step-by-step debugging process
 - [FAQ](#faq) - Quick answers to common questions
 
@@ -54,7 +55,7 @@ All validation errors are categorized by `ValidationCode` from the flow engine. 
 
 - Flow missing `id`, `name`, or `workspace` configuration
 - Step missing `id`, `name`, or type-specific fields (e.g., `prompt` for model steps)
-- Workspace missing `mode`, `gitStrategy`, or `reusePolicy`
+- No `workspace:` (required; the error lists the providers, see [Workspace Errors](#workspace-errors))
 
 **How to fix**:
 
@@ -67,10 +68,7 @@ All validation errors are categorized by `ValidationCode` from the flow engine. 
 ```yaml
 my-flow:
     name: 'My Flow'
-    # ❌ Missing 'id' field
-    workspace:
-        mode: isolated
-        # ❌ Missing gitStrategy and reusePolicy
+    # ❌ Missing 'id' and 'workspace'
     steps:
         - type: model
           # ❌ Missing 'id' and 'prompt'
@@ -83,10 +81,7 @@ my-flow:
 my-flow:
     id: my-flow # ✓ Added
     name: 'My Flow'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only # ✓ Added
-        reusePolicy: always # ✓ Added
+    workspace: in-place # ✓ Added
     steps:
         - type: model
           id: analyze # ✓ Added
@@ -103,7 +98,6 @@ my-flow:
 
 **Common causes**:
 
-- `concurrencyKey` is not a string
 - `workingDir` is not a string
 - `env` is not an object
 - `blocking` (user_intervention) is not a boolean
@@ -142,9 +136,7 @@ my-flow:
 
 **Common causes**:
 
-- Invalid `mode`: must be `isolated`, `shared`, or `manual`
-- Invalid `gitStrategy`: must be `main-only`, `feature-branch`, `any`, or `worktree`
-- Invalid `reusePolicy`: must be `never`, `if-available`, or `always`
+- Invalid `workspace` provider or option: see [Workspace Errors](#workspace-errors)
 - Invalid `model`: must be `sonnet`, `haiku`, or `opus`
 - Invalid input `type`: must be `string`, `number`, `boolean`, or `object`
 
@@ -156,10 +148,7 @@ my-flow:
 **Example (before)**:
 
 ```yaml
-workspace:
-    mode: dedicated # ❌ Not valid
-    gitStrategy: trunk-based # ❌ Not valid
-    reusePolicy: cached # ❌ Not valid
+workspace: { provider: pool, dir: D:/pool, prefix: repo-ws-, count: 0 } # ❌ count out of range
 
 steps:
     - type: model
@@ -171,10 +160,7 @@ steps:
 **Example (after)**:
 
 ```yaml
-workspace:
-    mode: isolated # ✓ Valid
-    gitStrategy: main-only # ✓ Valid
-    reusePolicy: always # ✓ Valid
+workspace: { provider: pool, dir: D:/pool, prefix: repo-ws-, count: 4 } # ✓ Valid
 
 steps:
     - type: model
@@ -245,10 +231,7 @@ steps:
 ```yaml
 my-flow:
     name: 'Empty Flow'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: in-place
     steps: [] # ❌ Empty
 ```
 
@@ -257,10 +240,7 @@ my-flow:
 ```yaml
 my-flow:
     name: 'Valid Flow'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: in-place
     steps: # ✓ At least one step
         - type: script
           id: hello
@@ -345,10 +325,7 @@ steps:
 ```yaml
 my-flow:
     name: 'Process File'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: in-place
     inputs:
         file_path: string # Note: underscore
     steps:
@@ -362,10 +339,7 @@ my-flow:
 ```yaml
 my-flow:
     name: 'Process File'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: in-place
     inputs:
         file_path: string
     steps:
@@ -379,10 +353,7 @@ my-flow:
 ```yaml
 my-flow:
     name: 'Process File'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: in-place
     inputs:
         file_path: string
         filePath: string # ✓ Added
@@ -604,10 +575,7 @@ steps:
 ```yaml
 recursive-flow:
     name: 'Recursive Flow'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: in-place
     inputs:
         count: number
     steps:
@@ -623,10 +591,7 @@ recursive-flow:
 ```yaml
 recursive-flow:
     name: 'Recursive Flow'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: in-place
     inputs:
         count: number
     steps:
@@ -1197,6 +1162,27 @@ This re-dispatches only the timed-out step -- nothing else re-runs. Only works w
 
 ---
 
+## Workspace Errors
+
+Provider rules: [schema-reference.md](./schema-reference.md#workspace-configuration).
+
+| Symptom (message starts with)                                                                | Cause and fix                                                                                                                       |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `The flow does not declare a workspace.`                                                     | `workspace:` is required. The suggestion lists the providers; the simplest is `workspace: in-place`.                                |
+| `"workspace.mode" is the removed legacy block and cannot be combined with "provider".`       | Remove `mode`, `gitStrategy`, `reusePolicy`, `concurrencyKey`; keep `provider` and its options.                                     |
+| `workspace.mode "isolated" with ... was removed` / `workspace.mode "shared" was removed`      | Rewrite with the suggestion: `worktree` (new branch per run) or `pool` (prepared clones); `in-place` or `readonly` for a shared folder. |
+| `"workspace.<key>" was removed together with the legacy workspace block.`                    | `gitStrategy`, `reusePolicy` or `concurrencyKey` left next to a provider: delete it.                                                |
+| Warning `workspace "mode: manual" is deprecated`                                             | Still runs, as `in-place`. Write `workspace: in-place`.                                                                              |
+| `WORKSPACE_READONLY_CONFLICT`: `The workspace is read-only, but these model steps declare tools that can modify it: ...` | Remove `write`, `edit`, `bash` from the listed steps, or use `in-place`, `worktree` or `pool`. |
+| Run stays `queued`, log says `Waiting for a free workspace: ...`                             | Pool full: the run waits with no timeout and starts when a slot is released. See the claim holders with `flow history` / `flow show`; end the wait with `flow cancel <executionId>`. |
+| `The pool folder(s) ... do not exist. The pool provider never creates a slot:`               | Create each slot (`git clone <url> <dir>/<prefix>N`, N = 1..count) or lower `count`. The message names the folders.                  |
+| `Every slot of the pool is free but has uncommitted changes, and the pool option "requireClean" refuses a dirty slot:` | Clean the named slots, or drop `requireClean` and clean the slot in a first step. |
+| `Invalid options for workspace provider "pool": ...`                                         | Give either `slots` or `dir` + `prefix` + `count`; the message says which.                                                           |
+| `Invalid baseDir "...": must not be inside an existing git worktree at "..."`                | `worktree` `baseDir` must be outside the project (itself a worktree): `../worktrees`, not `.flow/`.                                  |
+| `Workspace already exists at "..."`                                                          | A worktree folder of that name is already there: remove it (`git worktree remove`) or change `prefix`.                              |
+
+---
+
 ## Execution stuck `running`/`queued` (blocks the daemon update)
 
 `flow cancel <execution-id> [-p <project>] [--json]` ends that one execution; the daemon and other runs keep going. It works on queued, running and resumable (unanswered intervention) executions. The record ends `failed` with `lastError: cancelled by user` (and `endReason: cancelled`); its steps end as `cancelled by user`; workers holding its steps are disconnected; the workspace is released. No flow hook fires. Cancelling twice succeeds; an execution that already completed/failed is refused with its final status. With no daemon running, a `running` record is stale: `flow start` marks it failed.
@@ -1283,10 +1269,7 @@ Step-by-step process for debugging flow issues.
 ```yaml
 test-step-isolation:
     name: 'Test Step Isolation'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: never
+    workspace: in-place
     inputs:
         test_input: string
     steps:
@@ -1485,10 +1468,7 @@ flow-engine run my-flow --input data=test
 ```yaml
 test-my-flow:
     name: 'Test My Flow'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: never # Always fresh
+    workspace: in-place
     inputs:
         test_data: string
     steps:

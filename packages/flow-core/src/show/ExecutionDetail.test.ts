@@ -484,3 +484,35 @@ describe('renderExecutionDetail skipped steps', () => {
 		expect(lines.find(l => l.startsWith('  byReason '))).not.toContain('attempts');
 	});
 });
+
+describe('renderExecutionDetail of a run waiting for a workspace', () => {
+	const message =
+		'Waiting for a free workspace: 2/2 slots are claimed by: abcd1234. Cancel it with: flow cancel wait0000';
+	const record = {
+		executionId: 'wait0000',
+		flowFile: 'f.yml',
+		flowId: 'f',
+		status: 'queued' as const,
+		currentSteps: [],
+		startedAt: '2026-10-25T10:00:00.000Z',
+		completedAt: null,
+		steps: { a: { status: 'pending' as const } },
+		workspaceWait: { since: '2026-10-25T10:00:00.000Z', message, run: {} },
+	};
+
+	it('says it waits for a workspace, since when and why, instead of a bare queued', () => {
+		const out = renderExecutionDetail({ record, filePath: 'wait0000.json' }, { tail: 10, full: false });
+		expect(out).toContain('Status:    waiting for workspace');
+		expect(out).toContain('Waiting:   since 2026-10-25 10:00:00 UTC');
+		expect(out).toContain(`Reason:    ${message}`);
+		expect(out).toContain('has not started');
+		expect(out).not.toContain('still queued');
+	});
+
+	it('keeps the plain queued wording for a queued run that does not wait', () => {
+		const { workspaceWait: _removed, ...plain } = record;
+		const out = renderExecutionDetail({ record: plain, filePath: 'f.json' }, { tail: 10, full: false });
+		expect(out).toContain('Status:    queued');
+		expect(out).toContain('still queued');
+	});
+});

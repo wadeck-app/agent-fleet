@@ -87,6 +87,14 @@ sections:
                       - $type: ExtensionSlot
                         items: $sources.actions
 
+          # A run that waits for a workspace says why (who holds the slots, how to cancel); '' = it does not wait, nothing shown.
+          - $type: Section
+            $if: $sources.execution.workspaceWaitText
+            title: Waiting for a workspace
+            items:
+                - $type: flow:MarkdownText
+                  text: $sources.execution.workspaceWaitText
+
           - $type: DataTable
             rows: $sources.execution.timing
             columns:

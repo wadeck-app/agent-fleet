@@ -11,7 +11,7 @@ function source(pluginId: string, extensionPoint: string): PluginCatalogSource {
  *
  * Accepted exception to "one definition": the real manifests (each plugin package's plugin.config) import the
  * implementations, and through them execa and its dependencies, which an app-module bundle must not embed;
- * and the plugin packages expose no metadata-only entry to read the ids from. So the four ids and extension
+ * and the plugin packages expose no metadata-only entry to read the ids from. So the ids and extension
  * points are written here and in flow-cli, and flow-cli's BuiltinPlugins.test.ts pins both lists together:
  * a plugin added or renamed in one fails that test until the other is updated.
  */
@@ -20,4 +20,7 @@ export const BUILTIN_PLUGIN_CATALOG: Record<string, PluginCatalogSource> = {
 	'cli-approval': source('cli-approval', 'approval'),
 	'file-approval': source('file-approval', 'approval'),
 	worktree: source('worktree', 'workspace'),
+	'in-place': source('in-place', 'workspace'),
+	readonly: source('readonly', 'workspace'),
+	pool: source('pool', 'workspace'),
 };

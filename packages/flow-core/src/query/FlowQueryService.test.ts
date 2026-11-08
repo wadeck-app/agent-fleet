@@ -368,7 +368,7 @@ describe('FlowQueryService', () => {
 			expect(withPlugins.listPlugins()).toEqual([
 				{ id: 'none', extensionPoint: 'workspace', typeString: 'plugins.none.default' },
 			]);
-			expect(withPlugins.describePlugin('none').snippet).toContain('plugins.none.default');
+			expect(withPlugins.describePlugin('none').snippet).toContain('workspace: in-place');
 		});
 
 		it('fails loudly when no manifests were provided instead of listing nothing', () => {

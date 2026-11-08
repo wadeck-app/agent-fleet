@@ -28,6 +28,8 @@ const STATUS_VARIANTS: Record<string, RunStatusVariant> = {
 	FAILED: 'danger',
 	running: 'info',
 	waiting: 'default',
+	// A run queued for lack of a free workspace: stalled until someone releases a slot, so it is a warning, not a plain wait.
+	'waiting ws': 'warning',
 	retry: 'warning',
 };
 

@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import { CommandHandler } from './CommandHandler';
 import { completeArguments, registerFolderAsProject } from './CommandHandlerTestHarness';
 
@@ -22,26 +23,12 @@ const { mockAllocate, mockRelease } = vi.hoisted(() => ({
 	mockRelease: vi.fn(),
 }));
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = mockAllocate;
-			release = mockRelease;
-		},
-	};
-});
-
 const FLOW_WITH_GLOBAL_ENV = `\
 id: env-flow
 version: "1.0.0"
 name: Env Flow
 description: Test
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 env:
   FROM_FLOW: "cwd=\${{ context.cwd }}"
@@ -60,10 +47,7 @@ id: two
 version: "1.0.0"
 name: Two
 description: Test
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: s1
@@ -153,7 +137,13 @@ function makeHandler(
 		false,
 		20,
 		3,
-		extra.workspaceProvider as never
+		// Without a provider of its own, a test gets the stub driven by mockAllocate / mockRelease.
+		new FixedWorkspaceProviders(
+			(extra.workspaceProvider as never) ?? {
+				allocate: (...args: unknown[]) => mockAllocate(...args),
+				release: (...args: unknown[]) => mockRelease(...args),
+			}
+		)
 	);
 }
 
@@ -173,10 +163,11 @@ beforeEach(async () => {
 	({ dispose: disposeProject } = await registerFolderAsProject(tmpDir));
 	fs.mkdirSync(daemonDir, { recursive: true });
 	vi.clearAllMocks();
+	// Under the real temp dir: the daemon creates the meta folder on disk.
 	mockAllocate.mockResolvedValue({
-		path: '/tmp/test-workspace',
+		path: path.join(tmpDir, 'test-workspace'),
 		id: 'ws-test-id',
-		metaDir: '/tmp/test-workspace.meta',
+		metaDir: path.join(tmpDir, 'test-workspace.meta'),
 	});
 	mockRelease.mockResolvedValue(undefined);
 	mockExecStore.exists.mockReturnValue(false);
@@ -203,7 +194,7 @@ describe('CommandHandler run setup edge cases', () => {
 		expect(assign.stepConfig.env).toEqual({ FROM_FLOW: `cwd=${tmpDir}`, SHARED: 'step-value' });
 	});
 
-	it('refuses the run with WORKSPACE_ERROR when the native workspace cannot be allocated', async () => {
+	it('refuses the run with WORKSPACE_ERROR when the workspace cannot be allocated', async () => {
 		mockAllocate.mockRejectedValue(new Error('disk full'));
 		const handler = makeHandler();
 		const flowFile = path.join(tmpDir, 'flow.yml');
@@ -214,29 +205,13 @@ describe('CommandHandler run setup edge cases', () => {
 		expect(result).toEqual({
 			type: 'error',
 			code: 'WORKSPACE_ERROR',
-			message: 'Failed to allocate workspace. Ensure the flow workspace directory is writable.',
+			message: 'Failed to allocate the workspace: disk full',
 		});
 		expect(mockLogWriter.writeExecution).toHaveBeenCalledWith(
 			'__workspace',
 			expect.stringContaining('WORKSPACE_ERROR detail: Error: disk full'),
 			'error'
 		);
-		expect(mockExecStore.create).not.toHaveBeenCalled();
-	});
-
-	it('refuses the run with WORKSPACE_ERROR when the plugin provider cannot allocate', async () => {
-		const provider = { allocate: vi.fn().mockRejectedValue(new Error('quota')), release: vi.fn() };
-		const handler = makeHandler(createWorkerPool(false), { workspaceProvider: provider });
-		const flowFile = path.join(tmpDir, 'flow.yml');
-		fs.writeFileSync(flowFile, TWO_STEP_FLOW);
-
-		const result = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
-
-		expect(result).toEqual({
-			type: 'error',
-			code: 'WORKSPACE_ERROR',
-			message: 'Failed to allocate workspace via plugin provider: Error: quota',
-		});
 		expect(mockExecStore.create).not.toHaveBeenCalled();
 	});
 
@@ -258,7 +233,7 @@ describe('CommandHandler run setup edge cases', () => {
 		});
 	});
 
-	it('reports a failure to release the native workspace when the execution ends', async () => {
+	it('reports a failure to release the workspace when the execution ends', async () => {
 		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
 		mockRelease.mockRejectedValue(new Error('cannot release'));
 		const handler = makeHandler();
@@ -269,7 +244,7 @@ describe('CommandHandler run setup edge cases', () => {
 
 		await vi.waitFor(() => {
 			expect(stderr).toHaveBeenCalledWith(
-				expect.stringContaining(`for ${executionId}: Error: cannot release. Remove its directory by hand`)
+				expect.stringContaining(`for ${executionId}: Error: cannot release. Remove it by hand`)
 			);
 		});
 	});

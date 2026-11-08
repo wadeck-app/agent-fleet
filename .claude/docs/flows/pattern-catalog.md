@@ -56,10 +56,7 @@ data-simple-pipeline:
     version: '1.0.0'
     name: 'Data Flow: Simple Pipeline'
     description: 'Linear data flow: generate → transform → display'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     inputs:
         seed: string
     steps:
@@ -181,10 +178,7 @@ test-diamond:
     version: '1.0.0'
     name: 'Test: Diamond Pattern'
     description: 'Tests fork-join with diamond shape (A splits to B+C, then joins at D)'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     statusTransitions:
         onSuccess: approved
         onFailure: todo
@@ -328,10 +322,7 @@ test-fork:
     version: '1.0.0'
     name: 'Test: Fork Pattern'
     description: 'Tests parallel execution with 3-way fork (A splits to B+C+D)'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     statusTransitions:
         onSuccess: approved
         onFailure: todo
@@ -491,10 +482,7 @@ data-fanout-fanin:
     version: '1.0.0'
     name: 'Data Flow: Fan-Out/Fan-In'
     description: 'Complex pattern with multiple parallel transformations and aggregation'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     inputs:
         dataset: string
     steps:
@@ -698,10 +686,7 @@ data-conditional:
     version: '1.0.0'
     name: 'Data Flow: Conditional Processing'
     description: 'Data flows through different paths based on conditions'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     inputs:
         value: string
     steps:
@@ -880,10 +865,7 @@ test-loop:
     version: '1.0.0'
     name: 'Test: Feedback Loop (Retry Pattern)'
     description: 'Tests onFailure.goto with a test step that fails twice then succeeds'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     statusTransitions:
         onSuccess: approved
         onFailure: todo
@@ -1052,10 +1034,7 @@ test-review-loop:
     version: '1.0.0'
     name: 'Test: Review Feedback Loop'
     description: 'Tests onFailure.goto with a review step that fails once then approves'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     statusTransitions:
         onSuccess: approved
         onFailure: changes_requested
@@ -1215,10 +1194,7 @@ test-multi-review:
     version: '1.0.0'
     name: 'Test: Multi-Review with Skip and Reset'
     description: 'Tests skipOnLoop and resetOnSuccess with parallel review steps'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     statusTransitions:
         onSuccess: approved
         onFailure: changes_requested
@@ -1408,10 +1384,7 @@ data-etl:
     version: '1.0.0'
     name: 'Data Flow: ETL Pattern'
     description: 'Extract, Transform, Load pattern with multiple transformations'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     inputs:
         source: string
     steps:
@@ -1611,10 +1584,7 @@ data-build-pipeline:
     version: '1.0.0'
     name: 'Data Flow: Build Pipeline'
     description: 'CI/CD pipeline with compile, test, and package steps'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     inputs:
         version: string
     steps:
@@ -1842,10 +1812,7 @@ test-echo:
     version: '1.0.0'
     name: 'Test: Echo Flow'
     description: 'Simple echo flow used for testing subflow composition'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     inputs:
         message: string
     steps:
@@ -1864,10 +1831,7 @@ test-subflow-basic:
     version: '1.0.0'
     name: 'Test: Basic SubFlow'
     description: 'Tests basic subflow execution with inherit strategy'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     inputs:
         greeting: string
     steps:
@@ -1909,10 +1873,7 @@ test-subflow-nested:
     version: '1.0.0'
     name: 'Test: Nested SubFlows'
     description: 'Tests nested subflow execution (3 levels deep)'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     inputs:
         msg: string
     steps:
@@ -2044,10 +2005,7 @@ test-recursive-countdown:
     version: '1.0.0'
     name: 'Test: Recursive Countdown'
     description: 'Tests recursive SubFlowStep with exit condition (counts from N to 0)'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     inputs:
         count: string
     steps:
@@ -2236,10 +2194,7 @@ test-user-intervention:
     version: '1.0.0'
     name: 'Test: User Intervention'
     description: 'Tests user intervention step with approval workflow'
-    workspace:
-        mode: manual
-        gitStrategy: any
-        reusePolicy: always
+    workspace: in-place
     statusTransitions:
         onSuccess: approved
         onFailure: todo

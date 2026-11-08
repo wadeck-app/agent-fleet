@@ -268,4 +268,52 @@ describe('FlowDefinitionResolver', () => {
 			expect(error.message).toContain(first.definitionSnapshot);
 		});
 	});
+
+	describe('forSnapshotRef (a run that starts again from the definition it was accepted with)', () => {
+		it('returns the stored definition, with its version, hash and the given choice, committing nothing new', () => {
+			const first = fromFile(definition('1.0.0'));
+
+			const again = resolver.forSnapshotRef(first.definitionSnapshot, 'file');
+
+			expect(again.flow).toEqual(first.flow);
+			expect(again.version).toBe('1.0.0');
+			expect(again.hash).toBe(first.hash);
+			expect(again.definitionSnapshot).toBe(first.definitionSnapshot);
+			expect(again.choice).toBe('file');
+			expect(() => again.commit()).not.toThrow();
+		});
+
+		it('reads the snapshot even when the file it came from changed or disappeared', () => {
+			const first = fromFile(definition('1.0.0'));
+			fromFile(definition('1.1.0', 'echo changed'));
+
+			expect(resolver.forSnapshotRef(first.definitionSnapshot, 'file').flow.steps[0]).toMatchObject({
+				script: 'echo hi',
+			});
+		});
+
+		it('refuses a snapshot that was modified after it was written', () => {
+			const first = fromFile(definition('1.0.0'));
+			fs.writeFileSync(
+				path.join(dir, 'definitions', ...first.definitionSnapshot.split('/')),
+				yaml.dump(definition('1.0.0', 'tampered'))
+			);
+
+			const error = errorOf(() => resolver.forSnapshotRef(first.definitionSnapshot, 'file'));
+
+			expect(error.kind).toBe('snapshot-corrupt');
+		});
+
+		it('says the snapshot is missing, with what to do', () => {
+			expect(() => resolver.forSnapshotRef('my-flow/1.0.0-aaaaaaaaaaaa.yml', 'file')).toThrow(
+				/Cannot read definition snapshot/
+			);
+		});
+
+		it('refuses a reference that is not a snapshot name', () => {
+			const error = errorOf(() => resolver.forSnapshotRef('../escape.yml', 'file'));
+
+			expect(error.kind).toBe('snapshot-corrupt');
+		});
+	});
 });

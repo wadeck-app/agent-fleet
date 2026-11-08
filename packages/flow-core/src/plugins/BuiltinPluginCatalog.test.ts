@@ -4,11 +4,14 @@ import { BUILTIN_PLUGIN_CATALOG } from './BuiltinPluginCatalog.js';
 import { PLUGIN_CONFIGS, describePlugin, listPlugins } from './PluginCatalog.js';
 
 describe('BUILTIN_PLUGIN_CATALOG', () => {
-	it('names the four plugins flow ships, keyed by their pluginId', () => {
+	it('names the plugins flow ships, keyed by their pluginId', () => {
 		expect(Object.keys(BUILTIN_PLUGIN_CATALOG).sort()).toEqual([
 			'cli-approval',
 			'file-approval',
+			'in-place',
 			'none',
+			'pool',
+			'readonly',
 			'worktree',
 		]);
 		for (const [key, entry] of Object.entries(BUILTIN_PLUGIN_CATALOG)) expect(entry.pluginId).toBe(key);

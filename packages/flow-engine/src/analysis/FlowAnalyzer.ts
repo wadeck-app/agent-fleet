@@ -11,6 +11,7 @@
  * Used by FlowRecommendationEngine to match ideas with existing flows.
  */
 import type { FlowDefinition, FlowStep, InputSpec, NormalizedInputDefinition, VariableType } from '../types';
+import { WorkspaceDeclarationParser } from '../workspace/WorkspaceDeclarationParser';
 
 /**
  * Flow pattern types
@@ -122,7 +123,7 @@ export class FlowAnalyzer {
 			complexity,
 			tags,
 			stepCount: flow.steps.length,
-			isolated: flow.workspace.mode === 'isolated',
+			isolated: WorkspaceDeclarationParser.isExclusive(WorkspaceDeclarationParser.providerNameOf(flow.workspace)),
 			usesSubflows: flow.steps.some(s => s.type === 'subflow'),
 			requiresApproval: flow.steps.some(s => s.type === 'user_intervention'),
 		};

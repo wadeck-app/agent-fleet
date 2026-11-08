@@ -4,6 +4,8 @@ import { manifest as fileApprovalManifest } from 'plugin-file-approval/plugin.co
 import { manifest as noneManifest } from 'plugin-none/plugin.config';
 import { manifest as worktreeManifest } from 'plugin-worktree/plugin.config';
 
+import { IN_PLACE_MANIFEST, POOL_MANIFEST, READONLY_MANIFEST } from '../workspace/BuiltinWorkspaceManifests';
+
 /**
  * The plugins that ship inside the CLI, reachable without touching the filesystem.
  *
@@ -23,4 +25,7 @@ export const BUILTIN_PLUGIN_MANIFESTS: Record<string, PluginManifest> = {
 	'cli-approval': cliApprovalManifest as PluginManifest,
 	'file-approval': fileApprovalManifest as PluginManifest,
 	worktree: worktreeManifest as PluginManifest,
+	'in-place': IN_PLACE_MANIFEST,
+	readonly: READONLY_MANIFEST,
+	pool: POOL_MANIFEST,
 };

@@ -5,6 +5,8 @@ import type { WebSocket } from 'ws';
 
 import type { ExecutionStore } from '../storage/ExecutionStore';
 import type { LogWriter } from '../storage/LogWriter';
+import { WorkspaceProviders } from '../workspace/WorkspaceProviders';
+import type { WorkspaceProviderSource } from '../workspace/WorkspaceProviders';
 import { BoundStepWait, type WorkerTypeRouting } from './BoundStepWait.js';
 import type { DaemonSecrets } from './DaemonSecrets.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
@@ -23,9 +25,11 @@ import { StepDispatcher } from './StepDispatcher.js';
 import { StepInjection } from './StepInjection.js';
 import { StepOutcomes } from './StepOutcomes.js';
 import { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
+import { WaitingRuns } from './WaitingRuns.js';
 import { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
+import { WorkspaceWaitSupervisor } from './WorkspaceWaitSupervisor.js';
 
 /** What the pipeline is built from: the state CommandHandler owns, and the settings it was given. */
 export interface ExecutionPipelineDependencies {
@@ -38,7 +42,7 @@ export interface ExecutionPipelineDependencies {
 	executionStore: ExecutionStore;
 	logWriter: LogWriter;
 	daemonSecrets: DaemonSecrets;
-	workspaceProvider: WorkspaceProvider | undefined;
+	workspaceProviders: WorkspaceProviderSource | undefined;
 	resolvePerFlowWorkspaceProvider:
 		((section: NonNullable<FlowPluginOverrides['workspace']>) => Promise<WorkspaceProvider>) | undefined;
 	requestFromDeclaredSources: ((workerTypes?: ReadonlySet<string>) => void) | undefined;
@@ -66,6 +70,9 @@ export class ExecutionPipeline {
 	readonly supervisor: WorkerAssignmentSupervisor;
 	readonly runEnd: RunEndCoordinator;
 	readonly idleState: SchedulerIdleState;
+	/** The runs that wait for a workspace; they count as work in flight for the idle exit. */
+	readonly waitingRuns = new WaitingRuns();
+	readonly waitSupervisor: WorkspaceWaitSupervisor;
 	readonly dispatcher: StepDispatcher;
 	readonly outcomes: StepOutcomes;
 	readonly canceller: ExecutionCanceller;
@@ -105,7 +112,7 @@ export class ExecutionPipeline {
 			deps.runEndSettings,
 			deps.runEndedListener
 		);
-		this.idleState = new SchedulerIdleState(queue, executions, this.runEnd);
+		this.idleState = new SchedulerIdleState(queue, executions, this.runEnd, this.waitingRuns);
 		this.dispatcher = new StepDispatcher(
 			registry,
 			queue,
@@ -126,8 +133,7 @@ export class ExecutionPipeline {
 		);
 		const workspaces = new ExecutionWorkspaces(
 			logWriter,
-			deps.workspaceProvider,
-			deps.resolvePerFlowWorkspaceProvider
+			deps.workspaceProviders ?? new WorkspaceProviders(deps.resolvePerFlowWorkspaceProvider)
 		);
 		this.outcomes = new StepOutcomes(
 			executions,
@@ -151,6 +157,7 @@ export class ExecutionPipeline {
 			supervisor: this.supervisor,
 			hooks,
 			workspaces,
+			waitingRuns: this.waitingRuns,
 			logWriter,
 			disconnectWorker: worker => registry.disconnect(worker),
 			endExecution: (executionId, reason, priorError) =>
@@ -164,6 +171,12 @@ export class ExecutionPipeline {
 			deps.maxInjectedSteps,
 			deps.maxStepsPerExecution
 		);
+		this.waitSupervisor = new WorkspaceWaitSupervisor(
+			this.waitingRuns,
+			executionStore,
+			logWriter,
+			(executionId, reason) => workspaces.release(executionId, reason)
+		);
 		this.runRequests = new RunRequestHandler(
 			new FlowFileAccessGuard(deps.allowAbsolutePaths),
 			new RunDefinitionLoader(deps.definitionResolver, logWriter, () => workerRouting.workerTypes.knownTypes()),
@@ -175,7 +188,8 @@ export class ExecutionPipeline {
 			hooks,
 			executionStore,
 			logWriter,
-			() => this.tryDispatch()
+			() => this.tryDispatch(),
+			this.waitSupervisor
 		);
 	}
 

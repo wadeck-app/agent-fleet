@@ -1,5 +1,5 @@
 import { logsDirOf } from 'flow-core';
-import { TemplateRenderer } from 'flow-engine';
+import { ReadOnlyWorkspaceRules, TemplateRenderer } from 'flow-engine';
 import type { FlowDefinition, FlowStep } from 'flow-engine';
 
 import type { AssignableStep, ClientCommand, DaemonResponse, ExecutionContext } from '../ipc/Protocol';
@@ -103,8 +103,11 @@ export class RunStepPreparer {
 				: flow.steps
 		).map((s: FlowStep) => assertAssignable(s));
 
-		this.overlayMockEnv(assignable, cmd, executionId);
-		return assignable;
+		// A read-only workspace narrows the steps (default tools, prompt note, git without locks) before the mock overlay,
+		// which must still outrank everything.
+		const prepared = context.workspaceReadOnly === true ? ReadOnlyWorkspaceRules.apply(assignable) : assignable;
+		this.overlayMockEnv(prepared, cmd, executionId);
+		return prepared;
 	}
 
 	/** Resolves global flow env templates (context.* available: cwd, projectDir, workspaceDir). */

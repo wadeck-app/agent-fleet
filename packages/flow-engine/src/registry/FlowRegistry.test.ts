@@ -44,7 +44,7 @@ describe('FlowRegistry', () => {
 			expect(flow).toBeDefined();
 			expect(flow?.id).toBe('simple-qa');
 			expect(flow?.name).toBe('Simple Question & Answer');
-			expect(flow?.workspace.mode).toBe('shared');
+			expect(flow?.workspace).toBe('readonly');
 			expect(flow?.steps).toHaveLength(1);
 			expect(flow?.steps[0].type).toBe('model');
 		});
@@ -55,7 +55,7 @@ describe('FlowRegistry', () => {
 			expect(flow).toBeDefined();
 			expect(flow?.id).toBe('dev-full');
 			expect(flow?.name).toBe('Full Development Cycle');
-			expect(flow?.workspace.mode).toBe('isolated');
+			expect(flow?.workspace).toEqual({ provider: 'worktree', baseDir: '../worktrees', prefix: 'flow-' });
 			expect(flow?.steps).toHaveLength(4);
 		});
 
@@ -101,11 +101,7 @@ describe('FlowRegistry', () => {
 				id: 'test-flow',
 				name: 'Test Flow',
 				description: 'Test description',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				inputs: {
 					input1: 'string',
 				},
@@ -130,11 +126,7 @@ describe('FlowRegistry', () => {
 				id: 'invalid-flow',
 				name: 'Invalid Flow',
 				description: 'Has invalid step dependency',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				steps: [
 					createMockModelStep({
 						id: 'step1',
@@ -156,11 +148,7 @@ describe('FlowRegistry', () => {
 				id: 'temp-flow',
 				name: 'Temp',
 				description: '',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				steps: [
 					createMockModelStep({
 						id: 'step1',
@@ -219,11 +207,7 @@ custom-flow:
 					version: '1.0.0',
 					name: 'Custom Flow',
 					description: 'A custom flow',
-					workspace: {
-						mode: 'isolated',
-						gitStrategy: 'main-only',
-						reusePolicy: 'never',
-					},
+					workspace: 'in-place',
 					inputs: {
 						taskInput: 'string',
 					},
@@ -271,11 +255,7 @@ custom-flow:
 				'valid-flow': {
 					version: '1.0.0',
 					name: 'Valid Flow',
-					workspace: {
-						mode: 'isolated',
-						gitStrategy: 'main-only',
-						reusePolicy: 'never',
-					},
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'step1',
@@ -288,11 +268,7 @@ custom-flow:
 				'invalid-flow': {
 					version: '1.0.0',
 					name: 'Invalid Flow',
-					workspace: {
-						mode: 'isolated',
-						gitStrategy: 'main-only',
-						reusePolicy: 'never',
-					},
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'step1',
@@ -321,7 +297,7 @@ custom-flow:
 				'model-flow': {
 					version: '1.0.0',
 					name: 'Model Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'model-step',
@@ -357,7 +333,7 @@ custom-flow:
 				'script-flow': {
 					version: '1.0.0',
 					name: 'Script Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'script-step',
@@ -392,7 +368,7 @@ custom-flow:
 				'strict-flow': {
 					version: '1.0.0',
 					name: 'Strict Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{ id: 'a', name: 'A', type: 'script', script: 'false', shell: 'bash', strict: false },
 						{ id: 'b', name: 'B', type: 'script', script: 'true', shell: 'bash' },
@@ -416,7 +392,7 @@ custom-flow:
 				'timeout-flow': {
 					version: '1.0.0',
 					name: 'Timeout Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [{ id: 'a', name: 'A', type: 'script', script: 'sleep 1', shell: 'bash', timeout: 90 }],
 				},
 			});
@@ -434,7 +410,7 @@ custom-flow:
 				'model-timeout-flow': {
 					version: '1.0.0',
 					name: 'Model Timeout Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [{ id: 'a', name: 'A', type: 'model', model: 'haiku', prompt: 'hi', timeout: 15 }],
 				},
 			});
@@ -464,7 +440,7 @@ custom-flow:
 				'fields-flow': {
 					version: '1.0.0',
 					name: 'Fields Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [{ id: 'a', name: 'A', type: 'model', model: 'haiku', prompt: 'hi', [field]: value }],
 				},
 			});
@@ -482,7 +458,7 @@ custom-flow:
 				'script-fields-flow': {
 					version: '1.0.0',
 					name: 'Script Fields Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'a',
@@ -512,7 +488,7 @@ custom-flow:
 				'default-type-flow': {
 					version: '1.0.0',
 					name: 'Default Type Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'step1',
@@ -529,33 +505,35 @@ custom-flow:
 			expect(registry.getFlow('default-type-flow')).toBeUndefined();
 		});
 
-		it('should parse workspace config with defaults', async () => {
+		it('keeps the workspace declaration as written and applies no default', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
 			vi.mocked(yaml.load).mockReturnValue({
-				'workspace-flow': {
+				'named-flow': {
 					version: '1.0.0',
-					name: 'Workspace Flow',
-					workspace: {}, // Empty workspace config
-					steps: [
-						{
-							id: 'step1',
-							type: 'model',
-							prompt: 'Test',
-						},
-					],
+					name: 'Named',
+					workspace: 'readonly',
+					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
+				},
+				'object-flow': {
+					version: '1.0.0',
+					name: 'Object',
+					workspace: { provider: 'pool', dir: 'D:/pool', count: 2 },
+					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
+				},
+				'bare-flow': {
+					version: '1.0.0',
+					name: 'Bare',
+					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
 				},
 			});
 
 			await registry.loadProjectFlows();
 
-			const flow = registry.getFlow('workspace-flow');
-
-			// @formatter:off
-			expect(flow?.workspace.mode).toBe('isolated'); // Default
-			expect(flow?.workspace.gitStrategy).toBe('main-only'); // Default
-			expect(flow?.workspace.reusePolicy).toBe('never'); // Default
-			// @formatter:on
+			expect(registry.getFlow('named-flow')?.workspace).toBe('readonly');
+			expect(registry.getFlow('object-flow')?.workspace).toEqual({ provider: 'pool', dir: 'D:/pool', count: 2 });
+			// No default: the validator reports the missing declaration.
+			expect(registry.getFlow('bare-flow')?.workspace).toBeUndefined();
 		});
 
 		it('should parse step dependencies', async () => {
@@ -565,7 +543,7 @@ custom-flow:
 				'dep-flow': {
 					version: '1.0.0',
 					name: 'Dependency Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'step1',
@@ -597,7 +575,7 @@ custom-flow:
 				'cond-flow': {
 					version: '1.0.0',
 					name: 'Conditional Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'step1',
@@ -624,7 +602,7 @@ custom-flow:
 				'retry-flow': {
 					version: '1.0.0',
 					name: 'Retry Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'step1',
@@ -652,30 +630,17 @@ custom-flow:
 	});
 
 	describe('Flow Filtering', () => {
-		it('should filter flows by workspace mode - isolated', () => {
-			const isolatedFlows = registry.getFlowsByWorkspaceMode('isolated');
+		it('should filter flows by workspace provider', () => {
+			const worktreeFlows = registry.getFlowsByWorkspaceProvider('worktree');
 
-			expect(isolatedFlows.length).toBeGreaterThan(0);
-			isolatedFlows.forEach(flow => {
-				expect(flow.workspace.mode).toBe('isolated');
-			});
+			expect(worktreeFlows.map(flow => flow.id)).toContain('dev-full');
+			expect(worktreeFlows.map(flow => flow.id)).not.toContain('simple-qa');
 		});
 
-		it('should filter flows by workspace mode - shared', () => {
-			const sharedFlows = registry.getFlowsByWorkspaceMode('shared');
-
-			expect(sharedFlows.length).toBeGreaterThan(0);
-			sharedFlows.forEach(flow => {
-				expect(flow.workspace.mode).toBe('shared');
-			});
-		});
-
-		it('should return empty array if no flows match mode', () => {
-			// Clear all flows first
+		it('should return empty array if no flows match the provider', () => {
 			registry.clear(false);
 
-			const flows = registry.getFlowsByWorkspaceMode('isolated');
-			expect(flows).toEqual([]);
+			expect(registry.getFlowsByWorkspaceProvider('worktree')).toEqual([]);
 		});
 	});
 
@@ -685,11 +650,7 @@ custom-flow:
 				id: 'valid',
 				name: 'Valid',
 				description: 'Valid flow',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				inputs: {
 					input1: 'string',
 				},
@@ -714,11 +675,7 @@ custom-flow:
 				id: 'invalid',
 				name: 'Invalid',
 				description: 'Invalid flow',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				steps: [
 					createMockModelStep({
 						id: 'step1',
@@ -750,11 +707,7 @@ custom-flow:
 				id: 'custom',
 				name: 'Custom',
 				description: 'Custom flow',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				steps: [
 					createMockModelStep({
 						id: 'step1',
@@ -901,7 +854,7 @@ custom-flow:
 				'empty-steps': {
 					version: '1.0.0',
 					name: 'Empty Steps',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [],
 				},
 			});
@@ -919,7 +872,7 @@ custom-flow:
 				'no-name': {
 					version: '1.0.0',
 					name: 'No Step Name',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'step1',
@@ -945,7 +898,7 @@ custom-flow:
 			vi.mocked(yaml.load).mockReturnValue({
 				'flow-id': {
 					version: '1.0.0',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'step1',
@@ -971,7 +924,7 @@ custom-flow:
 				'no-inputs': {
 					version: '1.0.0',
 					name: 'No Inputs',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [
 						{
 							id: 'step1',
@@ -989,36 +942,6 @@ custom-flow:
 			// Should default to empty inputs object
 			expect(flow?.inputs).toEqual({});
 		});
-
-		it('should handle concurrencyKey in workspace config', async () => {
-			vi.mocked(fs.existsSync).mockReturnValue(true);
-			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
-			vi.mocked(yaml.load).mockReturnValue({
-				'concurrency-flow': {
-					version: '1.0.0',
-					name: 'Concurrency Flow',
-					workspace: {
-						mode: 'shared',
-						gitStrategy: 'main-only',
-						reusePolicy: 'always',
-						concurrencyKey: 'readonly',
-					},
-					steps: [
-						{
-							id: 'step1',
-							type: 'model',
-							prompt: 'Test',
-						},
-					],
-				},
-			});
-
-			await registry.loadProjectFlows();
-
-			const flow = registry.getFlow('concurrency-flow');
-
-			expect(flow?.workspace.concurrencyKey).toBe('readonly');
-		});
 	});
 
 	describe('Complex Flows', () => {
@@ -1029,7 +952,7 @@ custom-flow:
 				'complex-flow': {
 					version: '1.0.0',
 					name: 'Complex Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'feature-branch', reusePolicy: 'never' },
+					workspace: 'in-place',
 					inputs: {
 						input1: 'string',
 						input2: 'number',
@@ -1084,7 +1007,7 @@ custom-flow:
 				'hooks-flow': {
 					version: '1.0.0',
 					name: 'Hooks Flow',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					hooks: {
 						onStart: 'echo "Starting"',
 						onComplete: 'echo "Completed"',
@@ -1119,7 +1042,7 @@ custom-flow:
 					version: '1.0.0',
 					name: 'Custom Flow',
 					description: 'From external file',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					inputs: { input1: 'string' },
 					steps: [{ id: 'step1', type: 'model', model: 'sonnet', prompt: 'Test' }],
 				},
@@ -1163,7 +1086,7 @@ custom-flow:
 					version: '1.0.0',
 					name: 'External Name',
 					description: 'External desc',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					inputs: { input1: 'string' },
 					steps: [{ id: 'step1', type: 'model', model: 'sonnet', prompt: 'External' }],
 				},
@@ -1259,7 +1182,7 @@ custom-flow:
 				'different-flow': {
 					version: '1.0.0',
 					name: 'Different',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [],
 				},
 			};
@@ -1305,7 +1228,7 @@ custom-flow:
 					version: '1.0.0',
 					name: 'Custom',
 					description: 'Test',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [{ id: 'step1', type: 'model', model: 'sonnet', prompt: 'Test' }],
 				},
 			};
@@ -1345,11 +1268,7 @@ custom-flow:
 				id: 'test-flow',
 				name: 'Test Flow',
 				description: 'Test description',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				inputs: {
 					input1: 'string',
 				},
@@ -1375,11 +1294,7 @@ custom-flow:
 				id: 'flow1',
 				name: 'Flow 1',
 				description: 'Test',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				steps: [
 					createMockModelStep({
 						id: 'step1',
@@ -1413,11 +1328,7 @@ custom-flow:
 				id: 'flow1',
 				name: 'Flow 1',
 				description: 'Test',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				steps: [
 					createMockModelStep({
 						id: 'step1',
@@ -1448,11 +1359,7 @@ custom-flow:
 				id: 'flow1',
 				name: 'Flow 1',
 				description: 'Test',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				inputs: {
 					input1: 'string',
 				},
@@ -1485,11 +1392,7 @@ custom-flow:
 				id: 'flow1',
 				name: 'Flow 1',
 				description: 'Description A',
-				workspace: {
-					mode: 'isolated',
-					gitStrategy: 'main-only',
-					reusePolicy: 'never',
-				},
+				workspace: 'in-place',
 				inputs: {
 					input1: 'string',
 				},
@@ -1524,7 +1427,7 @@ custom-flow:
 			vi.mocked(yaml.load).mockReturnValue({
 				'no-version': {
 					name: 'No Version',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
 					// Missing version field
 				},
@@ -1542,7 +1445,7 @@ custom-flow:
 				'valid-version': {
 					version: '1.2.3',
 					name: 'Valid Version',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
 				},
 			});
@@ -1560,7 +1463,7 @@ custom-flow:
 				'invalid-version': {
 					version: 'v1.0', // Invalid format
 					name: 'Invalid Version',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
 				},
 			});
@@ -1577,13 +1480,13 @@ custom-flow:
 				'version-1': {
 					version: '0.0.1',
 					name: 'Version 1',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
 				},
 				'version-2': {
 					version: '10.20.30',
 					name: 'Version 2',
-					workspace: { mode: 'isolated', gitStrategy: 'main-only', reusePolicy: 'never' },
+					workspace: 'in-place',
 					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
 				},
 			});
@@ -1637,7 +1540,7 @@ custom-flow:
 						// Business types
 						prio: 'priority',
 					},
-					workspace: { mode: 'shared', gitStrategy: 'any', reusePolicy: 'prefer' },
+					workspace: 'in-place',
 					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
 				},
 			});
@@ -1660,7 +1563,7 @@ custom-flow:
 					inputs: {
 						invalid: 'invalidType',
 					},
-					workspace: { mode: 'shared', gitStrategy: 'any', reusePolicy: 'prefer' },
+					workspace: 'in-place',
 					steps: [{ id: 'step1', type: 'model', prompt: 'Test' }],
 				},
 			});

@@ -6,6 +6,7 @@ import { formatDuration } from '../history/ExecutionFormat.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import type { ResolvedExecution } from '../show/ExecutionDetail.js';
 import { type StepAttemptView, toStepAttemptViews } from './StepAttemptViews.js';
+import { isWaitingForWorkspace } from './WorkspaceWaitText.js';
 
 export type { StepAttemptView } from './StepAttemptViews.js';
 
@@ -31,6 +32,10 @@ export interface ExecutionSummary {
 	flowVersion?: string;
 	/** `flowVersion`, or `-` when it was not recorded: the text of a table cell. */
 	versionLabel: string;
+	/** True while the run is `queued` because its workspace pool has no free slot (it has done no work). Absent otherwise. */
+	waitingForWorkspace?: true;
+	/** Since when and why it waits; present exactly when `waitingForWorkspace` is. */
+	workspaceWait?: { since: string; message: string };
 	stepCount: number;
 	failedStepCount: number;
 	/** Steps that did not run (stored as `completed`; see StepSkip). Counted in `stepCount`, apart from the ones that ran. */
@@ -104,6 +109,13 @@ export function toExecutionSummary(record: ExecutionState, projectLookup?: Proje
 		...(projectLabel !== undefined ? { projectLabel } : {}),
 		...(record.flowVersion !== undefined ? { flowVersion: record.flowVersion } : {}),
 		versionLabel: versionColumnOf(record),
+		...(isWaitingForWorkspace(record)
+			? {
+					waitingForWorkspace: true as const,
+					// The `run` request of the wait is not sent: it is the daemon's restart copy, not display data.
+					workspaceWait: { since: record.workspaceWait!.since, message: record.workspaceWait!.message },
+				}
+			: {}),
 		stepCount: steps.length,
 		failedStepCount: steps.filter(step => step.status === 'failed').length,
 		skippedStepCount: countSkippedSteps(steps),

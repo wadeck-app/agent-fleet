@@ -10,6 +10,7 @@ describe('DaemonIdleShutdown', () => {
 	let logsDir: string;
 	let idle: boolean;
 	let runEndPending: boolean;
+	let waitingRuns: boolean;
 	let stopPeriodicWork: Mock<() => void>;
 	let stopDaemon: Mock<() => Promise<void>>;
 	let wsClose: Mock<() => void>;
@@ -26,6 +27,7 @@ describe('DaemonIdleShutdown', () => {
 		logsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-idle-shutdown-'));
 		idle = true;
 		runEndPending = false;
+		waitingRuns = false;
 		stopPeriodicWork = vi.fn<() => void>();
 		stopDaemon = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 		wsClose = vi.fn<() => void>();
@@ -35,6 +37,7 @@ describe('DaemonIdleShutdown', () => {
 				hasActiveExecutions: () => false,
 				hasResumableInterventions: () => false,
 				hasPendingRunEnds: () => runEndPending,
+				hasWaitingRuns: () => waitingRuns,
 				describeIdleState: () => 'state',
 				stopBackgroundWork: vi.fn(),
 			},
@@ -53,6 +56,17 @@ describe('DaemonIdleShutdown', () => {
 	afterEach(() => {
 		vi.useRealTimers();
 		fs.rmSync(logsDir, { recursive: true, force: true });
+	});
+
+	// A run waiting for a workspace has no scheduler yet, but the daemon holds it: stopping would drop it until the next start.
+	it('does not stop (nor lets an update restart the daemon) while a run waits for a workspace', () => {
+		waitingRuns = true;
+
+		shutdown.checkShutdown();
+		vi.advanceTimersByTime(SHUTDOWN_GRACE_MS * 2);
+
+		expect(stopDaemon).not.toHaveBeenCalled();
+		expect(shutdown.isIdle()).toBe(false);
 	});
 
 	// executions.remove runs before the run-end settle/ack/release phase: no active execution does not mean no work.

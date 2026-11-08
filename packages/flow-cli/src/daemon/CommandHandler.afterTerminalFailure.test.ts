@@ -30,17 +30,6 @@ vi.mock('node:os', async importOriginal => {
 	};
 });
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = mockAllocate;
-			release = mockRelease;
-		},
-	};
-});
-
 registerCommandHandlerHooks({ mockAllocate, mockRelease, hoistedState });
 
 const PARALLEL_FLOW_YAML = `\
@@ -48,10 +37,7 @@ id: parallel-flow
 version: "1.0.0"
 name: Parallel Flow
 description: Two independent steps
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: s1
@@ -69,10 +55,7 @@ id: parallel-intervention-flow
 version: "1.0.0"
 name: Parallel Intervention Flow
 description: A script and an approval, independent
-workspace:
-  mode: manual
-  gitStrategy: any
-  reusePolicy: if-available
+workspace: in-place
 inputs: {}
 steps:
   - id: a

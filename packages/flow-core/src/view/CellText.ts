@@ -1,5 +1,6 @@
 import type { ExecutionStatus, StepStatus } from '../execution/ExecutionState.js';
 import { formatStarted } from '../history/ExecutionFormat.js';
+import { WAITING_FOR_WORKSPACE_TAG } from './WorkspaceWaitText.js';
 
 /**
  * Short, plain ASCII renderings of execution fields for table cells that cannot style or truncate their content
@@ -27,7 +28,16 @@ const STEP_STATUS_TAGS: Record<StepStatus, string> = {
 // @formatter:on
 
 /** "ok", "FAILED"...: one short word that tells the outcome of a run where a table cell is narrow. */
-export function statusTag(status: string): string {
+export function statusTag(status: string, waitingForWorkspace = false): string {
+	if (waitingForWorkspace) {
+		// The flag only makes sense on a queued run (see ExecutionState.workspaceWait): anything else is a corrupt record.
+		if (status !== 'queued') {
+			throw new Error(
+				`A run waiting for a workspace must be 'queued', got '${status}': corrupt execution file? Remove its 'workspaceWait' or fix the status.`
+			);
+		}
+		return WAITING_FOR_WORKSPACE_TAG;
+	}
 	const tag = (STATUS_TAGS as Record<string, string | undefined>)[status];
 	if (tag === undefined) {
 		throw new Error(

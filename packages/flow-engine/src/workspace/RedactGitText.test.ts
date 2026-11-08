@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { redactGitText } from './RedactGitText';
+import { redactGitText, redactSecrets } from './RedactGitText';
 
 describe('redactGitText', () => {
 	it.each([
@@ -46,5 +46,17 @@ describe('redactGitText', () => {
 
 	it('drops blank lines', () => {
 		expect(redactGitText('\n\nfatal: x\n\n')).toBe('fatal: x');
+	});
+});
+
+describe('redactSecrets', () => {
+	// The refusal message is written by flow itself and carries its advice after a long path: it must arrive whole.
+	it('masks secrets but never cuts a long line or drops lines', () => {
+		const long = `${'x '.repeat(300)}end`;
+		const text = `first https://user:s3cret@github.com/o/r\n${long}\nthird\nfourth\nfifth\nsixth\nseventh`;
+		const out = redactSecrets(text);
+		expect(out).not.toContain('s3cret');
+		expect(out).toContain(long);
+		expect(out.split('\n')).toHaveLength(7);
 	});
 });

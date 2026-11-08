@@ -68,4 +68,59 @@ describe('DaemonStartupTasks', () => {
 		expect(writeDaemonLog).toHaveBeenCalledTimes(1);
 		expect(events.declareEvents).not.toHaveBeenCalled();
 	});
+
+	describe('resumeWaitingExecutions', () => {
+		it('starts the waiting runs again and says how many in the daemon log', async () => {
+			const resume = vi.fn(() => Promise.resolve());
+			const store = { waitingExecutionIdsAtStart: () => ['aaaa1111', 'bbbb2222'] } as unknown as ExecutionStore;
+			const hooksFor = () => undefined;
+
+			new DaemonStartupTasks('logs', publisher).resumeWaitingExecutions(
+				store,
+				{ resumeWaitingExecutions: resume },
+				hooksFor
+			);
+			await settle();
+
+			expect(resume).toHaveBeenCalledWith(hooksFor);
+			expect(writeDaemonLog).toHaveBeenCalledWith(
+				'logs',
+				'info',
+				'2 execution(s) were waiting for a workspace when the previous daemon stopped: starting them again, in arrival order'
+			);
+		});
+
+		it('says nothing and starts nothing when no run was waiting', async () => {
+			const resume = vi.fn(() => Promise.resolve());
+			const store = { waitingExecutionIdsAtStart: () => [] } as unknown as ExecutionStore;
+
+			new DaemonStartupTasks('logs', publisher).resumeWaitingExecutions(
+				store,
+				{ resumeWaitingExecutions: resume },
+				() => undefined
+			);
+			await settle();
+
+			expect(resume).not.toHaveBeenCalled();
+			expect(writeDaemonLog).not.toHaveBeenCalled();
+		});
+
+		it('logs a failure to start them again as an error that names the consequence', async () => {
+			const store = { waitingExecutionIdsAtStart: () => ['aaaa1111'] } as unknown as ExecutionStore;
+			const resume = vi.fn(() => Promise.reject(new Error('registry unreadable')));
+
+			new DaemonStartupTasks('logs', publisher).resumeWaitingExecutions(
+				store,
+				{ resumeWaitingExecutions: resume },
+				() => undefined
+			);
+			await settle();
+
+			expect(writeDaemonLog).toHaveBeenCalledWith(
+				'logs',
+				'error',
+				expect.stringContaining('could not start the waiting executions again: Error: registry unreadable')
+			);
+		});
+	});
 });

@@ -22,6 +22,15 @@ describe('statusTag', () => {
 		expect(statusTag(status)).toBe(expected);
 	});
 
+	it('tells a run that waits for a workspace from an ordinary queued one', () => {
+		expect(statusTag('queued', true)).toBe('waiting ws');
+		expect(statusTag('queued', false)).toBe('waiting');
+	});
+
+	it('refuses the waiting flag on a status other than queued', () => {
+		expect(() => statusTag('running', true)).toThrow(/queued/);
+	});
+
 	it('refuses a status it has no tag for instead of printing it bare', () => {
 		expect(() => statusTag('exploded')).toThrow(/exploded/);
 	});

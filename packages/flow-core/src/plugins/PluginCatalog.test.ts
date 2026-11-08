@@ -78,7 +78,15 @@ describe('describePlugin', () => {
 });
 
 describe('PLUGIN_CONFIGS', () => {
-	it('documents the four built-in plugins', () => {
-		expect(Object.keys(PLUGIN_CONFIGS).sort()).toEqual(['cli-approval', 'file-approval', 'none', 'worktree']);
+	it('documents the built-in plugins', () => {
+		expect(Object.keys(PLUGIN_CONFIGS).sort()).toEqual([
+			'cli-approval',
+			'file-approval',
+			'in-place',
+			'none',
+			'pool',
+			'readonly',
+			'worktree',
+		]);
 	});
 });

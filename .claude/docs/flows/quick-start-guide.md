@@ -66,10 +66,7 @@ simple-implement:
     version: '1.0.0'
     name: '(Dummy) Simple Implementation'
     description: 'Ask Claude to implement something'
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: { provider: worktree, baseDir: ../worktrees, prefix: flow- }
     statusTransitions:
         onSuccess: review
         onFailure: changes_requested
@@ -102,37 +99,22 @@ your-flow-id: # ✏️ Choose a unique, descriptive ID (kebab-case)
 
 ## Step 4: Configure Workspace
 
-Choose workspace mode based on your needs:
+`workspace:` is required. Pick a provider:
 
 ```yaml
-workspace:
-    mode: isolated # ✏️ Choose: isolated|shared|manual
-    gitStrategy: main-only # ✏️ Choose: main-only|feature-branch|any|worktree
-    reusePolicy: always # ✏️ Choose: never|if-available|always
+workspace: in-place # ✏️ Choose: in-place | readonly | worktree | pool
 ```
 
-### Workspace Mode Decision Table
+### Workspace Provider Decision Table
 
-| Mode         | When to Use                       | Git Changes         | Performance          | Safety               |
-| ------------ | --------------------------------- | ------------------- | -------------------- | -------------------- |
-| **isolated** | Code modifications, builds, tests | ✅ Allowed          | Slower (fresh clone) | ✅ High (isolated)   |
-| **shared**   | Q&A, analysis, read-only tasks    | ❌ Not allowed      | ⚡ Fast (reused)     | ⚠️ Medium (shared)   |
-| **manual**   | Local debugging                   | ✅ Uses current dir | ⚡ Instant           | ⚠️ Low (current dir) |
+| Provider   | When to Use                                              | Exclusive folder | Notes                                                  |
+| ---------- | -------------------------------------------------------- | ---------------- | ------------------------------------------------------ |
+| `in-place` | Scripts, demos, local debugging, analysis                | No               | Runs in the project folder as it is                    |
+| `readonly` | Q&A, analysis; no model step declares write/edit/bash    | No               | Advisory only; see schema reference                    |
+| `worktree` | Flows that modify code on their own branch               | Yes              | New worktree and branch per run; `baseDir` outside the project |
+| `pool`     | Prepared clones reused across runs                       | Yes              | Slots are never created or synced; a first step prepares the slot |
 
-**Git Strategy**:
-
-- `main-only`: Only use main branch (safest)
-- `feature-branch`: Create feature branches
-- `any`: Allow any branch
-- `worktree`: Use git worktrees (advanced)
-
-**Reuse Policy**:
-
-- `never`: Always create fresh workspace
-- `if-available`: Reuse if available, otherwise create new
-- `always`: Block until workspace available (for shared mode)
-
-**👉 Quick Rule**: Use `isolated` + `main-only` + `always` for most flows.
+**Quick Rule**: `worktree` for flows that change code, `in-place` for everything else. Options and rules: [schema-reference.md](schema-reference.md#workspace-configuration).
 
 ## Step 5: Define Inputs
 
@@ -429,7 +411,7 @@ Validating 10 flows...
 
 ### Testing Tips
 
-- Start with `manual` workspace mode for faster iteration
+- Start with `workspace: in-place` for faster iteration (no worktree to create)
 - Use simple test inputs first
 - Check the trace logs for each step
 - Verify outputs are extracted correctly
@@ -503,32 +485,27 @@ steps:
       value: { type: string, pattern: 'result=(.*)' } # Now matches!
 ```
 
-### Mistake #3: Using Wrong Workspace Mode
+### Mistake #3: Using Wrong Workspace Provider
 
-**Problem**: Using `shared` mode for flows that modify code.
+**Problem**: Using `readonly` for a flow whose model steps write (`WORKSPACE_READONLY_CONFLICT`), or `in-place` for a flow that must not touch your working folder.
 
 ```yaml
-# ❌ Wrong: shared mode for code modifications
-workspace:
-    mode: shared # Shared doesn't allow git changes!
-    gitStrategy: feature-branch # This will fail
+# ❌ Wrong: readonly with a step that declares write/edit/bash
+workspace: readonly
 ```
 
-**Solution**: Use correct mode for your task:
+**Solution**: Use the provider that matches the task:
 
 ```yaml
-# ✅ Correct: isolated mode for code modifications
-workspace:
-    mode: isolated # Allows git changes
-    gitStrategy: main-only
-    reusePolicy: always
+# ✅ Correct: code modifications on their own branch
+workspace: { provider: worktree, baseDir: ../worktrees, prefix: flow- }
 ```
 
 **Rule of Thumb**:
 
-- Code changes → `isolated`
-- Read-only (Q&A, analysis) → `shared`
-- Local debugging → `manual`
+- Code changes → `worktree` (or `pool`)
+- Read-only (Q&A, analysis) → `readonly`
+- Local debugging, scripts → `in-place`
 
 ### Mistake #4: Missing Output Declarations
 
@@ -615,10 +592,7 @@ build-and-test:
     name: 'Build and Test Application'
     description: 'Build the application, run tests, and report results'
 
-    workspace:
-        mode: isolated
-        gitStrategy: main-only
-        reusePolicy: always
+    workspace: { provider: worktree, baseDir: ../worktrees, prefix: flow- }
 
     statusTransitions:
         onSuccess: review

@@ -26,17 +26,6 @@ vi.mock('node:os', async importOriginal => {
 	return { ...actual, homedir: vi.fn().mockImplementation(() => actual.homedir()) };
 });
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = mockAllocate;
-			release = mockRelease;
-		},
-	};
-});
-
 registerCommandHandlerHooks({ mockAllocate, mockRelease, hoistedState });
 
 /**

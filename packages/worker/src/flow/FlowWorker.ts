@@ -17,7 +17,7 @@ import type {
 	InterventionResponse,
 } from 'flow-engine/executor/InterventionHandler';
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
-import type { FlowMetadata, FlowTrace, Workspace } from 'flow-engine/types';
+import type { FlowMetadata, FlowTrace, Workspace, WorkspaceConfig } from 'flow-engine/types';
 import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import * as yaml from 'js-yaml';
 import type { ChildProcess } from 'node:child_process';
@@ -936,6 +936,16 @@ export class FlowWorker implements Shutdownable {
 			// Allocate workspace based on flow configuration
 			this.sendTaskProgress('Allocating workspace...');
 
+			// This worker predates the workspace providers of flow-cli: it only knows the legacy block (mode/gitStrategy/reusePolicy).
+			// Anything else is refused here, naming the way out, rather than allocated as something it is not.
+			const declared = flow.workspace;
+			if (typeof declared !== 'object' || declared === null || !('mode' in declared)) {
+				throw new Error(
+					`Flow "${flow.id}" declares workspace ${JSON.stringify(declared)}, a workspace provider. This worker only runs the legacy workspace block (mode, gitStrategy, reusePolicy). Run the flow with flow-cli (flow run), which supports workspace providers.`
+				);
+			}
+			const legacyWorkspace = declared as unknown as WorkspaceConfig;
+
 			// Determine workspace path
 			let workspacePath: string | undefined;
 
@@ -945,14 +955,14 @@ export class FlowWorker implements Shutdownable {
 				this.logger.info(` Using task-specified workspace override: ${workspacePath}`);
 			}
 			// Otherwise, if manual mode but no path specified, use current working directory
-			else if (flow.workspace.mode === 'manual') {
+			else if (legacyWorkspace.mode === 'manual') {
 				workspacePath = process.cwd();
 				this.logger.info(` Using current working directory as manual workspace: ${workspacePath}`);
 			}
 
 			workspace = await this.workspaceManager.allocate({
 				taskId: task.id,
-				config: flow.workspace,
+				config: legacyWorkspace,
 				existingPath: workspacePath,
 				taskMetadata: {
 					description: task.description,

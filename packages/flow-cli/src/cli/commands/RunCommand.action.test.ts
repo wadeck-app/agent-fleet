@@ -321,6 +321,26 @@ describe('flow run: dispatch', () => {
 		expect(errors).toEqual(['Error: other']);
 	});
 
+	it('prints a refused flow readably (message, where, fix) instead of raw JSON, with exit 2', async () => {
+		const issues = [
+			{
+				severity: 'error',
+				code: 'MISSING_FIELD',
+				message: 'The flow does not declare a workspace.',
+				location: { field: 'workspace' },
+				suggestion: 'Add "workspace: in-place".',
+			},
+		];
+		harness.send.mockResolvedValue({ type: 'error', code: 'VALIDATION_FAILED', message: JSON.stringify(issues) });
+
+		expect(await runCli(flowFile)).toBe(2);
+
+		const text = errors.join('\n');
+		expect(text).toContain('The flow does not declare a workspace. [workspace]');
+		expect(text).toContain('Fix: Add "workspace: in-place".');
+		expect(text).not.toContain('"severity"');
+	});
+
 	it('rejects a response without an executionId', async () => {
 		harness.send.mockResolvedValue({ type: 'execution_started' });
 		expect(await runCli(flowFile)).toBe(1);
@@ -384,7 +404,7 @@ describe('flow run --wait', () => {
 		fs.mkdirSync(dir, { recursive: true });
 		fs.writeFileSync(path.join(dir, 'exec0001.json'), '{not json');
 		expect(await runCli(flowFile, '--wait')).toBe(1);
-		expect(errors[0]).toContain('Error: Error: Corrupted execution state for exec0001');
+		expect(errors.some(line => line.includes('Error: Error: Corrupted execution state for exec0001'))).toBe(true);
 	});
 
 	it('rejects an invalid timeout', async () => {
@@ -392,5 +412,36 @@ describe('flow run --wait', () => {
 		await expect(runCli(flowFile, '--wait', '--timeout', 'abc')).rejects.toThrow(
 			'Invalid timeout: abc. Use e.g. 10m, 30s, 5000ms'
 		);
+	});
+});
+
+describe('flow run: run that waits for a workspace', () => {
+	const message =
+		'Waiting for a free workspace: 1/1 slots are claimed by: abcd1234. Cancel it with: flow cancel exec0001';
+	const waiting = { workspaceWait: { since: new Date().toISOString(), message, run: {} } };
+
+	it('says on stderr that the run has not started and why, while stdout stays the bare execution id', async () => {
+		startedResponse();
+		createExecution('exec0001', waiting);
+		expect(await runCli(flowFile)).toBe(0);
+		expect(logs).toEqual(['exec0001']);
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toContain('is waiting for a workspace and has not started');
+		expect(errors[0]).toContain(message);
+	});
+
+	it('stays silent for a run that starts now', async () => {
+		startedResponse();
+		createExecution('exec0001', { status: 'running' });
+		expect(await runCli(flowFile)).toBe(0);
+		expect(errors).toEqual([]);
+	});
+
+	it('leaves the machine-readable output untouched', async () => {
+		startedResponse();
+		createExecution('exec0001', waiting);
+		expect(await runCli(flowFile, '--json')).toBe(0);
+		expect(errors).toEqual([]);
+		expect(stdout).toEqual(['{"executionId":"exec0001"}\n']);
 	});
 });

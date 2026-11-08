@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { ButtonLink } from '@wadeck-app/dsl-ui';
 import { FLOW_ACTION_BUTTON_STYLE, type FlowGraphResult } from 'flow-core';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { FlowGraphView } from './FlowGraphView.js';
 import { ANNOTATED_RUN_GRAPH, BUILD_GRAPH, SUBFLOW_GRAPH, chain, node } from './testing/GraphFixtures.js';
@@ -27,6 +27,47 @@ function renderView(result: FlowGraphResult, refreshError?: string) {
 		</MemoryRouter>
 	);
 }
+
+describe('FlowGraphView run waiting for a workspace', () => {
+	afterEach(cleanup);
+
+	it('badges the run as waiting for a workspace and shows why, instead of a bare queued', () => {
+		renderView(
+			executionResult({
+				execution: {
+					executionId: 'exec1',
+					status: 'queued',
+					startedAt: '2026-08-16T12:00:00.000Z',
+					completedAt: null,
+					workspaceWait: {
+						since: '2026-08-16T12:00:00.000Z',
+						message: 'Waiting for a free workspace: 2/2 slots are claimed.',
+					},
+				},
+			})
+		);
+		expect(screen.getByText('waiting for workspace')).toBeTruthy();
+		expect(screen.queryByText('queued')).toBeNull();
+		expect(screen.getByRole('status', { name: 'Waiting for a workspace' }).textContent).toContain(
+			'2/2 slots are claimed'
+		);
+	});
+
+	it('shows the plain queued badge and no banner for a queued run that does not wait', () => {
+		renderView(
+			executionResult({
+				execution: {
+					executionId: 'exec1',
+					status: 'queued',
+					startedAt: '2026-08-16T12:00:00.000Z',
+					completedAt: null,
+				},
+			})
+		);
+		expect(screen.getByText('queued')).toBeTruthy();
+		expect(screen.queryByRole('status', { name: 'Waiting for a workspace' })).toBeNull();
+	});
+});
 
 describe('FlowGraphView', () => {
 	it('says in the header which definition a run is drawn from', () => {

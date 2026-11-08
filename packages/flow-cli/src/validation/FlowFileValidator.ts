@@ -30,6 +30,7 @@ const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([
 	ValidationCode.SUB_STEP_WAVES_SINGLE_WAVE,
 	ValidationCode.WAVE_REDUNDANT_DEPENDS,
 	ValidationCode.SCRIPT_BODY_INTERPOLATION,
+	ValidationCode.WORKSPACE_DEPRECATED,
 ]);
 
 // Same reserved key as FlowRegistry.loadProjectFlows
@@ -121,7 +122,9 @@ export function validateFlowFile(filePath: string, versions: DefinitionSnapshotS
 	}
 
 	const validator = new EngineFlowValidator(undefined);
-	const result = validator.validate(flow);
+	// The validator annotates the flow it checks (`_autoDiscoveredInputs`): it gets a copy, so the version is assessed on the
+	// file as written, i.e. with the hash a run stores.
+	const result = validator.validate(structuredClone(flow));
 
 	if (result.summary.errors > 0) {
 		const errors = result.issues.filter((i: ValidationIssue) => i.severity === 'error').map(issueToCliError);
@@ -162,7 +165,8 @@ function issueToCliError(issue: ValidationIssue): CliValidationError {
 	};
 }
 
-function validationCodeToType(code: ValidationCode): string {
+/** The category `flow validate` prints for a code. Throws for a code it does not know: see the test that walks every ValidationCode. */
+export function validationCodeToType(code: ValidationCode): string {
 	switch (code) {
 		case ValidationCode.MISSING_FIELD:
 		case ValidationCode.INVALID_TYPE:
@@ -178,7 +182,20 @@ function validationCodeToType(code: ValidationCode): string {
 		case ValidationCode.SUB_STEP_WAVE_NESTED:
 		case ValidationCode.SUB_STEP_WAVE_INVALID:
 		case ValidationCode.WAVE_LATER_DEPENDS:
+		case ValidationCode.WAVE_REDUNDANT_DEPENDS:
+		case ValidationCode.SUB_STEP_WAVES_SINGLE_WAVE:
+		case ValidationCode.SUB_STEP_SIBLING_DEPENDENCY:
+		case ValidationCode.OPENCODE_SHELL_NOT_FOUND:
 			return 'schema';
+		case ValidationCode.WORKSPACE_READONLY_CONFLICT:
+		case ValidationCode.WORKSPACE_DEPRECATED:
+			return 'workspace';
+		case ValidationCode.SECRET_UNKNOWN:
+		case ValidationCode.SECRET_INVALID_NAME:
+		case ValidationCode.SECRET_FORBIDDEN_STEP:
+		case ValidationCode.SECRET_BAD_REFERENCE:
+		case ValidationCode.SECRET_IN_SCRIPT_TEXT:
+			return 'secret';
 		case ValidationCode.UNDEFINED_INPUT:
 		case ValidationCode.UNDEFINED_OUTPUT:
 		case ValidationCode.UNDEFINED_VARIABLE:
@@ -194,6 +211,7 @@ function validationCodeToType(code: ValidationCode): string {
 		case ValidationCode.INVALID_TEMPLATE_SYNTAX:
 		case ValidationCode.MALFORMED_EXPRESSION:
 		case ValidationCode.UNDECLARED_OUTPUT_KEY:
+		case ValidationCode.SCRIPT_BODY_INTERPOLATION:
 			return 'template';
 		case ValidationCode.UNUSED_INPUT:
 		case ValidationCode.UNUSED_OUTPUT:

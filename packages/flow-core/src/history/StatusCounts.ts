@@ -1,6 +1,11 @@
 import type { ExecutionState, ExecutionStatus } from '../execution/ExecutionState.js';
+import { isWaitingForWorkspace } from '../view/WorkspaceWaitText.js';
 
-export type StatusCounts = Record<ExecutionStatus, number> & { total: number };
+export type StatusCounts = Record<ExecutionStatus, number> & {
+	total: number;
+	/** Of the `queued` ones, how many wait for a workspace (they are counted in `queued` too, not apart). */
+	waitingForWorkspace: number;
+};
 
 // Typed against ExecutionStatus so a status added to the model fails the build here instead of being miscounted.
 const STATUSES = [
@@ -16,7 +21,15 @@ const STATUSES = [
  * With `flow`, only that flow's executions count, like `filterExecutions({ flow })`.
  */
 export function countByStatus(execs: readonly ExecutionState[], flow?: string): StatusCounts {
-	const counts: StatusCounts = { total: 0, queued: 0, running: 0, completed: 0, failed: 0, 're-queued': 0 };
+	const counts: StatusCounts = {
+		total: 0,
+		waitingForWorkspace: 0,
+		queued: 0,
+		running: 0,
+		completed: 0,
+		failed: 0,
+		're-queued': 0,
+	};
 	for (const exec of execs) {
 		if (flow !== undefined && exec.flowId !== flow) {
 			continue;
@@ -28,6 +41,9 @@ export function countByStatus(execs: readonly ExecutionState[], flow?: string): 
 		}
 		counts[exec.status] += 1;
 		counts.total += 1;
+		if (isWaitingForWorkspace(exec)) {
+			counts.waitingForWorkspace += 1;
+		}
 	}
 	return counts;
 }

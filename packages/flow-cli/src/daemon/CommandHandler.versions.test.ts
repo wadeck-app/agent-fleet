@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import type { ExecutionState } from '../ipc/Protocol';
+import { FixedWorkspaceProviders } from '../workspace/FixedWorkspaceProviders';
 import type { CommandHandler } from './CommandHandler';
 import { newCommandHandler, registerFolderAsProject } from './CommandHandlerTestHarness';
 
@@ -11,16 +12,13 @@ const { mockAllocate } = vi.hoisted(() => ({
 	mockAllocate: vi.fn(),
 }));
 
-vi.mock('flow-engine', async importOriginal => {
-	const actual = (await importOriginal()) as Record<string, unknown>;
-	return {
-		...actual,
-		WorkspaceManager: class MockWorkspaceManager {
-			allocate = mockAllocate;
-			release = vi.fn().mockResolvedValue(undefined);
-		},
-	};
-});
+// What the daemon asks its workspace provider for: the assertions "no workspace was allocated" read this mock.
+const workspaceProviders = (): FixedWorkspaceProviders =>
+	new FixedWorkspaceProviders({
+		allocate: (...allocateArguments: unknown[]) =>
+			(mockAllocate as (...a: unknown[]) => unknown)(...allocateArguments),
+		release: () => Promise.resolve(),
+	} as never);
 
 function flowBody(version: string | undefined, script = 'echo hi'): Record<string, unknown> {
 	return {
@@ -53,7 +51,18 @@ describe('CommandHandler flow versions', () => {
 			canProvision: vi.fn().mockReturnValue(false),
 			planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 		};
-		const handler = newCommandHandler(daemonDir, pool as never, pool as never);
+		const handler = newCommandHandler(
+			daemonDir,
+			pool as never,
+			pool as never,
+			undefined,
+			undefined,
+			undefined,
+			false,
+			undefined,
+			undefined,
+			workspaceProviders()
+		);
 		handlers.push(handler);
 		return handler;
 	}
@@ -269,7 +278,18 @@ No decision was made -- this step is unanswered, not denied.`;
 				canProvision: vi.fn().mockReturnValue(false),
 				planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 			};
-			const handler = newCommandHandler(daemonDir, pool as never, pool as never);
+			const handler = newCommandHandler(
+				daemonDir,
+				pool as never,
+				pool as never,
+				undefined,
+				undefined,
+				undefined,
+				false,
+				undefined,
+				undefined,
+				workspaceProviders()
+			);
 			handlers.push(handler);
 			interventionFlow('1.0.0', 'Title of version 1');
 			const started = (await runFile(handler)) as { executionId: string };

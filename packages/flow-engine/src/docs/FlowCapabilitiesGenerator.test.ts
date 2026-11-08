@@ -108,16 +108,22 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).toContain('task.');
 	});
 
-	it('documents workspace modes', () => {
-		expect(result).toContain('isolated');
-		expect(result).toContain('shared');
-		expect(result).toContain('manual');
+	it('documents that a workspace is required and lists the providers', () => {
+		expect(result).toContain('MUST declare');
+		for (const provider of ['in-place', 'readonly', 'worktree', 'pool']) {
+			expect(result).toContain(provider);
+		}
 	});
 
-	it('documents workspace git strategies', () => {
-		expect(result).toContain('main-only');
-		expect(result).toContain('feature-branch');
-		expect(result).toContain('worktree');
+	it('documents the pool wait and the read-only rules', () => {
+		expect(result).toContain('waiting for workspace');
+		expect(result).toContain('requireClean');
+		expect(result).toContain('intent, not isolation');
+	});
+
+	it('no longer documents the removed clone strategies as usable', () => {
+		expect(result).not.toContain('gitStrategy: main-only');
+		expect(result).not.toContain('| `feature-branch`');
 	});
 
 	it('documents status transition fields', () => {
