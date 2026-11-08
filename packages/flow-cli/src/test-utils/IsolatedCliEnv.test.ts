@@ -109,3 +109,25 @@ describe('createIsolatedCliEnv app-core registration', () => {
 		expect(iso.env['APP_CORE_PORT']).toBe('54321');
 	});
 });
+
+describe('createIsolatedCliEnv daemon port', () => {
+	const saved = process.env['FLOW_DAEMON_PORT'];
+	afterEach(() => {
+		if (saved === undefined) delete process.env['FLOW_DAEMON_PORT'];
+		else process.env['FLOW_DAEMON_PORT'] = saved;
+	});
+
+	// A daemon of a test must never take a port of the range where the user's daemon runs.
+	it('lets the OS pick the daemon port, whatever the parent shell says, unless the caller overrides it', () => {
+		process.env['FLOW_DAEMON_PORT'] = '47823';
+		const iso = createIsolatedCliEnv();
+		const overridden = createIsolatedCliEnv({ extra: { FLOW_DAEMON_PORT: '51234' } });
+		try {
+			expect(iso.env['FLOW_DAEMON_PORT']).toBe('0');
+			expect(overridden.env['FLOW_DAEMON_PORT']).toBe('51234');
+		} finally {
+			iso.cleanup();
+			overridden.cleanup();
+		}
+	});
+});

@@ -15,7 +15,7 @@ export const UNREACHABLE_REGISTRY = 'http://127.0.0.1:9';
 // must not change a test, and the real values must never reach the child. Case-insensitive because
 // Windows env names are, while JS object keys are not.
 const STRIPPED =
-	/^(FLOW_QUEUE_EVENTS$|UPDATER_|LAUNCHER_|CLI_SELF_CHECK|NPM_CONFIG_|FLOW_CONFIG_DIR$|APP_CORE_PORT$|APP_CORE_CONFIG_DIR$|XDG_CONFIG_HOME$|HOME$|USERPROFILE$|APPDATA$|LOCALAPPDATA$|TEMP$|TMP$|TMPDIR$)/i;
+	/^(FLOW_QUEUE_EVENTS$|UPDATER_|LAUNCHER_|CLI_SELF_CHECK|NPM_CONFIG_|FLOW_CONFIG_DIR$|FLOW_DAEMON_PORT$|APP_CORE_PORT$|APP_CORE_CONFIG_DIR$|XDG_CONFIG_HOME$|HOME$|USERPROFILE$|APPDATA$|LOCALAPPDATA$|TEMP$|TMP$|TMPDIR$)/i;
 
 /**
  * Port that app-core registration is pointed at: nothing listens on TCP port 1, so the SDK answers `deferred`/`skipped`
@@ -85,6 +85,8 @@ export function createIsolatedCliEnv(
 			// Not created: the SDK writes its pickup file only into an existing app-core config dir.
 			APP_CORE_CONFIG_DIR: join(home, '.config', 'app-core'),
 			APP_CORE_PORT: DEAD_APP_CORE_PORT,
+			// 0 = the OS picks a free port: a test daemon must not take one from the range where the user's daemon runs.
+			FLOW_DAEMON_PORT: '0',
 			XDG_CONFIG_HOME: join(home, '.config'),
 			TEMP: tempDir,
 			TMP: tempDir,
