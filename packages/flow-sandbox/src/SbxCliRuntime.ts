@@ -132,7 +132,7 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 			throw new SandboxError(
 				'command-failed',
 				`Sandbox "${sandbox}" was created, but "bash -c true" failed in it (exit ${result.exitCode}: ${result.stderr.trim() || result.stdout.trim() || 'no output'}). ` +
-					`flow-sandbox needs bash in the image; use an image that has it. The sandbox still exists: remove it with "sbx rm --force ${sandbox}".`,
+					`flow-sandbox needs bash in the image; use an image that has it. The sandbox exists: a direct caller removes it with "sbx rm --force ${sandbox}" (the sandbox lifecycle does so itself).`,
 				{ sandbox, exitCode: result.exitCode, stderr: result.stderr }
 			);
 		}

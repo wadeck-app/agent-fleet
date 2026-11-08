@@ -36,6 +36,24 @@ export class HostEnvironment {
 	}
 
 	/**
+	 * For the launching side: `env` without ANY carrier it inherited (from the parent shell, any case) plus the carriers captured now.
+	 * Always build the daemon's environment through this: a stale inherited carrier would otherwise survive wherever the current
+	 * process has no value to replace it (APPDATA and LOCALAPPDATA only exist on Windows). A copy; `env` is not modified.
+	 */
+	static isolate(
+		env: NodeJS.ProcessEnv,
+		source: NodeJS.ProcessEnv = process.env,
+		home: string = os.homedir()
+	): NodeJS.ProcessEnv {
+		const carriers = new Set<string>(Object.values(HostEnvironment.CARRIERS).map(name => name.toLowerCase()));
+		const kept: NodeJS.ProcessEnv = {};
+		for (const [name, value] of Object.entries(env)) {
+			if (!carriers.has(name.toLowerCase())) kept[name] = value;
+		}
+		return { ...kept, ...HostEnvironment.capture(source, home) };
+	}
+
+	/**
 	 * For the wrapper's OWN children (sbx, aws): `env` with the four directory variables set to their real values, and the
 	 * carriers removed. USERPROFILE falls back to the real HOME (the former single carrier). A copy; `env` is not modified.
 	 */

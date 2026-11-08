@@ -70,8 +70,7 @@ const timingLog = path.join(root, 'sbx-timing.jsonl');
 const daemonLog = path.join(root, 'daemon.log');
 const claimFolder = path.join(poolDirectory, '.flow-pool', 'slot-1.claim');
 const environment = {
-	...isolation.env,
-	...HostEnvironment.capture(),
+	...HostEnvironment.isolate(isolation.env),
 	FLOW_DAEMON_PORT: '0',
 	FLOW_DAEMON_IDLE_CHECK_MS: '600000',
 	AWS_PROFILE: profile,

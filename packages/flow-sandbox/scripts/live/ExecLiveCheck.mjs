@@ -110,8 +110,7 @@ if (!region) refuse('no AWS region: set EXEC_REGION or configure one for the pro
 const isolation = createIsolatedCliEnv();
 const root = fs.realpathSync.native(isolation.root);
 const environment = {
-	...isolation.env,
-	...HostEnvironment.capture(),
+	...HostEnvironment.isolate(isolation.env),
 	FLOW_DAEMON_PORT: '0',
 	...(sbxPath ? { SBX_PATH: sbxPath } : {}),
 	// A daemon with nothing to do stops after its idle check (default 30 s): keep it alive for the whole check.

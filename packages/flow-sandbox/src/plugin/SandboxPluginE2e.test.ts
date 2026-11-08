@@ -22,8 +22,9 @@ import { MOCK_SBX_PATH, type MockSbxCall } from '../testing/MockSbxHarness';
  * - the daemon builds the source from the artifact and asks it for a worker; the wrapper registers with the launch credential;
  * - a run bound with `workerType: sandbox` is served by that worker (the execution record names the source and the step output);
  * - the sbx command lines the wrapper issues, in order: create (explicit --cpus and -m, exactly the two mounts), the setup and the
- *   step's exec, then `rm --force` at the end of the run, while the mounted directories still exist (the daemon releases the
- *   workspace only after the ack, which follows the removal: the log order shows it);
+ *   step's exec, then `rm --force` at the end of the run, while the mounted directories still exist; the daemon releases the pool
+ *   slot (its claim folder disappears) only after the wrapper's ack, which follows the removal: asserted on the timestamp of the
+ *   `rm` call versus the disappearance of the claim;
  * - a second run gets another sandbox, served by the same, still registered, worker;
  * - no launch credential appears on an sbx command line, in a recorded environment or in the daemon log;
  * - a source that cannot start makes the bound step fail with the daemon's own "Last contact with source ... failed" message.
@@ -55,6 +56,9 @@ class FlowWorld {
 	readonly projectDirectory = path.join(this.root, 'project');
 	readonly mockState = path.join(this.root, 'sbx-state');
 	readonly poolDirectory = path.join(this.root, 'pool');
+	readonly claimFolder = path.join(this.poolDirectory, '.flow-pool', 'slot-1.claim');
+	/** One entry per run served through the sandbox: when its pool claim was first seen and when it disappeared (epoch ms). */
+	readonly releases: { seenAt: number | undefined; goneAt: number }[] = [];
 	readonly daemonLog = path.join(this.root, 'daemon.log');
 	readonly env: NodeJS.ProcessEnv;
 	projectId = '';
@@ -187,8 +191,18 @@ class FlowWorld {
 	async runAndRelease(file: string, removesASandbox = true): Promise<ExecutionRecord> {
 		const removals = (): number => this.sbxCalls().filter(call => call.argv[0] === 'rm').length;
 		const before = removals();
-		const record = await this.run(file);
-		if (!removesASandbox) return record;
+		const claimWatch = this.watchClaim();
+		let record: ExecutionRecord;
+		try {
+			record = await this.run(file);
+		} catch (error) {
+			claimWatch.stop();
+			throw error;
+		}
+		if (!removesASandbox) {
+			claimWatch.stop();
+			return record;
+		}
 		try {
 			await waitFor('the wrapper to remove the run sandbox', 40_000, () => removals() > before || undefined);
 		} catch (error) {
@@ -197,15 +211,39 @@ class FlowWorld {
 			const tail = this.log().slice(-3000);
 			throw new Error(`${String(error)}\nsbx calls:\n${calls.join('\n')}\ndaemon log (tail):\n${tail}`);
 		}
-		// The removal is followed by the removal of the run's secret and network rules: wait until the calls stop coming.
-		let count = this.sbxCalls().length;
-		for (let stable = 0; stable < 3; stable++) {
-			await new Promise(resolve => setTimeout(resolve, 500));
-			const now = this.sbxCalls().length;
-			stable = now === count ? stable : -1;
-			count = now;
-		}
+		// The daemon releases the pool slot (the claim folder disappears) only after the wrapper's ack, which follows the removal of the
+		// sandbox and of its rules: that is the end of the run for everything the tests look at, and what the next run waits for.
+		await this.waitForClaimRelease(claimWatch);
 		return record;
+	}
+
+	private watchClaim(): { stop(): void; seenAt(): number | undefined; goneAt(): number | undefined } {
+		let seenAt: number | undefined;
+		let goneAt: number | undefined;
+		const timer = setInterval(() => {
+			const present = fs.existsSync(this.claimFolder);
+			if (present && seenAt === undefined) seenAt = Date.now();
+			if (!present && seenAt !== undefined && goneAt === undefined) goneAt = Date.now();
+		}, 20);
+		return { stop: () => clearInterval(timer), seenAt: () => seenAt, goneAt: () => goneAt };
+	}
+
+	private async waitForClaimRelease(watch: ReturnType<FlowWorld['watchClaim']>): Promise<void> {
+		try {
+			await waitFor(
+				`the daemon to release the pool slot (${this.claimFolder} to disappear after the wrapper's ack)`,
+				30_000,
+				() => watch.goneAt()
+			);
+		} catch (error) {
+			const calls = this.sbxCalls().map(call => call.argv.slice(0, 2).join(' '));
+			throw new Error(
+				`${String(error)}. The wrapper removes the sandbox, then acknowledges the end of the run; if the claim never goes, the ack did not arrive.\nsbx calls:\n${calls.join('\n')}\ndaemon log (tail):\n${this.log().slice(-3000)}`
+			);
+		} finally {
+			watch.stop();
+		}
+		this.releases.push({ seenAt: watch.seenAt(), goneAt: watch.goneAt() as number });
 	}
 
 	sbxCalls(): MockSbxCall[] {
@@ -316,9 +354,8 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		expect(named[removal]?.argv).toEqual(['rm', '--force', sandbox]);
 	});
 
-	// The daemon no longer logs the release of a workspace (the providers: nothing to release for a pool slot but its claim), so the
-	// order removal-then-ack is only covered at unit level (ExecWrapper.test.ts); here the removal must find both mounts on the host.
-	it('removes the sandbox while both mounted directories still exist on the host', () => {
+	// The daemon no longer logs the release of a workspace; the release of a pool slot is the disappearance of its claim folder.
+	it('removes the sandbox while both mounted directories still exist on the host, and the daemon releases the pool slot only after the removal call', () => {
 		const calls = world.sbxCalls();
 		const [sandbox] = sandboxesCreated(calls);
 		const removal = calls.find(call => call.argv[0] === 'rm' && call.argv.includes(sandbox as string));
@@ -327,6 +364,10 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		// Still mounted when rm arrived: the directories existed on the host at that instant.
 		expect(Object.values(removal?.mountsExistAtRm ?? {})).toEqual([true, true]);
 		expect(log.indexOf(`Sandbox "${sandbox}" removed`)).toBeGreaterThan(-1);
+		const release = world.releases[0];
+		expect(release?.seenAt, 'the pool claim was never seen').toBeDefined();
+		expect(removal?.at, 'the mock did not stamp the rm call').toBeDefined();
+		expect(release?.goneAt).toBeGreaterThanOrEqual(removal?.at as number);
 	});
 
 	it('starts a second run on a fresh sandbox, served by the same wrapper, and removes that one too', async () => {

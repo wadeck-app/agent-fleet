@@ -139,12 +139,12 @@ describe('SandboxableWorkspace.metaDirectoryFor', () => {
 		);
 	});
 
-	it('derives the meta from outputsDir, refuses an outputsDir that is not <meta>/outputs, and keeps the sibling convention without one', () => {
+	it('refuses an assignment without outputsDir and an outputsDir that is not <meta>/outputs', () => {
 		directory('ws');
 		directory('ws.meta');
 
-		expect(SandboxableWorkspace.metaDirectoryFor({ workspaceDir: path.join(root, 'ws') })).toBe(
-			path.join(root, 'ws.meta')
+		expect(() => SandboxableWorkspace.metaDirectoryFor({ workspaceDir: path.join(root, 'ws') })).toThrow(
+			/no executionContext\.outputsDir/
 		);
 		expect(() =>
 			SandboxableWorkspace.metaDirectoryFor({

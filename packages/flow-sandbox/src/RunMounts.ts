@@ -30,9 +30,9 @@ export interface RunMountsOptions {
  * of the same path, not before. Links ABOVE the mount roots (a symlinked parent directory) are not examined.
  *
  * Warnings (logged once at construction, also kept in `warnings`):
- * - project directory (manual mode): the workspace equals `projectDir` (same drive/case rules as the mounts),
- *   or `<workspace>/.git` is a DIRECTORY, i.e. a regular checkout (git worktrees and submodules have a `.git`
- *   FILE instead). The agent can then change hooks, scripts and config that later run on the host.
+ * - project directory: the workspace equals `projectDir` (same drive/case rules as the mounts). The agent can then change
+ *   hooks, scripts and config that later run on the host. A `.git` DIRECTORY alone is the normal case of a pool slot (a
+ *   clone) and does not warn; slots used by sandboxed runs must be dedicated to them (README, T-16).
  * - `<workspace>/.git` is a FILE: a worktree or submodule. Its `gitdir:` points outside the mounts, so git
  *   does not work inside the sandbox (unsupported, documented by Docker, untested here).
  */
@@ -149,11 +149,7 @@ export class RunMounts {
 		const gitEntry = this.gitEntryKind(workspaceDir);
 		if (projectDir !== undefined && this.sameDirectory(workspaceDir, projectDir)) {
 			warnings.push(
-				`The sandbox workspace "${workspaceDir}" IS your project directory (projectDir option): the agent gets write access to your real files, including git hooks and scripts that later run on the host. Use a worktree workspace to isolate it.`
-			);
-		} else if (gitEntry === 'directory') {
-			warnings.push(
-				`The sandbox workspace "${workspaceDir}" is a regular git checkout (it contains a .git directory), probably your own project directory: the agent gets write access to your real files, including git hooks and scripts that later run on the host. Use a worktree workspace to isolate it.`
+				`The sandbox workspace "${workspaceDir}" IS your project directory (projectDir option): the agent gets write access to your real files, including git hooks and scripts that later run on the host. Use a pool slot dedicated to sandboxed runs instead.`
 			);
 		}
 		if (gitEntry === 'file') {

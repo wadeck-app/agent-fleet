@@ -164,14 +164,15 @@ describe('RunMounts warnings', () => {
 		expect(log.lines).toEqual([`warn: ${run.warnings[0]}`]);
 	});
 
-	it('warns once, as a project directory, when the workspace holds a .git directory', () => {
+	// A pool slot is a clone: its .git directory is the normal case of a valid run, not a reason to warn on every run. What makes a
+	// workspace the user's own project is projectDir (above); that a slot must be dedicated to sandboxed runs is documented (README).
+	it('does not warn about a .git directory: a pool slot is a clone', () => {
 		fs.mkdirSync(path.join(workspace, '.git'));
 
 		const run = mounts();
 
-		expect(run.warnings).toHaveLength(1);
-		expect(run.warnings[0]).toContain('regular git checkout');
-		expect(run.warnings[0]).toContain('git hooks');
+		expect(run.warnings).toEqual([]);
+		expect(log.lines).toEqual([]);
 	});
 
 	it('warns that git is unsupported (not "project directory") when .git is a worktree file, and gives both warnings when projectDir matches', () => {

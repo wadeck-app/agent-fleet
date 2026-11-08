@@ -299,10 +299,9 @@ export class BenchEnv {
 		this.daemonLog = path.join(this.root, 'daemon.log');
 		this.presenceDirectory = path.join(this.root, 'presence');
 		this.environment = {
-			...this.isolation.env,
 			// HOME, USERPROFILE, APPDATA, LOCALAPPDATA and APP_CORE_* stay isolated for the daemon (incident 2026-11-08); the real
 			// directories reach the wrapper's own sbx and aws children through FLOW_SANDBOX_HOST_* (HostEnvironment).
-			...HostEnvironment.capture(),
+			...HostEnvironment.isolate(this.isolation.env),
 			FLOW_DAEMON_PORT: '0',
 			...(sbxPath ? { SBX_PATH: sbxPath } : {}),
 			FLOW_DAEMON_IDLE_CHECK_MS: '600000',

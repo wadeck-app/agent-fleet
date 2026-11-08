@@ -48,6 +48,28 @@ describe('HostEnvironment', () => {
 		);
 	});
 
+	// A parent shell may carry FLOW_SANDBOX_HOST_* from an earlier run; createIsolatedCliEnv copies the parent environment. Only what
+	// the launching script captures itself may reach the daemon: a stale carrier would hand the wrapper somebody else's directories.
+	it('isolate: drops every inherited carrier (any case) and adds only the freshly captured ones', () => {
+		const inherited = {
+			HOME: '/iso',
+			KEEP: '1',
+			FLOW_SANDBOX_HOST_HOME: '/stale-home',
+			FLOW_SANDBOX_HOST_APPDATA: '/stale-appdata',
+			flow_sandbox_host_localappdata: '/stale-local',
+		};
+
+		const isolated = HostEnvironment.isolate(inherited, { USERPROFILE: '/real-up' }, '/real-home');
+
+		expect(isolated).toEqual({
+			HOME: '/iso',
+			KEEP: '1',
+			FLOW_SANDBOX_HOST_HOME: '/real-home',
+			FLOW_SANDBOX_HOST_USERPROFILE: '/real-up',
+		});
+		expect(inherited['FLOW_SANDBOX_HOST_HOME']).toBe('/stale-home');
+	});
+
 	it('captures the real directories of the launching process for the carriers', () => {
 		const captured = HostEnvironment.capture(
 			{ USERPROFILE: 'C:\\Users\\me', APPDATA: 'C:\\A', LOCALAPPDATA: '' },
