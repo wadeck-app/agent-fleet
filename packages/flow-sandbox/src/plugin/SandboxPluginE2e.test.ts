@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { PluginBundler } from '../PluginBundler';
+import { DaemonIsolationGuard } from '../testing/DaemonIsolationGuard';
 import { MOCK_SBX_PATH, type MockSbxCall } from '../testing/MockSbxHarness';
 
 /**
@@ -68,8 +69,11 @@ class FlowWorld {
 			SBX_MOCK_BASH_STDOUT: CANNED,
 			// A daemon with nothing to do stops after its idle check: keep it for the whole test.
 			FLOW_DAEMON_IDLE_CHECK_MS: '600000',
+			// The OS picks the daemon port: the user's own daemon (standard range) is never probed or competed with.
+			FLOW_DAEMON_PORT: '0',
 		};
 		delete this.env['SBX_MOCK_PATH'];
+		DaemonIsolationGuard.assert({ env: this.env, isolatedRoot: this.root });
 		fs.writeFileSync(
 			path.join(this.isolation.configDir, 'config.yml'),
 			`worker:\n  boundStepWaitSeconds: ${BOUND_WAIT_SECONDS}\n`

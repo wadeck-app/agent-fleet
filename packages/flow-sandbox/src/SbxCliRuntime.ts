@@ -1,5 +1,6 @@
 import * as os from 'node:os';
 
+import { HostEnvironment } from './HostEnvironment';
 import { HostPathFormatter } from './HostPathFormatter';
 import { PINNED_SBX_VERSION, sbxReleaseUrl } from './PinnedSbxVersion';
 import { PrivateEnvFile } from './PrivateEnvFile';
@@ -82,7 +83,11 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 
 	constructor(private readonly options: SbxCliRuntimeOptions = {}) {
 		this.platform = options.platform ?? process.platform;
-		this.env = { ...WorkerCredentialFilter.apply(options.env ?? process.env), MSYS_NO_PATHCONV: '1' };
+		// A daemon started with an isolated home carries the real user directories in FLOW_SANDBOX_HOST_*: sbx needs them (login state).
+		this.env = {
+			...WorkerCredentialFilter.apply(HostEnvironment.restoreFor(options.env ?? process.env)),
+			MSYS_NO_PATHCONV: '1',
+		};
 		this.tempDirectory = options.tempDirectory ?? os.tmpdir();
 		this.commandTimeoutMs = options.commandTimeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
 		this.createTimeoutMs = options.createTimeoutMs ?? DEFAULT_CREATE_TIMEOUT_MS;
@@ -122,7 +127,7 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 	 * pay one exec. A sandbox without bash cannot run anything this package starts, so it is reported now.
 	 */
 	private async absorbFirstBashBanner(sandbox: string): Promise<void> {
-		const result = await this.exec({ sandbox, command: ['bash', '-c', 'true'] });
+		const result = await this.execWithin({ sandbox, command: ['bash', '-c', 'true'] }, this.commandTimeoutMs);
 		if (result.exitCode !== 0) {
 			throw new SandboxError(
 				'command-failed',
@@ -134,6 +139,12 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 	}
 
 	async exec(request: ExecRequest): Promise<ExecResult> {
+		return this.execWithin(request, this.execTimeoutMs);
+	}
+	/** `exec` with its own time limit: the limit of a step is not the one of a housekeeping command. */ private async execWithin(
+		request: ExecRequest,
+		timeoutMs: number
+	): Promise<ExecResult> {
 		this.validator.exec(request);
 		await this.ensureVerified();
 
@@ -162,7 +173,7 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 					onStdout: request.onStdout,
 					onStderr: startNotice === undefined ? undefined : text => startNotice.push(text),
 					signal: request.signal,
-					timeoutMs: this.execTimeoutMs,
+					timeoutMs,
 				})
 				.finally(() => startNotice?.finish());
 			const result = { ...raw, stderr: SbxStartNoticeFilter.strip(request.sandbox, raw.stderr) };

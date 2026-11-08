@@ -47,6 +47,8 @@ import { fileURLToPath } from 'node:url';
 
 import { createIsolatedCliEnv } from '../../../flow-cli/src/test-utils/IsolatedCliEnv.ts';
 import { AwsCredentialExporter } from '../../src/AwsCredentialExporter.ts';
+import { HostEnvironment } from '../../src/HostEnvironment.ts';
+import { DaemonIsolationGuard } from '../../src/testing/DaemonIsolationGuard.ts';
 import { LeftoverSandboxes } from '../../src/LeftoverSandboxes.ts';
 import { NodeCommandRunner } from '../../src/NodeCommandRunner.ts';
 import { SbxCliRuntime } from '../../src/SbxCliRuntime.ts';
@@ -95,24 +97,25 @@ const region = process.env.HARNESS_REGION ?? (await awsText(['configure', 'get',
 if (!region) refuse('no AWS region: set HARNESS_REGION or configure one for the profile.');
 
 // ---- isolated environment ----
-// createIsolatedCliEnv redirects HOME, USERPROFILE, APPDATA and LOCALAPPDATA too. The wrapper inherits the daemon's
-// environment and must reach the REAL sbx login state and the real AWS SSO session, so those four are restored;
-// the flow config dir, the project registry (XDG_CONFIG_HOME), npm and the queue events stay isolated.
+// createIsolatedCliEnv redirects HOME, USERPROFILE, APPDATA, LOCALAPPDATA and the app-core registration too, and they STAY
+// isolated for the daemon: a daemon given the real ones registered this clone's app-modules with the user's real app-core
+// (incident 2026-11-08). The wrapper's own sbx and aws children need the REAL sbx login and AWS SSO session: the real
+// directories travel in FLOW_SANDBOX_HOST_* and come back only for those children (HostEnvironment). The daemon port is
+// chosen by the OS, so the user's own daemon (standard range) is never probed or competed with.
 const isolation = createIsolatedCliEnv();
 const root = fs.realpathSync.native(isolation.root);
 const environment = {
 	...isolation.env,
-	HOME: process.env.HOME ?? os.homedir(),
-	USERPROFILE: process.env.USERPROFILE ?? os.homedir(),
-	...(process.env.APPDATA ? { APPDATA: process.env.APPDATA } : {}),
-	...(process.env.LOCALAPPDATA ? { LOCALAPPDATA: process.env.LOCALAPPDATA } : {}),
+	...HostEnvironment.capture(),
+	FLOW_DAEMON_PORT: '0',
 	...(sbxPath ? { SBX_PATH: sbxPath } : {}),
-	FLOW_SANDBOX_HOST_HOME: os.homedir(),
 	// A daemon with nothing to do stops after its idle check (default 30 s): keep it alive for the whole check.
 	FLOW_DAEMON_IDLE_CHECK_MS: '600000',
 	AWS_PROFILE: hostProfile,
 };
 delete environment.SBX_MOCK_PATH;
+// Nothing of the daemon may reach the real user state: refuse to go on otherwise.
+DaemonIsolationGuard.assert({ env: environment, isolatedRoot: root });
 const configDirectory = isolation.configDir;
 const registryDirectory = path.join(environment.XDG_CONFIG_HOME, 'project');
 const projectDirectory = path.join(root, 'project');

@@ -13,8 +13,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createIsolatedCliEnv } from '../../../flow-cli/src/test-utils/IsolatedCliEnv.ts';
+import { HostEnvironment } from '../../src/HostEnvironment.ts';
 import { NodeCommandRunner } from '../../src/NodeCommandRunner.ts';
 import { SbxCliRuntime } from '../../src/SbxCliRuntime.ts';
+import { DaemonIsolationGuard } from '../../src/testing/DaemonIsolationGuard.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repositoryRoot = path.resolve(here, '..', '..', '..', '..');
@@ -296,17 +298,17 @@ export class BenchEnv {
 		this.presenceDirectory = path.join(this.root, 'presence');
 		this.environment = {
 			...this.isolation.env,
-			HOME: process.env.HOME ?? os.homedir(),
-			USERPROFILE: process.env.USERPROFILE ?? os.homedir(),
-			...(process.env.APPDATA ? { APPDATA: process.env.APPDATA } : {}),
-			...(process.env.LOCALAPPDATA ? { LOCALAPPDATA: process.env.LOCALAPPDATA } : {}),
+			// HOME, USERPROFILE, APPDATA, LOCALAPPDATA and APP_CORE_* stay isolated for the daemon (incident 2026-11-08); the real
+			// directories reach the wrapper's own sbx and aws children through FLOW_SANDBOX_HOST_* (HostEnvironment).
+			...HostEnvironment.capture(),
+			FLOW_DAEMON_PORT: '0',
 			...(sbxPath ? { SBX_PATH: sbxPath } : {}),
-			FLOW_SANDBOX_HOST_HOME: os.homedir(),
 			FLOW_DAEMON_IDLE_CHECK_MS: '600000',
 			AWS_PROFILE: options.profile ?? hostProfile,
 			...options.env,
 		};
 		delete this.environment.SBX_MOCK_PATH;
+		DaemonIsolationGuard.assert({ env: this.environment, isolatedRoot: this.root });
 		// Variables of the interactive Claude Code session that runs this bench must not leak into a nested claude.
 		for (const key of Object.keys(this.environment))
 			if (/^(CLAUDE_CODE_(?!USE_BEDROCK)|CLAUDE_PID|CLAUDE_BASH|CLAUDE_EFFORT)/i.test(key)) delete this.environment[key];

@@ -8,6 +8,7 @@ import { PassThrough } from 'node:stream';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HostEnvironment } from '../HostEnvironment';
 import { eachRow } from '../testing/EachRow';
 
 // The plugin is plain JavaScript that a user's daemon loads from a directory (see plugin/plugin.config.js): it is imported
@@ -488,6 +489,9 @@ describe('sandbox plugin: what the wrapper process is given and how it fails', (
 		};
 		Object.assign(process.env, planted);
 		process.env['AWS_PROFILE'] = 'kept';
+		// The real user directories of an isolated daemon (HostEnvironment): the wrapper restores them for its own sbx and aws children.
+		const carriers = Object.values(HostEnvironment.CARRIERS);
+		for (const name of carriers) process.env[name] = `/real/${name}`;
 		try {
 			const instance = await build({ ...GOOD, sbxPath: process.execPath });
 			await instance.source.obtainWorker(request());
@@ -504,12 +508,15 @@ describe('sandbox plugin: what the wrapper process is given and how it fails', (
 					'FLOW_WORKER_SOURCE_ID',
 					'SBX_PATH',
 					'AWS_PROFILE',
+					...carriers,
 				])
 			);
 			expect(names.some(name => /^path$/i.test(name))).toBe(true);
 			await instance.dispose();
 		} finally {
-			for (const name of [...Object.keys(planted), 'AWS_PROFILE']) delete process.env[name];
+			for (const name of [...Object.keys(planted), 'AWS_PROFILE', ...Object.values(HostEnvironment.CARRIERS)]) {
+				delete process.env[name];
+			}
 		}
 	});
 

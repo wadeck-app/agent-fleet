@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 
 import { requireAwsRegion } from '../AwsRegion';
+import { HostEnvironment } from '../HostEnvironment';
 import { NetworkResourceRule } from '../NetworkResourceRule';
 import { PresenceDirectory } from '../PresenceDirectory';
 import { RunSandboxName } from '../RunSandboxName';
@@ -50,7 +51,7 @@ function usage(script: string): string {
 		'  [--cpus <n>] [--memory <2g>] [--idle-minutes <n>] [--max-sandboxes <n>] [--presence-dir <dir>] [--log-file <file>]',
 		'  [--project-path <folder> ...] [--model-env NAME=VALUE ...] [--extra-allowed-host <host:port> ...] [--accept-ssh-agent-forwarding]',
 		'Environment (set by the daemon for a built-in:command source): FLOW_DAEMON_WS_URL, FLOW_WORKER_SOURCE_ID, FLOW_WORKER_TOKEN.',
-		'Optional: FLOW_SANDBOX_HOST_HOME (home directory given to the aws CLI), FLOW_SANDBOX_PRESENCE_DIR (default of --presence-dir, shared with the leftover CLI), SBX_PATH.',
+		'Optional: FLOW_SANDBOX_HOST_HOME, FLOW_SANDBOX_HOST_USERPROFILE, FLOW_SANDBOX_HOST_APPDATA, FLOW_SANDBOX_HOST_LOCALAPPDATA (the real user directories, given to the aws and sbx children only), FLOW_SANDBOX_PRESENCE_DIR (default of --presence-dir, shared with the leftover CLI), SBX_PATH.',
 	].join('\n');
 }
 
@@ -180,15 +181,11 @@ export class HarnessConfigParser {
 			if (problem !== undefined) fail(`invalid --extra-allowed-host ${JSON.stringify(host)}: ${problem}.`);
 		}
 
-		const hostHome = env['FLOW_SANDBOX_HOST_HOME'];
 		// The aws CLI needs none of the FLOW_* launch variables (the worker token lets whoever has it speak as this worker).
+		// The real user directories (AWS SSO session) come back here only; the daemon itself keeps its isolated ones (HostEnvironment).
 		const awsEnvironment: NodeJS.ProcessEnv = Object.fromEntries(
-			Object.entries(env).filter(([name]) => !name.startsWith('FLOW_'))
+			Object.entries(HostEnvironment.restoreFor(env)).filter(([name]) => !name.startsWith('FLOW_'))
 		);
-		if (hostHome !== undefined && hostHome !== '') {
-			awsEnvironment['HOME'] = hostHome;
-			awsEnvironment['USERPROFILE'] = hostHome;
-		}
 
 		return {
 			daemonUrl: requireEnvironment(env, 'FLOW_DAEMON_WS_URL', fail),
