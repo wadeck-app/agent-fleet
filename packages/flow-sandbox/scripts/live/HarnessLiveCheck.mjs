@@ -578,6 +578,10 @@ try {
 		});
 		created.sandbox = own[0].name;
 		evidence.sandbox = own[0];
+		// `sbx ls` reports `stopped` while `sbx stop` is still returning, and the wrapper writes its log line only after it returned
+		// (SandboxLifecycle.stopHeld): reading the log right now raced with that line (3 of 7 replays, 2026-11-08), so wait for it.
+		const expectedStop = park ? /stopped \(idle for 0\.2 min\)/ : /stopped \(daemon_stopping\)/;
+		await waitFor('the wrapper log to say why it stopped the sandbox', 20_000, () => expectedStop.test(readIfExists(wrapperLog)));
 		const log = readIfExists(wrapperLog);
 		if (park)
 			expect(
