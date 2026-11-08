@@ -24,6 +24,7 @@ const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf
 		slot: string;
 		label?: string;
 		path?: string;
+		tab?: { group: string; label: string; order: number };
 		view: { type: string; value: string };
 	}[];
 };
@@ -102,6 +103,22 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 			'/executions/:id=Execution',
 			'/plugins/:id=Plugin',
 		]);
+	});
+
+	// Tabs under the breadcrumb (app-core `tab`): both pages take the same :params (id) and the group name is what
+	// flow-chart joins as "flow:execution" (its own manifest test holds that side).
+	it('makes the execution detail and its logs the Summary and Logs tabs of the group "execution"', () => {
+		const tabs = Object.fromEntries(manifest.extensionPoints.filter(p => p.tab).map(p => [p.path, p.tab]));
+		expect(tabs).toEqual({
+			'/executions/:id': { group: 'execution', label: 'Summary', order: 10 },
+			'/executions/:id/logs': { group: 'execution', label: 'Logs', order: 20 },
+		});
+	});
+
+	it('gives no tab to /plugins/:id: it is alone', () => {
+		const plugin = manifest.extensionPoints.find(p => p.path === '/plugins/:id');
+		expect(plugin).toBeDefined();
+		expect(plugin).not.toHaveProperty('tab');
 	});
 
 	it('declares exactly the pages of flow-core FLOW_PAGE_PATHS, the contract the modules linking to them are tested against', () => {

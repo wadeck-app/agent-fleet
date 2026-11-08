@@ -179,11 +179,12 @@ describe('dsl-views', () => {
 
 describe('action buttons next to an execution', () => {
 	// The look is one for every action (own or contributed): the flow-core style, on a ButtonLink (a navigation that reads as a button).
-	it('uses the contract style on the Logs button of the detail header, in every variant', () => {
+	// The Logs tab (manifest `tab`, group "execution") replaces the Logs button of the detail header.
+	it('has no Logs button on the detail header, in every variant: the Logs tab replaces it', () => {
 		for (const { variant, document } of alternativesOf('execution-detail-page.yaml')) {
 			const logs = collectNodes(document, 'ButtonLink').filter(link => link['label'] === 'Logs');
-			expect(logs, String(variant)).toHaveLength(1);
-			expect(logs[0], String(variant)).toMatchObject(FLOW_ACTION_BUTTON_STYLE);
+			expect(logs, String(variant)).toEqual([]);
+			expect(JSON.stringify(document), String(variant)).not.toContain('logsHref');
 		}
 	});
 
@@ -686,16 +687,16 @@ describe('execution detail page', () => {
 		expect(collectNodes(parseView('executions-page.yaml').document, 'AbTest')).toEqual([]);
 	});
 
-	it('orders the header buttons [contributed links] [Logs] [contributed actions]', () => {
+	it('orders the header buttons [contributed links] [contributed actions] (the own Logs button is now a tab)', () => {
 		const document = initialView('execution-detail-page.yaml');
 		const group = collectNodes(document, 'HorizontalStack').find(stack =>
-			(stack['items'] as Record<string, unknown>[]).some(item => item['label'] === 'Logs')
+			(stack['items'] as Record<string, unknown>[]).some(item => item['items'] === '$sources.links')
 		)!;
 		expect(
 			(group['items'] as Record<string, unknown>[]).map(item =>
 				item['$type'] === 'ExtensionSlot' ? item['items'] : item['label']
 			)
-		).toEqual(['$sources.links', 'Logs', '$sources.actions']);
+		).toEqual(['$sources.links', '$sources.actions']);
 	});
 
 	it('badges the retries with exactly the texts and colours of flow-core RETRY_BADGE_VARIANTS', () => {
@@ -749,14 +750,6 @@ describe('execution detail page', () => {
 		expect(sections).toHaveLength(1);
 		expect(sections[0]).toMatchObject({ defaultOpen: false });
 		expect(collectNodes(sections[0]!, 'JsonViewer')[0]).toMatchObject({ field: 'ioText' });
-	});
-
-	it('links to the logs of the run in every variant', () => {
-		for (const { variant, document } of alternativesOf('execution-detail-page.yaml')) {
-			const logs = collectNodes(document, 'ButtonLink').filter(link => link['label'] === 'Logs');
-			expect(logs, String(variant)).toHaveLength(1);
-			expect(logs[0], String(variant)).toMatchObject({ to: '$sources.execution.logsHref' });
-		}
 	});
 
 	it('opens an attempts table under a step with several attempts or an unknown cost, in every variant', () => {
@@ -1005,7 +998,7 @@ describe('links read from a row or from the detail resolve to a page of the mani
 				}
 			}
 		}
-		expect(new Set(resolved)).toEqual(new Set(['$ctx.row.logsHref', '$sources.execution.logsHref']));
+		expect(new Set(resolved)).toEqual(new Set(['$ctx.row.logsHref']));
 	});
 });
 
@@ -1207,11 +1200,11 @@ describe('rows of buttons wrap whole at a narrow width (HorizontalStack wrap, ds
 		);
 	}
 
-	it('wraps every header row of the execution detail page (project slot, links, Logs, actions)', () => {
+	it('wraps every header row of the execution detail page (project slot, links, actions)', () => {
 		const rows = collectNodes(initialView('execution-detail-page.yaml'), 'HorizontalStack').slice(0, 3);
 		expect(rows).toHaveLength(3);
 		for (const row of rows) expect(row, JSON.stringify(row['items'])).toMatchObject({ wrap: true });
-		expect(rowsHolding('execution-detail-page.yaml', item => item['label'] === 'Logs')[0]).toMatchObject({
+		expect(rowsHolding('execution-detail-page.yaml', item => item['items'] === '$sources.links')[0]).toMatchObject({
 			wrap: true,
 			gap: 'gap-2',
 		});

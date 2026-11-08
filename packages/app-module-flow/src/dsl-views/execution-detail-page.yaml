@@ -1,10 +1,9 @@
 # Execution detail (`flow show <id>`), mounted at /modules/flow/executions/:id. ":id" of the manifest path is $route.id.
 # ?tail=<chars> sets how much of a failed step's output is kept; ?full=true lifts the limit.
 # There is no "Back to executions" link: the shell shows a breadcrumb.
-# Buttons, left to right: the slot "flow:execution-links" (flow-chart adds "Flow definition"), Logs (this module; logsHref
-# is a path the route builds: a DSL string cannot be concatenated), then the slot "flow:execution-actions" (flow-chart
-# adds "Flow chart"). Two slots because a slot renders where the view puts it: a contribution can only precede an own
-# button through its own slot. Their views are rendered with this page's context, so they can read $route.id and
+# Buttons, left to right: the slot "flow:execution-links" (flow-chart adds "Flow definition"), then the slot
+# "flow:execution-actions" (flow-chart adds "Flow chart"). The logs are a tab (manifest `tab`, group "execution"), not a button.
+# Two slots keep a contribution before or after the other. Their views are rendered with this page's context, so they can read $route.id and
 # $sources.execution.<field> (whole-string expressions only).
 # Times are ISO 8601 and shown by table columns with `format: datetime`, the shell formatter of every app-core table:
 # the run start and end are a one-row table (`timing`: a Badge or a StatTile cannot format a timestamp), a step start is
@@ -85,13 +84,6 @@ sections:
                       # Each slot renders nothing while no module contributes.
                       - $type: ExtensionSlot
                         items: $sources.links
-                      - {
-                            $type: ButtonLink,
-                            size: sm,
-                            variant: secondary,
-                            label: Logs,
-                            to: $sources.execution.logsHref,
-                        }
                       - $type: ExtensionSlot
                         items: $sources.actions
 

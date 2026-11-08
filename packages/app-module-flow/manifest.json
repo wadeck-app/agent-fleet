@@ -54,6 +54,7 @@
 			"slot": "route",
 			"label": "Execution",
 			"path": "/executions/:id",
+			"tab": { "group": "execution", "label": "Summary", "order": 10 },
 			"view": { "type": "path", "value": "./src/dsl-views/execution-detail-page.yaml" }
 		},
 		{
@@ -61,6 +62,7 @@
 			"slot": "route",
 			"label": "Logs",
 			"path": "/executions/:id/logs",
+			"tab": { "group": "execution", "label": "Logs", "order": 20 },
 			"view": { "type": "path", "value": "./src/dsl-views/execution-logs-page.yaml" }
 		},
 		{
