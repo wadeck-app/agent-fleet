@@ -220,7 +220,7 @@ labels:
 
 workspace:
     mode: shared
-    gitStrategy: any
+    gitStrategy: none
     reusePolicy: if-available
 
 steps:
