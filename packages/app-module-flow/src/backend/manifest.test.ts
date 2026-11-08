@@ -122,7 +122,7 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 				group: 'execution',
 				label: 'Logs',
 				order: 20,
-				count: { route: '/executions/:id/logs/count' },
+				count: { route: '/executions/:id/logs/count', field: 'count' },
 			},
 		});
 	});
@@ -137,7 +137,7 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 		expect(counts).toEqual({
 			'/executions': { route: '/executions/count/running', field: 'count', refreshSeconds: 60 },
 			'/workers': { route: '/workers/count', field: 'count', refreshSeconds: 60 },
-			'/executions/:id/logs': { route: '/executions/:id/logs/count' },
+			'/executions/:id/logs': { route: '/executions/:id/logs/count', field: 'count' },
 		});
 	});
 

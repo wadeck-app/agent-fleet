@@ -67,7 +67,7 @@
 				"group": "execution",
 				"label": "Logs",
 				"order": 20,
-				"count": { "route": "/executions/:id/logs/count" }
+				"count": { "route": "/executions/:id/logs/count", "field": "count" }
 			},
 			"view": { "type": "path", "value": "./src/dsl-views/execution-logs-page.yaml" }
 		},
