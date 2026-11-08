@@ -31,6 +31,7 @@ const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([
 	ValidationCode.WAVE_REDUNDANT_DEPENDS,
 	ValidationCode.SCRIPT_BODY_INTERPOLATION,
 	ValidationCode.WORKSPACE_DEPRECATED,
+	ValidationCode.WORKSPACE_WORKINGDIR_ABSOLUTE,
 ]);
 
 // Same reserved key as FlowRegistry.loadProjectFlows
@@ -189,6 +190,7 @@ export function validationCodeToType(code: ValidationCode): string {
 			return 'schema';
 		case ValidationCode.WORKSPACE_READONLY_CONFLICT:
 		case ValidationCode.WORKSPACE_DEPRECATED:
+		case ValidationCode.WORKSPACE_WORKINGDIR_ABSOLUTE:
 			return 'workspace';
 		case ValidationCode.SECRET_UNKNOWN:
 		case ValidationCode.SECRET_INVALID_NAME:

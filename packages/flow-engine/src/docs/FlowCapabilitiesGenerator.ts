@@ -111,7 +111,7 @@ captureOutput: true
 
 Key fields:
 - \`script\` (string, required) -- shell command(s) to execute
-- \`workingDir\` (string, optional) -- working directory for execution
+- \`workingDir\` (string, optional) -- working directory for execution; relative to the workspace root, an absolute path replaces the workspace (the flow-level \`workingDir\` is the default)
 - \`env\` (Record<string, string>, optional) -- environment variables
 - \`captureOutput\` (boolean, optional) -- whether to capture stdout/stderr
 - \`shell\` (\`bash\` | \`cmd\` | \`pwsh\`, recommended) -- execution shell; omitting it makes the shell depend on the platform and line count

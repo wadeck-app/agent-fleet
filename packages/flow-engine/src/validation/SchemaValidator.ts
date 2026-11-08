@@ -12,6 +12,8 @@
  * This validator focuses on STRUCTURE, not semantics (e.g., it doesn't validate
  * that step references are valid - that's done by other validators).
  */
+import * as path from 'node:path';
+
 import type {
 	FlowDefinition,
 	FlowStep,
@@ -173,6 +175,9 @@ export class SchemaValidator {
 				location: { field: 'workspace' },
 			});
 		}
+		if (parsed.spec.provider !== 'in-place') {
+			this.warnAbsoluteWorkingDirs(flow, parsed.spec.provider);
+		}
 		if (parsed.spec.provider === 'worktree') {
 			for (const issue of WorktreeOptionRules.check(parsed.spec.options)) {
 				this.issueCollector.addIssue({
@@ -196,6 +201,42 @@ export class SchemaValidator {
 					suggestion: conflict.suggestion,
 					context: { related: writing.map(step => step.stepId) },
 				});
+			}
+		}
+	}
+
+	/**
+	 * An absolute `workingDir` (flow-level or on a script step) replaces the workspace for script steps, so with an
+	 * isolated workspace (worktree, pool, readonly) the script silently runs in another folder. Model steps have no
+	 * `workingDir` field and always run in the workspace.
+	 */
+	private warnAbsoluteWorkingDirs(flow: FlowDefinition, provider: string): void {
+		// Checked for both path flavours: a flow written on Windows can be validated on Linux, and the reverse.
+		const isAbsolute = (value: unknown): value is string =>
+			typeof value === 'string' && (path.posix.isAbsolute(value) || path.win32.isAbsolute(value));
+		const warn = (workingDir: string, stepId: string | undefined, where: string): void => {
+			this.issueCollector.addIssue({
+				severity: 'warning',
+				code: ValidationCode.WORKSPACE_WORKINGDIR_ABSOLUTE,
+				message:
+					`${where} has the absolute workingDir '${workingDir}' while the flow declares workspace '${provider}': ` +
+					`it replaces the workspace for script steps, so they run in that folder instead of the isolated workspace ` +
+					`(model steps ignore workingDir and still run in the workspace).`,
+				location: { ...(stepId === undefined ? {} : { stepId }), field: 'workingDir' },
+				suggestion:
+					'Remove workingDir to run in the workspace, or make it relative (e.g. "packages/app"): a relative workingDir is resolved against the workspace root.',
+			});
+		};
+		if (isAbsolute(flow.workingDir)) {
+			warn(flow.workingDir, undefined, 'The flow');
+		}
+		if (!Array.isArray(flow.steps)) {
+			return;
+		}
+		for (const step of flow.steps) {
+			const candidate = step as unknown as { type?: unknown; id?: unknown; workingDir?: unknown };
+			if (candidate.type === 'script' && typeof candidate.id === 'string' && isAbsolute(candidate.workingDir)) {
+				warn(candidate.workingDir, candidate.id, `Script step '${candidate.id}'`);
 			}
 		}
 	}

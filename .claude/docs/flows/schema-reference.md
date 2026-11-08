@@ -458,7 +458,7 @@ Executes a shell script or command in the workspace.
 - **Type**: `string` (optional)
 - **Required**: No
 - **Default**: Workspace root directory
-- **Description**: Working directory for script execution (relative to workspace root)
+- **Description**: Working directory for script execution. Relative: resolved against the workspace root. Absolute: used as is and replaces the workspace (`flow validate` warns `WORKSPACE_WORKINGDIR_ABSOLUTE` when the flow's `workspace` is not `in-place`). The flow-level `workingDir` is the default; the step's wins. Model steps ignore it.
 - **Example**:
     ```yaml
     - type: script
@@ -1276,6 +1276,22 @@ steps:
           Priority: ${{ task.priority }}
           Project: ${{ task.projectName }}
 ```
+
+#### `context.*` names
+
+| Name                       | Value                                                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `context.cwd`              | Directory the run was launched from.                                                                                   |
+| `context.projectDir`       | The main project folder only when the run was launched through the main path (`RunProjectResolver`); otherwise the launch directory. |
+| `context.workspaceDir`     | The workspace the steps run in.                                                                                        |
+| `context.outputsDir`       | `<project>/.flow/runs/<executionId>.meta/outputs`; relative `writeOutput` paths land here, not in the workspace.       |
+| `context.workingDir`       | Only when the flow declares `workingDir`.                                                                              |
+| `context.lastSubStepError` | Last sub-step error, in the re-queued parent's prompt.                                                                 |
+| `context.subStepErrors`    | All accumulated sub-step errors of the parent.                                                                         |
+
+- No template name exists for the `executionId` or for the `.meta` folder itself.
+- Script processes get no `FLOW_*` run variable: pass values with `env:`.
+- The `.meta` folder is kept until the execution record expires (`logs.retainDays`, default 30).
 
 ### Template Locations
 

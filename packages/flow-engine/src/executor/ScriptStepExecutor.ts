@@ -88,7 +88,10 @@ export async function executeScriptStep(
 	stepTrace.env = stepEnv;
 	const renderedEnv = withSecrets(step, stepEnv, context);
 
-	const workingDir = step.workingDir ?? context.context?.['workingDir'] ?? workspacePath;
+	const declaredWorkingDir = step.workingDir ?? context.context?.['workingDir'];
+	// A relative workingDir is relative to the workspace root (not to the worker process cwd); an absolute one is used as is.
+	const workingDir =
+		typeof declaredWorkingDir === 'string' ? path.resolve(workspacePath, declaredWorkingDir) : workspacePath;
 	const result = await scriptExecutor.execute({
 		script: renderedScript,
 		workingDir,
