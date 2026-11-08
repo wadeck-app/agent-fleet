@@ -138,7 +138,19 @@ Only `workspace: pool`. `in-place` and `readonly` hand the sandbox the project f
 
 ### Pool slots used by sandboxed runs must be dedicated to them
 
-The sandbox has a read/write mount of the slot, `.git` included. Measured on real sbx (`scripts/live/PoolSlotLiveCheck.mjs`, 2026-11-08): code in the VM edited `<slot>/.git/config` and added a hook, both visible on the host, and a `core.fsmonitor` planted that way ran ON THE HOST when the host ran `git status` in the slot (the daemon does so when it allocates a slot). The plant also persists into the next run of the slot. So: never use your own checkout or a slot shared with host runs; treat a slot used by a sandbox as untrusted until re-cloned. Hardening the daemon's own git calls in a slot is a flow follow-up (threat model T-16).
+The sandbox has a read/write mount of the slot, `.git` included, and can edit `<slot>/.git/config`, hooks and `.gitattributes` (`scripts/live/PoolSlotLiveCheck.mjs`, real sbx, git 2.45.1.windows.1, 2026-11-08). What then ran on the HOST, measured against the production helper (`HardenedGit`, since 56dd1fb8) and probe (`GitFolderProbe`):
+
+| Planted from the sandbox | Plain git | Production read (`GitFolderProbe`, `hardenedGit` reading) | `hardenedGit` mutating (checkout, fetch) |
+| --- | --- | --- | --- |
+| `core.fsmonitor` | ran at `status` | blocked | blocked |
+| `core.hooksPath` (post-checkout hook in it) | ran at checkout | blocked (NUL hooksPath) | ran |
+| post-checkout hook in `.git/hooks` | not exercised | blocked (NUL hooksPath; reading checkout) | ran |
+| `filter.*.smudge` | not exercised | not exercised | ran |
+| `filter.*.clean` | not shown | RAN once the index was stale | ran |
+| `core.sshCommand` (ssh remote) | not exercised | not exercised | ran at fetch |
+| `credential.helper` (http remote, 401) | - | - | not triggered in this test (inconclusive) |
+
+So the daemon's reads are safe from fsmonitor and hooks, but the slot stays untrusted: never use your own checkout or a slot shared with host runs, and treat a slot a sandbox used as poisoned until re-cloned. Closing filters, `core.sshCommand`, `credential.helper` and git calls outside the helper is a flow follow-up (threat model T-16).
 
 ### Limits of the harness
 
