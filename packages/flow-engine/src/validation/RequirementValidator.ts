@@ -1,3 +1,4 @@
+import { ProfileCatalog } from '../requirements/ProfileCatalog';
 import { RequirementSyntax } from '../requirements/RequirementSyntax';
 import type { FlowDefinition, FlowStep } from '../types';
 import type { IssueCollector, ValidationIssue } from './ValidationTypes';
@@ -24,10 +25,74 @@ export class RequirementValidator {
 
 	validateFlow(flow: FlowDefinition): void {
 		this.validate(flow.requires, `Flow '${flow.id}'`, { field: 'requires' });
+		this.validateProfile(flow.profile, `Flow '${flow.id}'`, { field: 'profile' });
 	}
 
 	validateStep(step: FlowStep): void {
 		this.validate(step.requires, `Step '${step.id}'`, { stepId: step.id, field: 'requires' });
+		this.validateProfile(step.profile, `Step '${step.id}'`, { stepId: step.id, field: 'profile' });
+	}
+
+	/**
+	 * A `profile` must be one known name. The names are built in, so this is checked offline too; with `knownGuarantees`
+	 * the requirements it expands to must also be declared by a worker source (otherwise no worker could ever serve it).
+	 */
+	private validateProfile(profile: unknown, where: string, location: ValidationIssue['location']): void {
+		if (profile === undefined) {
+			return;
+		}
+		if (typeof profile !== 'string') {
+			this.reportProfile(ValidationCode.INVALID_TYPE, this.profileMessage(profile, where), location);
+			return;
+		}
+		const requirements = ProfileCatalog.find(profile);
+		if (requirements === undefined) {
+			const near = ProfileCatalog.closest(profile);
+			const known = ProfileCatalog.names().join(', ');
+			this.reportProfile(
+				ValidationCode.INVALID_VALUE,
+				`${where}: unknown profile "${profile}".${near.length > 0 ? ` Did you mean ${near.map(name => `"${name}"`).join(' or ')}?` : ''} Known profiles: ${known}`,
+				location,
+				`Write one of: ${known}. Names are checked here; whether a worker provides their guarantees is checked when the run starts.`
+			);
+			return;
+		}
+		const declared = this.knownGuarantees;
+		const missing = declared === undefined ? [] : requirements.filter(entry => !declared.includes(entry));
+		if (declared === undefined || missing.length === 0) {
+			return;
+		}
+		this.reportProfile(
+			ValidationCode.INVALID_VALUE,
+			declared.length === 0
+				? `${where}: profile "${profile}" cannot be met: no worker source declares any guarantee`
+				: `${where}: profile "${profile}" requires ${missing.map(entry => `"${entry}"`).join(', ')}, which no declared worker source guarantees. Declared guarantees: ${this.listed(declared)}`,
+			location,
+			'Declare a worker source that provides them (flow worker source list shows the declared ones), or use a profile or requires: that the declared sources can meet.'
+		);
+	}
+
+	private profileMessage(profile: unknown, where: string): string {
+		try {
+			ProfileCatalog.expand(profile, where);
+			return '';
+		} catch (error) {
+			return (error as Error).message;
+		}
+	}
+
+	private listed(known: readonly string[]): string {
+		const rest = known.length > MAX_LISTED_KNOWN ? ` (and ${known.length - MAX_LISTED_KNOWN} more)` : '';
+		return `${known.slice(0, MAX_LISTED_KNOWN).join(', ')}${rest}`;
+	}
+
+	private reportProfile(
+		code: ValidationCode,
+		message: string,
+		location: ValidationIssue['location'],
+		suggestion = `Write profile: <name> with one of ${ProfileCatalog.names().join(', ')} (one name; add more with requires: [...]).`
+	): void {
+		this.issueCollector.addIssue({ severity: 'error', code, message, location, suggestion });
 	}
 
 	private validate(requires: unknown, where: string, location: ValidationIssue['location']): void {

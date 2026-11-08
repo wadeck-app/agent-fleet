@@ -11,6 +11,7 @@ export { DefaultProcessLauncher } from './processing/DefaultProcessLauncher';
 export type { ProcessLauncher, ProcessSignal } from './processing/ProcessLauncher';
 export type { StepRunnerConfig } from './executor/StepRunner';
 export { RequirementSyntax } from './requirements/RequirementSyntax';
+export { ProfileCatalog } from './requirements/ProfileCatalog';
 export { FlowValidator } from './validation/FlowValidator';
 export type { ValidationIssue, ValidationResult } from './validation/FlowValidator';
 export { ValidationCode } from './validation/ValidationTypes';

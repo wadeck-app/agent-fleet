@@ -66,7 +66,7 @@ describe('requires: routed to the source that declares the guarantee', () => {
 	let idle: ReturnType<typeof idleWorker>[];
 	let sent: string[];
 
-	function writeFlow(requires: string): string {
+	function writeFlow(requires: string, profile?: string): string {
 		const file = path.join(tmpDir, 'needs.yml');
 		fs.writeFileSync(
 			file,
@@ -76,7 +76,8 @@ describe('requires: routed to the source that declares the guarantee', () => {
 				'name: Needs Flow',
 				'description: x',
 				'inputs: {}',
-				`requires: ${requires}`,
+				...(profile === undefined ? [] : [`profile: ${profile}`]),
+				...(requires === '' ? [] : [`requires: ${requires}`]),
 				`workspace: { provider: pool, dir: "${poolDir.replace(/\\/g, '/')}", prefix: ws-, count: 2 }`,
 				'steps:',
 				'  - id: only',
@@ -220,5 +221,43 @@ describe('requires: routed to the source that declares the guarantee', () => {
 		handler.tryDispatch();
 
 		expect(sent).toEqual(['w-x']);
+	});
+
+	// A profile is a named set of requirements: it routes exactly like the same list written in requires.
+	describe('profile: expanded to the guarantees the sources declare', () => {
+		it('serves profile agent (fs=confined, env=clean) from the sbx-like source only, never from a source that declares nothing', async () => {
+			const flowFile = writeFlow('', 'agent');
+
+			const response = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+			expect(response.type).toBe('execution_started');
+			// The host worker and the worker of the source that guarantees nothing are idle, and neither took the step.
+			expect(sent).toEqual([]);
+			await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toEqual(['sbx']));
+			idle.push(idleWorker('w-sbx', 'sbx'));
+			handler.tryDispatch();
+
+			expect(sent).toEqual(['w-sbx']);
+			const executionId = (response as { executionId: string }).executionId;
+			const record = JSON.parse(
+				fs.readFileSync(path.join(executionsDirOf(daemonDir), `${executionId}.json`), 'utf8')
+			) as { requirements: unknown };
+			expect(record.requirements).toEqual({
+				run: ['env=clean', 'fs=confined'],
+				steps: { only: ['env=clean', 'fs=confined'] },
+				profiles: { run: 'agent', steps: {} },
+			});
+		});
+
+		it('refuses profile inspect at run start: no declared source guarantees fs=readonly-enforced, and the message says which', async () => {
+			const flowFile = writeFlow('', 'inspect');
+
+			const response = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+			expect(response).toMatchObject({ type: 'error', code: 'VALIDATION_FAILED' });
+			expect(JSON.stringify(response)).toMatch(/profile .{1,6}inspect.{1,6} requires .{1,6}fs=readonly-enforced/);
+			expect(fixture.obtained).toEqual([]);
+			expect(fs.readdirSync(executionsDirOf(daemonDir))).toEqual([]);
+		});
 	});
 });

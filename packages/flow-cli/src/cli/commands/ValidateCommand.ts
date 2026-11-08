@@ -106,6 +106,9 @@ export function registerValidateCommand(program: Command, getConfigDir: () => st
 			for (const warning of result.warnings) {
 				console.error(`[warn] ${warning}`);
 			}
+			for (const note of result.notes ?? []) {
+				console.error(`[note] ${note}`);
+			}
 			console.log(`[ok] Flow is valid (version ${result.version})`);
 			process.exit(0);
 		});

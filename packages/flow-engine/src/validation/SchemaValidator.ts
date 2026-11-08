@@ -34,6 +34,7 @@ import { WorktreeOptionRules } from '../workspace/WorktreeOptionRules';
 import { RequirementValidator } from './RequirementValidator';
 import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
+import { WorkerTypeDeprecation } from './WorkerTypeDeprecation';
 
 /**
  * Minimal shape used to report a step whose `type` discriminant is none of the
@@ -133,6 +134,7 @@ export class SchemaValidator {
 
 		// Validate the flow-level worker type binding (optional)
 		this.validateFlowWorkerType(flow);
+		new WorkerTypeDeprecation(this.issueCollector).validate(flow);
 
 		// Validate the flow-level requirements (optional)
 		this.requirementValidator.validateFlow(flow);

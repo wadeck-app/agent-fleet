@@ -46,7 +46,9 @@ describe('RunRequestHandler -- requires', () => {
 	let declaredBySource: Record<string, string[]>;
 	let order: string[];
 
-	function writeFlow(lines: { flowRequires?: string; stepRequires?: string } = {}): string {
+	function writeFlow(
+		lines: { flowRequires?: string; stepRequires?: string; flowProfile?: string; stepProfile?: string } = {}
+	): string {
 		const poolPath = poolDir.replace(/\\/g, '/');
 		const text = [
 			'id: needs-flow',
@@ -55,6 +57,7 @@ describe('RunRequestHandler -- requires', () => {
 			'description: x',
 			'inputs: {}',
 			...(lines.flowRequires === undefined ? [] : [`requires: ${lines.flowRequires}`]),
+			...(lines.flowProfile === undefined ? [] : [`profile: ${lines.flowProfile}`]),
 			`workspace: { provider: pool, dir: "${poolPath}", prefix: ws-, count: 2 }`,
 			'steps:',
 			'  - id: only',
@@ -62,6 +65,7 @@ describe('RunRequestHandler -- requires', () => {
 			'    type: script',
 			'    script: echo hi',
 			...(lines.stepRequires === undefined ? [] : [`    requires: ${lines.stepRequires}`]),
+			...(lines.stepProfile === undefined ? [] : [`    profile: ${lines.stepProfile}`]),
 			'',
 		].join('\n');
 		fs.writeFileSync(flowFile, text);
@@ -167,6 +171,31 @@ describe('RunRequestHandler -- requires', () => {
 		});
 	});
 
+	it('expands a flow profile and a step profile into the recorded sets, keeping the names for display', async () => {
+		declaredBySource = { sbx: ['clean=run', 'env=clean', 'fs=confined', 'ports=private', 'sandbox'] };
+		writeFlow({ flowProfile: 'agent', stepProfile: 'untrusted-code', stepRequires: '["clean=run"]' });
+
+		const executionId = await run(newHandler());
+
+		expect(record(executionId).requirements).toEqual({
+			run: ['env=clean', 'fs=confined'],
+			steps: { only: ['clean=run', 'env=clean', 'fs=confined', 'ports=private'] },
+			profiles: { run: 'agent', steps: { only: 'untrusted-code' } },
+		});
+	});
+
+	it('refuses a profile whose guarantees no declared source provides, before anything is recorded', async () => {
+		// the sandbox of today does not declare fs=readonly-enforced: inspect is the one unmeetable profile
+		declaredBySource = { sbx: ['clean=run', 'env=clean', 'fs=confined', 'ports=private', 'sandbox'] };
+		writeFlow({ flowProfile: 'inspect' });
+
+		const response = await newHandler().handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(response).toMatchObject({ type: 'error', code: 'VALIDATION_FAILED' });
+		expect(JSON.stringify(response)).toMatch(/profile .{1,6}inspect.{1,6} requires .{1,6}fs=readonly-enforced/);
+		expect(fs.readdirSync(executionsDirOf(daemonDir))).toEqual([]);
+	});
+
 	it('keeps the resolved set out of the definition snapshot: the snapshot is the flow as written', async () => {
 		const text = writeFlow({ flowRequires: '["fs=confined"]' });
 
@@ -264,6 +293,25 @@ describe('RunRequestHandler -- requires', () => {
 			handler.tryDispatch();
 
 			expect(assigns()).toEqual([]);
+		});
+
+		it('enforces a recorded profile expansion even though its definition names no profile, and keeps the names', async () => {
+			const recorded = {
+				run: ['env=clean', 'fs=confined', 'fs=readonly-enforced'],
+				steps: { only: ['env=clean', 'fs=confined', 'fs=readonly-enforced'] },
+				profiles: { run: 'inspect', steps: {} },
+			};
+			leaveWaitingRecord('aaaa1111', recorded);
+			const handler = newHandler();
+			store.reconcileInterruptedExecutions();
+
+			await handler.resumeWaitingExecutions(() => undefined);
+			await vi.waitFor(() => expect(record('aaaa1111').workspaceWait).toBeUndefined());
+			handler.tryDispatch();
+
+			// the only declared source guarantees env=clean and fs=confined, not fs=readonly-enforced
+			expect(assigns()).toEqual([]);
+			expect(record('aaaa1111').requirements).toEqual(recorded);
 		});
 
 		it('keeps the recorded requirements in the record after it started', async () => {

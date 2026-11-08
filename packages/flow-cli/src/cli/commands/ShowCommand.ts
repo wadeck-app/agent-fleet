@@ -12,6 +12,7 @@ import {
 	renderFlowSummary,
 	renderVersionLines,
 } from 'flow-core';
+import { ProfileCatalog } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine/types';
 import * as fs from 'node:fs';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
@@ -53,7 +54,7 @@ function showFlowFile(file: string, opts: { json?: boolean }, versions: Definiti
 		return;
 	}
 
-	console.log(renderFlowSummary(flow));
+	console.log(renderFlowSummary(flow, name => ProfileCatalog.find(name)));
 	console.log(renderVersionLines(assessFileVersion(versions, flow.id, flow, file)).join('\n') + '\n');
 	const secrets = renderSecretsSummary(flow);
 	if (secrets !== '') {

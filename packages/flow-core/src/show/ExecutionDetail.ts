@@ -11,6 +11,7 @@ import { formatDuration, formatStartedUtc } from '../history/ExecutionFormat.js'
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { RECOVERED_RUN_HINT } from '../view/OutcomeHints.js';
 import { isWaitingForWorkspace, statusLabelOf, workspaceWaitLines } from '../view/WorkspaceWaitText.js';
+import { executionRequirementLines, stepRecordedRequirementLines } from './RequirementLines.js';
 import { renderStepCostLines, renderTotalCostLine } from './StepCostLines.js';
 import { renderStepIoLines } from './StepIoLines.js';
 
@@ -155,6 +156,7 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 		lines.push(`Completed: ${formatStartedUtc(record.completedAt)}`);
 	}
 	lines.push(`Duration:  ${formatDuration(record.startedAt, record.completedAt)}`);
+	lines.push(...executionRequirementLines(record.requirements));
 	// lastError is the last step failure ever seen; on a completed run it is a recovered retry, not the outcome.
 	if (record.lastError) {
 		if (record.status === 'completed') {
@@ -192,6 +194,7 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 				`      relaunch ${i + 1} (sub-step failed) ${formatStartedUtc(relaunch.at)}: ${firstLine.slice(0, 160)}`
 			);
 		}
+		lines.push(...stepRecordedRequirementLines(record.requirements, stepId, '      '));
 		if (skipReason !== undefined) {
 			lines.push(`      skipped: ${skipReason}`);
 		}

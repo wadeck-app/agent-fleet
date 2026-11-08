@@ -592,6 +592,13 @@ export interface BaseFlowStep {
 	 */
 	requires?: string[];
 
+	/**
+	 * Name of a built-in requirement profile (`agent`, `inspect`, `untrusted-code`, `hermetic-test`): a named set of
+	 * requirements that is added to this step's `requires` and to the flow-level ones (union, AND). See
+	 * {@link ProfileCatalog}. An unknown name fails validation.
+	 */
+	profile?: string;
+
 	/** Conditional execution expression (evaluated to boolean) */
 	when?: string;
 
@@ -1062,6 +1069,13 @@ export interface FlowDefinition {
 	 * from the set recorded when the run was accepted.
 	 */
 	requires?: string[];
+
+	/**
+	 * Requirement profile every step of the run -- injected steps included -- inherits (see {@link BaseFlowStep.profile}).
+	 * Expanded to its requirements and unioned with `requires:` and the step's own `profile:`/`requires:` when the daemon
+	 * accepts the run.
+	 */
+	profile?: string;
 
 	/**
 	 * Worker type every step of the run -- injected steps included -- is restricted to (e.g. `sandbox`). The type is the

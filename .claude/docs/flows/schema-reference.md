@@ -122,7 +122,7 @@ The root object that defines a complete flow.
 - **Syntax**: keyword (`sandbox`) or `key=value` (`fs=confined`); letters, digits, `.`, `_`, `-`. Every entry must hold (AND), compared by equality: no `a|b`, no ranges.
 - **Merge**: a step adds its own entries to the flow's. Steps injected into the run inherit the flow's `requires`.
 - **Guarantees come from the worker source**, not from worker labels.
-- **With `workerType`**: both keep working; both must hold. A source of an exclusive worker type may serve a step whose requirements it fully guarantees (asking for a guarantee is an opt-in); it still never serves a step that requires nothing.
+- **With `workerType`**: `workerType` is deprecated (`flow validate` warns; use `requires: [sandbox]` or a [`profile`](#profile)). Both keep working; both must hold. A source of an exclusive worker type may serve a step whose requirements it fully guarantees (asking for a guarantee is an opt-in); it still never serves a step that requires nothing.
 - **Checks**: `flow validate` offline is syntax-only (an unknown key is accepted). The daemon checks the key at run start, listing the declared guarantees.
 - **Workspace kind**: a source may declare the `workspace:` kinds it accepts (`workspaces`). If every source that can provide a run's requirements refuses the flow's kind, the daemon refuses the run when it starts, before any workspace is allocated (`WORKSPACE_KIND_NOT_ACCEPTED`: change `workspace:` or drop the requirement). `flow validate` offline cannot check it (no worker knowledge). See `packages/flow-cli/WORKERS.md`.
 - **Unmet at run time**: the step waits `worker.boundStepWaitSeconds`, then fails. It fails at once when no declared source provides the guarantee.
@@ -135,6 +135,32 @@ The root object that defines a complete flow.
           name: Build
           requires: [env=clean]
           script: npm run build
+    ```
+
+#### `profile`
+
+- **Type**: `string` (optional; also valid on each step)
+- **Description**: A named set of requirements, added (union, AND) to the `requires` of the same scope. Flow level: every step, injected ones included. Step level: that step.
+- **Built-in profiles**:
+
+    | Name             | Expands to                                 |
+    | ---------------- | ------------------------------------------ |
+    | `agent`          | `fs=confined`, `env=clean`                 |
+    | `inspect`        | `agent` + `fs=readonly-enforced`           |
+    | `untrusted-code` | `agent` + `ports=private`                  |
+    | `hermetic-test`  | `untrusted-code` + `clean=run`             |
+
+- **Checks**: an unknown name is a validation error (offline too) with `Did you mean` and the known names. Whether a worker source guarantees the expansion is checked at run start: a profile no declared source can meet refuses the run, naming the missing guarantees. The sandbox plugin declares everything `agent`, `untrusted-code` and `hermetic-test` need; `inspect` is refused until a source declares `fs=readonly-enforced` (no `:ro` mount yet). `net=filtered` is in no profile (no source declares it).
+- **Resolution**: expanded when the run is accepted and stored in the execution record; a resume uses the stored set. `flow show` prints the profile and its expansion.
+- **Example**:
+    ```yaml
+    profile: agent
+    steps:
+        - type: script
+          id: test
+          name: Test
+          profile: hermetic-test
+          script: npm test
     ```
 
 #### `hooks`
@@ -1125,6 +1151,11 @@ Properties shared by all step types (part of `BaseFlowStep`).
 - **Type**: `string[]` (optional; also a [flow-level property](#requires))
 - **Description**: Guarantees the worker must provide for this step. Added to the flow's `requires`.
 - **See**: [`requires` (flow level)](#requires) for syntax and checks
+
+### `profile`
+
+- **Type**: `string` (optional; also a [flow-level property](#profile))
+- **Description**: Named set of requirements for this step, added to the flow's `requires` and `profile`.
 
 ---
 

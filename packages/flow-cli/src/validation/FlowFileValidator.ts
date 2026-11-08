@@ -18,7 +18,7 @@ export interface CliValidationError {
 }
 
 export type ValidateResult =
-	| { exit: 0; version: string; warnings: string[] }
+	| { exit: 0; version: string; warnings: string[]; notes?: string[] }
 	| { exit: 1; errors: CliValidationError[] }
 	| { exit: 2; message: string }
 	| { exit: 3; errors: CliValidationError[] }
@@ -32,6 +32,7 @@ const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([
 	ValidationCode.SCRIPT_BODY_INTERPOLATION,
 	ValidationCode.WORKSPACE_DEPRECATED,
 	ValidationCode.WORKSPACE_WORKINGDIR_ABSOLUTE,
+	ValidationCode.WORKER_TYPE_DEPRECATED,
 ]);
 
 // Same reserved key as FlowRegistry.loadProjectFlows
@@ -151,7 +152,23 @@ export function validateFlowFile(filePath: string, versions: DefinitionSnapshotS
 	const flowWarnings = result.issues
 		.filter((i: ValidationIssue) => i.severity === 'warning' && SURFACED_WARNING_CODES.has(i.code))
 		.map(issueToWarning);
-	return { exit: 0, version: assessment.version, warnings: [...assessment.warnings, ...flowWarnings] };
+	const notes = usesRequirements(flow) ? [REQUIREMENTS_RUN_START_NOTE] : [];
+	return {
+		exit: 0,
+		version: assessment.version,
+		warnings: [...assessment.warnings, ...flowWarnings],
+		...(notes.length > 0 ? { notes } : {}),
+	};
+}
+
+const REQUIREMENTS_RUN_START_NOTE =
+	'Profile names and the syntax of requires were checked. Whether a worker source provides the guarantees (requires:, profile:) is only known to the daemon: it is checked when the run starts.';
+
+/** Whether the flow or a step declares `requires` or `profile`. */
+function usesRequirements(flow: FlowDefinition): boolean {
+	const declares = (target: { requires?: unknown; profile?: unknown }): boolean =>
+		target.requires !== undefined || target.profile !== undefined;
+	return declares(flow) || (Array.isArray(flow.steps) && flow.steps.some(step => declares(step)));
 }
 
 function issueToWarning(issue: ValidationIssue): string {
@@ -187,6 +204,7 @@ export function validationCodeToType(code: ValidationCode): string {
 		case ValidationCode.SUB_STEP_WAVES_SINGLE_WAVE:
 		case ValidationCode.SUB_STEP_SIBLING_DEPENDENCY:
 		case ValidationCode.OPENCODE_SHELL_NOT_FOUND:
+		case ValidationCode.WORKER_TYPE_DEPRECATED:
 			return 'schema';
 		case ValidationCode.WORKSPACE_READONLY_CONFLICT:
 		case ValidationCode.WORKSPACE_DEPRECATED:

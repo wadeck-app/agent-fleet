@@ -142,6 +142,34 @@ describe('ShowCommand', () => {
 		expect(allOutput).toContain('script');
 	});
 
+	it('shows the profile of a flow file with what it expands to', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'show-profile-'));
+		try {
+			const file = path.join(dir, 'profiled.yml');
+			fs.writeFileSync(
+				file,
+				yaml.dump({
+					id: 'profiled',
+					version: '1.0.0',
+					name: 'Profiled',
+					description: 'd',
+					workspace: 'in-place',
+					profile: 'agent',
+					steps: [{ id: 'build', name: 'Build', type: 'script', script: 'make', profile: 'hermetic-test' }],
+				})
+			);
+
+			runShow(file);
+
+			expect(logged()).toContain('profile:   agent');
+			expect(logged()).toContain('agent = env=clean, fs=confined');
+			expect(logged()).toContain('hermetic-test = clean=run, env=clean, fs=confined, ports=private');
+			expect(logged()).toContain('profile:hermetic-test');
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	it('output contains haiku model name for step-two', () => {
 		runShow(SIMPLE_FLOW);
 

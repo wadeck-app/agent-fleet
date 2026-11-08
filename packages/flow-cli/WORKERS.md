@@ -133,6 +133,8 @@ flow worker source add sandbox --provider docker-sandbox --plugin <pluginId>.<im
 workerType: sandbox # flow level, next to `labels:`
 ```
 
+**Deprecated** in favour of `requires:` / `profile:` (see below): `flow validate` warns (`WORKER_TYPE_DEPRECATED`, with the replacement; `workerType: sandbox` becomes `requires: [sandbox]`). The field itself behaves as before. It exists at flow level only; a step-level `workerType` is not read (the warning says so).
+
 - **The type of a worker** is the plugin id of its source's `--plugin <pluginId>.<implName>`: `sandbox.docker` and `sandbox.podman` are both type `sandbox`. A worker of a source without a plugin, or naming no source, has no type. A worker's source is authenticated by its source token.
 - **Every step of a bound run runs only on workers of that type**, injected steps included. It never falls back to a host worker, and no acceptance or distribution plugin can widen the set. Labels cannot give this guarantee: flow labels are merged into steps only at run start.
 - **Unknown type**: the run is refused (`VALIDATION_FAILED`) listing the known types. `flow validate` checks the name's shape only; the declared sources are per machine.
@@ -171,6 +173,28 @@ Additive to `workerType:` (both must hold). Field reference: `.claude/docs/flows
     - **Placement.** Same hard filter as `requires`, before S4 and S3: a step that requires something is never given to a worker whose source (built instance) does not accept the kind of its run; the kind travels as `StepPlacement.workspaceKind`. Fail-closed: an unbuilt instance accepts nothing, and a run whose kind is unknown goes only to unrestricted sources. Steps that require nothing are not filtered.
     - **Not checked offline.** `flow validate` has no knowledge of the worker sources; the check happens when the run starts.
 - **`assign` message**: carries the resolved set of the step as `requires?: string[]` (sorted; absent when empty), so a worker or wrapper that can verify a guarantee may refuse the step. The daemon does not require it to; a worker that ignores the field behaves as before.
+
+### Requirement profiles (`profile:`)
+
+```yaml
+profile: agent # flow level; a step may add its own `profile:` and `requires:`
+```
+
+A profile is a named set of requirements, built into the code (`ProfileCatalog` in flow-engine; design note `.claude/plans/2026-11-08_sandbox-step-requirements-design.md`, D2). It is expanded when the run is accepted and added (union, AND) to the `requires:` of the same scope; everything above (hard filter, run start check, unmet-at-run-time, injected steps) then applies to the expanded set.
+
+| Profile          | Expands to                       |
+| ---------------- | -------------------------------- |
+| `agent`          | `fs=confined`, `env=clean`       |
+| `inspect`        | `agent` + `fs=readonly-enforced` |
+| `untrusted-code` | `agent` + `ports=private`        |
+| `hermetic-test`  | `untrusted-code` + `clean=run`   |
+
+- **Meetable today: all but `inspect`.** The sandbox plugin declares `sandbox`, `fs=confined`, `env=clean`, `ports=private`, `clean=run` (`packages/flow-sandbox/plugin/plugin.config.js`), which covers `agent`, `untrusted-code` and `hermetic-test`. It does NOT declare `fs=readonly-enforced` (no `:ro` mount yet), so `inspect` is refused at run start (`VALIDATION_FAILED`, naming the profile and `fs=readonly-enforced`) until a source declares it.
+- **`net=filtered` is in no profile.** The sandbox does not declare it (raw TCP to public destinations is unverified). It is added to `untrusted-code` / `hermetic-test` only when a source declares and verifies it: a deliberate tightening that needs a changelog line.
+- **Names are checked offline** (`flow validate`: unknown name is an error with `Did you mean`, and the known list); **availability is checked at run start** by the daemon, against the declared guarantees. `flow validate` prints a note saying so.
+- **Recorded, not re-resolved.** The expansion is stored in the execution record (`requirements`, plus `profiles: { run?, steps }` with the names, for display only). A resume uses the record. A step injected at run time inherits the run's set (flow `requires` and `profile`) and adds the expansion of its own `profile`, read at each placement (so a newer binary could expand a name differently for injected steps only).
+- **Shown** by `flow show <file>` (`profile:`, `requires:`, `expands:` lines; `profile:`/`requires:` on a step row) and by `flow show <execution>` (`Profile:`, `Requires:`, and per step when it differs from the run).
+- **No configuration override yet.** Built-ins only. When `config.yml` overrides are added, the rule is that a config may only TIGHTEN a built-in (the override must contain every requirement of the built-in).
 
 ## Three rules that explain most surprises
 

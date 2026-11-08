@@ -178,12 +178,20 @@ export class RunDefinitionLoader {
 	}
 }
 
-/** Whether the flow or one of its steps declares `requires`. Asked before validation, so it trusts nothing about the shape. */
+/**
+ * Whether the flow or one of its steps declares `requires` or a `profile` (which expands to requirements). Asked before
+ * validation, so it trusts nothing about the shape.
+ */
 function hasRequirements(flow: FlowDefinition): boolean {
 	const steps: unknown = flow.steps;
 	return (
 		flow.requires !== undefined ||
-		(Array.isArray(steps) && steps.some(step => (step as { requires?: unknown } | null)?.requires !== undefined))
+		flow.profile !== undefined ||
+		(Array.isArray(steps) &&
+			steps.some(step => {
+				const declared = step as { requires?: unknown; profile?: unknown } | null;
+				return declared?.requires !== undefined || declared?.profile !== undefined;
+			}))
 	);
 }
 

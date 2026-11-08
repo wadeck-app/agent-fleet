@@ -25,6 +25,18 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).toContain('`fs=confined`');
 	});
 
+	it('documents the built-in profiles with their contents, the union with requires, and the deprecation of workerType', () => {
+		expect(result).toContain('`profile`');
+		for (const name of ['agent', 'inspect', 'untrusted-code', 'hermetic-test']) {
+			expect(result).toContain(`\`${name}\``);
+		}
+		expect(result).not.toContain('net=filtered');
+		expect(result).toMatch(/`inspect`.*no source declares/s);
+		expect(result).toContain('fs=readonly-enforced');
+		expect(result).toMatch(/added to .*requires/);
+		expect(result).toMatch(/`workerType` is deprecated/);
+	});
+
 	it('returns a non-empty string', () => {
 		expect(typeof result).toBe('string');
 		expect(result.length).toBeGreaterThan(0);

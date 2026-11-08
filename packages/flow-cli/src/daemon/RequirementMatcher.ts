@@ -1,4 +1,4 @@
-import { RequirementSyntax } from 'flow-engine';
+import { ProfileCatalog, RequirementSyntax } from 'flow-engine';
 
 /**
  * Decides whether a worker's source guarantees what a step requires.
@@ -20,7 +20,8 @@ export function missingRequirements(required: readonly string[], guarantees: rea
 }
 
 /**
- * The requirements of one step: the run's, plus the step's own `requires`, sorted and without duplicates.
+ * The requirements of one step: the run's, plus the step's own `requires` and the expansion of its `profile`, sorted and without
+ * duplicates.
  *
  * The own list is checked here again because a step injected at run time never went through the validator.
  *
@@ -30,8 +31,11 @@ export function missingRequirements(required: readonly string[], guarantees: rea
 export function normaliseStepRequirements(
 	runRequirements: readonly string[],
 	stepRequires: unknown,
-	stepId: string
+	stepId: string,
+	stepProfile?: unknown
 ): string[] {
-	const own = RequirementSyntax.normalise(stepRequires, `Step "${stepId}"`);
-	return [...new Set([...runRequirements, ...own])].sort();
+	const where = `Step "${stepId}"`;
+	const own = RequirementSyntax.normalise(stepRequires, where);
+	const fromProfile = stepProfile === undefined ? [] : ProfileCatalog.expand(stepProfile, where);
+	return [...new Set([...runRequirements, ...own, ...fromProfile])].sort();
 }

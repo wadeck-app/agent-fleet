@@ -30,7 +30,8 @@ export class StepPlacementBuilder {
 		const requires = requirementsForStep(
 			this.executions.requirementsOf(executionId),
 			step.stepId,
-			(step.stepConfig as { requires?: unknown }).requires
+			(step.stepConfig as { requires?: unknown }).requires,
+			(step.stepConfig as { profile?: unknown }).profile
 		);
 		const workspaceKind = this.executions.workspaceKindOf(executionId);
 		return {

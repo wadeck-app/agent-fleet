@@ -30,6 +30,42 @@ const flow = {
 	],
 } as unknown as FlowDefinition;
 
+describe('renderFlowSummary - requirements and profiles', () => {
+	const withProfiles = {
+		...flow,
+		profile: 'agent',
+		requires: ['sandbox'],
+		steps: [
+			{ id: 'build', type: 'script', script: 'make', profile: 'untrusted-code', requires: ['gpu'] },
+			{ id: 'plain', type: 'script', script: 'echo' },
+		],
+	} as unknown as FlowDefinition;
+	const expand = (name: string) =>
+		name === 'agent' ? ['env=clean'] : name === 'untrusted-code' ? ['ports=private'] : undefined;
+
+	it('shows the profile, the requires and the expansion of every profile in use in the header', () => {
+		const out = renderFlowSummary(withProfiles, expand);
+
+		expect(out).toContain(
+			'profile:   agent\nrequires:  sandbox\nexpands:   agent = env=clean\n           untrusted-code = ports=private\n'
+		);
+	});
+
+	it('shows the step own profile and requires on its row', () => {
+		const row = renderFlowSummary(withProfiles, expand)
+			.split('\n')
+			.find(line => line.includes('build'));
+
+		expect(row).toContain('profile:untrusted-code  requires:gpu');
+	});
+
+	it('prints nothing about requirements for a flow without them (output unchanged)', () => {
+		const out = renderFlowSummary(flow, expand);
+
+		expect(out).not.toMatch(/profile|requires|expands/);
+	});
+});
+
 describe('renderFlowSummary', () => {
 	it('shows v0.0.0 for a flow without a version instead of vundefined', () => {
 		const { version: _version, ...unversioned } = flow as unknown as Record<string, unknown>;

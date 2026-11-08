@@ -1,6 +1,7 @@
 import type { FlowDefinition, FlowStep, ModelFlowStep, SubFlowStep, UserInterventionStep } from 'flow-engine/types';
 
 import { UNVERSIONED } from '../definitions/FlowVersion.js';
+import { type ProfileExpander, flowRequirementLines, stepRequirementSuffix } from './RequirementLines.js';
 
 /** Left-aligned column that is never truncated (unlike the history table's fixed-width columns). */
 function pad(s: string, width: number): string {
@@ -152,8 +153,12 @@ export function formatWorkspace(workspace: unknown): string {
 	return [provider, ...Object.entries(options).map(([key, value]) => `${key}:${JSON.stringify(value)}`)].join('  ');
 }
 
-/** The table `flow show <file>` prints, as one string (leading and trailing blank line included). */
-export function renderFlowSummary(flow: FlowDefinition): string {
+/**
+ * The table `flow show <file>` prints, as one string (leading and trailing blank line included).
+ *
+ * @param expandProfile what a `profile:` stands for; without it only the profile names are shown
+ */
+export function renderFlowSummary(flow: FlowDefinition, expandProfile?: ProfileExpander): string {
 	const steps = flow.steps;
 	const out: string[] = [];
 
@@ -166,6 +171,7 @@ export function renderFlowSummary(flow: FlowDefinition): string {
 	}
 
 	out.push(`workspace: ${formatWorkspace(flow.workspace)}`);
+	out.push(...flowRequirementLines(flow, expandProfile));
 	out.push(`inputs:    ${formatInputs(flow.inputs)}`);
 	const status = formatStatus(flow);
 	if (status) {
@@ -205,7 +211,8 @@ export function renderFlowSummary(flow: FlowDefinition): string {
 				stepOutputs(step) +
 				stepLoop(step, steps) +
 				stepRetry(step) +
-				stepWave(step)
+				stepWave(step) +
+				stepRequirementSuffix(step)
 		);
 	}
 

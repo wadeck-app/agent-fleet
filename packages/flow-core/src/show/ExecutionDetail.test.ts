@@ -166,6 +166,33 @@ describe('ExecutionDetail', () => {
 			expect(out).toContain('diagnostics truncated (370400 bytes dropped): output.stdout, io.stderr');
 		});
 
+		it('shows the profile and the enforced requirements of the run, and of a step that differs', () => {
+			const record = minimal('prof0000');
+			Object.assign(record, {
+				requirements: {
+					run: ['env=clean', 'fs=confined'],
+					steps: { a: ['env=clean', 'fs=confined', 'ports=private'] },
+					profiles: { run: 'agent', steps: { a: 'untrusted-code' } },
+				},
+			});
+			writeExec('prof0000', record);
+
+			const out = renderExecutionDetail(resolveExecution(tmpDir, 'prof0000'), { tail: 10, full: false });
+
+			expect(out).toContain('Profile:   agent\nRequires:  env=clean, fs=confined\n');
+			expect(out).toContain(
+				'      profile: untrusted-code\n      requires: env=clean, fs=confined, ports=private'
+			);
+		});
+
+		it('prints no requirement line for a record without requirements', () => {
+			writeExec('noreq000', minimal('noreq000'));
+
+			const out = renderExecutionDetail(resolveExecution(tmpDir, 'noreq000'), { tail: 10, full: false });
+
+			expect(out).not.toMatch(/Profile:|Requires:|requires:/);
+		});
+
 		it('prints nothing about truncation for a step that was not cut', () => {
 			writeExec('nocut000', minimal('nocut000'));
 

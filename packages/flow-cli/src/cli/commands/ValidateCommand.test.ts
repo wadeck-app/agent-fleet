@@ -49,6 +49,21 @@ describe('ValidateCommand', () => {
 			expect(exitMock).toHaveBeenCalledWith(0);
 		});
 
+		it('prints a note about the run-start check without changing the result line or the exit code', () => {
+			mockValidateFlowFile.mockReturnValue({
+				exit: 0,
+				version: '1.2.0',
+				warnings: [],
+				notes: ['checked when the run starts'],
+			});
+
+			runValidate(['/some/flow.yml']);
+
+			expect(consoleErrorMock).toHaveBeenCalledWith('[note] checked when the run starts');
+			expect(consoleLogMock).toHaveBeenCalledWith('[ok] Flow is valid (version 1.2.0)');
+			expect(exitMock).toHaveBeenCalledWith(0);
+		});
+
 		it('prints the registry message with the referenced flows and exits 1, without a flow error count', () => {
 			mockValidateFlowFile.mockReturnValue({
 				exit: 4,

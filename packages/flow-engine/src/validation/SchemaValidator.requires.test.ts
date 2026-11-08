@@ -49,3 +49,29 @@ describe('SchemaValidator - requires', () => {
 		expect(JSON.stringify(result)).toContain('unknown requirement \\"nope\\"');
 	});
 });
+
+describe('SchemaValidator - profile', () => {
+	it('reports an unknown flow-level and step-level profile, accepts a known one', () => {
+		const collector = new MockIssueCollector();
+		const definition = flow(undefined, undefined) as unknown as { profile: string; steps: { profile: string }[] };
+		definition.profile = 'agnt';
+		definition.steps[0]!.profile = 'untrusted-code';
+		new SchemaValidator(collector).validateSchema(definition as unknown as FlowDefinition);
+		const issues = collector.issues.filter(i => i.location?.field === 'profile');
+		expect(issues).toHaveLength(1);
+		expect(issues[0]!.location?.stepId).toBeUndefined();
+		expect(issues[0]!.message).toContain('Did you mean "agent"?');
+	});
+
+	it('checks the expansion against the declared guarantees given as 4th param', () => {
+		const collector = new MockIssueCollector();
+		const definition = flow(undefined, undefined) as unknown as { profile: string };
+		definition.profile = 'agent';
+		new SchemaValidator(collector, [], undefined, ['fs=confined']).validateSchema(
+			definition as unknown as FlowDefinition
+		);
+		const issues = collector.issues.filter(i => i.location?.field === 'profile');
+		expect(issues).toHaveLength(1);
+		expect(issues[0]!.message).toContain('requires "env=clean",');
+	});
+});

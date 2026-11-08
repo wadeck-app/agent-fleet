@@ -31,8 +31,9 @@ function flowWithWorkerType(workerType: unknown): FlowDefinition {
 	return flow as unknown as FlowDefinition;
 }
 
+// The deprecation warning has its own test (WorkerTypeDeprecation.test.ts): here only the errors of the shape and name checks.
 function workerTypeIssues() {
-	return collector.issues.filter(i => i.location?.field === 'workerType');
+	return collector.issues.filter(i => i.location?.field === 'workerType' && i.severity === 'error');
 }
 
 describe('SchemaValidator - flow-level workerType shape', () => {

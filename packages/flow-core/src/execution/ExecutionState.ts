@@ -253,6 +253,19 @@ export type VersionChoice = 'latest' | 'pinned' | 'file';
 export interface RunRequirementsRecord {
 	/** Flow-level `requires`, sorted and without duplicates. */
 	run: string[];
-	/** Flow plus step `requires` of each declared step, sorted and without duplicates. */
+	/**
+	 * Flow plus step requirements of each declared step (`requires:` and the expansion of `profile:`), sorted and without
+	 * duplicates.
+	 */
 	steps: Record<string, string[]>;
+	/**
+	 * The `profile:` names declared, for display only: the `run` and `steps` sets above already contain their expansion and
+	 * are what is enforced. Absent when no profile was declared (and on records written before profiles existed).
+	 */
+	profiles?: {
+		/** Flow-level profile. */
+		run?: string;
+		/** Step-level profile of each declared step that names one. */
+		steps: Record<string, string>;
+	};
 }
