@@ -1,16 +1,13 @@
 import type { ExecutionState } from '../execution/ExecutionState.js';
 import { formatDuration, formatStartedUtc } from '../history/ExecutionFormat.js';
+import { WAITING_FOR_WORKSPACE_LABEL, WAITING_FOR_WORKSPACE_TAG } from './WorkspaceWaitLabels.js';
+
+export { WAITING_FOR_WORKSPACE_LABEL, WAITING_FOR_WORKSPACE_TAG };
 
 /**
  * A run that waits for a workspace is stored as `queued` plus `ExecutionState.workspaceWait` (no new status value).
  * Every place that prints a status words it the same way through here, so it is never read as an ordinary queued run.
  */
-
-/** Full wording: detail pages, `flow show`, tooltips. */
-export const WAITING_FOR_WORKSPACE_LABEL = 'waiting for workspace';
-
-/** Short wording for narrow table cells. */
-export const WAITING_FOR_WORKSPACE_TAG = 'waiting ws';
 
 type WaitFields = Pick<ExecutionState, 'status' | 'workspaceWait'>;
 

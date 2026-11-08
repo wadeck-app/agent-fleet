@@ -6,6 +6,7 @@ import type { FlowGraph, FlowGraphEdge } from './FlowGraph.js';
 export { FLOW_CHART_INDEX_PATH, chartPathOfExecution, chartPathOfFlow } from '../appModule/FlowChartPaths.js';
 export { executionStepLogsPath } from '../appModule/FlowExecutionLogsLink.js';
 export { FLOW_ACTION_BUTTON_STYLE, executionLogsPath } from '../appModule/FlowModuleContract.js';
+export { WAITING_FOR_WORKSPACE_LABEL } from '../view/WorkspaceWaitLabels.js';
 
 /** A parent with more sub-steps than this starts collapsed in a chart. */
 export const DEFAULT_MAX_EXPANDED_CHILDREN = 8;

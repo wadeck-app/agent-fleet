@@ -2,8 +2,13 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { Badge } from '@wadeck-app/dsl-ui';
 import { Background, ReactFlow, ReactFlowProvider } from '@xyflow/react';
-import { type FlowGraphResult, WAITING_FOR_WORKSPACE_LABEL } from 'flow-core';
-import { buildGraphTree, defaultCollapsedIds, executionStepLogsPath } from 'flow-core/graph-tree';
+import type { FlowGraphResult } from 'flow-core';
+import {
+	WAITING_FOR_WORKSPACE_LABEL,
+	buildGraphTree,
+	defaultCollapsedIds,
+	executionStepLogsPath,
+} from 'flow-core/graph-tree';
 
 import { describeChartMode } from './ChartMode.js';
 import { ChartToolbar } from './ChartToolbar.js';
