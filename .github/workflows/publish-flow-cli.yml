@@ -77,6 +77,43 @@ jobs:
                   path: packages/flow-cli-*
                   retention-days: 1
 
+    # Runs in parallel with build-and-test and is NOT a dependency of publish: a red test job never blocks a
+    # publication. continue-on-error keeps the workflow conclusion about the build and publish; the job itself
+    # still shows its own result in the run. Unit suites only (scripts/test-config.js); the mock drift check is a
+    # no-op in CI.
+    unit-tests:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        continue-on-error: true
+        steps:
+            - uses: actions/checkout@v5
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: '24'
+                  registry-url: 'https://npm.pkg.github.com'
+                  scope: '@wadeck-app'
+
+            - name: Install dependencies
+              run: npm ci
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build TypeScript
+              run: npm run build --workspaces --if-present
+
+            - name: Unit tests
+              run: npm run test:agent -- --type=unit
+
+            - name: Upload test errors
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: unit-test-errors
+                  path: test-errors.log
+                  if-no-files-found: ignore
+                  retention-days: 7
+
     publish:
         needs: build-and-test
         runs-on: ubuntu-latest
