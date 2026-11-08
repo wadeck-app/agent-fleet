@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HostEnvironment } from '../HostEnvironment';
+import { SANDBOX_GUARANTEES } from '../exec/RequiresGuard';
 import { eachRow } from '../testing/EachRow';
 
 // The plugin is plain JavaScript that a user's daemon loads from a directory (see plugin/plugin.config.js): it is imported
@@ -26,6 +27,7 @@ interface Instance {
 	dispose(): Promise<void>;
 	run?: unknown;
 	exclusive?: boolean;
+	guarantees?: string[];
 }
 interface PluginModule {
 	manifest: {
@@ -34,7 +36,11 @@ interface PluginModule {
 			string,
 			Record<
 				string,
-				{ version: number; provider(context: { sourceId: string; options: unknown }): Promise<Instance> }
+				{
+					version: number;
+					guarantees?: string[];
+					provider(context: { sourceId: string; options: unknown }): Promise<Instance>;
+				}
 			>
 		>;
 	};
@@ -369,6 +375,8 @@ describe('sandbox plugin: options are flat strings and parsed strictly', () => {
 			'--extra-allowed-host',
 			'*.npmjs.org:443',
 			'--accept-ssh-agent-forwarding',
+			// The plugin's wrapper always enforces the routing contract (RequiresGuard); only the dev harness scripts do not.
+			'--require-guarantees',
 		]);
 		expect(plugin.internals.wrapperId('sandbox-1')).toMatch(/^[a-z0-9]{1,12}$/);
 		expect(plugin.internals.wrapperId('sandbox-1')).not.toBe(plugin.internals.wrapperId('sandbox-2'));
@@ -414,6 +422,33 @@ describe('sandbox plugin: exclusivity', () => {
 		expect(instance.exclusive).toBe(true);
 		await instance.dispose();
 	});
+});
+
+describe('sandbox plugin: guarantees (the contract with the daemon)', () => {
+	// The daemon matches a flow's `requires:` against the guarantees of the AUTHENTICATED source instance, never worker labels. The manifest
+	// list is the static upper bound (read before any instance exists); the instance list is what routing reads and must be a subset.
+	it('declares the same guarantees in the manifest and on the instance, equal to what the exec variant enforces', async () => {
+		const plugin = await load();
+		const manifestList = plugin.manifest.implementations['worker-type']!['exec']!.guarantees;
+		const instance = await build();
+
+		expect(manifestList).toEqual([...SANDBOX_GUARANTEES]);
+		expect(instance.guarantees).toEqual([...SANDBOX_GUARANTEES]);
+		expect(new Set(instance.guarantees).size).toBe(instance.guarantees?.length);
+		await instance.dispose();
+	});
+
+	it.each(['net=filtered', 'fs=readonly-enforced'])(
+		'does not advertise %s, which it does not back yet',
+		async guarantee => {
+			const plugin = await load();
+			const instance = await build();
+
+			expect(plugin.manifest.implementations['worker-type']!['exec']!.guarantees).not.toContain(guarantee);
+			expect(instance.guarantees).not.toContain(guarantee);
+			await instance.dispose();
+		}
+	);
 });
 
 describe('sandbox plugin: obtainWorker', () => {

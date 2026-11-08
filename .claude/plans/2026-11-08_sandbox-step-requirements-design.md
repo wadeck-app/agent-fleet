@@ -30,7 +30,7 @@ Guarantees: `fs=confined`, `env=clean`, `net=filtered`, `ports=private`, `fs=rea
 | Cons | Needs a new field on the worker-type instance and a static twin. |
 | Recommendation | The core reads `guarantees` from the built `WorkerTypeInstance`, like `exclusive`, and fails closed: no built instance means no guarantees. The plugin also declares them statically in its manifest, so demand coverage knows which source to ask before an instance exists and validation can say "no declared source can ever provide X". An instance may not claim more than its manifest (the build fails). Worker labels never contribute. The check is a hard filter in `StepRouter.servableBy`, before S4: `DefaultWorkerAcceptance` is replaceable, a plugin could return true. |
 
-How the sandbox plugin declares them: one list in `manifest` (static) and the same list on the instance it returns (authoritative); the values are in the plugin contract, which flow-owner sends.
+How the sandbox plugin declares them (contract of core step 1): `guarantees: string[]` under `implementations['worker-type'].<impl>` in `plugin.config.js` (static) and the same list on the instance (authoritative, must be a subset). Values, each backed by a test or a measurement (plugin README, "Requiring guarantees"): `sandbox`, `fs=confined`, `env=clean`, `ports=private`, `clean=run`. NOT declared: `net=filtered` (raw TCP to public destinations unverified; an allow-all machine policy would make it false) and `fs=readonly-enforced` (no `:ro` mount in the exec variant yet). The source stays `exclusive: true`.
 
 ### D2. Profiles and their contents (B3, H3)
 
@@ -109,6 +109,24 @@ Evidence that `:ro` is enforced by the host side (virtiofs): as root in the VM, 
 | A step needs a guarantee nobody provides yet | Bounded wait like `workerType` today (`worker.boundStepWaitSeconds`, default 120 s), and immediate failure when no declared source can ever provide it (static manifest). The failure names the missing requirement. |
 | Concurrency | `exclusive` also exempts sandbox workers from `queue.concurrency` (`WorkerProvisioner`): removing it must replace the exemption by "workers whose source declares guarantees do not count", or the old stall returns (one sandbox worker blocking every unbound run). |
 
+### D9. Accepted workspace providers (H2): proposal for the core
+
+Today the plugin refuses a workspace it must not mount at the first step (`SandboxableWorkspace`, in the wrapper): late, after the run was accepted and the workspace allocated.
+
+Proposal: a static, optional `workspaces?: string[]` next to `guarantees`, under `implementations['worker-type'].<impl>` in the manifest.
+
+| Aspect | Proposal |
+| --- | --- |
+| Name and type | `workspaces?: string[]` |
+| Entries | Workspace provider kinds as written in the flow's `workspace:` (`in-place`, `readonly`, `worktree`, `pool`, or a plugin provider's name). The sandbox plugin declares `['pool']` |
+| Absent | No restriction (backward compatible, like `guarantees`) |
+| Instance | An optional `workspaces` on the instance may only NARROW the manifest list (subset, else the build fails), like `guarantees` |
+| Core check, at run start before any allocation | Let S be the declared sources whose `guarantees` cover the run's resolved requirements (the set the existing "no declared source provides" check uses). Refuse unless at least one source in S accepts the flow's workspace kind; a source in S without `workspaces` accepts any kind. "At least one" because any source of S may serve the run |
+| Unknown kind | Refused (fail closed): a kind the flow uses that the core cannot name never matches a declared list |
+| Error text | `Flow 'f' requires [sandbox], and the sources that provide it (sandbox-1) accept only the workspace kind(s) pool, but the flow declares workspace: in-place. Declare "workspace: pool" in the flow, or remove the requirement.` Names the flow, the requirements, the sources and their kinds, and the fix |
+| Offline | `flow validate` has no source knowledge (D7): the check runs at run start; the docs say so |
+| Plugin side | Keeps `SandboxableWorkspace` as defence in depth: the kind is coarse, the layout is what protects (a pool slot that contains the project is still refused) |
+
 ### D8. Where resolved requirements live (B4)
 
 | | |
@@ -121,6 +139,7 @@ Evidence that `:ro` is enforced by the host side (virtiofs): as root in the VM, 
 
 | Core (flow) | Sandbox plugin |
 | --- | --- |
+| Static `workspaces` check at run start (D9) | Declares `workspaces: ['pool']` once the core reads it |
 | Requirement syntax, known keys and values, "did you mean" | The list of guarantees it can enforce: manifest (static) and instance (authoritative) |
 | Profiles: built-ins, tightening-only overrides, unknown name fails | Accepted workspace providers, declared statically |
 | Hard filter in `StepRouter.servableBy` before S4; refusal naming the missing requirement | `fs=confined`, `env=clean`, `net=filtered`, `ports=private`, `clean=run|step`: enforcement in the VM |

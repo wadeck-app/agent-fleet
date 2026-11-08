@@ -215,6 +215,8 @@ function wrapperArguments(parsed, sourceId) {
 	for (const [flag, value] of pairs) if (value !== undefined) argv.push(flag, value);
 	for (const host of parsed.extraAllowedHosts) argv.push('--extra-allowed-host', host);
 	if (parsed.acceptSshAgentForwarding === true) argv.push('--accept-ssh-agent-forwarding');
+	// The wrapper refuses a step the daemon did not route by one of this worker type's guarantees (RequiresGuard).
+	argv.push('--require-guarantees');
 	return argv;
 }
 
@@ -365,6 +367,10 @@ function createInstance(context) {
 		// The daemon never offers this worker a step of a run that is not bound to `workerType: sandbox`, and never asks this
 		// source for a worker on behalf of such a run: host-only steps (cmd, pwsh, daemon API scripts) cannot run in a sandbox.
 		exclusive: true,
+		// What the workers of this source enforce, read by the daemon for routing (a flow's `requires:`); never worker labels. A subset of
+		// the manifest list below. Kept equal to SANDBOX_GUARANTEES (src/exec/RequiresGuard.ts) by a test; the reasons for each entry,
+		// and for the two that are NOT listed (net=filtered, fs=readonly-enforced), are there.
+		guarantees: [...GUARANTEES],
 		source: {
 			async obtainWorker(request) {
 				if (disposing !== undefined) {
@@ -485,6 +491,9 @@ function createInstance(context) {
 	};
 }
 
+/** The guarantees of the sandbox worker type (see RequiresGuard.ts for what backs each). The static upper bound is the manifest's, the instance repeats it. */
+const GUARANTEES = Object.freeze(['clean=run', 'env=clean', 'fs=confined', 'ports=private', 'sandbox']);
+
 export const manifest = {
 	pluginId: 'sandbox',
 	manifestVersion: '1',
@@ -492,6 +501,7 @@ export const manifest = {
 		'worker-type': {
 			exec: {
 				version: 1,
+				guarantees: [...GUARANTEES],
 				provider: async context => createInstance(context),
 			},
 		},

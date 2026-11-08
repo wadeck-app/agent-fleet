@@ -205,7 +205,7 @@ flow worker source add sandbox-1 --provider sandbox --plugin sandbox.exec \
   --option image=flow-sandbox:m7 --option pull=never
 ```
 
-Then restart the daemon (a plugin is loaded once per daemon) and write the flow with `workerType: sandbox` at flow level (see "Routing and isolation" below: this is what keeps injected steps in the sandbox). The daemon builds the source at its first contact with it.
+Then restart the daemon (a plugin is loaded once per daemon) and write the flow with `requires: [sandbox]` at flow level (see "Routing and isolation" and "Requiring guarantees" below: this is what keeps injected steps in the sandbox, and without it the wrapper refuses the step). The daemon builds the source at its first contact with it.
 
 | Option (flat string, `--option key=value`)                    | Required | Meaning                                                                                                                                         |
 | ------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -244,6 +244,33 @@ A flow reaches the exec wrapper in one of two ways, and only one of them isolate
 What the flow must contain: `workerType: sandbox`, a string of letters, digits, `_` and `-` (the flow validator checks the shape; a name no declared source provides is refused at run start, listing the known types). The type of a worker is the plugin id of its source's `--plugin <pluginId>.<implName>`; a source declared with `--provider` only, as today, has no type, so **a flow bound with `workerType: sandbox` cannot use the prototype sources at all**: its steps wait `worker.boundStepWaitSeconds` (120 s by default) and fail naming the type.
 
 **The sandbox worker type is exclusive.** The plugin returns `exclusive: true` (an optional boolean on the instance its factory returns; a non-boolean fails the build). An exclusive worker takes only the steps of runs bound to exactly its type: unbound flows, flows bound to another type, label-only matching and the injected steps of an unbound run never reach it, and the daemon never asks an exclusive source for a worker on behalf of an unbound run. So registering the sandbox source does NOT attract other flows: they keep running on host workers (and their host-only steps keep working there). It is fail-closed: a source loaded from a plugins directory counts as exclusive until its instance is built, so there is no window in which it serves an unbound step (built-in worker types are never exclusive). When an unbound step finds no worker while a connected exclusive worker would have accepted it, the execution log gets ONE warning for that step naming the worker, the type and `workerType: <type>`, which is the hint for a flow that was meant for the sandbox. Two limits: a worker that stays connected after its source was removed from the registry is treated as a host worker until it disconnects, and the flag belongs to the source instance (declare each sandbox source with this plugin; a source that is not this plugin has no such guarantee).
+
+### Requiring guarantees (`requires:`)
+
+A flow asks for the sandbox with `requires: [sandbox]` (flow level; a step may add entries; injected steps inherit the flow's). The daemon matches each entry, by equality, against the guarantees of the AUTHENTICATED source instance, never against worker labels (a worker declares those itself), and filters in the router before any acceptance plugin. This plugin declares, in the manifest (static upper bound) and on the instance (what routing reads), the same list, kept equal to `SANDBOX_GUARANTEES` (`src/exec/RequiresGuard.ts`) by a test:
+
+| Guarantee | What backs it |
+| --- | --- |
+| `sandbox` | every step process runs in an sbx VM (`SbxProcessLauncher`); live: `ExecLiveCheck`, `PluginLiveCheck` |
+| `fs=confined` | the VM mounts exactly the run's workspace and `.meta` (`RunMounts`); only their ancestors are visible, nothing can be created beside them (`PoolSlotLiveCheck`, one machine). The pool slot itself is writable (T-16) |
+| `env=clean` | the host environment is not passed into the VM (`VmEnvironmentFilter`); `ExecLiveCheck` asserts no AWS key, no launch token, no ambient variable |
+| `ports=private` | the plugin publishes no port; a listener started in a VM was not reachable from the host (`PortsLiveCheck`, one machine, sbx 0.51.0). Limit: VMs have identical private addressing, so a VM-to-VM probe by address cannot be made |
+| `clean=run` | a fresh VM per run, removed at the end of the run. The pool slot content (the workspace) persists |
+
+NOT declared, on purpose: `net=filtered` (raw TCP to public destinations is unverified and an allow-all machine policy would make it false: see "Raw TCP"), `fs=readonly-enforced` (the exec variant has no `:ro` mount yet). A flow requiring either is refused at run start (no declared source provides it).
+
+Because the source stays `exclusive: true`, a step is offered to it only when its requirements are non-empty and all guaranteed; `requires: [fs=confined]` alone is enough, a step without requirements never reaches it. Write it like this:
+
+```yaml
+requires: [sandbox]           # flow level: every step, injected ones included
+steps:
+    - id: build
+      requires: [clean=run]   # a step adds to the flow's list
+```
+
+An entry no declared source provides is refused when the run starts, with a "Did you mean" for a typo. `flow validate` offline cannot know the sources, so it does not catch that.
+
+**The wrapper refuses a step the daemon did not route by a guarantee** (`RequiresGuard`, fail closed): an assignment with no `requires`, an empty one, a malformed one, or an entry this worker does not provide fails the step with a message naming what is missing and the flow syntax to add; no sandbox is created. This also means a run bound only by `workerType: sandbox` (no `requires`) is refused: add `requires: [sandbox]`. The plugin starts its wrapper with `--require-guarantees`; the dev harness scripts (routing by labels, no guarantees) do not, and the relay harness is unchanged.
 
 **Host-only steps FAIL in a bound run.** A strictly bound run never falls back to a host worker, so a step that cannot run in the sandbox (`cmd`, `pwsh`, a script that calls the flow daemon API, a `user_intervention` step, Codex or OpenCode steps) does not run elsewhere: it fails. Put host-only work in another flow. This supersedes the earlier plan that let such steps run on the host (design decision 27).
 

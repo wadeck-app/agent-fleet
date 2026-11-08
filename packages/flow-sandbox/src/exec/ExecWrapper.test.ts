@@ -57,6 +57,8 @@ let root: string;
 let workspace: string;
 let meta: string;
 let log: RecordingSandboxLog;
+/** What the wrapper under test was started with (--require-guarantees); true unless a test says it is the dev harness. */
+let requireGuarantees = true;
 let runtime: FakeSandboxRuntime;
 let lifecycle: SandboxLifecycle;
 let daemon: FakeDaemon;
@@ -99,6 +101,7 @@ beforeEach(async () => {
 	);
 	daemon = new FakeDaemon();
 	prepares = 0;
+	requireGuarantees = true;
 	// The wrapper keeps the list of ITS test: a wrapper shut down by the previous test may still report.
 	const ownFinished = new ObservedList<true>();
 	finished = ownFinished;
@@ -145,6 +148,9 @@ beforeEach(async () => {
 		},
 		createMounts: (workspaceDir, workspaceMetaDir) =>
 			new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log }),
+		get requireGuarantees() {
+			return requireGuarantees;
+		},
 		now: () => Date.now(),
 		onFinished: () => ownFinished.push(true),
 		runEndRetryDelayMs: 5,
@@ -157,8 +163,14 @@ afterEach(async () => {
 	fs.rmSync(root, { recursive: true, force: true });
 });
 
-function assign(stepId: string, overrides: { type?: string; executionId?: string; env?: JsonObject } = {}): JsonObject {
+/** `requires: 'absent'` leaves the field out, as a daemon does for a step that requires nothing. */
+function assign(
+	stepId: string,
+	overrides: { type?: string; executionId?: string; env?: JsonObject; requires?: unknown } = {}
+): JsonObject {
+	const requires = overrides.requires ?? ['sandbox'];
 	return {
+		...(requires === 'absent' ? {} : { requires }),
 		type: 'assign',
 		assignmentId: `a-${stepId}`,
 		stepId,
@@ -351,6 +363,41 @@ describe('ExecWrapper run_end (the daemon says a run this wrapper served is over
 	});
 });
 
+describe('ExecWrapper refuses a step the daemon did not route by a guarantee of this worker (fail closed)', () => {
+	it.each([
+		['no requires field', 'absent', /no "requires"[\s\S]*requires: \[sandbox\]/],
+		['an empty list', [], /no "requires"/],
+		['a value that is not a list', 'sandbox', /must be a list of strings/],
+		['a guarantee this worker does not give', ['sandbox', 'gpu'], /"gpu"[\s\S]*does not guarantee/],
+	])(
+		'%s: the step fails with an actionable message, no sandbox is created, nothing runs',
+		async (_name, requires, message) => {
+			await run(assign('probe', { requires }));
+
+			expect(runtime.callsTo('create')).toHaveLength(0);
+			expect(prepares).toBe(0);
+			expect(daemon.types()).toEqual(['ready', 'step_failed', 'ready']);
+			expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(message);
+			expect(log.text()).toContain('failed in the exec wrapper');
+		}
+	);
+
+	// The dev harness scripts route by labels and have no guarantees: only the plugin's wrapper turns the guard on.
+	it('does not apply the guard when the wrapper was not started with --require-guarantees (dev harness only)', async () => {
+		requireGuarantees = false;
+
+		await run(assign('probe', { requires: 'absent' }));
+
+		expect(daemon.types()).toContain('step_completed');
+	});
+
+	it('serves a step that requires a subset of what it provides', async () => {
+		await run(assign('probe', { requires: ['fs=confined'] }));
+
+		expect(daemon.types()).toEqual(['ready', 'step_started', 'log', 'step_completed', 'ready']);
+	});
+});
+
 describe('ExecWrapper a script step', () => {
 	it('creates the sandbox, prepares it once, runs the engine with host paths and reports the outcome', async () => {
 		await run(assign('probe'));
@@ -481,6 +528,7 @@ describe('ExecWrapper failures', () => {
 			},
 			createMounts: (workspaceDir, workspaceMetaDir) =>
 				new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log }),
+			requireGuarantees: true,
 			now: () => Date.now(),
 			onFinished: () => undefined,
 		});

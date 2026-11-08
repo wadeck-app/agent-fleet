@@ -33,6 +33,8 @@ export interface HarnessConfig {
 	logFile: string | undefined;
 	/** The operator knowingly runs with sbx ssh agent forwarding on (the sbx default); otherwise the prerequisite check fails. */
 	acceptSshAgentForwarding: boolean;
+	/** Refuse a step whose assignment does not carry `requires` that this worker guarantees (the sandbox plugin sets it; the dev harness scripts do not). */
+	requireGuarantees: boolean;
 	/** Environment for model steps (for example the Bedrock model alias). */
 	modelEnvironment: Record<string, string>;
 	/** Extra `host:port` network rules opened for every sandbox, on top of what the model tool needs. */
@@ -49,7 +51,7 @@ function usage(script: string): string {
 		'  --region <aws region>                       for example us-east-1',
 		'  [--wrapper-id <1-12 [a-z0-9]>] [--labels a,b] [--image <tag>] [--pull always|missing|never] [--agent <kind>]',
 		'  [--cpus <n>] [--memory <2g>] [--idle-minutes <n>] [--max-sandboxes <n>] [--presence-dir <dir>] [--log-file <file>]',
-		'  [--project-path <folder> ...] [--model-env NAME=VALUE ...] [--extra-allowed-host <host:port> ...] [--accept-ssh-agent-forwarding]',
+		'  [--project-path <folder> ...] [--model-env NAME=VALUE ...] [--extra-allowed-host <host:port> ...] [--accept-ssh-agent-forwarding] [--require-guarantees]',
 		'Environment (set by the daemon for a built-in:command source): FLOW_DAEMON_WS_URL, FLOW_WORKER_SOURCE_ID, FLOW_WORKER_TOKEN.',
 		'Optional: FLOW_SANDBOX_HOST_HOME, FLOW_SANDBOX_HOST_USERPROFILE, FLOW_SANDBOX_HOST_APPDATA, FLOW_SANDBOX_HOST_LOCALAPPDATA (the real user directories, given to the aws and sbx children only), FLOW_SANDBOX_PRESENCE_DIR (default of --presence-dir, shared with the leftover CLI), SBX_PATH.',
 	].join('\n');
@@ -119,6 +121,7 @@ export class HarnessConfigParser {
 					'model-env': { type: 'string', multiple: true },
 					'extra-allowed-host': { type: 'string', multiple: true },
 					'accept-ssh-agent-forwarding': { type: 'boolean' },
+					'require-guarantees': { type: 'boolean' },
 				},
 			}).values;
 		} catch (error) {
@@ -217,6 +220,7 @@ export class HarnessConfigParser {
 			),
 			logFile: values['log-file'] as string | undefined,
 			acceptSshAgentForwarding: values['accept-ssh-agent-forwarding'] === true,
+			requireGuarantees: values['require-guarantees'] === true,
 			modelEnvironment,
 			extraAllowedHosts,
 			awsEnvironment,

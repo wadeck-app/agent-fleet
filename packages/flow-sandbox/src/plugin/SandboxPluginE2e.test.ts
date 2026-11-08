@@ -142,8 +142,16 @@ class FlowWorld {
 		);
 	}
 
-	/** One script step; `workerType` binds the run. */
-	writeFlow(name: string, workerType: boolean, workspace: 'pool' | 'in-place' = 'pool'): string {
+	/**
+	 * One script step. `true` asks for the sandbox with `requires: [sandbox]`; `false` asks for nothing; an object chooses
+	 * `workerType: sandbox` and/or an explicit `requires` list (flow level).
+	 */
+	writeFlow(
+		name: string,
+		binding: boolean | { workerType?: boolean; requires?: string[] },
+		workspace: 'pool' | 'in-place' = 'pool'
+	): string {
+		const chosen = binding === true ? { requires: ['sandbox'] } : binding === false ? {} : binding;
 		const file = path.join(this.projectDirectory, `${name}.yml`);
 		fs.writeFileSync(
 			file,
@@ -152,7 +160,8 @@ class FlowWorld {
 				"version: '1.0.0'",
 				`name: ${name}`,
 				'description: One script step.',
-				...(workerType ? ['workerType: sandbox'] : []),
+				...(chosen.workerType === true ? ['workerType: sandbox'] : []),
+				...(chosen.requires !== undefined ? [`requires: [${chosen.requires.join(', ')}]`] : []),
 				// A sandboxed worker accepts only a pool (the in-place workspace would expose <project>/.flow and .git/hooks).
 				workspace === 'pool'
 					? `workspace: { provider: pool, dir: '${this.poolDirectory.replaceAll(path.sep, '/')}', prefix: slot-, count: 1 }`
@@ -407,6 +416,44 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		);
 		expect(world.sbxCalls().filter(call => call.argv[0] === 'create')).toHaveLength(callsBefore);
 	}, 120_000);
+
+	it('a flow that asks for a SUBSET of the guarantees (fs=confined) is served by the exclusive source too', async () => {
+		const before = sandboxesCreated(world.sbxCalls()).length;
+
+		const record = await world.runAndRelease(world.writeFlow('subset', { requires: ['fs=confined'] }));
+
+		expect(record.status).toBe('completed');
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(before + 1);
+	}, 120_000);
+
+	// workerType alone still routes to the worker, but the wrapper refuses a step the daemon did not route by a guarantee (fail closed).
+	it('refuses a run bound only by workerType: the step fails saying to add requires: [sandbox], and no sandbox is created', async () => {
+		const before = sandboxesCreated(world.sbxCalls()).length;
+
+		const record = await world.run(world.writeFlow('type-only', { workerType: true }));
+
+		expect(record.status).toBe('failed');
+		expect(record.steps?.['probe']?.error).toMatch(/no "requires"[\s\S]*requires: \[sandbox\]/);
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(before);
+	}, 120_000);
+
+	it.each([
+		['a typo of a keyword', ['sandbx'], /sandbx[\s\S]*Did you mean[\s\S]*sandbox/],
+		[
+			'a value of a known key that is not declared',
+			['fs=confind'],
+			/fs=confind[\s\S]*Did you mean[\s\S]*fs=confined/,
+		],
+		['a requirement no declared source provides', ['sandbox', 'gpu'], /gpu/],
+	])('refuses at run start a flow that requires %s, before anything runs', (_name, requires, message) => {
+		const file = world.writeFlow('bad-requires', { requires });
+
+		const started = world.flow(['run', file, '--json']);
+
+		expect(started.status).not.toBe(0);
+		expect(`${started.stdout}${started.stderr}`).toMatch(message);
+		expect(`${started.stdout}${started.stderr}`).not.toMatch(/"executionId"/);
+	});
 
 	it('an unbound flow is kept off the sandbox worker: its type is exclusive, the step runs on a host worker', async () => {
 		// ROUTING FACT PINNED HERE: if this assertion ever fails, the exclusivity of the sandbox type changed. Update it together with

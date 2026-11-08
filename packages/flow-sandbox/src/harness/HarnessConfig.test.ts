@@ -37,6 +37,7 @@ describe('HarnessConfigParser', () => {
 			presenceDirectory: path.resolve('/presence'),
 			modelEnvironment: {},
 			acceptSshAgentForwarding: false,
+			requireGuarantees: false,
 		});
 	});
 
@@ -68,6 +69,7 @@ describe('HarnessConfigParser', () => {
 			'--project-path',
 			'/work/app',
 			'--accept-ssh-agent-forwarding',
+			'--require-guarantees',
 		]);
 
 		expect(config).toMatchObject({
@@ -83,6 +85,7 @@ describe('HarnessConfigParser', () => {
 			modelEnvironment: { A: '1', B: 'two=2' },
 			projectPaths: ['/work/app'],
 			acceptSshAgentForwarding: true,
+			requireGuarantees: true,
 		});
 	});
 

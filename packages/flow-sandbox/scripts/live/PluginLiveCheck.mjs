@@ -4,7 +4,7 @@
  * `npm test`, `npm run check` or CI. Creates ONE sandbox (name made by the plugin, prefix `flow-sbx-`), removed at the end of the run by
  * the plugin itself; a `finally` removes whatever is left.
  *
- * What it asserts: the run bound with `workerType: sandbox` and `workspace: pool` completes; the script step ran inside the VM; the
+ * What it asserts: the run bound with `requires: [sandbox]` and `workspace: pool` completes; the script step ran inside the VM; the
  * model step answered; the sandbox is gone at the end; `sbx rm --force` took N ms (measured by TimedSbx.mjs, which stands in for sbx via
  * the plugin option sbxPath and records every command); the sandbox was removed BEFORE the daemon released the pool slot (the claim
  * folder `<pool>/.flow-pool/slot-1.claim` disappears after the end of the `rm` command: the daemon releases the workspace only after the
@@ -137,7 +137,7 @@ version: '1.0.0'
 name: Plugin live check
 description: A script step and a model step served by the sandbox worker type.
 
-workerType: sandbox
+requires: [sandbox]
 
 # A sandboxed worker accepts only a pool: the in-place workspace would expose <project>/.flow and .git/hooks to the sandbox.
 workspace: { provider: pool, dir: '${poolDirectory.replaceAll('\\', '/')}', prefix: slot-, count: 1 }

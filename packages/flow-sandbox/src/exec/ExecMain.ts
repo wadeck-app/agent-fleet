@@ -204,6 +204,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 			},
 			log,
 			createDaemon: handlers => new DaemonLink({ url: config.daemonUrl, log, ...handlers }),
+			requireGuarantees: config.requireGuarantees,
 			createMounts: (workspaceDir, workspaceMetaDir) =>
 				new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log }),
 			now: () => Date.now(),

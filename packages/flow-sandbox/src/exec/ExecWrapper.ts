@@ -17,6 +17,7 @@ import { ReturnedPaths } from '../harness/ReturnedPaths';
 import { ExecAssignment, type PreparedAssignment } from './ExecAssignment';
 import { ExecRunEnd } from './ExecRunEnd';
 import type { ExecPreparedSandbox, ExecSandboxPreparer } from './ExecSandboxPreparer';
+import { RequiresGuard } from './RequiresGuard';
 
 /** What the engine reports for a step that ran (the shape of flow-cli's `WorkerAdapter.execute` result). */
 export interface StepOutcome {
@@ -60,6 +61,11 @@ export interface ExecWrapperDependencies {
 	onFinished: () => void;
 	/** Pause before the single retry of a failed removal at the end of a run (see ExecRunEnd). Default 2 s. */
 	runEndRetryDelayMs?: number;
+	/**
+	 * Refuse a step whose assignment has no `requires`, or one this worker does not guarantee (RequiresGuard). The sandbox plugin's
+	 * wrapper sets it. Explicit, no default: only the dev harness scripts (routing by labels, no guarantees) turn it off.
+	 */
+	requireGuarantees: boolean;
 }
 
 /**
@@ -207,6 +213,9 @@ export class ExecWrapper {
 		const timings = { received: now(), sandboxReady: 0, prepared: 0, outcome: 0 };
 		let reported = false;
 		try {
+			// Before anything is created: a step routed here without asking for a guarantee of this worker is not run.
+			const refusal = this.dependencies.requireGuarantees ? RequiresGuard.refusal(raw['requires']) : undefined;
+			if (refusal !== undefined) throw new SandboxError('invalid-argument', refusal);
 			const mounts = this.mountsFor(raw, ids.executionId);
 			await lifecycle.runStep({ executionId: ids.executionId, mounts }, async ({ sandbox }) => {
 				timings.sandboxReady = now();
