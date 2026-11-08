@@ -14,6 +14,7 @@ import { WORKER_TYPE_POINT, failureOf, noDirectory, wiringMistake } from './Work
 import { WorkerTypeGuarantees } from './WorkerTypeGuarantees.js';
 import { assertWorkerTypeInstance, withLaunchCredential } from './WorkerTypeInstanceShape.js';
 import { describeDuration, resolveEnvVars } from './WorkerTypeOptions.js';
+import { WorkerTypeWorkspaces } from './WorkerTypeWorkspaces.js';
 
 const DEFAULT_BUILD_TIMEOUT_MS = 30_000;
 export const DEFAULT_DISPOSE_TIMEOUT_MS = 30_000;
@@ -70,6 +71,10 @@ export class WorkerTypeInstances {
 	private readonly exclusivity = new Map<string, { plugin: string; exclusive: boolean }>();
 	/** What each BUILT instance guarantees, checked against its manifest (see {@link guaranteesOf}). */
 	private readonly guarantees = new WorkerTypeGuarantees();
+	/** What each BUILT instance accepts as workspace kind, checked against its manifest (see {@link workspacesOf}). */
+	private readonly workspaces = new WorkerTypeWorkspaces();
+	/** The kinds an instance was checked to accept, by the instance handed out (the plugin's own object is never altered). */
+	private readonly acceptedKinds = new WeakMap<WorkerTypeInstance, string[] | undefined>();
 	/** Sources whose instance was disposed, so a run that ends later can be told why nobody answers. */
 	private readonly disposed = new Set<string>();
 	/** Instances already handed to dispose(), so the two ways one can be reached (cache, late build) dispose it once. */
@@ -80,7 +85,10 @@ export class WorkerTypeInstances {
 	private readonly disposeTimeoutMs: number;
 
 	constructor(
-		private readonly loader: Pick<PluginLoader, 'loadProvider' | 'readDeclaredGuarantees'>,
+		private readonly loader: Pick<
+			PluginLoader,
+			'loadProvider' | 'readDeclaredGuarantees' | 'readDeclaredWorkspaces'
+		>,
 		private readonly log: (level: 'info' | 'error', message: string) => void,
 		timeouts: WorkerTypeTimeouts = {},
 		/**
@@ -153,6 +161,7 @@ export class WorkerTypeInstances {
 						plugin: exclusivityKey(plugin, pluginsDir),
 						exclusive: built.exclusive === true,
 					});
+					this.workspaces.record(sourceId, exclusivityKey(plugin, pluginsDir), this.acceptedKinds.get(built));
 					// Already checked against the manifest by the build; only the normal form is stored.
 					this.guarantees.record(
 						sourceId,
@@ -234,6 +243,33 @@ export class WorkerTypeInstances {
 	}
 
 	/**
+	 * The workspace provider kinds the workers of a declared source accept, from its BUILT instance (its own list, else
+	 * its manifest's). Undefined: no restriction. Synchronous and never builds anything.
+	 *
+	 * FAIL-CLOSED: no kind (an empty list) until the instance is built, after a failed build, a dispose, or a
+	 * re-declaration with another plugin. A source without a plugin is not restricted.
+	 */
+	workspacesOf(entry: WorkerSourceEntry): string[] | undefined {
+		return entry.plugin === undefined
+			? undefined
+			: this.workspaces.of(entry.sourceId, exclusivityKey(entry.plugin, entry.pluginsDir));
+	}
+
+	/**
+	 * The workspace kinds the manifest of a source's plugin declares its workers accept (the upper bound of
+	 * {@link workspacesOf}), read without building an instance. Undefined: no restriction, also for a source without a
+	 * plugin and for a built-in worker type.
+	 *
+	 * @throws an error naming the source and the plugin when the manifest cannot be read or lists an unknown kind.
+	 */
+	async declaredWorkspaces(entry: WorkerSourceEntry): Promise<string[] | undefined> {
+		if (entry.plugin === undefined || this.lookupBuiltin(`plugins.${entry.plugin}`) !== undefined) {
+			return undefined;
+		}
+		return WorkerTypeWorkspaces.readDeclared(this.loader, entry, this.buildTimeoutMs);
+	}
+
+	/**
 	 * The guarantees the manifest of a source's plugin declares it MAY enforce (the upper bound of
 	 * {@link guaranteesOf}), read without building an instance. This is what lets the daemon know which source to ask
 	 * for a worker, and which requirements a flow can name, before any worker exists. Empty for a source without a plugin
@@ -257,6 +293,7 @@ export class WorkerTypeInstances {
 		this.cache.delete(sourceId);
 		this.exclusivity.delete(sourceId);
 		this.guarantees.forget(sourceId);
+		this.workspaces.forget(sourceId);
 		this.disposed.add(sourceId);
 		await this.disposeBounded(sourceId, this.settled(cached));
 	}
@@ -392,6 +429,7 @@ export class WorkerTypeInstances {
 				assertWorkerTypeInstance(built);
 				// A built-in worker type declares no guarantee in a manifest, so it may advertise none.
 				WorkerTypeGuarantees.check(built, []);
+				this.acceptedKinds.set(built, WorkerTypeWorkspaces.check(built, undefined));
 				return built;
 			}
 			if (pluginsDir === undefined) {
@@ -413,8 +451,14 @@ export class WorkerTypeInstances {
 				built,
 				await this.loader.readDeclaredGuarantees(typeRef, WORKER_TYPE_POINT, pluginsDir)
 			);
+			const kinds = WorkerTypeWorkspaces.check(
+				built,
+				await this.loader.readDeclaredWorkspaces(typeRef, WORKER_TYPE_POINT, pluginsDir)
+			);
 			// A plugin from a directory is given a launch credential per ask by the daemon, never the minting service.
-			return withLaunchCredential(built, host);
+			const wrapped = withLaunchCredential(built, host);
+			this.acceptedKinds.set(wrapped, kinds);
+			return wrapped;
 		} catch (err) {
 			throw failureOf(entry, plugin, pluginsDir, registered !== undefined, getErrorMessage(err), err);
 		}

@@ -15,13 +15,14 @@ import { workerSatisfiesShell } from './ShellMatcher.js';
 import { explainDefaultRefusal } from './WorkerRefusal.js';
 import type { RegisteredWorker } from './WorkerRegistry.js';
 import type { ExclusiveLookup, GuaranteeLookup, WorkerTypeCatalog, WorkerTypeLookup } from './WorkerTypeCatalog.js';
+import { WorkspaceKindFilter } from './WorkspaceKindFilter.js';
 
 /**
  * What the router asks the worker type catalog. `guaranteeLookup` may be missing (a router built before requirements
  * existed): a step that requires something is then placed nowhere, never anywhere.
  */
 export type WorkerTypeKnowledge = Pick<WorkerTypeCatalog, 'typeLookup' | 'exclusiveLookup'> &
-	Partial<Pick<WorkerTypeCatalog, 'guaranteeLookup'>>;
+	Partial<Pick<WorkerTypeCatalog, 'guaranteeLookup' | 'workspaceLookup'>>;
 
 /** No worker has a type: what a router built without a catalog knows. */
 const NO_WORKER_TYPES: WorkerTypeKnowledge = {
@@ -148,7 +149,11 @@ export class StepRouter {
 		private readonly acceptance: WorkerAcceptanceProvider = new DefaultWorkerAcceptance(),
 		private readonly distribution: StepDistributionProvider = new DefaultStepDistribution(),
 		private readonly workerTypes: WorkerTypeKnowledge = NO_WORKER_TYPES
-	) {}
+	) {
+		this.workspaceKinds = new WorkspaceKindFilter(workerTypes);
+	}
+
+	private readonly workspaceKinds: WorkspaceKindFilter;
 
 	/**
 	 * The connection to dispatch to, or undefined when no live worker may run this step.
@@ -172,10 +177,10 @@ export class StepRouter {
 		isExclusive?: ExclusiveLookup,
 		guaranteesOf?: GuaranteeLookup
 	): WebSocket | undefined {
-		const candidates = this.withRequirements(
+		// Both are hard filters, before S4 and S3: the guarantees of the source, then the workspace kinds it accepts.
+		const candidates = this.workspaceKinds.filter(
 			step,
-			this.servableBy(step, allCandidates, typeOf, isExclusive),
-			guaranteesOf
+			this.withRequirements(step, this.servableBy(step, allCandidates, typeOf, isExclusive), guaranteesOf)
 		);
 		const byWorkerId = new Map(candidates.map(candidate => [candidate.worker.workerId, candidate]));
 
@@ -223,6 +228,11 @@ export class StepRouter {
 			guaranteesOf = undefined;
 		}
 		return missingRequirements(required, guaranteesOf?.(worker.sourceId) ?? []);
+	}
+
+	/** True when the step requires something and the source of this worker does not accept the kind of its run's workspace. */
+	refusesWorkspace(step: StepPlacement, worker: RegisteredWorker): boolean {
+		return this.workspaceKinds.refuses(step, worker);
 	}
 
 	/**

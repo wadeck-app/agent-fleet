@@ -21,4 +21,12 @@ export interface PluginImplementation {
 	 * entry that is not declared here fails to build. Absent: the implementation provides none.
 	 */
 	guarantees?: string[];
+	/**
+	 * `worker-type` only: the workspace provider kinds (as written in a flow's `workspace:`: `in-place`, `readonly`,
+	 * `worktree`, `pool`) the workers of this implementation accept, declared statically so the daemon refuses at run
+	 * start, before any workspace is allocated, a run that requires something only this implementation provides but uses
+	 * another kind. It is the upper bound of the built instance's `workspaces`. An unknown kind makes the manifest fail
+	 * to load. Absent: no restriction.
+	 */
+	workspaces?: string[];
 }

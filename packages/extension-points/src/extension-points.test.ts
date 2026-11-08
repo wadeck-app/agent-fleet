@@ -285,3 +285,35 @@ describe('worker-type v1 guarantees (additive field)', () => {
 		expect(placement.requires).toEqual(['fs=confined']);
 	});
 });
+
+describe('worker-type v1 workspaces (additive field)', () => {
+	it('an instance may narrow the workspace provider kinds it accepts, and an old instance need not', () => {
+		const old: WorkerTypeInstance = {
+			source: { obtainWorker: async () => undefined },
+			dispose: async () => undefined,
+		};
+		const poolOnly: WorkerTypeInstance = { ...old, workspaces: ['pool'] };
+		expect([old.workspaces, poolOnly.workspaces]).toEqual([undefined, ['pool']]);
+	});
+
+	it('a manifest implementation declares the accepted workspace kinds statically, next to its guarantees', () => {
+		const manifest: PluginManifest = {
+			pluginId: 'sbx',
+			manifestVersion: '1',
+			implementations: {
+				'worker-type': { docker: { version: 1, guarantees: ['sandbox'], workspaces: ['pool'] } },
+			},
+		};
+		expect(manifest.implementations['worker-type']?.['docker']?.workspaces).toEqual(['pool']);
+	});
+
+	it('a step placement carries the kind of the workspace of its run, optional', () => {
+		const placement: StepPlacement = {
+			stepId: 's',
+			labels: [],
+			requiresUserInterface: false,
+			workspaceKind: 'in-place',
+		};
+		expect(placement.workspaceKind).toBe('in-place');
+	});
+});

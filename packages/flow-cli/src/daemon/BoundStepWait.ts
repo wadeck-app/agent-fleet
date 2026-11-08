@@ -16,7 +16,8 @@ export interface BoundStepRouting {
 	 * What the declared sources may provide, to decide the fate of a step with requirements. Absent (a dispatcher built
 	 * before requirements existed): such a step is failed with a wiring error, never placed.
 	 */
-	declaredGuarantees?: Pick<DeclaredGuarantees, 'entries' | 'providersOfAll' | 'shortfalls' | 'unread'>;
+	declaredGuarantees?: Pick<DeclaredGuarantees, 'entries' | 'providersOfAll' | 'shortfalls' | 'unread'> &
+		Partial<Pick<DeclaredGuarantees, 'workspacesOf' | 'acceptsWorkspace'>>;
 }
 
 /** What the daemon needs to restrict a run to a worker type: where types come from, and how long a missing one is waited for. */
@@ -29,7 +30,10 @@ export interface WorkerTypeRouting {
 	/** Where the last contact error of each source is kept, to say why no worker of the type came. */
 	contactErrors: Pick<SourceContactErrors, 'sinceFor'>;
 	/** What the declared sources may provide: read at run start (which requirements exist) and at dispatch. */
-	declaredGuarantees: Pick<DeclaredGuarantees, 'entries' | 'providersOfAll' | 'shortfalls' | 'unread' | 'refresh'>;
+	declaredGuarantees: Pick<
+		DeclaredGuarantees,
+		'entries' | 'providersOfAll' | 'shortfalls' | 'unread' | 'refresh' | 'workspacesOf' | 'acceptsWorkspace'
+	>;
 }
 
 /** What routing found about a step of a run bound to a worker type that no idle worker could take. */

@@ -143,3 +143,30 @@ describe('WorkerTypeCatalog - guarantees', () => {
 		expect(calls).toBe(1);
 	});
 });
+
+describe('WorkerTypeCatalog - workspace kinds', () => {
+	const catalogWith = (kinds: Record<string, string[] | undefined>): WorkerTypeCatalog =>
+		new WorkerTypeCatalog(
+			{ list: () => [source('sbx', 'sandbox.docker'), source('open', 'other.x'), source('host', undefined)] },
+			{ isExclusive: () => false },
+			{ guaranteesOf: () => [], workspacesOf: entry => kinds[entry.sourceId] }
+		);
+
+	it('reads the kinds each declared source accepts, undefined meaning no restriction', () => {
+		const lookup = catalogWith({ sbx: ['pool'], open: undefined }).workspaceLookup();
+
+		expect([lookup('sbx'), lookup('open'), lookup('host')]).toEqual([['pool'], undefined, undefined]);
+	});
+
+	it('accepts nothing from a source no longer declared, and does not restrict a worker with no source', () => {
+		const lookup = catalogWith({}).workspaceLookup();
+
+		expect([lookup('gone'), lookup(undefined)]).toEqual([[], undefined]);
+	});
+
+	it('restricts nothing when the catalog has no workspace source (a wiring without the feature)', () => {
+		const lookup = catalogOf(source('sbx', 'sandbox.docker')).workspaceLookup();
+
+		expect(lookup('sbx')).toBeUndefined();
+	});
+});

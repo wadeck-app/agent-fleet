@@ -43,6 +43,8 @@ export class ExecutionRegistry {
 	 * execution, like the worker type, so a step injected later inherits them.
 	 */
 	private readonly requirements = new Map<string, RunRequirementsRecord>();
+	/** Workspace provider kind of each run (the flow's `workspace:`), read per placement so injected steps carry it too. */
+	private readonly workspaceKinds = new Map<string, string>();
 	/**
 	 * Executions kept alive (not cleaned up) after a `user_intervention` step timed out
 	 * unanswered, so a later `flow resume` can re-dispatch exactly that step.
@@ -69,6 +71,7 @@ export class ExecutionRegistry {
 		this.projects.delete(executionId);
 		this.boundWorkerTypes.delete(executionId);
 		this.requirements.delete(executionId);
+		this.workspaceKinds.delete(executionId);
 		this.activeCount--;
 	}
 
@@ -133,6 +136,16 @@ export class ExecutionRegistry {
 	/** Holds the requirements recorded for the execution; every placement of its steps, injected ones included, reads them. */
 	bindRequirements(executionId: string, requirements: RunRequirementsRecord): void {
 		this.requirements.set(executionId, requirements);
+	}
+
+	/** Holds the workspace provider kind of the execution's flow (see `FlowWorkspaceKind`). */
+	bindWorkspaceKind(executionId: string, kind: string): void {
+		this.workspaceKinds.set(executionId, kind);
+	}
+
+	/** The workspace provider kind of the execution, or undefined when it could not be determined. */
+	workspaceKindOf(executionId: string): string | undefined {
+		return this.workspaceKinds.get(executionId);
 	}
 
 	/** The requirements recorded for the execution, or undefined when the run requires nothing. */

@@ -139,6 +139,48 @@ export const manifest = {
 				version: 1,
 				provider: async context => makeInstance(context, { guarantees: ['fs=confined'] }),
 			},
+			// Workspace kinds (D9): manifest list is the upper bound, the instance may only narrow it.
+			poolonly: {
+				version: 1,
+				guarantees: ['sandbox'],
+				workspaces: ['pool'],
+				provider: async context => makeInstance(context, { guarantees: ['sandbox'] }),
+			},
+			poolnarrowed: {
+				version: 1,
+				guarantees: ['sandbox'],
+				workspaces: ['pool', 'worktree'],
+				provider: async context => makeInstance(context, { guarantees: ['sandbox'], workspaces: ['pool'] }),
+			},
+			workspaceoverclaim: {
+				version: 1,
+				guarantees: ['sandbox'],
+				workspaces: ['pool'],
+				provider: async context =>
+					makeInstance(context, { guarantees: ['sandbox'], workspaces: ['pool', 'worktree'] }),
+			},
+			unrestrictednarrowed: {
+				version: 1,
+				guarantees: ['sandbox'],
+				provider: async context => makeInstance(context, { guarantees: ['sandbox'], workspaces: ['readonly'] }),
+			},
+			badmanifestworkspace: {
+				version: 1,
+				guarantees: ['sandbox'],
+				workspaces: ['poool'],
+				provider: async context => makeInstance(context, { guarantees: ['sandbox'] }),
+			},
+			emptymanifestworkspaces: {
+				version: 1,
+				guarantees: ['sandbox'],
+				workspaces: [],
+				provider: async context => makeInstance(context, { guarantees: ['sandbox'] }),
+			},
+			badinstanceworkspace: {
+				version: 1,
+				guarantees: ['sandbox'],
+				provider: async context => makeInstance(context, { guarantees: ['sandbox'], workspaces: ['poool'] }),
+			},
 			invalid: {
 				version: 1,
 				provider: async () => ({ nothing: true }),

@@ -36,8 +36,9 @@ const MAX_LISTED = 10;
  */
 export class RequirementShortage {
 	constructor(
-		private readonly router: Pick<StepRouter, 'refusalOf' | 'missingRequirementsOf'>,
-		private readonly declared: Pick<DeclaredGuarantees, 'entries' | 'providersOfAll' | 'shortfalls' | 'unread'>,
+		private readonly router: Pick<StepRouter, 'refusalOf' | 'missingRequirementsOf' | 'refusesWorkspace'>,
+		private readonly declared: Pick<DeclaredGuarantees, 'entries' | 'providersOfAll' | 'shortfalls' | 'unread'> &
+			Partial<Pick<DeclaredGuarantees, 'workspacesOf' | 'acceptsWorkspace'>>,
 		private readonly wait: BoundStepWait,
 		private readonly contactErrors: Pick<SourceContactErrors, 'sinceFor'>
 	) {}
@@ -60,12 +61,16 @@ export class RequirementShortage {
 		}
 
 		const providers = this.declared.providersOfAll(required);
-		const eligible = providers.filter(sourceId => this.mayServe(placement, sourceId, inputs));
+		const eligible = providers.filter(
+			sourceId => this.mayServe(placement, sourceId, inputs) && this.acceptsWorkspace(placement, sourceId)
+		);
 		const canStillAppear =
 			eligible.length > 0 ||
 			this.declared.unread().length > 0 ||
 			inputs.connected.some(
-				worker => this.router.missingRequirementsOf(placement, worker, inputs.guaranteesOf).length === 0
+				worker =>
+					this.router.missingRequirementsOf(placement, worker, inputs.guaranteesOf).length === 0 &&
+					!this.router.refusesWorkspace(placement, worker)
 			);
 		if (!canStillAppear) {
 			this.wait.clearRequirement(executionId, placement.stepId);
@@ -97,6 +102,7 @@ export class RequirementShortage {
 		return (
 			this.mayServe(placement, worker.sourceId, inputs) &&
 			this.router.missingRequirementsOf(placement, worker, inputs.guaranteesOf).length === 0 &&
+			!this.router.refusesWorkspace(placement, worker) &&
 			this.router.refusalOf(placement, worker) === undefined
 		);
 	}
@@ -109,12 +115,31 @@ export class RequirementShortage {
 		return placement.boundWorkerType === undefined || inputs.typeOf(sourceId) === placement.boundWorkerType;
 	}
 
+	/** Whether a declared source accepts the workspace kind of the step's run (its manifest; a stub without that knowledge restricts nothing). */
+	private acceptsWorkspace(placement: StepPlacement, sourceId: string): boolean {
+		return this.declared.acceptsWorkspace?.(sourceId, placement.workspaceKind) ?? true;
+	}
+
+	private describeWorkspaceRefusal(head: string, kind: string | undefined, providers: string[]): string {
+		const kindsOf = (sourceId: string): string[] => this.declared.workspacesOf?.(sourceId) ?? [];
+		const sources = providers.map(sourceId => `${sourceId} (${kindsOf(sourceId).join(', ')})`).join(', ');
+		const accepted = [...new Set(providers.flatMap(kindsOf))].sort();
+		return (
+			`${head} the only declared sources that can provide them accept other workspace kinds: ${sources}, ` +
+			`but the workspace kind of this run is ${kind === undefined ? 'unknown' : `"${kind}"`}. ` +
+			`Fix: change "workspace:" in the flow to one of ${accepted.join(', ')}, or remove the requirement.`
+		);
+	}
+
 	private describeNoProvider(inputs: ShortageInputs, providers: string[]): string {
 		const { placement } = inputs;
 		const required = placement.requires ?? [];
 		const head = `Step "${placement.stepId}" requires ${required.join(', ')}, but`;
 		const known = this.declared.entries();
 
+		if (providers.length > 0 && providers.every(sourceId => !this.acceptsWorkspace(placement, sourceId))) {
+			return this.describeWorkspaceRefusal(head, placement.workspaceKind, providers);
+		}
 		if (providers.length > 0) {
 			return `${head} the only declared sources that can provide them (${providers.join(', ')}) are not of the worker type this run is bound to ("${placement.boundWorkerType ?? 'none'}"). Fix the workerType of the flow, or declare a source of that type that provides them.`;
 		}

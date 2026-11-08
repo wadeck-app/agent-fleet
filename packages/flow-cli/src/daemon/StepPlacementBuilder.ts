@@ -32,6 +32,7 @@ export class StepPlacementBuilder {
 			step.stepId,
 			(step.stepConfig as { requires?: unknown }).requires
 		);
+		const workspaceKind = this.executions.workspaceKindOf(executionId);
 		return {
 			stepId: step.stepId,
 			labels: labels ?? [],
@@ -42,6 +43,7 @@ export class StepPlacementBuilder {
 			...(shellKind !== undefined ? { shellKind } : {}),
 			...(boundWorkerType !== undefined ? { boundWorkerType } : {}),
 			...(requires.length > 0 ? { requires } : {}),
+			...(workspaceKind !== undefined ? { workspaceKind } : {}),
 		};
 	}
 }

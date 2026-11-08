@@ -78,3 +78,15 @@ describe('ExecutionRegistry - worker type binding', () => {
 		expect(registry.requirementsOf('e1')).toBeUndefined();
 	});
 });
+
+describe('ExecutionRegistry - workspace kind', () => {
+	it('knows the workspace kind of a run, none for an unknown execution, and forgets it with the execution', () => {
+		const registry = startedRegistry('e1');
+
+		registry.bindWorkspaceKind('e1', 'pool');
+		expect([registry.workspaceKindOf('e1'), registry.workspaceKindOf('ghost')]).toEqual(['pool', undefined]);
+
+		registry.remove('e1');
+		expect(registry.workspaceKindOf('e1')).toBeUndefined();
+	});
+});

@@ -49,6 +49,12 @@ export interface StepPlacement {
 	 * Absent: the step has none.
 	 */
 	requires?: string[];
+	/**
+	 * The workspace provider kind of the step's run, as written in the flow's `workspace:` (`in-place`, `pool`, or the name
+	 * of a configured instance). Informational for a plugin: for a step that requires something, the daemon has already
+	 * removed every worker whose source does not accept this kind. Absent: the kind could not be determined.
+	 */
+	workspaceKind?: string;
 }
 
 /** The candidate worker, as it declared itself when registering. */

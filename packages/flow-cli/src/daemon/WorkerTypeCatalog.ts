@@ -6,6 +6,12 @@ export type WorkerTypeLookup = (sourceId: string | undefined) => string | undefi
 /** Answers "what do the workers of this source guarantee": nothing for a worker of no source, or of one no longer declared. */
 export type GuaranteeLookup = (sourceId: string | undefined) => string[];
 
+/**
+ * Answers "which workspace provider kinds do the workers of this source accept": undefined for no restriction (also for a
+ * worker of no source), an empty list for a source no longer declared or not built.
+ */
+export type WorkspaceKindsLookup = (sourceId: string | undefined) => readonly string[] | undefined;
+
 /** Answers "do the workers of this source serve only runs bound to their type". */
 export type ExclusiveLookup = (sourceId: string | undefined) => boolean;
 
@@ -36,6 +42,8 @@ export class WorkerTypeCatalog {
 		 */
 		private readonly guarantees?: {
 			guaranteesOf(entry: WorkerSourceEntry): string[];
+			/** The workspace kinds the built instance of the source accepts (undefined: no restriction). Absent: no source is restricted. */
+			workspacesOf?(entry: WorkerSourceEntry): string[] | undefined;
 		}
 	) {}
 
@@ -65,6 +73,19 @@ export class WorkerTypeCatalog {
 			guaranteesOfSource.set(entry.sourceId, this.guarantees?.guaranteesOf(entry) ?? []);
 		}
 		return sourceId => (sourceId === undefined ? [] : (guaranteesOfSource.get(sourceId) ?? []));
+	}
+
+	/**
+	 * The workspace provider kinds each declared source accepts, from its built instance (fail-closed until it is built).
+	 * Same reading rules as {@link guaranteeLookup}.
+	 */
+	workspaceLookup(): WorkspaceKindsLookup {
+		const kindsOfSource = new Map<string, readonly string[] | undefined>();
+		for (const entry of this.sources.list()) {
+			kindsOfSource.set(entry.sourceId, this.guarantees?.workspacesOf?.(entry));
+		}
+		return sourceId =>
+			sourceId === undefined ? undefined : kindsOfSource.has(sourceId) ? kindsOfSource.get(sourceId) : [];
 	}
 
 	/**

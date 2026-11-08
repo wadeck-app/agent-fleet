@@ -18,6 +18,7 @@ import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import type { AllocatedWorkspace, ExecutionWorkspaces, WorkspaceWaiting } from './ExecutionWorkspaces.js';
 import type { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
+import { FlowWorkspaceKind } from './FlowWorkspaceKind.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
 import type { RunDefinitionLoader } from './RunDefinitionLoader.js';
 import { RunIdempotencyCache } from './RunIdempotencyCache';
@@ -27,6 +28,7 @@ import type { RunProject } from './RunProjectResolver.js';
 import { resolveRunRequirements } from './RunRequirements.js';
 import type { RunStepPreparer } from './RunStepPreparer.js';
 import { describeConditionError } from './SchedulerConditionError.js';
+import { WorkspaceKindAcceptance } from './WorkspaceKindAcceptance.js';
 import type { WorkspaceWaitSupervisor } from './WorkspaceWaitSupervisor.js';
 
 type RunCommand = Extract<ClientCommand, { type: 'run' }>;
@@ -68,8 +70,14 @@ export class RunRequestHandler {
 		private readonly projectResolver: RunProjectResolver = new RunProjectResolver(),
 		private readonly idempotency: RunIdempotencyCache<DaemonResponse> = new RunIdempotencyCache<DaemonResponse>(),
 		/** Read before a flow is checked: which requirements the declared sources may provide. Absent, requirements are checked for syntax only. */
-		private readonly declaredGuarantees?: Pick<DeclaredGuarantees, 'refresh'>
-	) {}
+		private readonly declaredGuarantees?: Pick<DeclaredGuarantees, 'refresh' | 'providersOfAll' | 'workspacesOf'>
+	) {
+		this.workspaceKinds =
+			declaredGuarantees === undefined ? undefined : new WorkspaceKindAcceptance(declaredGuarantees);
+	}
+
+	/** Refuses, before any workspace exists, a run only sources that do not accept its workspace kind could serve. */
+	private readonly workspaceKinds: WorkspaceKindAcceptance | undefined;
 
 	/** Forgets the remembered request ids (the daemon is stopping). */
 	forgetRequests(): void {
@@ -159,6 +167,12 @@ export class RunRequestHandler {
 				return;
 			}
 			const flow = loaded.resolved.flow;
+			// The stored requirements and the stored definition decide, as for a new run: nothing is allocated for a run refused.
+			const refusedKind = this.workspaceKinds?.check(flow.id, FlowWorkspaceKind.of(flow), state.requirements);
+			if (refusedKind !== undefined) {
+				this.failRecorded(executionId, unable(refusedKind));
+				return;
+			}
 			let secrets: ExecutionSecrets;
 			try {
 				secrets = this.daemonSecrets.prepare(flow, cmd.inputs ?? {}, project.runCwd);
@@ -252,6 +266,12 @@ export class RunRequestHandler {
 			requirements = resolveRunRequirements(flow);
 		} catch (err) {
 			return { response: { type: 'error', code: 'INVALID_REQUIREMENTS', message: normalizeError(err).message } };
+		}
+
+		// Still before anything exists: the sources that can serve the requirements must accept the workspace kind of the flow.
+		const refusedKind = this.workspaceKinds?.check(flow.id, FlowWorkspaceKind.of(flow), requirements);
+		if (refusedKind !== undefined) {
+			return { response: { type: 'error', code: 'WORKSPACE_KIND_NOT_ACCEPTED', message: refusedKind } };
 		}
 
 		// Declared secrets are resolved before an execution id, a workspace or a record exists:
@@ -386,6 +406,11 @@ export class RunRequestHandler {
 			// Same for the requirements: read per placement from the execution, so a step injected later inherits them.
 			if (accepted.requirements !== undefined) {
 				this.executions.bindRequirements(executionId, accepted.requirements);
+			}
+			// And the kind of workspace, which the routing filter compares with what the sources accept.
+			const workspaceKind = FlowWorkspaceKind.of(flow);
+			if (workspaceKind !== undefined) {
+				this.executions.bindWorkspaceKind(executionId, workspaceKind);
 			}
 			if (recorded) {
 				// It has waited: the record exists and now gets its workspace; the waiting trace goes.

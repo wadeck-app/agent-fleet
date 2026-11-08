@@ -10,6 +10,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { BUILTIN_PLUGIN_MANIFESTS } from './BuiltinPlugins';
 import { ModuleImporter } from './ModuleImporter';
+import { WorkspaceKindList } from './WorkspaceKindList';
 
 interface ExtensionPointVersion {
 	version: number;
@@ -31,6 +32,7 @@ interface PluginImplementation {
 	entrypoint?: string;
 	export?: string;
 	guarantees?: unknown;
+	workspaces?: unknown;
 }
 
 interface PluginManifest {
@@ -87,6 +89,22 @@ export class PluginLoader {
 	async readDeclaredGuarantees(typeRef: string, extensionPoint: string, pluginsDir?: string): Promise<string[]> {
 		const { impl } = await this.findImplementation(typeRef, extensionPoint, pluginsDir);
 		return RequirementSyntax.normalise(impl.guarantees, `Plugin ${typeRef}: manifest guarantees`);
+	}
+
+	/**
+	 * The static `workspaces` a plugin implementation declares in its manifest (worker-type only): the workspace provider
+	 * kinds its workers accept, read WITHOUT calling its provider. Undefined: no restriction.
+	 *
+	 * @throws when the manifest or the implementation cannot be found, or the declaration is not a non-empty list of
+	 *         known workspace kinds (the message lists them).
+	 */
+	async readDeclaredWorkspaces(
+		typeRef: string,
+		extensionPoint: string,
+		pluginsDir?: string
+	): Promise<string[] | undefined> {
+		const { impl } = await this.findImplementation(typeRef, extensionPoint, pluginsDir);
+		return WorkspaceKindList.normalise(impl.workspaces, `Plugin ${typeRef}: manifest workspaces`);
 	}
 
 	private async findImplementation(

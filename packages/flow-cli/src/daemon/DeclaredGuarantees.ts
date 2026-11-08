@@ -4,6 +4,8 @@ interface Read {
 	/** What the declaration was read from: another plugin or directory for the same source means read again. */
 	key: string;
 	declared: string[];
+	/** The workspace kinds the source accepts; undefined: no restriction. */
+	workspaces: string[] | undefined;
 }
 
 /**
@@ -22,12 +24,16 @@ export class DeclaredGuarantees {
 
 	/**
 	 * @param sources the declared worker sources
-	 * @param reader reads the static declaration of one source's plugin (`WorkerTypeInstances.declaredGuarantees`)
+	 * @param reader reads the static declaration of one source's plugin (`WorkerTypeInstances.declaredGuarantees`, and
+	 *        `declaredWorkspaces` for the workspace kinds it accepts: a reader without it declares no restriction)
 	 * @param log told, with the fix, of each source whose declaration cannot be read
 	 */
 	constructor(
 		private readonly sources: { list(): WorkerSourceEntry[] },
-		private readonly reader: { declaredGuarantees(entry: WorkerSourceEntry): Promise<string[]> },
+		private readonly reader: {
+			declaredGuarantees(entry: WorkerSourceEntry): Promise<string[]>;
+			declaredWorkspaces?(entry: WorkerSourceEntry): Promise<string[] | undefined>;
+		},
 		private readonly log: (message: string) => void
 	) {}
 
@@ -40,7 +46,10 @@ export class DeclaredGuarantees {
 					return;
 				}
 				try {
-					this.read.set(entry.sourceId, { key, declared: await this.reader.declaredGuarantees(entry) });
+					// Both or none: a source whose workspace kinds cannot be read must not look unrestricted.
+					const declared = await this.reader.declaredGuarantees(entry);
+					const workspaces = await this.reader.declaredWorkspaces?.(entry);
+					this.read.set(entry.sourceId, { key, declared, workspaces });
 				} catch (err) {
 					this.read.delete(entry.sourceId);
 					this.log(
@@ -78,6 +87,20 @@ export class DeclaredGuarantees {
 				missing: required.filter(entry => !read.declared.includes(entry)),
 			}))
 			.sort((a, b) => a.missing.length - b.missing.length || a.sourceId.localeCompare(b.sourceId));
+	}
+
+	/** The workspace kinds the declared source accepts, from its manifest; undefined: no restriction (or the source is not known). */
+	workspacesOf(sourceId: string): string[] | undefined {
+		return this.currentReads().find(read => read.sourceId === sourceId)?.read.workspaces;
+	}
+
+	/**
+	 * Whether the source may serve a run whose workspace is of this kind. A source without a restriction accepts any
+	 * kind; a restricted one never accepts a kind that is unknown (undefined), nor one it does not list.
+	 */
+	acceptsWorkspace(sourceId: string, kind: string | undefined): boolean {
+		const accepted = this.workspacesOf(sourceId);
+		return accepted === undefined || (kind !== undefined && accepted.includes(kind));
 	}
 
 	/** The plugin sources whose declaration is not known (not read yet, or unreadable). */

@@ -13,6 +13,7 @@ export function withLaunchCredential(
 	return {
 		...(instance.exclusive === undefined ? {} : { exclusive: instance.exclusive }),
 		...(instance.guarantees === undefined ? {} : { guarantees: instance.guarantees }),
+		...(instance.workspaces === undefined ? {} : { workspaces: instance.workspaces }),
 		source: new LaunchCredentialSource(instance.source, host.issueLaunchToken, host.revokeLaunchToken),
 		...(instance.run === undefined ? {} : { run: instance.run }),
 		dispose: () => instance.dispose(),

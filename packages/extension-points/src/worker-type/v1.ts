@@ -79,6 +79,16 @@ export interface WorkerTypeInstance {
 	 */
 	guarantees?: string[];
 	/**
+	 * Additive field of worker-type v1 (an instance without it accepts every workspace kind its manifest allows).
+	 *
+	 * The workspace provider kinds (`in-place`, `readonly`, `worktree`, `pool`) the workers of this source accept. It may
+	 * only NARROW the manifest's `workspaces` for this implementation (a subset), or the build fails; when the manifest
+	 * declares none, any known kind may be listed. A step that requires something is never placed on a worker of a
+	 * source that does not accept its run's workspace kind. When present it must be a list of known kinds: anything else
+	 * makes the build fail.
+	 */
+	workspaces?: string[];
+	/**
 	 * Called once per run this type served (once per source, however many of its workers took part), after the workers
 	 * acknowledged the end of the run (or the wait expired) and before the run's workspace is released. Bounded by the
 	 * ack timeout: a rejection or a hang is logged with the source and the execution, never blocks the release further.
