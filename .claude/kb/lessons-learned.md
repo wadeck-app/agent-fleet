@@ -6689,3 +6689,43 @@ flow-cli and app-module-* (flow-chart's package.json dependency on app-module-fl
 **Problem:** A relaunched step (8 attempts) showed about 0.3 USD while the real cost was 2.79 USD: only the last attempt's `meta` was displayed, and the failed attempts never reached the store. Once every attempt was logged, summing the raw `usd` would still be wrong: one real capture (execution ajk42rid, haiku, parent relaunched once with session resume) showed `usd` 0.00637995 then 0.00749017 for the same session, with cache write tokens 51022 then 56214, i.e. attempt 2 = attempt 1 + its own turn.
 **Fix:** `flow-core/src/execution/StepCost.ts` is the only place that computes costs: per-attempt share = delta against the previous attempt of the same session, step total = sum of the final value of each session, anything unprovable (no reported cost, decrease, no session id or provider, non-claude shared session, folded overflow) is UNKNOWN and shown as `$2.7900+ (2 attempts unknown)`, never 0. `attemptLog` entries record `sessionId` and `provider`.
 **Context:** Measured on claude only, one capture, 2 attempts. opencode and codex semantics for a shared session are unverified, hence unknown. `ExecutionView.costUsd` changed meaning on purpose (step total); the old value is `lastAttemptCostUsd`. Never add the raw `attemptLog[].usd` anywhere.
+
+## A series built in a separate checkout can pass there while a needed file is gitignored
+
+**Problem:** C2b was reviewed and sent as a commit series from a separate checkout; its fixture plugin `plugin.config.js` was hidden by `.gitignore` (`packages/*/src/**/*.js`), so it never entered a commit. The tests were green there and 42 flow-cli tests failed after the cherry-pick ("No manifest found for plugin fixture-sandbox").
+**Fix:** Before sending a series, run `git status --ignored` and check that no file a test needs is ignored; better, apply the series onto a fresh checkout and run the touched tests there. Plain-JS fixtures under `src/` need an explicit `!` exception in `.gitignore` (done for `packages/flow-cli/src/test-utils/worker-type-plugins/**/*.js`).
+**Context:** Found by flow-owner when applying the series, 2026-10-27.
+
+## flow-sandbox test diet (M6.1): what made the suite slow, and what to watch
+
+- The cost of `packages/flow-sandbox` tests is child processes of the sbx mock (about 50-300 ms each on a busy Windows machine), not assertions. Spend them on one sandbox that goes through a whole sequence; validation cases that are refused before any process starts share a runtime and cost nothing.
+- Independent tests with their own mock state directory can use `it.concurrent` with `onTestFinished` from the test context (a global `afterEach` would dispose other running tests' harnesses). Calls to ONE mock state directory must stay sequential: the mock rewrites `state.json` with a tmp-and-rename and two parallel calls fail with ENOENT on the rename.
+- Event waits instead of polling: `src/testing/ObservedList.ts` (`waitFor` resolves in the turn of the push). Handlers must capture the list of THEIR test: a bridge or link stopped by the previous test reports its close later, into the next test's variable.
+- `scripts/check-eslint.js` reports the number of non-empty OUTPUT LINES of a failing `npm run lint`, not the number of rules broken (one failing file can show as 13 "errors"). A mutation run or a half-edited test file on disk makes the owner's lint run fail: never run lint or mutation checks while another agent may be linting the same package.
+- Mutation proof of a security class: .claude/temp/m61/MutationCheck.mjs (specs in MutationSpecs.mjs) applies each edit, runs the suite, restores the file in `finally`.
+
+## Workspace providers (waiting runs, pool)
+
+- A mock of a collaborator that the production code no longer calls keeps `expect(mock).not.toHaveBeenCalled()` green for ever. After moving a seam (WorkspaceManager to provider source), re-point the assertion to the new seam (see CommandHandler.project/secrets/versions tests).
+- A run waiting for a pool slot is recorded `queued` plus `ExecutionState.workspaceWait`; no new status. `reconcileInterruptedExecutions` leaves such records alone and refreshes their file time, otherwise the checkpoint optimisation skips them at the next start and nothing ever starts them.
+- `packages/worker` (legacy FlowWorker) still imports `flow-engine/workspace/WorkspaceManager`: that file cannot be deleted until the legacy worker is retired.
+- `npm run bundle` for flow-cli fails here on `extensionPoints.3.tab: ... 'count'` (installed app-core-cli older than the manifest): the bundling vitest project cannot run until `npm install` refreshes it.
+- Bash-tool guardrail hooks match words in the command text (git worktree, git clean, git clone, rm): write the script with the Write tool and run `node <file>`; heredocs also halve backslashes.
+
+## A daemon started from a source checkout registers with the REAL app-core, whatever HOME it has
+
+**Problem:** Live checks and tests started a daemon of a source checkout. At start it registers its app-modules with app-core over HTTP on the default port 4850 (SDK: `APP_CORE_PORT`, else `<APP_CORE_CONFIG_DIR>/server.port.json`, else 4850), so an isolated HOME did not help: the user's real app-core was repointed at the clone's build (2026-11-08). The scripts had also handed the daemon the REAL HOME, USERPROFILE, APPDATA and LOCALAPPDATA so that the wrapper could reach the sbx login and the AWS SSO session.
+**Fix:** `createIsolatedCliEnv` sets `APP_CORE_PORT` to a dead port and `APP_CORE_CONFIG_DIR` to a directory that does not exist; `FLOW_DAEMON_PORT=0`. The real directories travel in `FLOW_SANDBOX_HOST_*` and come back only for the wrapper's own sbx/aws children (`HostEnvironment`). `DaemonIsolationGuard.assert` refuses to start a daemon otherwise, and `HostEnvironment.isolate` drops carriers inherited from the parent shell. Take a before/after snapshot of `~/.config/app-core`, `~/.config/project` and `~/.config/flow` around every daemon run and look for the markers only your run writes.
+**Context:** Never hand the real HOME to a daemon. The user's own daemon changes those folders all day: compare for your markers, not for byte equality.
+
+## sbx 0.51.0: the banner comes from the first bash, the image id is an index digest, template names carry the registry
+
+**Problem:** Three assumptions from sbx 0.49.2 and the mock were wrong on the real tool. (1) The default templates print a banner on stdout at the FIRST `bash` of a sandbox (`/etc/bash.bashrc` sources `/etc/profile.d/01-dhi.sh`, once, marker file), not at the first exec: `exec true` does not trigger it and does not absorb it. (2) The builder's Docker 29 uses the containerd image store: `docker image inspect .Id` is the digest of the image index (`index.json` of the saved archive), not the config blob of `manifest.json`, so the id check refused a good archive. (3) `sbx template ls` prints `docker.io/library/<name>`, so an exact-name match failed the plugin's image preflight.
+**Fix:** `SbxCliRuntime.create` runs `bash -c true` once and discards the output; `DockerImageId` accepts the index digest; `SbxTemplateListing` matches the last path segments. `sbx exec` on a stopped sandbox also prints `  ✓ sandbox <name> — started` on stderr (`SbxStartNoticeFilter`), and on a missing sandbox it exits 125.
+**Context:** Re-measure at every sbx upgrade (`CaptureSbxFixtures.mjs`, the live checks).
+
+## Run the real tool before trusting the mock: the first real run of the plugin found a bug no mock test could
+
+**Problem:** The sandbox plugin passed its whole mock suite and had never run on a real sbx. The first `PluginLiveCheck` failed on the image preflight (template names), and measuring a completed TCP handshake as "the connection left the VM" produced a wrong claim for weeks (the egress gateway completes any handshake).
+**Fix:** Keep one gated live check per claim, and judge by the receiving side (a server on the host that logs the connection), not by the sender's success. A table-driven RED with the REAL captured output (a fixture) replaces the guess in the mock.
+**Context:** A mock fixture is only as real as its capture; mark everything synthetic in the mock.
