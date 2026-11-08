@@ -65,6 +65,14 @@ flow docs --output /tmp/caps.md   # recommended
 flow docs                          # prints to stdout (large)
 ```
 
+### Workspace (mandatory) and script values
+
+- Every flow MUST declare `workspace:`; a flow without it is refused. The old `mode/gitStrategy/reusePolicy` block is refused with a rewrite hint (`mode: manual` still runs as `in-place`, deprecated).
+- Providers: `in-place` (the project folder, shared), `readonly` (shared, advisory: model steps may not declare write/edit/bash), `worktree` (`{ provider: worktree, baseDir, prefix }`: new branch per run, `baseDir` outside the project, only committed files, branch kept), `pool` (`{ provider: pool, dir, prefix, count }`: prepared clones; a full pool makes the run WAIT, no timeout, `flow cancel` ends it; make the first step sync the slot).
+- Bump `version` after editing `workspace:` (it changes the definition hash). A git failure refuses the run with `WORKSPACE_GIT_FAILED` and the cause, it never continues in an empty folder.
+- Script cwd is `workingDir` (relative to the workspace) else the workspace; an absolute `workingDir` replaces the workspace (`flow validate` warns). Model steps ignore `workingDir`.
+- In a `script:` body, `${{ inputs.* }}` is pasted as raw text: pass untrusted values through `env:` and read them as shell variables (`flow validate` warns `SCRIPT_BODY_INTERPOLATION`).
+
 ### flow show
 
 Display a concise table summary of a flow file. Use this to review a generated or existing flow before editing or running it. One line per step.
@@ -78,7 +86,7 @@ Example output:
 ```
 my-flow  v1.0.0
 My Flow Name
-workspace: isolated  git:feature-branch  reuse:never
+workspace: in-place
 inputs:    description (text, required)   priority (enum, default: medium)
 status:    ok -> approved   fail -> todo
 ---------------------------------------------------------------
