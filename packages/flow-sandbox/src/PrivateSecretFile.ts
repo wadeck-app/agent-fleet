@@ -1,14 +1,15 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { PrivateAcl } from './PrivateAcl';
 import { SandboxError } from './SandboxError';
 
 /** Characters a shell would treat specially inside the double quotes of the `cat` command. */
 const UNSAFE_IN_COMMAND = /["$`\\\0\r\n]/;
 
 /**
- * A file holding one sandbox's credential-endpoint secret, in its own owner-only directory under the host
- * temporary directory (never inside a sandbox mount: sbx requires helpers outside writable mounts).
+ * A file holding one sandbox's credential-endpoint secret, in its own owner-only directory (modes; on Windows the ACL is
+ * restricted to the current user, see PrivateAcl) under the host temporary directory (never inside a sandbox mount: sbx requires helpers outside writable mounts).
  * `sbx secret set-custom --command` reads it with `valueCommand`, so the secret never appears on a command
  * line. `dispose()` removes it; call it when the sandbox is removed.
  */
@@ -28,8 +29,11 @@ export class PrivateSecretFile {
 		const directory = fs.mkdtempSync(path.join(tempDirectory, 'flow-sandbox-secret-'));
 		const filePath = path.join(directory, 'secret');
 		try {
+			// Before the secret is written: nothing secret ever sits under the inherited ACL of the temporary folder.
+			PrivateAcl.restrictToCurrentUser(directory, 'directory');
 			// No trailing newline: the command output is the secret as is.
 			fs.writeFileSync(filePath, secret, { mode: 0o600 });
+			PrivateAcl.restrictToCurrentUser(filePath, 'file');
 		} catch (error) {
 			fs.rmSync(directory, { recursive: true, force: true });
 			throw error;

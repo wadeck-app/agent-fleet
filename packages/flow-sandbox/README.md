@@ -44,7 +44,7 @@ No drift check in `scripts/check-mock-drift.js`: it probes a CLI in PATH against
 
 - `PathTranslator` is lexical; symlinks and junctions are rejected by `RunMounts` (M3).
 - `start` is an `exec true` (sbx has no start verb).
-- Windows ignores the file mode `0600` of the secret and env files (`PrivateSecretFile`, `PrivateEnvFile`, the wrapper secrets directory): on Windows they are as private as the temp directory of the account (the default `%TEMP%` is readable by the account, SYSTEM and administrators only). Residual, NOT closed: no owner-only ACL is set (that needs the Windows ACL tool, which was not used here), and a wrapper does not check that `%TEMP%` is private; do not point `TEMP` at a shared folder. A wrapper killed hard leaves its `flow-sbx-<exec|harness>-secrets-<wrapperId>-*` and `flow-sandbox-env-*` directories behind; at startup `StaleTempSweep` removes those older than 24 h whose wrapper is not running (env directories only while no wrapper runs), logging each removal.
+- Windows ignores the file mode `0600` of the secret and env files (`PrivateSecretFile`, `PrivateEnvFile`, the wrapper secrets directory): on Windows they are as private as the temp directory of the account (the default `%TEMP%` was measured readable by the account, SYSTEM, the administrators and, inherited, a local group on this machine). The secret and env files and the secrets directory of a wrapper now get an owner-only ACL on Windows (`PrivateAcl`: inheritance removed, full control for the current user by SID, applied before anything is written; a failure stops the write, no silent fallback; verified with the real tool in `PrivateAcl.test.ts` and by a full real run in which sbx still reads the secret). Residual: a wrapper does not check that `%TEMP%` itself is private; do not point `TEMP` at a shared folder. A wrapper killed hard leaves its `flow-sbx-<exec|harness>-secrets-<wrapperId>-*` and `flow-sandbox-env-*` directories behind; at startup `StaleTempSweep` removes those older than 24 h whose wrapper is not running (env directories only while no wrapper runs), logging each removal.
 - Host abort of `exec` does not stop the process in the VM; call `stop`.
 
 ## M2: credentials, network rules, tool stores
@@ -153,6 +153,10 @@ The sandbox has a read/write mount of the slot, `.git` included, and can edit `<
 | `credential.helper` (http remote, 401) | - | not applicable | not triggered (inconclusive) |
 
 So the daemon's reads are safe from fsmonitor, hooks and filter drivers; mutating calls (the flow's sync step, your own tools) are not. Use dedicated slots, re-clone them, or restore `.git/config`, `hooks/`, `info/` and `.gitattributes` in the sync step before any mutating git call. Not covered: the legacy web-backend git service, FlowWorker git calls, the user's own tools. The user's global git config is out of reach of the sandbox: only the ancestors of the mounts are visible in the host user directory, and nothing could be created there as agent or root (this machine, one run).
+
+### Leftover sandboxes: explicit command (decision 26)
+
+Never automatic. A wrapper only reports leftovers at start and stops (never removes) its own sandboxes on exit. List and remove with the command the artifact ships, no source checkout needed: `node <plugins-dir>/plugin-sandbox/wrapper.cjs leftover list` and `... leftover remove <name> [--force]` (the repository script `scripts/LeftoverCli.mjs` is the same code). `remove` takes one exact name, refuses a name without the plugin's `flow-sbx-` marker and a sandbox whose run or wrapper is alive (presence files), and `--force` only overrides a missing presence directory. Covered by `SandboxPluginArtifact.test.ts` (list, refusal, removal, usage error).
 
 ### Limits of the harness
 

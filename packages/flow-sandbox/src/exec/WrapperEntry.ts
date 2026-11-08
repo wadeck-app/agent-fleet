@@ -1,5 +1,6 @@
 import os from 'node:os';
 
+import { runLeftover } from '../LeftoverMain';
 import { PresenceDirectory } from '../PresenceDirectory';
 import { SbxBinaryLocator } from '../SbxBinaryLocator';
 import { SbxCliRuntime } from '../SbxCliRuntime';
@@ -12,12 +13,17 @@ import { runExecWrapper } from './ExecMain';
 import { WrapperPreflight } from './WrapperPreflight';
 
 /**
- * The two things `wrapper.cjs` does (the sandbox plugin starts it, see plugin/plugin.config.js):
+ * The three things `wrapper.cjs` does (the sandbox plugin starts it, see plugin/plugin.config.js):
  * - `wrapper.cjs preflight <options>`: checks the options and this machine, runs nothing, exits 0 or fails with the fix;
+ * - `wrapper.cjs leftover list | remove <name> [--force]`: the explicit command for leftover sandboxes (decision 26), exit code 0, 1 or 2;
  * - `wrapper.cjs <options>`: the exec wrapper itself (a worker for the daemon named by FLOW_DAEMON_WS_URL).
  * The options are the ones of HarnessConfigParser in both modes.
  */
 export async function runWrapperEntry(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<void> {
+	if (argv[0] === 'leftover') {
+		process.exitCode = await runLeftover(argv.slice(1), env);
+		return;
+	}
 	if (argv[0] !== 'preflight') {
 		await runExecWrapper(argv, env);
 		return;

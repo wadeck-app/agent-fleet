@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { PluginBundler } from '../PluginBundler';
+import { MOCK_SBX_PATH, MockSbxHarness } from '../testing/MockSbxHarness';
 
 // The BUILT artifact (not the source), copied where no node_modules can be reached (the temp directory), loaded by flow's REAL
 // PluginLoader and WorkerTypeInstances. Built here, so CI needs no prior `npm run bundle`.
@@ -61,6 +62,58 @@ describe('the sandbox plugin artifact', () => {
 		expect(wrapper.stderr).toContain("Unknown option '--bad-option'");
 		expect(wrapper.stderr).toContain('wrapper.cjs preflight');
 	});
+
+	// Decision 26: leftovers are listed and removed by an explicit command. The artifact is all a user has (no source checkout, no tsx),
+	// so the command ships in it: `wrapper.cjs leftover list | remove <name> [--force]`.
+	it('ships the leftover command: list shows a plugin sandbox, remove removes exactly that one, a bad command is a usage error', async () => {
+		const harness = new MockSbxHarness();
+		try {
+			const workspace = harness.makeDirectory('ws-');
+			await harness.runtime().create({
+				name: 'flow-sbx-w1-run1',
+				agent: 'shell',
+				mounts: [{ hostPath: workspace }],
+				cpus: 2,
+				memory: '2g',
+			});
+			await harness.runtime().create({
+				name: 'someone-elses',
+				agent: 'shell',
+				mounts: [{ hostPath: workspace }],
+				cpus: 2,
+				memory: '2g',
+			});
+			const presence = harness.makeDirectory('presence-');
+			const leftover = (...args: string[]): ReturnType<typeof spawnSync> =>
+				spawnSync(
+					process.execPath,
+					[path.join(pluginsDirectory, 'plugin-sandbox', 'wrapper.cjs'), 'leftover', ...args],
+					{
+						cwd: root,
+						encoding: 'utf8',
+						env: { ...harness.env(), SBX_PATH: MOCK_SBX_PATH, FLOW_SANDBOX_PRESENCE_DIR: presence },
+					}
+				);
+
+			const listed = leftover('list');
+			const refused = leftover('remove', 'someone-elses');
+			const removed = leftover('remove', 'flow-sbx-w1-run1');
+			const usage = leftover();
+
+			expect(listed.status, String(listed.stderr)).toBe(0);
+			expect(String(listed.stdout)).toContain('flow-sbx-w1-run1');
+			expect(String(listed.stdout)).not.toContain('someone-elses');
+			// A sandbox without the plugin's marker is never touched.
+			expect(refused.status).toBe(1);
+			expect(removed.status, String(removed.stderr)).toBe(0);
+			const remaining = (await harness.runtime().list()).map(info => info.name);
+			expect(remaining).toEqual(['someone-elses']);
+			expect(usage.status).toBe(2);
+			expect(String(usage.stderr)).toContain('Usage: leftover list');
+		} finally {
+			harness.dispose();
+		}
+	}, 60_000);
 
 	it("is built by flow's real loader, its options are parsed, and obtainWorker starts the wrapper with the credential in the environment only", async () => {
 		const record = path.join(root, 'launch.json');

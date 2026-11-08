@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { PrivateAcl } from './PrivateAcl';
 import { SandboxRequestValidator } from './SandboxRequestValidator';
 
 /**
@@ -22,7 +23,10 @@ export class PrivateEnvFile {
 		const directory = fs.mkdtempSync(path.join(tempDirectory, 'flow-sandbox-env-'));
 		const filePath = path.join(directory, 'env');
 		try {
+			// Before the values are written (they may be credentials); see PrivateAcl for what this does on Windows.
+			PrivateAcl.restrictToCurrentUser(directory, 'directory');
 			fs.writeFileSync(filePath, `${lines.join('\n')}\n`, { mode: 0o600 });
+			PrivateAcl.restrictToCurrentUser(filePath, 'file');
 		} catch (error) {
 			fs.rmSync(directory, { recursive: true, force: true });
 			throw error;

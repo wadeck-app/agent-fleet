@@ -12,6 +12,7 @@ import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { LeftoverSandboxes } from '../LeftoverSandboxes';
 import { NodeCommandRunner } from '../NodeCommandRunner';
 import { PresenceDirectory } from '../PresenceDirectory';
+import { PrivateAcl } from '../PrivateAcl';
 import { isProcessAlive } from '../ProcessLiveness';
 import { RunMounts } from '../RunMounts';
 import { SandboxCapacity } from '../SandboxCapacity';
@@ -94,6 +95,8 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 		await leftovers.reapOwn(config.wrapperId, new Set());
 
 		const secretsDirectory = fs.mkdtempSync(path.join(os.tmpdir(), `flow-sbx-exec-secrets-${config.wrapperId}-`));
+		// The secret files made in it are the wrapper's own; on Windows only the current user may read them.
+		PrivateAcl.restrictToCurrentUser(secretsDirectory, 'directory');
 		cleanup.add('remove the secrets directory', () =>
 			fs.rmSync(secretsDirectory, { recursive: true, force: true })
 		);

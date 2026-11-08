@@ -1,2 +1,0 @@
-SANDBOX                     AGENT   STATUS      PORTS   WORKSPACE                                                    CREATED
-flow-sbx-capture-c91344ea   shell   ● running           C:\Users\<user>\AppData\Local\Temp\flow-sbx-capture-Ul5f8i   5s

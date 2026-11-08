@@ -9,6 +9,7 @@ import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { LeftoverSandboxes } from '../LeftoverSandboxes';
 import { NodeCommandRunner } from '../NodeCommandRunner';
 import { PresenceDirectory } from '../PresenceDirectory';
+import { PrivateAcl } from '../PrivateAcl';
 import { isProcessAlive } from '../ProcessLiveness';
 import { RunMounts } from '../RunMounts';
 import { SandboxCapacity } from '../SandboxCapacity';
@@ -78,6 +79,8 @@ export async function runHarness(argv: readonly string[], env: NodeJS.ProcessEnv
 		const secretsDirectory = fs.mkdtempSync(
 			path.join(os.tmpdir(), `flow-sbx-harness-secrets-${config.wrapperId}-`)
 		);
+		// The secret files made in it are the wrapper's own; on Windows only the current user may read them.
+		PrivateAcl.restrictToCurrentUser(secretsDirectory, 'directory');
 		cleanup.add('remove the secrets directory', () =>
 			fs.rmSync(secretsDirectory, { recursive: true, force: true })
 		);

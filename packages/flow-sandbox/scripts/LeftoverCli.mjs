@@ -14,42 +14,10 @@
  *                              (default ~/.config/flow/sandbox-presence, flow's ConfigDir 'flow').
  *   SBX_PATH                   sbx executable when it is not in the default install directory.
  *
+ * The shipped plugin has the same command: node <plugins-dir>/plugin-sandbox/wrapper.cjs leftover list | remove <name> [--force]
+ *
  * Exit code: 0 done, 1 refused or failed, 2 usage error.
  */
-import fs from 'node:fs';
-import os from 'node:os';
+import { runLeftover } from '../src/LeftoverMain.ts';
 
-import { LeftoverCommand } from '../src/LeftoverCommand.ts';
-import { LeftoverSandboxes } from '../src/LeftoverSandboxes.ts';
-import { PresenceDirectory } from '../src/PresenceDirectory.ts';
-import { isProcessAlive } from '../src/ProcessLiveness.ts';
-import { SbxCliRuntime } from '../src/SbxCliRuntime.ts';
-import { SystemClock } from '../src/SystemClock.ts';
-import { WrapperPresence } from '../src/WrapperPresence.ts';
-
-// The same resolution as the wrappers (--presence-dir, then the variable, then the default): one source of truth.
-const presenceDirectory = PresenceDirectory.resolve(
-	undefined,
-	process.env,
-	PresenceDirectory.defaultPath(os.homedir())
-);
-const log = {
-	info: message => console.error(`info: ${message}`),
-	warn: message => console.error(`warn: ${message}`),
-};
-const leftovers = new LeftoverSandboxes(
-	new SbxCliRuntime(),
-	new SystemClock(),
-	log,
-	new WrapperPresence(presenceDirectory, isProcessAlive, process.pid)
-);
-const command = new LeftoverCommand(
-	leftovers,
-	{
-		out: line => console.log(line),
-		err: line => console.error(line),
-	},
-	{ directory: presenceDirectory, exists: () => fs.existsSync(presenceDirectory) }
-);
-
-process.exitCode = await command.run(process.argv.slice(2));
+process.exitCode = await runLeftover(process.argv.slice(2), process.env);

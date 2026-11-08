@@ -1,2 +1,0 @@
-error: sandbox 'fs-capture-missing' not found
-  try: sbx ls

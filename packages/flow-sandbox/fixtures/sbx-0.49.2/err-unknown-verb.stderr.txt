@@ -1,2 +1,0 @@
-error: sbx: unknown command: sbx nosuchverb
-  try: sbx --help
