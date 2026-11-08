@@ -8,7 +8,10 @@
  * - mutating (`worktree add/remove`, `clone`, `checkout`, `fetch`, `branch`): only fsmonitor disabled. The hooks of the
  *   user's own repository (git-lfs, husky `post-checkout`) keep running, so a worktree or a clone is created as before.
  *
- * Not covered: `filter.*` drivers, `core.sshCommand` and `credential.helper`; the user's own git calls (flow script
+ * Filter drivers (run when `git status` re-hashes a stale file) cannot be switched off by a fixed `-c`: a reading call
+ * that may hash files adds the entries of `neutralizeFilterDrivers` (HardenedGitFilters.ts).
+ *
+ * Not covered: `core.sshCommand` and `credential.helper` (mutating calls); the user's own git calls (flow script
  * steps) are out of scope.
  */
 

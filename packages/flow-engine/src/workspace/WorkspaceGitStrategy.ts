@@ -5,7 +5,12 @@
  * A setup that cannot be done is never swallowed: it throws a {@link WorkspaceGitSetupError} (see WorkspaceGitMessages)
  * and the run is refused, rather than going on in an empty directory.
  */
-import { HARDENED_GIT_MUTATING_CONFIG, HARDENED_GIT_READING_CONFIG } from 'extension-points';
+import {
+	type FilterListingExec,
+	HARDENED_GIT_MUTATING_CONFIG,
+	HARDENED_GIT_READING_CONFIG,
+	neutralizeFilterDrivers,
+} from 'extension-points';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { type SimpleGit, simpleGit } from 'simple-git';
@@ -40,7 +45,8 @@ export class WorkspaceGitStrategy {
 	 */
 	constructor(
 		private readonly projectRoot: string,
-		private readonly gitBinary: string = 'git'
+		private readonly gitBinary: string = 'git',
+		private readonly filterListing?: FilterListingExec
 	) {}
 
 	/**
@@ -51,12 +57,12 @@ export class WorkspaceGitStrategy {
 	 * GIT_OPTIONAL_LOCKS is not set: simple-git replaces the whole environment when one is given and then rejects the
 	 * ambient GIT_EDITOR / GIT_ASKPASS; these calls run at allocation time, not beside a running step.
 	 */
-	private getGit(mode: 'reading' | 'mutating', workingDir?: string): SimpleGit {
+	private getGit(mode: 'reading' | 'mutating', workingDir?: string, extraConfig: readonly string[] = []): SimpleGit {
 		const reading = mode === 'reading';
 		// simple-git refuses any core.fsmonitor / core.hooksPath setting unless allowed; enable only what the mode sets.
 		const options = {
 			binary: this.gitBinary,
-			config: [...(reading ? HARDENED_GIT_READING_CONFIG : HARDENED_GIT_MUTATING_CONFIG)],
+			config: [...(reading ? HARDENED_GIT_READING_CONFIG : HARDENED_GIT_MUTATING_CONFIG), ...extraConfig],
 			unsafe: reading
 				? { allowUnsafeFsMonitor: true, allowUnsafeHooksPath: true }
 				: { allowUnsafeFsMonitor: true },
@@ -74,7 +80,8 @@ export class WorkspaceGitStrategy {
 	}
 
 	private async readGitState(workspacePath: string): Promise<WorkspaceGitState> {
-		const git = this.getGit('reading', workspacePath);
+		// status re-hashes stale files through the filter drivers the folder declares (a run may have planted one): blank them.
+		const git = this.getGit('reading', workspacePath, await neutralizeFilterDrivers(workspacePath, this.filterListing));
 		const status = await git.status();
 		const branch = status.current || 'unknown';
 		const isClean = status.isClean();

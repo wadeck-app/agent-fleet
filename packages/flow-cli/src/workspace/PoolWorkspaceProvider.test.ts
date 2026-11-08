@@ -304,6 +304,17 @@ describe('PoolWorkspaceProvider', () => {
 		expect(fs.existsSync(path.join(pool, '.flow-pool', 'ws-1.claim'))).toBe(false);
 	});
 
+	it('fails the run and gives the slot back when the probe refuses to inspect it', async () => {
+		probeState = () => {
+			throw new Error('Could not list the filter drivers of the slot');
+		};
+		const provider = make(1);
+
+		await expect(provider.allocate(request('aaaa1111'))).rejects.toThrow(/filter drivers/);
+		expect(fs.existsSync(path.join(pool, '.flow-pool', 'ws-1.claim'))).toBe(false);
+		expect(localExecutions.has('aaaa1111')).toBe(false);
+	});
+
 	it('with requireClean, fails (instead of waiting) when every slot is free but dirty, naming them', async () => {
 		probeState = () => ({ isRepository: true, dirty: true });
 		const provider = make(2, { requireClean: true });

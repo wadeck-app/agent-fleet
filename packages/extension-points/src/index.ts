@@ -36,4 +36,12 @@ export {
 } from './pathValidation.js';
 export { hardenedGit, HARDENED_GIT_MUTATING_CONFIG, HARDENED_GIT_READING_CONFIG } from './HardenedGit.js';
 export type { HardenedGitCommand, HardenedGitOptions } from './HardenedGit.js';
+export {
+	blankFilterDriverConfig,
+	FILTER_DRIVER_LISTING_ARGS,
+	FilterDriverListingError,
+	neutralizeFilterDrivers,
+	parseUntrustedFilterDriverNames,
+} from './HardenedGitFilters.js';
+export type { FilterListingExec } from './HardenedGitFilters.js';
 export { releaseWorkspace } from './releaseWorkspace.js';

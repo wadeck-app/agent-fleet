@@ -12,6 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkspaceGitStrategy } from './WorkspaceGitStrategy';
 
+// The folders of the fake git do not exist: no filter driver is declared there.
+const noFilters = async (): Promise<string> => '';
+
 const simpleGitFactory = vi.hoisted(() => vi.fn());
 vi.mock('simple-git', async importOriginal => {
 	const original = await importOriginal<typeof import('simple-git')>();
@@ -96,7 +99,7 @@ describe('WorkspaceGitStrategy passes the hardening flags to every git call', ()
 	}
 
 	it('state reading, worktree listing and removal', async () => {
-		const strategy = new WorkspaceGitStrategy(scratch);
+		const strategy = new WorkspaceGitStrategy(scratch, 'git', noFilters);
 		await strategy.getGitState(scratch);
 		await strategy.isWorktree(path.join(scratch, 'w'));
 		await strategy.removeWorktree(path.join(scratch, 'w'));
@@ -108,7 +111,7 @@ describe('WorkspaceGitStrategy passes the hardening flags to every git call', ()
 	});
 
 	it('the worktree setup reads with hooks off and creates the branch and the worktree with hooks on', async () => {
-		await new WorkspaceGitStrategy(scratch).setupGit(path.join(scratch, 'w'), 'worktree', 'main', {}, 'task-1234');
+		await new WorkspaceGitStrategy(scratch, 'git', noFilters).setupGit(path.join(scratch, 'w'), 'worktree', 'main', {}, 'task-1234');
 
 		expectModePerCall();
 		const creation = recorded.find(call => rawSubcommand(call, 'add'));
@@ -117,7 +120,7 @@ describe('WorkspaceGitStrategy passes the hardening flags to every git call', ()
 	});
 
 	it('the clone setup clones and checks out with hooks on, and reads the state with hooks off', async () => {
-		await new WorkspaceGitStrategy(scratch).setupGit(path.join(scratch, 'c'), 'main-only', 'main', {}, 'task-1234');
+		await new WorkspaceGitStrategy(scratch, 'git', noFilters).setupGit(path.join(scratch, 'c'), 'main-only', 'main', {}, 'task-1234');
 
 		expectModePerCall();
 		for (const method of ['clone', 'checkout']) {
@@ -170,6 +173,40 @@ describe('WorkspaceGitStrategy against a repository written by a run', () => {
 		const state = await new WorkspaceGitStrategy(repo).getGitState(repo);
 
 		expect(state?.isClean).toBe(true);
+		expect(fs.existsSync(canary)).toBe(false);
+	});
+
+	/** A clean filter that leaves a canary and passes the content through, and a stale index so that status re-hashes the file. */
+	function plantFilter(): { repo: string; canary: string } {
+		const { repo, canary } = plantFsmonitor();
+		git(repo, 'config', '--unset', 'core.fsmonitor');
+		const script = path.join(scratch, 'filter.js');
+		fs.writeFileSync(
+			script,
+			'require("fs").writeFileSync(process.argv[2], "ran");\nprocess.stdin.pipe(process.stdout);\n'
+		);
+		const posix = (file: string): string => file.replaceAll('\\', '/');
+		git(repo, 'config', 'filter.canary.clean', `"${posix(process.execPath)}" "${posix(script)}" "${posix(canary)}"`);
+		git(repo, 'config', 'filter.canary.required', 'true');
+		fs.writeFileSync(path.join(repo, '.gitattributes'), '* filter=canary\n');
+		const old = new Date('2020-01-01T00:00:00Z');
+		fs.utimesSync(path.join(repo, 'a.txt'), old, old);
+		return { repo, canary };
+	}
+
+	it('control: an unhardened status with a stale index runs the planted clean filter', async () => {
+		const { repo, canary } = plantFilter();
+		await realSimpleGit({ baseDir: repo }).status();
+
+		expect(fs.existsSync(canary)).toBe(true);
+	});
+
+	it('does not run the planted clean filter when reading the state', async () => {
+		const { repo, canary } = plantFilter();
+		simpleGitFactory.mockImplementation((...args: Parameters<typeof realSimpleGit>) => realSimpleGit(...args));
+
+		await new WorkspaceGitStrategy(repo).getGitState(repo);
+
 		expect(fs.existsSync(canary)).toBe(false);
 	});
 });

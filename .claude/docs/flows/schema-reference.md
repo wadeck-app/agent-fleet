@@ -197,6 +197,15 @@ done
 
 - Sandboxed runs: a slot is mounted read/write, so the run can edit its `.git/config` and `.git/hooks`. Dedicate slots to sandboxed runs; never share them with a non-sandboxed flow or a repository you use by hand.
 - The daemon's git calls that read a slot or any workspace folder (`status`, `rev-parse`, `log`, `worktree list`) run with `core.fsmonitor=false`, `core.hooksPath` pointing at a device that holds no file (`NUL` on Windows, `/dev/null` elsewhere) and `GIT_OPTIONAL_LOCKS=0`. A planted fsmonitor command or hook does not run on the host (`HardenedGit.ts` in `extension-points`).
+- Before every `status`, the daemon also lists the `filter.<name>.*` drivers declared in the folder's own `.git/config` (`git config --show-scope`) and blanks their `clean`, `smudge` and `process` commands (`HardenedGitFilters.ts`); a filter planted by a sandboxed run does not run on the host. Drivers of your system and global git config (git-lfs) stay active. If the listing fails, the run is refused with the folder and the cause; nothing runs unhardened.
+- The sync step of your flow is NOT covered: it runs with your privileges, outside the daemon's hardening, so `git pull`, `checkout` or `clean` in a slot runs the hooks, filters and `core.sshCommand` a previous sandboxed run planted. `-c core.hooksPath=/dev/null -c core.fsmonitor=false` is not enough (filters, `sshCommand`, `credential.helper` and the in-repo `.gitattributes` remain). Reset the slot's git state from a trusted source first, or re-clone it:
+
+```bash
+# Inside the slot, before any other git command: drop what the sandboxed run could have written, then rebuild the config (re-apply the `core.hooksPath` of the creation script). Sketch, not run end to end; a plain re-clone is the simplest robust variant.
+rm -rf .git/hooks .git/info .git/config .git/config.worktree .gitattributes
+git init -q && git remote add origin "$repo"
+git fetch origin && git checkout -f --detach origin/main && git clean -fdx
+```
 - Calls that change the repository (`worktree add/remove`, `clone`, `checkout`, `branch`) only disable `core.fsmonitor`: the hooks of your own repository (git-lfs, husky `post-checkout`) still run when a worktree or clone is created.
 - This is not a boundary against a non-sandboxed run: flow runs its steps with your privileges, so such a run can change anything your account can, and git run by your own script steps is not hardened.
 

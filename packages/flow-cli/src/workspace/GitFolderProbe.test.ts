@@ -60,19 +60,21 @@ describe('GitFolderProbe hardening', () => {
 		const calls: Array<{ args: string[]; env: NodeJS.ProcessEnv | undefined; cwd: string | undefined }> = [];
 		const fakeExec: GitExecFile = (_file, args, options, callback) => {
 			calls.push({ args, env: options.env, cwd: options.cwd });
-			callback(null, 'true\n');
+			// The listing of the filter drivers (git config) finds none.
+			callback(null, args.includes('config') ? '' : 'true\n');
 		};
 
 		await new GitFolderProbe(fakeExec).inspect('/slot');
 
-		expect(calls).toHaveLength(2);
+		expect(calls).toHaveLength(3);
 		for (const call of calls) {
 			expect(call.cwd).toBe('/slot');
 			expect(call.args.slice(0, 4)).toEqual(['-c', 'core.fsmonitor=false', '-c', HARDENED_GIT_READING_CONFIG[1]]);
 			expect(call.env?.GIT_OPTIONAL_LOCKS).toBe('0');
 		}
 		expect(calls[0].args).toContain('rev-parse');
-		expect(calls[1].args).toContain('status');
+		expect(calls[1].args).toContain('config');
+		expect(calls[2].args).toContain('status');
 	});
 });
 

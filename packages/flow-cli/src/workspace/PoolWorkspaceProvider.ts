@@ -230,7 +230,14 @@ export class PoolWorkspaceProvider implements WorkspaceProvider {
 				}
 				continue;
 			}
-			const state = await this.deps.probe.inspect(slot);
+			let state: Awaited<ReturnType<GitFolderProbe['inspect']>>;
+			try {
+				state = await this.deps.probe.inspect(slot);
+			} catch (error) {
+				// The probe refused to run git in this slot: give the slot back, the run is refused with the probe's reason.
+				this.claims.release(slot, request.executionId);
+				throw error;
+			}
 			if (this.options.requireClean && state.isRepository && state.dirty) {
 				this.claims.release(slot, request.executionId);
 				dirtySlots.push(slot);
