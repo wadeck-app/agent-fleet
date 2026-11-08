@@ -198,20 +198,21 @@ export class ScriptExecutor {
 			const shellKind = options.shellKind;
 			const strategy: ShellStrategy =
 				shellKind === 'bash'
-					? new BashShellStrategy()
+					? new BashShellStrategy(this.launcher)
 					: shellKind === 'cmd'
 						? new CmdShellStrategy()
-						: new PwshShellStrategy();
+						: new PwshShellStrategy(this.launcher);
 			// Only bash needs the PATH-casing fix (see normalizePathKey) -- cmd/pwsh resolve
 			// their binary and spawn via Windows' own case-insensitive env lookups.
 			const shellEnv = shellKind === 'bash' ? normalizePathKey(cleanEnv) : cleanEnv;
 			// Synchronous throw inside this async method becomes a rejected promise --
 			// no try/catch here on purpose, so resolve() errors propagate verbatim.
 			const binary = strategy.resolve(shellEnv);
+			// Host only (a sandbox launcher answers with its own bash path).
 			// Git's bash is a thin shell: without its coreutils dirs on PATH, `sed`/`dirname` and npm
 			// POSIX shims fail with "command not found" when the daemon started without Git Bash on
 			// PATH (same as the implicit-bash path below).
-			if (shellKind === 'bash' && process.platform === 'win32') {
+			if (shellKind === 'bash' && process.platform === 'win32' && !this.isolatesEnvironment) {
 				ensureGitCoreutilsOnPath(shellEnv, binary);
 			}
 

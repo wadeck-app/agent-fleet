@@ -60,6 +60,20 @@ describe('ScriptExecutor -- ProcessLauncher seam', () => {
 		expect(launcher.callsOf('spawn').map(call => call.command)).toEqual(['/resolved/bash']);
 	});
 
+	it('the explicit shell kind path resolves the shell through a sandbox launcher, not on the host', async () => {
+		const launcher = new FakeProcessLauncher({ isolatesEnvironment: true });
+		launcher.lookups.set('which bash', '/vm/bin/bash');
+		const child = createFakeChild(556);
+		launcher.queueChild(child);
+
+		const done = new ScriptExecutor(launcher).execute({ script: 'echo hi', shellKind: 'bash' });
+		child.emit('close', 0);
+		await done;
+
+		expect(launcher.callsOf('lookupExecutable').map(call => call.command)).toEqual(['which bash']);
+		expect(launcher.callsOf('spawn').map(call => call.command)).toEqual(['/vm/bin/bash']);
+	});
+
 	it('a timeout kills the tree through the same launcher', async () => {
 		const { launcher, child } = launcherWithChild();
 

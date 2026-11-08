@@ -25,12 +25,7 @@ const ALLOWLIST: Readonly<Record<string, string>> = {
  * Looks like a real bypass, not a legitimate spawner: kept apart from ALLOWLIST so it stays visible. Remove an entry by
  * fixing the file (use `ProcessLauncher.lookupExecutable`), never by moving it to ALLOWLIST.
  */
-const KNOWN_BYPASSES: Readonly<Record<string, string>> = {
-	'executor/shell/BashShellStrategy.ts':
-		'`execSync("which bash")` resolves the shell on the host even when a sandbox launcher runs the script',
-	'executor/shell/PwshShellStrategy.ts':
-		'`execSync("which pwsh")` / `where.exe` resolve the shell on the host even when a sandbox launcher runs the script',
-};
+const KNOWN_BYPASSES: Readonly<Record<string, string>> = {};
 
 const TOLERATED: Readonly<Record<string, string>> = { ...ALLOWLIST, ...KNOWN_BYPASSES };
 
