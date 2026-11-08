@@ -34,4 +34,6 @@ export {
 	validateTaskIdForBranchName,
 	validateBranchNamePrefix,
 } from './pathValidation.js';
+export { hardenedGit, HARDENED_GIT_MUTATING_CONFIG, HARDENED_GIT_READING_CONFIG } from './HardenedGit.js';
+export type { HardenedGitCommand, HardenedGitOptions } from './HardenedGit.js';
 export { releaseWorkspace } from './releaseWorkspace.js';

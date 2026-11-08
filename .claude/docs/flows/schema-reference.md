@@ -195,6 +195,11 @@ for n in 1 2 3 4; do
 done
 ```
 
+- Sandboxed runs: a slot is mounted read/write, so the run can edit its `.git/config` and `.git/hooks`. Dedicate slots to sandboxed runs; never share them with a non-sandboxed flow or a repository you use by hand.
+- The daemon's git calls that read a slot or any workspace folder (`status`, `rev-parse`, `log`, `worktree list`) run with `core.fsmonitor=false`, `core.hooksPath` pointing at a device that holds no file (`NUL` on Windows, `/dev/null` elsewhere) and `GIT_OPTIONAL_LOCKS=0`. A planted fsmonitor command or hook does not run on the host (`HardenedGit.ts` in `extension-points`).
+- Calls that change the repository (`worktree add/remove`, `clone`, `checkout`, `branch`) only disable `core.fsmonitor`: the hooks of your own repository (git-lfs, husky `post-checkout`) still run when a worktree or clone is created.
+- This is not a boundary against a non-sandboxed run: flow runs its steps with your privileges, so such a run can change anything your account can, and git run by your own script steps is not hardened.
+
 ### Removed and deprecated
 
 | Old                                                         | Now                                                                                   |

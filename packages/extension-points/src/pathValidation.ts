@@ -1,7 +1,9 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { lstatSync, statSync } from 'node:fs';
 import type { Stats } from 'node:fs';
 import { normalize, parse, resolve, sep } from 'node:path';
+
+import { hardenedGit } from './HardenedGit.js';
 
 const UNIX_SYSTEM_DIRS = ['/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64', '/boot', '/sys', '/proc', '/dev', '/var'];
 
@@ -52,7 +54,9 @@ export function validateWorkspacePath(taskId: string, baseDir: string): void {
 
 function getActiveWorktreePaths(projectDir: string): string[] {
 	try {
-		const output = execSync('git worktree list --porcelain', {
+		const git = hardenedGit(['worktree', 'list', '--porcelain'], { reading: true });
+		const output = execFileSync('git', git.args, {
+			env: git.env,
 			encoding: 'utf8',
 			stdio: ['ignore', 'pipe', 'ignore'],
 			windowsHide: true,

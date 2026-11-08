@@ -1,5 +1,6 @@
 import type { WorkspaceHandle, WorkspaceProvider, WorkspaceRequest } from 'extension-points';
 import {
+	hardenedGit,
 	validateBaseDir,
 	validateBranchNamePrefix,
 	validateTaskIdForBranchName,
@@ -20,14 +21,17 @@ export interface WorktreeOptions {
 	_gitOutput?: (args: string[], cwd: string) => Promise<string>;
 }
 
+// The repository may have been written by a previous run: no fsmonitor command, no hooks (see hardenedGit).
 async function defaultExecGit(args: string[], cwd: string): Promise<void> {
 	const { execa } = await import('execa');
-	await execa('git', args, { cwd });
+	const git = hardenedGit(args);
+	await execa('git', git.args, { cwd, env: git.env });
 }
 
 async function defaultGitOutput(args: string[], cwd: string): Promise<string> {
 	const { execa } = await import('execa');
-	return (await execa('git', args, { cwd })).stdout;
+	const git = hardenedGit(args, { reading: true });
+	return (await execa('git', git.args, { cwd, env: git.env })).stdout;
 }
 
 /** Credentials in a URL (`https://user:token@host`) must not reach a message. */
