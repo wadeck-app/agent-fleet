@@ -161,6 +161,8 @@ Relative paths in options are relative to the PROJECT folder, never to the worki
 
 - `baseDir` must be OUTSIDE the project (the project is itself a worktree): `../worktrees`, not `.flow/`. Branch and folder: `<prefix><executionId>` (`prefix`: letters, digits, `.`, `_`, `-`).
 - A failed git command refuses the run with the git message; it never continues in an empty directory.
+- The branch starts at the `HEAD` of the project folder when the run starts: only committed files exist in the worktree (uncommitted or untracked files of the project are absent).
+- At the end of the run the worktree folder is removed (`git worktree remove --force`) and the branch is kept; delete merged branches yourself.
 - A worktree has a `.git` FILE: git does not work inside the sandbox. Use a pool of clones for sandboxed runs.
 
 ### `pool`
