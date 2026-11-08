@@ -23,6 +23,7 @@ Status: plan (no code changed). Paths are relative to `packages/`.
 | 7 | Pool creation: documented script first, command later. | Default taken |
 | 8 | Keep `worktree`; alias `none` -> `in-place`. | Default taken |
 | 9 | metaDir per execution: `<projectDir>/.flow/runs/<executionId>.meta`. | Default taken |
+| 10 | A flow with no available folder is a WAITING EXECUTION: the daemon keeps its state, as if the flow did not exist, and it continues when a slot frees. No failure, no timeout; re-queued after a daemon restart. Rules in 2.3. | User, final |
 
 ## 1. Current state (from code)
 
@@ -111,12 +112,14 @@ metaDir: in-place, pool and readonly paths outlive or are shared by executions, 
   - Empty claim dir older than a few seconds (crash between mkdir and write) is stale.
   - Recovery logs a warning naming the slot and the dead executionId.
   - Daemon start reconciles its own claims.
-- None free: the run WAITS for the next free slot, no timeout (the flow has nowhere to run yet). Wait is the only behaviour; no option. Consequences:
-  - Fairness: one FIFO queue of waiting executions per pool, held by the daemon; a freed slot is offered to the head of the queue first (claim order = arrival order). Claim records written by other daemons/processes are not queued: they compete via the atomic `mkdir`, so strict FIFO holds per daemon only.
-  - Visibility: the execution enters a `waiting for workspace` state, shown in `flow history` / `flow show` and in the UI. A log line at start and every 60 s: "waiting for a free slot (n/N claimed by: <executionId, flow, since>...)". Never silent.
-  - Cancellation: `flow cancel` must end a waiting execution (leave the queue, no slot claimed, final state cancelled).
-  - Idle/update: a waiting execution counts as ACTIVE for the daemon idle-exit and update decisions (`SchedulerIdleState.hasActiveExecutions`, `DaemonIdleShutdown.isIdle`), so the daemon neither idle-stops nor updates under it. To verify in step 5: whether an execution still in allocation is already counted by `ExecutionRegistry.activeExecutionCount`; if not, register it before waiting.
-  - Daemon restart: waiting executions are not re-queued. `reconcileInterruptedExecutions` marks them failed/interrupted as for any other execution (`DaemonStartupTasks.ts:47`); the user re-runs with `flow run`.
+- None free: the execution is a WAITING EXECUTION (decision 10): a queued execution whose state the daemon keeps. No option. Rules:
+  - (a) Inert: no failure, no timeout, no error state; simply pending. It consumes no slot, no worker, no concurrency permit and does NOT count against `queue.concurrency` / worker limits while waiting. Other flows are scheduled as if it did not exist.
+  - (b) Resume: automatic when a slot is released, in FIFO order (arrival order, one queue per pool held by the daemon). Triggers: event-driven on the release inside the daemon, plus a periodic recheck of the claim directory (stale or foreign-process claims) at a modest interval. Claims written by other daemons/processes are not queued: they compete via the atomic `mkdir`, so strict FIFO holds per daemon only.
+  - (c) Record: status `queued`/`waiting`, stored with its inputs and the flow snapshot, so its state survives.
+  - (d) Restart or stop: it has done no work, so it is RE-QUEUED at start, never marked interrupted/failed. Mechanism: the persisted record (c) is the source; at startup the daemon rebuilds the queue from the stored snapshot and inputs, in original arrival order. `reconcileInterruptedExecutions` (`DaemonStartupTasks.ts:47`) must skip waiting records.
+  - (e) Visibility: log line at start and every 60 s ("waiting for a free slot (n/N claimed by: <executionId, flow, since>...)"); state shown in `flow history` / `flow show` and the UI. Never silent. `flow cancel` ends it (leaves the queue, no slot claimed, final state cancelled).
+  - (f) No work before the claim: the flow's steps/workers are untouched, and no source is asked for workers while waiting.
+  - Idle/update: a waiting execution counts as active work for idle-stop and update deferral (`SchedulerIdleState.hasActiveExecutions`, `DaemonIdleShutdown.isIdle`), otherwise it would be lost or never run. If this daemon's own executions can never free a slot, the periodic claim recheck frees it once external claims go away.
   - Deadlock: an execution holds at most one slot and never requests a second. A `SubFlowStep` with `workspaceStrategy: inherit` reuses the parent's workspace; `separate` is not implemented (`SubflowStepExecutor.ts:19-24`); injected steps share the run's workspace (stated by the requester, not re-verified in code). No nested allocation exists, so no hold-and-wait cycle. A pool smaller than the number of concurrently allowed executions just queues. Rule for the future: implementing `separate` must not allocate from the same pool while the parent holds a slot.
 - Dirty slots: provider reports dirtiness as a note in the log. `requireClean: true` skips dirty slots and fails if none is clean. Default is NOT to block, because the healing script step must be able to fix a dirty slot.
 - Who builds the pool: documented script first (see below), then a command `flow workspace pool create --from <repo> --dir <dir> --prefix <p> --count <n>`. Not created implicitly by the provider.
@@ -195,7 +198,17 @@ Default when `workspace:` is absent: error (decision 1). The validation message 
 
 ## 5. Open questions
 
-All nine are decided (table at the top). 1, 3, 4, 5 by the user; 2, 6, 7, 8, 9 are the plan's recommendation, open to objection.
+All points are decided (table at the top). 1, 3, 4, 5, 10 by the user; 2, 6, 7, 8, 9 are the plan's recommendation, open to objection.
+
+### Still to verify in code
+
+- Code path of `ExecutionRegistry.activeExecutionCount` / `hasActiveExecutions`: is a waiting execution counted as active (decision 10, idle/update rule)? If not, make it count.
+- Definition hash: computed on the definition text or the parsed object (`DefinitionHash.ts`).
+- Concurrent outputs collision under a shared `outputsDir` (`ScriptStepExecutor.ts:32`).
+- `GIT_OPTIONAL_LOCKS=0` behaviour per git version.
+- MAX_PATH with a deep pool prefix on Windows (`.meta` sibling).
+- Read-only sandbox mount support (`RunMounts.ts`).
+- Injected steps share the run's workspace (stated by the requester, not seen in code).
 
 ## 6. Implementation plan (small TDD steps)
 
@@ -206,7 +219,7 @@ All nine are decided (table at the top). 1, 3, 4, 5 by the user; 2, 6, 7, 8, 9 a
 | 3 | `in-place` provider (+ `none` alias with warning); built-in manifest in `BuiltinPlugins.ts`; tests next to the class | yes | 2 |
 | 4 | `readonly` provider + `workspaceReadOnly` context + default read tools + prompt note + `GIT_OPTIONAL_LOCKS`; tests with mock CLIs (`CLAUDE_MOCK_PATH`/`OPENCODE_MOCK_PATH`) per project rule | yes | 2 |
 | 5 | `pool` provider: claim, stale recovery, `requireClean`; tests incl. two concurrent claimers, crash-between-mkdir-and-write, dead pid; pool-creation script documented | yes | 2 |
-| 5b | Pool wait (no timeout): per-pool FIFO queue, `waiting for workspace` state in `flow history/show` + UI, log at start and every 60 s with claim holders, `flow cancel` of a waiting execution, waiting counted as active for idle-exit/update, reconcile marks interrupted. Needs a new execution state (store, CLI, UI: frontend-dev agent). Tests: FIFO order, cancel while waiting, idle check, restart | yes | 5 |
+| 5b | Pool wait (no timeout): per-pool FIFO queue, `waiting for workspace` state in `flow history/show` + UI, log at start and every 60 s with claim holders, `flow cancel` of a waiting execution, waiting counted as active for idle-exit/update, waiting records re-queued at start (reconcile skips them), no concurrency permit held while waiting. Needs a new execution state (store, CLI, UI: frontend-dev agent). Tests: FIFO order, cancel while waiting, idle check, restart | yes | 5 |
 | 6 | Flow syntax `workspace: <name>` / `{provider, ...}` in `FlowRegistry`/`SchemaValidator`; absent block = error with providers + example (remove the default at `FlowRegistry.ts:668-675`); legacy block error with hint (clone strategies, `gitStrategy: none`, `shared`/`isolated` combos); `manual` -> `in-place` with warning; `plugins.workspace` deprecation; docs + skill + generator; rewrite the 10 `isolated` flows of the repo | no (changes definitions) | 3-5b |
 | 7 | Remove `allocateNative`, `WorkspaceManager`, `WorkspaceGitStrategy`, `WorkspacePruner` native use, `WorkspaceConfig` types, `pruneProjectWorkspaces` | no | 6 |
 
@@ -216,8 +229,8 @@ Each step: unit tests, `check` skill, coverage >= 70%.
 
 - Contract change touches a published extension point: additive fields only, `taskId` alias kept.
 - Existing flows break at step 6 (22 manual / 18 isolated+shared in this repo, plus every flow without a `workspace:` block): the 10 `isolated` flows must be rewritten by hand (`worktree` or `pool`), and the absent-block error forces an edit of flows that relied on the default. Migration list and error hint are the mitigation.
-- Waiting without timeout: a pool whose slots are held by stuck or very long runs blocks every later run indefinitely. Mitigation is visibility only (state, 60 s log naming the holders) and `flow cancel`; stale-claim recovery (2.3) must work or the wait never ends.
-- The `waiting for workspace` state touches the execution store, CLI and UI; it must be counted as active by the daemon idle/update checks or the daemon can stop under waiting runs.
+- Waiting without timeout: a pool whose slots are held by stuck or very long runs keeps later runs of that flow pending indefinitely (other flows are unaffected). Mitigation is visibility only (state, 60 s log naming the holders) and `flow cancel`; stale-claim recovery (2.3) must work or the wait never ends.
+- The waiting state touches the execution store, CLI and UI, and the startup reconcile; it must count as active for idle/update checks and be re-queued, not interrupted, at start.
 - `.meta` relocation changes where outputs and sessions are found (history, pruner `PluginMetaCleaner`): needs a check of every reader of `workspaceMetaDir`.
 - Claim correctness on Windows (antivirus holding the claim dir, pid reuse): covered by tests with injected clock/pid checker.
 - Readonly default tools may surprise users who relied on `bash` for `git log`: the option and the start-time message must make it obvious.
