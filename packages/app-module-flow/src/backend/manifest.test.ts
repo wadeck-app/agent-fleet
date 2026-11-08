@@ -122,7 +122,7 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 				group: 'execution',
 				label: 'Logs',
 				order: 20,
-				count: { route: '/executions/:id/logs/count', field: 'count' },
+				count: { route: '/executions/:id/logs/count', field: 'count', label: 'log lines' },
 			},
 		});
 	});
@@ -135,9 +135,9 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 				.filter(([, count]) => count !== undefined)
 		);
 		expect(counts).toEqual({
-			'/executions': { route: '/executions/count/running', field: 'count', refreshSeconds: 60 },
-			'/workers': { route: '/workers/count', field: 'count', refreshSeconds: 60 },
-			'/executions/:id/logs': { route: '/executions/:id/logs/count', field: 'count' },
+			'/executions': { route: '/executions/count/running', field: 'count', refreshSeconds: 60, label: 'running executions' },
+			'/workers': { route: '/workers/count', field: 'count', refreshSeconds: 60, label: 'connected workers' },
+			'/executions/:id/logs': { route: '/executions/:id/logs/count', field: 'count', label: 'log lines' },
 		});
 	});
 
