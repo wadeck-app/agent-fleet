@@ -4,6 +4,13 @@ import * as path from 'node:path';
 import { RunMetaDirectory } from './RunMetaDirectory';
 import { SandboxError } from './SandboxError';
 
+/**
+ * The workspace provider kinds the sandbox worker type accepts: declared in the plugin manifest and on the instance (plugin/plugin.config.js,
+ * kept equal by a test), checked by the core at run start (WORKSPACE_KIND_NOT_ACCEPTED). The kind is coarse: the layout check below stays as
+ * defence in depth (a pool slot that contains the project is still refused).
+ */
+export const SANDBOX_WORKSPACE_KINDS: readonly string[] = ['pool'];
+
 /** What the wrapper needs of an assignment's `executionContext` to decide which directories become mounts. */
 export interface SandboxableContext {
 	workspaceDir: string;

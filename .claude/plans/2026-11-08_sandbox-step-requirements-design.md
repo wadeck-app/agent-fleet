@@ -109,23 +109,19 @@ Evidence that `:ro` is enforced by the host side (virtiofs): as root in the VM, 
 | A step needs a guarantee nobody provides yet | Bounded wait like `workerType` today (`worker.boundStepWaitSeconds`, default 120 s), and immediate failure when no declared source can ever provide it (static manifest). The failure names the missing requirement. |
 | Concurrency | `exclusive` also exempts sandbox workers from `queue.concurrency` (`WorkerProvisioner`): removing it must replace the exemption by "workers whose source declares guarantees do not count", or the old stall returns (one sandbox worker blocking every unbound run). |
 
-### D9. Accepted workspace providers (H2): proposal for the core
+### D9. Accepted workspace providers (H2): implemented (core 1e3e5428, plugin side done)
 
-Today the plugin refuses a workspace it must not mount at the first step (`SandboxableWorkspace`, in the wrapper): late, after the run was accepted and the workspace allocated.
-
-Proposal: a static, optional `workspaces?: string[]` next to `guarantees`, under `implementations['worker-type'].<impl>` in the manifest.
-
-| Aspect | Proposal |
+| Aspect | Final contract |
 | --- | --- |
-| Name and type | `workspaces?: string[]` |
-| Entries | Workspace provider kinds as written in the flow's `workspace:` (`in-place`, `readonly`, `worktree`, `pool`, or a plugin provider's name). The sandbox plugin declares `['pool']` |
-| Absent | No restriction (backward compatible, like `guarantees`) |
-| Instance | An optional `workspaces` on the instance may only NARROW the manifest list (subset, else the build fails), like `guarantees` |
-| Core check, at run start before any allocation | Let S be the declared sources whose `guarantees` cover the run's resolved requirements (the set the existing "no declared source provides" check uses). Refuse unless at least one source in S accepts the flow's workspace kind; a source in S without `workspaces` accepts any kind. "At least one" because any source of S may serve the run |
-| Unknown kind | Refused (fail closed): a kind the flow uses that the core cannot name never matches a declared list |
-| Error text | `Flow 'f' requires [sandbox], and the sources that provide it (sandbox-1) accept only the workspace kind(s) pool, but the flow declares workspace: in-place. Declare "workspace: pool" in the flow, or remove the requirement.` Names the flow, the requirements, the sources and their kinds, and the fix |
-| Offline | `flow validate` has no source knowledge (D7): the check runs at run start; the docs say so |
-| Plugin side | Keeps `SandboxableWorkspace` as defence in depth: the kind is coarse, the layout is what protects (a pool slot that contains the project is still refused) |
+| Manifest | `workspaces?: string[]` under `implementations['worker-type'].<impl>`: static upper bound. The sandbox plugin declares `['pool']` |
+| Instance | `WorkerTypeInstance.workspaces?: string[]` may only narrow the manifest list; a kind outside it fails the build. The plugin declares `['pool']` too; a test keeps manifest, instance and `SANDBOX_WORKSPACE_KINDS` equal |
+| Entries | Built-in kinds only: `in-place`, `pool`, `readonly`, `worktree`. An unknown kind, a non-list or an empty list fails when the manifest loads, listing the known kinds. Absent: no restriction |
+| Run start | Refusal code `WORKSPACE_KIND_NOT_ACCEPTED`, before any allocation. The check uses the manifest; an instance that narrows further is enforced at placement only |
+| Routing | `StepRouter` filters on the workspace kind after the requirements filter |
+| Offline | `flow validate` has no source knowledge (D7): the check runs at run start |
+| Plugin | `SandboxableWorkspace` stays as defence in depth: the kind is coarse, the layout is what protects (a pool slot containing the project is still refused) |
+
+Caveats: a configured NAMED provider instance (`plugins.instances.<name>`) cannot be listed in a manifest, so a restricted source never accepts a flow that names one. This does not affect the documented pool setup (the inline form `workspace: { provider: pool, ... }` is the kind `pool`). Observed while testing it (2026-11-08, one machine): a global `config.yml` with only `plugins.instances` makes the daemon refuse to start ("No workspace provider configured", `resolveAll` requires one), and `plugins.workspace` is not declared in the global config schema, so a named instance could not be configured at all in the isolated test: reported to flow-owner, not blocking.
 
 ### D8. Where resolved requirements live (B4)
 
@@ -139,7 +135,7 @@ Proposal: a static, optional `workspaces?: string[]` next to `guarantees`, under
 
 | Core (flow) | Sandbox plugin |
 | --- | --- |
-| Static `workspaces` check at run start (D9) | Declares `workspaces: ['pool']` once the core reads it |
+| Static `workspaces` check at run start (D9): done | Declares `workspaces: ['pool']`: done |
 | Requirement syntax, known keys and values, "did you mean" | The list of guarantees it can enforce: manifest (static) and instance (authoritative) |
 | Profiles: built-ins, tightening-only overrides, unknown name fails | Accepted workspace providers, declared statically |
 | Hard filter in `StepRouter.servableBy` before S4; refusal naming the missing requirement | `fs=confined`, `env=clean`, `net=filtered`, `ports=private`, `clean=run|step`: enforcement in the VM |

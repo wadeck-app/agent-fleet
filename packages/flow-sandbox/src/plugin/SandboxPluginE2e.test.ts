@@ -137,9 +137,14 @@ class FlowWorld {
 			stdio: ['ignore', log, log],
 			windowsHide: true,
 		});
-		await waitFor('the daemon to publish worker.port', 60_000, () =>
-			fs.existsSync(path.join(this.isolation.configDir, 'worker.port'))
-		);
+		try {
+			await waitFor('the daemon to publish worker.port', 60_000, () =>
+				fs.existsSync(path.join(this.isolation.configDir, 'worker.port'))
+			);
+		} catch (error) {
+			// The daemon log says why it did not come up (for example a configuration it refused).
+			throw new Error(`${String(error)}\ndaemon log:\n${this.log().slice(-3000)}`);
+		}
 	}
 
 	/**
@@ -405,17 +410,27 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		for (const call of world.sbxCalls()) expect((call as { workerEnv?: string[] }).workerEnv).toEqual([]);
 	});
 
-	it('refuses an in-place workspace for a bound run, in plain words, and starts no sandbox', async () => {
-		const callsBefore = world.sbxCalls().filter(call => call.argv[0] === 'create').length;
+	// D9: the core reads the accepted workspace kinds from the manifest and refuses at run start, before any allocation.
+	it('refuses at run start (WORKSPACE_KIND_NOT_ACCEPTED) a sandbox-requiring flow with an in-place workspace: no run, no sandbox, no slot', () => {
+		const createsBefore = sandboxesCreated(world.sbxCalls()).length;
+		const runFolders = (): string[] => {
+			const directory = path.join(world.projectDirectory, '.flow', 'runs');
+			return fs.existsSync(directory) ? fs.readdirSync(directory).sort() : [];
+		};
+		const runsBefore = runFolders();
 
-		const record = await world.run(world.writeFlow('in-place', true, 'in-place'));
+		const started = world.flow(['run', world.writeFlow('in-place', true, 'in-place'), '--json']);
 
-		expect(record.status).toBe('failed');
-		expect(world.log()).toContain(
-			'needs workspace: pool, the in-place workspace exposes <project>/.flow and .git/hooks to the sandbox'
-		);
-		expect(world.sbxCalls().filter(call => call.argv[0] === 'create')).toHaveLength(callsBefore);
-	}, 120_000);
+		const output = `${started.stdout}${started.stderr}`;
+		expect(started.status).not.toBe(0);
+		expect(output).toContain('WORKSPACE_KIND_NOT_ACCEPTED');
+		expect(output).toMatch(/in-place[\s\S]*pool|pool[\s\S]*in-place/);
+		expect(output).not.toMatch(/"executionId"/);
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(createsBefore);
+		// Nothing was allocated: no run folder in the project, no claim folder in the pool.
+		expect(runFolders()).toEqual(runsBefore);
+		expect(fs.existsSync(path.join(world.poolDirectory, '.flow-pool', 'slot-1.claim'))).toBe(false);
+	});
 
 	it('a flow that asks for a SUBSET of the guarantees (fs=confined) is served by the exclusive source too', async () => {
 		const before = sandboxesCreated(world.sbxCalls()).length;

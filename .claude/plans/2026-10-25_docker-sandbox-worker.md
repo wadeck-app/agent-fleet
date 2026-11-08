@@ -101,7 +101,7 @@ Agreed order: P1 and C4 first -> characterization tests (no send-to-all, injecte
 
 ## 10. State and open points (2026-11-08)
 
-History of the earlier progress notes (C1 to C4 rulings, M-milestone details) is in git; this section is the current state only.
+History of the earlier progress notes is in git; this section is the current state only. DONE and tested (checked by flow-owner against integration 1e3e5428): C1-2 shadow logging, C1-3 registry-first, the C3 INBOUND ruling, C3-2 and C3-3, C2b `run_end`.
 
 ### Done
 
@@ -116,13 +116,13 @@ History of the earlier progress notes (C1 to C4 rulings, M-milestone details) is
 | Slot hardening | Daemon reads: fsmonitor, hooks, filter drivers closed (flow-owner). Measured table in the plugin README and T-16 |
 | Leftovers | `wrapper.cjs leftover list` and `remove` shipped in the artifact (decision 26) |
 | Secrets on Windows | Owner-only ACL on the plugin's secret and env files (`PrivateAcl`); protects against other OS users only |
+| D9 accepted workspace kinds | Core 1e3e5428 and plugin (`workspaces: ['pool']`): refused at run start with `WORKSPACE_KIND_NOT_ACCEPTED`, e2e on a real isolated daemon |
 | Requirements, step 1 | Core (flow-owner): `requires:`, guarantees from the source instance, hard filter. Plugin: guarantees `sandbox`, `fs=confined`, `env=clean`, `ports=private`, `clean=run`; `RequiresGuard` in the wrapper. Design: `2026-11-08_sandbox-step-requirements-design.md` |
 
 ### Pending
 
 | Item | Owner | Note |
 | --- | --- | --- |
-| D9: `workspaces` in the manifest, static core check | flow-owner, then plugin | Proposal in the design note; plugin waits for his names |
 | Profiles (tightening-only config), injected-step inheritance, the assign field always sent | core | Design note, migration steps 3 and 4 |
 | Implicit `agent` for model steps, removal of `workerType` and `exclusive` | core + plugin | Last step; pin "an unbound model flow still lands in a sandbox" in `SandboxPluginE2e` |
 | `queue.concurrency` accounting once `exclusive` goes | core | "Workers whose source declares guarantees do not count" |
@@ -133,6 +133,19 @@ History of the earlier progress notes (C1 to C4 rulings, M-milestone details) is
 | Relay harness | - | Parked prototype; its guard and requirements are not wired |
 | Tool-provision MCP | user | Separate plan to write after the sandbox work: a generic MCP the worker offers a model, tools defined in the step, host credentials kept out of the VM, operator allow-list open point |
 | `assertNoDirectProcessApi` should scan `src/**` with an allowlist | flow-owner (optional) | Also document that providers passed in `StepRunnerConfig.providers` keep their own launcher |
+
+### Core open items (flow-owner)
+
+1. Manifest `sensitiveFields?: string[]` (`extension-points/src/manifest.ts`) is dead metadata; only the baseline `SENSITIVE_FIELDS` is enforced (`LiteralCredentials.ts`). Being made a load-time warning "not applied" plus a test that the baseline cannot be weakened.
+2. C3 FORK is not really migrated: `host.fork` is unused in production; the daemon builds its fork fallback directly.
+3. C1 builtins migration (worktree, cli-approval, file-approval, none) is deferred on purpose.
+4. C1-4 T-02 threat note is a GATE for whoever first wires a config-supplied absolute path or bare package into `loadPlugin` / `PluginModuleLoader` (no production consumer yet).
+5. C4 `assertNoDirectProcessApi` scans only 6 launcher test files and static `import from`; flow-owner is hardening it (`src/**` with an allowlist, dynamic import, require, export-from).
+6. C2c "never host fallback after N re-dispatches" is not traced; the requirements hard filter is its successor.
+7. A `workerType` run with workspace in-place or readonly only gets the `WORKSPACE_KIND_NOT_ACCEPTED` check through `requires:`; moot once `workerType` is removed.
+8. Deviation from the INBOUND ruling: the credential-in-URL check (userinfo, `token=` query keys) also applies to the `built-in:inbound` provider form (stricter, `WORKERS.md`).
+9. C2-5 realpath mounts TOCTOU stays with sbx (pending table).
+10. A global `config.yml` with only `plugins.instances` makes the daemon refuse to start ("No workspace provider configured") while `plugins.workspace` is not in the global schema: named provider instances cannot be configured (found in the D9 e2e).
 
 ### Not verified (say so in any claim)
 

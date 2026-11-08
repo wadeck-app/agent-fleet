@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HostEnvironment } from '../HostEnvironment';
+import { SANDBOX_WORKSPACE_KINDS } from '../SandboxableWorkspace';
 import { SANDBOX_GUARANTEES } from '../exec/RequiresGuard';
 import { eachRow } from '../testing/EachRow';
 
@@ -28,6 +29,7 @@ interface Instance {
 	run?: unknown;
 	exclusive?: boolean;
 	guarantees?: string[];
+	workspaces?: string[];
 }
 interface PluginModule {
 	manifest: {
@@ -39,6 +41,7 @@ interface PluginModule {
 				{
 					version: number;
 					guarantees?: string[];
+					workspaces?: string[];
 					provider(context: { sourceId: string; options: unknown }): Promise<Instance>;
 				}
 			>
@@ -435,6 +438,20 @@ describe('sandbox plugin: guarantees (the contract with the daemon)', () => {
 		expect(manifestList).toEqual([...SANDBOX_GUARANTEES]);
 		expect(instance.guarantees).toEqual([...SANDBOX_GUARANTEES]);
 		expect(new Set(instance.guarantees).size).toBe(instance.guarantees?.length);
+		await instance.dispose();
+	});
+
+	// The daemon refuses a flow whose workspace kind the sources that provide its requirements do not accept, at run start before any
+	// allocation (WORKSPACE_KIND_NOT_ACCEPTED). The manifest list is the static upper bound; the instance may only narrow it.
+	it('declares the accepted workspace kinds, the same in the manifest and on the instance: pool only', async () => {
+		const plugin = await load();
+		const instance = await build();
+
+		expect(plugin.manifest.implementations['worker-type']!['exec']!.workspaces).toEqual([
+			...SANDBOX_WORKSPACE_KINDS,
+		]);
+		expect(instance.workspaces).toEqual([...SANDBOX_WORKSPACE_KINDS]);
+		expect([...SANDBOX_WORKSPACE_KINDS]).toEqual(['pool']);
 		await instance.dispose();
 	});
 

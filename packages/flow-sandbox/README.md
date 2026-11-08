@@ -134,6 +134,8 @@ The harness uses the header. It only works for clients that go through the proxy
 
 ### Workspaces a sandboxed worker accepts
 
+Only `workspace: pool`, declared as `workspaces: ['pool']` in the manifest and on the instance (kept equal by a test). The core checks it when the run starts, before any allocation: a flow that requires the sandbox with another kind is refused with `WORKSPACE_KIND_NOT_ACCEPTED` (no run, no sandbox, no slot; `SandboxPluginE2e`). The kind is the built-in name used in the flow: the inline form `workspace: { provider: pool, dir: ..., count: ... }` is the kind `pool`. A configured NAMED provider instance (`plugins.instances.<name>`) cannot be listed in a manifest, so a source that restricts its kinds never accepts a flow that names one. `SandboxableWorkspace` below stays as defence in depth, because the kind is coarse.
+
 Only `workspace: pool`. `in-place` and `readonly` hand the sandbox the project folder, including `<project>/.flow` (flow definitions, outputs of other runs) and `.git/hooks`; `worktree` has a `.git` file whose gitdir is outside the mounts. The wrapper refuses them (`SandboxableWorkspace`): the run's `.meta` (from `executionContext.outputsDir`) must lie outside the workspace after resolving links and junctions, which also refuses a pool slot that contains the project.
 
 ### Pool slots used by sandboxed runs must be dedicated to them
