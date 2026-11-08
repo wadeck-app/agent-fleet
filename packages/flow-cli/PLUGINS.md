@@ -91,3 +91,7 @@ plugins:
 The daemon reads the project config in the registry (`<registry>/projects/<project id>/flow/config/config.yml`) of the registered project; `.flow/config.yml` in the repository is an error that gives the `mv` command. In a project config, `plugins` accepts only `workspace`, `tasks`, `secrets`, `approval` (`instances` belongs in `~/.config/flow/config.yml`), and any other key is refused with the file and key. Plugins declared in the config of the folder the daemon was launched from apply only if that folder is a registered project; an unregistered launch folder whose config declares `plugins:` is an error. A worker serves its own project (`FLOW_PROJECT`, else the registered project containing its cwd) plus the ones named by `--project` (see `WORKERS.md`).
 
 Third-party plugins resolve from `node_modules`; built-in plugins (`none`, `cli-approval`, `file-approval`, `worktree`) are bundled inside the CLI and need no install.
+
+## Manifest `sensitiveFields` is not applied
+
+A manifest implementation that declares `sensitiveFields` makes the loader print a warning (once per plugin id) and nothing else: the field is ignored, it neither adds nor removes names. Only the built-in `SENSITIVE_FIELDS` list (`packages/extension-points/src/sensitiveFields.ts`) is enforced; a literal under any other option name is accepted. Remove the field and have users pass secret options as `${ENV_VAR}`; to get a name refused as a literal, add it to the built-in list.

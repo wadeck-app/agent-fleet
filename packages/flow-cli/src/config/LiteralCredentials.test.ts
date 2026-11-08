@@ -1,3 +1,4 @@
+import { SENSITIVE_FIELDS } from 'extension-points';
 import { describe, expect, it } from 'vitest';
 
 import { validateNoLiteralCredentials } from './LiteralCredentials.js';
@@ -19,6 +20,13 @@ describe('validateNoLiteralCredentials', () => {
 
 	it('rejects a reference mixed with literal text', () => {
 		expect(() => validateNoLiteralCredentials({ password: 'pre-${X}' }, 'ctx')).toThrow(/Literal credential/);
+	});
+
+	it('refuses a literal under every baseline SENSITIVE_FIELDS entry, whatever a plugin manifest declares', () => {
+		expect(SENSITIVE_FIELDS.length).toBeGreaterThan(0);
+		for (const field of SENSITIVE_FIELDS) {
+			expect(() => validateNoLiteralCredentials({ [field]: 'literal' }, 'ctx'), field).toThrow(/Literal credential/);
+		}
 	});
 
 	it('does not look at non-string values', () => {

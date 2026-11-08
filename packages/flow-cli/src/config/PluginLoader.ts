@@ -33,6 +33,8 @@ interface PluginImplementation {
 	export?: string;
 	guarantees?: unknown;
 	workspaces?: unknown;
+	/** Dead metadata: read only to warn that it is not applied. */
+	sensitiveFields?: unknown;
 }
 
 interface PluginManifest {
@@ -44,6 +46,8 @@ interface PluginManifest {
 interface PluginLoaderOptions {
 	pluginPackagesDir?: string;
 	registryPath?: string;
+	/** Receives load-time warnings. Defaults to stderr: a manifest declaration that is ignored must never be silent. */
+	warn?: (message: string) => void;
 }
 
 function loadRegistry(registryPath: string): ExtensionPointsRegistry {
@@ -71,8 +75,15 @@ export class PluginLoader {
 	private pluginPackagesDir: string | undefined;
 	private registryPath: string | undefined;
 	private registryCache: ExtensionPointsRegistry | null = null;
+	private readonly warn: (message: string) => void;
+	private readonly sensitiveFieldsWarned = new Set<string>();
 
 	constructor(options: PluginLoaderOptions = {}) {
+		this.warn =
+			options.warn ??
+			(message => {
+				process.stderr.write(`[flow] warning: ${message}\n`);
+			});
 		this.pluginPackagesDir = options.pluginPackagesDir;
 		// registryPath is optional -- when absent, registry is loaded via require() which works
 		// both in dev (normal node_modules) and in bundled mode (inlined by esbuild).
@@ -145,7 +156,22 @@ export class PluginLoader {
 			);
 		}
 		this.assertVersionSupported(extensionPoint, impl.version);
+		this.warnIfSensitiveFieldsDeclared(pluginId, implName, impl);
 		return { pluginId, implName, impl };
+	}
+
+	// Once per plugin id and loader: the declaration changes nothing, so repeating the warning only adds noise.
+	private warnIfSensitiveFieldsDeclared(pluginId: string, implName: string, impl: PluginImplementation): void {
+		if (impl.sensitiveFields === undefined || this.sensitiveFieldsWarned.has(pluginId)) {
+			return;
+		}
+		this.sensitiveFieldsWarned.add(pluginId);
+		this.warn(
+			`plugin "${pluginId}" (implementation "${implName}") declares "sensitiveFields" in its manifest, but that field is NOT applied: ` +
+				`only flow's built-in list of sensitive option names is enforced, so a literal secret under any other name is accepted. ` +
+				`Remove "sensitiveFields" from the manifest and have users pass every secret option as \${ENV_VAR}. ` +
+				`If a name should be refused as a literal, it must be added to SENSITIVE_FIELDS in packages/extension-points/src/sensitiveFields.ts.`
+		);
 	}
 
 	async loadProvider(

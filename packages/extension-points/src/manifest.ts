@@ -13,6 +13,11 @@ export interface PluginImplementation {
 	provider?: (options: unknown) => unknown;
 	entrypoint?: string;
 	export?: string;
+	/**
+	 * @deprecated NOT applied: nothing reads it except the loader, which warns when it is declared. Only the built-in
+	 * `SENSITIVE_FIELDS` list is enforced (literal credentials refused), and a manifest can neither extend nor weaken it.
+	 * Remove it; users pass secret options as `${ENV_VAR}`. To make a new name refused, add it to `SENSITIVE_FIELDS`.
+	 */
 	sensitiveFields?: string[];
 	/**
 	 * `worker-type` only: the guarantees (`key=value` or keyword entries) the workers of this implementation MAY enforce,

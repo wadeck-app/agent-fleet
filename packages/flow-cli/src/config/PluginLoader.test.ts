@@ -4,6 +4,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { validateNoLiteralCredentials } from './LiteralCredentials.js';
 import { PluginLoader } from './PluginLoader.js';
 
 // Resolve the real extension-points.json from the monorepo root
@@ -27,6 +28,8 @@ function makePluginPackage(
 		implName: string;
 		version: number;
 		providerFactory?: string;
+		/** JS expression written as the implementation's `sensitiveFields`; absent: the field is not declared. */
+		sensitiveFields?: string;
 	}
 ): void {
 	mkdirSync(join(packageDir, 'src'), { recursive: true });
@@ -56,6 +59,7 @@ export const manifest = {
     ${opts.extensionPoint}: {
       ${opts.implName}: {
         version: ${opts.version},
+        ${opts.sensitiveFields === undefined ? '' : `sensitiveFields: ${opts.sensitiveFields},`}
         provider: ${opts.providerFactory ?? '(opts) => ({ allocate: async () => ({ path: "/tmp", id: "x" }), release: async () => {} })'},
       },
     },
@@ -83,6 +87,65 @@ beforeEach(() => {
 
 afterEach(() => {
 	rmSync(tmpBase, { recursive: true, force: true });
+});
+
+describe('PluginLoader manifest sensitiveFields', () => {
+	function setup(sensitiveFields?: string): { loader: PluginLoader; warnings: string[] } {
+		const d = getTestDir();
+		makePluginPackage(join(d, 'packages', 'plugin-none'), {
+			pluginId: 'none',
+			extensionPoint: 'workspace',
+			implName: 'default',
+			version: 1,
+			...(sensitiveFields === undefined ? {} : { sensitiveFields }),
+		});
+		const warnings: string[] = [];
+		const loader = new PluginLoader({
+			pluginPackagesDir: join(d, 'packages'),
+			registryPath: REGISTRY_PATH,
+			warn: message => warnings.push(message),
+		});
+		return { loader, warnings };
+	}
+
+	it('warns, naming the plugin id and the actionable alternative, when a manifest declares sensitiveFields', async () => {
+		const { loader, warnings } = setup("['dockerPass']");
+		await loader.loadProvider('plugins.none.default', 'workspace', {});
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toMatch(/plugin "none"/);
+		expect(warnings[0]).toMatch(/sensitiveFields/);
+		expect(warnings[0]).toMatch(/NOT applied/);
+		expect(warnings[0]).toMatch(/\$\{ENV_VAR\}/);
+		expect(warnings[0]).toMatch(/remove/i);
+	});
+
+	it('warns once per plugin even when the plugin is loaded several times', async () => {
+		const { loader, warnings } = setup("['dockerPass']");
+		await loader.loadProvider('plugins.none.default', 'workspace', {});
+		await loader.loadProvider('plugins.none.default', 'workspace', {});
+		await loader.readDeclaredGuarantees('plugins.none.default', 'workspace');
+		expect(warnings).toHaveLength(1);
+	});
+
+	it('warns for an empty list too: declaring the field at all is the misunderstanding', async () => {
+		const { loader, warnings } = setup('[]');
+		await loader.loadProvider('plugins.none.default', 'workspace', {});
+		expect(warnings).toHaveLength(1);
+	});
+
+	it('warns nothing when the manifest does not declare sensitiveFields', async () => {
+		const { loader, warnings } = setup();
+		await loader.loadProvider('plugins.none.default', 'workspace', {});
+		expect(warnings).toEqual([]);
+	});
+
+	it('cannot weaken the baseline: a manifest with sensitiveFields: [] still gets a literal token refused', async () => {
+		const { loader } = setup('[]');
+		await loader.loadProvider('plugins.none.default', 'workspace', { token: 'abc123' });
+		expect(() => validateNoLiteralCredentials({ token: 'abc123' }, 'plugin "none" options')).toThrow(
+			/Literal credential value in plugin "none" options: sensitive field "token"/
+		);
+	});
 });
 
 describe('PluginLoader', () => {

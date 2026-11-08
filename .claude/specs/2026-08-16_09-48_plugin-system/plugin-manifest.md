@@ -57,8 +57,8 @@ interface PluginImplementation {
 	// JSON manifest only (or TS fallback):
 	entrypoint?: string; // relative path to compiled JS, e.g. "./dist/public.js"
 	export?: string; // named export, e.g. "taskProvider"
-	sensitiveFields?: string[]; // additional sensitive option field names beyond the baseline in @flow/plugin-sdk
-	// merged with baseline during PLUGIN-007 validation; cannot remove baseline entries
+	// DEPRECATED, NOT applied (superseded): the loader warns when declared; only the built-in SENSITIVE_FIELDS is enforced.
+	sensitiveFields?: string[];
 }
 ```
 
