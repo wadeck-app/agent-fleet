@@ -627,7 +627,7 @@ describe('SbxCliRuntime environment, version and binary', () => {
 			await runtime.stop('box-1');
 
 			const calls = harness.calls();
-			expect(calls.map(call => call.argv[0])).toEqual(['version', 'create', 'ls', 'stop']);
+			expect(calls.map(call => call.argv[0])).toEqual(['version', 'create', 'exec', 'ls', 'stop']);
 			expect(calls.every(call => call.msysNoPathconv === '1')).toBe(true);
 		}
 	);
@@ -697,6 +697,69 @@ describe('SbxCliRuntime environment, version and binary', () => {
 				'diagnose --json',
 				'policy ls --json',
 			]);
+		}
+	);
+});
+
+describe('SbxCliRuntime notices printed by sbx itself', () => {
+	// Fixtures exec-first-after-create and exec-after-stop: the default templates print a banner on the stdout of the first
+	// bash of a sandbox, and `sbx exec` announces on stderr that it started a stopped sandbox.
+	it.concurrent(
+		'create absorbs the first-bash banner, with or without an image, so the first command sees only its own output',
+		async ({ onTestFinished }) => {
+			for (const image of [undefined, 'flow-sandbox:test']) {
+				const { harness, runtime, workspace, meta } = world(onTestFinished, 'bash-canned');
+				await runtime.create(createRequest(workspace, meta, image === undefined ? {} : { image }));
+
+				const first = await runtime.exec({ sandbox: 'box-1', command: ['bash', '-c', 'echo step'] });
+
+				expect(first, String(image)).toEqual({ exitCode: 0, stdout: 'mock-sandbox-output\n', stderr: '' });
+				expect(harness.callsWithVerb('exec')[0]?.argv, String(image)).toEqual([
+					'exec',
+					'box-1',
+					'--',
+					'bash',
+					'-c',
+					'true',
+				]);
+			}
+		}
+	);
+
+	it.concurrent(
+		'create fails with the fix when the new sandbox has no bash, naming the sandbox that now exists',
+		async ({ onTestFinished }) => {
+			const { runtime, workspace, meta } = world(onTestFinished, 'no-bash');
+
+			const error = await rejection(runtime.create(createRequest(workspace, meta)));
+
+			expect(error.kind).toBe('command-failed');
+			expect(error.message).toContain('Sandbox "box-1" was created');
+			expect(error.message).toContain('sbx rm');
+			expect(error.message).toContain('bash');
+		}
+	);
+
+	it.concurrent(
+		'removes the start notice of an exec on a stopped sandbox from the result and the stream, and keeps the command stderr',
+		async ({ onTestFinished }) => {
+			const { runtime } = await boxed(onTestFinished);
+			await runtime.stop('box-1');
+			const streamed: string[] = [];
+
+			const restarted = await runtime.exec({
+				sandbox: 'box-1',
+				command: ['stderr', 'program says hi'],
+				onStderr: text => streamed.push(text),
+			});
+
+			expect(restarted).toEqual({ exitCode: 0, stdout: '', stderr: 'program says hi\n' });
+			expect(streamed.join('')).toBe('program says hi\n');
+
+			// Running sandbox: nothing to remove, and a program printing the notice of ANOTHER sandbox keeps it.
+			const other = '  ✓ sandbox other-1 — started';
+			const printed = await runtime.exec({ sandbox: 'box-1', command: ['stderr', other] });
+			expect(printed.stderr).toBe(`${other}\n`);
 		}
 	);
 });

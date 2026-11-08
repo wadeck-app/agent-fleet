@@ -14,6 +14,20 @@
 			"stderrFile": "version.stderr.txt"
 		},
 		{
+			"id": "exec-first-after-create",
+			"args": [
+				"exec",
+				"<sandbox>",
+				"--",
+				"bash",
+				"-c",
+				"true"
+			],
+			"exitCode": 0,
+			"stdoutFile": "exec-first-after-create.stdout.txt",
+			"stderrFile": "exec-first-after-create.stderr.txt"
+		},
+		{
 			"id": "ls-json",
 			"args": [
 				"ls",
@@ -304,6 +318,17 @@
 			"exitCode": 1,
 			"stdoutFile": "err-unknown-verb.stdout.txt",
 			"stderrFile": "err-unknown-verb.stderr.txt"
+		},
+		{
+			"id": "exec-after-stop",
+			"args": [
+				"exec",
+				"<sandbox>",
+				"true"
+			],
+			"exitCode": 0,
+			"stdoutFile": "exec-after-stop.stdout.txt",
+			"stderrFile": "exec-after-stop.stderr.txt"
 		}
 	]
 }

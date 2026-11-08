@@ -19,7 +19,7 @@
  *                        network-deny-all, network-allow-all, version:<x.y.z>, diagnose-garbage, diagnose-without-auth,
  *                        daemon-unhealthy, policy-garbage, settings-garbage, ssh-setting-missing, ssh-setting-string,
  *                        bash-canned (SYNTHETIC: `bash` in exec prints SBX_MOCK_BASH_STDOUT instead of running a script, and
- *                        answers the executable lookup; the mock has no VM and no bash).
+ *                        answers the executable lookup; the mock has no VM and no bash), no-bash (SYNTHETIC: every bash exits 127).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -287,6 +287,20 @@ function settingsOutput() {
 	return JSON.stringify(settings, null, 2);
 }
 
+// REAL behaviour (fixture exec-first-after-create): the default templates print a banner on the stdout of the FIRST bash
+// of a sandbox (/etc/bash.bashrc sources /etc/profile.d/01-dhi.sh, which leaves a marker); a sandbox made from
+// an image (-t) printed none in the observed images.
+function printBannerOnce(sandbox) {
+	if (sandbox.mock.template !== null || sandbox.mock.bannerShown === true) return;
+	sandbox.mock.bannerShown = true;
+	saveState(state);
+	process.stdout.write(
+		fixture('exec-first-after-create.stdout.txt')
+			.replaceAll('<sandbox>', sandbox.name)
+			.replaceAll('<workspace>', path.basename(sandbox.workspaces[0] ?? ''))
+	);
+}
+
 function runPseudoCommand(sandbox, command, cwd, env) {
 	const [name, ...rest] = command;
 	switch (name) {
@@ -340,6 +354,14 @@ function runPseudoCommand(sandbox, command, cwd, env) {
 			setInterval(() => {}, 1000);
 			return undefined;
 		case 'bash':
+			// SYNTHETIC (scenario no-bash): an image without bash.
+			if (hasScenario('no-bash')) {
+				process.stderr.write('bash: bash: command not found\n');
+				return 127;
+			}
+			printBannerOnce(sandbox);
+			// The warm-up of SbxCliRuntime.create (`bash -c true`) needs no scenario.
+			if (rest.length === 2 && rest[0] === '-c' && rest[1] === 'true') return 0;
 			// SYNTHETIC (scenario bash-canned): no VM, no bash. The executable lookup (`bash -c <script> flow-lookup <names>`)
 			// finds every name; any other bash call (a step's script) prints the canned text and succeeds WITHOUT running it.
 			if (hasScenario('bash-canned')) {
@@ -455,6 +477,10 @@ switch (verbMatch ?? argv[0]) {
 		if (!name) fail('error: sandbox name required');
 		if (!state.sandboxes[name]) notFound(name, 125);
 		const sandbox = requireSandbox(name);
+		// REAL behaviour (fixture exec-after-stop): starting a stopped sandbox is announced on stderr.
+		if (sandbox.status === 'stopped') {
+			process.stderr.write(fixture('exec-after-stop.stderr.txt').replaceAll('<sandbox>', name));
+		}
 		sandbox.status = 'running';
 		saveState(state);
 		if (rest.length === 0) fail('error: exec needs a command');

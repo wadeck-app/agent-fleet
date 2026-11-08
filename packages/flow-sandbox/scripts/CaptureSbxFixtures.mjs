@@ -33,8 +33,11 @@ const sbx =
 // A name that cannot exist: the probes below must fail with "not found" and touch nothing.
 const MISSING = 'fs-capture-missing';
 
+// `<sandbox>` stands for the throw-away capture sandbox. `before` runs (unrecorded) just before the capture.
 const COMMANDS = [
 	{ id: 'version', args: ['version'] },
+	// The FIRST bash after create: the default templates print a banner on stdout (/etc/bash.bashrc sources /etc/profile.d/01-dhi.sh once per sandbox); the flow-sandbox images do not.
+	{ id: 'exec-first-after-create', args: ['exec', '<sandbox>', '--', 'bash', '-c', 'true'] },
 	{ id: 'ls-json', args: ['ls', '--json'] },
 	{ id: 'ls-table', args: ['ls'] },
 	{ id: 'diagnose-json', args: ['diagnose', '--json'] },
@@ -63,6 +66,8 @@ const COMMANDS = [
 	{ id: 'err-rm-missing', args: ['rm', '--force', MISSING] },
 	{ id: 'err-cp-missing', args: ['cp', `${MISSING}:/x`, os.tmpdir()] },
 	{ id: 'err-unknown-verb', args: ['nosuchverb'] },
+	// An exec on a STOPPED sandbox starts it and prints a notice on stderr. Last, so the listings above stay `running`.
+	{ id: 'exec-after-stop', args: ['exec', '<sandbox>', 'true'], before: ['stop', '<sandbox>'] },
 ];
 
 function run(args) {
@@ -81,7 +86,14 @@ function run(args) {
 }
 
 // The command ids whose output lists the throw-away sandbox or its scoped rule.
-const NEEDS_CAPTURE_SANDBOX = ['ls-json', 'ls-table', 'policy-ls-json', 'policy-ls-table'];
+const NEEDS_CAPTURE_SANDBOX = [
+	'ls-json',
+	'ls-table',
+	'policy-ls-json',
+	'policy-ls-table',
+	'exec-first-after-create',
+	'exec-after-stop',
+];
 const CAPTURE_RULE_RESOURCE = 'example.com:443';
 
 function runChecked(args) {
@@ -164,12 +176,20 @@ try {
 		console.log(`created throw-away sandbox ${captureSandbox} with one scoped rule`);
 	}
 	for (const command of selected) {
-		const result = run(command.args);
+		const withSandbox = args => args.map(arg => (arg === '<sandbox>' ? captureSandbox : arg));
+		if (command.before !== undefined) runChecked(withSandbox(command.before));
+		const result = run(withSandbox(command.args));
 		assertPopulated(command.id, result.stdout, captureSandbox);
 		const stdoutFile = `${command.id}.stdout.txt`;
 		const stderrFile = `${command.id}.stderr.txt`;
-		writeFileSync(path.join(outDir, stdoutFile), sanitize(result.stdout));
-		writeFileSync(path.join(outDir, stderrFile), sanitize(result.stderr));
+		// The sandbox name and the workspace folder are random per capture (the mock puts the real ones back).
+		const anonymize = text =>
+			sanitize(text)
+				.replaceAll(captureSandbox ?? '\0', '<sandbox>')
+				// The banner prints the workspace path cut from the left ("...ox-capture-AbC"): only its row is replaced.
+				.replace(/(workspace {2})\S+$/m, '$1<workspace>');
+		writeFileSync(path.join(outDir, stdoutFile), anonymize(result.stdout));
+		writeFileSync(path.join(outDir, stderrFile), anonymize(result.stderr));
 		entries.push({ id: command.id, args: command.args, exitCode: result.status, stdoutFile, stderrFile });
 		console.log(`captured ${command.id} (exit ${result.status})`);
 	}

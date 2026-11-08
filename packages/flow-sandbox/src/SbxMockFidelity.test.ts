@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { PINNED_SBX_VERSION } from './PinnedSbxVersion';
@@ -178,5 +179,34 @@ describe('sbx mock versus the captured outputs', () => {
 			// Accepted flags then fail later for state reasons; the unknown-flag error is what must not appear.
 			expect(results[index]?.stderr, args.join(' ')).not.toContain('unknown flag');
 		});
+	});
+});
+
+describe('sbx mock versus the captured notices of sbx', () => {
+	it('prints the captured banner once on the first bash of a sandbox made without an image, none for an image, and the captured start notice when exec starts a stopped sandbox', async () => {
+		const harness = newHarness('bash-canned');
+		const workspace = harness.makeDirectory();
+		const create = (name: string, ...extra: string[]) =>
+			runMock(['create', '--name', name, '--cpus', '2', '-m', '2g', ...extra, 'shell', workspace], harness);
+		await create('plain-1');
+		await create('image-1', '-t', 'flow-sandbox:test');
+		const bash = (name: string) => runMock(['exec', name, '--', 'bash', '-c', 'echo x'], harness);
+
+		const first = await bash('plain-1');
+		const second = await bash('plain-1');
+		const withImage = await bash('image-1');
+		await runMock(['stop', 'plain-1'], harness);
+		const restarted = await runMock(['exec', 'plain-1', '--', 'true'], harness);
+
+		const banner = fixtures.stdout('exec-first-after-create');
+		expect(banner).toContain('Docker Sandbox');
+		expect(first.stdout).toBe(
+			banner.replaceAll('<sandbox>', 'plain-1').replaceAll('<workspace>', path.basename(workspace)) +
+				'mock-sandbox-output\n'
+		);
+		expect(second.stdout).toBe('mock-sandbox-output\n');
+		expect(withImage.stdout).toBe('mock-sandbox-output\n');
+		expect(restarted.stderr).toBe(fixtures.stderr('exec-after-stop').replaceAll('<sandbox>', 'plain-1'));
+		expect(restarted.stderr).toBe('  ✓ sandbox plain-1 — started\n');
 	});
 });

@@ -28,6 +28,7 @@ import type {
 } from './SbxIntrospection';
 import { SbxOutputParser } from './SbxOutputParser';
 import { SbxProcess, type SbxProcessResult } from './SbxProcess';
+import { SbxStartNoticeFilter } from './SbxStartNoticeFilter';
 import { WorkerCredentialFilter } from './WorkerCredentialFilter';
 
 export interface SbxCliRuntimeOptions {
@@ -110,6 +111,26 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 			args.push(mount.readOnly === true ? `${native}:ro` : native);
 		}
 		await this.runChecked(args, this.createTimeoutMs, request.name);
+		await this.absorbFirstBashBanner(request.name);
+	}
+
+	/**
+	 * The default sbx templates print a banner on the stdout of the FIRST bash of a sandbox (/etc/bash.bashrc sources
+	 * /etc/profile.d/01-dhi.sh, which then leaves a marker; fixture exec-first-after-create). Nothing turns it off: no flag,
+	 * setting or variable (NO_COLOR only removes the colors). Whatever runs first would find it in its output, a model
+	 * tool included, so a bash that prints nothing runs here, once, and its output is discarded. Images that print no banner
+	 * pay one exec. A sandbox without bash cannot run anything this package starts, so it is reported now.
+	 */
+	private async absorbFirstBashBanner(sandbox: string): Promise<void> {
+		const result = await this.exec({ sandbox, command: ['bash', '-c', 'true'] });
+		if (result.exitCode !== 0) {
+			throw new SandboxError(
+				'command-failed',
+				`Sandbox "${sandbox}" was created, but "bash -c true" failed in it (exit ${result.exitCode}: ${result.stderr.trim() || result.stdout.trim() || 'no output'}). ` +
+					`flow-sandbox needs bash in the image; use an image that has it. The sandbox still exists: remove it with "sbx rm --force ${sandbox}".`,
+				{ sandbox, exitCode: result.exitCode, stderr: result.stderr }
+			);
+		}
 	}
 
 	async exec(request: ExecRequest): Promise<ExecResult> {
@@ -127,16 +148,24 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 			if (request.cwd !== undefined) args.push('-w', request.cwd);
 			args.push(request.sandbox, '--', ...request.command);
 
-			const result = await this.process.run({
-				binary: this.requireBinary(),
-				args,
-				env: this.env,
-				stdin: request.stdin,
-				onStdout: request.onStdout,
-				onStderr: request.onStderr,
-				signal: request.signal,
-				timeoutMs: this.execTimeoutMs,
-			});
+			// `sbx exec` announces on stderr that it started a stopped sandbox (fixture exec-after-stop): not the command's output.
+			const startNotice =
+				request.onStderr === undefined
+					? undefined
+					: new SbxStartNoticeFilter(request.sandbox, request.onStderr);
+			const raw = await this.process
+				.run({
+					binary: this.requireBinary(),
+					args,
+					env: this.env,
+					stdin: request.stdin,
+					onStdout: request.onStdout,
+					onStderr: startNotice === undefined ? undefined : text => startNotice.push(text),
+					signal: request.signal,
+					timeoutMs: this.execTimeoutMs,
+				})
+				.finally(() => startNotice?.finish());
+			const result = { ...raw, stderr: SbxStartNoticeFilter.strip(request.sandbox, raw.stderr) };
 			// A program inside the sandbox can print the same text and exit 1: only the sandbox list can tell.
 			if (
 				this.isSandboxNotFound(result, request.sandbox, EXEC_SANDBOX_NOT_FOUND_EXIT_CODE) &&
