@@ -3,13 +3,15 @@ import type { SandboxLog } from '../SandboxLog';
 import { SandboxOptionsParser } from '../SandboxOptionsParser';
 import type { PrerequisiteReport } from '../SbxPrerequisiteCheck';
 
-/** The rows of `sbx template ls`: `<repository> <tag> <id> ...` (see image/build-image.mjs, which uses the same test). */
+/** The rows of `sbx template ls`: `<repository> <tag> <id> ...`, the repository possibly with registry and namespace. */
 export class SbxTemplateListing {
 	static has(listing: string, tag: string): boolean {
 		const [repository = '', version = ''] = tag.split(':');
 		return listing.split('\n').some(line => {
 			const columns = line.trim().split(/\s+/);
-			return columns[0] === repository && columns[1] === version;
+			// The real sbx prints the full name (docker.io/library/flow-sandbox): a short name matches its last path segments.
+			const named = columns[0] === repository || (columns[0] ?? '').endsWith(`/${repository}`);
+			return named && columns[1] === version;
 		});
 	}
 }

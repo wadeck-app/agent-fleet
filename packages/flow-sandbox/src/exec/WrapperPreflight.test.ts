@@ -12,6 +12,14 @@ const BROKEN: PrerequisiteReport = {
 };
 const LISTING = 'REPOSITORY   TAG   IMAGE ID\nflow-sandbox   m7   abc123   2 days ago\n';
 
+const REAL_LISTING = [
+	'REPOSITORY                                TAG                  IMAGE ID       FLAVOR               CREATED',
+	'docker.io/docker/sandbox-templates        claude-code-docker   4a94d9144a70   claude-code-docker   2w',
+	'docker.io/library/flow-sandbox            m6                   ff2274123d7c   claude-code-docker   1m',
+	'docker.io/library/flow-sandbox            m7                   45b01d327679   claude-code-docker   1w',
+	'docker.io/library/sandbox-kit-assembled   288e344711c803b4     e2fec539cbfc   claude-code-docker   1w',
+].join('\n');
+
 const CONFIG = {
 	image: 'flow-sandbox:m7' as string | undefined,
 	cpus: 2,
@@ -35,6 +43,23 @@ describe('SbxTemplateListing', () => {
 			],
 			({ tag, present }) => {
 				expect(SbxTemplateListing.has(LISTING, tag)).toBe(present);
+			}
+		));
+
+	// Real `sbx template ls` (0.51.0, 2026-11-08): the repository column is the full name, `docker.io/library/flow-sandbox`.
+	it('finds a template tag in the listing of the real sbx, where the repository carries its registry and namespace (each case)', () =>
+		eachRow(
+			[
+				{ tag: 'flow-sandbox:m7', present: true },
+				{ tag: 'flow-sandbox:m6', present: true },
+				{ tag: 'docker.io/library/flow-sandbox:m6', present: true },
+				{ tag: 'flow-sandbox:m9', present: false },
+				{ tag: 'sandbox:m7', present: false },
+				{ tag: 'templates:claude-code-docker', present: false },
+				{ tag: 'sandbox-templates:claude-code-docker', present: true },
+			],
+			({ tag, present }) => {
+				expect(SbxTemplateListing.has(REAL_LISTING, tag)).toBe(present);
 			}
 		));
 });
