@@ -99,27 +99,60 @@ Supersedes sections 4 and 5 wherever they conflict. Verify each reference before
 
 Agreed order: P1 and C4 first -> characterization tests (no send-to-all, injected-step routing, plugin config loaded from the bundle) -> C0 as a short decision note (flow-owner's explicit OK required before core code) -> C2 minimal behind a feature flag + ack before release, then the acceptance rule as its own change -> C1 additive -> C3 one kind per change (relay first, fork last).
 
-## 10. Progress and open follow-ups (2026-10-27)
+## 10. State and open points (2026-11-08)
 
-Landed and pushed by flow-owner (origin/integration at `b34fd137`): P1, kill fixes (Codex, OpenCode, Claude, killAllRunningScripts), link refusal, C4 seam (9 commits), C2a (11 commits). In progress: C2b (clone branch `sbx/c2b`), M7 exec prototype. Done in `packages/flow-sandbox` (untracked): M0-M4. Not started: C1 (additive), C3, C2c (acceptance rule), M6, M8, production cleanup.
+History of the earlier progress notes (C1 to C4 rulings, M-milestone details) is in git; this section is the current state only.
 
-C1 (additive registry, branch `sbx/c1`, 6 commits) approved by flow-owner on 2026-11-06, applied by him after his current batch. Open items for the future migration change (builtins last): the `sensitiveFields` preservation tests of the C1 row are NOT covered yet; when a plugin dir shadows a registered builtin (or the reverse) log which source answered or make the choice explicit before the first migration; `WorkerTypeInstances` always passes a `pluginsDir`, so the registry is never consulted for worker types today: decide in C3 whether it consults the registry first; add a T-02 note to the threat model when a consumer first wires a config-supplied absolute path or bare package.
+### Done
 
-C3 progress (2026-11-06): relay (`611185c2`) and `pluginsDir`-optional-for-built-ins (`4ebbf9d6`) applied; `command` (`sbx/c3-command`) approved, being applied by flow-owner. Pending in the next commit: document that the plugin path expands `${NAME}` in `command`/`args`/`cwd` from the daemon env (via `resolveEnvVars`, `WorkerTypeInstances.ts:230`) while `built-in:command` never did (WORKERS.md plus the plugin doc comment); fix the runtime error in `CommandWorkerSource` that still says "uses built-in:command" for `command.default`; check the unchecked casts of host/options in `create()`. INBOUND ruling (flow-owner): map `entry.nudgeUrl` to `options.nudgeUrl` at ONE place (`WorkerTypeInstances.get/build` or `providerOf`, before the cache fingerprint) for the registry-answered path only, when `options.nudgeUrl` is undefined; both set and different: refuse at declare and at build with an actionable message; never pass the whole entry (it would leak `tokenHash`/`sourceTokenHash`/`pluginsDir`); do not widen `worker-type/v1`; do not rewrite stored entries; validate at declare that `nudgeUrl` is an http(s) URL; do not touch `SENSITIVE_FIELDS` for self-declared entries (`SelfDeclaration.ts:43` writes `nudgeUrl`); refuse URL userinfo or a `token=` query in the NEW plugin form only, if cheap. FORK last (statically bundled, Windows console rule).
+| Area | State |
+| --- | --- |
+| Package `packages/flow-sandbox` | M0 to M8 done: mounts, lifecycle, credentials, relay harness (parked), exec variant, plugin `sandbox.exec`; on integration |
+| Core C0 to C4 | Applied by flow-owner |
+| Plugin end to end | Real sbx 0.51.0 and real Bedrock: `PluginLiveCheck` 7/7 (script and model step in the VM, `sbx rm` about 0.5 s, pool claim released after the removal) |
+| sbx 0.51.0 | Pinned, fixtures re-captured, banner and start notice absorbed, `exec` on a missing sandbox exits 125, image id check for the containerd store, image `flow-sandbox:m6` |
+| Isolation of tests | `DaemonIsolationGuard`, `HostEnvironment` (real home only for the wrapper's sbx/aws children), `FLOW_DAEMON_PORT=0`, snapshots around daemon runs |
+| Workspaces | A sandboxed worker accepts only `workspace: pool` (`SandboxableWorkspace`); meta derived from `outputsDir` |
+| Slot hardening | Daemon reads: fsmonitor, hooks, filter drivers closed (flow-owner). Measured table in the plugin README and T-16 |
+| Leftovers | `wrapper.cjs leftover list` and `remove` shipped in the artifact (decision 26) |
+| Secrets on Windows | Owner-only ACL on the plugin's secret and env files (`PrivateAcl`); protects against other OS users only |
+| Requirements, step 1 | Core (flow-owner): `requires:`, guarantees from the source instance, hard filter. Plugin: guarantees `sandbox`, `fs=confined`, `env=clean`, `ports=private`, `clean=run`; `RequiresGuard` in the wrapper. Design: `2026-11-08_sandbox-step-requirements-design.md` |
 
-TODO, separate plan/spec to write AFTER the sandbox work is finished (user, 2026-11-08): a generic tool-provision MCP. The worker offers its model, whatever the model and whatever the worker, a generic MCP server to which tools are added on the fly according to need (e.g. access to the CLI of `task`, `queue`, `flow`, for particular commands), each tool with an id and a description. These tools are defined in the STEP definition and used by the worker to hand the information to the model. It must be properly designed (not an ad hoc bridge). Inputs from the sandbox brainstorm: a host-side MCP server can hold credentials the agent never sees, reached from the VM through a bridge like the engine's MCP callback; the user wants the definition in the step; open design point: who may expose which host command to an agent (a flow can be generated by an agent), e.g. an operator allow-list on the worker.
+### Pending
 
-Sandbox requirements design (brainstorm in progress, NOT final, user decisions so far, 2026-11-07/08): the flow never names a worker type, so `workerType` and the `exclusive` flag are to be removed in favour of step REQUIREMENTS (labels extended with `key=value`, worker-provided guarantees such as `fs=confined`, `env=clean`, `ports=private`, `clean=run|step`, `fs=readonly`) grouped into named PROFILES defined in configuration with built-in defaults (`agent`, `read-only`, `untrusted-code`, `hermetic-test`); model steps carry the `agent` profile implicitly, steps that execute code written by the agent (tests, build) are isolated, other scripts run directly on the worker (host); `shell: cmd|pwsh` are implicit requirements; injected steps inherit the requirements of their parent; run affinity is a best-effort preference (a strategy plugin may come later), a worker accepts a step without requirement only for a run it already serves; `npm test && git push` in one step is a bad flow and stays unsupported; host-provided tools for a model step are the separate TODO above. Nothing of this is implemented yet.
+| Item | Owner | Note |
+| --- | --- | --- |
+| D9: `workspaces` in the manifest, static core check | flow-owner, then plugin | Proposal in the design note; plugin waits for his names |
+| Profiles (tightening-only config), injected-step inheritance, the assign field always sent | core | Design note, migration steps 3 and 4 |
+| Implicit `agent` for model steps, removal of `workerType` and `exclusive` | core + plugin | Last step; pin "an unbound model flow still lands in a sandbox" in `SandboxPluginE2e` |
+| `queue.concurrency` accounting once `exclusive` goes | core | "Workers whose source declares guarantees do not count" |
+| Host-script marker and the mixed-flow ERROR | core | With the tool-provision plan |
+| `net=filtered` and `fs=readonly-enforced` guarantees | plugin | Need a public-destination measurement and a `:ro` primary design (note, O1) |
+| Realpath-resolved mounts (TOCTOU between check and `createMounts`) | plugin + core | Needs a path-translation change |
+| Codex and OpenCode steps in the exec variant | plugin | Refused today |
+| Relay harness | - | Parked prototype; its guard and requirements are not wired |
+| Tool-provision MCP | user | Separate plan to write after the sandbox work: a generic MCP the worker offers a model, tools defined in the step, host credentials kept out of the VM, operator allow-list open point |
+| `assertNoDirectProcessApi` should scan `src/**` with an allowlist | flow-owner (optional) | Also document that providers passed in `StepRunnerConfig.providers` keep their own launcher |
 
-Relation between the workspace mode `readonly` (flow level, workspace redesign plan `2026-11-07_workspace-provider-redesign.md`) and the step guarantee `fs=readonly` / profile `read-only` (user, 2026-11-08): related but NOT strongly coupled. A flow can run on a readonly workspace (every step is then read-only) or be read-write with a single review step kept read-only. The workspace mode is a ceiling; a step guarantee can narrow it, never widen it (a step asking for write access on a readonly workspace is an error at validation or start). Implementation caveat to design: the sandbox mounts are fixed at sandbox creation, so a whole-run readonly workspace is a `:ro` mount (documented by sbx, untested), while a read-only STEP inside a read-write run can only be enforced by a separate sandbox with a `:ro` mount (about +8 s) or softly (tool permission mode, not a boundary); a provider must advertise `fs=readonly` only if it can enforce it.
+### Not verified (say so in any claim)
 
-Open follow-ups:
-- C4 hardening (flow-owner review, optional): `assertNoDirectProcessApi` should scan `src/**` with an allowlist instead of an explicit file list (it misses new files, StepRunner, dynamic `import()`/`require`/export-from); document where C2b/C3 read it that providers passed through `StepRunnerConfig.providers` keep their own launcher, so a sandbox launcher does not cover them unless the caller builds them with the same launcher.
-- Threat T-15 (sbx 0.51.0, one machine): raw TCP to ruleless HOST ports was observed blocked; public destinations unverified (needs a receiving server); re-measure at every sbx upgrade.
-- Threat T-16 residual (measured): a sandbox can plant `core.fsmonitor`/hooks in its pool slot's `.git` and the host ran it at `git status`. Core follow-up (flow-owner, in progress): run the daemon's git calls in a slot hardened (`-c core.fsmonitor=false -c core.hooksPath=<empty>`) or re-clone the slot; README says slots must be dedicated.
-- Core validation (flow-owner plans): refuse `workspace: in-place`/`readonly` with `workerType: sandbox` at validation time, not only in the wrapper.
-- Mount REALPATH-resolved paths: `SandboxableWorkspace` resolves links to decide, but `createMounts` receives the original paths (TOCTOU between check and mount). Not trivial: the engine's paths (original spelling) are translated through the same mounts; do it together with a path-translation change.
-- Production cleanup at the end: loaded templates `poc-m0`, `m0b`, `m4` (and `m2`, `m7` once superseded) via `sbx template rm`; scratch files under `.claude/temp/` and `/tmp` (listed for the user, not deleted with bypasses); gitignore `packages/flow-sandbox/image/opt-flow/*.cjs`; lockfile for the new `flow-sandbox` dependencies (`ws`, `@types/ws`, `@wadeck-app/project-sdk`, `esbuild`); commit `packages/flow-sandbox` plus its wiring (`tsconfig.json`, `scripts/test-config.js`, `scripts/check-ts.js`, `.prettierignore`).
+- `credential.helper` planted in a slot: not triggered in the one test (inconclusive).
+- Nested read/write mount of a subdirectory inside a primary mount: experiment not run.
+- Restart of a stopped sandbox on a pool slot: only the mock covers it.
+- Raw TCP to public destinations, and a VM-to-VM probe (identical private addressing): not testable as built.
+- Everything measured on one Windows 10 machine, sbx 0.51.0, git 2.45.1.windows.1; Linux and macOS never run.
+
+### Cleanup list for the user (nothing here was deleted by the agents)
+
+| What | Where |
+| --- | --- |
+| `flow-test-iso-*`, `flow-sbx-exec-secrets-*`, `flow-sbx-slot-*`, other `flow-sbx-*` folders | `%TEMP%` |
+| `pkg-*` scratch folders (tools, patches, snapshots, drafts such as `requirements-engine-draft.patch`) | `C:/Workspace_Tooling/` |
+| Evidence folders | `agent-fleet/.claude/temp` (`poc-m2`, `m4`, `m7`, `m8`, `sbx-0-51`) |
+| Loaded sbx templates `poc-m0`, `m0b`, `m2`, `m4`, `m7` (`m6` is the current image) | `sbx template rm` |
+| Clone branches: `tmp-m6-5` and the superseded `sbx/*` (all but `sbx/requirements`) | `C:/Workspace_Tooling/agent-fleet-sbx` |
+| Empty directory `packages/flow-engine/src/requirements/` | the clone |
+| Gitignore `packages/flow-sandbox/image/opt-flow/*.cjs` | repository |
 
 ## 8. Review log
 
