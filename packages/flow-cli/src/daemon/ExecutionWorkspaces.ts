@@ -1,6 +1,6 @@
 import type { WorkspaceHandle, WorkspaceProvider } from 'extension-points';
 import { releaseWorkspace } from 'extension-points';
-import { WorkspaceManager } from 'flow-engine';
+import { WorkspaceAllocationError, WorkspaceGitSetupError, WorkspaceManager, redactGitText } from 'flow-engine';
 import type { FlowDefinition, FlowPluginOverrides } from 'flow-engine';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
@@ -82,7 +82,7 @@ export class ExecutionWorkspaces {
 				response: {
 					type: 'error',
 					code: 'WORKSPACE_ERROR',
-					message: 'Failed to allocate workspace via plugin provider.',
+					message: `Failed to allocate workspace via plugin provider: ${redactGitText(getErrorMessage(err))}`,
 				},
 			};
 		}
@@ -95,7 +95,7 @@ export class ExecutionWorkspaces {
 			// Meta dir creation failed - release the handle before propagating
 			void provider.release(handle).catch((releaseErr: unknown) => {
 				process.stderr.write(
-					`[CommandHandler] Failed to release plugin workspace after setup error for ${executionId}: ${String(releaseErr)}\n`
+					`[CommandHandler] Failed to release plugin workspace "${handle.path}" after setup error for ${executionId}: ${String(releaseErr)}. Remove it by hand if nothing uses it.\n`
 				);
 			});
 			throw setupErr;
@@ -114,7 +114,10 @@ export class ExecutionWorkspaces {
 	}
 
 	private async allocateNative(cwd: string, flow: FlowDefinition, executionId: string): Promise<AllocatedWorkspace> {
-		const manager = new WorkspaceManager(cwd);
+		// Warnings of the manager (manual directory without git, with uncommitted changes) go to the log of this execution.
+		const manager = new WorkspaceManager(cwd, {
+			onWarning: message => this.logWriter.writeExecution(executionId, message, 'warning'),
+		});
 		let workspace: Awaited<ReturnType<typeof manager.allocate>>;
 		try {
 			workspace = await manager.allocate({
@@ -123,13 +126,19 @@ export class ExecutionWorkspaces {
 				existingPath: cwd,
 			});
 		} catch (err) {
+			if (err instanceof WorkspaceGitSetupError) {
+				// The message already carries what was attempted, git's (redacted) words and the fix: the run is not started.
+				this.logWriter.writeExecution('__workspace', `${err.code}: ${err.message}`, 'error');
+				return { ok: false, response: { type: 'error', code: err.code, message: err.message } };
+			}
 			this.logWriter.writeExecution('__workspace', `WORKSPACE_ERROR detail: ${String(err)}`, 'error');
+			const detail = err instanceof WorkspaceAllocationError ? ` ${redactGitText(err.message)}` : '';
 			return {
 				ok: false,
 				response: {
 					type: 'error',
 					code: 'WORKSPACE_ERROR',
-					message: 'Failed to allocate workspace. Ensure the flow workspace directory is writable.',
+					message: `Failed to allocate workspace. Ensure the flow workspace directory is writable.${detail}`,
 				},
 			};
 		}
@@ -146,7 +155,7 @@ export class ExecutionWorkspaces {
 		this.pluginHandles.delete(executionId);
 		void entry.provider.release(entry.handle).catch((releaseErr: unknown) => {
 			process.stderr.write(
-				`[CommandHandler] Failed to release workspace after setup error for ${executionId}: ${String(releaseErr)}\n`
+				`[CommandHandler] Failed to release workspace "${entry.handle.path}" after setup error for ${executionId}: ${String(releaseErr)}. Remove it by hand if nothing uses it.\n`
 			);
 		});
 	}
@@ -158,7 +167,7 @@ export class ExecutionWorkspaces {
 			this.pluginHandles.delete(executionId);
 			void releaseWorkspace(pluginWs.provider, pluginWs.handle, priorError).catch((err: unknown) => {
 				process.stderr.write(
-					`[CommandHandler] Failed to release plugin workspace for ${executionId}: ${String(err)}\n`
+					`[CommandHandler] Failed to release plugin workspace "${pluginWs.handle.path}" for ${executionId}: ${String(err)}. Remove it by hand if nothing uses it.\n`
 				);
 			});
 		}
@@ -168,7 +177,7 @@ export class ExecutionWorkspaces {
 			this.nativeManagers.delete(executionId);
 			void nativeWs.manager.release(nativeWs.workspaceId, executionId).catch((err: unknown) => {
 				process.stderr.write(
-					`[CommandHandler] Failed to release workspace for ${executionId}: ${String(err)}\n`
+					`[CommandHandler] Failed to release workspace ${nativeWs.workspaceId} (under .flow/workspaces) for ${executionId}: ${String(err)}. Remove its directory by hand if nothing uses it.\n`
 				);
 			});
 		}

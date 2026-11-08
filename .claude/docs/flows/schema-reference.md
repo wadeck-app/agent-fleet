@@ -150,14 +150,17 @@ Defines workspace isolation and Git strategy for flow execution.
 
 #### `gitStrategy`
 
-- **Type**: `GitStrategy` (`'main-only'` | `'feature-branch'` | `'any'` | `'worktree'`)
+- **Type**: `GitStrategy` (`'main-only'` | `'feature-branch'` | `'any'` | `'worktree'` | `'none'`)
 - **Required**: Yes
-- **Description**: Defines which Git branches can be used for execution
+- **Description**: Defines how the workspace gets its Git content
 - **Valid Values**:
-    - `main-only`: Only execute on main/master branch
-    - `feature-branch`: Create and use feature branches
-    - `any`: Any branch allowed (for debugging)
-    - `worktree`: Use Git worktrees for isolation
+    - `main-only`: Shallow clone of the project, `main` checked out (the branch `main` must exist; it is not configurable)
+    - `feature-branch`: Clone, then a new `fleet/task-*` branch created from `main`
+    - `any`: Clone, `main` checked out
+    - `worktree`: Git worktree on a new `fleet/task-*` branch started from the current commit (the project's checked-out branch does not move)
+    - `none`: No Git; an empty directory
+- **Failure behaviour**: With any strategy except `none`, a failed Git setup refuses the run at start with code `WORKSPACE_GIT_FAILED`; the run never continues in an empty directory. The message gives the strategy, project directory, branch, Git's output (credentials removed, capped) and the fix. Detected causes: git not on PATH, project directory not a git repository, repository without commit, branch `main` missing. Nothing is left on disk.
+- **Manual mode**: `mode: manual` never fails on Git; a directory without Git, or with uncommitted changes, is a warning in the execution log.
 - **Example**:
     ```yaml
     workspace:

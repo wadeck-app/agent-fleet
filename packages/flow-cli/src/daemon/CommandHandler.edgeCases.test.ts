@@ -235,7 +235,7 @@ describe('CommandHandler run setup edge cases', () => {
 		expect(result).toEqual({
 			type: 'error',
 			code: 'WORKSPACE_ERROR',
-			message: 'Failed to allocate workspace via plugin provider.',
+			message: 'Failed to allocate workspace via plugin provider: Error: quota',
 		});
 		expect(mockExecStore.create).not.toHaveBeenCalled();
 	});
@@ -254,9 +254,7 @@ describe('CommandHandler run setup edge cases', () => {
 		await expect(handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never)).rejects.toThrow('store broke');
 		await vi.waitFor(() => {
 			expect(release).toHaveBeenCalledOnce();
-			expect(stderr).toHaveBeenCalledWith(
-				expect.stringContaining('Failed to release workspace after setup error')
-			);
+			expect(stderr).toHaveBeenCalledWith(expect.stringContaining('after setup error'));
 		});
 	});
 
@@ -271,7 +269,7 @@ describe('CommandHandler run setup edge cases', () => {
 
 		await vi.waitFor(() => {
 			expect(stderr).toHaveBeenCalledWith(
-				expect.stringContaining(`Failed to release workspace for ${executionId}`)
+				expect.stringContaining(`for ${executionId}: Error: cannot release. Remove its directory by hand`)
 			);
 		});
 	});

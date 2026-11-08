@@ -303,7 +303,7 @@ Configured via the \`workspace\` field of a \`FlowDefinition\`:
 \`\`\`yaml
 workspace:
   mode: isolated | shared | manual
-  gitStrategy: main-only | feature-branch | any | worktree
+  gitStrategy: main-only | feature-branch | any | worktree | none
   reusePolicy: never | if-available | always
   concurrencyKey: optional-group-key
 \`\`\`
@@ -322,6 +322,9 @@ workspace:
 | \`feature-branch\` | A feature branch is created for each execution |
 | \`any\` | No constraint on branch |
 | \`worktree\` | Uses git worktrees for isolation without full clones |
+| \`none\` | No git; an empty directory |
+
+A failed git setup (any strategy except \`none\`) refuses the run with \`WORKSPACE_GIT_FAILED\`; it never continues in an empty directory. A git branch \`main\` must exist for \`main-only\`, \`any\`, \`feature-branch\`.
 
 ### Reuse policies
 | Policy | Description |

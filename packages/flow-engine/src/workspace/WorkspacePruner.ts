@@ -20,8 +20,8 @@ function removeWithMeta(dirPath: string): void {
 		if (fs.existsSync(metaPath)) {
 			fs.rmSync(metaPath, { recursive: true, force: true });
 		}
-	} catch {
-		// ignore meta cleanup failure
+	} catch (err) {
+		process.stderr.write(`[WorkspacePruner] failed to remove ${metaPath}: ${String(err)}. Delete it by hand.\n`);
 	}
 }
 

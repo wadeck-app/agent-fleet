@@ -18,7 +18,9 @@ export { FlowGenerator } from './generation/FlowGenerator';
 export type { FlowGenerationResult, FlowConstraints } from './generation/FlowGenerator';
 export { FlowRecommendationEngine } from './analysis/FlowRecommendationEngine';
 export type { IdeaRequirements } from './analysis/FlowRecommendationEngine';
-export { WorkspaceManager } from './workspace/WorkspaceManager';
+export { redactGitText } from './workspace/RedactGitText';
+export type { WorkspaceManagerOptions } from './workspace/WorkspaceManager';
+export { WorkspaceAllocationError, WorkspaceGitSetupError, WorkspaceManager } from './workspace/WorkspaceManager';
 export { buildSubStepFeedback, FlowScheduler } from './orchestration/FlowScheduler';
 export type {
 	FailureOrigin,

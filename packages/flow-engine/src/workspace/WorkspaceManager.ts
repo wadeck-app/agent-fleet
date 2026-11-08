@@ -10,12 +10,13 @@ import * as path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { Workspace, WorkspaceConfig } from '../types';
+import { describeDirtyManual } from './WorkspaceGitMessages';
 import { WorkspaceGitStrategy } from './WorkspaceGitStrategy';
 import { pruneWorkspaceDirAtStartup, pruneWorkspaces } from './WorkspacePruner';
-import { WorkspaceAllocationError } from './WorkspaceTypes';
+import { WorkspaceAllocationError, WorkspaceGitSetupError } from './WorkspaceTypes';
 
 // Re-exported for backward compatibility -- definition lives in WorkspaceTypes.ts
-export { WorkspaceAllocationError };
+export { WorkspaceAllocationError, WorkspaceGitSetupError };
 
 export interface WorkspaceAllocationOptions {
 	taskId: string;
@@ -27,15 +28,35 @@ export interface WorkspaceAllocationOptions {
 	autoCreate?: boolean;
 }
 
+/** Test seams and the sink of non-fatal warnings. */
+export interface WorkspaceManagerOptions {
+	/** The git executable (`git` from the PATH by default). */
+	gitBinary?: string;
+	/** Receives the warnings meant for the user (manual workspace without git or with uncommitted changes), besides the console. */
+	onWarning?: (message: string) => void;
+	/** Removes a directory tree (`fs.rmSync` by default). */
+	removeDirectory?: (dirPath: string) => void;
+}
+
 export class WorkspaceManager {
 	private workspaces: Map<string, Workspace> = new Map();
 	private workspacesByTask: Map<string, string> = new Map();
 	private basePath: string;
 	private git: WorkspaceGitStrategy;
 
-	constructor(private readonly projectRoot: string) {
+	private readonly onWarning?: (message: string) => void;
+	private readonly removeDirectory: (dirPath: string) => void;
+
+	constructor(
+		private readonly projectRoot: string,
+		options: WorkspaceManagerOptions = {}
+	) {
 		this.basePath = path.join(projectRoot, '.flow', 'workspaces');
-		this.git = new WorkspaceGitStrategy(projectRoot);
+		this.git = new WorkspaceGitStrategy(projectRoot, options.gitBinary);
+		this.onWarning = options.onWarning;
+		this.removeDirectory =
+			options.removeDirectory ??
+			((dirPath: string) => fs.rmSync(dirPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
 		if (!fs.existsSync(this.basePath)) {
 			fs.mkdirSync(this.basePath, { recursive: true });
 		}
@@ -104,7 +125,9 @@ export class WorkspaceManager {
 				await this.git.removeWorktree(workspace.path);
 				console.log(`Removed worktree at ${workspace.path}`);
 			} catch (error) {
-				console.error(`Failed to remove worktree: ${error}`);
+				console.error(
+					`Failed to remove the git worktree "${workspace.path}": ${String(error)}. After the directory is removed, run "git worktree prune" in ${this.projectRoot}.`
+				);
 				this.removeDirSafe(workspace.path);
 			}
 		} else {
@@ -190,8 +213,9 @@ export class WorkspaceManager {
 		if (!fs.existsSync(workspacePath))
 			throw new WorkspaceAllocationError(`Manual workspace path does not exist: ${workspacePath}`);
 		const gitState = await this.git.getGitState(workspacePath);
-		if (gitState && !gitState.isClean) console.warn(`  Manual workspace has uncommitted changes: ${workspacePath}`);
-		if (!gitState) console.warn(`  Manual workspace is not a git repository: ${workspacePath}`);
+		// The user chose this directory: a warning, not a refusal, but one they will see in the execution log.
+		if (gitState && !gitState.isClean) this.warn(describeDirtyManual(workspacePath));
+		if (!gitState) this.warn(await this.git.explainManualWithoutGit(workspacePath));
 		const id = uuidv4();
 		const metaDir = workspacePath + '.meta';
 		fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });
@@ -223,13 +247,25 @@ export class WorkspaceManager {
 		const prefix = mode === 'shared' ? 'shared' : 'isolated';
 		const workspacePath = path.join(this.basePath, `${prefix}-${id}`);
 		const metaDir = workspacePath + '.meta';
+		let gitState: Workspace['git'];
 		try {
-			fs.mkdirSync(workspacePath, { recursive: true });
-			fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });
+			try {
+				fs.mkdirSync(workspacePath, { recursive: true });
+				fs.mkdirSync(path.join(metaDir, 'outputs'), { recursive: true });
+			} catch (error) {
+				throw new WorkspaceAllocationError(
+					`Failed to create the workspace directory "${workspacePath}": ${String(error)}. Check that ${this.basePath} is writable and the disk is not full.`
+				);
+			}
+			gitState = await this.git.setupGit(workspacePath, config.gitStrategy, gitBranch, taskMetadata, taskId);
 		} catch (error) {
-			throw new WorkspaceAllocationError(`Failed to create workspace directory: ${error}`);
+			// Nothing of a refused allocation stays on disk; what cannot be removed is named so that it can be removed by hand.
+			const stuck = this.discardPartialWorkspace([workspacePath, metaDir]);
+			if (error instanceof Error && stuck.length > 0) {
+				error.message += ` ${stuck.map(s => `"${s.dir}" could not be removed (${s.reason})`).join('; ')}: delete ${stuck.length > 1 ? 'them' : 'it'} by hand once nothing uses ${stuck.length > 1 ? 'them' : 'it'}.`;
+			}
+			throw error;
 		}
-		const gitState = await this.git.setupGit(workspacePath, config.gitStrategy, gitBranch, taskMetadata, taskId);
 		const ws: Workspace = {
 			id,
 			path: workspacePath,
@@ -251,6 +287,11 @@ export class WorkspaceManager {
 		return ws;
 	}
 
+	private warn(message: string): void {
+		console.warn(`  ${message}`);
+		this.onWarning?.(message);
+	}
+
 	private deregister(workspaceId: string): void {
 		this.workspaces.delete(workspaceId);
 		for (const [taskId, wId] of this.workspacesByTask.entries()) {
@@ -260,10 +301,25 @@ export class WorkspaceManager {
 
 	private removeDirSafe(dirPath: string): void {
 		try {
-			if (fs.existsSync(dirPath))
-				fs.rmSync(dirPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+			if (fs.existsSync(dirPath)) this.removeDirectory(dirPath);
 		} catch (error) {
-			console.error(`Failed to remove workspace directory: ${error}`);
+			console.error(`Failed to remove workspace directory "${dirPath}": ${String(error)}. Delete it by hand.`);
 		}
+	}
+
+	/** Removes the directories of an allocation that failed; returns the ones that are still there. */
+	private discardPartialWorkspace(dirs: string[]): Array<{ dir: string; reason: string }> {
+		const stuck: Array<{ dir: string; reason: string }> = [];
+		for (const dir of dirs) {
+			try {
+				if (fs.existsSync(dir)) this.removeDirectory(dir);
+			} catch (error) {
+				console.error(
+					`Failed to remove "${dir}" after a failed workspace allocation: ${String(error)}. Delete it by hand.`
+				);
+				stuck.push({ dir, reason: String(error) });
+			}
+		}
+		return stuck;
 	}
 }
