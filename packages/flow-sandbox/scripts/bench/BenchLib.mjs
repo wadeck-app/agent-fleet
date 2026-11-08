@@ -229,17 +229,19 @@ export class Sampler {
 // ---------------------------------------------------------------------------------------------------------------
 // Flow files
 // ---------------------------------------------------------------------------------------------------------------
-export function flowHeader({ id, labelled, sharedWorkspace = true }) {
+/** Set by the bench world before any flow is written: the directory of its pool (slots slot-1..slot-8). */
+let poolDirectoryOfFlows;
+
+export function flowHeader({ id, labelled }) {
+	if (poolDirectoryOfFlows === undefined) throw new Error('flowHeader: no bench world has set its pool directory yet.');
 	return `id: ${id}
 version: '1.0.0'
 name: ${id}
 description: M8 benchmark flow
 
 ${labelled ? 'labels:\n    - sandbox\n' : ''}
-workspace:
-    mode: ${sharedWorkspace ? 'shared' : 'isolated'}
-    gitStrategy: any
-    reusePolicy: if-available
+# A sandboxed worker accepts only a pool: the in-place workspace would expose <project>/.flow and .git/hooks to the sandbox.
+workspace: { provider: pool, dir: '${poolDirectoryOfFlows.replaceAll('\\', '/')}', prefix: slot-, count: 8 }
 
 steps:
 `;
@@ -321,6 +323,8 @@ export class BenchEnv {
 		if (path.resolve(this.configDirectory).toLowerCase() === path.resolve(os.homedir(), '.config', 'flow').toLowerCase())
 			throw new Error(`the isolated config dir ${this.configDirectory} equals the real flow config dir.`);
 		fs.mkdirSync(this.projectDirectory, { recursive: true });
+		poolDirectoryOfFlows = path.join(this.root, 'pool');
+		for (let slot = 1; slot <= 8; slot++) fs.mkdirSync(path.join(poolDirectoryOfFlows, `slot-${slot}`), { recursive: true });
 		fs.mkdirSync(this.presenceDirectory, { recursive: true });
 	}
 

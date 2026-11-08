@@ -5,6 +5,7 @@ import type { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import type { SandboxLifecycle } from '../SandboxLifecycle';
 import type { SandboxLog } from '../SandboxLog';
+import { SandboxableWorkspace } from '../SandboxableWorkspace';
 import { AssignmentRewriter } from './AssignmentRewriter';
 import { type AssignmentWait, newAssignmentWait, withTimeout } from './AssignmentWait';
 import { DaemonReporter } from './DaemonReporter';
@@ -253,8 +254,15 @@ export class HarnessWrapper {
 		if (!isNonEmptyString(workspaceDir)) {
 			throw new SandboxError('invalid-argument', 'The assignment has no executionContext.workspaceDir.');
 		}
-		// The daemon puts a run's `.meta` next to its workspace (ExecutionWorkspaces: `<workspace>.meta`).
-		const mounts = this.dependencies.createMounts(workspaceDir, `${workspaceDir}.meta`);
+		// The run's `.meta` is derived from outputsDir; a workspace that would expose the project to the sandbox is refused.
+		const mounts = this.dependencies.createMounts(
+			workspaceDir,
+			SandboxableWorkspace.metaDirectoryFor({
+				workspaceDir,
+				outputsDir: context['outputsDir'],
+				workspaceReadOnly: context['workspaceReadOnly'],
+			})
+		);
 		// A different run keeps its own mounts; SandboxLifecycle refuses it (worker-busy) before anything is created.
 		this.mounts = { executionId, mounts };
 		return mounts;

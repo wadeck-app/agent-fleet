@@ -54,6 +54,7 @@ class FlowWorld {
 	readonly root = fs.realpathSync.native(this.isolation.root);
 	readonly projectDirectory = path.join(this.root, 'project');
 	readonly mockState = path.join(this.root, 'sbx-state');
+	readonly poolDirectory = path.join(this.root, 'pool');
 	readonly daemonLog = path.join(this.root, 'daemon.log');
 	readonly env: NodeJS.ProcessEnv;
 	projectId = '';
@@ -62,6 +63,7 @@ class FlowWorld {
 	constructor() {
 		fs.mkdirSync(this.projectDirectory, { recursive: true });
 		fs.mkdirSync(this.mockState, { recursive: true });
+		fs.mkdirSync(path.join(this.poolDirectory, 'slot-1'), { recursive: true });
 		this.env = {
 			...this.isolation.env,
 			SBX_MOCK_STATE_DIR: this.mockState,
@@ -137,7 +139,7 @@ class FlowWorld {
 	}
 
 	/** One script step; `workerType` binds the run. */
-	writeFlow(name: string, workerType: boolean): string {
+	writeFlow(name: string, workerType: boolean, workspace: 'pool' | 'in-place' = 'pool'): string {
 		const file = path.join(this.projectDirectory, `${name}.yml`);
 		fs.writeFileSync(
 			file,
@@ -147,7 +149,10 @@ class FlowWorld {
 				`name: ${name}`,
 				'description: One script step.',
 				...(workerType ? ['workerType: sandbox'] : []),
-				'workspace: in-place',
+				// A sandboxed worker accepts only a pool (the in-place workspace would expose <project>/.flow and .git/hooks).
+				workspace === 'pool'
+					? `workspace: { provider: pool, dir: '${this.poolDirectory.replaceAll(path.sep, '/')}', prefix: slot-, count: 1 }`
+					: 'workspace: in-place',
 				'steps:',
 				'    - id: probe',
 				'      name: Probe',
@@ -175,14 +180,31 @@ class FlowWorld {
 	}
 
 	/**
-	 * Runs a flow, then waits until the daemon has released its workspace: that happens after the end-of-run notice, the wrapper's
-	 * removal of the sandbox and its ack, so everything the tests look at afterwards (sbx calls, log lines) exists.
+	 * Runs a flow, then waits until the wrapper has removed the run's sandbox (end-of-run notice, then `sbx rm`), so everything the
+	 * tests look at afterwards (sbx calls, log lines) exists. The daemon no longer logs the release of a workspace (the workspace
+	 * providers: an in-place workspace has nothing to release), so the removal itself is the signal.
 	 */
-	async runAndRelease(file: string): Promise<ExecutionRecord> {
-		const released = (): number => this.log().split('Released workspace').length - 1;
-		const before = released();
+	async runAndRelease(file: string, removesASandbox = true): Promise<ExecutionRecord> {
+		const removals = (): number => this.sbxCalls().filter(call => call.argv[0] === 'rm').length;
+		const before = removals();
 		const record = await this.run(file);
-		await waitFor('the daemon to release the run workspace', 40_000, () => released() > before || undefined);
+		if (!removesASandbox) return record;
+		try {
+			await waitFor('the wrapper to remove the run sandbox', 40_000, () => removals() > before || undefined);
+		} catch (error) {
+			// The calls and the end of the daemon log say what the wrapper did instead.
+			const calls = this.sbxCalls().map(call => call.argv.join(' '));
+			const tail = this.log().slice(-3000);
+			throw new Error(`${String(error)}\nsbx calls:\n${calls.join('\n')}\ndaemon log (tail):\n${tail}`);
+		}
+		// The removal is followed by the removal of the run's secret and network rules: wait until the calls stop coming.
+		let count = this.sbxCalls().length;
+		for (let stable = 0; stable < 3; stable++) {
+			await new Promise(resolve => setTimeout(resolve, 500));
+			const now = this.sbxCalls().length;
+			stable = now === count ? stable : -1;
+			count = now;
+		}
 		return record;
 	}
 
@@ -230,6 +252,11 @@ async function waitFor<T>(
 }
 
 /** The sandbox a `create` call made, and the calls that name it. */
+/** The execution id in `<project>/.flow/runs/<executionId>.meta`. */
+function runIdOf(metaDirectory: string): string {
+	return path.basename(metaDirectory).replace(/\.meta$/, '');
+}
+
 function sandboxesCreated(calls: MockSbxCall[]): string[] {
 	return calls.filter(call => call.argv[0] === 'create').map(call => call.argv[2] as string);
 }
@@ -276,18 +303,22 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		const removal = named.findIndex(call => call.argv[0] === 'rm');
 
 		expect(create?.argv.slice(3, 8)).toEqual(['--cpus', '2', '-m', '2g', 'claude']);
-		// Exactly the two mounts: the run workspace and its .meta, both below the project's .flow/workspaces.
+		// Exactly the two mounts: the pool slot (the workspace) and the run's .meta in the project's .flow/runs, outside the slot.
 		const mounts = create?.argv.slice(8) ?? [];
 		expect(mounts).toHaveLength(2);
-		expect(mounts[1]).toBe(`${mounts[0]}.meta`);
-		expect(mounts[0]).toContain(path.join('.flow', 'workspaces'));
+		expect(mounts[0]).toBe(path.join(world.poolDirectory, 'slot-1'));
+		expect(mounts[1]).toBe(
+			path.join(world.projectDirectory, '.flow', 'runs', `${runIdOf(mounts[1] as string)}.meta`)
+		);
 		expect(verbs.indexOf('create')).toBe(0);
 		expect(stepExec).toBeGreaterThan(0);
 		expect(removal).toBeGreaterThan(stepExec);
 		expect(named[removal]?.argv).toEqual(['rm', '--force', sandbox]);
 	});
 
-	it('removes the sandbox BEFORE the daemon releases the run workspace (ack after removal)', () => {
+	// The daemon no longer logs the release of a workspace (the providers: nothing to release for a pool slot but its claim), so the
+	// order removal-then-ack is only covered at unit level (ExecWrapper.test.ts); here the removal must find both mounts on the host.
+	it('removes the sandbox while both mounted directories still exist on the host', () => {
 		const calls = world.sbxCalls();
 		const [sandbox] = sandboxesCreated(calls);
 		const removal = calls.find(call => call.argv[0] === 'rm' && call.argv.includes(sandbox as string));
@@ -295,10 +326,7 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 
 		// Still mounted when rm arrived: the directories existed on the host at that instant.
 		expect(Object.values(removal?.mountsExistAtRm ?? {})).toEqual([true, true]);
-		const removed = log.indexOf(`Sandbox "${sandbox}" removed`);
-		const released = log.indexOf('Released workspace');
-		expect(removed).toBeGreaterThan(-1);
-		expect(released).toBeGreaterThan(removed);
+		expect(log.indexOf(`Sandbox "${sandbox}" removed`)).toBeGreaterThan(-1);
 	});
 
 	it('starts a second run on a fresh sandbox, served by the same wrapper, and removes that one too', async () => {
@@ -327,13 +355,25 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		for (const call of world.sbxCalls()) expect((call as { workerEnv?: string[] }).workerEnv).toEqual([]);
 	});
 
+	it('refuses an in-place workspace for a bound run, in plain words, and starts no sandbox', async () => {
+		const callsBefore = world.sbxCalls().filter(call => call.argv[0] === 'create').length;
+
+		const record = await world.run(world.writeFlow('in-place', true, 'in-place'));
+
+		expect(record.status).toBe('failed');
+		expect(world.log()).toContain(
+			'needs workspace: pool, the in-place workspace exposes <project>/.flow and .git/hooks to the sandbox'
+		);
+		expect(world.sbxCalls().filter(call => call.argv[0] === 'create')).toHaveLength(callsBefore);
+	}, 120_000);
+
 	it('an unbound flow is kept off the sandbox worker: its type is exclusive, the step runs on a host worker', async () => {
 		// ROUTING FACT PINNED HERE: if this assertion ever fails, the exclusivity of the sandbox type changed. Update it together with
 		// the README section "Routing and isolation" (the paragraph on the exclusive worker type) and the plugin declaration steps.
 		// The plugin declares `exclusive: true`, so the daemon offers its worker only to runs bound with `workerType: sandbox` and does
 		// not ask the source for a worker for an unbound run: the demand is covered by a host worker the daemon forks.
 		const callsBefore = world.sbxCalls().length;
-		const record = await world.runAndRelease(world.writeFlow('unbound', false));
+		const record = await world.runAndRelease(world.writeFlow('unbound', false), false);
 
 		expect(record.steps?.['probe']?.sourceId).not.toBe('sandbox-1');
 		expect(world.sbxCalls()).toHaveLength(callsBefore);

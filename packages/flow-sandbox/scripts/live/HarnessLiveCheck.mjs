@@ -119,6 +119,8 @@ DaemonIsolationGuard.assert({ env: environment, isolatedRoot: root });
 const configDirectory = isolation.configDir;
 const registryDirectory = path.join(environment.XDG_CONFIG_HOME, 'project');
 const projectDirectory = path.join(root, 'project');
+// The pool of the flow: one prepared folder (plain, outside the project), the workspace of the run.
+const poolDirectory = path.join(root, 'pool');
 const wrapperLog = path.join(root, 'wrapper.log');
 const daemonLog = path.join(root, 'daemon.log');
 const presenceDirectory = path.join(root, 'presence');
@@ -198,10 +200,8 @@ description: A script step and a model step that must run inside a sandbox.
 labels:
     - sandbox
 
-workspace:
-    mode: shared
-    gitStrategy: none
-    reusePolicy: if-available
+# A sandboxed worker accepts only a pool: the in-place workspace would expose <project>/.flow and .git/hooks to the sandbox.
+workspace: { provider: pool, dir: '${poolDirectory.replaceAll('\\', '/')}', prefix: slot-, count: 1 }
 
 steps:
     - id: probe
@@ -308,6 +308,7 @@ try {
 	console.log(`isolated flow config dir: ${configDirectory}`);
 
 	fs.mkdirSync(projectDirectory, { recursive: true });
+	fs.mkdirSync(path.join(poolDirectory, 'slot-1'), { recursive: true });
 	fs.mkdirSync(presenceDirectory, { recursive: true });
 	const project = await addProject(registryDirectory, { name: `harness-${wrapperId}`, path: projectDirectory });
 	evidence.projectId = project.id;
@@ -429,7 +430,7 @@ try {
 		}
 	);
 
-	const workspaces = path.join(projectDirectory, '.flow', 'workspaces');
+	const workspaces = path.join(projectDirectory, '.flow', 'runs');
 	const metaDirectory = () => {
 		if (!fs.existsSync(workspaces)) return undefined;
 		const name = fs
@@ -623,7 +624,7 @@ try {
 		const name = created.sandbox;
 		expect(name !== undefined, 'no sandbox to scan');
 		const meta = metaDirectory();
-		const workspaceMount = meta.slice(0, -'.meta'.length);
+		const workspaceMount = path.join(poolDirectory, 'slot-1');
 		const translate = hostPath => `/${hostPath[0].toLowerCase()}${hostPath.slice(2).replaceAll('\\', '/')}`;
 		const credentials = await new AwsCredentialExporter({ commandRunner: new NodeCommandRunner() }).export(
 			hostProfile
