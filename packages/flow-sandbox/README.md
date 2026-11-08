@@ -138,19 +138,21 @@ Only `workspace: pool`. `in-place` and `readonly` hand the sandbox the project f
 
 ### Pool slots used by sandboxed runs must be dedicated to them
 
-The sandbox has a read/write mount of the slot, `.git` included, and can edit `<slot>/.git/config`, hooks and `.gitattributes` (`scripts/live/PoolSlotLiveCheck.mjs`, real sbx, git 2.45.1.windows.1, 2026-11-08). What then ran on the HOST, measured against the production helper (`HardenedGit`, since 56dd1fb8) and probe (`GitFolderProbe`):
+The sandbox has a read/write mount of the slot, `.git` included, and can edit `<slot>/.git/config`, hooks, `.git/info/attributes` and `.gitattributes`. Measured on real sbx with `scripts/live/PoolSlotLiveCheck.mjs` (git 2.45.1.windows.1, 2026-11-08, each cell run twice, against the production helpers at e7905266). "Ran" means code planted from the sandbox ran on the HOST:
 
-| Planted from the sandbox | Plain git | Production read (`GitFolderProbe`, `hardenedGit` reading) | `hardenedGit` mutating (checkout, fetch) |
+| Planted from the sandbox | Plain git (control) | Daemon read probe (`GitFolderProbe`) | `hardenedGit` mutating (checkout, fetch) |
 | --- | --- | --- | --- |
-| `core.fsmonitor` | ran at `status` | blocked | blocked |
-| `core.hooksPath` (post-checkout hook in it) | ran at checkout | blocked (NUL hooksPath) | ran |
-| post-checkout hook in `.git/hooks` | not exercised | blocked (NUL hooksPath; reading checkout) | ran |
-| `filter.*.smudge` | not exercised | not exercised | ran |
-| `filter.*.clean` | not shown | RAN once the index was stale | ran |
-| `core.sshCommand` (ssh remote) | not exercised | not exercised | ran at fetch |
-| `credential.helper` (http remote, 401) | - | - | not triggered in this test (inconclusive) |
+| `core.fsmonitor` | ran 2/2 | blocked 2/2 | not applicable (off) |
+| post-checkout hook, `core.hooksPath` | ran | blocked 2/2 (no hook runs in a status) | ran 2/2 |
+| `filter.*.clean`, stale index: in `.git/config`, worktree-scope config, an included file | ran 2/2 each | blocked 2/2 each | ran (1/2 to 2/2) |
+| odd driver names (dots, upper case, non-ASCII, backslash, quote) | ran 2/2 each | blocked 2/2 each | - |
+| driver name containing `=` | ran 2/2 | `FilterDriverListingError`, nothing ran, 2/2 | - |
+| name redefined from the user-level config (git-lfs-like) | planted ran | planted blocked; user-level-only driver still trusted, ran 2/2 | - |
+| `filter.*.smudge` | - | not applicable | ran 1/2 |
+| `core.sshCommand` (ssh remote) | - | not applicable | ran 2/2 at fetch |
+| `credential.helper` (http remote, 401) | - | not applicable | not triggered (inconclusive) |
 
-So the daemon's reads are safe from fsmonitor and hooks, but the slot stays untrusted: never use your own checkout or a slot shared with host runs, and treat a slot a sandbox used as poisoned until re-cloned. Closing filters, `core.sshCommand`, `credential.helper` and git calls outside the helper is a flow follow-up (threat model T-16).
+So the daemon's reads are safe from fsmonitor, hooks and filter drivers; mutating calls (the flow's sync step, your own tools) are not. Use dedicated slots, re-clone them, or restore `.git/config`, `hooks/`, `info/` and `.gitattributes` in the sync step before any mutating git call. Not covered: the legacy web-backend git service, FlowWorker git calls, the user's own tools. The user's global git config is out of reach of the sandbox: only the ancestors of the mounts are visible in the host user directory, and nothing could be created there as agent or root (this machine, one run).
 
 ### Limits of the harness
 
