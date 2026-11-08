@@ -15,7 +15,13 @@ export const UNREACHABLE_REGISTRY = 'http://127.0.0.1:9';
 // must not change a test, and the real values must never reach the child. Case-insensitive because
 // Windows env names are, while JS object keys are not.
 const STRIPPED =
-	/^(FLOW_QUEUE_EVENTS$|UPDATER_|LAUNCHER_|CLI_SELF_CHECK|NPM_CONFIG_|FLOW_CONFIG_DIR$|XDG_CONFIG_HOME$|HOME$|USERPROFILE$|APPDATA$|LOCALAPPDATA$|TEMP$|TMP$|TMPDIR$)/i;
+	/^(FLOW_QUEUE_EVENTS$|UPDATER_|LAUNCHER_|CLI_SELF_CHECK|NPM_CONFIG_|FLOW_CONFIG_DIR$|APP_CORE_PORT$|APP_CORE_CONFIG_DIR$|XDG_CONFIG_HOME$|HOME$|USERPROFILE$|APPDATA$|LOCALAPPDATA$|TEMP$|TMP$|TMPDIR$)/i;
+
+/**
+ * Port that app-core registration is pointed at: nothing listens on TCP port 1, so the SDK answers `deferred`/`skipped`
+ * instead of registering a source-checkout module with the user's real app-core (4850).
+ */
+export const DEAD_APP_CORE_PORT = '1';
 
 export interface IsolatedCliEnv {
 	/** Root of the throwaway tree (config, home, npm prefix, npm cache). */
@@ -76,6 +82,9 @@ export function createIsolatedCliEnv(
 		env,
 		{
 			FLOW_CONFIG_DIR: configDir,
+			// Not created: the SDK writes its pickup file only into an existing app-core config dir.
+			APP_CORE_CONFIG_DIR: join(home, '.config', 'app-core'),
+			APP_CORE_PORT: DEAD_APP_CORE_PORT,
 			XDG_CONFIG_HOME: join(home, '.config'),
 			TEMP: tempDir,
 			TMP: tempDir,

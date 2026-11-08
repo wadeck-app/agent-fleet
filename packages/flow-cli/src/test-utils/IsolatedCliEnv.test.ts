@@ -1,7 +1,8 @@
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { type IsolatedCliEnv, UNREACHABLE_REGISTRY, createIsolatedCliEnv } from './IsolatedCliEnv';
+import { DEAD_APP_CORE_PORT, type IsolatedCliEnv, UNREACHABLE_REGISTRY, createIsolatedCliEnv } from './IsolatedCliEnv';
 
 describe('createIsolatedCliEnv', () => {
 	let iso: IsolatedCliEnv | undefined;
@@ -73,5 +74,38 @@ describe('createIsolatedCliEnv', () => {
 	it('applies extra entries last', () => {
 		iso = createIsolatedCliEnv({ extra: { UPDATER_FORCE: '1' } });
 		expect(iso.env['UPDATER_FORCE']).toBe('1');
+	});
+});
+
+describe('createIsolatedCliEnv app-core registration', () => {
+	const saved = { ...process.env };
+	let iso: IsolatedCliEnv | undefined;
+
+	afterEach(() => {
+		iso?.cleanup();
+		iso = undefined;
+		for (const key of Object.keys(process.env)) {
+			if (!(key in saved)) {
+				delete process.env[key];
+			}
+		}
+		Object.assign(process.env, saved);
+	});
+
+	// A daemon started from a source checkout registers its dev modules with app-core: the SDK targets
+	// APP_CORE_PORT (else 4850) and APP_CORE_CONFIG_DIR (else ~/.config/app-core).
+	it('cannot reach the real app-core: private config dir that does not exist, and a port nothing listens on', () => {
+		process.env['APP_CORE_PORT'] = '4850';
+		process.env['APP_CORE_CONFIG_DIR'] = 'C:/real/app-core';
+		iso = createIsolatedCliEnv();
+		expect(iso.env['APP_CORE_CONFIG_DIR']?.startsWith(iso.root)).toBe(true);
+		expect(existsSync(iso.env['APP_CORE_CONFIG_DIR'] as string)).toBe(false);
+		expect(iso.env['APP_CORE_PORT']).toBe(DEAD_APP_CORE_PORT);
+		expect(DEAD_APP_CORE_PORT).not.toBe('4850');
+	});
+
+	it('lets the caller opt back in through `extra` (a test against a FAKE app-core)', () => {
+		iso = createIsolatedCliEnv({ extra: { APP_CORE_PORT: '54321' } });
+		expect(iso.env['APP_CORE_PORT']).toBe('54321');
 	});
 });
