@@ -1,6 +1,7 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import {
 	DEFAULT_HISTORY_LIMIT,
+	ExecutionLookupError,
 	FLOW_CHART_INDEX_PATH,
 	FLOW_HEALTHS,
 	FLOW_HEALTH_ANY,
@@ -14,6 +15,7 @@ import {
 	chartPathOfExecution,
 	chartPathOfFlow,
 	countByHealth,
+	errorMessage,
 	filterFlowSummaries,
 	flowHealth,
 	optionalInteger,
@@ -25,6 +27,24 @@ import {
 import { replyWithError } from './ErrorReply.js';
 
 export const MAX_FLOWS_LIMIT = 500;
+
+/**
+ * Answer for a run that is not there (stale link, retention cleanup, typo). The lookup error names the data folder, which
+ * the page must not show: it goes to the server log, the page gets this text and `notFound: true` (the same wording as
+ * the flow module's not-found page).
+ */
+function replyExecutionNotFound(
+	reply: Parameters<typeof replyWithError>[0],
+	err: ExecutionLookupError,
+	id: string
+): void {
+	// The lookup error names the data folder, which the page must not show: it stays in the server log.
+	console.warn(`[flow-chart] Execution not found: ${errorMessage(err)}`);
+	reply.code(404).send({
+		error: `Execution ${id} was not found. It may have been removed by the retention cleanup, or the id is wrong.`,
+		notFound: true,
+	});
+}
 
 function readTarget(query: QueryParams): FlowGraphTarget {
 	const executionId = optionalString(query, 'executionId');
@@ -125,9 +145,14 @@ export function registerGraphRoutes(ctx: ModuleContext, service: FlowQueryServic
 	ctx.registerRoute('GET', '/graph', (req, reply) => {
 		const query = (req as { query?: QueryParams }).query ?? {};
 		try {
-			const result = service.getFlowGraph(readTarget(query));
+			const target = readTarget(query);
+			const result = service.getFlowGraph(target);
 			return reply.code(200).send(result);
 		} catch (err) {
+			if (err instanceof ExecutionLookupError && (err.kind === 'not-found' || err.kind === 'invalid-id')) {
+				const id = optionalString(query, 'executionId') ?? '';
+				return replyExecutionNotFound(reply, err, id);
+			}
 			return replyWithError(reply, err);
 		}
 	});

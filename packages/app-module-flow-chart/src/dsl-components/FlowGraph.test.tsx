@@ -39,6 +39,24 @@ describe('FlowGraph', () => {
 		expect(alert).toHaveTextContent('cannot be shown');
 		expect(alert).toHaveTextContent("Execution 'zzz' not found. Run flow history.");
 	});
+
+	it('shows a not-found state (no red alert) with a link to the executions when the run does not exist', async () => {
+		const fetchFunction = vi
+			.fn()
+			.mockResolvedValue(json(404, { error: 'Execution zzz was not found.', notFound: true }));
+		render(
+			<MemoryRouter>
+				<FlowGraph target={{ executionId: 'zzz' }} fetchFunction={fetchFunction} />
+			</MemoryRouter>
+		);
+		const notice = await screen.findByRole('status', { name: 'Execution not found' });
+		expect(notice).toHaveTextContent('Execution zzz was not found.');
+		expect(screen.queryByRole('alert')).toBeNull();
+		expect(screen.getByRole('link', { name: 'See all executions' })).toHaveAttribute(
+			'href',
+			'/modules/flow/executions'
+		);
+	});
 });
 
 describe('registry entries', () => {

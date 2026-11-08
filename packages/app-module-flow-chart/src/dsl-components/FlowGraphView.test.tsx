@@ -56,27 +56,11 @@ describe('FlowGraphView', () => {
 		expect(screen.queryByRole('link', { name: /^Back to/ })).toBeNull();
 	});
 
-	it('links the header of a run to its logs page', () => {
+	// The Logs tab of the shell (app-core tabs of group flow:execution) replaces the former header button.
+	it('has no header Logs button for a run or a definition: the Logs tab is the way', () => {
 		renderView(executionResult());
-		expect(screen.getByRole('link', { name: 'Logs' })).toHaveAttribute(
-			'href',
-			'/modules/flow/executions/exec1/logs'
-		);
-	});
-
-	it('draws that logs link with the contract style of every action next to an execution', () => {
-		renderView(executionResult());
-		const logs = screen.getByRole('link', { name: 'Logs' });
+		expect(screen.queryByRole('link', { name: 'Logs' })).toBeNull();
 		cleanup();
-		render(
-			<MemoryRouter>
-				<ButtonLink to="/x" label="Reference" {...FLOW_ACTION_BUTTON_STYLE} />
-			</MemoryRouter>
-		);
-		expect(logs.className).toBe(screen.getByRole('link', { name: 'Reference' }).className);
-	});
-
-	it('has no logs link for a definition without a run', () => {
 		renderView(executionResult({ execution: undefined, graph: chain(3) }));
 		expect(screen.queryByRole('link', { name: 'Logs' })).toBeNull();
 	});

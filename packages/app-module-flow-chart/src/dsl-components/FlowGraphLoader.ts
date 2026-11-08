@@ -10,6 +10,8 @@ export type FetchFunction = (url: string, init?: { signal?: AbortSignal }) => Pr
 export type GraphState =
 	| { state: 'loading' }
 	| { state: 'error'; message: string }
+	// The record does not exist (the API flags it `notFound`): a state of its own, not a failure.
+	| { state: 'not-found'; message: string }
 	| { state: 'ready'; result: FlowGraphResult; refreshError: string | undefined };
 
 /** A run still going is redrawn at this pace, so its steps turn green as they finish. */
@@ -29,6 +31,14 @@ function isGraphResult(value: unknown): value is FlowGraphResult {
 	}
 	const graph = (value as { graph?: unknown }).graph as { nodes?: unknown; edges?: unknown } | undefined;
 	return graph !== undefined && Array.isArray(graph.nodes) && Array.isArray(graph.edges);
+}
+
+/** The API answered "this record is not there" (404 with `notFound: true`). */
+export class GraphNotFoundError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'GraphNotFoundError';
+	}
 }
 
 export async function loadFlowGraph(
@@ -56,6 +66,13 @@ export async function loadFlowGraph(
 	}
 	if (!response.ok) {
 		const message = (body as { error?: unknown } | undefined)?.error;
+		if (
+			response.status === 404 &&
+			typeof message === 'string' &&
+			(body as { notFound?: unknown }).notFound === true
+		) {
+			throw new GraphNotFoundError(message);
+		}
 		throw new Error(typeof message === 'string' ? message : `HTTP ${response.status} from ${url}.`);
 	}
 	if (!isGraphResult(body)) {
@@ -107,7 +124,7 @@ export function useFlowGraph(
 				}
 				const message = (err as Error).message;
 				if (!hasGraph) {
-					setState({ state: 'error', message });
+					setState({ state: err instanceof GraphNotFoundError ? 'not-found' : 'error', message });
 					return;
 				}
 				setState(previous => (previous.state === 'ready' ? { ...previous, refreshError: message } : previous));

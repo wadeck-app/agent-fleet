@@ -76,6 +76,15 @@ describe('useFlowGraph', () => {
 		expect(hook.current.state === 'error' && hook.current.message).toBe('Execution zzz not found.');
 	});
 
+	it('goes to not-found when the API flags the record as missing', async () => {
+		const fetchFn = vi
+			.fn()
+			.mockResolvedValue(jsonResponse(404, { error: 'Execution zzz was not found.', notFound: true }));
+		const { result: hook } = renderHook(() => useFlowGraph({ executionId: 'zzz' }, fetchFn));
+		await waitFor(() => expect(hook.current.state).toBe('not-found'));
+		expect(hook.current.state === 'not-found' && hook.current.message).toBe('Execution zzz was not found.');
+	});
+
 	it('does not refresh a finished run', async () => {
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 		const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, result('completed')));

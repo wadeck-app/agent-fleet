@@ -1,15 +1,9 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { Badge, ButtonLink } from '@wadeck-app/dsl-ui';
+import { Badge } from '@wadeck-app/dsl-ui';
 import { Background, ReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { FlowGraphResult } from 'flow-core';
-import {
-	FLOW_ACTION_BUTTON_STYLE,
-	buildGraphTree,
-	defaultCollapsedIds,
-	executionLogsPath,
-	executionStepLogsPath,
-} from 'flow-core/graph-tree';
+import { buildGraphTree, defaultCollapsedIds, executionStepLogsPath } from 'flow-core/graph-tree';
 
 import { describeChartMode } from './ChartMode.js';
 import { ChartToolbar } from './ChartToolbar.js';
@@ -165,13 +159,6 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 						</p>
 						<p className="text-xs text-muted">{mode.hint}</p>
 					</div>
-					{execution && (
-						<ButtonLink
-							to={executionLogsPath(execution.executionId)}
-							label="Logs"
-							{...FLOW_ACTION_BUTTON_STYLE}
-						/>
-					)}
 				</div>
 			</header>
 

@@ -150,11 +150,18 @@ describe('contributions to the slots of flow', () => {
 		}
 	});
 
-	it('fills the execution detail page and the executions list', () => {
+	// The "Flow chart" button of the execution page is the Chart tab (route /flows/runs/:id): a second entry would duplicate it.
+	// Both come from this module, so the tab is there whenever the button would have been. The expanded row of the executions
+	// list has no tabs, so its "Flow chart" button stays.
+	const SLOT_WITHOUT_CONTRIBUTION = 'execution-actions';
+
+	it('fills the execution page links and the executions list, but not the execution page actions (the Chart tab replaces them)', () => {
 		expect(contributions.map(p => p.slot).sort()).toEqual(
 			Object.keys(FLOW_EXPOSED_SLOTS)
+				.filter(slot => slot !== SLOT_WITHOUT_CONTRIBUTION)
 				.map(slot => `${flowSlotPrefix}${slot}`)
 				.sort()
 		);
+		expect(Object.keys(FLOW_EXPOSED_SLOTS)).toContain(SLOT_WITHOUT_CONTRIBUTION);
 	});
 });

@@ -7,7 +7,6 @@ app-core module `flow-chart`: draws a flow as a graph (steps, `depends`, `when`,
 | Where                                                          | What                                                 | Source                                    |
 | -------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------- |
 | Slot `flow:execution-links` (execution page, before Logs)      | "Flow definition" button (`target: flow`)            | `src/dsl-views/execution-link.yaml`       |
-| Slot `flow:execution-actions` (execution page, after Logs)     | "Flow chart" button                                  | `src/dsl-views/execution-action.yaml`     |
 | Slot `flow:execution-row-links` (expanded row, before Logs)    | "Flow definition" button, id from `$ctx.row.flowId`  | `src/dsl-views/execution-row-link.yaml`   |
 | Slot `flow:execution-row-actions` (expanded row, after Logs)   | "Flow chart" button, id from `$ctx.row.executionId`  | `src/dsl-views/execution-row-action.yaml` |
 | Slot `flow:executions-actions` (executions list)               | "Flow charts" button                                 | `src/dsl-views/executions-action.yaml`    |

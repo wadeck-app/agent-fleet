@@ -2,7 +2,7 @@
 # ?tail=<chars> sets how much of a failed step's output is kept; ?full=true lifts the limit.
 # There is no "Back to executions" link: the shell shows a breadcrumb.
 # Buttons, left to right: the slot "flow:execution-links" (flow-chart adds "Flow definition"), then the slot
-# "flow:execution-actions" (flow-chart adds "Flow chart"). The logs are a tab (manifest `tab`, group "execution"), not a button.
+# "flow:execution-actions" (no contributor today: flow-chart is the Chart tab). The logs are a tab (manifest `tab`, group "execution"), not a button.
 # Two slots keep a contribution before or after the other. Their views are rendered with this page's context, so they can read $route.id and
 # $sources.execution.<field> (whole-string expressions only).
 # Times are ISO 8601 and shown by table columns with `format: datetime`, the shell formatter of every app-core table:

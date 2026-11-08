@@ -32,15 +32,6 @@
 		},
 		{
 			"kind": "widget",
-			"slot": "flow:execution-actions",
-			"label": "Flow chart",
-			"view": {
-				"type": "path",
-				"value": "./src/dsl-views/execution-action.yaml"
-			}
-		},
-		{
-			"kind": "widget",
 			"slot": "flow:execution-row-actions",
 			"label": "Flow chart",
 			"view": {

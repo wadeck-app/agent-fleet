@@ -196,6 +196,13 @@ describe('GET /graph', () => {
 		expect(errorOf(body)).toContain('zzz999');
 	});
 
+	it('flags an unknown execution as notFound and never shows the data folder', async () => {
+		const { body } = await callRoute(routes, 'GET /graph', { query: { executionId: 'zzz999' } });
+		expect((body as { notFound?: boolean }).notFound).toBe(true);
+		expect(errorOf(body)).not.toContain(fixture.configDir);
+		expect(errorOf(body)).toMatch(/removed by the retention cleanup|id is wrong/);
+	});
+
 	it('answers 404 for a flow nobody ran', async () => {
 		const { status, body } = await callRoute(routes, 'GET /graph', { query: { flowId: 'ghost' } });
 		expect(status).toBe(404);

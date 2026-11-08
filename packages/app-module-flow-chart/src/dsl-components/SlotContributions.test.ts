@@ -22,8 +22,13 @@ const contributions = manifest.extensionPoints
 	});
 
 describe('contributions to the slots of the flow module', () => {
-	it('fills every slot the flow module exposes (an unfilled one would leave the button out of a page)', () => {
-		expect(contributions.map(c => c.slot).sort()).toEqual(Object.keys(FLOW_EXPOSED_SLOTS).sort());
+	// execution-actions is left empty on purpose: the Chart tab (manifest route /flows/runs/:id) replaces the page button.
+	it('fills every slot the flow module exposes except execution-actions (the Chart tab replaces it)', () => {
+		expect(contributions.map(c => c.slot).sort()).toEqual(
+			Object.keys(FLOW_EXPOSED_SLOTS)
+				.filter(slot => slot !== 'execution-actions')
+				.sort()
+		);
 	});
 
 	it.each(contributions)('$file has a root $type the slot accepts, read from the flow contract', ({ slot, view }) => {
