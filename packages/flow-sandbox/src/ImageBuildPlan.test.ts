@@ -22,11 +22,13 @@ describe('ImageBuildPlan', () => {
 			ImageBuildPlan.inspectId('flow-sandbox:m9'),
 			ImageBuildPlan.save('flow-sandbox:m9', tar),
 			ImageBuildPlan.readManifest(tar),
+			ImageBuildPlan.readIndex(tar),
 		];
 
 		expect(commands[0]).toEqual(['docker', 'build', '-t', 'flow-sandbox:m9', context]);
 		expect(commands[2]).toEqual(['docker', 'save', 'flow-sandbox:m9', '-o', tar]);
 		expect(commands[3]).toEqual(['tar', '-xOf', tar, 'manifest.json']);
+		expect(commands[4]).toEqual(['tar', '-xOf', tar, 'index.json']);
 		for (const command of commands) expect(command).not.toContain('-c');
 	});
 

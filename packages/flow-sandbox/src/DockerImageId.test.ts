@@ -52,6 +52,31 @@ describe('DockerImageId', () => {
 			}
 		));
 
+	// Docker 29 with the containerd image store (the sbx 0.51.0 builder): `docker image inspect` .Id is the digest of the image
+	// index, which the saved archive lists in index.json; its manifest.json Config is another digest (observed with hello-world).
+	it('assertInArchive: the containerd store, where the id is the index digest of the archive (each case)', () =>
+		eachRow(
+			[
+				{ label: 'index digest equals the id', index: [{ digest: ID }], tags: ['flow-sandbox:m9'], ok: true },
+				{
+					label: 'another index digest',
+					index: [{ digest: `sha256:${'b'.repeat(64)}` }],
+					tags: ['flow-sandbox:m9'],
+					ok: false,
+				},
+				{ label: 'right digest, another tag', index: [{ digest: ID }], tags: ['flow-sandbox:old'], ok: false },
+				{ label: 'no index', index: undefined, tags: ['flow-sandbox:m9'], ok: false },
+			],
+			({ index, tags, ok }) => {
+				const manifest = JSON.stringify([{ Config: `blobs/sha256/${'c'.repeat(64)}`, RepoTags: tags }]);
+				const indexJson =
+					index === undefined ? 'tar: index.json: Not found' : JSON.stringify({ manifests: index });
+				const run = (): void => DockerImageId.assertInArchive(ID, manifest, 'flow-sandbox:m9', indexJson);
+				if (ok) expect(run).not.toThrow();
+				else expect(run).toThrow(/does not hold image/);
+			}
+		));
+
 	it('assertInArchive: refuses a manifest that is not JSON', () => {
 		expect(() => DockerImageId.assertInArchive(ID, 'tar: manifest.json: Not found', 'x:1')).toThrow(/not JSON/);
 	});

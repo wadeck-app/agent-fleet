@@ -70,14 +70,18 @@ function step(label) {
 	console.log(`[${new Date().toISOString()}] ${label}`);
 }
 
-/** Runs one command (an argument list, no shell) in the builder sandbox and returns its standard output. */
-async function inBuilder(label, command) {
+/**
+ * Runs one command (an argument list, no shell) in the builder sandbox and returns its standard output.
+ * With `tolerateFailure`, a failing command returns its error text instead of throwing (index.json is absent from classic archives).
+ */
+async function inBuilder(label, command, tolerateFailure = false) {
 	step(label);
 	const result = await runtime.exec({
 		sandbox: builder,
 		command,
 		signal: AbortSignal.timeout(900_000),
 	});
+	if (result.exitCode !== 0 && tolerateFailure) return result.stderr || result.stdout;
 	if (result.exitCode !== 0) {
 		throw new Error(
 			`${label} failed (exit ${result.exitCode}).\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
@@ -105,7 +109,9 @@ try {
 	DockerImageId.assertInArchive(
 		imageId,
 		await inBuilder('read the archive manifest', ImageBuildPlan.readManifest(tarInVm)),
-		tag
+		tag,
+		// containerd image store: the image id is the digest listed here, not the config of manifest.json.
+		await inBuilder('read the archive index', ImageBuildPlan.readIndex(tarInVm), true)
 	);
 	const tarPath = path.join(output, 'image.tar');
 	step(`sbx template load (${Math.round(statSync(tarPath).size / 1e6)} MB)`);

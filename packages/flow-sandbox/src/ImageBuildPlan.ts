@@ -35,4 +35,9 @@ export class ImageBuildPlan {
 	static readManifest(tarInVm: string): string[] {
 		return ['tar', '-xOf', tarInVm, 'manifest.json'];
 	}
+
+	/** OCI layout of the archive; absent from archives of the classic image store. */
+	static readIndex(tarInVm: string): string[] {
+		return ['tar', '-xOf', tarInVm, 'index.json'];
+	}
 }
