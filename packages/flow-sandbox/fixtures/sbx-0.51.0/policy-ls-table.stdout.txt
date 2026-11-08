@@ -1,0 +1,4 @@
+POLICY                                 SOURCE   APPLIES TO                          SUMMARY
+8d8e76ad-b6d0-490d-86d9-06faec933d93   local    sandbox:flow-sbx-capture-aa24a9cc   network: 1 allow
+default-deny-all                       local    all                                 network: deny when no rule decides
+local-policy                           local    all                                 network: 195 allow; filesystem read: 1 allow; filesystem write: 1 allow

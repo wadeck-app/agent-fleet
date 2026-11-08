@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const FIXTURE_VERSION = '0.49.2';
+const FIXTURE_VERSION = '0.51.0';
 const fixtureDir = path.join(
 	path.dirname(fileURLToPath(import.meta.url)),
 	'..',
@@ -197,9 +197,9 @@ if (hasScenario('daemon-down')) {
 
 const state = loadState();
 
-function notFound(name) {
-	// REAL text (err-*-missing fixtures)
-	fail(`error: sandbox '${name}' not found\n  try: sbx ls`);
+function notFound(name, code = 1) {
+	// REAL text (err-*-missing fixtures); `sbx exec` exits 125 instead of 1 since 0.51.0
+	fail(`error: sandbox '${name}' not found\n  try: sbx ls`, code);
 }
 
 function requireSandbox(name) {
@@ -410,6 +410,11 @@ switch (verbMatch ?? argv[0]) {
 			id: `mock-${name}`,
 			agent,
 			status: 'running',
+			// Since 0.51.0 `ls --json` lists `mounts` as "<host path>:<path in the VM>"; the ':ro' form was not captured (synthetic).
+			mounts: workspaces.map(
+				workspace =>
+					`${workspace}:${workspace.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`).replaceAll('\\', '/')}`
+			),
 			workspaces,
 			// An omitted --cpus/-m would be sbx's 20 CPUs / half of the RAM: record that so a test sees the difference.
 			cpus: cpus ? Number(cpus) : 20,
@@ -447,6 +452,8 @@ switch (verbMatch ?? argv[0]) {
 			env[pair.slice(0, eq)] = pair.slice(eq + 1);
 		}
 		recordCall({ envFileContent });
+		if (!name) fail('error: sandbox name required');
+		if (!state.sandboxes[name]) notFound(name, 125);
 		const sandbox = requireSandbox(name);
 		sandbox.status = 'running';
 		saveState(state);

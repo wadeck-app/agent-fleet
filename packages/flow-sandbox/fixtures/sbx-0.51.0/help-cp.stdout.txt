@@ -1,0 +1,46 @@
+Description:
+  Either SRC or DST must be a sandbox path, written as SANDBOX:PATH.
+  The other must be a local path. Copying between two sandboxes is not supported. Or — with --cloud — the cloud sandbox
+  ID (sbx_*) or name from "sbx --cloud ls". Cloud transfers go through the Docker
+  Sandboxes Cloud file API instead of the local sandboxd.
+
+  Cloud copies transfer files, not symbolic links or empty directories. A symbolic
+  link passed as SRC is always followed on upload. Links inside an uploaded
+  directory are skipped unless --follow-link is set. On download, --follow-link
+  follows SRC only when it names a symbolic link to a file. Downloads of directories
+  skip symbolic links even with --follow-link.
+
+  When copying a directory, the directory itself is placed at the destination.
+  If the destination path does not exist it is created; if it already exists
+  as a directory, the source is placed inside it.
+
+  For local paths inside workspace directories or other host directories mounted
+  into the sandbox, sbx cp refuses symbolic links that escape those directories,
+  even with --follow-link, including when a directory is reached through a
+  symbolic link, junction or substituted drive.
+
+Usage:
+  sbx cp SRC DST [flags]
+
+Examples:
+  # Copy a file from host to sandbox
+  sbx cp ./config.json my-sandbox:/home/user/
+
+  # Copy a file from sandbox to host
+  sbx cp my-sandbox:/home/user/output.log ./
+
+  # Copy a directory
+  sbx cp ./src/ my-sandbox:/home/user/src
+
+  # Copy to/from a cloud sandbox
+  sbx --cloud cp ./config.json sbx_abc:/workspace/config.json
+  sbx --cloud cp sbx_abc:/workspace/out.log ./
+
+Flags:
+  -L, --follow-link   Follow symbolic links in the source path (cloud: does not follow links inside downloaded directories)
+  -h, --help          help for cp
+
+Global Flags:
+      --cloud      Dispatch to Docker Cloud Sandboxes API instead of local sandboxd (supported by a growing set of verbs — run 'sbx --cloud --help' for the current list)
+  -D, --debug      Enable debug logging
+      --no-input   Never prompt; commands that need an answer fail with the command to run instead

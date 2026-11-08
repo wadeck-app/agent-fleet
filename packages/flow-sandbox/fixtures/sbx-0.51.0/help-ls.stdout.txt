@@ -1,0 +1,28 @@
+Description:
+  List all sandboxes with their agent, status, published ports, and workspace.
+
+Usage:
+  sbx ls [flags]
+
+Aliases:
+  ls, list
+
+Examples:
+  sbx ls
+
+  # Names only, for scripting
+  sbx ls -q
+
+  # Machine-readable output
+  sbx ls --format json
+
+Flags:
+      --format string   Output format: table, json or yaml
+  -h, --help            help for ls
+      --json            Output in JSON format
+  -q, --quiet           Only display sandbox names
+
+Global Flags:
+      --cloud      Dispatch to Docker Cloud Sandboxes API instead of local sandboxd (supported by a growing set of verbs — run 'sbx --cloud --help' for the current list)
+  -D, --debug      Enable debug logging
+      --no-input   Never prompt; commands that need an answer fail with the command to run instead

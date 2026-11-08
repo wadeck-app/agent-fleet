@@ -49,7 +49,9 @@ describe('captured fixtures', () => {
 		for (const command of manifest.commands) {
 			// Reading throws when the file is missing.
 			const text = fixtures.stdout(command.id) + fixtures.stderr(command.id);
-			expect(command.exitCode, command.id).toBe(command.id.startsWith('err-') ? 1 : 0);
+			expect(command.exitCode, command.id).toBe(
+				command.id === 'err-exec-missing' ? 125 : command.id.startsWith('err-') ? 1 : 0
+			);
 			expect(text, command.id).not.toMatch(/C:\\Users\\(?!<user>)[^\\]+/);
 		}
 	});
@@ -114,7 +116,8 @@ describe('sbx mock versus the captured outputs', () => {
 		const results = await Promise.all(cases.map(([, args]) => runMock(args)));
 
 		cases.forEach(([id], index) => {
-			expect(results[index]?.exitCode, id).toBe(1);
+			// `sbx exec` exits 125 for a missing sandbox since 0.51.0, the other verbs 1.
+			expect(results[index]?.exitCode, id).toBe(id === 'err-exec-missing' ? 125 : 1);
 			expect(results[index]?.stderr, id).toBe(fixtures.stderr(id));
 			expect(results[index]?.stdout, id).toBe('');
 		});

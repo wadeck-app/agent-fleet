@@ -71,7 +71,7 @@ beforeEach(() => {
 			'const env = process.env; const here = __dirname; const mode = (fs.existsSync(here + "/mode") ? fs.readFileSync(here + "/mode", "utf8") : "").trim();',
 			'fs.appendFileSync(here + "/stub.log", JSON.stringify({ argv: process.argv.slice(2), env: { FLOW_DAEMON_WS_URL: env.FLOW_DAEMON_WS_URL, FLOW_WORKER_SOURCE_ID: env.FLOW_WORKER_SOURCE_ID, FLOW_WORKER_TOKEN: env.FLOW_WORKER_TOKEN, SBX_PATH: env.SBX_PATH }, keys: Object.keys(env) }) + \'\\n\');',
 			"if (process.argv[2] === 'preflight') {",
-			"  if (mode === 'preflight-fails') { process.stderr.write('sbx 0.1.0 is installed but 0.49.2 is required: install it from the release page\\n'); process.exit(1); }",
+			"  if (mode === 'preflight-fails') { process.stderr.write('sbx 0.1.0 is installed but 0.51.0 is required: install it from the release page\\n'); process.exit(1); }",
 			'  process.exit(0);',
 			'}',
 			"const half = Math.floor((env.FLOW_WORKER_TOKEN || '').length / 2);",
@@ -396,7 +396,7 @@ describe('sandbox plugin: the factory refuses to build with a plain message that
 				setMode('preflight-fails');
 			},
 			options: GOOD,
-			fragment: '0.49.2 is required',
+			fragment: '0.51.0 is required',
 		},
 	])('$label', async ({ setup, options, fragment }) => {
 		setup();

@@ -1,7 +1,7 @@
 /** Read-only views of the sbx installation, parsed from `--json` outputs. Implemented by SbxCliRuntime. */
 
 export interface SbxVersionInfo {
-	/** For example `0.49.2` (no leading `v`). */
+	/** For example `0.51.0` (no leading `v`). */
 	version: string;
 	/** Build commit printed after the version, when present. */
 	commit: string | undefined;
@@ -11,7 +11,7 @@ export interface SbxVersionInfo {
 
 export interface SbxDiagnoseCheck {
 	name: string;
-	/** Raw sbx status: `pass`, `warn`, `skip` seen in 0.49.2; anything else is treated as a failure. */
+	/** Raw sbx status: `pass`, `warn`, `skip` seen in 0.51.0; anything else is treated as a failure. */
 	status: string;
 	message: string;
 	detail: string;

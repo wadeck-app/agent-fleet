@@ -5,7 +5,7 @@ import { eachRow } from '../testing/EachRow';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { SbxTemplateListing, WrapperPreflight } from './WrapperPreflight';
 
-const OK: PrerequisiteReport = { ok: true, findings: [{ id: 'version', severity: 'ok', message: 'sbx 0.49.2' }] };
+const OK: PrerequisiteReport = { ok: true, findings: [{ id: 'version', severity: 'ok', message: 'sbx 0.51.0' }] };
 const BROKEN: PrerequisiteReport = {
 	ok: false,
 	findings: [{ id: 'not-signed-in', severity: 'error', message: 'sbx is not signed in: run `sbx login`' }],

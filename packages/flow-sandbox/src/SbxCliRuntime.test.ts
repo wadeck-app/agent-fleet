@@ -206,6 +206,13 @@ describe('SbxCliRuntime exec', () => {
 				command: ['fail', '1', "error: sandbox 'box-1' not found"],
 			});
 			expect(printed.exitCode).toBe(1);
+
+			// Same with the exit code sbx uses for a missing sandbox (125): the sandbox exists, so it is the program's own output.
+			const printed125 = await runtime.exec({
+				sandbox: 'box-1',
+				command: ['fail', '125', "error: sandbox 'box-1' not found"],
+			});
+			expect(printed125.exitCode).toBe(125);
 		}
 	);
 
@@ -635,8 +642,8 @@ describe('SbxCliRuntime environment, version and binary', () => {
 			expect(error.kind).toBe('version-mismatch');
 			expect(error.message).toContain('sbx 0.50.0 found at');
 			expect(error.message).toContain(MOCK_SBX_PATH);
-			expect(error.message).toContain('pinned to sbx 0.49.2');
-			expect(error.message).toContain('https://github.com/docker/sbx-releases/releases/tag/v0.49.2');
+			expect(error.message).toContain('pinned to sbx 0.51.0');
+			expect(error.message).toContain('https://github.com/docker/sbx-releases/releases/tag/v0.51.0');
 			expect(error.message).toContain('PINNED_SBX_VERSION');
 			expect(harness.callsWithVerb('create')).toEqual([]);
 
@@ -645,7 +652,7 @@ describe('SbxCliRuntime environment, version and binary', () => {
 
 			expect(await runtime.readVersion()).toEqual({
 				version: '0.50.0',
-				commit: '5d40fd43027b33ed1f1a39c14fb07e2503d6998f',
+				commit: '7d55286de0c775148b985ed349f760f1eba06203',
 				binaryPath: MOCK_SBX_PATH,
 			});
 		}

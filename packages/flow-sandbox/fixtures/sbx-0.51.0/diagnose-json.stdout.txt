@@ -1,0 +1,151 @@
+{
+  "version": "1.0",
+  "checks": [
+    {
+      "name": "CLI binary",
+      "status": "pass",
+      "message": "found",
+      "detail": "C:\\Users\\<user>\\AppData\\Local\\DockerSandboxes\\bin\\sbx.exe",
+      "hint": ""
+    },
+    {
+      "name": "Binary version",
+      "status": "pass",
+      "message": "v0.51.0",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "Host processes",
+      "status": "pass",
+      "message": "2 sbx, 0 containerd-shim-nerdbox-v1",
+      "detail": "sbx PID 56136: C:\\Users\\<user>\\AppData\\Local\\DockerSandboxes\\bin\\sbx.exe\nsbx PID 62796: C:\\Users\\<user>\\AppData\\Local\\DockerSandboxes\\bin\\sbx.exe",
+      "hint": ""
+    },
+    {
+      "name": "Daemon",
+      "status": "pass",
+      "message": "healthy",
+      "detail": "version v0.51.0",
+      "hint": ""
+    },
+    {
+      "name": "Daemon diagnostics",
+      "status": "pass",
+      "message": "collected (138796 bytes)",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "Virtualization",
+      "status": "pass",
+      "message": "supported",
+      "detail": "WHvCapabilityCodeHypervisorPresent is true",
+      "hint": ""
+    },
+    {
+      "name": "mkfs.erofs",
+      "status": "pass",
+      "message": "found",
+      "detail": "C:\\Users\\<user>\\AppData\\Local\\DockerSandboxes\\libexec\\mkfs.erofs.exe, default block size 4096 bytes, guest kernel page size 4096 bytes",
+      "hint": ""
+    },
+    {
+      "name": "mkfs.ext4",
+      "status": "pass",
+      "message": "found",
+      "detail": "C:\\Users\\<user>\\AppData\\Local\\DockerSandboxes\\libexec\\mkfs.ext4.exe, mke2fs 1.47.3 (8-Jul-2025)",
+      "hint": ""
+    },
+    {
+      "name": "Storage directories",
+      "status": "pass",
+      "message": "all 1 paths present",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "Directory permissions",
+      "status": "pass",
+      "message": "all writable",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "Disk space",
+      "status": "pass",
+      "message": "398.9GiB free",
+      "detail": "398.9GiB free of 1.819TiB on the state directory's volume",
+      "hint": ""
+    },
+    {
+      "name": "ZFS offset sync",
+      "status": "skip",
+      "message": "state directory is not on ZFS",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "eCryptfs",
+      "status": "skip",
+      "message": "state directory is not on eCryptfs",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "Version match",
+      "status": "pass",
+      "message": "v0.51.0",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "Socket",
+      "status": "pass",
+      "message": "path configured",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "SSH client config",
+      "status": "pass",
+      "message": "not configured",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "Claude Desktop SSH shell",
+      "status": "skip",
+      "message": "local SSH not configured",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "Authentication",
+      "status": "pass",
+      "message": "authenticated",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "Global network policy",
+      "status": "pass",
+      "message": "initialized",
+      "detail": "",
+      "hint": ""
+    },
+    {
+      "name": "TLS trust store",
+      "status": "pass",
+      "message": "not overridden in this shell",
+      "detail": "A daemon started from another shell logs a warning at startup if its environment overrides it",
+      "hint": ""
+    }
+  ],
+  "summary": {
+    "pass": 17,
+    "warn": 0,
+    "fail": 0,
+    "skip": 3
+  }
+}

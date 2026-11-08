@@ -25,7 +25,7 @@ Needs `bash` on PATH (Git for Windows on Windows): `CredentialProcessScript.test
 
 ## Mock fidelity
 
-Real captures (sbx 0.49.2, `fixtures/sbx-0.49.2/`, written by `scripts/CaptureSbxFixtures.mjs`: read-only commands, plus one throw-away `flow-sbx-capture-*` sandbox with one scoped rule so `ls-json` and `policy-ls-json` are populated; it refuses to write them empty): version, `ls --json`, `diagnose --json`, `policy ls --json`, `settings ls --json`, `--help` of the verbs used, "sandbox not found" errors. The mock validates flags against the captured help and `SbxMockFidelity.test.ts` compares its output with the captures.
+Real captures (sbx 0.51.0, `fixtures/sbx-0.51.0/`, written by `scripts/CaptureSbxFixtures.mjs`: read-only commands, plus one throw-away `flow-sbx-capture-*` sandbox with one scoped rule so `ls-json` and `policy-ls-json` are populated; it refuses to write them empty): version, `ls --json`, `diagnose --json`, `policy ls --json`, `settings ls --json`, `--help` of the verbs used, "sandbox not found" errors. The mock validates flags against the captured help and `SbxMockFidelity.test.ts` compares its output with the captures.
 
 SYNTHETIC (invented by the mock, verified only by the live check):
 

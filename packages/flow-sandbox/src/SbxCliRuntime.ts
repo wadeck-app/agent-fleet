@@ -48,6 +48,8 @@ export interface SbxCliRuntimeOptions {
 
 const DEFAULT_COMMAND_TIMEOUT_MS = 120_000;
 const DEFAULT_CREATE_TIMEOUT_MS = 600_000;
+/** `sbx exec` on a missing sandbox exits 125 (sbx 0.51.0, fixture err-exec-missing); the other verbs exit 1. */
+const EXEC_SANDBOX_NOT_FOUND_EXIT_CODE = 125;
 /** Largest timer value Node accepts; stands for "no limit". */
 const NO_TIMEOUT_MS = 2 ** 31 - 1;
 
@@ -136,7 +138,10 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 				timeoutMs: this.execTimeoutMs,
 			});
 			// A program inside the sandbox can print the same text and exit 1: only the sandbox list can tell.
-			if (this.isSandboxNotFound(result, request.sandbox) && !(await this.exists(request.sandbox))) {
+			if (
+				this.isSandboxNotFound(result, request.sandbox, EXEC_SANDBOX_NOT_FOUND_EXIT_CODE) &&
+				!(await this.exists(request.sandbox))
+			) {
 				throw this.notFound(request.sandbox, args, result);
 			}
 			return result;
@@ -384,10 +389,10 @@ export class SbxCliRuntime implements SandboxRuntime, SbxIntrospection {
 		return (await this.list()).some(info => info.name === sandbox);
 	}
 
-	private isSandboxNotFound(result: SbxProcessResult, sandbox: string): boolean {
+	private isSandboxNotFound(result: SbxProcessResult, sandbox: string, exitCode = 1): boolean {
 		// Only sbx's own failure counts: the command inside the sandbox can print anything and exit 1.
 		return (
-			result.exitCode === 1 &&
+			result.exitCode === exitCode &&
 			result.stdout === '' &&
 			result.stderr.startsWith(`error: sandbox '${sandbox}' not found`)
 		);

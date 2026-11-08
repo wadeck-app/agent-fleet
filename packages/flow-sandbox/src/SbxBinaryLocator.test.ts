@@ -150,7 +150,7 @@ describe('SbxBinaryLocator default locations', () => {
 		expect(error.kind).toBe('binary-missing');
 		expect(error.message).toBe(
 			`The sbx executable (Docker Sandboxes) was not found. Looked in: ${WINDOWS_DEFAULT}, PATH. ` +
-				'Install sbx 0.49.2 (https://github.com/docker/sbx-releases/releases/tag/v0.49.2), then either add it to PATH, ' +
+				'Install sbx 0.51.0 (https://github.com/docker/sbx-releases/releases/tag/v0.51.0), then either add it to PATH, ' +
 				'set the SBX_PATH environment variable to the executable, or pass the "binaryPath" option.'
 		);
 	});

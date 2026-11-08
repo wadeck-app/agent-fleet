@@ -47,7 +47,7 @@ function scriptBinary(name: string, source: string): (created: MockSbxHarness) =
 	};
 }
 
-/** The healthy state of the captured sbx 0.49.2 machine, with the parts a test changes. */
+/** The healthy state of the captured sbx 0.51.0 machine, with the parts a test changes. */
 class StateIntrospection implements SbxIntrospection {
 	readonly reads: string[] = [];
 	diagnose: SbxDiagnoseCheck[] = [
@@ -62,7 +62,7 @@ class StateIntrospection implements SbxIntrospection {
 
 	readVersion(): Promise<SbxVersionInfo> {
 		this.reads.push('version');
-		return Promise.resolve({ version: '0.49.2', commit: undefined, binaryPath: '/stub/sbx' });
+		return Promise.resolve({ version: '0.51.0', commit: undefined, binaryPath: '/stub/sbx' });
 	}
 
 	readDiagnose(): Promise<SbxDiagnoseReport> {
@@ -132,7 +132,7 @@ describe('SbxPrerequisiteCheck against the sbx mock', () => {
 			expect(finding(report, 'network-mode').message).toBe(
 				'Machine network policy is deny-all: a sandbox reaches only the hosts opened for it.'
 			);
-			expect(finding(report, 'version').message).toBe(`sbx 0.49.2 at ${MOCK_SBX_PATH}.`);
+			expect(finding(report, 'version').message).toBe(`sbx 0.51.0 at ${MOCK_SBX_PATH}.`);
 		}
 	);
 
@@ -187,7 +187,7 @@ describe('SbxPrerequisiteCheck against the sbx mock', () => {
 			expect(searchMessage).toContain('The sbx executable (Docker Sandboxes) was not found. Looked in:');
 			expect(searchMessage).toContain(path.win32.join(emptyHome, 'DockerSandboxes', 'bin', 'sbx.exe'));
 			expect(searchMessage).toContain(
-				'Install sbx 0.49.2 (https://github.com/docker/sbx-releases/releases/tag/v0.49.2)'
+				'Install sbx 0.51.0 (https://github.com/docker/sbx-releases/releases/tag/v0.51.0)'
 			);
 			expect(searchMessage).toContain('set the SBX_PATH environment variable');
 
@@ -226,8 +226,8 @@ describe('SbxPrerequisiteCheck against the sbx mock', () => {
 			const mismatch = finding(report, 'version-mismatch');
 			expect(mismatch.severity).toBe('error');
 			expect(mismatch.message).toBe(
-				`sbx 0.50.0 found at ${MOCK_SBX_PATH}, but flow-sandbox is pinned to sbx 0.49.2. ` +
-					'Install v0.49.2 (https://github.com/docker/sbx-releases/releases/tag/v0.49.2) or point SBX_PATH / the "binaryPath" option to it.'
+				`sbx 0.50.0 found at ${MOCK_SBX_PATH}, but flow-sandbox is pinned to sbx 0.51.0. ` +
+					'Install v0.51.0 (https://github.com/docker/sbx-releases/releases/tag/v0.51.0) or point SBX_PATH / the "binaryPath" option to it.'
 			);
 			expect(report.ok).toBe(false);
 			// Every other command refuses to run on a wrong version: reporting them would only repeat this error.
@@ -304,7 +304,7 @@ describe('SbxPrerequisiteCheck on a given state', () => {
 		state.ssh = undefined;
 		const missing = finding(await checkState(state), 'ssh-setting-missing');
 		expect(missing.severity).toBe('error');
-		expect(missing.message).toContain('sbx has no setting "ssh.agentForwardingEnabled" (sbx 0.49.2 has it)');
+		expect(missing.message).toContain('sbx has no setting "ssh.agentForwardingEnabled" (sbx 0.51.0 has it)');
 		expect(missing.message).toContain('refresh the fixtures');
 
 		state.ssh = 'yes';

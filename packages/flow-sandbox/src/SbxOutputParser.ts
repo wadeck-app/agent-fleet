@@ -28,7 +28,7 @@ export class SbxOutputParser {
 			throw new SandboxError(
 				'output-unparsable',
 				`Cannot read the sbx version from \`sbx version\` output: "${excerpt(output)}". ` +
-					'Expected a line like "sbx version v0.49.2 <commit>". The sbx output format changed or this is not sbx: ' +
+					'Expected a line like "sbx version v0.51.0 <commit>". The sbx output format changed or this is not sbx: ' +
 					'check which executable is used (binaryPath option / SBX_PATH).'
 			);
 		}

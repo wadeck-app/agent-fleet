@@ -33,8 +33,8 @@ const globalAllow = (...resources: string[]): Record<string, unknown> => ({
 describe('SbxOutputParser.parseVersion', () => {
 	it('reads the captured `sbx version` output and the variants of the banner', () => {
 		expect(parser.parseVersion(fixtures.stdout('version'))).toEqual({
-			version: '0.49.2',
-			commit: '5d40fd43027b33ed1f1a39c14fb07e2503d6998f',
+			version: '0.51.0',
+			commit: '7d55286de0c775148b985ed349f760f1eba06203',
 		});
 		const cases: [string, string, { version: string; commit: string | undefined }][] = [
 			[
@@ -45,8 +45,8 @@ describe('SbxOutputParser.parseVersion', () => {
 			['no leading v', 'sbx version 1.2.3 abcdef1\r\n', { version: '1.2.3', commit: 'abcdef1' }],
 			[
 				'a banner line before',
-				'warning: x\nsbx version v0.49.2 5d40fd4\n',
-				{ version: '0.49.2', commit: '5d40fd4' },
+				'warning: x\nsbx version v0.51.0 7d55286\n',
+				{ version: '0.51.0', commit: '7d55286' },
 			],
 		];
 		for (const [label, output, expected] of cases) expect(parser.parseVersion(output), label).toEqual(expected);
@@ -57,7 +57,7 @@ describe('SbxOutputParser.parseVersion', () => {
 			const error = failure(() => parser.parseVersion(output), JSON.stringify(output));
 
 			expect(error.kind, output).toBe('output-unparsable');
-			expect(error.message, output).toContain('Expected a line like "sbx version v0.49.2 <commit>"');
+			expect(error.message, output).toContain('Expected a line like "sbx version v0.51.0 <commit>"');
 			expect(error.message, output).toContain(`"${output.trim()}"`);
 		}
 	});
@@ -137,7 +137,7 @@ describe('SbxOutputParser.parseDiagnose', () => {
 	it('reads the captured report with its statuses, and treats missing message, detail and hint as empty strings', () => {
 		const report = parser.parseDiagnose(fixtures.stdout('diagnose-json'));
 
-		expect(report.checks).toHaveLength(17);
+		expect(report.checks).toHaveLength(20);
 		expect(report.checks.find(check => check.name === 'Authentication')).toEqual({
 			name: 'Authentication',
 			status: 'pass',
@@ -145,10 +145,9 @@ describe('SbxOutputParser.parseDiagnose', () => {
 			detail: '',
 			hint: '',
 		});
-		expect(new Set(report.checks.map(check => check.status))).toEqual(new Set(['pass', 'warn', 'skip']));
-		expect(report.checks.find(check => check.name === 'Binary version')?.hint).toContain(
-			'Download the latest release'
-		);
+		// 0.51.0 is the latest release, so no check warns in the capture (0.49.2 warned about a newer release): the status is covered below.
+		expect(new Set(report.checks.map(check => check.status))).toEqual(new Set(['pass', 'skip']));
+		expect(parser.parseDiagnose('{"checks":[{"name":"x","status":"warn"}]}').checks[0]?.status).toBe('warn');
 		expect(parser.parseDiagnose('{"checks":[{"name":"x","status":"pass"}]}').checks).toEqual([
 			{ name: 'x', status: 'pass', message: '', detail: '', hint: '' },
 		]);
@@ -173,7 +172,8 @@ describe('SbxOutputParser.parseNetworkPolicy', () => {
 		expect(parser.parseNetworkPolicy(fixtures.stdout('policy-ls-json'))).toEqual({
 			mode: 'restricted',
 			allowedResourceCount: 195,
-			deniedResourceCount: 0,
+			// The implicit `default-deny-all` row (deny `**`, "when no rule decides") added in 0.51.0: a fallback, not an allow-list change.
+			deniedResourceCount: 1,
 		});
 	});
 
@@ -239,7 +239,7 @@ describe('SbxOutputParser.parseSettings', () => {
 		const settings = parser.parseSettings(fixtures.stdout('settings-ls-json'));
 
 		expect(settings.get('ssh.agentForwardingEnabled')).toBe(true);
-		expect(settings.get('kit.allowedSources')).toEqual(['docker.io/']);
+		expect(settings.get('kit.allowedSources')).toEqual(['docker.io/', 'dhi.io/']);
 		expect(settings.get('daemon.log.maxBackups')).toBe(3);
 		expect(settings.has('no.such.key')).toBe(false);
 	});
