@@ -12,6 +12,12 @@ import { satisfies } from 'semver';
 import { describe, expect, it } from 'vitest';
 
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), '../..');
+interface FigureDeclaration {
+	route: string;
+	field?: string;
+	refreshSeconds?: number;
+}
+
 const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf8')) as {
 	id?: string;
 	version?: unknown;
@@ -24,7 +30,8 @@ const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf
 		slot: string;
 		label?: string;
 		path?: string;
-		tab?: { group: string; label: string; order: number };
+		tab?: { group: string; label: string; order: number; count?: FigureDeclaration };
+		count?: FigureDeclaration;
 		view: { type: string; value: string };
 	}[];
 };
@@ -111,7 +118,26 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 		const tabs = Object.fromEntries(manifest.extensionPoints.filter(p => p.tab).map(p => [p.path, p.tab]));
 		expect(tabs).toEqual({
 			'/executions/:id': { group: 'execution', label: 'Summary', order: 10 },
-			'/executions/:id/logs': { group: 'execution', label: 'Logs', order: 20 },
+			'/executions/:id/logs': {
+				group: 'execution',
+				label: 'Logs',
+				order: 20,
+				count: { route: '/executions/:id/logs/count' },
+			},
+		});
+	});
+
+	// App-core "figures next to entries": the shell GETs /api/modules/flow<route> and shows the number as a pill.
+	it('shows a figure next to the Executions (running) and Workers (connected) menu entries and the Logs tab (log lines)', () => {
+		const counts = Object.fromEntries(
+			manifest.extensionPoints
+				.map(p => [p.path, p.count ?? p.tab?.count] as const)
+				.filter(([, count]) => count !== undefined)
+		);
+		expect(counts).toEqual({
+			'/executions': { route: '/executions/count/running', field: 'count', refreshSeconds: 60 },
+			'/workers': { route: '/workers/count', field: 'count', refreshSeconds: 60 },
+			'/executions/:id/logs': { route: '/executions/:id/logs/count' },
 		});
 	});
 

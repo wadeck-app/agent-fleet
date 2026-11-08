@@ -9,7 +9,7 @@ One look everywhere: a small secondary navigating button (`ButtonLink`, `variant
 | `requires.flow` range          | flow-core `FLOW_REQUIRED_RANGE`                                                            | flow-chart `manifest.test.ts`                                                              |
 
 - The platform checks only the root `$type`, never props. A slot accepting `ButtonLink` could not stop `variant: primary`, so the slots accept one component, `flow-chart:FlowChartLink`, whose style is not a prop and which renders an error for any key besides `target`, `executionId` and `flowId` (`target: flow` links the definition chart, `execution` the run chart, `index` the flows list).
-- Two slots per place (`execution-links` / `execution-actions`, `execution-row-links` / `execution-row-actions`) exist only so a contribution can sit before or after the module's own Logs button; both accept the same root.
+- Two slots per place exist so a contribution can sit before or after an own button; both accept the same root. Row panel (`execution-row-links` / `execution-row-actions`): before / after the Logs button. Detail header (`execution-links` / `execution-actions`): Logs is a tab there, so `execution-actions` is kept but has no contributor today (flow-chart is the Chart tab).
 - The platform has no per-slot allow-list of contributors: any module that `requires` flow may contribute the accepted `$type`.
 - Another module contributes only after its component (fixed style, closed keys) is added to `FLOW_ACTION_SLOT_ACCEPTS` and `manifest.json`.
 - This module has no `dslLib`, so its own buttons are plain `ButtonLink` nodes with the same two props, pinned by tests.

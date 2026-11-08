@@ -21,6 +21,62 @@ function routesFor(service: Pick<FlowQueryService, 'listWorkers'>): ReturnType<t
 	return routes;
 }
 
+describe('GET /workers/count (the figure next to the Workers menu entry)', () => {
+	it('answers 0 with no daemon running (a normal state, not an error)', async () => {
+		const routes = routesFor(FlowQueryService.forConfigDir(fixture.configDir));
+		expect(await callRoute(routes, 'GET /workers/count')).toEqual({ status: 200, body: { count: 0 } });
+	});
+
+	it('counts the connected workers and nothing else', async () => {
+		const worker = (workerId: string) => ({
+			workerId,
+			pid: 42,
+			state: 'idle' as const,
+			labels: [],
+			attachedProjects: [],
+			hasUserInterface: false,
+			ephemeral: true,
+		});
+		const routes = routesFor({
+			listWorkers: vi.fn().mockResolvedValue({
+				workers: [worker('w1'), worker('w2')],
+				daemon: { running: true, pid: 1, port: 2, startedAt: 'x' },
+				declaredSources: [],
+			}),
+		});
+		expect(await callRoute(routes, 'GET /workers/count')).toEqual({ status: 200, body: { count: 2 } });
+	});
+
+	it('does not count declared sources: they are not connected workers', async () => {
+		writeFileSync(
+			join(fixture.configDir, 'worker-sources.json'),
+			JSON.stringify({
+				sources: [
+					{
+						sourceId: 'laptop',
+						provider: 'built-in:relay',
+						labels: [],
+						maxWorkers: 2,
+						tokenHash: 'h',
+						sourceTokenHash: 'h',
+						createdAt: '2026-01-01T00:00:00.000Z',
+					},
+				],
+			})
+		);
+		const routes = routesFor(FlowQueryService.forConfigDir(fixture.configDir));
+		expect((await callRoute(routes, 'GET /workers/count')).body).toEqual({ count: 0 });
+	});
+
+	it('answers 502 with the actionable message when the daemon answered but not with a worker list', async () => {
+		const message = 'The running daemon predates this command: run flow stop && flow start.';
+		const routes = routesFor({
+			listWorkers: vi.fn().mockRejectedValue(new WorkerListError(message, 'daemon-outdated')),
+		});
+		expect(await callRoute(routes, 'GET /workers/count')).toEqual({ status: 502, body: { error: message } });
+	});
+});
+
 describe('GET /workers', () => {
 	it('with no daemon running answers 200 with the empty list and why it is empty (a normal state, not an error)', async () => {
 		const routes = routesFor(FlowQueryService.forConfigDir(fixture.configDir));

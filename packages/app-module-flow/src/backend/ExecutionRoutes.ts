@@ -106,6 +106,19 @@ function flowsCaption(shown: number, total: number): string {
  * `stripForServing` (ANSI stripped, nothing else: no secret guessing; masking happens when the daemon writes).
  */
 export function registerExecutionRoutes(ctx: ModuleContext, service: FlowQueryService): void {
+	/**
+	 * `GET /executions/count/running`: the figure next to the Executions menu entry. Same reader as the list; limit 0
+	 * keeps the items out of the answer, `total` is the count before pagination.
+	 */
+	ctx.registerRoute('GET', '/executions/count/running', (_req, reply) => {
+		try {
+			const { total } = service.listExecutions({ status: 'running', limit: 0 });
+			return reply.code(200).send({ count: total });
+		} catch (err) {
+			return replyWithError(reply, err);
+		}
+	});
+
 	ctx.registerRoute('GET', '/executions', (req, reply) => {
 		const query = (req as { query?: QueryParams }).query ?? {};
 		try {

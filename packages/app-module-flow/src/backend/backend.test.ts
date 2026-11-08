@@ -35,6 +35,8 @@ describe('backend entry', () => {
 			'GET /executions',
 			'GET /executions/:id',
 			'GET /executions/:id/logs',
+			'GET /executions/:id/logs/count',
+			'GET /executions/count/running',
 			'GET /flows',
 			'GET /logs',
 			'GET /plugins',
@@ -42,6 +44,7 @@ describe('backend entry', () => {
 			'GET /related/project/:projectId',
 			'GET /widgets/executions',
 			'GET /workers',
+			'GET /workers/count',
 		]);
 	});
 
@@ -77,6 +80,9 @@ describe('backend entry', () => {
 		['GET /executions', 'listExecutions', 'disk on fire', {}],
 		['GET /executions/:id', 'getExecution', 'disk on fire', { params: { id: 'abc' } }],
 		['GET /executions/:id/logs', 'readExecutionLogs', 'disk on fire', { params: { id: 'abc' } }],
+		['GET /executions/:id/logs/count', 'readExecutionLogs', 'disk on fire', { params: { id: 'abc' } }],
+		['GET /executions/count/running', 'listExecutions', 'disk on fire', {}],
+		['GET /workers/count', 'listWorkers', 'disk on fire', {}],
 		['GET /logs', 'readLogs', 'disk on fire', {}],
 		['GET /workers', 'listWorkers', 'disk on fire', {}],
 		['GET /plugins', 'listPlugins', 'disk on fire', {}],

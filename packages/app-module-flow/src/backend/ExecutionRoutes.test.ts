@@ -17,9 +17,36 @@ beforeEach(() => {
 
 afterEach(() => fixture.dispose());
 
+describe('GET /executions/count/running (the figure next to the Executions menu entry)', () => {
+	it('answers 0, not an error, when nothing ran yet', async () => {
+		expect(await callRoute(routes, 'GET /executions/count/running')).toEqual({ status: 200, body: { count: 0 } });
+	});
+
+	it('counts only the running executions, whatever their number (no page size cuts it)', async () => {
+		for (let index = 0; index < 25; index++) {
+			fixture.addExecution({ executionId: `run${index}`, status: 'running' });
+		}
+		fixture.addExecution({ executionId: 'q1', status: 'queued' });
+		fixture.addExecution({ executionId: 'f1', status: 'failed' });
+		fixture.addExecution({ executionId: 'c1', status: 'completed' });
+		expect(await callRoute(routes, 'GET /executions/count/running')).toEqual({ status: 200, body: { count: 25 } });
+	});
+
+	it('answers the figure only: no id, no flow, no path', async () => {
+		fixture.addExecution({ executionId: 'secretid', flowId: 'secretflow', status: 'running' });
+		const { body } = await callRoute(routes, 'GET /executions/count/running');
+		expect(Object.keys(body as object)).toEqual(['count']);
+	});
+});
+
 describe('GET /executions', () => {
 	it('registers the list and the detail routes', () => {
-		expect([...routes.keys()].sort()).toEqual(['GET /executions', 'GET /executions/:id', 'GET /flows']);
+		expect([...routes.keys()].sort()).toEqual([
+			'GET /executions',
+			'GET /executions/:id',
+			'GET /executions/count/running',
+			'GET /flows',
+		]);
 	});
 
 	it('answers an empty page, not an error, when nothing ran yet', async () => {

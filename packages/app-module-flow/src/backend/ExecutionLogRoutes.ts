@@ -54,6 +54,21 @@ function noticeOf(logs: ExecutionLogsView, filtered: boolean): string {
  * filter matches the stored message.
  */
 export function registerExecutionLogRoutes(ctx: ModuleContext, service: FlowQueryService): void {
+	/**
+	 * `GET /executions/:id/logs/count`: the figure next to the Logs tab, the `total` of the unfiltered logs page. The
+	 * lines are counted by the same reader as the page (no cheaper source exists: the daemon logs are per-day files of
+	 * every run). An unknown id answers the page's not-found notice, which has no `count`, so the shell shows nothing.
+	 */
+	ctx.registerRoute('GET', '/executions/:id/logs/count', (req, reply) => {
+		const { id } = req.params as { id: string };
+		try {
+			const { total } = service.readExecutionLogs(id, { limit: 1, page: 0 });
+			return reply.code(200).send({ count: total });
+		} catch (err) {
+			return replyNotFoundOrError(reply, err, id);
+		}
+	});
+
 	ctx.registerRoute('GET', '/executions/:id/logs', (req, reply) => {
 		const { id } = req.params as { id: string };
 		const query = (req as { query?: QueryParams }).query ?? {};

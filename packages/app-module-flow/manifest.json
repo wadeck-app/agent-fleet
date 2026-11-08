@@ -47,6 +47,7 @@
 			"slot": "nav",
 			"label": "Flow Executions",
 			"path": "/executions",
+			"count": { "route": "/executions/count/running", "field": "count", "refreshSeconds": 60 },
 			"view": { "type": "path", "value": "./src/dsl-views/executions-page.yaml" }
 		},
 		{
@@ -62,7 +63,12 @@
 			"slot": "route",
 			"label": "Logs",
 			"path": "/executions/:id/logs",
-			"tab": { "group": "execution", "label": "Logs", "order": 20 },
+			"tab": {
+				"group": "execution",
+				"label": "Logs",
+				"order": 20,
+				"count": { "route": "/executions/:id/logs/count" }
+			},
 			"view": { "type": "path", "value": "./src/dsl-views/execution-logs-page.yaml" }
 		},
 		{
@@ -70,6 +76,7 @@
 			"slot": "nav",
 			"label": "Flow Workers",
 			"path": "/workers",
+			"count": { "route": "/workers/count", "field": "count", "refreshSeconds": 60 },
 			"view": { "type": "path", "value": "./src/dsl-views/workers-page.yaml" }
 		},
 		{

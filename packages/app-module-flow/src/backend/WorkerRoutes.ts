@@ -8,6 +8,16 @@ import { replyWithError } from './ErrorReply.js';
  * hashes: flow-core strips them) and the reason for an empty list. No daemon running is a normal 200.
  */
 export function registerWorkerRoutes(ctx: ModuleContext, service: FlowQueryService): void {
+	// The figure next to the Workers menu entry: connected workers only (declared sources are not workers).
+	ctx.registerRoute('GET', '/workers/count', async (_req, reply) => {
+		try {
+			const { workers } = await service.listWorkers();
+			return reply.code(200).send({ count: workers.length });
+		} catch (err) {
+			return replyWithError(reply, err);
+		}
+	});
+
 	ctx.registerRoute('GET', '/workers', async (_req, reply) => {
 		try {
 			// Awaited before reply.code(): a failure must not leave a 200 status set on the error answer.

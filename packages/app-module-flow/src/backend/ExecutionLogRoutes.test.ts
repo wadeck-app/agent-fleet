@@ -88,9 +88,43 @@ beforeEach(() => {
 
 afterEach(() => fixture.dispose());
 
+describe('GET /executions/:id/logs/count (the figure next to the Logs tab)', () => {
+	const count = (id: string) => callRoute(routes, 'GET /executions/:id/logs/count', { params: { id } });
+
+	it('counts every log line of the run, the lines of other runs excluded', async () => {
+		expect(await count('run1')).toEqual({ status: 200, body: { count: 4 } });
+	});
+
+	it('equals the total of the logs page, and accepts an id prefix like the page does', async () => {
+		const total = ((await call({})).body as LogsBody).total;
+		expect((await count('run')).body).toEqual({ count: total });
+	});
+
+	it('answers 0 for a run whose day has no log file', async () => {
+		fixture.addExecution({
+			executionId: 'nolog',
+			startedAt: '2026-01-01T10:00:00.000Z',
+			completedAt: '2026-01-01T10:01:00.000Z',
+		});
+		expect(await count('nolog')).toEqual({ status: 200, body: { count: 0 } });
+	});
+
+	it('answers the not-found notice of the logs page (no "count" field: the shell shows nothing) for an unknown id, without the data folder', async () => {
+		const { status, body } = await count('missing');
+		expect(status).toBe(200);
+		expect(body).not.toHaveProperty('count');
+		expect(JSON.stringify(body)).not.toContain(fixture.configDir);
+		expect(body).toEqual((await call({}, 'missing')).body);
+	});
+
+	it('answers the figure only: no path, no message', async () => {
+		expect(Object.keys((await count('run1')).body as object)).toEqual(['count']);
+	});
+});
+
 describe('GET /executions/:id/logs', () => {
-	it('registers one route', () => {
-		expect([...routes.keys()]).toEqual(['GET /executions/:id/logs']);
+	it('registers the page route and its count route', () => {
+		expect([...routes.keys()].sort()).toEqual(['GET /executions/:id/logs', 'GET /executions/:id/logs/count']);
 	});
 
 	it('answers the lines of the run with ISO timestamps (the shell formats them), the page size and the offset', async () => {

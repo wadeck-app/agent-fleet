@@ -8,7 +8,9 @@ Pages: `src/dsl-views/*.yaml`, referenced by `manifest.json`. `views.test.ts` ch
 
 Components: `src/dsl-components` makes this a dslLib module; `flow:MarkdownText` renders log messages (the prompt of a model step) as safe markdown, see [.docs/markdown-text.md](.docs/markdown-text.md).
 
-Slots other modules fill: `flow:execution-links` / `flow:execution-actions` (detail header, before / after Logs), `flow:execution-row-links` / `flow:execution-row-actions` (row panel, before / after Logs), `flow:executions-actions` (list page). See `FlowModuleContract` in flow-core.
+Slots other modules fill: `flow:execution-links` / `flow:execution-actions` (detail header buttons; Logs is a tab there; `execution-actions` has no contributor, flow-chart is the Chart tab), `flow:execution-row-links` / `flow:execution-row-actions` (row panel, before / after Logs), `flow:executions-actions` (list page). See `FlowModuleContract` in flow-core.
+
+Figures next to entries (app-core `count` in `manifest.json`): `GET /executions/count/running` (Executions entry), `GET /workers/count` (Workers entry), `GET /executions/:id/logs/count` (Logs tab); each answers `{ "count": n }`.
 
 Details: [.docs/pages-and-variants.md](.docs/pages-and-variants.md) covers the executions page, execution logs, times and columns, and the dashboard widget (the logs page is the only view with A/B experiments, `flow-logs-*`, see "Log view experiments" there).
 
