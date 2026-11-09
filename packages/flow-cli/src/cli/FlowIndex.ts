@@ -19,6 +19,7 @@ import { describeCommandLine } from './CommandLineLog';
 import { consumeDaemonModeFlag } from './DaemonModeFlag';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { registerCancelCommand } from './commands/CancelCommand';
+import { withVersionFlagAlias } from './VersionFlagAlias.js';
 import { buildCliCommand } from './commands/CliCommand.js';
 import { formatCliError } from './commands/CliErrorOutput';
 import { describeCliFailure } from './commands/CliFailureText';
@@ -173,7 +174,7 @@ async function main(): Promise<void> {
 	}
 
 	const program = new Command();
-	program.name('flow').version(VERSION).description('CLI for running and validating agent flows');
+	program.name('flow').version(VERSION, '-V, --version', 'output the version number (-v works too)').description('CLI for running and validating agent flows');
 	// Register --pid as a documented option (handled before parseAsync above)
 	program.option('--pid', 'Show the daemon PID and exit');
 	program.addHelpText('before', CONCEPTS_TEXT);
@@ -212,7 +213,7 @@ async function main(): Promise<void> {
 	// Schedule background updater even when a command throws
 	const bundlePath = resolveOwnBundlePath(FLOW_BUNDLE_NAME, fileURLToPath(import.meta.url));
 	try {
-		await program.parseAsync(process.argv);
+		await program.parseAsync(withVersionFlagAlias(process.argv));
 	} finally {
 		// VERSION lets shared-cli refuse to spawn for a dev build (no mutating npm install -g from a repo checkout; incident 2026-10-25).
 		updateManager.scheduleBackgroundUpdate(bundlePath, 'flow-updater.cjs', VERSION);
