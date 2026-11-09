@@ -245,6 +245,62 @@ steps:
 	return file;
 }
 
+// fs=readonly-enforced: `profile: inspect` (agent + fs=readonly-enforced). The pool slot is a :ro secondary mount, .meta the read/write primary.
+const INSPECT_REPO_CONTENT = 'repo content that inspect must be able to read';
+function writeInspectFlow() {
+	const file = path.join(projectDirectory, 'plugin-live-inspect.yml');
+	fs.writeFileSync(
+		file,
+		`id: plugin-live-inspect
+version: '1.0.0'
+name: Plugin live check, inspect
+description: Read the workspace, fail to write it, write to the run meta directory.
+
+profile: inspect
+
+workspace: { provider: pool, dir: '${poolDirectory.replaceAll('\\', '/')}', prefix: slot-, count: 1 }
+
+steps:
+    - id: probe
+      name: Read, write attempt, meta write
+      strict: false
+      type: script
+      shell: bash
+      script: |
+          echo "cwd=$(pwd)"
+          echo "read=$(cat repo.txt)"
+          written=$({ echo changed >> repo.txt; } 2>&1); echo "write_exit=$?"
+          echo "write_error=$written"
+          created=$({ echo new > new-file.txt; } 2>&1); echo "create_exit=$?"
+          echo "create_error=$created"
+          echo "workspace_mount=$(awk -v d="$(pwd)" '$5==d {print $6}' /proc/self/mountinfo | head -1)"
+          meta=$(awk '{print $5}' /proc/self/mountinfo | grep '\\.meta$' | head -1)
+          echo "meta=$meta"
+          mkdir -p "$meta/outputs" && echo inspect-wrote-this > "$meta/outputs/inspect-write.txt"; echo "meta_write_exit=$?"
+      output:
+          report:
+              type: string
+              from: stdout
+
+    - id: ask
+      name: One word
+      type: model
+      model: sonnet
+      depends:
+          - probe
+      env:
+          ANTHROPIC_DEFAULT_SONNET_MODEL: ${process.env.ANTHROPIC_DEFAULT_SONNET_MODEL ?? ''}
+      prompt: |
+          Reply with the single word OK and nothing else.
+      output:
+          answer:
+              type: string
+              from: last_message
+`
+	);
+	return file;
+}
+
 const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sandbox-live-art-'));
 const claimEvents = { seen: undefined, gone: undefined };
 // Sandboxes that exist before this check: only a sandbox created after this point may be removed by it.
@@ -477,6 +533,94 @@ try {
 			'the second sbx rm call',
 			90_000,
 			() => timings().filter(entry => entry.words[0] === 'rm').length >= 2
+		);
+		const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
+			entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+		);
+		expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
+	});
+
+	await step(
+		'profile: inspect on real sbx: the repo is readable, a write to the workspace fails read-only, .meta is writable, the model step answers',
+		async () => {
+			const slot = path.join(poolDirectory, 'slot-1');
+			const repoFile = path.join(slot, 'repo.txt');
+			fs.writeFileSync(repoFile, INSPECT_REPO_CONTENT);
+			const createsBefore = timings().filter(entry => entry.words[0] === 'create').length;
+			const started = flow(['run', writeInspectFlow(), '--json']);
+			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+			const executionId = match[1];
+			const inspect = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
+				const shown = flow(['show', executionId, '--json']);
+				if (shown.status !== 0) return undefined;
+				const parsed = JSON.parse(shown.stdout);
+				return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+			});
+			const statuses = Object.fromEntries(Object.entries(inspect.steps ?? {}).map(([id, s]) => [id, s.status]));
+			expect(
+				inspect.status === 'completed',
+				`inspect run is ${inspect.status}: ${JSON.stringify(statuses)} ${JSON.stringify(inspect.steps)}`
+			);
+			const text = inspect.steps?.probe?.io?.stdout?.text ?? '';
+			const fields = Object.fromEntries(
+				text
+					.split(/\r?\n/)
+					.filter(line => line.includes('='))
+					.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()])
+			);
+			expect(fields.read === INSPECT_REPO_CONTENT, `the repo was not readable: read=${fields.read}`);
+			expect(
+				fields.write_exit !== '0' && /Read-only file system/.test(fields.write_error ?? ''),
+				`the write to the workspace did not fail read-only: exit ${fields.write_exit}, ${fields.write_error}`
+			);
+			expect(
+				fields.create_exit !== '0' && /Read-only file system/.test(fields.create_error ?? ''),
+				`creating a file in the workspace did not fail read-only: exit ${fields.create_exit}, ${fields.create_error}`
+			);
+			expect(
+				/\bro\b/.test(fields.workspace_mount ?? ''),
+				`the workspace mount options do not show ro: ${fields.workspace_mount}`
+			);
+			expect(
+				fields.meta_write_exit === '0',
+				`the write to .meta failed: exit ${fields.meta_write_exit}, meta=${fields.meta}`
+			);
+			// The verdict is taken on the HOST.
+			expect(fs.readFileSync(repoFile, 'utf8') === INSPECT_REPO_CONTENT, 'the host file repo.txt changed');
+			expect(!fs.existsSync(path.join(slot, 'new-file.txt')), 'a file was created in the slot on the host');
+			const runsDirectory = path.join(projectDirectory, '.flow', 'runs');
+			const written = fs
+				.readdirSync(runsDirectory)
+				.map(name => path.join(runsDirectory, name, 'outputs', 'inspect-write.txt'))
+				.find(candidate => fs.existsSync(candidate));
+			expect(written !== undefined, 'the file written to .meta/outputs from the VM is not on the host');
+			expect(
+				/\bOK\b/.test(JSON.stringify(inspect.steps?.ask?.output ?? inspect.steps?.ask ?? {})),
+				'the model step did not answer OK under inspect'
+			);
+			expect(
+				inspect.steps?.probe?.sourceId === 'sandbox-live' && inspect.steps?.ask?.sourceId === 'sandbox-live',
+				'a step was not served by the sandbox source'
+			);
+			const required = inspect.requirements?.steps?.probe ?? [];
+			expect(
+				required.includes('fs=readonly-enforced'),
+				`the record does not show fs=readonly-enforced: ${JSON.stringify(inspect.requirements)}`
+			);
+			const creates = timings().filter(entry => entry.words[0] === 'create');
+			expect(creates.length === createsBefore + 1, 'expected exactly one more sandbox');
+			// TimedSbx records only the first two words of a command, so the :ro of the create line is proven by the VM (mount options) and by the mock e2e.
+			evidence.inspect = { fields, requirements: inspect.requirements };
+			return `read ok, write: ${fields.write_error}, workspace mount options ${fields.workspace_mount}, .meta write ok, host file unchanged`;
+		}
+	);
+
+	await step('the inspect sandbox is removed too', async () => {
+		await waitFor(
+			'the third sbx rm call',
+			90_000,
+			() => timings().filter(entry => entry.words[0] === 'rm').length >= 3
 		);
 		const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
 			entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)

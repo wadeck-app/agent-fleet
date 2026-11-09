@@ -17,7 +17,7 @@ import { ReturnedPaths } from '../harness/ReturnedPaths';
 import { ExecAssignment, type PreparedAssignment } from './ExecAssignment';
 import { ExecRunEnd } from './ExecRunEnd';
 import type { ExecPreparedSandbox, ExecSandboxPreparer } from './ExecSandboxPreparer';
-import { RequiresGuard } from './RequiresGuard';
+import { READ_ONLY_GUARANTEE, RequiresGuard } from './RequiresGuard';
 
 /** What the engine reports for a step that ran (the shape of flow-cli's `WorkerAdapter.execute` result). */
 export interface StepOutcome {
@@ -65,8 +65,11 @@ export interface ExecWrapperDependencies {
 	createHostExecutor: (context: HostExecutorContext) => StepExecutor;
 	log: SandboxLog;
 	createDaemon: (handlers: DaemonHandlers) => DaemonControl;
-	/** The RunMounts of a run (workspace, `.meta` next to it). Throws with an actionable message when they are unusable. */
-	createMounts: (workspaceDir: string, workspaceMetaDir: string) => RunMounts;
+	/**
+	 * The RunMounts of a run (workspace, `.meta` next to it). `readOnlyWorkspace` is true when the run requires `fs=readonly-enforced`:
+	 * the workspace must then be a `:ro` mount (the wrapper checks what comes back). Throws with an actionable message when they are unusable.
+	 */
+	createMounts: (workspaceDir: string, workspaceMetaDir: string, readOnlyWorkspace: boolean) => RunMounts;
 	now: () => number;
 	/** Called once, when the wrapper is over (the daemon went away). The process should exit. */
 	onFinished: () => void;
@@ -228,7 +231,14 @@ export class ExecWrapper {
 			const refusal = this.dependencies.requireGuarantees ? RequiresGuard.refusal(raw['requires']) : undefined;
 			if (refusal !== undefined) throw new SandboxError('invalid-argument', refusal);
 			const onHost = this.placement(raw, ids.stepId) === 'host';
-			const mounts = this.mountsFor(raw, ids.executionId);
+			const wantsReadOnly = RequiresGuard.wantsReadOnly(raw['requires']);
+			if (onHost && wantsReadOnly) {
+				throw new SandboxError(
+					'invalid-argument',
+					`host: true cannot satisfy ${READ_ONLY_GUARANTEE}: a host script writes the workspace freely. Remove host: true from step "${ids.stepId}", or the read-only requirement (profile: inspect) from the flow.`
+				);
+			}
+			const mounts = this.mountsFor(raw, ids.executionId, ids.stepId, wantsReadOnly);
 			if (onHost) {
 				log.info(`script step "${ids.stepId}" runs on the host (host: true), not in the sandbox.`);
 				const assignment = new ExecAssignment({ mounts, log, injectedEnv: () => ({}) }).prepare(raw);
@@ -424,8 +434,11 @@ export class ExecWrapper {
 		return 'host';
 	}
 
-	private mountsFor(raw: JsonObject, executionId: string): RunMounts {
-		if (this.mounts !== undefined && this.mounts.executionId === executionId) return this.mounts.mounts;
+	private mountsFor(raw: JsonObject, executionId: string, stepId: string, wantsReadOnly: boolean): RunMounts {
+		if (this.mounts !== undefined && this.mounts.executionId === executionId) {
+			this.requireSameMode(this.mounts.mounts, stepId, wantsReadOnly);
+			return this.mounts.mounts;
+		}
 		const context = raw['executionContext'] as JsonObject;
 		const workspaceDir = context['workspaceDir'];
 		if (!isNonEmptyString(workspaceDir)) {
@@ -438,11 +451,32 @@ export class ExecWrapper {
 				workspaceDir,
 				outputsDir: context['outputsDir'],
 				workspaceReadOnly: context['workspaceReadOnly'],
-			})
+			}),
+			wantsReadOnly
 		);
+		// What the factory built must be what the run asked for: never a read/write workspace under fs=readonly-enforced.
+		if (mounts.readOnlyWorkspace !== wantsReadOnly) {
+			throw new SandboxError(
+				'invalid-argument',
+				wantsReadOnly
+					? `step "${stepId}" requires ${READ_ONLY_GUARANTEE} but the mounts built for the run's workspace are not read-only; no sandbox was created.`
+					: `step "${stepId}" does not require ${READ_ONLY_GUARANTEE} but the mounts built for the run's workspace are read-only; no sandbox was created.`
+			);
+		}
 		// A different run keeps its own mounts; SandboxLifecycle refuses it (worker-busy) before anything is created.
 		this.mounts = { executionId, mounts };
 		return mounts;
+	}
+
+	/** The mounts of a run are fixed when its sandbox is created: every step of the run must agree on the read-only requirement. */
+	private requireSameMode(mounts: RunMounts, stepId: string, wantsReadOnly: boolean): void {
+		if (mounts.readOnlyWorkspace === wantsReadOnly) return;
+		throw new SandboxError(
+			'invalid-argument',
+			wantsReadOnly
+				? `step "${stepId}" requires ${READ_ONLY_GUARANTEE} but the sandbox of this run was created with a read/write workspace (the mounts are fixed when the sandbox is created). Put ${READ_ONLY_GUARANTEE} at flow level (or use profile: inspect) so every step of the run has it.`
+				: `step "${stepId}" does not require ${READ_ONLY_GUARANTEE} but the sandbox of this run was created with a read-only workspace (the mounts are fixed when the sandbox is created). Give every step the same requirements at flow level.`
+		);
 	}
 
 	private async ensurePrepared(sandbox: string, mounts: RunMounts): Promise<ExecPreparedSandbox> {

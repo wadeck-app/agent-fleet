@@ -99,8 +99,7 @@ export class AssignmentRewriter {
 
 	private translateContext(context: JsonObject): JsonObject {
 		const { mounts } = this.options;
-		const [workspace, meta] = mounts.sandboxMounts();
-		if (workspace === undefined || meta === undefined) throw new Error('RunMounts must have two mounts');
+		const meta = mounts.metaMount();
 		const workspaceDir = String(context['workspaceDir']);
 		const outputsDir = String(context['outputsDir']);
 		const cwd = context['cwd'];

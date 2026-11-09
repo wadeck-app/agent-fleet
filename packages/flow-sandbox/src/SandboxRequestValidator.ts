@@ -55,6 +55,11 @@ export class SandboxRequestValidator {
 		if (request.mounts.length === 0) {
 			throw invalid('A sandbox needs at least one mount; without it the agent works on no host files.');
 		}
+		if (request.mounts[0]?.readOnly === true) {
+			throw invalid(
+				'The first mount (the primary one) must be read/write: sbx refuses a read-only primary. Put the read/write directory first and the :ro one after it.'
+			);
+		}
 		if (request.image !== undefined && !/^\S+$/.test(request.image)) {
 			throw invalid(`Image "${request.image}" must be a non-empty reference without whitespace.`);
 		}

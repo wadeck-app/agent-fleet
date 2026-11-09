@@ -457,17 +457,24 @@ describe('sandbox plugin: guarantees (the contract with the daemon)', () => {
 		await instance.dispose();
 	});
 
-	it.each(['net=filtered', 'fs=readonly-enforced'])(
-		'does not advertise %s, which it does not back yet',
-		async guarantee => {
-			const plugin = await load();
-			const instance = await build();
+	it('does not advertise net=filtered, which it cannot verify (raw TCP to public destinations needs an external receiver)', async () => {
+		const plugin = await load();
+		const instance = await build();
 
-			expect(plugin.manifest.implementations['worker-type']!['exec']!.guarantees).not.toContain(guarantee);
-			expect(instance.guarantees).not.toContain(guarantee);
-			await instance.dispose();
-		}
-	);
+		expect(plugin.manifest.implementations['worker-type']!['exec']!.guarantees).not.toContain('net=filtered');
+		expect(instance.guarantees).not.toContain('net=filtered');
+		await instance.dispose();
+	});
+
+	// Declared only after the live proof (PluginLiveCheck, profile: inspect on real sbx 0.51.0, one machine).
+	it('advertises fs=readonly-enforced in the manifest and on the instance', async () => {
+		const plugin = await load();
+		const instance = await build();
+
+		expect(plugin.manifest.implementations['worker-type']!['exec']!.guarantees).toContain('fs=readonly-enforced');
+		expect(instance.guarantees).toContain('fs=readonly-enforced');
+		await instance.dispose();
+	});
 });
 
 describe('sandbox plugin: obtainWorker', () => {

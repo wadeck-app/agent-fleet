@@ -366,7 +366,7 @@ function createInstance(context) {
 	return {
 		// What the workers of this source enforce, read by the daemon for routing (a flow's `requires:`); never worker labels. Declaring any makes the source requirement-only: it never gets a step without requirements. A subset of
 		// the manifest list below. Kept equal to SANDBOX_GUARANTEES (src/exec/RequiresGuard.ts) by a test; the reasons for each entry,
-		// and for the two that are NOT listed (net=filtered, fs=readonly-enforced), are there.
+		// and for the one that is NOT listed (net=filtered), are there.
 		guarantees: [...GUARANTEES],
 		// The workspace kinds this type accepts (may only narrow the manifest's list). In-place and readonly would expose <project>/.flow and
 		// .git/hooks; a worktree has a .git file whose gitdir is outside the mounts. Kept equal to SANDBOX_WORKSPACE_KINDS by a test.
@@ -492,7 +492,14 @@ function createInstance(context) {
 }
 
 /** The guarantees of the sandbox worker type (see RequiresGuard.ts for what backs each). The static upper bound is the manifest's, the instance repeats it. */
-const GUARANTEES = Object.freeze(['clean=run', 'env=clean', 'fs=confined', 'ports=private', 'sandbox']);
+const GUARANTEES = Object.freeze([
+	'clean=run',
+	'env=clean',
+	'fs=confined',
+	'fs=readonly-enforced',
+	'ports=private',
+	'sandbox',
+]);
 
 /** The workspace provider kinds of the sandbox worker type (see SandboxableWorkspace.ts for why only pool). */
 const WORKSPACES = Object.freeze(['pool']);

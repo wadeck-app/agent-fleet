@@ -251,15 +251,31 @@ A flow reaches the exec wrapper in one of two ways, and only one of them isolate
 
 A flow asks for the sandbox with `requires: [sandbox]` (flow level; a step may add entries; injected steps inherit the flow's). The daemon matches each entry, by equality, against the guarantees of the AUTHENTICATED source instance, never against worker labels (a worker declares those itself), and filters in the router before any acceptance plugin. This plugin declares, in the manifest (static upper bound) and on the instance (what routing reads), the same list, kept equal to `SANDBOX_GUARANTEES` (`src/exec/RequiresGuard.ts`) by a test:
 
-| Guarantee       | What backs it                                                                                                                                                                                                                     |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sandbox`       | every step process runs in an sbx VM (`SbxProcessLauncher`); live: `ExecLiveCheck`, `PluginLiveCheck`                                                                                                                             |
-| `fs=confined`   | the VM mounts exactly the run's workspace and `.meta` (`RunMounts`); only their ancestors are visible, nothing can be created beside them (`PoolSlotLiveCheck`, one machine). The pool slot itself is writable (T-16)             |
-| `env=clean`     | the host environment is not passed into the VM (`VmEnvironmentFilter`); `ExecLiveCheck` asserts no AWS key, no launch token, no ambient variable                                                                                  |
-| `ports=private` | the plugin publishes no port; a listener started in a VM was not reachable from the host (`PortsLiveCheck`, one machine, sbx 0.51.0). Limit: VMs have identical private addressing, so a VM-to-VM probe by address cannot be made |
-| `clean=run`     | a fresh VM per run, removed at the end of the run. The pool slot content (the workspace) persists                                                                                                                                 |
+| Guarantee              | What backs it                                                                                                                                                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sandbox`              | every step process runs in an sbx VM (`SbxProcessLauncher`); live: `ExecLiveCheck`, `PluginLiveCheck`                                                                                                                             |
+| `fs=confined`          | the VM mounts exactly the run's workspace and `.meta` (`RunMounts`); only their ancestors are visible, nothing can be created beside them (`PoolSlotLiveCheck`, one machine). The pool slot itself is writable (T-16)             |
+| `env=clean`            | the host environment is not passed into the VM (`VmEnvironmentFilter`); `ExecLiveCheck` asserts no AWS key, no launch token, no ambient variable                                                                                  |
+| `ports=private`        | the plugin publishes no port; a listener started in a VM was not reachable from the host (`PortsLiveCheck`, one machine, sbx 0.51.0). Limit: VMs have identical private addressing, so a VM-to-VM probe by address cannot be made |
+| `fs=readonly-enforced` | the run's workspace is a `:ro` SECONDARY mount and `.meta` the read/write primary, built from the run's requirements (see "Read-only runs: `profile: inspect`"). Proven on one machine, sbx 0.51.0                                |
+| `clean=run`            | a fresh VM per run, removed at the end of the run. The pool slot content (the workspace) persists                                                                                                                                 |
 
-NOT declared, on purpose: `net=filtered` (raw TCP to public destinations is unverified and an allow-all machine policy would make it false: see "Raw TCP"), `fs=readonly-enforced` (the exec variant has no `:ro` mount yet). A flow requiring either is refused at run start (no declared source provides it).
+NOT declared, on purpose: `net=filtered` (raw TCP to public destinations is unverified and an allow-all machine policy would make it false: see "Raw TCP"; it cannot be verified without an external receiver). A flow requiring it is refused at run start (no declared source provides it).
+
+### Read-only runs: `profile: inspect`
+
+`profile: inspect` is `agent` plus `fs=readonly-enforced`. The mounts of a run follow its resolved requirements (the assign's `requires`); the capability is declared by the source, but a run without the requirement keeps the normal read/write workspace.
+
+| Run requires `fs=readonly-enforced` | `sbx create` mounts (first = primary)                      |
+| ----------------------------------- | ---------------------------------------------------------- |
+| no                                  | pool slot (read/write), `.meta`                            |
+| yes                                 | `.meta` (read/write primary), pool slot as `:ro` secondary |
+
+What a step under `inspect` sees: cwd is the pool slot, readable; any write to it fails with `Read-only file system` (for the agent and for root); `.meta` stays writable (outputs, the model's session store); outputs are collected by the engine on the host as usual.
+
+- **One mode per run.** The mounts are fixed when the sandbox is created, so every step of a run must agree: the wrapper refuses a step whose requirement differs from the run's first step (message: put it at flow level or use the profile), and refuses a mount set that does not match the requirement (never a read/write workspace under `fs=readonly-enforced`). A read-only step inside a read/write run would need a second sandbox: not implemented.
+- **`host: true` is refused** on a step that requires it: a host script writes the workspace freely. (A host script also is not confined in the `fs=confined`/`env=clean` sense; the core warns for model flows, nothing else is checked.)
+- **Proof level** (`PluginLiveCheck` 12/12 and `ReadOnlyLiveCheck`, sbx 0.51.0, Windows 10, one machine, 2026-11-09): a `profile: inspect` run reads the repo file, the write and the file creation in the workspace fail with `Read-only file system`, the VM shows the workspace mount as `ro`, a write to `.meta/outputs` from the VM reaches the host, the model step answers in the VM (session store under `.meta` works), and the host file is unchanged. The attack list as root (remount, bind, a second virtiofs mount, `mount(2)` from python, `/proc/<pid>/root`, a descriptor) all returned `Read-only file system` with the host file unchanged, with the read/write directory as primary and the other one `:ro`. The enforcement is host-side virtiofs. NOT proven: virtiofs protocol attacks, kernel exploits, other VM channels, other sbx versions or hosts.
 
 Because the source is requirement-only, a step is offered to it only when its requirements are non-empty and all guaranteed; `requires: [fs=confined]` alone is enough, a step without requirements never reaches it. Write it like this:
 

@@ -98,7 +98,9 @@ The workspace mode is a ceiling; a step guarantee can only narrow it; a step ask
 | --- | --- |
 | Pros | One rule; the enforced guarantee is separate from the advisory workspace flag. |
 | Cons | A read-only step inside a read-write run needs a second sandbox with the workspace as a `:ro` secondary mount (about +8 s), because mounts are fixed at creation. |
-| Recommendation | As stated. Open point O1: the primary mount must be read/write, so a whole-run `:ro` workspace needs another primary (the run's `.meta`, not tested). |
+| Recommendation | As stated. Open point O1: the primary mount must be read/write, so a whole-run `:ro` workspace needs another primary (the run's `.meta`). |
+
+**Status: implemented for the whole run (2026-11-09).** `RunMounts.readOnlyWorkspace` builds `.meta` first (read/write primary) and the workspace `:ro`; the wrapper derives it from the assign's `requires`, refuses a run whose steps disagree and a mount set that does not match, and refuses `host: true` with the requirement. `fs=readonly-enforced` is declared in the manifest and on the instance after the live proof (`PluginLiveCheck` with `profile: inspect`, `ReadOnlyLiveCheck`; one machine, host-side virtiofs). Not implemented: a read-only step inside a read/write run (second sandbox).
 
 Evidence that `:ro` is enforced by the host side (virtiofs): as root in the VM, remounts, a new mount namespace, a second virtiofs mount of the share and `mount(2)` all failed with `Read-only file system` and the host file was unchanged (sbx 0.51.0, one machine; plugin README, "Mounts: links and read-only"). Not tested: protocol-level or kernel attacks.
 
@@ -142,7 +144,7 @@ Caveats: a configured NAMED provider instance (`plugins.instances.<name>`) canno
 | Profiles: built-ins, tightening-only overrides, unknown name fails | Accepted workspace providers, declared statically |
 | Hard filter in `StepRouter.servableBy` before S4; refusal naming the missing requirement | `fs=confined`, `env=clean`, `net=filtered`, `ports=private`, `clean=run|step`: enforcement in the VM |
 | Resolved set in the execution record; injected steps inherit; assign always carries the set | Wrapper refuses an assign without the set; every script in the VM (as today); `SandboxableWorkspace` stays as defence in depth |
-| Bounded wait, immediate failure when no declared source can provide it; concurrency rule for guarantee-declaring sources | `fs=readonly-enforced` only once a `:ro` mount enforces it: not yet, not advertised |
+| Bounded wait, immediate failure when no declared source can provide it; concurrency rule for guarantee-declaring sources | `fs=readonly-enforced`: done, advertised after the live proof |
 | Host-script marker and the mixed-flow ERROR (later) | Leftover command and ACL on its secret files, unchanged |
 | Remove `workerType` and `exclusive` with implicit `agent` for model steps (last) | Drop the worker-type declaration and the exclusivity paragraphs of its README |
 
@@ -159,7 +161,7 @@ Caveats: a configured NAMED provider instance (`plugins.instances.<name>`) canno
 
 | # | Question | Default if undecided |
 | --- | --- | --- |
-| O1 | Whole-run read-only needs another read/write primary mount | The run's `.meta`; only "primary must be read/write" is verified |
+| O1 | Whole-run read-only needs another read/write primary mount | Resolved: the run's `.meta`, verified live (2026-11-09): reading, failing writes, `.meta` outputs and the model's session store all work |
 | O2 | `clean=step` costs about +8 s per step | Accept; say it on the profile |
 | O3 | Name and level of the host-script marker | Decided with the tool-provision plan |
 | O4 | Name of the requirements field next to `labels` | Core decides |

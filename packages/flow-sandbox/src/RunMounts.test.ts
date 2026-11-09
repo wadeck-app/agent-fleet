@@ -20,8 +20,9 @@ function sandboxForm(hostPath: string): string {
 	return drive?.[1] === undefined ? normalized : `/${drive[1].toLowerCase()}${drive[2] ?? ''}`;
 }
 
-function mounts(extra: { projectDir?: string; workspaceDir?: string } = {}): RunMounts {
+function mounts(extra: { projectDir?: string; workspaceDir?: string; readOnlyWorkspace?: boolean } = {}): RunMounts {
 	return new RunMounts({
+		...(extra.readOnlyWorkspace === undefined ? {} : { readOnlyWorkspace: extra.readOnlyWorkspace }),
 		workspaceDir: extra.workspaceDir ?? workspace,
 		workspaceMetaDir: meta,
 		platform: process.platform,
@@ -42,6 +43,39 @@ beforeEach(() => {
 
 afterEach(() => {
 	fs.rmSync(root, { recursive: true, force: true });
+});
+
+describe('RunMounts whole-run read-only workspace (fs=readonly-enforced)', () => {
+	// sbx needs the PRIMARY (first) mount read/write: with a read-only workspace the run's .meta is the primary and the workspace a :ro secondary.
+	it('puts .meta first (read/write) and the workspace second (:ro) when the workspace is read-only', () => {
+		const readOnly = mounts({ readOnlyWorkspace: true });
+
+		expect(readOnly.readOnlyWorkspace).toBe(true);
+		expect(readOnly.sandboxMounts()).toEqual([{ hostPath: meta }, { hostPath: workspace, readOnly: true }]);
+		expect(readOnly.workspaceMount()).toEqual({ hostPath: workspace, readOnly: true });
+		expect(readOnly.metaMount()).toEqual({ hostPath: meta });
+	});
+
+	it('keeps the read/write workspace first and no :ro flag by default and when asked explicitly', () => {
+		for (const built of [mounts(), mounts({ readOnlyWorkspace: false })]) {
+			expect(built.readOnlyWorkspace).toBe(false);
+			expect(built.sandboxMounts()).toEqual([{ hostPath: workspace }, { hostPath: meta }]);
+			expect(built.workspaceMount()).toEqual({ hostPath: workspace });
+			expect(built.metaMount()).toEqual({ hostPath: meta });
+		}
+	});
+
+	it('translates the same paths whatever the mode', () => {
+		const readOnly = mounts({ readOnlyWorkspace: true });
+		const readWrite = mounts();
+
+		expect(readOnly.toSandboxPath(path.join(workspace, 'a.txt'), 'p')).toBe(
+			readWrite.toSandboxPath(path.join(workspace, 'a.txt'), 'p')
+		);
+		expect(readOnly.toSandboxPath(path.join(meta, 'outputs'), 'p')).toBe(
+			readWrite.toSandboxPath(path.join(meta, 'outputs'), 'p')
+		);
+	});
 });
 
 describe('RunMounts mounts and cwd', () => {

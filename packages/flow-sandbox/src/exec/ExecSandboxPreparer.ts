@@ -65,8 +65,7 @@ export class ExecSandboxPreparer {
 
 		let store: ReturnType<ToolStoreRedirect['prepare']>;
 		try {
-			const [, meta] = mounts.sandboxMounts();
-			if (meta === undefined) throw new Error('RunMounts must have two mounts');
+			const meta = mounts.metaMount();
 			store = new ToolStoreRedirect({
 				translator: mounts.translator,
 				workspaceMetaDir: meta.hostPath,

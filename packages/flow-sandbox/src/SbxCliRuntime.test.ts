@@ -140,6 +140,11 @@ describe('SbxCliRuntime create', () => {
 			['a memory without unit', { memory: '2048' }, 'must look like "512m" or "2g"'],
 			['a memory below the minimum', { memory: '256m' }, 'below the sbx minimum of 512m'],
 			['no mount', { mounts: [] }, 'needs at least one mount'],
+			[
+				'a read-only primary mount',
+				{ mounts: [{ hostPath: workspace, readOnly: true }, { hostPath: meta }] },
+				'first mount (the primary one) must be read/write',
+			],
 			['an image with whitespace', { image: 'a b' }, 'without whitespace'],
 			['a relative mount', { mounts: [{ hostPath: 'relative/dir' }] }, 'cannot be given to sbx'],
 		];

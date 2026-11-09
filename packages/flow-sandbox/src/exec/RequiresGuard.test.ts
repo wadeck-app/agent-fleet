@@ -4,8 +4,15 @@ import { eachRow } from '../testing/EachRow';
 import { RequiresGuard, SANDBOX_GUARANTEES } from './RequiresGuard';
 
 describe('SANDBOX_GUARANTEES', () => {
-	it('lists only what the exec variant enforces (and never fs=readonly-enforced or net=filtered, which it does not back yet)', () => {
-		expect([...SANDBOX_GUARANTEES]).toEqual(['clean=run', 'env=clean', 'fs=confined', 'ports=private', 'sandbox']);
+	it('lists only what the exec variant enforces (fs=readonly-enforced since the :ro workspace mount; never net=filtered, which it cannot verify)', () => {
+		expect([...SANDBOX_GUARANTEES]).toEqual([
+			'clean=run',
+			'env=clean',
+			'fs=confined',
+			'fs=readonly-enforced',
+			'ports=private',
+			'sandbox',
+		]);
 	});
 });
 
@@ -50,7 +57,7 @@ describe('RequiresGuard.refusal', () => {
 		await eachRow<[string, unknown, string[]]>(
 			[
 				['an unknown keyword', ['sandbox', 'gpu'], ['gpu']],
-				['two missing', ['net=filtered', 'fs=readonly-enforced'], ['net=filtered', 'fs=readonly-enforced']],
+				['two missing', ['net=filtered', 'gpu'], ['net=filtered', 'gpu']],
 				['a wrong value of a known key', ['fs=readonly', 'fs=confined'], ['fs=readonly']],
 				['no ordering: clean=step is not clean=run', ['clean=step'], ['clean=step']],
 			],

@@ -8,13 +8,15 @@
  * - `ports=private`  the plugin publishes no port and a listener inside the VM was unreachable from the host and other VMs
  *                    (scripts/live/PortsLiveCheck.mjs, one machine);
  * - `clean=run`      a fresh VM per run, removed at the end of the run (the pool slot content is the workspace and persists).
+ * - `fs=readonly-enforced` the run workspace is a `:ro` secondary mount, `.meta` the read/write primary (RunMounts; PluginLiveCheck with profile: inspect);
  * Not advertised: `net=filtered` (raw TCP to public destinations is unverified, and an allow-all machine policy would make it
- * false: README "Raw TCP"), `fs=readonly-enforced` (no `:ro` mount in the exec variant yet).
+ * false: README "Raw TCP").
  */
 export const SANDBOX_GUARANTEES: readonly string[] = [
 	'clean=run',
 	'env=clean',
 	'fs=confined',
+	'fs=readonly-enforced',
 	'ports=private',
 	'sandbox',
 ];
@@ -25,7 +27,15 @@ export const SANDBOX_GUARANTEES: readonly string[] = [
  * only because it asked for guarantees it provides, so an assign that carries none, or something this worker does not provide, is
  * a routing bug or an old daemon: the step is refused (fail closed, nothing runs).
  */
+/** The guarantee that makes the run's workspace a `:ro` mount (RunMounts `readOnlyWorkspace`). */
+export const READ_ONLY_GUARANTEE = 'fs=readonly-enforced';
+
 export class RequiresGuard {
+	/** True when the assign's `requires` asks for a read-only workspace. Call after {@link refusal}: a malformed value counts as not asking. */
+	static wantsReadOnly(requires: unknown): boolean {
+		return Array.isArray(requires) && requires.includes(READ_ONLY_GUARANTEE);
+	}
+
 	/** The refusal message, or undefined when the step may run. */
 	static refusal(requires: unknown): string | undefined {
 		const provided = SANDBOX_GUARANTEES.join(', ');

@@ -97,8 +97,7 @@ export class CredentialedSandboxPreparer implements SandboxPreparer {
 		try {
 			const vmEnvironment = await options.runtime.exec({ sandbox, command: ['env'] });
 			proxyEnvironment = VmProxyEnvironment.parse(sandbox, vmEnvironment.stdout);
-			const [, meta] = mounts.sandboxMounts();
-			if (meta === undefined) throw new Error('RunMounts must have two mounts');
+			const meta = mounts.metaMount();
 			store = new ToolStoreRedirect({
 				translator: mounts.translator,
 				workspaceMetaDir: meta.hostPath,

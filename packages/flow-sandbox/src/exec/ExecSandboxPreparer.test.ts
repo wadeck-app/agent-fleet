@@ -67,7 +67,13 @@ function preparer(modelEnvironment: Record<string, string> = {}): ExecSandboxPre
 
 /** Mounts whose second (meta) mount is missing: the step after the credential access throws. */
 function mountsWithoutMeta(): RunMounts {
-	return Object.create(mounts, { sandboxMounts: { value: () => [mounts.sandboxMounts()[0]] } }) as RunMounts;
+	return Object.create(mounts, {
+		metaMount: {
+			value: () => {
+				throw new Error('RunMounts must have two mounts');
+			},
+		},
+	}) as RunMounts;
 }
 
 describe('ExecSandboxPreparer', () => {

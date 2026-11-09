@@ -168,7 +168,7 @@ class FlowWorld {
 	 */
 	writeFlow(
 		name: string,
-		binding: boolean | { removedWorkerType?: boolean; requires?: string[] },
+		binding: boolean | { removedWorkerType?: boolean; requires?: string[]; profile?: string },
 		workspace: 'pool' | 'in-place' = 'pool'
 	): string {
 		const chosen = binding === true ? { requires: ['sandbox'] } : binding === false ? {} : binding;
@@ -182,6 +182,7 @@ class FlowWorld {
 				'description: One script step.',
 				...(chosen.removedWorkerType === true ? ['workerType: sandbox'] : []),
 				...(chosen.requires !== undefined ? [`requires: [${chosen.requires.join(', ')}]`] : []),
+				...(chosen.profile !== undefined ? [`profile: ${chosen.profile}`] : []),
 				// A sandboxed worker accepts only a pool (the in-place workspace would expose <project>/.flow and .git/hooks).
 				workspace === 'pool'
 					? `workspace: { provider: pool, dir: '${this.poolDirectory.replaceAll(path.sep, '/')}', prefix: slot-, count: 1 }`
@@ -523,6 +524,38 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		expect(fs.existsSync(path.join(world.poolDirectory, '.flow-pool', 'slot-1.claim'))).toBe(false);
 	});
 
+	// fs=readonly-enforced: the daemon resolves profile: inspect into requirements, the wrapper builds the mounts from them. The mock
+	// proves the command line (the `:ro` is enforced by the real sbx: PluginLiveCheck); a run without the requirement keeps a read/write workspace.
+	it('creates the sandbox of a profile: inspect run with .meta as the read/write primary and the pool slot as a :ro secondary mount', async () => {
+		const createsBefore = sandboxesCreated(world.sbxCalls()).length;
+
+		const record = await world.runAndRelease(world.writeFlow('inspect-run', { profile: 'inspect' }));
+
+		expect(record.status).toBe('completed');
+		const creates = world.sbxCalls().filter(call => call.argv[0] === 'create');
+		expect(creates).toHaveLength(createsBefore + 1);
+		const mounts = (creates.at(-1)?.argv ?? []).slice(8);
+		expect(mounts).toHaveLength(2);
+		expect(mounts[0]).toBe(
+			path.join(world.projectDirectory, '.flow', 'runs', `${runIdOf(mounts[0] as string)}.meta`)
+		);
+		expect(mounts[1]).toBe(`${path.join(world.poolDirectory, 'slot-1')}:ro`);
+	}, 120_000);
+
+	it('keeps the pool slot read/write and first for a run that does not ask for read-only (the capability is not a default)', async () => {
+		const record = await world.runAndRelease(world.writeFlow('not-inspect', { profile: 'agent' }));
+
+		expect(record.status).toBe('completed');
+		const mounts = (
+			world
+				.sbxCalls()
+				.filter(call => call.argv[0] === 'create')
+				.at(-1)?.argv ?? []
+		).slice(8);
+		expect(mounts[0]).toBe(path.join(world.poolDirectory, 'slot-1'));
+		expect(mounts.some(mount => mount.endsWith(':ro'))).toBe(false);
+	}, 120_000);
+
 	it('a flow that asks for a SUBSET of the guarantees (fs=confined) is served by the requirement-only source too', async () => {
 		const before = sandboxesCreated(world.sbxCalls()).length;
 
@@ -718,12 +751,13 @@ describe('sandbox plugin, real daemon: a source that guarantees only part of the
 		fs.cpSync(artifactDirectory, partial, { recursive: true });
 		const config = path.join(partial, 'plugin-sandbox', 'plugin.config.js');
 		const original = fs.readFileSync(config, 'utf8');
-		const declared = "['clean=run', 'env=clean', 'fs=confined', 'ports=private', 'sandbox']";
-		if (!original.includes(declared))
+		// The list is one declaration in the artifact (formatted on one or several lines): replace the whole of it.
+		const listing = /const GUARANTEES = Object\.freeze\(\[[^\]]*\]\);/;
+		if (!listing.test(original))
 			throw new Error('the guarantees list of the artifact was not found: update this test');
 		fs.writeFileSync(
 			config,
-			original.replace(declared, () => "['fs=confined', 'sandbox']")
+			original.replace(listing, () => "const GUARANTEES = Object.freeze(['fs=confined', 'sandbox']);")
 		);
 		await world.registerProject();
 		world.declareSource('sandbox-partial', partial, MOCK_SBX_PATH);

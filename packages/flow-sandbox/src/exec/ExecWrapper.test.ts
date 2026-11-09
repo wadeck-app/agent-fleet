@@ -65,6 +65,10 @@ let daemon: FakeDaemon;
 let wrapper: ExecWrapper;
 let prepares: number;
 let executorContexts: StepExecutorContext[];
+/** The read-only flag the wrapper passed to `createMounts`, one entry per call. */
+let mountRequests: boolean[];
+/** When true the test factory builds read/write mounts whatever the wrapper asked: a wrong factory, to prove the wrapper checks. */
+let ignoreReadOnlyFlag: boolean;
 /** One entry per step the wrapper ran ON THE HOST (host: true), with the environment names the step declared. */
 let hostExecutions: { stepConfig: JsonObject; executionContext: JsonObject; declared: string[] }[];
 let executorCalls: { stepConfig: JsonObject; executionContext: JsonObject }[];
@@ -108,6 +112,8 @@ beforeEach(async () => {
 	const ownFinished = new ObservedList<true>();
 	finished = ownFinished;
 	executorContexts = [];
+	mountRequests = [];
+	ignoreReadOnlyFlag = false;
 	executorCalls = [];
 	hostExecutions = [];
 	behaviour = (_stepConfig, _context, send) => {
@@ -155,8 +161,16 @@ beforeEach(async () => {
 			daemon.handlers = handlers;
 			return daemon;
 		},
-		createMounts: (workspaceDir, workspaceMetaDir) =>
-			new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log }),
+		createMounts: (workspaceDir, workspaceMetaDir, readOnlyWorkspace) => {
+			mountRequests.push(readOnlyWorkspace);
+			return new RunMounts({
+				workspaceDir,
+				workspaceMetaDir,
+				platform: process.platform,
+				log,
+				readOnlyWorkspace: ignoreReadOnlyFlag ? false : readOnlyWorkspace,
+			});
+		},
 		get requireGuarantees() {
 			return requireGuarantees;
 		},
@@ -416,6 +430,80 @@ describe('ExecWrapper refuses a step the daemon did not route by a guarantee of 
 	});
 });
 
+const READONLY = 'fs=readonly-enforced';
+
+describe('ExecWrapper whole-run read-only (the mounts follow the requirements of the run)', () => {
+	const createdMounts = (): { hostPath: string; readOnly?: boolean }[] =>
+		(runtime.callsTo('create')[0]?.request as { mounts: { hostPath: string; readOnly?: boolean }[] }).mounts;
+
+	it('mounts the workspace read/write first without the requirement', async () => {
+		await run(assign('probe', { requires: ['sandbox'] }));
+
+		expect(mountRequests).toEqual([false]);
+		expect(createdMounts()).toEqual([{ hostPath: workspace }, { hostPath: meta }]);
+	});
+
+	it('mounts .meta first (read/write) and the workspace second (:ro) with fs=readonly-enforced', async () => {
+		await run(assign('probe', { requires: ['sandbox', READONLY] }));
+
+		expect(mountRequests).toEqual([true]);
+		expect(createdMounts()).toEqual([{ hostPath: meta }, { hostPath: workspace, readOnly: true }]);
+	});
+
+	it('refuses a later step of the run that needs the other mode: the mounts are fixed when the sandbox is created', async () => {
+		await run(assign('first', { requires: ['sandbox'] }));
+		await run(assign('second', { requires: ['sandbox', READONLY] }));
+
+		expect(runtime.callsTo('create')).toHaveLength(1);
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(
+			/"second"[\s\S]*fs=readonly-enforced[\s\S]*read\/write[\s\S]*flow level/
+		);
+		expect(executorContexts).toHaveLength(1);
+	});
+
+	it('refuses the other way round too (read-only run, then a step without the requirement)', async () => {
+		await run(assign('first', { requires: ['sandbox', READONLY] }));
+		await run(assign('second', { requires: ['sandbox'] }));
+
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(/"second"[\s\S]*read-only[\s\S]*flow level/);
+		expect(executorContexts).toHaveLength(1);
+	});
+
+	it('serves several steps of a read-only run on the same read-only sandbox', async () => {
+		await run(assign('first', { requires: ['sandbox', READONLY] }));
+		await run(assign('second', { requires: ['sandbox', READONLY] }));
+
+		expect(runtime.callsTo('create')).toHaveLength(1);
+		expect(executorContexts).toHaveLength(2);
+		expect(daemon.ofType('step_failed')).toHaveLength(0);
+	});
+
+	it('refuses to create a sandbox when the mounts it was given do not match the requirement (a factory that built them read/write)', async () => {
+		ignoreReadOnlyFlag = true;
+
+		await run(assign('probe', { requires: ['sandbox', READONLY] }));
+
+		expect(runtime.callsTo('create')).toHaveLength(0);
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(/fs=readonly-enforced[\s\S]*not read-only/);
+	});
+
+	it('refuses a host: true script that requires fs=readonly-enforced: a host script writes the workspace', async () => {
+		await run(assign('probe', { requires: ['sandbox', READONLY], host: HOST }));
+
+		expect(hostExecutions).toHaveLength(0);
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(/host: true[\s\S]*fs=readonly-enforced/);
+	});
+
+	it('builds read/write mounts for the dev harness (no guarantees required, no requires in the assign)', async () => {
+		requireGuarantees = false;
+
+		await run(assign('probe', { requires: 'absent' }));
+
+		expect(mountRequests).toEqual([false]);
+		expect(createdMounts()[0]).toEqual({ hostPath: workspace });
+	});
+});
+
 const HOST = { top: true, config: true };
 
 describe('ExecWrapper host: true (a script that runs on the wrapper machine, not in the VM)', () => {
@@ -640,8 +728,8 @@ describe('ExecWrapper failures', () => {
 				daemon.handlers = handlers;
 				return daemon;
 			},
-			createMounts: (workspaceDir, workspaceMetaDir) =>
-				new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log }),
+			createMounts: (workspaceDir, workspaceMetaDir, readOnlyWorkspace) =>
+				new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log, readOnlyWorkspace }),
 			requireGuarantees: true,
 			now: () => Date.now(),
 			onFinished: () => undefined,

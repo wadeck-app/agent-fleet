@@ -15,6 +15,11 @@ export interface RunMountsOptions {
 	log: SandboxLog;
 	/** The user's own project directory, when the wrapper knows it (manual mode); see the heuristic below. */
 	projectDir?: string;
+	/**
+	 * Whole-run read-only (`fs=readonly-enforced`): the workspace is a `:ro` SECONDARY mount and `.meta` is the read/write PRIMARY one
+	 * (sbx needs the first mount read/write). Default false: the workspace is the read/write primary.
+	 */
+	readOnlyWorkspace?: boolean;
 }
 
 /**
@@ -39,6 +44,8 @@ export interface RunMountsOptions {
 export class RunMounts {
 	readonly translator: PathTranslator;
 	readonly warnings: readonly string[];
+	/** True when the workspace is mounted `:ro` (the run requires `fs=readonly-enforced`). */
+	readonly readOnlyWorkspace: boolean;
 	private readonly flavor: path.PlatformPath;
 	private readonly roots: readonly string[];
 
@@ -49,6 +56,7 @@ export class RunMounts {
 			workspaceMetaDir: options.workspaceMetaDir,
 			platform: options.platform,
 		});
+		this.readOnlyWorkspace = options.readOnlyWorkspace === true;
 		this.roots = [options.workspaceDir, options.workspaceMetaDir];
 		this.requireRealDirectory(options.workspaceDir, 'workspaceDir');
 		this.requireRealDirectory(options.workspaceMetaDir, 'workspaceMetaDir');
@@ -57,9 +65,26 @@ export class RunMounts {
 		this.warnings = warnings;
 	}
 
-	/** The mounts to give to `sbx create`: workspace first (primary), then `.meta`. */
+	/** The workspace mount, `:ro` when the run requires `fs=readonly-enforced`. */
+	workspaceMount(): SandboxMount {
+		return this.readOnlyWorkspace
+			? { hostPath: this.options.workspaceDir, readOnly: true }
+			: { hostPath: this.options.workspaceDir };
+	}
+
+	/** The run's `.meta` mount: always read/write (outputs, session store). */
+	metaMount(): SandboxMount {
+		return { hostPath: this.options.workspaceMetaDir };
+	}
+
+	/**
+	 * The mounts to give to `sbx create`, the first one being the primary (it must be read/write): the workspace then `.meta`, or
+	 * `.meta` then the `:ro` workspace for a read-only run. Look a mount up with {@link workspaceMount} / {@link metaMount}, never by position.
+	 */
 	sandboxMounts(): SandboxMount[] {
-		return [{ hostPath: this.options.workspaceDir }, { hostPath: this.options.workspaceMetaDir }];
+		return this.readOnlyWorkspace
+			? [this.metaMount(), this.workspaceMount()]
+			: [this.workspaceMount(), this.metaMount()];
 	}
 
 	/** Host path -> path inside the sandbox, refusing anything outside the mounts or through a link. */
