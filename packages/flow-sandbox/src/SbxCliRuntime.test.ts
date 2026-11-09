@@ -733,6 +733,25 @@ describe('SbxCliRuntime notices printed by sbx itself', () => {
 		}
 	);
 
+	// The executable lookup answers `/usr/local/bin/bash` and the engine runs exactly that path. The mock must treat the path and the name as the
+	// same program (a script staged into the VM runs through `bash -c <cleanup> ... /usr/local/bin/bash`; one that is not staged runs the path directly).
+	it.concurrent(
+		'the mock runs a program given by its absolute VM path like the program of the same name',
+		async ({ onTestFinished }) => {
+			const { runtime, workspace, meta } = world(onTestFinished, 'bash-canned');
+			await runtime.create(createRequest(workspace, meta));
+
+			const byName = await runtime.exec({ sandbox: 'box-1', command: ['bash', '-e', '-u', '/tmp/x.sh'] });
+			const byPath = await runtime.exec({
+				sandbox: 'box-1',
+				command: ['/usr/local/bin/bash', '-e', '-u', '/tmp/x.sh'],
+			});
+
+			expect(byPath).toEqual(byName);
+			expect(byPath.exitCode).toBe(0);
+		}
+	);
+
 	it.concurrent(
 		'create fails with the fix when the new sandbox has no bash, naming the sandbox that now exists',
 		async ({ onTestFinished }) => {

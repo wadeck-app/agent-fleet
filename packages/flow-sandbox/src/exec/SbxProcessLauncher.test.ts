@@ -71,6 +71,8 @@ function launcherFor(
 		sandbox: SANDBOX,
 		translator: new StepCommandTranslator({
 			mounts,
+			platform: process.platform,
+			hostDirectories: [hostTemp, root],
 			stager: new VmFileStager({
 				runtime,
 				log,

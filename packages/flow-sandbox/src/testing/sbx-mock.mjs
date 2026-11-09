@@ -302,7 +302,9 @@ function printBannerOnce(sandbox) {
 }
 
 function runPseudoCommand(sandbox, command, cwd, env) {
-	const [name, ...rest] = command;
+	// A program given by its absolute path in the VM (`/usr/local/bin/bash`, what the executable lookup answers) is the same program as its name.
+	const [program, ...rest] = command;
+	const name = path.posix.isAbsolute(program) ? path.posix.basename(program) : program;
 	switch (name) {
 		case 'true':
 			return 0;

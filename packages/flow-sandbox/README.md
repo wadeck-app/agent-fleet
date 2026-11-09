@@ -262,6 +262,22 @@ A flow asks for the sandbox with `requires: [sandbox]` (flow level; a step may a
 
 NOT declared, on purpose: `net=filtered` (raw TCP to public destinations is unverified and an allow-all machine policy would make it false: see "Raw TCP"; it cannot be verified without an external receiver). A flow requiring it is refused at run start (no declared source provides it).
 
+### Windows and POSIX hosts
+
+The exec variant is meant to work on a Windows host and on a POSIX host (macOS, Linux; spec decision 23). The code takes the platform as a parameter and the translators use `path.win32` / `path.posix` explicitly, so both behaviours are unit-tested on any machine (tests named "on a Windows host" / "on a POSIX host").
+
+How the translator tells a HOST path from anything else in a command line (`StepCommandTranslator`):
+
+| Host                           | A host path is                                                                                                 | What happens to it                                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Windows                        | any `C:\x` or `\\server\share` path (a drive letter cannot be a VM path)                                       | a generated temp file is copied into the VM; a path under the mounts is translated; anything else is refused |
+| POSIX                          | an absolute path under the two mounts or under a known host directory (the temp directory, the home directory) | same three outcomes                                                                                          |
+| POSIX, any other absolute path | not recognised: assumed to be a VM path and passed through (host and VM paths look alike)                      | pass-through, pinned by a test                                                                               |
+
+The host node is recognised wherever it lives. A `workingDir` or `flowWorkingDir` that is absolute in the host's syntax must lie inside the mounts. `sbxPath` is checked for a network path (`\\server\share` or `//server/share`) before the absolute-path check.
+
+Proof level: platform-injected unit tests (every case for both flavours) and the Windows host runs. NOT yet shown on a real Linux or macOS machine: the CI job `unit-tests` (ubuntu) is the first real run, and `PluginLiveCheck` has only been run on Windows.
+
 ### Mounts use the resolved directories
 
 The wrapper resolves the workspace and `.meta` paths of an assignment (links, junctions, 8.3 names) ONCE, runs the layout check on the resolved directories (`.meta` outside the workspace, pool only) and gives `sbx create` exactly those resolved paths: nothing is resolved again between the check and the mount. The engine keeps its own spelling in the execution context and in the paths it passes to the launcher; `PathTranslator` accepts both spellings and translates them to the sandbox form of the mounted directory, and paths reported back by the VM come out in the mounted (resolved) form. Limit: a real directory replaced or renamed after the resolution is not detected, which needs the same host access as editing the directory itself. Proof: unit tests with an injected resolver that answers differently the second time (`SandboxableWorkspace.test.ts`, `ExecWrapper.test.ts`) and a `PluginLiveCheck` step on real sbx with the pool reached through a junction in an ancestor directory (the core refuses a link as the pool folder itself; whether the core already resolves the slot path before the wrapper sees it was not established, so that step proves no regression with a link, not that the aliasing was needed).

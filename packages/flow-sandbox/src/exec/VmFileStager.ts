@@ -57,7 +57,7 @@ export class VmFileStager {
 	private readonly directory: string;
 
 	constructor(private readonly options: VmFileStagerOptions) {
-		this.rewriter = new McpConfigRewriter(options.hostNodePath);
+		this.rewriter = new McpConfigRewriter(options.hostNodePath, options.platform);
 		this.directory = options.vmDirectory ?? '/tmp/flow-staged';
 	}
 

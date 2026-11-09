@@ -1,9 +1,15 @@
-import path from 'node:path';
-
 import type { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import type { SandboxLog } from '../SandboxLog';
-import { UNC, WINDOWS_ABSOLUTE, sameHostPath } from './HostPaths';
+import {
+	type PathFlavor,
+	UNC,
+	WINDOWS_ABSOLUTE,
+	basenameBySyntax,
+	flavorOf,
+	pathModuleOf,
+	sameHostPath,
+} from './HostPaths';
 import { type VmEnvironmentFilter } from './VmEnvironmentFilter';
 import type { VmFileStager } from './VmFileStager';
 
@@ -44,15 +50,25 @@ const REFUSED_PROGRAMS = new Map<string, string>([
  * - the program: the host `bash.exe` the script executor resolved becomes `bash`, the host node becomes `node`, a
  *   command line with `shell: true` becomes `/bin/sh -c`, `cmd`/`pwsh` are refused (route those steps to a worker
  *   without the `sandbox` label); a Windows path to any other program is refused;
- * - arguments that are Windows absolute paths: a generated temp file is copied into the VM (VmFileStager), a path inside
- *   the run's two mounts is translated, anything else is refused (UNC paths, other drives, other host files);
+ * - arguments that are host paths: a generated temp file is copied into the VM (VmFileStager), a path inside the run's two
+ *   mounts is translated, anything else is refused (UNC paths, other drives, other host files). What counts as a host path
+ *   depends on the host: on Windows any `C:\\x` path (a drive letter cannot be a VM path); on a POSIX host a path looks like a
+ *   VM path, so only an absolute path under the mounts or under a known host directory (the temp directory, the home
+ *   directory: `hostDirectories`) is a host path, and any other absolute path is assumed to be a VM path and passed through;
  * - `cwd` must be inside the two mounts (RunMounts, links rejected);
  * - the environment loses the host-only variables (VmEnvironmentFilter).
  */
 export class StepCommandTranslator {
+	private readonly flavor: PathFlavor;
+
 	constructor(
 		private readonly options: {
-			mounts: RunMounts;
+			/** Only translation and containment are used, so a stand-in works in tests. */
+			mounts: Pick<RunMounts, 'toSandboxPath' | 'contains'>;
+			/** The host's platform (default: this one). Decides what a host path looks like; tests pass `win32` and `linux` on any host. */
+			platform?: NodeJS.Platform;
+			/** POSIX hosts: directories whose absolute paths are host files (not VM paths): the temp directory, the home directory. */
+			hostDirectories?: readonly string[];
 			stager: VmFileStager;
 			environment: VmEnvironmentFilter;
 			hostNodePath: string;
@@ -60,7 +76,9 @@ export class StepCommandTranslator {
 			/** Environment names the step declared (its env, its secrets, the wrapper's model env): never dropped as ambient. */
 			declaredEnvironmentNames: ReadonlySet<string>;
 		}
-	) {}
+	) {
+		this.flavor = flavorOf(options.platform ?? process.platform);
+	}
 
 	async translate(request: StepCommandRequest): Promise<TranslatedCommand> {
 		const program = this.program(request);
@@ -104,10 +122,11 @@ export class StepCommandTranslator {
 		const refusal = REFUSED_PROGRAMS.get(name);
 		if (refusal !== undefined)
 			throw this.refused(command, `${refusal}; run this step on a worker without the "sandbox" label`);
+		// The host node is recognised first, wherever it lives (/usr/local/bin/node is no host directory, but it is not in the VM either).
+		if (sameHostPath(command, this.options.hostNodePath, this.flavor)) {
+			return { command: 'node', args, display: 'node' };
+		}
 		if (this.isHostPath(command)) {
-			if (sameHostPath(command, this.options.hostNodePath)) {
-				return { command: 'node', args, display: 'node' };
-			}
 			// A host path to bash used to be mapped to the VM's. Since core 1f4b567a the shell strategy asks the launcher (isolatesEnvironment), so a
 			// host bash here means the engine resolved on the host: refused, no quiet mapping.
 			if (SHELLS_IN_VM.has(name)) {
@@ -133,7 +152,7 @@ export class StepCommandTranslator {
 				`The argument "${argument}" is a UNC path; the sandbox mounts only the run's workspace and .meta.`
 			);
 		}
-		if (!WINDOWS_ABSOLUTE.test(argument)) return argument;
+		if (!this.isHostPath(argument)) return argument;
 		if (this.options.stager.isStageable(argument)) {
 			const copy = await this.options.stager.stage(sandbox, argument);
 			if (copy.mcpCallbackPort !== undefined) mcpCallbackPorts.push(copy.mcpCallbackPort);
@@ -154,12 +173,23 @@ export class StepCommandTranslator {
 		return ['bash', '-c', CLEANUP_SCRIPT, 'flow-run', String(staged.length), ...staged, ...command];
 	}
 
-	private isHostPath(command: string): boolean {
-		return WINDOWS_ABSOLUTE.test(command) || UNC.test(command);
+	/** See the class comment: certain on Windows, by location on a POSIX host. */
+	private isHostPath(value: string): boolean {
+		if (this.flavor === 'win32') return WINDOWS_ABSOLUTE.test(value) || UNC.test(value);
+		if (!pathModuleOf('posix').isAbsolute(value)) return false;
+		return (
+			this.options.mounts.contains(value) ||
+			(this.options.hostDirectories ?? []).some(directory => this.isUnderPosix(directory, value))
+		);
+	}
+
+	private isUnderPosix(directory: string, value: string): boolean {
+		const relative = pathModuleOf('posix').relative(directory, value);
+		return relative === '' || (!relative.startsWith('..') && !pathModuleOf('posix').isAbsolute(relative));
 	}
 
 	private programName(command: string): string {
-		const base = path.win32.basename(command).toLowerCase();
+		const base = basenameBySyntax(command).toLowerCase();
 		return base.replace(/\.(exe|cmd|bat)$/, '');
 	}
 

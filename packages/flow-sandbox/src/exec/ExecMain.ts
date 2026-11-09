@@ -167,6 +167,9 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 					sandbox,
 					translator: new StepCommandTranslator({
 						mounts,
+						platform: process.platform,
+						// On a POSIX host these are the places a host file can be told from a VM path (the mounts are known to RunMounts).
+						hostDirectories: [os.tmpdir(), fs.realpathSync.native(os.tmpdir()), os.homedir()],
 						stager: new VmFileStager({
 							runtime,
 							log,

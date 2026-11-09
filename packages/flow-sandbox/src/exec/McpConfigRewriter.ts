@@ -1,7 +1,5 @@
-import path from 'node:path';
-
 import { SandboxError } from '../SandboxError';
-import { sameHostPath } from './HostPaths';
+import { basenameBySyntax, flavorOf, sameHostPath } from './HostPaths';
 
 /** Where the image keeps the MCP files (`image/Dockerfile`). */
 export const VM_FORWARDER_PATH = '/opt/flow/mcp-callback-forwarder.cjs';
@@ -34,7 +32,11 @@ function isObject(value: unknown): value is JsonObject {
  * change what the step can do.
  */
 export class McpConfigRewriter {
-	constructor(private readonly hostNodePath: string) {}
+	/** @param platform the host the node path comes from (default: this one): decides whether two spellings of it are the same file. */
+	constructor(
+		private readonly hostNodePath: string,
+		private readonly platform: NodeJS.Platform = process.platform
+	) {}
 
 	rewrite(text: string, source: string): RewrittenMcpConfig {
 		let parsed: unknown;
@@ -91,11 +93,11 @@ export class McpConfigRewriter {
 		const { command, args } = entry;
 		const valid =
 			typeof command === 'string' &&
-			sameHostPath(command, this.hostNodePath) &&
+			sameHostPath(command, this.hostNodePath, flavorOf(this.platform)) &&
 			Array.isArray(args) &&
 			args.length === 1 &&
 			typeof args[0] === 'string' &&
-			path.basename(args[0]) === 'mcp-server.cjs' &&
+			basenameBySyntax(args[0]) === 'mcp-server.cjs' &&
 			entry['cwd'] === undefined;
 		if (!valid) {
 			throw new SandboxError(

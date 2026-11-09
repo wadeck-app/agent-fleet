@@ -112,6 +112,31 @@ class FlowWorld {
 		return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 	}
 
+	/**
+	 * Same as {@link flow} without blocking this process: the claim watcher (a timer) must keep ticking while a flow command runs. A blocking
+	 * `spawnSync` of about a second starves it, and a run that ends faster than that (a step the wrapper refused) would have its pool claim
+	 * created and released without the watcher ever seeing it, which the test then reports as "the claim was never released".
+	 */
+	flowAsync(args: string[], timeoutMs = 120_000): Promise<{ status: number | null; stdout: string; stderr: string }> {
+		return new Promise(resolve => {
+			const child = spawn(process.execPath, ['--import', tsxUrl, flowIndex, ...args], {
+				env: this.env,
+				cwd: this.projectDirectory,
+				windowsHide: true,
+				stdio: ['ignore', 'pipe', 'pipe'],
+			});
+			let stdout = '';
+			let stderr = '';
+			child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString('utf8')));
+			child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
+			const timer = setTimeout(() => child.kill(), timeoutMs);
+			child.on('close', status => {
+				clearTimeout(timer);
+				resolve({ status, stdout, stderr });
+			});
+		});
+	}
+
 	async registerProject(): Promise<void> {
 		const registry = path.join(String(this.env['XDG_CONFIG_HOME']), 'project');
 		this.projectId = (await addProject(registry, { name: 'e2e', path: this.projectDirectory })).id;
@@ -230,7 +255,7 @@ class FlowWorld {
 	 * A pool flow bound with `requires: [sandbox]` whose steps are, in order, a script marked `host: true` (id `host`, it prints
 	 * the canary variable if it can see it) and/or an unmarked script (id `vm`).
 	 */
-	writeHostFlow(name: string, steps: ('host' | 'vm')[]): string {
+	writeHostFlow(name: string, steps: ('host' | 'vm')[], profile?: string): string {
 		const file = path.join(this.projectDirectory, `${name}.yml`);
 		const scripts = {
 			host: [
@@ -256,7 +281,7 @@ class FlowWorld {
 				"version: '1.0.0'",
 				`name: ${name}`,
 				'description: Host and VM script steps.',
-				'requires: [sandbox]',
+				...(profile === undefined ? ['requires: [sandbox]'] : [`profile: ${profile}`]),
 				`workspace: { provider: pool, dir: '${this.poolDirectory.replaceAll(path.sep, '/')}', prefix: slot-, count: 1 }`,
 				'steps:',
 				...steps.flatMap(step => scripts[step]),
@@ -276,13 +301,17 @@ class FlowWorld {
 
 	/** Runs a flow and waits until its execution settles. */
 	async run(file: string, timeoutMs = 90_000): Promise<ExecutionRecord> {
-		return this.settle(this.start(file), timeoutMs);
+		// Asynchronous start: the claim watcher of runAndRelease must tick while `flow run` is running (see flowAsync).
+		const started = await this.flowAsync(['run', file, '--json']);
+		const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+		if (match === null) throw new Error(`no executionId from flow run: ${started.stdout}${started.stderr}`);
+		return this.settle(match[1] as string, timeoutMs);
 	}
 
 	/** Waits until an execution settles. */
 	async settle(executionId: string, timeoutMs = 90_000): Promise<ExecutionRecord> {
-		return waitFor(`execution ${executionId} to settle`, timeoutMs, () => {
-			const shown = this.flow(['show', executionId, '--json']);
+		return waitFor(`execution ${executionId} to settle`, timeoutMs, async () => {
+			const shown = await this.flowAsync(['show', executionId, '--json']);
 			if (shown.status !== 0) return undefined;
 			const parsed = JSON.parse(shown.stdout) as ExecutionRecord;
 			return ['completed', 'failed', 'cancelled'].includes(parsed.status ?? '') ? parsed : undefined;
@@ -294,7 +323,11 @@ class FlowWorld {
 	 * tests look at afterwards (sbx calls, log lines) exists. The daemon no longer logs the release of a workspace (the workspace
 	 * providers: an in-place workspace has nothing to release), so the removal itself is the signal.
 	 */
-	async runAndRelease(file: string, removesASandbox = true): Promise<ExecutionRecord> {
+	/**
+	 * `removesASandbox`: true waits for the sandbox removal and the claim release; false returns at once; 'no-sandbox' waits only for the claim
+	 * release (a run in which the wrapper created no sandbox, for example a step it refused).
+	 */
+	async runAndRelease(file: string, removesASandbox: boolean | 'no-sandbox' = true): Promise<ExecutionRecord> {
 		const removals = (): number => this.sbxCalls().filter(call => call.argv[0] === 'rm').length;
 		const before = removals();
 		const claimWatch = this.watchClaim();
@@ -305,8 +338,12 @@ class FlowWorld {
 			claimWatch.stop();
 			throw error;
 		}
-		if (!removesASandbox) {
+		if (removesASandbox === false) {
 			claimWatch.stop();
+			return record;
+		}
+		if (removesASandbox === 'no-sandbox') {
+			await this.waitForClaimRelease(claimWatch);
 			return record;
 		}
 		try {
@@ -554,6 +591,20 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		).slice(8);
 		expect(mounts[0]).toBe(path.join(world.poolDirectory, 'slot-1'));
 		expect(mounts.some(mount => mount.endsWith(':ro'))).toBe(false);
+	}, 120_000);
+
+	// The failed-run path: the wrapper refuses a step (here host: true under a read-only profile), the run ends failed, and the daemon must
+	// still release the pool slot after the wrapper's end-of-run ack. Pinned because a CI run on another host timed out waiting for the claim
+	// after a step had failed; this proves the release does not depend on the step having succeeded.
+	it('releases the pool slot of a run whose step the wrapper refused (no sandbox was created)', async () => {
+		const createsBefore = sandboxesCreated(world.sbxCalls()).length;
+		const file = world.writeHostFlow('refused-run', ['host'], 'inspect');
+
+		const record = await world.runAndRelease(file, 'no-sandbox');
+
+		expect(record.status).toBe('failed');
+		expect(record.steps?.['host']?.error).toMatch(/host: true cannot satisfy fs=readonly-enforced/);
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(createsBefore);
 	}, 120_000);
 
 	it('a flow that asks for a SUBSET of the guarantees (fs=confined) is served by the requirement-only source too', async () => {

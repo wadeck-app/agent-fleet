@@ -180,9 +180,11 @@ function parseOptions(raw) {
 		parsed.acceptSshAgentForwarding = raw.acceptSshAgentForwarding === 'true';
 	}
 	if (raw.sbxPath !== undefined) {
-		if (!isAbsolute(raw.sbxPath)) throw optionError('sbxPath', 'must be an absolute path');
+		// The network form is recognised by its syntax, before `isAbsolute`: on a POSIX host `\\server\share\sbx.exe` is not absolute and
+		// would otherwise get the less specific message.
 		if (/^(?:\\\\|\/\/)/.test(raw.sbxPath))
 			throw optionError('sbxPath', 'must be a local path, not a network path');
+		if (!isAbsolute(raw.sbxPath)) throw optionError('sbxPath', 'must be an absolute path');
 		if (!isFile(raw.sbxPath)) throw optionError('sbxPath', `must be a file that exists, found ${raw.sbxPath}`);
 		parsed.sbxPath = raw.sbxPath;
 	}

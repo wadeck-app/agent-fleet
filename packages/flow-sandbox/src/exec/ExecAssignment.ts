@@ -3,6 +3,7 @@ import type { SandboxLog } from '../SandboxLog';
 import { AssignmentFields } from '../harness/AssignmentFields';
 import { type JsonObject, isJsonObject } from '../harness/HarnessMessages';
 import type { ExecStepType } from './ExecSandboxPreparer';
+import { UNC, WINDOWS_ABSOLUTE, flavorOf } from './HostPaths';
 
 export interface PreparedAssignment {
 	assignmentId: string;
@@ -15,8 +16,6 @@ export interface PreparedAssignment {
 	/** Environment variable names the step declares: its `env` (wrapper values merged in) and its `secrets`. */
 	declaredEnvironmentNames: ReadonlySet<string>;
 }
-
-const WINDOWS_ABSOLUTE = /^[A-Za-z]:[\\/]/;
 
 /**
  * Daemon to engine, in the exec variant. Unlike the relay variant nothing is translated here: the engine runs on the
@@ -37,6 +36,8 @@ export class ExecAssignment {
 			mounts: RunMounts;
 			injectedEnv: (stepType: ExecStepType) => Readonly<Record<string, string>>;
 			log: SandboxLog;
+			/** The host's platform (default: this one): which paths count as absolute. Tests pass `win32` and `linux` on any host. */
+			platform?: NodeJS.Platform;
 		}
 	) {}
 
@@ -86,7 +87,11 @@ export class ExecAssignment {
 		return names;
 	}
 
+	/** An absolute path (in the syntax of the host, or Windows-looking on any host) must lie inside the mounts; a relative one is resolved against the workspace by the engine. */
 	private requireMounted(value: string, label: string): void {
-		if (WINDOWS_ABSOLUTE.test(value)) this.options.mounts.toSandboxPath(value, label);
+		const posixAbsolute = flavorOf(this.options.platform ?? process.platform) === 'posix' && value.startsWith('/');
+		if (posixAbsolute || WINDOWS_ABSOLUTE.test(value) || UNC.test(value)) {
+			this.options.mounts.toSandboxPath(value, label);
+		}
 	}
 }

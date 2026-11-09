@@ -106,6 +106,16 @@ export class RunMounts {
 			: [this.workspaceMount(), this.metaMount()];
 	}
 
+	/**
+	 * True when the path lies (lexically) under one of the two mounts, in the mounted or the engine spelling. It does not look at links:
+	 * {@link toSandboxPath} does. Used to tell a host path from any other text on a POSIX host, where host and VM paths look alike.
+	 */
+	contains(hostPath: string): boolean {
+		return [...this.roots, ...this.spellings.map(entry => entry.spelling)].some(
+			root => this.isUnder(root, hostPath) || hostPath.startsWith(`${root}${this.flavor.sep}`)
+		);
+	}
+
 	/** Host path -> path inside the sandbox, refusing anything outside the mounts or through a link. */
 	toSandboxPath(hostPath: string, label: string): string {
 		const sandboxPath = this.translator.toSandbox(hostPath, label);

@@ -48,6 +48,9 @@ beforeEach(async () => {
 	await runtime.create({ name: 'box', agent: 'claude', mounts: [{ hostPath: workspace }], cpus: 1, memory: '1g' });
 	translator = new StepCommandTranslator({
 		mounts: new RunMounts({ workspaceDir: workspace, workspaceMetaDir: meta, platform: process.platform, log }),
+		platform: process.platform,
+		// POSIX hosts: where a host file can be told from a VM path. Not used on Windows (a drive letter is enough).
+		hostDirectories: [hostTemp, root],
 		stager: new VmFileStager({
 			runtime,
 			log,
@@ -180,10 +183,18 @@ describe('StepCommandTranslator program', () => {
 			}
 		));
 
-	it('refuses a host program the VM does not have, and a shell with arguments', async () => {
-		expect((await refusal(translator.translate(request({ command: 'C:\\tools\\mytool.exe' })))).message).toMatch(
-			/host path and the VM has no such program/
-		);
+	// Windows by nature (a drive-letter program): the same rule on a POSIX host (a program in a known host directory) is in
+	// StepCommandTranslator.platform.test.ts, "refuses a host path to a shell".
+	it.skipIf(process.platform !== 'win32')(
+		'refuses a host program the VM does not have (drive-letter path)',
+		async () => {
+			expect(
+				(await refusal(translator.translate(request({ command: 'C:\\tools\\mytool.exe' })))).message
+			).toMatch(/host path and the VM has no such program/);
+		}
+	);
+
+	it('refuses a shell with arguments', async () => {
 		expect(
 			(await refusal(translator.translate(request({ command: 'ls', args: ['-l'], shell: true })))).message
 		).toMatch(/both arguments and a shell/);
@@ -206,7 +217,7 @@ describe('StepCommandTranslator paths', () => {
 			outside,
 			'\\\\server\\share\\x',
 			notEngineFile,
-			`${workspace}\\..\\elsewhere\\secret.txt`,
+			`${workspace}${path.sep}..${path.sep}elsewhere${path.sep}secret.txt`,
 		]) {
 			const error = await refusal(translator.translate(request({ command: 'cat', args: [argument] })));
 			expect(error.kind).toBe('path-outside-mounts');
