@@ -82,7 +82,17 @@ function _runWithExit(bin, binArgs) {
       env: { ...process.env, LAUNCHER_BUNDLE_OVERRIDE: bundlePath },
     });
   } catch (err) {
-    process.exit(err != null && typeof err === 'object' && 'status' in err && typeof err.status === 'number' ? err.status : 1);
+    if (err != null && typeof err === 'object' && 'status' in err && typeof err.status === 'number') {
+      process.exit(err.status);
+    }
+    // No numeric exit status: the command could not even be started (EACCES when the exec bit is missing, ENOENT, ...).
+    // Never exit silently: the user would see a command that "does nothing".
+    const reason = err != null && typeof err === 'object' && 'code' in err ? `${err.code}: ${err.message}` : String(err);
+    process.stderr.write(`{{CLI_NAME}}: cannot start ${bin}: ${reason}\n`);
+    if (err != null && typeof err === 'object' && err.code === 'EACCES') {
+      process.stderr.write(`{{CLI_NAME}}: the file is not executable. Run: chmod +x "${bin}"\n`);
+    }
+    process.exit(1);
   }
 }
 
@@ -93,7 +103,9 @@ function _runWithExit(bin, binArgs) {
 // so we run node directly to guarantee output visibility.
 var _bypassLauncher = _args[0] !== 'start';
 
-if (process.platform === 'win32' && _bypassLauncher) {
+// The same bypass on macOS/Linux: every command but 'start' runs the bundle with node directly, so a platform binary
+// that lost its exec bit (EACCES) can no longer make an ordinary command exit with no output.
+if (_bypassLauncher) {
   _runWithExit(process.execPath, [bundlePath].concat(_args));
 } else {
   _runWithExit(launcherPath, _args);
