@@ -5,7 +5,7 @@
 // imports only node: modules. Everything heavy (the engine, the sandbox layer) lives in wrapper.cjs, a separate process.
 // Built into dist-plugin/plugin-sandbox/ by `npm run bundle --workspace flow-sandbox`; declared with
 //   flow worker source add <id> --provider sandbox --plugin sandbox.exec --plugins-dir <dist-plugin> --option projects=<ids> ...
-// (README, "Plugin"). The ref `sandbox.exec` gives the worker type `sandbox`: the flow binds a run with `workerType: sandbox`.
+// (README, "Plugin"). A flow asks for it with `requires: [sandbox]` (or `profile: untrusted-code`); declaring guarantees makes the source requirement-only in the core.
 //
 // Two environment variables exist for TESTS ONLY, read from the daemon's own environment:
 //   FLOW_SANDBOX_PLUGIN_WRAPPER     path of a script that stands in for wrapper.cjs
@@ -215,7 +215,7 @@ function wrapperArguments(parsed, sourceId) {
 	for (const [flag, value] of pairs) if (value !== undefined) argv.push(flag, value);
 	for (const host of parsed.extraAllowedHosts) argv.push('--extra-allowed-host', host);
 	if (parsed.acceptSshAgentForwarding === true) argv.push('--accept-ssh-agent-forwarding');
-	// The wrapper refuses a step the daemon did not route by one of this worker type's guarantees (RequiresGuard).
+	// The wrapper refuses a step the daemon did not route by one of this source's guarantees (RequiresGuard).
 	argv.push('--require-guarantees');
 	return argv;
 }
@@ -364,10 +364,7 @@ function createInstance(context) {
 	}
 
 	return {
-		// The daemon never offers this worker a step of a run that is not bound to `workerType: sandbox`, and never asks this
-		// source for a worker on behalf of such a run: host-only steps (cmd, pwsh, daemon API scripts) cannot run in a sandbox.
-		exclusive: true,
-		// What the workers of this source enforce, read by the daemon for routing (a flow's `requires:`); never worker labels. A subset of
+		// What the workers of this source enforce, read by the daemon for routing (a flow's `requires:`); never worker labels. Declaring any makes the source requirement-only: it never gets a step without requirements. A subset of
 		// the manifest list below. Kept equal to SANDBOX_GUARANTEES (src/exec/RequiresGuard.ts) by a test; the reasons for each entry,
 		// and for the two that are NOT listed (net=filtered, fs=readonly-enforced), are there.
 		guarantees: [...GUARANTEES],

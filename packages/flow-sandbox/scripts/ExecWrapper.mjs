@@ -17,9 +17,9 @@
  *
  * ROUTING IS BY LABELS HERE, WHICH DOES NOT ISOLATE: a step injected by a model (the MCP `provideSteps` tool) carries no
  * labels, so the daemon may run it on a host worker, outside the sandbox. Isolation against injected steps needs a run
- * bound to a worker TYPE: the flow declares `workerType: sandbox` and the source is declared with a plugin ref
+ * that asks for guarantees: the flow declares `requires: [sandbox]` and the source is declared with a plugin ref
  * (`flow worker source add <id> --plugin sandbox.<implementation> --plugins-dir <dir> ...`, the plugin sandbox.exec, built by `npm run bundle --workspace flow-sandbox`;
- * not yet run against a real sandbox). A `built-in:command` source has no worker type, so a bound run would never reach it.
+ * not yet run against a real sandbox). A `built-in:command` source declares no guarantees, so a flow with `requires` would never reach it.
  * The wrapper logs a warning at startup when it can see that its source has no plugin ref.
  *
  * The wrapper declares `run-events`: when the daemon says a run is over (`run_end`), the run's sandbox is REMOVED and then

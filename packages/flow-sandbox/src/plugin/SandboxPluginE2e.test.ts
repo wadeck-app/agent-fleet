@@ -20,7 +20,7 @@ import { MOCK_SBX_PATH, type MockSbxCall } from '../testing/MockSbxHarness';
  *
  * WHAT THIS PROVES
  * - the daemon builds the source from the artifact and asks it for a worker; the wrapper registers with the launch credential;
- * - a run bound with `workerType: sandbox` is served by that worker (the execution record names the source and the step output);
+ * - a run with `requires: [sandbox]` is served by that worker (the execution record names the source and the step output);
  * - the sbx command lines the wrapper issues, in order: create (explicit --cpus and -m, exactly the two mounts), the setup and the
  *   step's exec, then `rm --force` at the end of the run, while the mounted directories still exist; the daemon releases the pool
  *   slot (its claim folder disappears) only after the wrapper's ack, which follows the removal: asserted on the timestamp of the
@@ -151,12 +151,12 @@ class FlowWorld {
 	}
 
 	/**
-	 * One script step. `true` asks for the sandbox with `requires: [sandbox]`; `false` asks for nothing; an object chooses
-	 * `workerType: sandbox` and/or an explicit `requires` list (flow level).
+	 * One script step. `true` asks for the sandbox with `requires: [sandbox]`; `false` asks for nothing; an object chooses an explicit
+	 * `requires` list (flow level) and/or the REMOVED `workerType: sandbox` line (only to prove the daemon rejects it).
 	 */
 	writeFlow(
 		name: string,
-		binding: boolean | { workerType?: boolean; requires?: string[] },
+		binding: boolean | { removedWorkerType?: boolean; requires?: string[] },
 		workspace: 'pool' | 'in-place' = 'pool'
 	): string {
 		const chosen = binding === true ? { requires: ['sandbox'] } : binding === false ? {} : binding;
@@ -168,7 +168,7 @@ class FlowWorld {
 				"version: '1.0.0'",
 				`name: ${name}`,
 				'description: One script step.',
-				...(chosen.workerType === true ? ['workerType: sandbox'] : []),
+				...(chosen.removedWorkerType === true ? ['workerType: sandbox'] : []),
 				...(chosen.requires !== undefined ? [`requires: [${chosen.requires.join(', ')}]`] : []),
 				// A sandboxed worker accepts only a pool (the in-place workspace would expose <project>/.flow and .git/hooks).
 				workspace === 'pool'
@@ -226,12 +226,21 @@ class FlowWorld {
 		return file;
 	}
 
-	/** Runs a flow and waits until its execution settles. */
-	async run(file: string, timeoutMs = 90_000): Promise<ExecutionRecord> {
+	/** Starts a flow and returns its execution id. */
+	start(file: string): string {
 		const started = this.flow(['run', file, '--json']);
 		const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
 		if (match === null) throw new Error(`no executionId from flow run: ${started.stdout}${started.stderr}`);
-		const executionId = match[1] as string;
+		return match[1] as string;
+	}
+
+	/** Runs a flow and waits until its execution settles. */
+	async run(file: string, timeoutMs = 90_000): Promise<ExecutionRecord> {
+		return this.settle(this.start(file), timeoutMs);
+	}
+
+	/** Waits until an execution settles. */
+	async settle(executionId: string, timeoutMs = 90_000): Promise<ExecutionRecord> {
 		return waitFor(`execution ${executionId} to settle`, timeoutMs, () => {
 			const shown = this.flow(['show', executionId, '--json']);
 			if (shown.status !== 0) return undefined;
@@ -475,7 +484,7 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		expect(fs.existsSync(path.join(world.poolDirectory, '.flow-pool', 'slot-1.claim'))).toBe(false);
 	});
 
-	it('a flow that asks for a SUBSET of the guarantees (fs=confined) is served by the exclusive source too', async () => {
+	it('a flow that asks for a SUBSET of the guarantees (fs=confined) is served by the requirement-only source too', async () => {
 		const before = sandboxesCreated(world.sbxCalls()).length;
 
 		const record = await world.runAndRelease(world.writeFlow('subset', { requires: ['fs=confined'] }));
@@ -484,16 +493,29 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(before + 1);
 	}, 120_000);
 
-	// workerType alone still routes to the worker, but the wrapper refuses a step the daemon did not route by a guarantee (fail closed).
-	it('refuses a run bound only by workerType: the step fails saying to add requires: [sandbox], and no sandbox is created', async () => {
+	// workerType is gone from the core: the flow is rejected at validation, with the migration in the message, before any run exists.
+	it('rejects a flow with workerType at run start (WORKER_TYPE_REMOVED) with the migration text: no run, no sandbox', () => {
 		const before = sandboxesCreated(world.sbxCalls()).length;
+		const file = world.writeFlow('legacy-type', { removedWorkerType: true });
 
-		const record = await world.run(world.writeFlow('type-only', { workerType: true }));
+		const started = world.flow(['run', file, '--json']);
+		const validated = world.flow(['validate', file]);
 
-		expect(record.status).toBe('failed');
-		expect(record.steps?.['probe']?.error).toMatch(/no "requires"[\s\S]*requires: \[sandbox\]/);
+		const output = `${started.stdout}${started.stderr}`;
+		expect(started.status).not.toBe(0);
+		expect(output).not.toMatch(/"executionId"/);
+		expect(`${output}${validated.stdout}${validated.stderr}`).toContain('WORKER_TYPE_REMOVED');
+		for (const fragment of [
+			'workerType was removed',
+			'requires: [sandbox]',
+			'profile: <name>',
+			'flow worker source list',
+		]) {
+			expect(output).toContain(fragment);
+		}
+		expect(validated.status).not.toBe(0);
 		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(before);
-	}, 120_000);
+	});
 
 	it.each([
 		['a typo of a keyword', ['sandbx'], /sandbx[\s\S]*Did you mean[\s\S]*sandbox/],
@@ -513,11 +535,11 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		expect(`${started.stdout}${started.stderr}`).not.toMatch(/"executionId"/);
 	});
 
-	it('an unbound flow is kept off the sandbox worker: its type is exclusive, the step runs on a host worker', async () => {
-		// ROUTING FACT PINNED HERE: if this assertion ever fails, the exclusivity of the sandbox type changed. Update it together with
-		// the README section "Routing and isolation" (the paragraph on the exclusive worker type) and the plugin declaration steps.
-		// The plugin declares `exclusive: true`, so the daemon offers its worker only to runs bound with `workerType: sandbox` and does
-		// not ask the source for a worker for an unbound run: the demand is covered by a host worker the daemon forks.
+	it('a flow without requirements never reaches the sandbox source: the step runs on a host worker', async () => {
+		// ROUTING FACT PINNED HERE: if this assertion ever fails, the requirement-only rule of the core changed. Update it together with
+		// the README section "Routing and isolation" and the plugin declaration steps.
+		// The plugin declares guarantees, so the core makes the source requirement-only: it offers its worker only steps whose non-empty
+		// requires it fully guarantees, and does not ask the source for a worker for an unbound run: a host worker the daemon forks covers it.
 		const callsBefore = world.sbxCalls().length;
 		const record = await world.runAndRelease(world.writeFlow('unbound', false), false);
 
@@ -525,6 +547,19 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		expect(world.sbxCalls()).toHaveLength(callsBefore);
 		expect(record.status).toBe('completed');
 	}, 120_000);
+
+	// queue.concurrency is 1 by default: a connected requirement-only worker must not take that slot from a run that never uses it.
+	it('a connected sandbox worker does not stall an unrelated run: a requirement-less flow and a requires: [sandbox] flow both complete when started together', async () => {
+		const bound = world.start(world.writeFlow('together-bound', true));
+		const unbound = world.start(world.writeFlow('together-unbound', false));
+
+		const [boundRecord, unboundRecord] = await Promise.all([world.settle(bound), world.settle(unbound)]);
+
+		expect(unboundRecord.status).toBe('completed');
+		expect(unboundRecord.steps?.['probe']?.sourceId).not.toBe('sandbox-1');
+		expect(boundRecord.status).toBe('completed');
+		expect(boundRecord.steps?.['probe']?.sourceId).toBe('sandbox-1');
+	}, 150_000);
 });
 
 // host: true (design note D4): the sandbox worker serves the step on its own machine. The mock runs no VM, so the proof of

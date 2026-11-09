@@ -27,7 +27,6 @@ interface Instance {
 	source: { obtainWorker(request: WorkerRequest): Promise<void> };
 	dispose(): Promise<void>;
 	run?: unknown;
-	exclusive?: boolean;
 	guarantees?: string[];
 	workspaces?: string[];
 }
@@ -417,12 +416,15 @@ describe('sandbox plugin: the factory refuses to build with a plain message that
 	});
 });
 
-describe('sandbox plugin: exclusivity', () => {
-	// An unbound flow must never be routed to a sandbox worker (host-only steps fail there): the daemon reads this flag.
-	it('declares its worker type exclusive', async () => {
+describe('sandbox plugin: requirement-only routing', () => {
+	// A source that declares guarantees is requirement-only in the core: it never gets a step without requirements. The old `exclusive` flag is gone.
+	it('declares guarantees and no exclusive flag, on the instance and in the manifest', async () => {
 		const instance = await build();
+		const plugin = await load();
 
-		expect(instance.exclusive).toBe(true);
+		expect(instance.guarantees?.length).toBeGreaterThan(0);
+		expect('exclusive' in instance).toBe(false);
+		expect(JSON.stringify(plugin.manifest)).not.toContain('exclusive');
 		await instance.dispose();
 	});
 });

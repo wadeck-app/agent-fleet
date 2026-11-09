@@ -28,7 +28,7 @@ describe('RequiresGuard.refusal', () => {
 
 		expect(message).toMatch(/no "requires"/);
 		expect(message).toContain('requires: [sandbox]');
-		expect(message).toContain('workerType: sandbox alone is not enough');
+		expect(message).not.toMatch(/workerType/i);
 		for (const guarantee of SANDBOX_GUARANTEES) expect(message).toContain(guarantee);
 	});
 

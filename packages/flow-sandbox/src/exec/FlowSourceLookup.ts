@@ -9,7 +9,7 @@ export interface SourceFacts {
 /**
  * Reads flow's own registry of worker sources (`worker-sources.json` in flow's config directory), the file
  * `flow worker source list` prints. Read-only. It is the only place the wrapper can learn whether its source was declared
- * with a plugin ref, which is what gives its workers a worker type. It sees the registry of ITS environment (same user,
+ * with a plugin ref, which is what makes the source declare guarantees. It sees the registry of ITS environment (same user,
  * same `XDG_CONFIG_HOME`): a daemon running with another config directory is not visible from here.
  */
 export class FlowSourceLookup {

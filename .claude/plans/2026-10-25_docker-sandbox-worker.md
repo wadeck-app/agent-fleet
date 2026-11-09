@@ -117,16 +117,15 @@ History of the earlier progress notes is in git; this section is the current sta
 | Leftovers | `wrapper.cjs leftover list` and `remove` shipped in the artifact (decision 26) |
 | Secrets on Windows | Owner-only ACL on the plugin's secret and env files (`PrivateAcl`); protects against other OS users only |
 | D9 accepted workspace kinds | Core 1e3e5428 and plugin (`workspaces: ['pool']`): refused at run start with `WORKSPACE_KIND_NOT_ACCEPTED`, e2e on a real isolated daemon |
+| Host scripts, profiles, `workerType` removal | Core 0cbd9c7f, 57d0eacb, 24d770f2 and plugin (2026-11-09): `host: true` script steps run on the wrapper machine (`HostScriptEnvironment` allow-list); built-in profiles expand to requirements; `workerType` is the validation error `WORKER_TYPE_REMOVED`; `exclusive` is removed from the plugin (a source declaring guarantees is requirement-only and its workers do not count against `queue.concurrency`); e2e on a real isolated daemon, `PluginLiveCheck` 8/8 |
 | Requirements, step 1 | Core (flow-owner): `requires:`, guarantees from the source instance, hard filter. Plugin: guarantees `sandbox`, `fs=confined`, `env=clean`, `ports=private`, `clean=run`; `RequiresGuard` in the wrapper. Design: `2026-11-08_sandbox-step-requirements-design.md` |
 
 ### Pending
 
 | Item | Owner | Note |
 | --- | --- | --- |
-| Profiles (tightening-only config), injected-step inheritance, the assign field always sent | core | Design note, migration steps 3 and 4 |
-| Implicit `agent` for model steps, removal of `workerType` and `exclusive` | core + plugin | Last step; pin "an unbound model flow still lands in a sandbox" in `SandboxPluginE2e` |
-| `queue.concurrency` accounting once `exclusive` goes | core | "Workers whose source declares guarantees do not count" |
-| Host-script marker and the mixed-flow ERROR | core | With the tool-provision plan |
+| Implicit `agent` for model steps (phase B) | core + plugin | Not started on the plugin side; when it lands, pin "a requirement-less model flow still lands in a sandbox" in `SandboxPluginE2e` (today the e2e pins that a requirement-less flow never reaches the sandbox source) |
+| Mixed-flow rule for `host: true` | core | Core warns (`HOST_SCRIPT_WITH_MODEL_STEPS`) instead of the ERROR the design note asked for |
 | `net=filtered` and `fs=readonly-enforced` guarantees | plugin | Need a public-destination measurement and a `:ro` primary design (note, O1) |
 | Realpath-resolved mounts (TOCTOU between check and `createMounts`) | plugin + core | Needs a path-translation change |
 | Codex and OpenCode steps in the exec variant | plugin | Refused today |
@@ -142,7 +141,7 @@ History of the earlier progress notes is in git; this section is the current sta
 4. C1-4 T-02 threat note is a GATE for whoever first wires a config-supplied absolute path or bare package into `loadPlugin` / `PluginModuleLoader` (no production consumer yet).
 5. C4 `assertNoDirectProcessApi` scans only 6 launcher test files and static `import from`; flow-owner is hardening it (`src/**` with an allowlist, dynamic import, require, export-from).
 6. C2c "never host fallback after N re-dispatches" is not traced; the requirements hard filter is its successor.
-7. A `workerType` run with workspace in-place or readonly only gets the `WORKSPACE_KIND_NOT_ACCEPTED` check through `requires:`; moot once `workerType` is removed.
+7. (Closed with 24d770f2: `workerType` is removed, so the `WORKSPACE_KIND_NOT_ACCEPTED` check applies to every sandbox-requiring flow.)
 8. Deviation from the INBOUND ruling: the credential-in-URL check (userinfo, `token=` query keys) also applies to the `built-in:inbound` provider form (stricter, `WORKERS.md`).
 9. C2-5 realpath mounts TOCTOU stays with sbx (pending table).
 10. A global `config.yml` with only `plugins.instances` makes the daemon refuse to start ("No workspace provider configured") while `plugins.workspace` is not in the global schema: named provider instances cannot be configured (found in the D9 e2e).

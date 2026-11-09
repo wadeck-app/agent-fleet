@@ -5,9 +5,9 @@
  * or CI. It makes real Bedrock calls (one word), creates ONE real sandbox and starts a real (isolated) flow daemon.
  *
  * Routing here is by LABELS (`labels: [sandbox]`, a `built-in:command` source), which does NOT isolate against steps a
- * model injects (they carry no labels). The strict form, `workerType: sandbox` in the flow with a source declared by
+ * model injects (they carry no labels). The strict form, `requires: [sandbox]` in the flow with a source declared by
  * `--plugin sandbox.<impl>`, needs the sandbox plugin (`npm run bundle --workspace flow-sandbox`), which this script does not declare yet (a plugin live check is a separate task): adding
- * `workerType` to its flow alone would make every step wait for a worker type that does not exist and fail.
+ * `requires` to its flow alone would make every step wait for a source that declares the guarantee and fail.
  *
  * What it does:
  *  1. builds an ISOLATED flow environment (own FLOW_CONFIG_DIR / XDG_CONFIG_HOME / npm config, see

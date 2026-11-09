@@ -24,8 +24,6 @@ export const SANDBOX_GUARANTEES: readonly string[] = [
  * empty) in the `assign` message and routes by the guarantees of the worker's authenticated source. A step reaches this worker
  * only because it asked for guarantees it provides, so an assign that carries none, or something this worker does not provide, is
  * a routing bug or an old daemon: the step is refused (fail closed, nothing runs).
- *
- * Note: a run bound only with `workerType: sandbox` and no `requires` is refused too. Write `requires: [sandbox]`.
  */
 export class RequiresGuard {
 	/** The refusal message, or undefined when the step may run. */
@@ -34,7 +32,7 @@ export class RequiresGuard {
 		if (requires === undefined || requires === null || (Array.isArray(requires) && requires.length === 0)) {
 			return (
 				`the assignment has no "requires": a step reaches the sandbox worker only when its flow asks for a guarantee this worker provides, ` +
-				`so the step was not run. Add "requires: [sandbox]" at the flow or step level (workerType: sandbox alone is not enough). ` +
+				`so the step was not run. Add "requires: [sandbox]" at the flow or step level. ` +
 				`This worker provides: ${provided}.`
 			);
 		}

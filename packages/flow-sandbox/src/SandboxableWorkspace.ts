@@ -5,7 +5,7 @@ import { RunMetaDirectory } from './RunMetaDirectory';
 import { SandboxError } from './SandboxError';
 
 /**
- * The workspace provider kinds the sandbox worker type accepts: declared in the plugin manifest and on the instance (plugin/plugin.config.js,
+ * The workspace provider kinds the sandbox worker accepts: declared in the plugin manifest and on the instance (plugin/plugin.config.js,
  * kept equal by a test), checked by the core at run start (WORKSPACE_KIND_NOT_ACCEPTED). The kind is coarse: the layout check below stays as
  * defence in depth (a pool slot that contains the project is still refused).
  */
@@ -44,14 +44,14 @@ export class SandboxableWorkspace {
 				`A sandboxed worker needs workspace: pool, the in-place workspace exposes <project>/.flow and .git/hooks to the sandbox. ` +
 					`The run's .meta directory ${metaDir} lies inside its workspace ${context.workspaceDir}, so the sandbox would see the project's .flow ` +
 					'folder (flow definitions, the outputs of other runs) and its git hooks. Declare "workspace: pool" in the flow (see the schema reference, "pool"), ' +
-					'or remove the workerType binding.'
+					'or remove the sandbox requirement (requires: [sandbox]).'
 			);
 		}
 		if (context.workspaceReadOnly === true) {
 			throw new SandboxError(
 				'invalid-argument',
 				`A sandboxed worker needs workspace: pool, not readonly: the readonly provider exposes the project folder (<project>/.flow and .git/hooks) to the sandbox ` +
-					`(workspace ${context.workspaceDir}). Declare "workspace: pool" in the flow, or remove the workerType binding.`
+					`(workspace ${context.workspaceDir}). Declare "workspace: pool" in the flow, or remove the sandbox requirement (requires: [sandbox]).`
 			);
 		}
 		if (SandboxableWorkspace.isFile(path.join(context.workspaceDir, '.git'))) {

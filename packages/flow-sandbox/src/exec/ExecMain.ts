@@ -35,12 +35,12 @@ import { FlowSourceLookup } from './FlowSourceLookup';
 import { HostScriptEnvironment } from './HostScriptEnvironment';
 import { HostScriptLauncher } from './HostScriptLauncher';
 import { McpCallbackRules } from './McpCallbackRules';
+import { RoutingPreflight } from './RoutingPreflight';
 import { SbxProcessLauncher } from './SbxProcessLauncher';
 import { StepCommandTranslator } from './StepCommandTranslator';
 import { VmEnvironmentFilter } from './VmEnvironmentFilter';
 import { VmExecutableLookup } from './VmExecutableLookup';
 import { VmFileStager } from './VmFileStager';
-import { WorkerTypePreflight } from './WorkerTypePreflight';
 
 /** Version string the wrapper reports to the daemon (`flow worker list`). */
 const EXEC_VERSION = 'sandbox-exec-m7';
@@ -64,7 +64,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 		`starting: wrapper ${config.wrapperId}, source ${config.sourceId}, projects ${config.projectIds.join(',')}, labels ${config.labels.join(',')}, image ${config.image ?? '(agent default)'}`
 	);
 	// What the wrapper can know about its routing: how its source was declared (never the flow). One line, a warning unless the source has a plugin ref.
-	new WorkerTypePreflight({
+	new RoutingPreflight({
 		sourceId: config.sourceId,
 		lookup: () => new FlowSourceLookup(flowConfigDir()).find(config.sourceId),
 		log,

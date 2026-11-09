@@ -15,9 +15,9 @@
  *
  * ROUTING IS BY LABELS HERE, WHICH DOES NOT ISOLATE: a step injected by a model (the MCP `provideSteps` tool) carries no
  * labels, so the daemon may run it on a host worker, outside the sandbox. Isolation against injected steps needs a run
- * bound to a worker TYPE: the flow declares `workerType: sandbox` and the source is declared with a plugin ref
+ * that asks for guarantees: the flow declares `requires: [sandbox]` and the source is declared with a plugin ref
  * (`flow worker source add <id> --plugin sandbox.<implementation> --plugins-dir <dir> ...`, the plugin sandbox.exec, built by `npm run bundle --workspace flow-sandbox`;
- * not yet run against a real sandbox). A `built-in:command` source has no worker type, so a bound run would never reach it.
+ * not yet run against a real sandbox). A `built-in:command` source declares no guarantees, so a flow with `requires` would never reach it.
  * (This relay prototype does not check its source at startup; the exec wrapper does.)
  *
  * No run-end events exist yet (plan C2): sandboxes are left STOPPED, never removed. Clean up with

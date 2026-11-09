@@ -159,7 +159,7 @@ function writeFlow() {
 		`id: plugin-live-check
 version: '1.0.0'
 name: Plugin live check
-description: A script step and a model step served by the sandbox worker type.
+description: A script step and a model step served by the sandbox source.
 
 requires: [sandbox]
 

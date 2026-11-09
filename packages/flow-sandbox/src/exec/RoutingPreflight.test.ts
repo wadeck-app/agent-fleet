@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { eachRow } from '../testing/EachRow';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { FlowSourceLookup } from './FlowSourceLookup';
-import { WorkerTypePreflight } from './WorkerTypePreflight';
+import { RoutingPreflight } from './RoutingPreflight';
 
 const roots: string[] = [];
 
@@ -15,28 +15,33 @@ afterEach(() => {
 	for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
-describe('WorkerTypePreflight (what the wrapper can know about how it was declared)', () => {
+describe('RoutingPreflight (what the wrapper can know about how it was declared)', () => {
 	// The wrapper cannot see the flow, so it can never promise isolation; it can only say what the source gives it.
 	it('states what the source gives the wrapper: info with a plugin ref, ONE warning otherwise (each case)', () =>
 		eachRow(
 			[
 				{
-					label: 'a source declared with a plugin ref: its workers have that type (info, no warning)',
+					label: 'a source declared with a plugin ref: requirement-only routing, steps arrive only with requires (info, no warning)',
 					lookup: () => ({ plugin: 'sandbox.exec' }),
 					level: 'info',
-					fragments: ['worker type "sandbox"', 'workerType: sandbox'],
+					fragments: ['plugin sandbox.exec', 'requires: [sandbox]', 'injected steps'],
 				},
 				{
-					label: 'a source of another plugin id: the flow must name that type (info)',
+					label: 'a source of another plugin id: named as declared (info)',
 					lookup: () => ({ plugin: 'gpubox.exec' }),
 					level: 'info',
-					fragments: ['worker type "gpubox"', 'workerType: gpubox'],
+					fragments: ['plugin gpubox.exec', 'requires:'],
 				},
 				{
-					label: 'a source without a plugin ref (built-in:command): no worker type, label routing only (warning)',
+					label: 'a source without a plugin ref (built-in:command): no guarantees, label routing only (warning)',
 					lookup: () => ({}),
 					level: 'warn',
-					fragments: ['has no plugin ref', 'NOT isolating', '--plugin sandbox.<implementation>'],
+					fragments: [
+						'has no plugin ref',
+						'NOT isolating',
+						'--plugin sandbox.<implementation>',
+						'requires: [sandbox]',
+					],
 				},
 				{
 					label: 'a source that is not in the registry the wrapper can read (warning, says so)',
@@ -56,7 +61,7 @@ describe('WorkerTypePreflight (what the wrapper can know about how it was declar
 			({ lookup, level, fragments }) => {
 				const log = new RecordingSandboxLog();
 
-				new WorkerTypePreflight({ sourceId: 'sbx-exec', lookup, log }).run();
+				new RoutingPreflight({ sourceId: 'sbx-exec', lookup, log }).run();
 
 				expect(log.lines).toHaveLength(1);
 				expect(log.lines[0]).toMatch(new RegExp(`^${level}:`));
