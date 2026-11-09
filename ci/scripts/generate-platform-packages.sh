@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copied from C:\Workspace_Tooling\ci-templates (working tree of 2026-11-09, uncommitted at the time): re-sync from there, do not edit here.
+# Copied from C:/Workspace_Tooling/ci-templates commit 0099d00 (scripts/generate-platform-packages.sh): re-sync from there, do not edit here.
 # Generates platform package directories for npm publish.
 # Called by CI before copy-binaries.sh. Not needed locally.
 #
