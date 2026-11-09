@@ -14,7 +14,7 @@ const UNTRUSTED_CODE = [...AGENT, 'ports=private'] as const;
  * `net=filtered` is in NO profile: the sandbox plugin does not declare it (raw TCP to public destinations is unverified;
  * an allow-all machine policy would make it false), so a profile containing it could be met by no source. It is added to
  * `untrusted-code` / `hermetic-test` only when a source declares AND verifies it: a deliberate tightening that needs a
- * changelog line. `inspect` stays unmeetable until a source declares `fs=readonly-enforced` (a `:ro` mount).
+ * changelog line. `inspect` needs `fs=readonly-enforced`, which the sandbox plugin declares since its `:ro` mount was measured.
  */
 const PROFILES: Readonly<Record<string, readonly string[]>> = {
 	// model steps
