@@ -56,7 +56,6 @@ describe('RunDefinitionLoader - requires', () => {
 		return new RunDefinitionLoader(
 			resolver,
 			{ writeExecution: () => undefined } as unknown as LogWriter,
-			undefined,
 			guarantees
 		);
 	}
@@ -163,7 +162,16 @@ describe('RunDefinitionLoader - warnings of an accepted flow', () => {
 		const file = path.join(dir, 'flow.yml');
 		fs.writeFileSync(
 			file,
-			['id: w', 'name: W', 'version: 1.0.0', 'description: d', 'workspace: in-place', 'steps:', ...steps, ''].join('\n')
+			[
+				'id: w',
+				'name: W',
+				'version: 1.0.0',
+				'description: d',
+				'workspace: in-place',
+				'steps:',
+				...steps,
+				'',
+			].join('\n')
 		);
 		return loader().load({ type: 'run', flowFile: file } as never, file);
 	}
@@ -173,7 +181,12 @@ describe('RunDefinitionLoader - warnings of an accepted flow', () => {
 	const model = ['  - { id: agent, name: agent, type: model, prompt: p }'];
 
 	it('reports HOST_SCRIPT_WITH_MODEL_STEPS once per host script step', () => {
-		const loaded = load([...model, ...hostScript('a', 'true'), ...hostScript('b', 'true'), ...hostScript('c', 'false')]);
+		const loaded = load([
+			...model,
+			...hostScript('a', 'true'),
+			...hostScript('b', 'true'),
+			...hostScript('c', 'false'),
+		]);
 
 		if (!loaded.ok) throw new Error(`expected the flow to be accepted: ${JSON.stringify(loaded.response)}`);
 		expect(loaded.warnings).toHaveLength(2);

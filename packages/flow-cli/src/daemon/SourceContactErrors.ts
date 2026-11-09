@@ -1,5 +1,3 @@
-import type { WorkerTypeLookup } from './WorkerTypeCatalog.js';
-
 /** What `contactDeclaredSources` tells about each ask of a source. It never carries the text of an error. */
 export interface ContactOutcome {
 	failed(sourceId: string): void;
@@ -59,16 +57,17 @@ export class SourceContactErrors implements ContactOutcome {
 		}
 	}
 
-	/** {@link since} for one type, as the function a bound-step wait asks with the time it started. */
-	sinceFor(type: string, typeOf: WorkerTypeLookup): (sinceMs: number) => string[] {
-		return sinceMs => this.since(type, typeOf, sinceMs);
+	/** {@link since} for some sources, as the function a requirement wait asks with the time it started. */
+	sinceFor(sourceIds: Iterable<string>): (sinceMs: number) => string[] {
+		const wanted = new Set(sourceIds);
+		return sinceMs => this.since(wanted, sinceMs);
 	}
 
-	/** One sentence per source of `type` whose latest failure is NOT older than `sinceMs`. */
-	since(type: string, typeOf: WorkerTypeLookup, sinceMs: number): string[] {
+	/** One sentence per source of `sourceIds` whose latest failure is NOT older than `sinceMs`. */
+	since(sourceIds: ReadonlySet<string>, sinceMs: number): string[] {
 		const sentences: string[] = [];
 		for (const [sourceId, run] of this.runs) {
-			if (typeOf(sourceId) === type && run.at >= sinceMs) {
+			if (sourceIds.has(sourceId) && run.at >= sinceMs) {
 				sentences.push(this.describe(sourceId, run));
 			}
 		}

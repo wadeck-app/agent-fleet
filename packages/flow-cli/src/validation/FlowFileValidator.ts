@@ -190,6 +190,7 @@ export function validationCodeToType(code: ValidationCode): string {
 		case ValidationCode.SUB_STEP_SIBLING_DEPENDENCY:
 		case ValidationCode.OPENCODE_SHELL_NOT_FOUND:
 		case ValidationCode.WORKER_TYPE_DEPRECATED:
+		case ValidationCode.WORKER_TYPE_REMOVED:
 		case ValidationCode.HOST_SCRIPT_WITH_MODEL_STEPS:
 			return 'schema';
 		case ValidationCode.WORKSPACE_READONLY_CONFLICT:

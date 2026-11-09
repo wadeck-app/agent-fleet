@@ -2,7 +2,7 @@ import type { StepPlacement, WorkerAcceptanceProvider, WorkerCandidate } from 'e
 import { describe, expect, it, vi } from 'vitest';
 
 import { DefaultStepDistribution, DefaultWorkerAcceptance, StepRouter } from './StepRouter.js';
-import { explainDefaultRefusal, tallyAcceptance } from './WorkerRefusal.js';
+import { explainDefaultRefusal } from './WorkerRefusal.js';
 import type { RegisteredWorker } from './WorkerRegistry.js';
 
 /**
@@ -145,45 +145,6 @@ describe('refusalOf and select ask the plugin about the SAME worker', () => {
 		expect(seen).toHaveLength(2);
 		expect(seen[0]).toEqual(seen[1]);
 		expect(seen[0]).toMatchObject({ version: '9.9.9', pid: 4242, features: ['secrets'] });
-	});
-});
-
-describe('tallyAcceptance', () => {
-	const bound = step({ boundWorkerType: 'sandbox' });
-	const ofType = (id: string, labels: string[] = []) => registered({ workerId: id, labels, sourceId: 'sbx-1' });
-	const typeOf = (sourceId: string | undefined) => (sourceId === 'sbx-1' ? 'sandbox' : undefined);
-
-	it('stops at the first worker that accepts: nothing more is asked', () => {
-		const calls: string[] = [];
-		const spy = {
-			refusalOf: (_step: StepPlacement, candidate: WorkerCandidate) => {
-				calls.push(candidate.workerId);
-				return undefined;
-			},
-		};
-
-		const tally = tallyAcceptance(spy, bound, [ofType('w-1'), ofType('w-2'), ofType('w-3')], typeOf);
-
-		expect(tally.anyAccepts).toBe(true);
-		expect(calls).toEqual(['w-1']);
-	});
-
-	it('builds the refusal list only when asked for it, and only from workers of the type', () => {
-		const calls: string[] = [];
-		const spy = {
-			refusalOf: (_step: StepPlacement, candidate: WorkerCandidate) => {
-				calls.push(candidate.workerId);
-				return 'it lacks the label "gpu"';
-			},
-		};
-		const other = registered({ workerId: 'host-1' });
-
-		const tally = tallyAcceptance(spy, bound, [ofType('w-1'), other], typeOf);
-		expect(tally.anyAccepts).toBe(false);
-		const callsDuringTally = calls.length;
-
-		expect(tally.refusals()).toEqual(['w-1 (it lacks the label "gpu")']);
-		expect(callsDuringTally).toBe(1);
 	});
 });
 

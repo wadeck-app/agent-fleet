@@ -45,69 +45,12 @@ describe('UnmetDemandCoverage - steps nothing could take', () => {
 		expect(requestFromDeclaredSources).toHaveBeenCalledWith(undefined);
 	});
 
-	// A host worker can never run a step of a bound run, so forking one for it only spends a process.
-	describe('steps of a run bound to a worker type', () => {
-		it('never plans or forks a host worker for them', () => {
-			const { coverage, provisioner } = build({ fork: 1 });
-
-			coverage.cover(0, new Set(['sandbox']));
-
-			expect(provisioner.planProvisioning).not.toHaveBeenCalled();
-			expect(provisioner.provision).not.toHaveBeenCalled();
-		});
-
-		it('asks only the sources of that type for a worker, once while they wait', () => {
-			const { coverage, requestFromDeclaredSources } = build();
-
-			coverage.cover(0, new Set(['sandbox']));
-			coverage.cover(0, new Set(['sandbox']));
-
-			expect(requestFromDeclaredSources).toHaveBeenCalledTimes(1);
-			expect(requestFromDeclaredSources).toHaveBeenCalledWith(new Set(['sandbox']));
-		});
-
-		it('asks again for a type that starts waiting later, and for the first one after nothing waited', () => {
-			const { coverage, requestFromDeclaredSources } = build();
-
-			coverage.cover(0, new Set(['sandbox']));
-			coverage.cover(0, new Set(['sandbox', 'gpu']));
-			coverage.cover(0);
-			coverage.cover(0, new Set(['sandbox']));
-
-			expect(requestFromDeclaredSources.mock.calls.map(call => [...(call[0] as Set<string>)].sort())).toEqual([
-				['sandbox'],
-				['gpu'],
-				['sandbox'],
-			]);
-		});
-
-		it('does not keep a demand re-check running for them: their own deadline timer covers the bound', () => {
-			const { coverage, rerunDispatch } = build({ fork: 0 });
-
-			coverage.cover(0, new Set(['sandbox']));
-			vi.advanceTimersByTime(10_000);
-
-			expect(rerunDispatch).not.toHaveBeenCalled();
-		});
-
-		it('plans only for the steps a host worker could run when both kinds wait', () => {
-			const { coverage, provisioner, requestFromDeclaredSources } = build({ fork: 1 });
-
-			coverage.cover(1, new Set(['sandbox']));
-
-			expect(provisioner.planProvisioning).toHaveBeenCalledWith(1, 0);
-			expect(provisioner.provision).toHaveBeenCalledTimes(1);
-			expect(requestFromDeclaredSources).toHaveBeenCalledTimes(1);
-			expect(requestFromDeclaredSources).toHaveBeenCalledWith(undefined);
-		});
-	});
-
 	// A step that requires something is demand for the sources that declare it, not for a host worker (it guarantees nothing).
 	describe('steps waiting for a requirement', () => {
 		it('never plans or forks a host worker for them', () => {
 			const { coverage, provisioner } = build({ fork: 1 });
 
-			coverage.cover(0, new Set(), new Set(['sbx']));
+			coverage.cover(0, new Set(['sbx']));
 
 			expect(provisioner.planProvisioning).not.toHaveBeenCalled();
 			expect(provisioner.provision).not.toHaveBeenCalled();
@@ -116,22 +59,22 @@ describe('UnmetDemandCoverage - steps nothing could take', () => {
 		it('asks only the sources that can provide it, by id, once while they wait', () => {
 			const { coverage, requestFromDeclaredSources } = build();
 
-			coverage.cover(0, new Set(), new Set(['sbx']));
-			coverage.cover(0, new Set(), new Set(['sbx']));
+			coverage.cover(0, new Set(['sbx']));
+			coverage.cover(0, new Set(['sbx']));
 
 			expect(requestFromDeclaredSources).toHaveBeenCalledTimes(1);
-			expect(requestFromDeclaredSources).toHaveBeenCalledWith(undefined, new Set(['sbx']));
+			expect(requestFromDeclaredSources).toHaveBeenCalledWith(new Set(['sbx']));
 		});
 
 		it('asks again for a source that starts waiting later, and for the first one after nothing waited', () => {
 			const { coverage, requestFromDeclaredSources } = build();
 
-			coverage.cover(0, new Set(), new Set(['a']));
-			coverage.cover(0, new Set(), new Set(['a', 'b']));
+			coverage.cover(0, new Set(['a']));
+			coverage.cover(0, new Set(['a', 'b']));
 			coverage.cover(0);
-			coverage.cover(0, new Set(), new Set(['a']));
+			coverage.cover(0, new Set(['a']));
 
-			expect(requestFromDeclaredSources.mock.calls.map(call => [...(call[1] as Set<string>)].sort())).toEqual([
+			expect(requestFromDeclaredSources.mock.calls.map(call => [...(call[0] as Set<string>)].sort())).toEqual([
 				['a'],
 				['b'],
 				['a'],
@@ -141,7 +84,7 @@ describe('UnmetDemandCoverage - steps nothing could take', () => {
 		it('does not keep a demand re-check running for them', () => {
 			const { coverage, rerunDispatch } = build({ fork: 0 });
 
-			coverage.cover(0, new Set(), new Set(['sbx']));
+			coverage.cover(0, new Set(['sbx']));
 			vi.advanceTimersByTime(10_000);
 
 			expect(rerunDispatch).not.toHaveBeenCalled();
@@ -150,11 +93,11 @@ describe('UnmetDemandCoverage - steps nothing could take', () => {
 		it('still plans for the steps a host worker could run when both kinds wait, asking the sources of the requirement apart', () => {
 			const { coverage, provisioner, requestFromDeclaredSources } = build({ fork: 1 });
 
-			coverage.cover(1, new Set(), new Set(['sbx']));
+			coverage.cover(1, new Set(['sbx']));
 
 			expect(provisioner.provision).toHaveBeenCalledTimes(1);
 			expect(requestFromDeclaredSources).toHaveBeenCalledWith(undefined);
-			expect(requestFromDeclaredSources).toHaveBeenCalledWith(undefined, new Set(['sbx']));
+			expect(requestFromDeclaredSources).toHaveBeenCalledWith(new Set(['sbx']));
 		});
 	});
 });

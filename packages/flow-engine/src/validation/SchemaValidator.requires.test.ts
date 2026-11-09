@@ -40,12 +40,12 @@ describe('SchemaValidator - requires', () => {
 
 	it('checks the known guarantees when the 4th param is given', () => {
 		const collector = new MockIssueCollector();
-		new SchemaValidator(collector, [], undefined, ['sandbox']).validateSchema(flow(['sandbox'], ['zz=2']));
+		new SchemaValidator(collector, [], ['sandbox']).validateSchema(flow(['sandbox'], ['zz=2']));
 		expect(requiresIssues(collector).map(i => i.location?.stepId)).toEqual(['s1']);
 	});
 
 	it('FlowValidator passes the known guarantees down', () => {
-		const result = new FlowValidator(undefined, [], undefined, ['sandbox']).validate(flow(['nope'], undefined));
+		const result = new FlowValidator(undefined, [], ['sandbox']).validate(flow(['nope'], undefined));
 		expect(JSON.stringify(result)).toContain('unknown requirement \\"nope\\"');
 	});
 });
@@ -67,9 +67,7 @@ describe('SchemaValidator - profile', () => {
 		const collector = new MockIssueCollector();
 		const definition = flow(undefined, undefined) as unknown as { profile: string };
 		definition.profile = 'agent';
-		new SchemaValidator(collector, [], undefined, ['fs=confined']).validateSchema(
-			definition as unknown as FlowDefinition
-		);
+		new SchemaValidator(collector, [], ['fs=confined']).validateSchema(definition as unknown as FlowDefinition);
 		const issues = collector.issues.filter(i => i.location?.field === 'profile');
 		expect(issues).toHaveLength(1);
 		expect(issues[0]!.message).toContain('requires "env=clean",');

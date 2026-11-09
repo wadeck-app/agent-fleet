@@ -1,9 +1,5 @@
 import type { StepPlacement, WorkerCandidate } from 'extension-points';
 
-import type { StepRouter } from './StepRouter.js';
-import type { RegisteredWorker } from './WorkerRegistry.js';
-import type { WorkerTypeLookup } from './WorkerTypeCatalog.js';
-
 /** The longest label or shell name printed in a reason, and how many labels are listed before "and N more". */
 const MAX_NAME_LENGTH = 80;
 const MAX_LABELS_LISTED = 5;
@@ -40,28 +36,4 @@ export function explainDefaultRefusal(step: StepPlacement, worker: WorkerCandida
 		return "it does not serve this step's project";
 	}
 	return undefined;
-}
-
-/**
- * Whether any connected worker of the type a step is bound to (`step.boundWorkerType`) would accept it (idle or busy: it
- * can free up for it), asking the acceptance of each worker only until one accepts; and, on demand, a
- * `<worker id> (<reason>)` for every worker of the type that would not. A worker that refuses the step never will, so it
- * must not hold the wait for a worker of the type open. The workers are the registered ones, the same objects
- * `StepRouter.select` asks about. Read-only: who may receive a step is decided by `select`.
- */
-export function tallyAcceptance(
-	router: Pick<StepRouter, 'refusalOf'>,
-	step: StepPlacement,
-	connected: RegisteredWorker[],
-	typeOf: WorkerTypeLookup
-): { anyAccepts: boolean; refusals: () => string[] } {
-	const ofType = connected.filter(worker => typeOf(worker.sourceId) === step.boundWorkerType);
-	return {
-		anyAccepts: ofType.some(worker => router.refusalOf(step, worker) === undefined),
-		refusals: () =>
-			ofType.flatMap(worker => {
-				const reason = router.refusalOf(step, worker);
-				return reason === undefined ? [] : [`${worker.workerId} (${reason})`];
-			}),
-	};
 }

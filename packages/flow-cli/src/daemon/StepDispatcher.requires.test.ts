@@ -108,10 +108,8 @@ async function build(
 		(_executionId, stepId, reason) => failed.push({ stepId, reason }),
 		{
 			workerTypes: {
-				typeLookup: () => sourceId => (sourceId === undefined ? undefined : `${sourceId}-type`),
-				exclusiveLookup: () => sourceId =>
+				requirementOnlyLookup: () => sourceId =>
 					sourceId !== undefined && (options.exclusive ?? []).includes(sourceId),
-				knownTypes: () => ['sbx-type', 'plain-type'],
 				guaranteeLookup: () => sourceId => (sourceId === undefined ? [] : (GUARANTEES[sourceId] ?? [])),
 			},
 			wait,
@@ -215,7 +213,7 @@ describe('StepDispatcher - requirements', () => {
 
 		expect(queue.length).toBe(1);
 		expect(failed).toEqual([]);
-		expect(cover).toHaveBeenCalledWith(0, new Set(), new Set(['sbx']));
+		expect(cover).toHaveBeenCalledWith(0, new Set(['sbx']));
 	});
 
 	it('waits for a busy worker that meets the requirements without a clock, and never fails the step', async () => {
@@ -272,18 +270,6 @@ describe('StepDispatcher - requirements', () => {
 		dispatcher.tryDispatch();
 
 		expect(wait.size).toBe(0);
-	});
-
-	it('requires the worker type too when the run is bound (both must hold)', async () => {
-		const { dispatcher, executions, enqueue, addWorker, sent } = await build();
-		executions.bindWorkerType('e1', 'plain-type');
-		executions.bindRequirements('e1', { run: ['fs=confined'], steps: { s1: ['fs=confined'] } });
-		addWorker(workerOf('w-sbx', 'sbx'));
-		enqueue('s1');
-
-		dispatcher.tryDispatch();
-
-		expect(sent).toHaveLength(0);
 	});
 
 	it('fails the step loudly when the dispatcher was built without the declared guarantees (a wiring mistake)', async () => {
@@ -408,7 +394,7 @@ describe('StepDispatcher - requirements', () => {
 			dispatcher.tryDispatch();
 
 			expect(failed).toEqual([]);
-			expect(cover).toHaveBeenCalledWith(0, new Set(), new Set(['sbx']));
+			expect(cover).toHaveBeenCalledWith(0, new Set(['sbx']));
 		});
 	});
 });

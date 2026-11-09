@@ -402,11 +402,6 @@ export class RunRequestHandler {
 			// Also kept in memory: routing consults it per dispatch, and a worker the daemon
 			// did not create only serves the projects it declared (D#9).
 			this.executions.setProject(executionId, { projectId, projectRoot });
-			// A run bound to a worker type keeps every step on workers of that type, injected ones included; held in
-			// memory next to the project because routing consults it per placement (the validator already checked the name).
-			if (flow.workerType !== undefined) {
-				this.executions.bindWorkerType(executionId, flow.workerType);
-			}
 			// Same for the requirements: read per placement from the execution, so a step injected later inherits them.
 			if (accepted.requirements !== undefined) {
 				this.executions.bindRequirements(executionId, accepted.requirements);

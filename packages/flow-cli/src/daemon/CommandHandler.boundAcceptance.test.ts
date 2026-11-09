@@ -11,6 +11,7 @@ import {
 	registerCommandHandlerHooks,
 	tmpDir,
 } from './CommandHandlerTestHarness';
+import { DeclaredGuarantees } from './DeclaredGuarantees';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry';
 import { WorkerTypeCatalog } from './WorkerTypeCatalog';
 
@@ -29,16 +30,16 @@ vi.mock('node:os', async importOriginal => {
 registerCommandHandlerHooks({ mockAllocate, mockRelease, hoistedState });
 
 /**
- * A step of a run bound to a worker type, and workers of that type that are connected: which of them count for the wait.
+ * A step that requires a guarantee, and connected workers whose source provides it: which of them count for the wait.
  * The flow demands the label "gpu", so a worker without it refuses the step.
  */
 
-const GPU_BOUND_FLOW = `\
-id: gpu-bound
+const GPU_REQUIRING_FLOW = `\
+id: gpu-requiring
 version: "1.0.0"
-name: Gpu Bound
-description: bound to a worker type, demands a label
-workerType: sandbox
+name: Gpu Requiring
+description: requires the sandbox guarantee, demands a label
+requires: [sandbox]
 labels: [gpu]
 workspace:
   mode: manual
@@ -66,14 +67,25 @@ function source(sourceId: string, plugin: string): WorkerSourceEntry {
 	} as WorkerSourceEntry;
 }
 
+const SOURCES = [source('sbx-1', 'sandbox.docker'), source('sbx-2', 'sandbox.docker')];
+
 const CATALOG = new WorkerTypeCatalog(
-	{
-		list: () => [source('sbx-1', 'sandbox.docker'), source('sbx-2', 'sandbox.docker')],
-	},
-	{ isExclusive: () => false }
+	{ list: () => SOURCES },
+	{ isRequirementOnly: () => false },
+	{ guaranteesOf: () => ['sandbox'] }
 );
 
-/** A connected worker of type "sandbox" (its source is declared), with the given labels. */
+const DECLARED = new DeclaredGuarantees(
+	{ list: () => SOURCES },
+	{ declaredGuarantees: async () => ['sandbox'] },
+	() => {}
+);
+
+beforeAll(async () => {
+	await DECLARED.refresh();
+});
+
+/** A connected worker of a source that guarantees "sandbox" (the source is declared), with the given labels. */
 function sandboxWorker(name: string, labels: string[], sourceId = 'sbx-1') {
 	return {
 		ws: { name },
@@ -125,20 +137,20 @@ function daemonWith(idle: Worker[], connected: Worker[]) {
 		undefined,
 		undefined,
 		undefined,
-		{ ...emptyWorkerRouting(), workerTypes: CATALOG, boundStepWaitMs: 120_000 }
+		{ ...emptyWorkerRouting(), workerTypes: CATALOG, boundStepWaitMs: 120_000, declaredGuarantees: DECLARED }
 	);
 	return { handler, sent };
 }
 
 async function startRun(handler: TrackedCommandHandler) {
 	const flowFile = path.join(tmpDir, 'gpu.yml');
-	fs.writeFileSync(flowFile, GPU_BOUND_FLOW);
+	fs.writeFileSync(flowFile, GPU_REQUIRING_FLOW);
 	return handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
 }
 
 const lastFailureReason = () => String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
 
-describe('a bound step and the workers of its type that are connected', () => {
+describe('a step with requirements and the workers that meet them that are connected', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 	});
@@ -146,7 +158,7 @@ describe('a bound step and the workers of its type that are connected', () => {
 		vi.useRealTimers();
 	});
 
-	it('hands the step to a connected worker of the type that has the label', async () => {
+	it('hands the step to a connected worker that meets the requirements and has the label', async () => {
 		const accepting = sandboxWorker('w-2', ['gpu']);
 		const { handler, sent } = daemonWith([accepting], [accepting]);
 
@@ -155,7 +167,7 @@ describe('a bound step and the workers of its type that are connected', () => {
 		expect(sent).toEqual(['w-2']);
 	});
 
-	it('keeps waiting while a worker of the type that has the label is connected but busy', async () => {
+	it('keeps waiting while a worker that meets the requirements and has the label is connected but busy', async () => {
 		const busy = sandboxWorker('w-3', ['gpu']);
 		const { handler, sent } = daemonWith([], [busy]);
 		await startRun(handler);
@@ -169,7 +181,7 @@ describe('a bound step and the workers of its type that are connected', () => {
 	});
 });
 
-describe('a bound step fails fast when no connected worker of its type can accept it', () => {
+describe('a step with requirements fails once the bound is spent when no connected worker can accept it', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 	});
@@ -177,7 +189,7 @@ describe('a bound step fails fast when no connected worker of its type can accep
 		vi.useRealTimers();
 	});
 
-	it('no longer lets a connected worker that refuses the step hold the bound open, and names it and why', async () => {
+	it('does not let a connected worker that refuses the step hold the bound open', async () => {
 		const refusing = sandboxWorker('w-1', []);
 		const { handler, sent } = daemonWith([refusing], [refusing]);
 		await startRun(handler);
@@ -187,14 +199,9 @@ describe('a bound step fails fast when no connected worker of its type can accep
 
 		expect(sent).toEqual([]);
 		expect(mockExecStore.markStepFailed).toHaveBeenCalledTimes(1);
-		expect(lastFailureReason()).toContain('worker type "sandbox"');
-		expect(lastFailureReason()).toContain(
-			'no worker of that type that accepts this step was available in the 120s it waited'
-		);
-		expect(lastFailureReason()).not.toContain('was connected in the');
-		expect(lastFailureReason()).toContain(
-			'Workers of that type are connected but refuse this step: w-1 (it lacks the label "gpu").'
-		);
+		expect(lastFailureReason()).toContain('requires sandbox');
+		expect(lastFailureReason()).toContain('accepts this step was available in the 120s it waited');
+		expect(lastFailureReason()).not.toMatch(/workerType|worker type/);
 	});
 
 	it('does not fail before the bound: a refusing worker may be replaced by one that accepts', async () => {
@@ -219,25 +226,6 @@ describe('a bound step fails fast when no connected worker of its type can accep
 
 		expect(sent).toEqual([]);
 		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
-	});
-
-	it('lists every refusing worker of the type, and none of another type', async () => {
-		const first = sandboxWorker('w-1', []);
-		const second = sandboxWorker('w-2', ['arm'], 'sbx-2');
-		const host = {
-			...sandboxWorker('host-1', []),
-			worker: { ...sandboxWorker('host-1', []).worker, sourceId: undefined },
-		};
-		const { handler } = daemonWith([first, second], [first, second, host as never]);
-		await startRun(handler);
-
-		vi.advanceTimersByTime(121_000);
-		handler.tryDispatch();
-
-		expect(lastFailureReason()).toContain(
-			'refuse this step: w-1 (it lacks the label "gpu"); w-2 (it lacks the label "gpu").'
-		);
-		expect(lastFailureReason()).not.toContain('host-1');
 	});
 
 	it('hands the step to the worker that accepts it as soon as it is idle, whatever the others do', async () => {
@@ -291,10 +279,10 @@ describe('a worker that flips between accepting and refusing', () => {
 		handler.tryDispatch();
 		expect(sent).toEqual([]);
 		expect(mockExecStore.markStepFailed).toHaveBeenCalledTimes(1);
-		expect(lastFailureReason()).toContain('w-1 (it lacks the label "gpu")');
+		expect(lastFailureReason()).toContain('requires sandbox');
 	});
 
-	it('asks the acceptance of each worker of the type only until one accepts', async () => {
+	it('keeps waiting while any of several connected workers that meet the requirements and accept the step is busy', async () => {
 		const busyAccepting = sandboxWorker('w-1', ['gpu']);
 		const second = sandboxWorker('w-2', ['gpu'], 'sbx-2');
 		const { handler } = daemonWith([], [busyAccepting, second]);

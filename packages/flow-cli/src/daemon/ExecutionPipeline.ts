@@ -45,8 +45,7 @@ export interface ExecutionPipelineDependencies {
 	workspaceProviders: WorkspaceProviderSource | undefined;
 	resolvePerFlowWorkspaceProvider:
 		((section: NonNullable<FlowPluginOverrides['workspace']>) => Promise<WorkspaceProvider>) | undefined;
-	requestFromDeclaredSources:
-		((workerTypes?: ReadonlySet<string>, sourceIds?: ReadonlySet<string>) => void) | undefined;
+	requestFromDeclaredSources: ((sourceIds?: ReadonlySet<string>) => void) | undefined;
 	interactivityPolicy: InteractivityPolicyProvider | undefined;
 	stalledStepLimitMs: number;
 	definitionResolver: FlowDefinitionResolver;
@@ -181,12 +180,7 @@ export class ExecutionPipeline {
 		);
 		this.runRequests = new RunRequestHandler(
 			new FlowFileAccessGuard(deps.allowAbsolutePaths),
-			new RunDefinitionLoader(
-				deps.definitionResolver,
-				logWriter,
-				() => workerRouting.workerTypes.knownTypes(),
-				workerRouting.declaredGuarantees
-			),
+			new RunDefinitionLoader(deps.definitionResolver, logWriter, workerRouting.declaredGuarantees),
 			new RunStepPreparer(deps.daemonDir, logWriter),
 			daemonSecrets,
 			workspaces,

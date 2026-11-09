@@ -147,8 +147,8 @@ describe('requires: routed to the source that declares the guarantee', () => {
 		args[1] = pool as never;
 		args[2] = pool as never;
 		args[4] = new ExecutionStore(executionsDirOf(daemonDir));
-		args[REQUEST_SOURCES_INDEX] = (types, ids) => {
-			contact.contactSources(4101, types, ids);
+		args[REQUEST_SOURCES_INDEX] = ids => {
+			contact.contactSources(4101, ids);
 		};
 		args[ROUTING_INDEX] = routing;
 		handler = new TrackedCommandHandler(...args);
@@ -202,7 +202,7 @@ describe('requires: routed to the source that declares the guarantee', () => {
 		expect(sent).toEqual([]);
 	});
 
-	// Asking for a guarantee is an explicit opt-in, like binding by workerType: an exclusive source serves it.
+	// Asking for a guarantee is an explicit opt-in: a requirement-only source serves it.
 	it('serves a step with requirements from an exclusive source that guarantees them, asked by id', async () => {
 		sources.declare({
 			sourceId: 'xsbx',

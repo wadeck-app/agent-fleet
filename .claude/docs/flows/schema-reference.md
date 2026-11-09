@@ -122,7 +122,8 @@ The root object that defines a complete flow.
 - **Syntax**: keyword (`sandbox`) or `key=value` (`fs=confined`); letters, digits, `.`, `_`, `-`. Every entry must hold (AND), compared by equality: no `a|b`, no ranges.
 - **Merge**: a step adds its own entries to the flow's. Steps injected into the run inherit the flow's `requires`.
 - **Guarantees come from the worker source**, not from worker labels.
-- **With `workerType`**: `workerType` is deprecated (`flow validate` warns; use `requires: [sandbox]` or a [`profile`](#profile)). Both keep working; both must hold. A source of an exclusive worker type may serve a step whose requirements it fully guarantees (asking for a guarantee is an opt-in); it still never serves a step that requires nothing.
+- **`workerType` was removed**: a flow or step that sets it is refused (`flow validate` and run start; a stored version too). Write `requires: [sandbox]` or a [`profile`](#profile). See `flow worker source list` for the sources.
+- **Requirement-only sources**: a source that declares `guarantees` never receives a step that requires nothing; it serves only steps whose requirements it fully guarantees, and its workers do not count against `queue.concurrency`.
 - **Checks**: `flow validate` offline is syntax-only (an unknown key is accepted). The daemon checks the key at run start, listing the declared guarantees.
 - **Workspace kind**: a source may declare the `workspace:` kinds it accepts (`workspaces`). If every source that can provide a run's requirements refuses the flow's kind, the daemon refuses the run when it starts, before any workspace is allocated (`WORKSPACE_KIND_NOT_ACCEPTED`: change `workspace:` or drop the requirement). `flow validate` offline cannot check it (no worker knowledge). See `packages/flow-cli/WORKERS.md`.
 - **Unmet at run time**: the step waits `worker.boundStepWaitSeconds`, then fails. It fails at once when no declared source provides the guarantee.

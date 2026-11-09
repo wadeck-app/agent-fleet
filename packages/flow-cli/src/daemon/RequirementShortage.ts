@@ -6,7 +6,7 @@ import type { DeclaredGuarantees } from './DeclaredGuarantees.js';
 import type { SourceContactErrors } from './SourceContactErrors.js';
 import type { StepRouter } from './StepRouter.js';
 import type { RegisteredWorker } from './WorkerRegistry.js';
-import type { GuaranteeLookup, WorkerTypeLookup } from './WorkerTypeCatalog.js';
+import type { GuaranteeLookup } from './WorkerTypeCatalog.js';
 
 /** What the dispatcher knows about a step with requirements that no idle worker could take. */
 export interface ShortageInputs {
@@ -16,7 +16,6 @@ export interface ShortageInputs {
 	/** Every connected worker, idle or busy. */
 	connected: RegisteredWorker[];
 	guaranteesOf: GuaranteeLookup;
-	typeOf: WorkerTypeLookup;
 }
 
 export type ShortageDecision = { action: 'wait'; sources: ReadonlySet<string> } | { action: 'fail'; reason: string };
@@ -61,9 +60,7 @@ export class RequirementShortage {
 		}
 
 		const providers = this.declared.providersOfAll(required);
-		const eligible = providers.filter(
-			sourceId => this.mayServe(placement, sourceId, inputs) && this.acceptsWorkspace(placement, sourceId)
-		);
+		const eligible = providers.filter(sourceId => this.acceptsWorkspace(placement, sourceId));
 		const canStillAppear =
 			eligible.length > 0 ||
 			this.declared.unread().length > 0 ||
@@ -77,17 +74,13 @@ export class RequirementShortage {
 			return { action: 'fail', reason: this.describeNoProvider(inputs, providers) };
 		}
 
-		const types = new Set(
-			eligible.map(sourceId => inputs.typeOf(sourceId)).filter((type): type is string => type !== undefined)
-		);
 		const decision = this.wait.decideRequirement({
 			executionId,
 			stepId: placement.stepId,
 			required,
 			connectedServing: 0,
 			closest: () => this.closestSentences(inputs),
-			contactErrorsSince: since =>
-				[...types].flatMap(type => this.contactErrors.sinceFor(type, inputs.typeOf)(since)),
+			contactErrorsSince: this.contactErrors.sinceFor(eligible),
 		});
 		return decision.action === 'fail' ? decision : { action: 'wait', sources: new Set(eligible) };
 	}
@@ -97,22 +90,13 @@ export class RequirementShortage {
 		this.wait.clearRequirement(executionId, stepId);
 	}
 
-	/** A connected worker that meets the requirements, accepts the step and is allowed to take it (type, exclusivity). */
+	/** A connected worker that meets the requirements and accepts the step. */
 	private serves(placement: StepPlacement, worker: RegisteredWorker, inputs: ShortageInputs): boolean {
 		return (
-			this.mayServe(placement, worker.sourceId, inputs) &&
 			this.router.missingRequirementsOf(placement, worker, inputs.guaranteesOf).length === 0 &&
 			!this.router.refusesWorkspace(placement, worker) &&
 			this.router.refusalOf(placement, worker) === undefined
 		);
-	}
-
-	/**	 * Whether the workers of this source may take the step at all: for a bound run the type it is bound to. Otherwise any source:	 * asking for guarantees is an explicit opt-in, so exclusivity (which keeps a source off steps that ask for nothing) is not applied.	 */ private mayServe(
-		placement: StepPlacement,
-		sourceId: string | undefined,
-		inputs: ShortageInputs
-	): boolean {
-		return placement.boundWorkerType === undefined || inputs.typeOf(sourceId) === placement.boundWorkerType;
 	}
 
 	/** Whether a declared source accepts the workspace kind of the step's run (its manifest; a stub without that knowledge restricts nothing). */
@@ -139,9 +123,6 @@ export class RequirementShortage {
 
 		if (providers.length > 0 && providers.every(sourceId => !this.acceptsWorkspace(placement, sourceId))) {
 			return this.describeWorkspaceRefusal(head, placement.workspaceKind, providers);
-		}
-		if (providers.length > 0) {
-			return `${head} the only declared sources that can provide them (${providers.join(', ')}) are not of the worker type this run is bound to ("${placement.boundWorkerType ?? 'none'}"). Fix the workerType of the flow, or declare a source of that type that provides them.`;
 		}
 
 		const unknown = required.filter(entry => !known.includes(entry));

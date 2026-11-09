@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { SourceContactErrors } from './SourceContactErrors.js';
-import type { WorkerTypeLookup } from './WorkerTypeCatalog.js';
 
 const at = (hh: number, mm: number, ss: number): number => Date.UTC(2026, 10, 6, hh, mm, ss);
-const typeOf: WorkerTypeLookup = sourceId =>
-	({ 'sbx-1': 'sandbox', 'sbx-2': 'sandbox', 'gpu-1': 'gpu' })[sourceId ?? ''];
+/** The sources a wait asks about. */
+const asked: ReadonlySet<string> = new Set(['sbx-1', 'sbx-2']);
 
 function store(logsDir: string | undefined = 'C:/logs') {
 	const clock = { now: at(17, 0, 0) };
@@ -22,7 +21,7 @@ describe('SourceContactErrors - metadata only', () => {
 		clock.now = at(17, 2, 11);
 		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, 0)).toEqual([
+		expect(errors.since(asked, 0)).toEqual([
 			'Last contact with source "sbx-1" failed at 2026-11-06T17:02:11Z (3 consecutive failures since 17:01:20Z); the error is in the daemon log (flow logs, or C:/logs).',
 		]);
 	});
@@ -32,7 +31,7 @@ describe('SourceContactErrors - metadata only', () => {
 		clock.now = at(17, 2, 11);
 		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, 0)).toEqual([
+		expect(errors.since(asked, 0)).toEqual([
 			'Last contact with source "sbx-1" failed at 2026-11-06T17:02:11Z; the error is in the daemon log (flow logs, or C:/logs).',
 		]);
 	});
@@ -43,7 +42,7 @@ describe('SourceContactErrors - metadata only', () => {
 		clock.now = at(17, 2, 11);
 		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, 0)).toEqual([
+		expect(errors.since(asked, 0)).toEqual([
 			'Last contact with source "sbx-1" failed at 2026-11-06T17:02:11Z; the error is in the daemon log (flow logs).',
 		]);
 	});
@@ -55,8 +54,8 @@ describe('SourceContactErrors - metadata only', () => {
 		clock.now = at(17, 5, 0);
 		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, 0)[0]).toContain('(2 consecutive failures since 17:01:00Z)');
-		expect(errors.since('sandbox', typeOf, 0)[0]).toContain('failed at 2026-11-06T17:05:00Z');
+		expect(errors.since(asked, 0)[0]).toContain('(2 consecutive failures since 17:01:00Z)');
+		expect(errors.since(asked, 0)[0]).toContain('failed at 2026-11-06T17:05:00Z');
 	});
 
 	it('starts the count again after a success', () => {
@@ -66,12 +65,12 @@ describe('SourceContactErrors - metadata only', () => {
 		errors.failed('sbx-1');
 
 		errors.succeeded('sbx-1');
-		expect(errors.since('sandbox', typeOf, 0)).toEqual([]);
+		expect(errors.since(asked, 0)).toEqual([]);
 
 		clock.now = at(17, 9, 0);
 		errors.failed('sbx-1');
-		expect(errors.since('sandbox', typeOf, 0)[0]).not.toContain('consecutive');
-		expect(errors.since('sandbox', typeOf, 0)[0]).toContain('failed at 2026-11-06T17:09:00Z');
+		expect(errors.since(asked, 0)[0]).not.toContain('consecutive');
+		expect(errors.since(asked, 0)[0]).toContain('failed at 2026-11-06T17:09:00Z');
 	});
 
 	it('excludes a failure older than the start of the wait, and includes one at that very time', () => {
@@ -79,27 +78,27 @@ describe('SourceContactErrors - metadata only', () => {
 		clock.now = at(17, 1, 0);
 		errors.failed('sbx-1');
 
-		expect(errors.since('sandbox', typeOf, at(17, 1, 1))).toEqual([]);
-		expect(errors.since('sandbox', typeOf, at(17, 1, 0))).toHaveLength(1);
+		expect(errors.since(asked, at(17, 1, 1))).toEqual([]);
+		expect(errors.since(asked, at(17, 1, 0))).toHaveLength(1);
 	});
 
-	it('excludes the failures of sources of another type, or of no type', () => {
+	it('excludes the failures of sources that were not asked about', () => {
 		const { clock, errors } = store();
 		clock.now = at(17, 2, 0);
 		errors.failed('gpu-1');
 		errors.failed('stray');
 
-		expect(errors.since('sandbox', typeOf, 0)).toEqual([]);
+		expect(errors.since(asked, 0)).toEqual([]);
 	});
 
-	it('lists every source of the type, each with its own streak', () => {
+	it('lists every source asked about, each with its own streak', () => {
 		const { clock, errors } = store();
 		clock.now = at(17, 2, 0);
 		errors.failed('sbx-1');
 		errors.failed('sbx-2');
 		errors.failed('sbx-2');
 
-		const sentences = errors.since('sandbox', typeOf, 0);
+		const sentences = errors.since(asked, 0);
 		expect(sentences).toHaveLength(2);
 		expect(sentences[0]).toContain('"sbx-1"');
 		expect(sentences[1]).toContain('"sbx-2"');
@@ -114,15 +113,15 @@ describe('SourceContactErrors - metadata only', () => {
 
 		errors.retainOnly(['sbx-1']);
 
-		expect(errors.since('sandbox', typeOf, 0)).toHaveLength(1);
-		expect(errors.since('sandbox', typeOf, 0)[0]).toContain('"sbx-1"');
+		expect(errors.since(asked, 0)).toHaveLength(1);
+		expect(errors.since(asked, 0)[0]).toContain('"sbx-1"');
 	});
 
-	it('hands a bound-step wait the same sentences through sinceFor', () => {
+	it('hands a requirement wait the same sentences through sinceFor', () => {
 		const { clock, errors } = store();
 		clock.now = at(17, 2, 0);
 		errors.failed('sbx-1');
 
-		expect(errors.sinceFor('sandbox', typeOf)(0)).toEqual(errors.since('sandbox', typeOf, 0));
+		expect(errors.sinceFor(asked)(0)).toEqual(errors.since(asked, 0));
 	});
 });

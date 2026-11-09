@@ -7,7 +7,7 @@ import { DefaultProvisioning } from './DefaultProvisioning.js';
 import type { ForkWorkerSource } from './ForkWorkerSource.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 import type { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
-import type { ExclusiveLookup } from './WorkerTypeCatalog.js';
+import type { RequirementOnlyLookup } from './WorkerTypeCatalog.js';
 
 /**
  * Decides when more capacity is wanted, and which workers are allowed to join.
@@ -36,13 +36,13 @@ export class WorkerProvisioner {
 		 */
 		private readonly report: (message: string) => void = message => process.stderr.write(`${message}\n`),
 		/**
-		 * Which workers are of an exclusive worker type (read per count). They serve only runs bound to their type and the
-		 * source caps them, so they do not use the concurrency limit, which exists to bound the host workers this daemon
-		 * forks for everything else: counting them would leave no room to fork one for an unbound run (with the default
-		 * limit of 1, a single connected sandbox worker stalled every unbound run with nothing forked and nothing said).
-		 * Without it every worker counts.
+		 * Which workers come from a requirement-only source (one that declares guarantees; read per count). They serve only
+		 * steps that require what the source guarantees and the source caps them, so they do not use the concurrency
+		 * limit, which exists to bound the host workers this daemon forks for everything else: counting them would leave no
+		 * room to fork one for a step that requires nothing (with the default limit of 1, a single connected sandbox worker
+		 * stalled every such step with nothing forked and nothing said). Without it every worker counts.
 		 */
-		private readonly exclusiveLookup?: () => ExclusiveLookup
+		private readonly requirementOnlyLookup?: () => RequirementOnlyLookup
 	) {}
 
 	/** Workers connected or already requested. */
@@ -55,12 +55,12 @@ export class WorkerProvisioner {
 	 * the price of forking nothing for an unbound run until the sources can be read again.
 	 */
 	private countedLive(): number {
-		if (this.exclusiveLookup === undefined) {
+		if (this.requirementOnlyLookup === undefined) {
 			return this.registry.liveCount;
 		}
 		try {
-			const isExclusive = this.exclusiveLookup();
-			return this.registry.listConnected().filter(worker => !isExclusive(worker.sourceId)).length;
+			const isRequirementOnly = this.requirementOnlyLookup();
+			return this.registry.listConnected().filter(worker => !isRequirementOnly(worker.sourceId)).length;
 		} catch {
 			return this.registry.liveCount;
 		}

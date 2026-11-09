@@ -4,11 +4,11 @@ import { RetryBackoff } from './RetryBackoff.js';
 import type { SourceContactErrors } from './SourceContactErrors.js';
 import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 
-/** What the dispatcher needs to place the steps of a run bound to a worker type, and to say why none could be. */
+/** What the dispatcher needs to place the steps of a run, and to say why a step with requirements could not be placed. */
 export interface BoundStepRouting {
-	/** Where a worker's type comes from. */
+	/** Where the requirement-only sources and the guarantees of the workers' sources come from. */
 	workerTypes: WorkerTypeRouting['workerTypes'];
-	/** Bounds the wait of a step of a bound run for a worker of its type. */
+	/** Bounds the wait of a step with requirements for a worker that meets them. */
 	wait: BoundStepWait;
 	/** Where the contact failures of the sources are kept. */
 	contactErrors: WorkerTypeRouting['contactErrors'];
@@ -20,14 +20,13 @@ export interface BoundStepRouting {
 		Partial<Pick<DeclaredGuarantees, 'workspacesOf' | 'acceptsWorkspace'>>;
 }
 
-/** What the daemon needs to restrict a run to a worker type: where types come from, and how long a missing one is waited for. */
+/** What the daemon needs to route steps with requirements: where guarantees come from, and how long a missing worker is waited for. */
 export interface WorkerTypeRouting {
 	/** `guaranteeLookup` is what a requirement is matched against (the real catalog has it); without it no worker meets one. */
-	workerTypes: Pick<WorkerTypeCatalog, 'typeLookup' | 'exclusiveLookup' | 'knownTypes'> &
-		Partial<Pick<WorkerTypeCatalog, 'guaranteeLookup'>>;
+	workerTypes: Pick<WorkerTypeCatalog, 'requirementOnlyLookup'> & Partial<Pick<WorkerTypeCatalog, 'guaranteeLookup'>>;
 	/** `worker.boundStepWaitSeconds`, in milliseconds. */
 	boundStepWaitMs: number;
-	/** Where the last contact error of each source is kept, to say why no worker of the type came. */
+	/** Where the last contact error of each source is kept, to say why no worker came. */
 	contactErrors: Pick<SourceContactErrors, 'sinceFor'>;
 	/** What the declared sources may provide: read at run start (which requirements exist) and at dispatch. */
 	declaredGuarantees: Pick<
@@ -36,45 +35,24 @@ export interface WorkerTypeRouting {
 	>;
 }
 
-/** What routing found about a step of a run bound to a worker type that no idle worker could take. */
-export interface BoundStepWaitRequest {
-	executionId: string;
-	stepId: string;
-	/** The worker type the run is bound to. */
-	workerType: string;
-	/** Connected workers of that type, idle or busy: a busy one frees up, so the step is queued, not unserved. */
-	connectedOfType: number;
-	/** Worker types the declared sources stand for, to say what the run could have been bound to. */
-	knownTypes: string[];
-	/**
-	 * One sentence per source of that type whose latest contact failure is not older than the given time (the moment the
-	 * step started waiting): metadata only, never the text of an error. Asked for only when the step fails.
-	 */
-	contactErrorsSince?: ((sinceMs: number) => string[]) | undefined;
-	/**
-	 * The connected workers of that type that do NOT accept the step, one `<worker id> (<reason>)` each (worked out only when
-	 * the step fails): they are not counted in `connectedOfType`, and a failure names them. Fixed words and declared names only, never a plugin's text.
-	 */
-	refusals?: (() => string[]) | undefined;
-}
-
 export type BoundStepWaitDecision = { action: 'wait' } | { action: 'fail'; reason: string };
 
-/** How long a step of a bound run waits for a worker of its type to exist. Obtaining one (a sandbox) takes a while. */
+/** How long a step with requirements waits for a worker that meets them. Obtaining one (a sandbox) takes a while. */
 export const DEFAULT_BOUND_STEP_WAIT_MS = 120_000;
 
 /** How long after the first failed dispatch pass of a series the timer of a step that is still waiting asks again (it doubles from there). */
 export const DEADLINE_RETRY_MS = 5_000;
 
 /**
- * Bounds how long a step of a run bound to a worker type waits for a worker of that type.
+ * Bounds how long a step with requirements waits for a worker that meets them.
  *
- * Such a step never runs on any other worker, so without a bound it would stay queued forever when nobody of the
- * type shows up (the source is not declared, its plugin cannot start workers). The clock only runs while NO worker
- * of the type is connected: one that is busy is a queue to wait in, not a worker that is missing.
+ * Such a step never runs on a worker that does not meet them, so without a bound it would stay queued forever when
+ * nobody who does shows up (the source is not declared, its plugin cannot start workers). The clock only runs while NO
+ * worker that meets the requirements and accepts the step is connected: one that is busy is a queue to wait in, not a
+ * worker that is missing.
  *
- * State is one start time and one timer per `executionId:stepId`, dropped when the step fails ({@link decide}), when it
- * is handed to a worker ({@link clear}), when a worker of the type connects, when its execution is over
+ * State is one start time and one timer per `executionId:stepId`, dropped when the step fails ({@link decideRequirement}),
+ * when it is handed to a worker ({@link clearRequirement}), when a serving worker connects, when its execution is over
  * ({@link forgetExecution}) and when the daemon stops ({@link stop}), so it cannot grow with the executions a
  * long-lived daemon has served.
  *
@@ -103,29 +81,13 @@ export class BoundStepWait {
 		return this.waitingSince.size;
 	}
 
-	decide(request: BoundStepWaitRequest): BoundStepWaitDecision {
-		return this.bounded(
-			keyOf(request.executionId, request.stepId),
-			request.connectedOfType > 0,
-			(since, waitedMs) =>
-				describeFailure(
-					request,
-					waitedMs,
-					this.waitMs,
-					request.contactErrorsSince?.(since) ?? [],
-					request.refusals?.() ?? []
-				)
-		);
-	}
-
 	/**
-	 * The same bounded wait for a step with requirements (`requires:`), with a clock of its own so a step that is also
-	 * bound to a worker type keeps both: the clock runs only while NO worker that meets the requirements and accepts the
-	 * step is connected.
+	 * Decides the fate of a step with requirements (`requires:`) that found no idle worker: the clock runs only while NO
+	 * worker that meets the requirements and accepts the step is connected.
 	 */
 	decideRequirement(request: RequirementWaitRequest): BoundStepWaitDecision {
 		return this.bounded(
-			requirementKeyOf(request.executionId, request.stepId),
+			keyOf(request.executionId, request.stepId),
 			request.connectedServing > 0,
 			(since, waitedMs) =>
 				describeRequirementFailure(request, waitedMs, this.waitMs, request.contactErrorsSince?.(since) ?? [])
@@ -134,7 +96,7 @@ export class BoundStepWait {
 
 	/** The step with requirements was handed to a worker: it is no longer waiting. */
 	clearRequirement(executionId: string, stepId: string): void {
-		this.forget(requirementKeyOf(executionId, stepId));
+		this.forget(keyOf(executionId, stepId));
 	}
 
 	private bounded(
@@ -157,11 +119,6 @@ export class BoundStepWait {
 
 		this.forget(key);
 		return { action: 'fail', reason: describe(since, waitedMs) };
-	}
-
-	/** The step was handed to a worker: it is no longer waiting. */
-	clear(executionId: string, stepId: string): void {
-		this.forget(keyOf(executionId, stepId));
 	}
 
 	/** Forgets the steps of an execution that is over. */
@@ -224,46 +181,6 @@ export class BoundStepWait {
 	}
 }
 
-/** Apart from the key of the worker type wait: a step can wait for both, each with its own clock. */
-function requirementKeyOf(executionId: string, stepId: string): string {
-	return `${executionId}:${stepId}#requires`;
-}
-
 function keyOf(executionId: string, stepId: string): string {
 	return `${executionId}:${stepId}`;
-}
-
-/** At most five refusing workers are named; the rest are counted. */
-const MAX_NAMED_REFUSALS = 5;
-
-function describeRefusals(refusals: string[]): string {
-	if (refusals.length === 0) {
-		return '';
-	}
-	const named = refusals.slice(0, MAX_NAMED_REFUSALS);
-	const rest = refusals.length - named.length;
-	const list = rest > 0 ? `${named.join('; ')}; and ${String(rest)} more` : named.join('; ');
-	return ` Workers of that type are connected but refuse this step: ${list}.`;
-}
-
-function describeFailure(
-	request: BoundStepWaitRequest,
-	waitedMs: number,
-	boundMs: number,
-	contactErrors: string[],
-	refusals: string[]
-): string {
-	const known =
-		request.knownTypes.length === 0
-			? 'no worker source with a plugin is declared, so no worker type exists yet'
-			: `known worker types: ${request.knownTypes.join(', ')}`;
-	return (
-		`Step "${request.stepId}" belongs to a run bound to worker type "${request.workerType}" (the flow's workerType field), ` +
-		`but no worker of that type ${refusals.length === 0 ? 'was connected' : 'that accepts this step was available'} in the ${String(Math.round(waitedMs / 1000))}s it waited, and a step of a bound run never runs on another worker. ` +
-		`${known}. ` +
-		`Check that a source of that type is declared (flow worker source list) and that its plugin can start workers (see the daemon log). ` +
-		`If starting one takes longer than ${String(Math.round(boundMs / 1000))}s, raise worker.boundStepWaitSeconds in the daemon config.` +
-		describeRefusals(refusals) +
-		(contactErrors.length === 0 ? '' : ` ${contactErrors.join(' ')}`)
-	);
 }

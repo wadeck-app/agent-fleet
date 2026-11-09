@@ -38,8 +38,7 @@ const step = (overrides: Partial<StepPlacement> = {}): StepPlacement => ({
 
 const GUARANTEES: Record<string, string[]> = { sbx: ['fs=confined', 'env=clean'], plain: [] };
 const catalog = {
-	typeLookup: () => (sourceId: string | undefined) => (sourceId === 'sbx' ? 'sandbox' : undefined),
-	exclusiveLookup: () => () => false,
+	requirementOnlyLookup: () => () => false,
 	guaranteeLookup: () => (sourceId: string | undefined) =>
 		sourceId === undefined ? [] : (GUARANTEES[sourceId] ?? []),
 };
@@ -106,19 +105,6 @@ describe('StepRouter - requirements (hard filter on the guarantees of the source
 		expect(accepts).toHaveBeenCalledTimes(1);
 	});
 
-	it('requires the worker type too when the run is bound (both must hold)', () => {
-		const router = new StepRouter(undefined, undefined, catalog);
-		const bound = step({ boundWorkerType: 'sandbox', requires: ['net=filtered'] });
-
-		expect(router.select(bound, [sandboxed])).toBeUndefined();
-		expect(router.select(step({ boundWorkerType: 'sandbox', requires: ['fs=confined'] }), [host, sandboxed])).toBe(
-			sandboxed.ws
-		);
-		expect(
-			router.select(step({ boundWorkerType: 'other', requires: ['fs=confined'] }), [sandboxed])
-		).toBeUndefined();
-	});
-
 	it('fails closed, and says so on stderr, when the guarantees cannot be read', () => {
 		const broken = {
 			...catalog,
@@ -134,8 +120,7 @@ describe('StepRouter - requirements (hard filter on the guarantees of the source
 
 	it('fails closed, and says so on stderr, when the router was built without a guarantee source', () => {
 		const router = new StepRouter(undefined, undefined, {
-			typeLookup: catalog.typeLookup,
-			exclusiveLookup: catalog.exclusiveLookup,
+			requirementOnlyLookup: catalog.requirementOnlyLookup,
 		});
 
 		expect(router.select(step({ requires: ['fs=confined'] }), [host, sandboxed])).toBeUndefined();
@@ -143,11 +128,11 @@ describe('StepRouter - requirements (hard filter on the guarantees of the source
 		expect(router.select(step(), [host])).toBe(host.ws);
 	});
 
-	it('uses the lookup the caller already has, like the type and the exclusivity', () => {
+	it('uses the lookup the caller already has, like the requirement-only sources', () => {
 		const router = new StepRouter(undefined, undefined, catalog);
 		const given = () => ['fs=confined'];
 
-		expect(router.select(step({ requires: ['fs=confined'] }), [plain], undefined, undefined, given)).toBe(plain.ws);
+		expect(router.select(step({ requires: ['fs=confined'] }), [plain], undefined, given)).toBe(plain.ws);
 	});
 
 	it('names what a worker lacks, for a failure message, without consulting any plugin', () => {
@@ -165,7 +150,7 @@ describe('StepRouter - requirements (hard filter on the guarantees of the source
 describe('StepRouter - requirements and exclusive sources', () => {
 	const exclusiveCatalog = {
 		typeLookup: () => (sourceId: string | undefined) => (sourceId === 'xsbx' ? 'sandbox' : undefined),
-		exclusiveLookup: () => (sourceId: string | undefined) => sourceId === 'xsbx',
+		requirementOnlyLookup: () => (sourceId: string | undefined) => sourceId === 'xsbx',
 		guaranteeLookup: () => (sourceId: string | undefined) => (sourceId === 'xsbx' ? ['sandbox'] : []),
 	};
 	const exclusiveWorker = candidate('w-x', 'xsbx');
@@ -195,13 +180,5 @@ describe('StepRouter - requirements and exclusive sources', () => {
 		const router = new StepRouter(undefined, undefined, exclusiveCatalog);
 
 		expect(router.select(step({ requires: ['sandbox', 'other'] }), [exclusiveWorker])).toBeUndefined();
-	});
-
-	it('does not bring an exclusive worker to a run bound to another type', () => {
-		const router = new StepRouter(undefined, undefined, exclusiveCatalog);
-
-		expect(
-			router.select(step({ boundWorkerType: 'gpu', requires: ['sandbox'] }), [exclusiveWorker])
-		).toBeUndefined();
 	});
 });

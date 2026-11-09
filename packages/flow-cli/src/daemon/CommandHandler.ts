@@ -96,8 +96,7 @@ export class CommandHandler {
 		 * registry, the published endpoint -- which this class deliberately knows nothing
 		 * about. Optional so the many tests that never exercise provisioning stay unchanged.
 		 */
-		requestFromDeclaredSources:
-			((workerTypes?: ReadonlySet<string>, sourceIds?: ReadonlySet<string>) => void) | undefined,
+		requestFromDeclaredSources: ((sourceIds?: ReadonlySet<string>) => void) | undefined,
 		/**
 		 * S9 policy deciding the fate of a step needing a human (D#39).
 		 *
@@ -130,9 +129,9 @@ export class CommandHandler {
 		/** Told, after the acknowledgements, that a run ended, so the worker type that owns the source can clean up. */
 		runEndedListener: RunEndedListener | undefined,
 		/**
-		 * What restricts a run to a worker type (the flow's `workerType`): the declared sources the types come from, and
-		 * `worker.boundStepWaitSeconds`, and where the contact failures of the sources are kept. REQUIRED: a caller that
-		 * dropped it would silently lose the contact information in a bound step's failure. A test that needs no routing
+		 * How steps with requirements are routed: the declared sources the guarantees come from, `worker.boundStepWaitSeconds`,
+		 * and where the contact failures of the sources are kept. REQUIRED: a caller that dropped it would silently lose the
+		 * contact information in the failure of a step with requirements. A test that needs no routing
 		 * passes `emptyWorkerRouting()` (CommandHandlerTestHarness).
 		 */
 		workerRouting: WorkerTypeRouting

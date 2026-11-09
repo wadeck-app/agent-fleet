@@ -98,7 +98,7 @@ describe('RunRequestHandler -- requires', () => {
 		);
 		const routing: WorkerTypeRouting = {
 			...emptyWorkerRouting(),
-			workerTypes: new WorkerTypeCatalog({ list: () => sources }, { isExclusive: () => false }),
+			workerTypes: new WorkerTypeCatalog({ list: () => sources }, { isRequirementOnly: () => false }),
 			boundStepWaitMs: DEFAULT_BOUND_STEP_WAIT_MS,
 			contactErrors: new SourceContactErrors(),
 			declaredGuarantees: declared,

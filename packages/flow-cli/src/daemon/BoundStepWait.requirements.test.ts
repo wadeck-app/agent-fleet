@@ -46,7 +46,7 @@ describe('BoundStepWait - steps that require something', () => {
 		expect(reason).toContain('120s');
 		expect(reason).toContain('worker.boundStepWaitSeconds');
 		expect(reason).toContain('Closest: worker w1 (source sbx) lacks net=filtered.');
-		expect(reason).not.toContain('belongs to a run bound to worker type');
+		expect(reason).not.toMatch(/workerType|worker type/);
 	});
 
 	it('restarts the clock when a serving worker showed up and went away', () => {
@@ -59,22 +59,7 @@ describe('BoundStepWait - steps that require something', () => {
 		expect(wait.decideRequirement(request())).toEqual({ action: 'wait' });
 	});
 
-	it('is a wait of its own: a bound worker type wait for the same step keeps its clock', () => {
-		const wait = build(1_000);
-		wait.decide({ executionId: 'e1', stepId: 's1', workerType: 'sandbox', connectedOfType: 0, knownTypes: [] });
-		now += 600;
-		wait.decideRequirement(request());
-
-		expect(wait.size).toBe(2);
-		now += 600;
-		expect(
-			wait.decide({ executionId: 'e1', stepId: 's1', workerType: 'sandbox', connectedOfType: 0, knownTypes: [] })
-				.action
-		).toBe('fail');
-		expect(wait.decideRequirement(request())).toEqual({ action: 'wait' });
-	});
-
-	it('asks for a dispatch pass when the bound may have passed, like the worker type wait', () => {
+	it('asks for a dispatch pass when the bound may have passed', () => {
 		const onDeadline = vi.fn();
 		const wait = build(1_000, onDeadline);
 

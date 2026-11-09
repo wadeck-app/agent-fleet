@@ -14,20 +14,19 @@ import { missingRequirements } from './RequirementMatcher.js';
 import { workerSatisfiesShell } from './ShellMatcher.js';
 import { explainDefaultRefusal } from './WorkerRefusal.js';
 import type { RegisteredWorker } from './WorkerRegistry.js';
-import type { ExclusiveLookup, GuaranteeLookup, WorkerTypeCatalog, WorkerTypeLookup } from './WorkerTypeCatalog.js';
+import type { GuaranteeLookup, RequirementOnlyLookup, WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 import { WorkspaceKindFilter } from './WorkspaceKindFilter.js';
 
 /**
  * What the router asks the worker type catalog. `guaranteeLookup` may be missing (a router built before requirements
  * existed): a step that requires something is then placed nowhere, never anywhere.
  */
-export type WorkerTypeKnowledge = Pick<WorkerTypeCatalog, 'typeLookup' | 'exclusiveLookup'> &
+export type WorkerTypeKnowledge = Pick<WorkerTypeCatalog, 'requirementOnlyLookup'> &
 	Partial<Pick<WorkerTypeCatalog, 'guaranteeLookup' | 'workspaceLookup'>>;
 
-/** No worker has a type: what a router built without a catalog knows. */
+/** No source is requirement-only and none guarantees anything: what a router built without a catalog knows. */
 const NO_WORKER_TYPES: WorkerTypeKnowledge = {
-	typeLookup: () => () => undefined,
-	exclusiveLookup: () => () => false,
+	requirementOnlyLookup: () => () => false,
 };
 
 /** An idle worker together with the connection to reach it. */
@@ -142,8 +141,8 @@ export class DefaultStepDistribution implements StepDistributionProvider {
  */
 export class StepRouter {
 	/**
-	 * @param workerTypes where a worker's type comes from (see {@link WorkerTypeCatalog}). Without it no worker has a
-	 *        type, so a step bound to a worker type is placed nowhere: the safe answer to a missing wiring.
+	 * @param workerTypes where the requirement-only sources and the guarantees come from (see {@link WorkerTypeCatalog}).
+	 *        Without a guarantee source a step that requires something is placed nowhere: the safe answer to a missing wiring.
 	 */
 	constructor(
 		private readonly acceptance: WorkerAcceptanceProvider = new DefaultWorkerAcceptance(),
@@ -160,27 +159,25 @@ export class StepRouter {
 	 *
 	 * Undefined is not an error: it is how the caller learns it needs to obtain a worker.
 	 *
-	 * @param typeOf which type a worker is of, when the caller already has the answer (and reports its own failure to
-	 *        get it); otherwise it is asked of the catalog this router was built with.
+	 * @param isRequirementOnly which workers come from a requirement-only source, when the caller already has the answer;
+	 *        otherwise it is asked of the catalog this router was built with. Only read for a step that requires nothing.
 	 *
-	 * @param isExclusive which workers are of an exclusive type, when the caller already has the answer; otherwise it is
-	 *        asked of the catalog this router was built with. Only read for a step that is not bound.
+	 * @param guaranteesOf what the workers' sources guarantee, when the caller already has the answer. Only read for a step
+	 *        that requires something.
 	 *
-	 * A step bound to a worker type is first narrowed to the workers of that type; a step that is not bound is first
-	 * stripped of the workers of an exclusive type (they serve only runs bound to their type) -- before S4 and S3, which
-	 * can neither widen the set back nor be consulted about the others.
+	 * A step that requires nothing is first stripped of the workers of requirement-only sources (they serve only steps whose
+	 * requirements they guarantee) -- before S4 and S3, which can neither widen the set back nor be consulted about the others.
 	 */
 	select(
 		step: StepPlacement,
 		allCandidates: RoutingCandidate[],
-		typeOf?: WorkerTypeLookup,
-		isExclusive?: ExclusiveLookup,
+		isRequirementOnly?: RequirementOnlyLookup,
 		guaranteesOf?: GuaranteeLookup
 	): WebSocket | undefined {
 		// Both are hard filters, before S4 and S3: the guarantees of the source, then the workspace kinds it accepts.
 		const candidates = this.workspaceKinds.filter(
 			step,
-			this.withRequirements(step, this.servableBy(step, allCandidates, typeOf, isExclusive), guaranteesOf)
+			this.withRequirements(step, this.servableBy(step, allCandidates, isRequirementOnly), guaranteesOf)
 		);
 		const byWorkerId = new Map(candidates.map(candidate => [candidate.worker.workerId, candidate]));
 
@@ -274,55 +271,33 @@ export class StepRouter {
 	}
 
 	/**
-	 * The candidates whose type is the one the step's run is bound to; for a run that is not bound, those that are not of
-	 * an exclusive type (a worker with no source is never exclusive).
+	 * A step that requires something keeps every candidate: asking for guarantees is an explicit opt-in, so requirement-only
+	 * sources are not held back, and the requirement filter that follows keeps only the sources that guarantee all of it.
+	 * A step that requires nothing is stripped of the workers of requirement-only sources (a worker with no source is never
+	 * one).
 	 *
-	 * A lookup that throws (the source registry cannot be read) leaves no worker of any type: the step stays unplaced
-	 * and the reason is reported, rather than the failure aborting the dispatch loop of every execution. For a step that
-	 * is not bound the same failure keeps off every worker that names a source (fail-closed: it may be exclusive) and
-	 * leaves the workers that name none.
+	 * A lookup that throws (the source registry cannot be read) keeps off every worker that names a source (fail-closed: it
+	 * may be requirement-only) and leaves the workers that name none; the reason is reported rather than the failure
+	 * aborting the dispatch loop of every execution.
 	 */
 	private servableBy(
 		step: StepPlacement,
 		candidates: RoutingCandidate[],
-		given?: WorkerTypeLookup,
-		givenExclusive?: ExclusiveLookup
+		given?: RequirementOnlyLookup
 	): RoutingCandidate[] {
-		if (step.boundWorkerType === undefined) {
-			// Asking for guarantees is an explicit opt-in (like binding by workerType): exclusivity is not applied, and
-			// the requirement filter that follows keeps only the sources that guarantee all of it.
-			return (step.requires?.length ?? 0) > 0
-				? candidates
-				: this.withoutExclusive(step, candidates, givenExclusive);
+		if ((step.requires?.length ?? 0) > 0) {
+			return candidates;
 		}
-		let typeOf: WorkerTypeLookup;
+		let isRequirementOnly: RequirementOnlyLookup;
 		try {
-			typeOf = given ?? this.workerTypes.typeLookup();
+			isRequirementOnly = given ?? this.workerTypes.requirementOnlyLookup();
 		} catch (err) {
 			process.stderr.write(
-				`[StepRouter] cannot tell which workers are of type "${step.boundWorkerType}" for step ${step.stepId}, so it is placed nowhere for now: ${normalizeError(err).message}\n`
-			);
-			return [];
-		}
-		return candidates.filter(candidate => typeOf(candidate.worker.sourceId) === step.boundWorkerType);
-	}
-
-	private withoutExclusive(
-		step: StepPlacement,
-		candidates: RoutingCandidate[],
-		given?: ExclusiveLookup
-	): RoutingCandidate[] {
-		let isExclusive: ExclusiveLookup;
-		try {
-			isExclusive = given ?? this.workerTypes.exclusiveLookup();
-		} catch (err) {
-			process.stderr.write(
-				`[StepRouter] cannot tell which workers are of an exclusive worker type for step ${step.stepId}, so only workers that name no source may take it for now: ${normalizeError(err).message}
-`
+				`[StepRouter] cannot tell which workers come from a requirement-only worker source for step ${step.stepId}, so only workers that name no source may take it for now: ${normalizeError(err).message}\n`
 			);
 			return candidates.filter(candidate => candidate.worker.sourceId === undefined);
 		}
-		return candidates.filter(candidate => !isExclusive(candidate.worker.sourceId));
+		return candidates.filter(candidate => !isRequirementOnly(candidate.worker.sourceId));
 	}
 
 	/**

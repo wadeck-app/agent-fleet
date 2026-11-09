@@ -12,6 +12,7 @@ import {
 	registerCommandHandlerHooks,
 	tmpDir,
 } from './CommandHandlerTestHarness';
+import { DeclaredGuarantees } from './DeclaredGuarantees';
 import { SourceContactErrors } from './SourceContactErrors';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry';
 import { WorkerTypeCatalog } from './WorkerTypeCatalog';
@@ -33,12 +34,12 @@ vi.mock('node:os', async importOriginal => {
 
 registerCommandHandlerHooks({ mockAllocate, mockRelease, hoistedState });
 
-const BOUND_FLOW_YAML = `\
-id: bound-flow
+const REQUIRING_FLOW_YAML = `\
+id: requiring-flow
 version: "1.0.0"
-name: Bound Flow
-description: bound to a worker type
-workerType: sandbox
+name: Requiring Flow
+description: requires the sandbox guarantee
+requires: [sandbox]
 workspace:
   mode: manual
   gitStrategy: any
@@ -51,14 +52,14 @@ steps:
     script: echo hello
 `;
 
-const UNBOUND_FLOW_YAML = BOUND_FLOW_YAML.replace('workerType: sandbox\n', '');
+const PLAIN_FLOW_YAML = REQUIRING_FLOW_YAML.replace('requires: [sandbox]\n', '');
 
-const INTERVENTION_BOUND_FLOW_YAML = `\
-id: bound-intervention
+const INTERVENTION_REQUIRING_FLOW_YAML = `\
+id: requiring-intervention
 version: "1.0.0"
-name: Bound Intervention
-description: bound to a worker type
-workerType: sandbox
+name: Requiring Intervention
+description: requires the sandbox guarantee
+requires: [sandbox]
 workspace:
   mode: manual
   gitStrategy: any
@@ -87,12 +88,25 @@ function source(sourceId: string, plugin: string): WorkerSourceEntry {
 	} as WorkerSourceEntry;
 }
 
+/** sbx-1 guarantees "sandbox"; gpu-1 guarantees something else. */
+const GUARANTEES: Record<string, string[]> = { 'sbx-1': ['sandbox'], 'gpu-1': ['gpu'] };
+const SOURCES = [source('sbx-1', 'sandbox.docker'), source('gpu-1', 'gpu.farm')];
+
 const CATALOG = new WorkerTypeCatalog(
-	{
-		list: () => [source('sbx-1', 'sandbox.docker'), source('gpu-1', 'gpu.farm')],
-	},
-	{ isExclusive: () => false }
+	{ list: () => SOURCES },
+	{ isRequirementOnly: () => false },
+	{ guaranteesOf: entry => GUARANTEES[entry.sourceId] ?? [] }
 );
+
+const DECLARED = new DeclaredGuarantees(
+	{ list: () => SOURCES },
+	{ declaredGuarantees: async entry => GUARANTEES[entry.sourceId] ?? [] },
+	() => {}
+);
+
+beforeAll(async () => {
+	await DECLARED.refresh();
+});
 
 /** An idle worker: `sourceId` absent is a host worker (one that belongs to no declared source). */
 function idleWorker(name: string, props: { sourceId?: string; hasUserInterface?: boolean } = {}) {
@@ -122,7 +136,7 @@ function daemonWith(
 	options: {
 		connected?: Idle[];
 		boundStepWaitMs?: number;
-		requestFromSources?: (types?: ReadonlySet<string>) => void;
+		requestFromSources?: (sourceIds?: ReadonlySet<string>) => void;
 	} = {}
 ) {
 	const pool = createMockWorkerPool();
@@ -159,6 +173,7 @@ function daemonWith(
 			workerTypes: CATALOG,
 			boundStepWaitMs: options.boundStepWaitMs ?? 120_000,
 			contactErrors: new SourceContactErrors(),
+			declaredGuarantees: DECLARED,
 		}
 	);
 	return { handler, pool, sent };
@@ -174,28 +189,28 @@ const child = (id: string) => ({ id, name: id, type: 'script', script: 'echo inj
 
 const lastFailureReason = () => String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
 
-describe('CommandHandler -- a run bound to a worker type', () => {
-	// A host worker is idle and listed first: only the binding keeps the step off it.
-	it('sends a step only to a worker of the bound type, even when a host worker is idle', async () => {
+describe('CommandHandler -- a run whose steps require a guarantee', () => {
+	// A host worker is idle and listed first: only the requirement keeps the step off it.
+	it('sends a step only to a worker whose source guarantees it, even when a host worker is idle', async () => {
 		const { handler, sent } = daemonWith([idleWorker('host'), idleWorker('sandbox', { sourceId: 'sbx-1' })]);
 
-		await run(handler, BOUND_FLOW_YAML);
+		await run(handler, REQUIRING_FLOW_YAML);
 
 		expect(sent.map(s => s.to)).toEqual(['sandbox']);
 	});
 
-	it('does not send a step to a worker of another type', async () => {
+	it('does not send a step to a worker whose source does not guarantee it', async () => {
 		const { handler, sent } = daemonWith([idleWorker('gpu', { sourceId: 'gpu-1' })]);
 
-		await run(handler, BOUND_FLOW_YAML);
+		await run(handler, REQUIRING_FLOW_YAML);
 
 		expect(sent).toEqual([]);
 	});
 
 	// Flow labels are merged into steps only at run start, so labels cannot cover a step added later.
-	it('sends a step injected into a bound run only to a worker of the bound type', async () => {
+	it('sends a step injected into the run only to a worker whose source guarantees the run requirements', async () => {
 		const { handler, sent } = daemonWith([idleWorker('host'), idleWorker('sandbox', { sourceId: 'sbx-1' })]);
-		const result = await run(handler, BOUND_FLOW_YAML);
+		const result = await run(handler, REQUIRING_FLOW_YAML);
 		const { executionId } = result as { executionId: string };
 
 		handler.injectSteps(executionId, [child('injected')]);
@@ -207,7 +222,7 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 	it('keeps an injected step queued when only host workers are idle', async () => {
 		const sandbox = idleWorker('sandbox', { sourceId: 'sbx-1' });
 		const { handler, sent, pool } = daemonWith([sandbox], { connected: [sandbox, idleWorker('host')] });
-		const { executionId } = (await run(handler, BOUND_FLOW_YAML)) as { executionId: string };
+		const { executionId } = (await run(handler, REQUIRING_FLOW_YAML)) as { executionId: string };
 		pool.listIdle.mockReturnValue([idleWorker('host')]);
 
 		handler.injectSteps(executionId, [child('injected')]);
@@ -217,15 +232,15 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 		expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
 	});
 
-	it('is not affected by a flow that is not bound: a host worker takes its step as before', async () => {
+	it('is not affected by a flow that requires nothing: a host worker takes its step as before', async () => {
 		const { handler, sent } = daemonWith([idleWorker('host'), idleWorker('sandbox', { sourceId: 'sbx-1' })]);
 
-		await run(handler, UNBOUND_FLOW_YAML);
+		await run(handler, PLAIN_FLOW_YAML);
 
 		expect(sent.map(s => s.to)).toEqual(['host']);
 	});
 
-	it('is not affected by a flow that is not bound when no routing settings are given at all', async () => {
+	it('is not affected by a flow that requires nothing when no routing settings are given at all', async () => {
 		const pool = createMockWorkerPool();
 		const sent: string[] = [];
 		pool.listIdle.mockReturnValue([idleWorker('host')]);
@@ -242,22 +257,33 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 			mockLogWriter as never
 		);
 
-		await run(handler, UNBOUND_FLOW_YAML);
+		await run(handler, PLAIN_FLOW_YAML);
 
 		expect(sent).toEqual(['s1']);
 	});
 
-	it('refuses to start a run bound to an unknown type, naming the known ones', async () => {
+	it('refuses to start a run that requires a guarantee no declared source provides, naming the typo', async () => {
 		const { handler, sent } = daemonWith([idleWorker('host')]);
 
-		const result = await run(handler, BOUND_FLOW_YAML.replace('workerType: sandbox', 'workerType: sandbx'));
+		const result = await run(handler, REQUIRING_FLOW_YAML.replace('requires: [sandbox]', 'requires: [sandbx]'));
 
 		expect(result).toMatchObject({ type: 'error', code: 'VALIDATION_FAILED' });
-		expect(JSON.stringify(result)).toContain('Known worker types: gpu, sandbox');
+		expect(JSON.stringify(result)).toContain('sandbx');
 		expect(sent).toEqual([]);
 	});
 
-	describe('when no worker of the type is connected', () => {
+	it('refuses to start a run that still sets the removed workerType, with the migration message', async () => {
+		const { handler, sent } = daemonWith([idleWorker('host')]);
+
+		const result = await run(handler, REQUIRING_FLOW_YAML.replace('requires: [sandbox]', 'workerType: sandbox'));
+
+		expect(result).toMatchObject({ type: 'error', code: 'VALIDATION_FAILED' });
+		expect(JSON.stringify(result)).toContain('workerType was removed');
+		expect(JSON.stringify(result)).toContain('requires: [sandbox]');
+		expect(sent).toEqual([]);
+	});
+
+	describe('when no worker that meets the requirement is connected', () => {
 		beforeEach(() => {
 			vi.useFakeTimers();
 		});
@@ -267,7 +293,7 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 
 		it('keeps the step queued for the whole bound, never running it on the host worker', async () => {
 			const { handler, sent } = daemonWith([idleWorker('host')], { boundStepWaitMs: 120_000 });
-			await run(handler, BOUND_FLOW_YAML);
+			await run(handler, REQUIRING_FLOW_YAML);
 
 			vi.advanceTimersByTime(119_000);
 			handler.tryDispatch();
@@ -278,7 +304,7 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 
 		it('fails the step once the bound is spent, with a message saying what to do, and never runs it on the host', async () => {
 			const { handler, sent } = daemonWith([idleWorker('host')], { boundStepWaitMs: 120_000 });
-			await run(handler, BOUND_FLOW_YAML);
+			await run(handler, REQUIRING_FLOW_YAML);
 
 			vi.advanceTimersByTime(121_000);
 			handler.tryDispatch();
@@ -286,7 +312,7 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 			expect(sent).toEqual([]);
 			expect(mockExecStore.markStepFailed).toHaveBeenCalledTimes(1);
 			const reason = lastFailureReason();
-			expect(reason).toContain('worker type "sandbox"');
+			expect(reason).toContain('requires sandbox');
 			expect(reason).toContain('never runs on another worker');
 			expect(reason).toContain('flow worker source list');
 			expect(reason).toContain('worker.boundStepWaitSeconds');
@@ -299,7 +325,7 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 			const { handler, pool, sent } = daemonWith([idleWorker('host')], { boundStepWaitMs: 120_000 });
 			pool.planProvisioning.mockReturnValue({ fork: 1 });
 			pool.provision.mockRejectedValue(new Error('docker is down'));
-			await run(handler, BOUND_FLOW_YAML);
+			await run(handler, REQUIRING_FLOW_YAML);
 
 			await vi.advanceTimersByTimeAsync(119_000);
 			expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
@@ -307,7 +333,7 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 
 			expect(sent).toEqual([]);
 			expect(mockExecStore.markStepFailed).toHaveBeenCalledTimes(1);
-			expect(lastFailureReason()).toContain('worker type "sandbox"');
+			expect(lastFailureReason()).toContain('requires sandbox');
 		});
 
 		it('fails an injected step by itself when the bound passes', async () => {
@@ -317,7 +343,7 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 				boundStepWaitMs: 5_000,
 			});
 			pool.planProvisioning.mockReturnValue({ fork: 1 });
-			const { executionId } = (await run(handler, BOUND_FLOW_YAML)) as { executionId: string };
+			const { executionId } = (await run(handler, REQUIRING_FLOW_YAML)) as { executionId: string };
 			pool.listIdle.mockReturnValue([host]);
 			pool.summarize.mockReturnValue([host.worker]);
 			handler.injectSteps(executionId, [child('injected')]);
@@ -331,7 +357,7 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 
 		it('stops watching the bound when the daemon stops', async () => {
 			const { handler } = daemonWith([idleWorker('host')], { boundStepWaitMs: 5_000 });
-			await run(handler, BOUND_FLOW_YAML);
+			await run(handler, REQUIRING_FLOW_YAML);
 
 			handler.stopBackgroundWork();
 			await vi.advanceTimersByTimeAsync(60_000);
@@ -344,7 +370,7 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 			const { handler, sent, pool } = daemonWith([host, idleWorker('sandbox', { sourceId: 'sbx-1' })], {
 				boundStepWaitMs: 1_000,
 			});
-			const { executionId } = (await run(handler, BOUND_FLOW_YAML)) as { executionId: string };
+			const { executionId } = (await run(handler, REQUIRING_FLOW_YAML)) as { executionId: string };
 			// The sandbox worker is gone (the first step is with it); only the host worker is left.
 			pool.listIdle.mockReturnValue([host]);
 			pool.summarize.mockReturnValue([host.worker]);
@@ -359,13 +385,13 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 		});
 
 		// A worker of the type that is busy frees up: that is a queue, not a missing worker.
-		it('keeps waiting past the bound while a worker of the type is connected but busy', async () => {
+		it('keeps waiting past the bound while a worker that meets the requirement is connected but busy', async () => {
 			const busySandbox = idleWorker('sandbox', { sourceId: 'sbx-1' });
 			const { handler, sent } = daemonWith([idleWorker('host')], {
 				boundStepWaitMs: 120_000,
 				connected: [idleWorker('host'), busySandbox],
 			});
-			await run(handler, BOUND_FLOW_YAML);
+			await run(handler, REQUIRING_FLOW_YAML);
 
 			vi.advanceTimersByTime(600_000);
 			handler.tryDispatch();
@@ -374,9 +400,9 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 			expect(mockExecStore.markStepFailed).not.toHaveBeenCalled();
 		});
 
-		it('places the step as soon as a worker of the type is idle, whatever it waited before', async () => {
+		it('places the step as soon as a worker that meets the requirement is idle, whatever it waited before', async () => {
 			const { handler, sent, pool } = daemonWith([idleWorker('host')], { boundStepWaitMs: 120_000 });
-			await run(handler, BOUND_FLOW_YAML);
+			await run(handler, REQUIRING_FLOW_YAML);
 			vi.advanceTimersByTime(100_000);
 
 			pool.listIdle.mockReturnValue([idleWorker('host'), idleWorker('sandbox', { sourceId: 'sbx-1' })]);
@@ -387,27 +413,27 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 		});
 	});
 
-	// A host worker can never run a bound step: forking one for it only spends a process.
+	// A host worker guarantees nothing: forking one for a step with requirements only spends a process.
 	describe('demand for workers', () => {
-		it('plans and forks no host worker for a bound step nothing can run, and asks only the sources of its type', async () => {
+		it('plans and forks no host worker for a step nothing can run, and asks only the sources that can provide it, by id', async () => {
 			const requested: (ReadonlySet<string> | undefined)[] = [];
 			const { handler, pool } = daemonWith([idleWorker('host')], {
-				requestFromSources: types => requested.push(types),
+				requestFromSources: ids => requested.push(ids),
 			});
 
-			await run(handler, BOUND_FLOW_YAML);
+			await run(handler, REQUIRING_FLOW_YAML);
 			handler.tryDispatch();
 
 			expect(pool.planProvisioning).not.toHaveBeenCalled();
 			expect(pool.provision).not.toHaveBeenCalled();
-			expect(requested).toEqual([new Set(['sandbox'])]);
+			expect(requested).toEqual([new Set(['sbx-1'])]);
 		});
 
-		it('still plans for the steps of a run that is not bound', async () => {
+		it('still plans for the steps of a run that requires nothing', async () => {
 			const requested: (ReadonlySet<string> | undefined)[] = [];
-			const { handler, pool } = daemonWith([], { requestFromSources: types => requested.push(types) });
+			const { handler, pool } = daemonWith([], { requestFromSources: ids => requested.push(ids) });
 
-			await run(handler, UNBOUND_FLOW_YAML);
+			await run(handler, PLAIN_FLOW_YAML);
 
 			expect(pool.planProvisioning).toHaveBeenCalledWith(1, expect.any(Number));
 			expect(requested).toEqual([undefined]);
@@ -415,10 +441,10 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 	});
 
 	describe('when the worker is lost before the step starts', () => {
-		it('hands the step over again only to workers of the type, then fails after the re-dispatch budget', async () => {
+		it('hands the step over again only to workers that meet the requirement, then fails after the re-dispatch budget', async () => {
 			const sandbox = idleWorker('sandbox', { sourceId: 'sbx-1' });
 			const { handler, sent } = daemonWith([idleWorker('host'), sandbox]);
-			await run(handler, BOUND_FLOW_YAML);
+			await run(handler, REQUIRING_FLOW_YAML);
 
 			for (let i = 0; i <= MAX_REDISPATCHES; i++) {
 				handler.handleWorkerDisconnect(sandbox.ws as never);
@@ -433,12 +459,12 @@ describe('CommandHandler -- a run bound to a worker type', () => {
 	});
 
 	describe('when the run is resumed', () => {
-		// Resume re-dispatches into the same in-memory execution: the binding must still be there.
-		it('keeps sending the resumed step only to a worker of the bound type', async () => {
+		// Resume re-dispatches into the same in-memory execution: the requirements must still be there.
+		it('keeps sending the resumed step only to a worker that meets the requirement', async () => {
 			const host = idleWorker('host', { hasUserInterface: true });
 			const sandbox = idleWorker('sandbox', { sourceId: 'sbx-1', hasUserInterface: true });
 			const { handler, sent } = daemonWith([host, sandbox]);
-			const { executionId } = (await run(handler, INTERVENTION_BOUND_FLOW_YAML)) as { executionId: string };
+			const { executionId } = (await run(handler, INTERVENTION_REQUIRING_FLOW_YAML)) as { executionId: string };
 			handler.onStepFailed(executionId, 'approve', 'timed out: this step is unanswered, not denied');
 			expect(handler.hasResumableInterventions()).toBe(true);
 

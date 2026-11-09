@@ -37,12 +37,6 @@ export interface StepPlacement {
 	 */
 	shellKind?: 'bash' | 'cmd' | 'pwsh';
 	/**
-	 * Worker type the step's run is bound to (flow-level `workerType:`), or undefined for a run that is not bound.
-	 * Informational for a plugin: the daemon has already removed every worker of another type (or of none) before
-	 * asking S4 or S3, and a plugin answering differently cannot bring one back.
-	 */
-	boundWorkerType?: string;
-	/**
 	 * Requirements (`key=value` or keyword entries) the step must find met: the flow's and the step's, as recorded when the
 	 * run was accepted. Informational for a plugin: the daemon has already removed every worker whose source does not
 	 * guarantee all of them before asking S4 or S3, and a plugin answering differently cannot bring one back.

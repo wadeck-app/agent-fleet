@@ -311,7 +311,7 @@ async function startOwningDaemon(
 					message => {
 						writeDaemonLog(logsDir, 'error', message);
 					},
-					() => new WorkerTypeCatalog(sourceRegistry, workerTypes, workerTypes).exclusiveLookup()
+					() => new WorkerTypeCatalog(sourceRegistry, workerTypes, workerTypes).requirementOnlyLookup()
 				);
 				const commandHandler = new CommandHandler(
 					resolvedDaemonDir,
@@ -333,7 +333,7 @@ async function startOwningDaemon(
 					// the port the listener *asked* for: a source handed that number would
 					// create a worker that dials nothing, or worse something else. The startup
 					// contact fires the moment the bind completes, so nothing is lost.
-					(requestedTypes, requestedSources) => {
+					requestedSources => {
 						const boundWorkerPort = listener.boundPort;
 						if (boundWorkerPort === undefined) {
 							writeDaemonLog(
@@ -343,7 +343,7 @@ async function startOwningDaemon(
 							);
 							return;
 						}
-						sourceContact.contactSources(boundWorkerPort, requestedTypes, requestedSources);
+						sourceContact.contactSources(boundWorkerPort, requestedSources);
 					},
 					undefined,
 					config.queue.stepSilenceLimitSeconds * 1000,

@@ -12,8 +12,7 @@ import { surfacedWarningsOf } from '../validation/SurfacedWarnings.js';
 
 /** `warnings`: what `flow validate` would print for the accepted flow (surfaced engine warnings), one line each, for the run to tell. */
 export type LoadedDefinition =
-	| { ok: true; resolved: ResolvedDefinition; warnings: string[] }
-	| { ok: false; response: DaemonResponse };
+	{ ok: true; resolved: ResolvedDefinition; warnings: string[] } | { ok: false; response: DaemonResponse };
 
 type Refused = Extract<LoadedDefinition, { ok: false }>;
 type Checked = Refused | { ok: true; warnings: string[] };
@@ -53,14 +52,9 @@ function versionRefusalCode(kind: FlowVersionError['kind']): string {
  * (see FlowDefinitionResolver), without writing anything. Every refusal is a response, so a refused run leaves nothing behind.
  */
 export class RunDefinitionLoader {
-	/**
-	 * @param knownWorkerTypes The worker types the declared sources stand for, read when a flow names one (`workerType`)
-	 *        and not otherwise. Absent, a bound flow is checked for shape only.
-	 */
 	constructor(
 		private readonly resolver: FlowDefinitionResolver,
 		private readonly logWriter: LogWriter,
-		private readonly knownWorkerTypes?: () => string[],
 		private readonly guarantees?: { entries(): string[]; unread(): string[] }
 	) {}
 
@@ -150,25 +144,11 @@ export class RunDefinitionLoader {
 	}
 
 	private check(flow: FlowDefinition, checkRequirements = true): Checked {
-		let knownWorkerTypes: string[] | undefined;
-		if ((flow as { workerType?: unknown }).workerType !== undefined && this.knownWorkerTypes !== undefined) {
-			try {
-				knownWorkerTypes = this.knownWorkerTypes();
-			} catch (err) {
-				return refuse(
-					'WORKER_SOURCES_UNREADABLE',
-					`The flow is bound to a worker type, but the declared worker sources cannot be read, so the type cannot be checked: ${getErrorMessage(err)}. ` +
-						'Fix or remove the worker sources file (see: flow worker source list), then run the flow again.'
-				);
-			}
-		}
 		// The validator annotates the flow it is given (`_autoDiscoveredInputs`). It gets a copy: the hash, the snapshot text and the
 		// definition that runs must all describe the object as written, or a stored snapshot never matches its hash again.
 		const usesRequirements = hasRequirements(flow);
 		const knownGuarantees = checkRequirements && usesRequirements ? this.guarantees?.entries() : undefined;
-		const result = new FlowValidator(undefined, [], knownWorkerTypes, knownGuarantees).validate(
-			structuredClone(flow)
-		);
+		const result = new FlowValidator(undefined, [], knownGuarantees).validate(structuredClone(flow));
 		if (result.valid) {
 			return { ok: true, warnings: surfacedWarningsOf(result.issues) };
 		}

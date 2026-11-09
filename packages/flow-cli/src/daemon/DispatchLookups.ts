@@ -2,25 +2,21 @@ import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { LogWriter } from '../storage/LogWriter';
 import type { BoundStepRouting } from './BoundStepWait.js';
-import type { ExclusiveLookup, GuaranteeLookup, WorkerTypeLookup } from './WorkerTypeCatalog.js';
+import type { GuaranteeLookup, RequirementOnlyLookup } from './WorkerTypeCatalog.js';
 
-/** Every worker is of no type. */
-export const NO_TYPE: WorkerTypeLookup = () => undefined;
-
-/** Every worker that names a source may be of an exclusive type: what is assumed when the sources cannot be read. */
-const ANY_SOURCE_EXCLUSIVE: ExclusiveLookup = sourceId => sourceId !== undefined;
+/** Every worker that names a source may come from a requirement-only source: what is assumed when the sources cannot be read. */
+const ANY_SOURCE_REQUIREMENT_ONLY: RequirementOnlyLookup = sourceId => sourceId !== undefined;
 
 /** No source guarantees anything: what is assumed when the guarantees cannot be read (fail-closed). */
 const NO_GUARANTEES: GuaranteeLookup = () => [];
 
 /**
- * What the dispatcher reads from the declared worker sources (types, exclusivity, guarantees), each answering the safe way
- * when the sources cannot be read, and saying so ONCE per execution in its log: the same unreadable file would otherwise
- * be reported on every dispatch pass.
+ * What the dispatcher reads from the declared worker sources (requirement-only sources, guarantees), each answering the
+ * safe way when the sources cannot be read, and saying so ONCE per execution in its log: the same unreadable file would
+ * otherwise be reported on every dispatch pass.
  */
 export class DispatchLookups {
-	private readonly typesReported = new Set<string>();
-	private readonly exclusivityReported = new Set<string>();
+	private readonly requirementOnlyReported = new Set<string>();
 	private readonly guaranteesReported = new Set<string>();
 
 	constructor(
@@ -30,51 +26,27 @@ export class DispatchLookups {
 
 	/** Forgets what was reported for an execution that is over. */
 	forgetExecution(executionId: string): void {
-		this.typesReported.delete(executionId);
-		this.exclusivityReported.delete(executionId);
+		this.requirementOnlyReported.delete(executionId);
 		this.guaranteesReported.delete(executionId);
 	}
 
 	/**
-	 * Which type each worker is of. When the sources cannot be read no worker has a type: the step stays unplaced and
-	 * fails after the bound.
+	 * Which workers come from a requirement-only source. When that cannot be read, every worker that names a source counts
+	 * as one (fail-closed).
 	 */
-	typeLookup(executionId: string): WorkerTypeLookup {
+	requirementOnlyLookup(executionId: string): RequirementOnlyLookup {
 		try {
-			return this.workerTypes.typeLookup();
+			return this.workerTypes.requirementOnlyLookup();
 		} catch (err) {
-			this.reportSources(executionId, err);
-			return NO_TYPE;
-		}
-	}
-
-	/** The types some declared source stands for; none when the sources cannot be read. */
-	knownTypes(executionId: string): string[] {
-		try {
-			return this.workerTypes.knownTypes();
-		} catch (err) {
-			this.reportSources(executionId, err);
-			return [];
-		}
-	}
-
-	/**
-	 * Which workers are of an exclusive type. When that cannot be read, every worker that names a source counts as
-	 * exclusive (fail-closed).
-	 */
-	exclusiveLookup(executionId: string): ExclusiveLookup {
-		try {
-			return this.workerTypes.exclusiveLookup();
-		} catch (err) {
-			if (!this.exclusivityReported.has(executionId)) {
-				this.exclusivityReported.add(executionId);
+			if (!this.requirementOnlyReported.has(executionId)) {
+				this.requirementOnlyReported.add(executionId);
 				this.logWriter.writeExecution(
 					executionId,
-					`Cannot read the declared worker sources, so workers that come from a source are not offered steps of a run that is not bound to a worker type (they may be of an exclusive type): ${normalizeError(err).message}. Fix or remove the worker sources file (see: flow worker source list).`,
+					`Cannot read the declared worker sources, so workers that come from a source are not offered steps that require nothing (they may come from a requirement-only source): ${normalizeError(err).message}. Fix or remove the worker sources file (see: flow worker source list).`,
 					'warning'
 				);
 			}
-			return ANY_SOURCE_EXCLUSIVE;
+			return ANY_SOURCE_REQUIREMENT_ONLY;
 		}
 	}
 
@@ -107,18 +79,6 @@ export class DispatchLookups {
 		this.logWriter.writeExecution(
 			executionId,
 			`Cannot tell what the declared worker sources guarantee, so no worker counts as meeting the requirements of a step and those steps cannot be placed: ${cause}. Fix or remove the worker sources file (see: flow worker source list).`,
-			'warning'
-		);
-	}
-
-	private reportSources(executionId: string, err: unknown): void {
-		if (this.typesReported.has(executionId)) {
-			return;
-		}
-		this.typesReported.add(executionId);
-		this.logWriter.writeExecution(
-			executionId,
-			`Cannot read the declared worker sources, so no connected worker counts as being of the bound worker type and its steps cannot be placed: ${normalizeError(err).message}. Fix or remove the worker sources file (see: flow worker source list).`,
 			'warning'
 		);
 	}

@@ -81,57 +81,12 @@ describe('DaemonSourceContact - plugin sources', () => {
 	});
 });
 
-describe('DaemonSourceContact - asking only the sources of some worker types', () => {
-	it('contacts a plugin source whose type is wanted', async () => {
-		declarePlugin('sandbox');
-
-		contact.contactSources(4101, new Set(['fixture-sandbox']));
-
-		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
-	});
-
-	// The two contacts use different ports, so a worker request says which contact produced it. The later contact for
-	// the wanted type is a marker: contacts are handled in order, so by the time it has produced a worker anything the
-	// earlier one would have produced is there too. Counting workers alone would pass with a broken filter, as soon as
-	// the first one obtained satisfied the wait.
-	it('does not contact a source of another type', async () => {
-		declarePlugin('sandbox');
-
-		contact.contactSources(4101, new Set(['gpu']));
-		contact.contactSources(4102, new Set(['fixture-sandbox']));
-		await vi.waitFor(() => expect(endpointsObtained()).toContain('ws://127.0.0.1:4102'));
-
-		expect(endpointsObtained()).toEqual(['ws://127.0.0.1:4102']);
-	});
-
-	it('contacts every source when no type is given', async () => {
-		declarePlugin('sandbox');
-
-		contact.contactSources(4101);
-
-		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
-	});
-
-	// Dropping a source from the list asked is not removing it: its instance must stay.
-	it('does not dispose the instance of a source that was merely not asked', async () => {
-		declarePlugin('sandbox');
-		contact.contactSources(4101);
-		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
-
-		contact.contactSources(4101, new Set(['gpu']));
-		contact.contactSources(4101, new Set(['fixture-sandbox']));
-		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(2));
-
-		expect(fixture.disposed).toEqual([]);
-	});
-});
-
-describe('DaemonSourceContact - exclusive worker types', () => {
-	const declareExclusive = (sourceId: string): void => {
+describe('DaemonSourceContact - requirement-only sources (deprecated exclusive, or declared guarantees)', () => {
+	const declareExclusive = (sourceId: string, implementation = 'exclusive'): void => {
 		registry.declare({
 			sourceId,
 			provider: 'fixture',
-			plugin: 'fixture-sandbox.exclusive',
+			plugin: `fixture-sandbox.${implementation}`,
 			pluginsDir: FIXTURE_PLUGINS_DIR,
 			labels: [],
 			maxWorkers: 1,
@@ -139,13 +94,13 @@ describe('DaemonSourceContact - exclusive worker types', () => {
 	};
 
 	// Same marker technique as above: a later contact on another port proves the earlier one has been handled.
-	it('does not ask an exclusive source for a worker on behalf of demand no run is bound for, but builds its instance', async () => {
+	it('does not ask an exclusive source for a worker on behalf of demand that requires nothing, but builds its instance', async () => {
 		declareExclusive('sbx');
 		declarePlugin('plain');
 
 		contact.contactSources(4101);
 		await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toContain('plain'));
-		contact.contactSources(4102, new Set(['fixture-sandbox']));
+		contact.contactSources(4102, new Set(['plain']));
 		await vi.waitFor(() => expect(endpointsObtained()).toContain('ws://127.0.0.1:4102'));
 
 		expect(fixture.created.map(entry => entry.sourceId).sort()).toEqual(['plain', 'sbx']);
@@ -155,31 +110,48 @@ describe('DaemonSourceContact - exclusive worker types', () => {
 		expect(asked).not.toContain('sbx@ws://127.0.0.1:4101');
 	});
 
-	it('asks an exclusive source for a worker when the demand is for its type', async () => {
-		declareExclusive('sbx');
+	// The rule that replaces `exclusive`: declaring guarantees is enough, the flag is not needed.
+	it('does not ask a source that declares guarantees for a worker on behalf of demand that requires nothing, but builds its instance', async () => {
+		declareExclusive('guarded', 'confined');
+		declarePlugin('plain');
 
-		contact.contactSources(4101, new Set(['fixture-sandbox']));
+		contact.contactSources(4101);
+		await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toContain('plain'));
+		contact.contactSources(4102, new Set(['plain']));
+		await vi.waitFor(() => expect(endpointsObtained()).toContain('ws://127.0.0.1:4102'));
 
-		await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toEqual(['sbx']));
+		expect(fixture.created.map(entry => entry.sourceId).sort()).toEqual(['guarded', 'plain']);
+		const asked = fixture.obtained.map(
+			entry => `${entry.sourceId}@${(entry.request as { daemonEndpoint: string }).daemonEndpoint}`
+		);
+		expect(asked).not.toContain('guarded@ws://127.0.0.1:4101');
+	});
+
+	it('asks a source that declares guarantees for a worker when the demand names it by id', async () => {
+		declareExclusive('guarded', 'confined');
+
+		contact.contactSources(4101, new Set(['guarded']));
+
+		await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toEqual(['guarded']));
 	});
 
 	it('asks an exclusive source for a worker when the demand names it by id (a step that requires what it guarantees)', async () => {
 		declareExclusive('sbx');
 
-		contact.contactSources(4101, undefined, new Set(['sbx']));
+		contact.contactSources(4101, new Set(['sbx']));
 
 		await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toEqual(['sbx']));
 	});
 });
 
-describe('DaemonSourceContact - asking only the sources that can provide a requirement', () => {
+describe('DaemonSourceContact - asking only the sources named', () => {
 	const sourcesObtained = (): string[] => fixture.obtained.map(entry => entry.sourceId);
 
-	it('contacts only the sources named, whatever their type', async () => {
+	it('contacts only the sources named', async () => {
 		declarePlugin('a');
 		declarePlugin('b');
 
-		contact.contactSources(4101, undefined, new Set(['b']));
+		contact.contactSources(4101, new Set(['b']));
 		await vi.waitFor(() => expect(sourcesObtained()).toContain('b'));
 
 		expect(sourcesObtained()).toEqual(['b']);
@@ -188,8 +160,8 @@ describe('DaemonSourceContact - asking only the sources that can provide a requi
 	it('contacts nothing for a source id that is not declared', async () => {
 		declarePlugin('a');
 
-		contact.contactSources(4101, undefined, new Set(['ghost']));
-		contact.contactSources(4102, new Set(['fixture-sandbox']));
+		contact.contactSources(4101, new Set(['ghost']));
+		contact.contactSources(4102, new Set(['a']));
 		await vi.waitFor(() => expect(endpointsObtained()).toContain('ws://127.0.0.1:4102'));
 
 		expect(endpointsObtained()).toEqual(['ws://127.0.0.1:4102']);
@@ -201,7 +173,7 @@ describe('DaemonSourceContact - asking only the sources that can provide a requi
 		contact.contactSources(4101);
 		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(2));
 
-		contact.contactSources(4101, undefined, new Set(['b']));
+		contact.contactSources(4101, new Set(['b']));
 		await vi.waitFor(() => expect(fixture.obtained).toHaveLength(3));
 
 		expect(fixture.disposed).toEqual([]);

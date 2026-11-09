@@ -34,7 +34,13 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).toMatch(/`inspect`.*no source declares/s);
 		expect(result).toContain('fs=readonly-enforced');
 		expect(result).toMatch(/added to .*requires/);
-		expect(result).toMatch(/`workerType` is deprecated/);
+		expect(result).toMatch(/`workerType` was removed/);
+		expect(result).not.toMatch(/`workerType` (is deprecated|keeps working)/);
+	});
+
+	it('documents that a source declaring guarantees only serves the steps that require them', () => {
+		expect(result).toMatch(/declares? guarantees.*only/s);
+		expect(result).toContain('queue.concurrency');
 	});
 
 	it('returns a non-empty string', () => {

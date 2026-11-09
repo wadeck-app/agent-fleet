@@ -13,6 +13,7 @@ import {
 	tmpDir,
 } from './CommandHandlerTestHarness';
 import { DaemonSourceContact } from './DaemonSourceContact';
+import { DeclaredGuarantees } from './DeclaredGuarantees';
 import { LaunchTokenIssuer } from './LaunchTokenIssuer';
 import { SourceContactErrors } from './SourceContactErrors';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry';
@@ -33,12 +34,12 @@ vi.mock('node:os', async importOriginal => {
 
 registerCommandHandlerHooks({ mockAllocate, mockRelease, hoistedState });
 
-const BOUND_FLOW_YAML = `\
+const REQUIRING_FLOW_YAML = `\
 id: bound-flow
 version: "1.0.0"
 name: Bound Flow
-description: bound to a worker type
-workerType: sandbox
+description: requires the sandbox guarantee
+requires: [sandbox]
 workspace:
   mode: manual
   gitStrategy: any
@@ -65,15 +66,24 @@ function source(sourceId: string, plugin: string): WorkerSourceEntry {
 	} as WorkerSourceEntry;
 }
 
+/** sbx-1 guarantees "sandbox"; gpu-1 guarantees something else, so it can never serve the flow. */
+const GUARANTEES: Record<string, string[]> = { 'sbx-1': ['sandbox'], 'gpu-1': ['gpu'] };
+const SOURCES = [source('sbx-1', 'sandbox.docker'), source('gpu-1', 'gpu.farm')];
+
 const CATALOG = new WorkerTypeCatalog(
-	{
-		list: () => [source('sbx-1', 'sandbox.docker'), source('gpu-1', 'gpu.farm')],
-	},
-	{ isExclusive: () => false }
+	{ list: () => SOURCES },
+	{ isRequirementOnly: () => false },
+	{ guaranteesOf: entry => GUARANTEES[entry.sourceId] ?? [] }
 );
 
-/** A daemon with only a host worker connected: nothing of the bound type ever shows up. */
-function daemon(contactErrors: SourceContactErrors) {
+/** A daemon with only a host worker connected: no worker that meets the requirement ever shows up. */
+async function daemon(contactErrors: SourceContactErrors) {
+	const declaredGuarantees = new DeclaredGuarantees(
+		{ list: () => SOURCES },
+		{ declaredGuarantees: async entry => GUARANTEES[entry.sourceId] ?? [] },
+		() => {}
+	);
+	await declaredGuarantees.refresh();
 	const pool = createMockWorkerPool();
 	const hostWorker = {
 		ws: { name: 'host' },
@@ -112,19 +122,19 @@ function daemon(contactErrors: SourceContactErrors) {
 		undefined,
 		undefined,
 		undefined,
-		{ ...emptyWorkerRouting(), workerTypes: CATALOG, boundStepWaitMs: 120_000, contactErrors }
+		{ ...emptyWorkerRouting(), workerTypes: CATALOG, boundStepWaitMs: 120_000, contactErrors, declaredGuarantees }
 	);
 }
 
 async function startRun(handler: TrackedCommandHandler) {
-	const flowFile = path.join(tmpDir, 'bound.yml');
-	fs.writeFileSync(flowFile, BOUND_FLOW_YAML);
+	const flowFile = path.join(tmpDir, 'requiring.yml');
+	fs.writeFileSync(flowFile, REQUIRING_FLOW_YAML);
 	return handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
 }
 
 const lastFailureReason = () => String(mockExecStore.markStepFailed.mock.calls.at(-1)?.[2] ?? '');
 
-describe('CommandHandler - a bound step that no worker of its type served', () => {
+describe('CommandHandler - a step with requirements that no worker served', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 	});
@@ -132,9 +142,9 @@ describe('CommandHandler - a bound step that no worker of its type served', () =
 		vi.useRealTimers();
 	});
 
-	it('names the failed contact with a source of that type, after the step started waiting, and where the error is', async () => {
+	it('names the failed contact with a source that could provide it, after the step started waiting, and where the error is', async () => {
 		const errors = new SourceContactErrors('C:/logs');
-		const handler = daemon(errors);
+		const handler = await daemon(errors);
 		await startRun(handler);
 		vi.advanceTimersByTime(1_000);
 		errors.failed('sbx-1');
@@ -152,19 +162,19 @@ describe('CommandHandler - a bound step that no worker of its type served', () =
 		const errors = new SourceContactErrors();
 		errors.failed('sbx-1');
 		vi.advanceTimersByTime(5_000);
-		const handler = daemon(errors);
+		const handler = await daemon(errors);
 		await startRun(handler);
 
 		vi.advanceTimersByTime(121_000);
 		handler.tryDispatch();
 
-		expect(lastFailureReason()).toContain('worker type "sandbox"');
+		expect(lastFailureReason()).toContain('requires sandbox');
 		expect(lastFailureReason()).not.toContain('Last contact');
 	});
 
-	it('does not name the failure of a source of another type', async () => {
+	it('does not name the failure of a source that cannot provide it', async () => {
 		const errors = new SourceContactErrors();
-		const handler = daemon(errors);
+		const handler = await daemon(errors);
 		await startRun(handler);
 		vi.advanceTimersByTime(1_000);
 		errors.failed('gpu-1');
@@ -172,12 +182,12 @@ describe('CommandHandler - a bound step that no worker of its type served', () =
 		vi.advanceTimersByTime(121_000);
 		handler.tryDispatch();
 
-		expect(lastFailureReason()).not.toContain('gpu-1');
+		expect(lastFailureReason()).not.toContain('Last contact with source "gpu-1"');
 	});
 
 	it('does not name a failure that a later successful ask cleared', async () => {
 		const errors = new SourceContactErrors();
-		const handler = daemon(errors);
+		const handler = await daemon(errors);
 		await startRun(handler);
 		vi.advanceTimersByTime(1_000);
 		errors.failed('sbx-1');
@@ -210,7 +220,7 @@ describe('CommandHandler - a bound step that no worker of its type served', () =
 			new LaunchTokenIssuer(),
 			new WorkerTypeInstances(new PluginLoader(), () => {})
 		);
-		const handler = daemon(sourceContact.contactErrors);
+		const handler = await daemon(sourceContact.contactErrors);
 		await startRun(handler);
 
 		sourceContact.contactSources(4101);

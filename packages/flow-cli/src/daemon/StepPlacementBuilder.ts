@@ -24,9 +24,8 @@ export class StepPlacementBuilder {
 		const { executionId } = step.executionContext;
 		const project = this.executions.projectOf(executionId);
 		// Read per placement, from the execution and not from the step: a step injected later carries none of the flow's
-		// fields, and the binding must hold for it too. Same for the requirements, which are the ones recorded when the
-		// run was accepted, never resolved again from the definition.
-		const boundWorkerType = this.executions.boundWorkerTypeOf(executionId);
+		// fields, and the requirements must hold for it too. They are the ones recorded when the run was accepted, never
+		// resolved again from the definition.
 		const requires = requirementsForStep(
 			this.executions.requirementsOf(executionId),
 			step.stepId,
@@ -42,7 +41,6 @@ export class StepPlacementBuilder {
 			requiresUserInterface: step.stepConfig.type === 'user_intervention',
 			...(project !== undefined ? { projectId: project.projectId, projectRoot: project.projectRoot } : {}),
 			...(shellKind !== undefined ? { shellKind } : {}),
-			...(boundWorkerType !== undefined ? { boundWorkerType } : {}),
 			...(requires.length > 0 ? { requires } : {}),
 			...(workspaceKind !== undefined ? { workspaceKind } : {}),
 		};

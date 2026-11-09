@@ -1,54 +1,50 @@
 import type { FlowScheduler } from 'flow-engine';
 import { describe, expect, it, vi } from 'vitest';
-import type { WebSocket } from 'ws';
 
 import type { AssignableStep, ExecutionContext } from '../ipc/Protocol';
 import { BoundStepWait } from './BoundStepWait.js';
+import { DeclaredGuarantees } from './DeclaredGuarantees.js';
 import { ExecutionRegistry } from './ExecutionRegistry.js';
 import { ReadyStepQueue } from './ReadyStepQueue.js';
 import { StepDispatcher } from './StepDispatcher.js';
+import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
-/** The booking a bound step leaves in {@link BoundStepWait} must end with the step, whichever way it ends. */
-describe('StepDispatcher - the wait of a step of a bound run is forgotten', () => {
-	const sandboxWs = { name: 'sandbox' } as unknown as WebSocket;
-	const sandbox = {
-		ws: sandboxWs,
-		worker: {
-			state: 'idle',
-			workerId: 'sandbox',
-			pid: 1,
-			labels: [],
-			attachedProjects: [],
-			attachedProjectIds: [],
-			hasUserInterface: false,
-			ephemeral: true,
-			shellCapabilities: [],
-			features: [],
-			sourceId: 'sbx-1',
-		},
-	};
+/** What the dispatcher books and reports around the sources, whichever way a step ends. */
+describe('StepDispatcher - the wait of a step with requirements and the unreadable sources', () => {
+	const source = {
+		sourceId: 'sbx-1',
+		provider: 'x',
+		plugin: 'sbx.impl',
+		pluginsDir: '/p',
+		labels: [],
+		maxWorkers: 1,
+		tokenHash: 'h',
+		createdAt: 'x',
+	} as WorkerSourceEntry;
 
-	function build(
+	type Catalog = ConstructorParameters<typeof StepDispatcher>[11]['workerTypes'];
+
+	async function build(
 		boundStepWaitMs: number,
-		catalog: {
-			typeLookup: () => (sourceId: string | undefined) => string | undefined;
-			exclusiveLookup: () => (sourceId: string | undefined) => boolean;
-			knownTypes: () => string[];
-		} = {
-			typeLookup: () => sourceId => (sourceId === 'sbx-1' ? 'sandbox' : undefined),
-			exclusiveLookup: () => () => false,
-			knownTypes: () => ['sandbox'],
+		catalog: Catalog = {
+			requirementOnlyLookup: () => () => false,
+			guaranteeLookup: () => sourceId => (sourceId === 'sbx-1' ? ['sandbox'] : []),
 		}
 	) {
+		const declared = new DeclaredGuarantees(
+			{ list: () => [source] },
+			{ declaredGuarantees: async () => ['sandbox'] },
+			() => {}
+		);
+		await declared.refresh();
 		const logWriter = { writeExecution: vi.fn() };
 		const clock = { now: 0 };
 		const boundWait = new BoundStepWait(boundStepWaitMs, () => clock.now);
-		const idle: (typeof sandbox)[] = [];
 		const registry = {
-			listIdle: () => idle,
+			listIdle: () => [],
 			summarize: () => [],
 			listConnected: () => [],
-			describe: () => ({ workerId: 'sandbox', sourceId: 'sbx-1', features: [] as string[] }),
+			describe: () => undefined,
 			markBusy: vi.fn(),
 			send: vi.fn(() => true),
 		};
@@ -63,7 +59,6 @@ describe('StepDispatcher - the wait of a step of a bound run is forgotten', () =
 		};
 		const context = { executionId: 'e1' } as ExecutionContext;
 		executions.start('e1', scheduler as unknown as FlowScheduler, context, []);
-		executions.bindWorkerType('e1', 'sandbox');
 		const failed: string[] = [];
 		const dispatcher = new StepDispatcher(
 			registry as never,
@@ -77,81 +72,37 @@ describe('StepDispatcher - the wait of a step of a bound run is forgotten', () =
 			logWriter as never,
 			{ decide: () => ({ action: 'wait' }) },
 			(_executionId, stepId) => failed.push(stepId),
-			{ workerTypes: catalog, wait: boundWait, contactErrors: { sinceFor: () => () => [] } }
+			{
+				workerTypes: catalog,
+				wait: boundWait,
+				contactErrors: { sinceFor: () => () => [] },
+				declaredGuarantees: declared,
+			}
 		);
-		const enqueue = (stepId: string) =>
+		const enqueue = (stepId: string, executionContext: ExecutionContext = context) =>
 			queue.unshift({
 				stepId,
 				stepConfig: { id: stepId, type: 'script' } as unknown as AssignableStep,
-				executionContext: context,
+				executionContext,
 			});
-		return {
-			dispatcher,
-			boundWait,
-			clock,
-			idle,
-			enqueue,
-			failed,
-			queue,
-			executions,
-			scheduler,
-			logWriter,
-			context,
-		};
+		return { dispatcher, boundWait, clock, enqueue, failed, executions, scheduler, logWriter, queue };
 	}
 
-	it('books the step while it waits for a worker of its type', () => {
-		const { dispatcher, boundWait, enqueue } = build(1_000);
+	it('forgets the steps of an execution that ends while they wait for a worker that meets their requirements', async () => {
+		const { dispatcher, boundWait, enqueue, executions } = await build(1_000);
+		executions.bindRequirements('e1', { run: ['sandbox'], steps: {} });
 		enqueue('s1');
-
 		dispatcher.tryDispatch();
-
 		expect(boundWait.size).toBe(1);
-	});
-
-	it('forgets the step when it is handed to a worker', () => {
-		const { dispatcher, boundWait, idle, enqueue, failed } = build(1_000);
-		enqueue('s1');
-		dispatcher.tryDispatch();
-
-		idle.push(sandbox);
-		dispatcher.tryDispatch();
-
-		expect(boundWait.size).toBe(0);
-		expect(failed).toEqual([]);
-	});
-
-	it('forgets the step when it fails for want of a worker', () => {
-		const { dispatcher, boundWait, clock, enqueue, failed } = build(1_000);
-		enqueue('s1');
-		dispatcher.tryDispatch();
-
-		clock.now = 1_000;
-		dispatcher.tryDispatch();
-
-		expect(failed).toEqual(['s1']);
-		expect(boundWait.size).toBe(0);
-	});
-
-	it('forgets the steps of an execution that ends while they wait', () => {
-		const { dispatcher, boundWait, enqueue } = build(1_000);
-		enqueue('s1');
-		dispatcher.tryDispatch();
 
 		dispatcher.forgetExecution('e1');
 
 		expect(boundWait.size).toBe(0);
 	});
 
-	it('books nothing for a step of a run that is not bound, and leaves it queued', () => {
-		const { dispatcher, boundWait, queue, executions, scheduler } = build(1_000);
-		const otherContext = { executionId: 'e2' } as ExecutionContext;
-		executions.start('e2', scheduler as unknown as FlowScheduler, otherContext, []);
-		queue.unshift({
-			stepId: 's1',
-			stepConfig: { id: 's1', type: 'script' } as unknown as AssignableStep,
-			executionContext: otherContext,
-		});
+	it('books nothing for a step that requires nothing, and leaves it queued', async () => {
+		const { dispatcher, boundWait, queue, enqueue } = await build(1_000);
+		enqueue('s1');
 
 		dispatcher.tryDispatch();
 
@@ -159,35 +110,19 @@ describe('StepDispatcher - the wait of a step of a bound run is forgotten', () =
 		expect(queue.length).toBe(1);
 	});
 
-	// A binding no source stands for (a stale run, a source removed since): the step must end, not wait for ever.
-	it('books a step of a run bound to a type no source stands for, then fails it naming the known types', () => {
-		const { dispatcher, boundWait, clock, executions, enqueue, failed } = build(1_000);
-		executions.bindWorkerType('e1', 'ghost');
-		enqueue('s1');
-		dispatcher.tryDispatch();
-		expect(boundWait.size).toBe(1);
-
-		clock.now = 1_000;
-		dispatcher.tryDispatch();
-
-		expect(failed).toEqual(['s1']);
-		expect(boundWait.size).toBe(0);
-	});
-
 	describe('when the declared sources cannot be read', () => {
-		const unreadable = {
-			exclusiveLookup: () => () => false,
-			typeLookup: () => {
+		const unreadable: Catalog = {
+			requirementOnlyLookup: () => {
 				throw new Error('worker-sources.json is corrupt');
 			},
-			knownTypes: () => {
+			guaranteeLookup: () => {
 				throw new Error('worker-sources.json is corrupt');
 			},
 		};
 
-		it('says so once per execution in its log, however many passes and steps it affects', () => {
+		it('says so once per execution in its log, however many passes and steps it affects', async () => {
 			const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
-			const { dispatcher, enqueue, logWriter } = build(60_000, unreadable);
+			const { dispatcher, enqueue, logWriter } = await build(60_000, unreadable);
 			enqueue('s1');
 			enqueue('s2');
 
@@ -205,20 +140,16 @@ describe('StepDispatcher - the wait of a step of a bound run is forgotten', () =
 			stderr.mockRestore();
 		});
 
-		it('says so again for another execution, and again for the same one after it ended and a new one began', () => {
-			const { dispatcher, enqueue, logWriter, executions, scheduler, queue } = build(60_000, unreadable);
+		it('says so again for another execution, and again for the same one after it ended and a new one began', async () => {
+			const { dispatcher, enqueue, logWriter, executions, scheduler } = await build(60_000, unreadable);
 			const second = { executionId: 'e2' } as ExecutionContext;
 			executions.start('e2', scheduler as unknown as FlowScheduler, second, []);
-			executions.bindWorkerType('e2', 'sandbox');
+			// The sources are read once per pass, so the passes are separate: the first step of a pass is the execution told.
 			enqueue('s1');
-			queue.unshift({
-				stepId: 's1',
-				stepConfig: { id: 's1', type: 'script' } as unknown as AssignableStep,
-				executionContext: second,
-			});
-
 			dispatcher.tryDispatch();
 			dispatcher.forgetExecution('e1');
+			dispatcher.tryDispatch();
+			enqueue('s1', second);
 			dispatcher.tryDispatch();
 
 			const warned = logWriter.writeExecution.mock.calls
@@ -227,8 +158,9 @@ describe('StepDispatcher - the wait of a step of a bound run is forgotten', () =
 			expect(warned.sort()).toEqual(['e1', 'e1', 'e2']);
 		});
 
-		it('still fails the step after the bound, with the reason', () => {
-			const { dispatcher, enqueue, clock, failed } = build(1_000, unreadable);
+		it('still fails a step with requirements after the bound, with the reason', async () => {
+			const { dispatcher, enqueue, clock, failed, executions } = await build(1_000, unreadable);
+			executions.bindRequirements('e1', { run: ['sandbox'], steps: {} });
 			enqueue('s1');
 			dispatcher.tryDispatch();
 

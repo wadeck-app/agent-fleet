@@ -35,7 +35,7 @@ const GUARANTEES: Record<string, string[]> = { poolbox: ['sandbox'], openbox: ['
 const WORKSPACES: Record<string, string[] | undefined> = { poolbox: ['pool'], openbox: undefined, host: undefined };
 const catalog = {
 	typeLookup: () => () => undefined,
-	exclusiveLookup: () => () => false,
+	requirementOnlyLookup: () => () => false,
 	guaranteeLookup: () => (sourceId: string | undefined) =>
 		sourceId === undefined ? [] : (GUARANTEES[sourceId] ?? []),
 	workspaceLookup: () => (sourceId: string | undefined) =>

@@ -88,14 +88,22 @@ describe('validateFlowFile - note on the run-start check', () => {
 	});
 });
 
-describe('validateFlowFile - workerType deprecation', () => {
-	it('prints the warning with the replacement for workerType: sandbox, exit stays 0', () => {
+describe('validateFlowFile - the removed workerType', () => {
+	it('refuses workerType: sandbox with the whole migration in the printed message', () => {
 		const result = validateFlowFile(flowWith({ workerType: 'sandbox' }), store);
 
-		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
-		expect(result.warnings).toHaveLength(1);
-		expect(result.warnings[0]).toContain('workerType "sandbox" is deprecated');
-		expect(result.warnings[0]).toContain('requires: [sandbox]');
+		if (result.exit !== 1) throw new Error(`Expected exit 1, got ${JSON.stringify(result)}`);
+		expect(result.errors).toHaveLength(1);
+		expect(result.errors[0]!.message).toContain('workerType was removed: write requires: [sandbox]');
+		expect(result.errors[0]!.message).toContain('flow worker source list');
+	});
+
+	it('refuses a step-level workerType too', () => {
+		const result = validateFlowFile(flowWith({}, { workerType: 'sandbox' }), store);
+
+		if (result.exit !== 1) throw new Error(`Expected exit 1, got ${JSON.stringify(result)}`);
+		expect(result.errors[0]!.message).toContain("Step 's'");
+		expect(result.errors[0]!.message).toContain('workerType was removed');
 	});
 
 	it('prints nothing without workerType', () => {

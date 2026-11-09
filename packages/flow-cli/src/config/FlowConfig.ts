@@ -114,11 +114,11 @@ export interface FlowConfigData {
 		 */
 		ackTimeoutSeconds: number;
 		/**
-		 * How long, in seconds, a step of a run bound to a worker type (the flow's `workerType`) waits for a worker of
-		 * that type to be connected before it is FAILED. Default: 120. Must be between 1 and 600.
+		 * How long, in seconds, a step with requirements (`requires:` / `profile:`) waits for a worker whose source
+		 * guarantees them to be connected before it is FAILED. Default: 120. Must be between 1 and 600.
 		 *
-		 * Such a step never runs on another worker, so it cannot be left queued forever when nobody of the type shows
-		 * up. The clock only runs while no worker of the type is connected: a busy one is a queue to wait in.
+		 * Such a step never runs on another worker, so it cannot be left queued forever when nobody who meets the
+		 * requirements shows up. The clock only runs while no such worker is connected: a busy one is a queue to wait in.
 		 */
 		boundStepWaitSeconds: number;
 	};

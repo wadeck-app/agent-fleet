@@ -54,12 +54,10 @@ describe('RunDefinitionLoader - profile', () => {
 				throw new Error('not used');
 			},
 		} as unknown as FlowDefinitionResolver;
-		return new RunDefinitionLoader(
-			resolver,
-			{ writeExecution: () => undefined } as unknown as LogWriter,
-			undefined,
-			{ entries: () => entries, unread: () => [] as string[] }
-		);
+		return new RunDefinitionLoader(resolver, { writeExecution: () => undefined } as unknown as LogWriter, {
+			entries: () => entries,
+			unread: () => [] as string[],
+		});
 	}
 
 	const load = (loader: RunDefinitionLoader, file: string) =>
@@ -102,7 +100,10 @@ describe('RunDefinitionLoader - profile', () => {
 		expect(refusal(loaded)).toMatch(/Did you mean .{1,6}agent/);
 	});
 
-	it('does not refuse a flow only because workerType is deprecated: the warning informs, the field behaves as before', () => {
-		expect(load(loaderKnowing([]), flowFile(undefined, undefined, 'sandbox')).ok).toBe(true);
+	it('refuses a flow that still sets workerType, with the migration message (see RunDefinitionLoader.workerType.test.ts)', () => {
+		const loaded = load(loaderKnowing([]), flowFile(undefined, undefined, 'sandbox'));
+
+		expect(loaded.ok).toBe(false);
+		expect(refusal(loaded)).toMatch(/workerType was removed/);
 	});
 });

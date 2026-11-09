@@ -17,45 +17,12 @@ function source(sourceId: string, plugin?: string): WorkerSourceEntry {
 }
 
 function catalogOf(...entries: WorkerSourceEntry[]): WorkerTypeCatalog {
-	return new WorkerTypeCatalog({ list: () => entries }, { isExclusive: () => false });
+	return new WorkerTypeCatalog({ list: () => entries }, { isRequirementOnly: () => false });
 }
 
-describe('WorkerTypeCatalog', () => {
-	// The type is the plugin id of the ref, so two implementations of one plugin are the same type.
-	it('names the type of a plugin source after the plugin id of its ref', () => {
-		const lookup = catalogOf(source('sbx-1', 'sandbox.docker')).typeLookup();
-		expect(lookup('sbx-1')).toBe('sandbox');
-	});
-
-	it('gives the same type to two sources of one plugin, whatever the implementation', () => {
-		const lookup = catalogOf(source('a', 'sandbox.docker'), source('b', 'sandbox.podman')).typeLookup();
-		expect([lookup('a'), lookup('b')]).toEqual(['sandbox', 'sandbox']);
-	});
-
-	// A host worker must never be mistaken for a typed one.
-	it('gives no type to a source without a plugin, to an unknown source and to a worker without a source', () => {
-		const lookup = catalogOf(source('host', undefined)).typeLookup();
-		expect([lookup('host'), lookup('nobody'), lookup(undefined)]).toEqual([undefined, undefined, undefined]);
-	});
-
-	it('lists the known types once each, sorted', () => {
-		const catalog = catalogOf(
-			source('a', 'sandbox.docker'),
-			source('b', 'gpu.farm'),
-			source('c', 'sandbox.podman'),
-			source('host', undefined)
-		);
-		expect(catalog.knownTypes()).toEqual(['gpu', 'sandbox']);
-	});
-
-	it('lists no type when no plugin source is declared', () => {
-		expect(catalogOf(source('host', undefined)).knownTypes()).toEqual([]);
-	});
-});
-
-describe('WorkerTypeCatalog - exclusive types', () => {
+describe('WorkerTypeCatalog - requirement-only sources', () => {
 	const exclusiveIds = (...ids: string[]) => ({
-		isExclusive: (entry: WorkerSourceEntry) => ids.includes(entry.sourceId),
+		isRequirementOnly: (entry: WorkerSourceEntry) => ids.includes(entry.sourceId),
 	});
 
 	it('answers exclusive for the workers of the sources the exclusivity says are', () => {
@@ -63,17 +30,17 @@ describe('WorkerTypeCatalog - exclusive types', () => {
 			{ list: () => [source('sbx', 'sandbox.exec'), source('farm', 'gpu.farm')] },
 			exclusiveIds('sbx')
 		);
-		const isExclusive = catalog.exclusiveLookup();
+		const isRequirementOnly = catalog.requirementOnlyLookup();
 
-		expect([isExclusive('sbx'), isExclusive('farm')]).toEqual([true, false]);
+		expect([isRequirementOnly('sbx'), isRequirementOnly('farm')]).toEqual([true, false]);
 	});
 
 	// Documented limit: a connection whose source was removed keeps its sourceId but no entry says anything about it.
 	it('answers not exclusive for a worker with no source or a source that is not declared', () => {
 		const catalog = new WorkerTypeCatalog({ list: () => [source('sbx', 'sandbox.exec')] }, exclusiveIds('sbx'));
-		const isExclusive = catalog.exclusiveLookup();
+		const isRequirementOnly = catalog.requirementOnlyLookup();
 
-		expect([isExclusive(undefined), isExclusive('gone')]).toEqual([false, false]);
+		expect([isRequirementOnly(undefined), isRequirementOnly('gone')]).toEqual([false, false]);
 	});
 
 	it('reads the sources once per lookup, not once per worker', () => {
@@ -87,9 +54,9 @@ describe('WorkerTypeCatalog - exclusive types', () => {
 			},
 			exclusiveIds('sbx')
 		);
-		const isExclusive = catalog.exclusiveLookup();
-		isExclusive('sbx');
-		isExclusive('sbx');
+		const isRequirementOnly = catalog.requirementOnlyLookup();
+		isRequirementOnly('sbx');
+		isRequirementOnly('sbx');
 
 		expect(reads).toBe(1);
 	});
@@ -103,7 +70,7 @@ describe('WorkerTypeCatalog - guarantees', () => {
 	it('reads the guarantees of each declared source from its built instance', () => {
 		const catalog = new WorkerTypeCatalog(
 			{ list: () => [source('sbx', 'sandbox.docker'), source('other', 'other.x')] },
-			{ isExclusive: () => false },
+			{ isRequirementOnly: () => false },
 			guaranteeing
 		);
 		const lookup = catalog.guaranteeLookup();
@@ -115,7 +82,7 @@ describe('WorkerTypeCatalog - guarantees', () => {
 	it('gives no guarantee to a worker without a source or with an undeclared source', () => {
 		const catalog = new WorkerTypeCatalog(
 			{ list: () => [source('sbx', 'sandbox.docker')] },
-			{ isExclusive: () => false },
+			{ isRequirementOnly: () => false },
 			guaranteeing
 		);
 		const lookup = catalog.guaranteeLookup();
@@ -133,7 +100,7 @@ describe('WorkerTypeCatalog - guarantees', () => {
 		let calls = 0;
 		const catalog = new WorkerTypeCatalog(
 			{ list: () => [source('sbx', 'sandbox.docker')] },
-			{ isExclusive: () => false },
+			{ isRequirementOnly: () => false },
 			{ guaranteesOf: () => (calls++, ['x']) }
 		);
 		const lookup = catalog.guaranteeLookup();
@@ -148,7 +115,7 @@ describe('WorkerTypeCatalog - workspace kinds', () => {
 	const catalogWith = (kinds: Record<string, string[] | undefined>): WorkerTypeCatalog =>
 		new WorkerTypeCatalog(
 			{ list: () => [source('sbx', 'sandbox.docker'), source('open', 'other.x'), source('host', undefined)] },
-			{ isExclusive: () => false },
+			{ isRequirementOnly: () => false },
 			{ guaranteesOf: () => [], workspacesOf: entry => kinds[entry.sourceId] }
 		);
 

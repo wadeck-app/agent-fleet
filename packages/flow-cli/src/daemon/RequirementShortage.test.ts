@@ -52,7 +52,7 @@ async function build(declaration: Record<string, string[]>, options: { unreadabl
 	const wait = new BoundStepWait(options.waitMs ?? 1_000, () => clock.now);
 	const catalog = {
 		typeLookup: () => (sourceId: string | undefined) => (sourceId === undefined ? undefined : `${sourceId}-type`),
-		exclusiveLookup: () => () => false,
+		requirementOnlyLookup: () => () => false,
 	};
 	const shortage = new RequirementShortage(new StepRouter(undefined, undefined, catalog), declared, wait, {
 		sinceFor: () => () => [],
@@ -67,7 +67,6 @@ function inputs(overrides: Partial<ShortageInputs> = {}, requires: string[] = ['
 		placement,
 		connected: [],
 		guaranteesOf: sourceId => (sourceId === 'sbx' ? ['fs=confined', 'net=filtered'] : []),
-		typeOf: sourceId => (sourceId === undefined ? undefined : `${sourceId}-type`),
 		...overrides,
 	};
 }
@@ -170,25 +169,5 @@ describe('RequirementShortage', () => {
 
 		expect(decision).toEqual({ action: 'wait', sources: new Set() });
 		expect(wait.size).toBe(0);
-	});
-
-	it('fails at once, naming the fix, when the run is bound to a type none of the sources that provide the set is of', async () => {
-		const { shortage } = await build({ sbx: ['fs=confined'] });
-		const bound: StepPlacement = { ...inputs().placement, boundWorkerType: 'gpu-type' };
-
-		const decision = shortage.assess(inputs({ placement: bound }));
-
-		expect(decision.action).toBe('fail');
-		const reason = decision.action === 'fail' ? decision.reason : '';
-		expect(reason).toContain('not of the worker type this run is bound to ("gpu-type")');
-	});
-
-	it('only asks the sources of the type the run is bound to', async () => {
-		const { shortage } = await build({ sbx: ['fs=confined'], other: ['fs=confined'] });
-		const bound: StepPlacement = { ...inputs().placement, boundWorkerType: 'other-type' };
-
-		const decision = shortage.assess(inputs({ placement: bound }));
-
-		expect(decision).toEqual({ action: 'wait', sources: new Set(['other']) });
 	});
 });

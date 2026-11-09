@@ -18,7 +18,7 @@ const entry = {
 	tokenHash: 'h',
 	createdAt: '2026-11-06T00:00:00.000Z',
 };
-const typeOf = (sourceId: string | undefined) => (sourceId === 'sbx-1' ? 'thing' : undefined);
+const asked: ReadonlySet<string> = new Set(['sbx-1']);
 const failing = (failure: unknown) =>
 	({ get: () => Promise.resolve({ source: { obtainWorker: () => Promise.reject(failure) } }) }) as never;
 
@@ -48,7 +48,7 @@ describe('hostile contact errors', () => {
 		async (_index, text) => {
 			const { errors } = await contactWith(new Error(text));
 
-			const sentences = errors.since('thing', typeOf, 0);
+			const sentences = errors.since(asked, 0);
 			expect(sentences).toHaveLength(1);
 			expect(sentences[0]).toMatch(
 				/^Last contact with source "sbx-1" failed at \d{4}-\d\d-\d\dT[\d:]+Z; the error is in the daemon log \(flow logs, or C:\/logs\)\.$/
@@ -73,7 +73,7 @@ describe('hostile contact errors', () => {
 
 		expect(reads).toBe(1);
 		expect(reports).toHaveLength(1);
-		expect(errors.since('thing', typeOf, 0)[0]!.length).toBeLessThan(200);
+		expect(errors.since(asked, 0)[0]!.length).toBeLessThan(200);
 	});
 
 	it('hand the outcome sink the fact of the failure and nothing else', async () => {

@@ -7,6 +7,7 @@ import { InboundWorkerSource } from './InboundWorkerSource.js';
 import { buildInboundWorkerType } from './InboundWorkerTypePlugin.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
 import { buildRelayWorkerType } from './RelayWorkerTypePlugin.js';
+import { isRequirementOnlyInstance } from './RequirementOnlyInstance.js';
 import type { ContactOutcome } from './SourceContactErrors.js';
 import { FORK_PROVIDER_NAME, storedForkProviderMessage } from './WorkerSourceForkRule.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
@@ -38,11 +39,12 @@ export interface SourceProviderDependencies {
 	/** Builds and keeps the worker-type instance of each plugin source; without it a plugin source cannot be served. */
 	workerTypes?: Pick<WorkerTypeInstances, 'get'>;
 	/**
-	 * True when the ask is not on behalf of a run bound to the source's type: a source whose instance declares itself
-	 * exclusive is then built but NOT asked for a worker, because its workers serve nothing else (a sandbox started for no
-	 * run would sit idle, or worse be mistaken for capacity). A source whose build fails is not asked either.
+	 * True when the ask is on behalf of demand that requires nothing: a requirement-only source (its instance declares
+	 * guarantees, or the deprecated `exclusive`) is then built but NOT asked for a worker, because its workers serve only
+	 * steps that require what it guarantees (a sandbox started for no such step would sit idle, or worse be mistaken for
+	 * capacity). A source whose build fails is not asked either.
 	 */
-	skipExclusive?: boolean;
+	skipRequirementOnly?: boolean;
 }
 
 /**
@@ -95,7 +97,7 @@ export function resolveSourceProvider(
 
 /**
  * The provider that obtains workers for an entry: its plugin instance (built once, then reused) when it names a
- * plugin, else the built-in one; undefined when the ask must skip an exclusive source (see `skipExclusive`). A plugin ref is
+ * plugin, else the built-in one; undefined when the ask must skip a requirement-only source (see `skipRequirementOnly`). A plugin ref is
  * never read as a provider name, so an unknown provider still throws.
  */
 async function providerOf(
@@ -127,7 +129,9 @@ async function providerOf(
 		...(dependencies.revokeLaunchToken === undefined ? {} : { revokeLaunchToken: dependencies.revokeLaunchToken }),
 	};
 	const instance = await workerTypes.get(entry, host);
-	return dependencies.skipExclusive === true && instance.exclusive === true ? undefined : instance.source;
+	return dependencies.skipRequirementOnly === true && isRequirementOnlyInstance(instance)
+		? undefined
+		: instance.source;
 }
 
 /** The message of whatever was thrown; a value whose message cannot be read must not reject the whole contact. */

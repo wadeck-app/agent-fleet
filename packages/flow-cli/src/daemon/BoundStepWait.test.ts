@@ -7,35 +7,35 @@ function waitWithClock(waitMs: number) {
 	return { clock, wait: new BoundStepWait(waitMs, () => clock.now) };
 }
 
-const request = (overrides: Partial<Parameters<BoundStepWait['decide']>[0]> = {}) => ({
+const request = (overrides: Partial<Parameters<BoundStepWait['decideRequirement']>[0]> = {}) => ({
 	executionId: 'e1',
 	stepId: 's1',
-	workerType: 'sandbox',
-	connectedOfType: 0,
-	knownTypes: ['sandbox'],
+	required: ['sandbox'],
+	connectedServing: 0,
+	closest: () => [],
 	...overrides,
 });
 
 describe('BoundStepWait', () => {
-	it('waits while no worker of the type has been missing for the whole bound', () => {
+	it('waits while no worker that meets the requirements has been missing for the whole bound', () => {
 		const { clock, wait } = waitWithClock(120_000);
 
-		expect(wait.decide(request()).action).toBe('wait');
+		expect(wait.decideRequirement(request()).action).toBe('wait');
 		clock.now += 119_999;
-		expect(wait.decide(request()).action).toBe('wait');
+		expect(wait.decideRequirement(request()).action).toBe('wait');
 	});
 
 	it('fails once the bound is spent, saying what is missing and what to do', () => {
 		const { clock, wait } = waitWithClock(120_000);
-		wait.decide(request());
+		wait.decideRequirement(request());
 		clock.now += 120_000;
 
-		const decision = wait.decide(request());
+		const decision = wait.decideRequirement(request());
 
 		expect(decision.action).toBe('fail');
 		const reason = decision.action === 'fail' ? decision.reason : '';
 		expect(reason).toContain('"s1"');
-		expect(reason).toContain('"sandbox"');
+		expect(reason).toContain('requires sandbox');
 		expect(reason).toContain('120s');
 		expect(reason).toContain('never runs on another worker');
 		expect(reason).toContain('flow worker source list');
@@ -45,78 +45,60 @@ describe('BoundStepWait', () => {
 	it('fails at once with a zero bound', () => {
 		const { wait } = waitWithClock(0);
 
-		expect(wait.decide(request()).action).toBe('fail');
+		expect(wait.decideRequirement(request()).action).toBe('fail');
 	});
 
-	// A busy worker of the type will free up: waiting for it is queueing, not a missing worker.
-	it('keeps waiting, and starts the count over, while a worker of the type is connected', () => {
+	// A busy worker that meets the requirements will free up: waiting for it is queueing, not a missing worker.
+	it('keeps waiting, and starts the count over, while a worker that meets the requirements is connected', () => {
 		const { clock, wait } = waitWithClock(1_000);
-		wait.decide(request());
+		wait.decideRequirement(request());
 		clock.now += 900;
-		expect(wait.decide(request({ connectedOfType: 1 })).action).toBe('wait');
+		expect(wait.decideRequirement(request({ connectedServing: 1 })).action).toBe('wait');
 
 		clock.now += 900;
-		expect(wait.decide(request()).action).toBe('wait');
+		expect(wait.decideRequirement(request()).action).toBe('wait');
 		clock.now += 1_000;
-		expect(wait.decide(request()).action).toBe('fail');
+		expect(wait.decideRequirement(request()).action).toBe('fail');
 	});
 
 	it('counts each step of each execution on its own', () => {
 		const { clock, wait } = waitWithClock(1_000);
-		wait.decide(request());
+		wait.decideRequirement(request());
 		clock.now += 1_000;
 
-		expect(wait.decide(request({ stepId: 's2' })).action).toBe('wait');
-		expect(wait.decide(request({ executionId: 'e2' })).action).toBe('wait');
-		expect(wait.decide(request()).action).toBe('fail');
+		expect(wait.decideRequirement(request({ stepId: 's2' })).action).toBe('wait');
+		expect(wait.decideRequirement(request({ executionId: 'e2' })).action).toBe('wait');
+		expect(wait.decideRequirement(request()).action).toBe('fail');
 	});
 
 	it('forgets a step that failed, so the key does not outlive it', () => {
 		const { clock, wait } = waitWithClock(1_000);
-		wait.decide(request());
+		wait.decideRequirement(request());
 		clock.now += 1_000;
-		wait.decide(request());
+		wait.decideRequirement(request());
 
 		expect(wait.size).toBe(0);
 	});
 
 	it('forgets a step that was dispatched', () => {
 		const { wait } = waitWithClock(1_000);
-		wait.decide(request());
+		wait.decideRequirement(request());
 		expect(wait.size).toBe(1);
 
-		wait.clear('e1', 's1');
+		wait.clearRequirement('e1', 's1');
 
 		expect(wait.size).toBe(0);
 	});
 
 	it('forgets every step of an execution that is over, and only that one', () => {
 		const { wait } = waitWithClock(1_000);
-		wait.decide(request());
-		wait.decide(request({ stepId: 's2' }));
-		wait.decide(request({ executionId: 'e10' }));
+		wait.decideRequirement(request());
+		wait.decideRequirement(request({ stepId: 's2' }));
+		wait.decideRequirement(request({ executionId: 'e10' }));
 
 		wait.forgetExecution('e1');
 
 		expect(wait.size).toBe(1);
-	});
-
-	it('names the types it knows when the bound type is not one of them', () => {
-		const { wait } = waitWithClock(0);
-
-		const decision = wait.decide(request({ workerType: 'sandbx', knownTypes: ['gpu', 'sandbox'] }));
-
-		const reason = decision.action === 'fail' ? decision.reason : '';
-		expect(reason).toContain('known worker types: gpu, sandbox');
-	});
-
-	it('says no worker type is declared when none is', () => {
-		const { wait } = waitWithClock(0);
-
-		const decision = wait.decide(request({ knownTypes: [] }));
-
-		const reason = decision.action === 'fail' ? decision.reason : '';
-		expect(reason).toContain('no worker source with a plugin is declared');
 	});
 });
 
@@ -136,7 +118,7 @@ describe('BoundStepWait - its own deadline timer', () => {
 
 	it('asks for a dispatch pass when the bound is spent, without any other event', () => {
 		const { wait, onDeadline } = timed(120_000);
-		wait.decide(request());
+		wait.decideRequirement(request());
 
 		vi.advanceTimersByTime(119_999);
 		expect(onDeadline).not.toHaveBeenCalled();
@@ -146,10 +128,10 @@ describe('BoundStepWait - its own deadline timer', () => {
 
 	it('arms one timer per step however often it is decided', () => {
 		const { wait, onDeadline } = timed(1_000);
-		wait.decide(request());
+		wait.decideRequirement(request());
 		vi.advanceTimersByTime(400);
-		wait.decide(request());
-		wait.decide(request());
+		wait.decideRequirement(request());
+		wait.decideRequirement(request());
 
 		vi.advanceTimersByTime(10_000);
 
@@ -161,12 +143,12 @@ describe('BoundStepWait - its own deadline timer', () => {
 		const onDeadline = vi.fn();
 		const clock = { now: 0 };
 		const wait = new BoundStepWait(1_000, () => clock.now, onDeadline);
-		wait.decide(request());
+		wait.decideRequirement(request());
 		clock.now = 600;
 
 		vi.advanceTimersByTime(1_000);
 		expect(onDeadline).toHaveBeenCalledTimes(1);
-		wait.decide(request());
+		wait.decideRequirement(request());
 
 		vi.advanceTimersByTime(400);
 		expect(onDeadline).toHaveBeenCalledTimes(2);
@@ -174,8 +156,8 @@ describe('BoundStepWait - its own deadline timer', () => {
 
 	it('does not fire for a step handed to a worker', () => {
 		const { wait, onDeadline } = timed(1_000);
-		wait.decide(request());
-		wait.clear('e1', 's1');
+		wait.decideRequirement(request());
+		wait.clearRequirement('e1', 's1');
 
 		vi.advanceTimersByTime(5_000);
 
@@ -184,20 +166,20 @@ describe('BoundStepWait - its own deadline timer', () => {
 
 	it('does not fire for a step that failed', () => {
 		const { wait, onDeadline } = timed(1_000);
-		wait.decide(request());
+		wait.decideRequirement(request());
 		vi.advanceTimersByTime(1_000);
 		expect(onDeadline).toHaveBeenCalledTimes(1);
-		wait.decide(request());
+		wait.decideRequirement(request());
 
 		vi.advanceTimersByTime(5_000);
 
 		expect(onDeadline).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not fire while a worker of the type is connected', () => {
+	it('does not fire while a worker that meets the requirements is connected', () => {
 		const { wait, onDeadline } = timed(1_000);
-		wait.decide(request());
-		wait.decide(request({ connectedOfType: 1 }));
+		wait.decideRequirement(request());
+		wait.decideRequirement(request({ connectedServing: 1 }));
 
 		vi.advanceTimersByTime(5_000);
 
@@ -206,7 +188,7 @@ describe('BoundStepWait - its own deadline timer', () => {
 
 	it('does not fire for an execution that is over', () => {
 		const { wait, onDeadline } = timed(1_000);
-		wait.decide(request());
+		wait.decideRequirement(request());
 		wait.forgetExecution('e1');
 
 		vi.advanceTimersByTime(5_000);
@@ -216,8 +198,8 @@ describe('BoundStepWait - its own deadline timer', () => {
 
 	it('does not fire once stopped', () => {
 		const { wait, onDeadline } = timed(1_000);
-		wait.decide(request());
-		wait.decide(request({ stepId: 's2' }));
+		wait.decideRequirement(request());
+		wait.decideRequirement(request({ stepId: 's2' }));
 
 		wait.stop();
 		vi.advanceTimersByTime(5_000);
@@ -241,7 +223,7 @@ describe('BoundStepWait - its own deadline timer', () => {
 				throw new Error('dispatch exploded');
 			});
 			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
-			wait.decide(request());
+			wait.decideRequirement(request());
 
 			expect(() => vi.advanceTimersByTime(1_000)).not.toThrow();
 
@@ -260,7 +242,7 @@ describe('BoundStepWait - its own deadline timer', () => {
 				})
 				.mockImplementation(() => undefined);
 			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
-			wait.decide(request());
+			wait.decideRequirement(request());
 
 			vi.advanceTimersByTime(1_000);
 			expect(onDeadline).toHaveBeenCalledTimes(1);
@@ -276,7 +258,7 @@ describe('BoundStepWait - its own deadline timer', () => {
 				throw new Error('dispatch exploded');
 			});
 			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
-			wait.decide(request());
+			wait.decideRequirement(request());
 			vi.advanceTimersByTime(1_000);
 			expect(onDeadline).toHaveBeenCalledTimes(1);
 
@@ -300,9 +282,9 @@ describe('BoundStepWait - its own deadline timer', () => {
 				throw new Error('dispatch exploded');
 			});
 			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
-			wait.decide(request({ stepId: 's1' }));
-			wait.decide(request({ stepId: 's2' }));
-			wait.decide(request({ stepId: 's3' }));
+			wait.decideRequirement(request({ stepId: 's1' }));
+			wait.decideRequirement(request({ stepId: 's2' }));
+			wait.decideRequirement(request({ stepId: 's3' }));
 
 			vi.advanceTimersByTime(10 * 60_000);
 
@@ -320,7 +302,7 @@ describe('BoundStepWait - its own deadline timer', () => {
 				throw new Error('dispatch exploded');
 			});
 			const wait = new BoundStepWait(1_000, Date.now, onDeadline);
-			wait.decide(request());
+			wait.decideRequirement(request());
 			vi.advanceTimersByTime(1_000 + 5_000);
 			expect(onDeadline).toHaveBeenCalledTimes(2);
 
@@ -331,7 +313,7 @@ describe('BoundStepWait - its own deadline timer', () => {
 			onDeadline.mockImplementation(() => {
 				throw new Error('dispatch exploded');
 			});
-			wait.decide(request({ stepId: 's2' }));
+			wait.decideRequirement(request({ stepId: 's2' }));
 			vi.advanceTimersByTime(1_000);
 			expect(onDeadline).toHaveBeenCalledTimes(4);
 			vi.advanceTimersByTime(5_000);
@@ -340,15 +322,15 @@ describe('BoundStepWait - its own deadline timer', () => {
 		});
 
 		// The clock the step is judged by reads short of the bound, so the failing pass re-arms the step's own timer
-		// (as `decide` does for a step that still waits) before it throws.
+		// (as `decideRequirement` does for a step that still waits) before it throws.
 		it('bounds the retries of a pass that re-arms the timer of its step and then throws', () => {
 			const holder: { wait?: BoundStepWait } = {};
 			const onDeadline = vi.fn().mockImplementation(() => {
-				holder.wait?.decide(request());
+				holder.wait?.decideRequirement(request());
 				throw new Error('dispatch exploded');
 			});
 			holder.wait = new BoundStepWait(1_000, () => 0, onDeadline);
-			holder.wait.decide(request());
+			holder.wait.decideRequirement(request());
 
 			vi.advanceTimersByTime(10 * 60_000);
 
@@ -360,11 +342,11 @@ describe('BoundStepWait - its own deadline timer', () => {
 		it('does not ask again for a step the failed pass had already settled', () => {
 			const holder: { wait?: BoundStepWait } = {};
 			const onDeadline = vi.fn().mockImplementation(() => {
-				holder.wait?.clear('e1', 's1');
+				holder.wait?.clearRequirement('e1', 's1');
 				throw new Error('dispatch exploded');
 			});
 			holder.wait = new BoundStepWait(1_000, Date.now, onDeadline);
-			holder.wait.decide(request());
+			holder.wait.decideRequirement(request());
 
 			vi.advanceTimersByTime(1_000 + DEADLINE_RETRY_MS * 3);
 
@@ -374,7 +356,7 @@ describe('BoundStepWait - its own deadline timer', () => {
 
 	it('leaves no timer behind for a bound of zero, which fails at once', () => {
 		const { wait } = timed(0);
-		wait.decide(request());
+		wait.decideRequirement(request());
 
 		expect(vi.getTimerCount()).toBe(0);
 	});
@@ -389,7 +371,7 @@ describe('BoundStepWait - its own deadline timer', () => {
 		}) as never);
 		const { wait } = timed(1_000);
 
-		wait.decide(request());
+		wait.decideRequirement(request());
 
 		expect(unref).toHaveBeenCalledTimes(1);
 		spy.mockRestore();

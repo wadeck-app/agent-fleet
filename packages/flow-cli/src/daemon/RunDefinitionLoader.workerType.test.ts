@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { LogWriter } from '../storage/LogWriter.js';
 import { RunDefinitionLoader } from './RunDefinitionLoader.js';
 
-/** A flow bound to a worker type is refused at run start when no declared source stands for that type. */
-describe('RunDefinitionLoader - flow-level workerType', () => {
+/** `workerType` was removed: a flow that sets it, or a stored version that does, is refused with the migration message. */
+describe('RunDefinitionLoader - the removed workerType', () => {
 	let dir: string;
 
 	beforeEach(() => {
@@ -19,133 +19,76 @@ describe('RunDefinitionLoader - flow-level workerType', () => {
 		fs.rmSync(dir, { recursive: true, force: true });
 	});
 
+	const FLOW_LINES = (workerTypeLine: string): string[] => [
+		'id: bound',
+		'name: Bound',
+		'version: 1.0.0',
+		'description: used to be bound to a worker type',
+		...(workerTypeLine === '' ? [] : [workerTypeLine]),
+		'workspace: in-place',
+		'steps:',
+		'  - id: s',
+		'    name: S',
+		'    type: script',
+		'    script: "true"',
+		'',
+	];
+
 	function flowFile(workerTypeLine: string): string {
 		const file = path.join(dir, 'flow.yml');
-		fs.writeFileSync(
-			file,
-			[
-				'id: bound',
-				'name: Bound',
-				'version: 1.0.0',
-				'description: bound to a worker type',
-				...(workerTypeLine === '' ? [] : [workerTypeLine]),
-				'workspace: in-place',
-				'steps:',
-				'  - id: s',
-				'    name: S',
-				'    type: script',
-				'    script: "true"',
-				'',
-			].join('\n')
-		);
+		fs.writeFileSync(file, FLOW_LINES(workerTypeLine).join('\n'));
 		return file;
 	}
 
-	function loaderKnowing(knownWorkerTypes: (() => string[]) | undefined) {
+	const storedFlow = { id: 'bound', name: 'Bound', version: '1.0.0', description: 'd', workspace: 'in-place' };
+
+	function loader(): RunDefinitionLoader {
 		const resolver = {
 			forFile: (request: { flow: unknown }): ResolvedDefinition =>
 				({ flow: request.flow }) as unknown as ResolvedDefinition,
+			forSnapshotRef: (): ResolvedDefinition =>
+				({
+					flow: {
+						...storedFlow,
+						workerType: 'sandbox',
+						steps: [{ id: 's', name: 'S', type: 'script', script: 'true' }],
+					},
+				}) as unknown as ResolvedDefinition,
 		} as unknown as FlowDefinitionResolver;
-		return new RunDefinitionLoader(
-			resolver,
-			{ writeExecution: () => undefined } as unknown as LogWriter,
-			knownWorkerTypes
-		);
+		return new RunDefinitionLoader(resolver, { writeExecution: () => undefined } as unknown as LogWriter);
 	}
 
-	function load(loader: RunDefinitionLoader, file: string) {
-		return loader.load({ type: 'run', flowFile: file } as never, file);
-	}
+	const load = (file: string) => loader().load({ type: 'run', flowFile: file } as never, file);
+	const refusal = (loaded: ReturnType<typeof load>) => JSON.stringify(loaded.ok ? undefined : loaded.response);
 
-	it('runs a flow bound to a type some declared source stands for', () => {
-		const loaded = load(
-			loaderKnowing(() => ['gpu', 'sandbox']),
-			flowFile('workerType: sandbox')
-		);
-
-		expect(loaded.ok).toBe(true);
-	});
-
-	it('refuses a flow bound to an unknown type with VALIDATION_FAILED, naming the known ones', () => {
-		const loaded = load(
-			loaderKnowing(() => ['gpu', 'sandbox']),
-			flowFile('workerType: sandbx')
-		);
+	it('refuses a flow with workerType: sandbox with VALIDATION_FAILED and the migration message', () => {
+		const loaded = load(flowFile('workerType: sandbox'));
 
 		expect(loaded.ok).toBe(false);
-		const response = loaded.ok ? undefined : loaded.response;
-		expect(response).toMatchObject({ type: 'error', code: 'VALIDATION_FAILED' });
-		expect(JSON.stringify(response)).toContain('Known worker types: gpu, sandbox');
+		expect(loaded.ok ? undefined : loaded.response).toMatchObject({ type: 'error', code: 'VALIDATION_FAILED' });
+		expect(refusal(loaded)).toContain('workerType was removed');
+		expect(refusal(loaded)).toContain('requires: [sandbox]');
+		expect(refusal(loaded)).toContain('flow worker source list');
 	});
 
-	it('reads the declared types at each run, so a source declared since is seen', () => {
-		const declared: string[] = [];
-		const loader = loaderKnowing(() => declared);
-		const file = flowFile('workerType: sandbox');
-		expect(load(loader, file).ok).toBe(false);
-
-		declared.push('sandbox');
-
-		expect(load(loader, file).ok).toBe(true);
-	});
-
-	it('refuses a bound flow when no type is known at all, saying how to declare one', () => {
-		const loaded = load(
-			loaderKnowing(() => []),
-			flowFile('workerType: sandbox')
-		);
+	it('refuses any other value too, without inventing a replacement', () => {
+		const loaded = load(flowFile('workerType: gpu'));
 
 		expect(loaded.ok).toBe(false);
-		expect(JSON.stringify(loaded.ok ? undefined : loaded.response)).toContain('flow worker source add');
+		expect(refusal(loaded)).toContain('workerType was removed');
+		expect(refusal(loaded)).not.toContain('requires: [sandbox]');
 	});
 
-	// Without the field nothing about the run changes, whatever the sources are.
-	it('runs a flow without workerType when no type is known', () => {
-		const loaded = load(
-			loaderKnowing(() => []),
-			flowFile('')
-		);
-
-		expect(loaded.ok).toBe(true);
+	it('runs a flow without workerType', () => {
+		expect(load(flowFile('')).ok).toBe(true);
 	});
 
-	it('does not look at the declared sources for a flow without workerType', () => {
-		const loader = loaderKnowing(() => {
-			throw new Error('the registry must not be read');
-		});
+	// A version stored before the removal and run again by id@version, or a waiting run started again after a restart.
+	it('refuses a stored definition snapshot that still has workerType, with the same message', () => {
+		const loaded = loader().loadSnapshot('bound@1.0.0', {} as never);
 
-		expect(load(loader, flowFile('')).ok).toBe(true);
-	});
-});
-
-describe('RunDefinitionLoader - flow-level workerType when the declared sources cannot be read', () => {
-	it('refuses the run and says what could not be read, instead of guessing the type is fine', () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-def-worker-type-'));
-		try {
-			const file = path.join(dir, 'flow.yml');
-			fs.writeFileSync(
-				file,
-				'id: b\nname: B\nversion: 1.0.0\ndescription: d\nworkerType: sandbox\nworkspace: in-place\nsteps:\n  - { id: s, name: S, type: script, script: "true" }\n'
-			);
-			const resolver = { forFile: () => ({}) } as unknown as FlowDefinitionResolver;
-			const loader = new RunDefinitionLoader(
-				resolver,
-				{ writeExecution: () => undefined } as unknown as LogWriter,
-				() => {
-					throw new Error('worker-sources.json is corrupt');
-				}
-			);
-
-			const loaded = loader.load({ type: 'run', flowFile: file } as never, file);
-
-			expect(loaded.ok).toBe(false);
-			expect(loaded.ok ? undefined : loaded.response).toMatchObject({
-				type: 'error',
-				code: 'WORKER_SOURCES_UNREADABLE',
-			});
-			expect(JSON.stringify(loaded.ok ? undefined : loaded.response)).toContain('worker-sources.json is corrupt');
-		} finally {
-			fs.rmSync(dir, { recursive: true, force: true });
-		}
+		expect(loaded.ok).toBe(false);
+		expect(refusal(loaded)).toContain('workerType was removed');
+		expect(refusal(loaded)).toContain('requires: [sandbox]');
 	});
 });

@@ -25,8 +25,6 @@ const DEMAND_RECHECK_MS = 250;
 export class UnmetDemandCoverage {
 	/** When the current episode of unserved demand began, for the S8 wait (D#25) */
 	private unmetDemandSince: number | undefined;
-	/** Bound worker types whose sources were already asked for a worker while their steps keep waiting */
-	private readonly requestedBoundTypes = new Set<string>();
 	/** Sources asked for a worker because a step waits for a requirement they can provide, while that step keeps waiting */
 	private readonly requestedRequirementSources = new Set<string>();
 	/** Pending re-run of dispatch while S8 waits; nothing else would trigger one */
@@ -36,45 +34,25 @@ export class UnmetDemandCoverage {
 
 	/**
 	 * @param rerunDispatch Runs a dispatch pass again once the S8 wait can have elapsed.
-	 * @param requestFromDeclaredSources Asks the declared sources for a worker (D#66): every one, or only the sources
-	 *        of the given worker types. Injected because contacting a source needs the daemon's own wiring, which this
+	 * @param requestFromDeclaredSources Asks the declared sources for a worker (D#66): every one, or only the given
+	 *        sources. Injected because contacting a source needs the daemon's own wiring, which this
 	 *        class deliberately knows nothing about.
 	 */
 	constructor(
 		private readonly provisioner: WorkerProvisioner,
 		private readonly rerunDispatch: () => void,
-		private readonly requestFromDeclaredSources?: (
-			workerTypes?: ReadonlySet<string>,
-			sourceIds?: ReadonlySet<string>
-		) => void
+		private readonly requestFromDeclaredSources?: (sourceIds?: ReadonlySet<string>) => void
 	) {}
 
 	/**
 	 * Called at the end of every dispatch pass.
 	 *
 	 * @param unmetDemand steps nothing could run that a host worker could: the only ones worth forking for.
-	 * @param boundTypes worker types that unplaced steps of bound runs wait for. A host worker can never run those
-	 *        steps, so they are not counted in `unmetDemand`: nothing is planned or forked for them, only the sources
-	 *        of their type are asked, once while they wait. Their deadline is the dispatcher's, not a re-check's.
-	 * @param requirementSources ids of the declared sources that can provide what unplaced steps require. Same rule as
-	 *        `boundTypes`: not counted in `unmetDemand` (a host worker guarantees nothing), only these sources are asked,
-	 *        once while the steps wait, and the deadline is the dispatcher's.
+	 * @param requirementSources ids of the declared sources that can provide what unplaced steps require. Not counted in
+	 *        `unmetDemand` (a host worker guarantees nothing): nothing is planned or forked for them, only these sources
+	 *        are asked, once while the steps wait, and the deadline is the dispatcher's, not a re-check's.
 	 */
-	cover(
-		unmetDemand: number,
-		boundTypes: ReadonlySet<string> = new Set(),
-		requirementSources: ReadonlySet<string> = new Set()
-	): void {
-		const newBoundTypes = new Set([...boundTypes].filter(type => !this.requestedBoundTypes.has(type)));
-		for (const type of [...this.requestedBoundTypes]) {
-			if (!boundTypes.has(type)) {
-				this.requestedBoundTypes.delete(type);
-			}
-		}
-		for (const type of newBoundTypes) {
-			this.requestedBoundTypes.add(type);
-		}
-
+	cover(unmetDemand: number, requirementSources: ReadonlySet<string> = new Set()): void {
 		const newSources = new Set([...requirementSources].filter(id => !this.requestedRequirementSources.has(id)));
 		for (const id of [...this.requestedRequirementSources]) {
 			if (!requirementSources.has(id)) {
@@ -85,15 +63,12 @@ export class UnmetDemandCoverage {
 			this.requestedRequirementSources.add(id);
 		}
 		if (newSources.size > 0) {
-			this.requestFromDeclaredSources?.(undefined, newSources);
+			this.requestFromDeclaredSources?.(newSources);
 		}
 
 		if (unmetDemand === 0) {
 			this.unmetDemandSince = undefined;
 			this.clearRecheck();
-			if (newBoundTypes.size > 0) {
-				this.requestFromDeclaredSources?.(newBoundTypes);
-			}
 			return;
 		}
 
@@ -107,8 +82,6 @@ export class UnmetDemandCoverage {
 		// later. Once per episode, not once per pass: the re-check fires several times a second.
 		if (isNewEpisode) {
 			this.requestFromDeclaredSources?.(undefined);
-		} else if (newBoundTypes.size > 0) {
-			this.requestFromDeclaredSources?.(newBoundTypes);
 		}
 
 		const plan = this.provisioner.planProvisioning(unmetDemand, now - this.unmetDemandSince);

@@ -9,7 +9,6 @@ const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([
 	ValidationCode.SCRIPT_BODY_INTERPOLATION,
 	ValidationCode.WORKSPACE_DEPRECATED,
 	ValidationCode.WORKSPACE_WORKINGDIR_ABSOLUTE,
-	ValidationCode.WORKER_TYPE_DEPRECATED,
 	ValidationCode.HOST_SCRIPT_WITH_MODEL_STEPS,
 ]);
 

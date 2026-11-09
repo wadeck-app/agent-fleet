@@ -46,7 +46,7 @@ async function build(kinds: Record<string, string[] | undefined>) {
 	await declared.refresh();
 	const catalog = {
 		typeLookup: () => () => undefined,
-		exclusiveLookup: () => () => false,
+		requirementOnlyLookup: () => () => false,
 		workspaceLookup: () => (sourceId: string | undefined) => (sourceId === undefined ? undefined : kinds[sourceId]),
 	};
 	const wait = new BoundStepWait(1_000, () => 0);
@@ -68,7 +68,6 @@ function inputs(workspaceKind: string | undefined, connected: RegisteredWorker[]
 		placement,
 		connected,
 		guaranteesOf: () => ['sandbox'],
-		typeOf: () => undefined,
 	};
 }
 

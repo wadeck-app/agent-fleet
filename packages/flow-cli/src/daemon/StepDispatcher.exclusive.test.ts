@@ -25,8 +25,8 @@ const worker = (workerId: string, sourceId?: string) => ({
 	},
 });
 
-/** An exclusive sandbox source and, optionally, a worker of another plugin type. */
-function build(options: { bound?: string; exclusiveLookup?: () => (sourceId: string | undefined) => boolean } = {}) {
+/** A requirement-only sandbox source and a host worker. */
+function build(options: { requirementOnlyLookup?: () => (sourceId: string | undefined) => boolean } = {}) {
 	const sandbox = worker('sandbox', 'sbx-1');
 	const host = worker('host');
 	const idle: ReturnType<typeof worker>[] = [];
@@ -53,9 +53,6 @@ function build(options: { bound?: string; exclusiveLookup?: () => (sourceId: str
 	};
 	const context = { executionId: 'e1' } as ExecutionContext;
 	executions.start('e1', scheduler as unknown as FlowScheduler, context, []);
-	if (options.bound !== undefined) {
-		executions.bindWorkerType('e1', options.bound);
-	}
 	const dispatcher = new StepDispatcher(
 		registry as never,
 		queue,
@@ -70,9 +67,7 @@ function build(options: { bound?: string; exclusiveLookup?: () => (sourceId: str
 		() => undefined,
 		{
 			workerTypes: {
-				typeLookup: () => sourceId => (sourceId === 'sbx-1' ? 'sandbox' : undefined),
-				exclusiveLookup: options.exclusiveLookup ?? (() => sourceId => sourceId === 'sbx-1'),
-				knownTypes: () => ['sandbox'],
+				requirementOnlyLookup: options.requirementOnlyLookup ?? (() => sourceId => sourceId === 'sbx-1'),
 			},
 			wait: new BoundStepWait(1_000, () => 0),
 			contactErrors: { sinceFor: () => () => [] },
@@ -90,8 +85,8 @@ function build(options: { bound?: string; exclusiveLookup?: () => (sourceId: str
 const warnings = (logWriter: { writeExecution: ReturnType<typeof vi.fn> }): string[] =>
 	logWriter.writeExecution.mock.calls.filter(call => call[2] === 'warning').map(call => String(call[1]));
 
-describe('StepDispatcher - exclusive worker types', () => {
-	it('runs a step of an unbound run on the host worker, not on the exclusive worker listed first', () => {
+describe('StepDispatcher - requirement-only sources', () => {
+	it('runs a step that requires nothing on the host worker, not on the requirement-only worker listed first', () => {
 		const { dispatcher, idle, sandbox, host, enqueue, markBusy } = build();
 		idle.push(sandbox, host);
 		enqueue('s1');
@@ -101,7 +96,7 @@ describe('StepDispatcher - exclusive worker types', () => {
 		expect(markBusy).toHaveBeenCalledWith(host.ws);
 	});
 
-	it('leaves a step of an unbound run unplaced when only the exclusive worker is idle, and counts it as demand for a host worker', () => {
+	it('leaves a step that requires nothing unplaced when only the requirement-only worker is idle, and counts it as demand for a host worker', () => {
 		const { dispatcher, idle, sandbox, enqueue, send, cover } = build();
 		idle.push(sandbox);
 		enqueue('s1');
@@ -109,11 +104,11 @@ describe('StepDispatcher - exclusive worker types', () => {
 		dispatcher.tryDispatch();
 
 		expect(send).not.toHaveBeenCalled();
-		// One step a host worker could run, no bound type waited for: the sources asked are the ones of no type bound.
+		// One step a host worker could run, no source waited for.
 		expect(cover).toHaveBeenCalledWith(1, new Set());
 	});
 
-	it('tells the execution log once per step to bind the flow, naming the exclusive type and worker', () => {
+	it('tells the execution log once per step to add requires:, naming the worker and the reason', () => {
 		const { dispatcher, idle, sandbox, enqueue, logWriter } = build();
 		idle.push(sandbox);
 		enqueue('s1');
@@ -123,49 +118,30 @@ describe('StepDispatcher - exclusive worker types', () => {
 
 		const messages = warnings(logWriter);
 		expect(messages).toHaveLength(1);
-		expect(messages[0]).toContain('exclusive worker type (sandbox)');
 		expect(messages[0]).toContain('sandbox');
-		expect(messages[0]).toContain('workerType: sandbox');
+		expect(messages[0]).toContain('declare guarantees');
+		expect(messages[0]).toContain('requires: [<guarantee>]');
+		expect(messages[0]).toContain('flow worker source list');
+		expect(messages[0]).not.toContain('workerType');
 	});
 
-	it('says nothing when no connected exclusive worker would have taken the step', () => {
-		const { dispatcher, enqueue, logWriter } = build({ exclusiveLookup: () => () => false });
+	it('says nothing when no connected requirement-only worker would have taken the step', () => {
+		const { dispatcher, enqueue, logWriter } = build({ requirementOnlyLookup: () => () => false });
 		enqueue('s1');
 
 		dispatcher.tryDispatch();
 
 		expect(warnings(logWriter)).toEqual([]);
-	});
-
-	it('still runs a step of a run bound to the exclusive type on its worker', () => {
-		const { dispatcher, idle, sandbox, host, enqueue, markBusy, logWriter } = build({ bound: 'sandbox' });
-		idle.push(host, sandbox);
-		enqueue('s1');
-
-		dispatcher.tryDispatch();
-
-		expect(markBusy).toHaveBeenCalledWith(sandbox.ws);
-		expect(warnings(logWriter)).toEqual([]);
-	});
-
-	it('does not run a step of a run bound to another type on the exclusive worker', () => {
-		const { dispatcher, idle, sandbox, enqueue, markBusy } = build({ bound: 'gpu' });
-		idle.push(sandbox);
-		enqueue('s1');
-
-		dispatcher.tryDispatch();
-
-		expect(markBusy).not.toHaveBeenCalled();
 	});
 
 	// Fail-closed: a registry that cannot be read must not turn the sandbox into a host worker.
 	const unreadable = {
-		exclusiveLookup: () => {
+		requirementOnlyLookup: () => {
 			throw new Error('registry file is corrupt');
 		},
 	};
 
-	it('keeps an unbound step off a worker that names a source when the sources cannot be read, but not off a host worker', () => {
+	it('keeps a step that requires nothing off a worker that names a source when the sources cannot be read, but not off a host worker', () => {
 		const { dispatcher, idle, sandbox, host, enqueue, markBusy } = build(unreadable);
 		idle.push(sandbox, host);
 		enqueue('s1');

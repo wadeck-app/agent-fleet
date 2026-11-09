@@ -32,7 +32,7 @@ export function assertWorkerTypeInstance(candidate: unknown): asserts candidate 
 	}
 	if (instance.exclusive !== undefined && typeof instance.exclusive !== 'boolean') {
 		throw new Error(
-			`its instance has an "exclusive" that is not a boolean (got ${JSON.stringify(instance.exclusive)}). Fix: set exclusive: true to serve only runs bound to the type, or remove it.`
+			`its instance has an "exclusive" that is not a boolean (got ${JSON.stringify(instance.exclusive)}). Fix: remove it (deprecated), and declare the guarantees of the source instead: a source that declares guarantees serves only steps that require them.`
 		);
 	}
 }

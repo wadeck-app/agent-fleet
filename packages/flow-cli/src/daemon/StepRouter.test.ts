@@ -335,107 +335,13 @@ describe('StepRouter', () => {
 	});
 });
 
-describe('StepRouter - run bound to a worker type', () => {
+describe('StepRouter - requirement-only sources', () => {
 	const typed = (workerId: string, sourceId: string, overrides: Partial<RegisteredWorker> = {}) =>
 		candidate(workerId, { sourceId, ...overrides });
-	const types: Record<string, string> = { 'sbx-1': 'sandbox', 'sbx-2': 'sandbox', 'gpu-1': 'gpu' };
-	const workerTypes = {
-		typeLookup: () => (sourceId: string | undefined) => (sourceId === undefined ? undefined : types[sourceId]),
-		exclusiveLookup: () => () => false,
-	};
-
-	it('places a bound step on the worker of that type even when a host worker is listed first', () => {
-		const router = new StepRouter(undefined, undefined, workerTypes);
-		const host = candidate('host');
-		const sandbox = typed('sandbox', 'sbx-1');
-
-		expect(router.select(step({ boundWorkerType: 'sandbox' }), [host, sandbox])).toBe(sandbox.ws);
-	});
-
-	it('places nothing when only host workers and workers of another type are idle', () => {
-		const router = new StepRouter(undefined, undefined, workerTypes);
-		const candidates = [candidate('host'), typed('gpu', 'gpu-1'), typed('unknown-source', 'ghost')];
-
-		expect(router.select(step({ boundWorkerType: 'sandbox' }), candidates)).toBeUndefined();
-	});
-
-	it('places a step that is not bound on any worker, typed or not, as before', () => {
-		const router = new StepRouter(undefined, undefined, workerTypes);
-		const host = candidate('host');
-
-		expect(router.select(step(), [host, typed('sandbox', 'sbx-1')])).toBe(host.ws);
-	});
-
-	// S4 is documented as not a security boundary: it must not be able to bring a refused worker back.
-	it('does not let a permissive acceptance plugin or a distribution plugin bring a worker of another type back', () => {
-		const acceptance: WorkerAcceptanceProvider = { accepts: () => true };
-		const distribution: StepDistributionProvider = { order: candidates => [...candidates].reverse() };
-		const router = new StepRouter(acceptance, distribution, workerTypes);
-
-		expect(router.select(step({ boundWorkerType: 'sandbox' }), [candidate('host')])).toBeUndefined();
-	});
-
-	it('asks the acceptance plugin only about workers of the bound type', () => {
-		const asked: string[] = [];
-		const acceptance: WorkerAcceptanceProvider = {
-			accepts: ({ worker }) => {
-				asked.push(worker.workerId);
-				return true;
-			},
-		};
-		const router = new StepRouter(acceptance, undefined, workerTypes);
-
-		router.select(step({ boundWorkerType: 'sandbox' }), [candidate('host'), typed('sandbox', 'sbx-1')]);
-
-		expect(asked).toEqual(['sandbox']);
-	});
-
-	it('still applies the ordinary rules among workers of the bound type', () => {
-		const router = new StepRouter(undefined, undefined, workerTypes);
-		const noLabel = typed('one', 'sbx-1');
-		const labelled = typed('two', 'sbx-2', { labels: ['big'] });
-
-		expect(router.select(step({ boundWorkerType: 'sandbox', labels: ['big'] }), [noLabel, labelled])).toBe(
-			labelled.ws
-		);
-	});
-
-	// No lookup wired is a wiring gap: the safe answer is that nobody has a type, never that anybody does.
-	it('places a bound step nowhere when no type lookup was given', () => {
-		const router = new StepRouter();
-
-		expect(router.select(step({ boundWorkerType: 'sandbox' }), [typed('sandbox', 'sbx-1')])).toBeUndefined();
-	});
-
-	it('places nothing, and says why on stderr, when the source registry cannot be read', () => {
-		const written: string[] = [];
-		const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(chunk => {
-			written.push(String(chunk));
-			return true;
-		});
-		const router = new StepRouter(undefined, undefined, {
-			typeLookup: () => {
-				throw new Error('registry file is corrupt');
-			},
-			exclusiveLookup: () => () => false,
-		});
-
-		const chosen = router.select(step({ boundWorkerType: 'sandbox' }), [typed('sandbox', 'sbx-1')]);
-		stderr.mockRestore();
-
-		expect(chosen).toBeUndefined();
-		expect(written.join('')).toContain('registry file is corrupt');
-	});
-});
-
-describe('StepRouter - exclusive worker types', () => {
-	const typed = (workerId: string, sourceId: string, overrides: Partial<RegisteredWorker> = {}) =>
-		candidate(workerId, { sourceId, ...overrides });
-	const types: Record<string, string> = { 'sbx-1': 'sandbox', 'sbx-2': 'sandbox', 'gpu-1': 'gpu' };
 	const exclusive = new Set(['sbx-1', 'sbx-2']);
 	const workerTypes = {
-		typeLookup: () => (sourceId: string | undefined) => (sourceId === undefined ? undefined : types[sourceId]),
-		exclusiveLookup: () => (sourceId: string | undefined) => sourceId !== undefined && exclusive.has(sourceId),
+		requirementOnlyLookup: () => (sourceId: string | undefined) =>
+			sourceId !== undefined && exclusive.has(sourceId),
 	};
 	const router = () => new StepRouter(undefined, undefined, workerTypes);
 
@@ -457,22 +363,12 @@ describe('StepRouter - exclusive worker types', () => {
 		expect(router().select(step(), [typed('sandbox', 'sbx-1')])).toBeUndefined();
 	});
 
-	// An injected step carries no labels and no workerType of its own: only the run's (absent) binding applies.
+	// An injected step carries no labels of its own.
 	it('places an unbound step with no labels nowhere on an exclusive worker that carries every label', () => {
 		const sandbox = typed('sandbox', 'sbx-1', { labels: ['big', 'gpu'] });
 
 		expect(router().select(step({ labels: [] }), [sandbox])).toBeUndefined();
 		expect(router().select(step({ labels: ['big'] }), [sandbox])).toBeUndefined();
-	});
-
-	it('places a step of a run bound to the exclusive type on its worker', () => {
-		const sandbox = typed('sandbox', 'sbx-1');
-
-		expect(router().select(step({ boundWorkerType: 'sandbox' }), [candidate('host'), sandbox])).toBe(sandbox.ws);
-	});
-
-	it('does not place a step of a run bound to another type on an exclusive worker', () => {
-		expect(router().select(step({ boundWorkerType: 'gpu' }), [typed('sandbox', 'sbx-1')])).toBeUndefined();
 	});
 
 	it('does not let a permissive acceptance plugin bring an exclusive worker back, and does not ask it about one', () => {
@@ -489,7 +385,7 @@ describe('StepRouter - exclusive worker types', () => {
 		expect(asked).toEqual([]);
 	});
 
-	it('leaves the workers of a type that is not exclusive available to unbound steps', () => {
+	it('leaves the workers of a source that is not requirement-only available to steps that require nothing', () => {
 		const gpu = typed('gpu', 'gpu-1');
 
 		expect(router().select(step(), [gpu])).toBe(gpu.ws);
@@ -498,7 +394,7 @@ describe('StepRouter - exclusive worker types', () => {
 	it('uses the lookup given by the caller instead of the catalog', () => {
 		const sandbox = typed('sandbox', 'sbx-1');
 
-		expect(router().select(step(), [sandbox], undefined, () => false)).toBe(sandbox.ws);
+		expect(router().select(step(), [sandbox], () => false)).toBe(sandbox.ws);
 	});
 
 	it('knows no exclusive worker when no catalog was given', () => {
@@ -515,8 +411,7 @@ describe('StepRouter - exclusive worker types', () => {
 			return true;
 		});
 		const unreadable = new StepRouter(undefined, undefined, {
-			typeLookup: () => () => undefined,
-			exclusiveLookup: () => {
+			requirementOnlyLookup: () => {
 				throw new Error('registry file is corrupt');
 			},
 		});

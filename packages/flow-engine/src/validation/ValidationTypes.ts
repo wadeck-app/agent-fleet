@@ -19,6 +19,8 @@ export enum ValidationCode {
 	MISSING_FIELD = 'MISSING_FIELD',
 	INVALID_TYPE = 'INVALID_TYPE',
 	INVALID_VALUE = 'INVALID_VALUE',
+	/** `workerType` (flow or step level) was removed: replaced by `requires:` / `profile:`. */
+	WORKER_TYPE_REMOVED = 'WORKER_TYPE_REMOVED',
 	DUPLICATE_ID = 'DUPLICATE_ID',
 	EMPTY_COLLECTION = 'EMPTY_COLLECTION',
 
@@ -70,6 +72,7 @@ export enum ValidationCode {
 	OPENCODE_SHELL_NOT_FOUND = 'OPENCODE_SHELL_NOT_FOUND',
 	WORKSPACE_DEPRECATED = 'WORKSPACE_DEPRECATED',
 	WORKSPACE_WORKINGDIR_ABSOLUTE = 'WORKSPACE_WORKINGDIR_ABSOLUTE',
+	/** No longer emitted (`workerType` is now the error WORKER_TYPE_REMOVED); kept so stored validation results still parse. */
 	WORKER_TYPE_DEPRECATED = 'WORKER_TYPE_DEPRECATED',
 	HOST_SCRIPT_WITH_MODEL_STEPS = 'HOST_SCRIPT_WITH_MODEL_STEPS',
 

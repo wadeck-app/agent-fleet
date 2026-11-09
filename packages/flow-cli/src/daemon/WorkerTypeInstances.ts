@@ -8,6 +8,7 @@ import { findBuiltinWorkerType } from './BuiltinWorkerTypes.js';
 import type { ForkWorkerInputs } from './ForkWorkerTypePlugin.js';
 import { INBOUND_PLUGIN_REF, entryNudgeUrlToCopy } from './InboundNudgeOption.js';
 import type { RegisteredRelay } from './RelayRegistry.js';
+import { isRequirementOnlyInstance } from './RequirementOnlyInstance.js';
 import { PLUGIN_REF } from './WorkerSourcePluginReference.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 import { WORKER_TYPE_POINT, failureOf, noDirectory, wiringMistake } from './WorkerTypeFailures.js';
@@ -67,7 +68,7 @@ interface CachedInstance {
  */
 export class WorkerTypeInstances {
 	private readonly cache = new Map<string, CachedInstance>();
-	/** What each BUILT instance declared about exclusivity, with the plugin it was built from (see {@link isExclusive}). */
+	/** What each BUILT instance declared about exclusivity, with the plugin it was built from (see {@link isRequirementOnly}). */
 	private readonly exclusivity = new Map<string, { plugin: string; exclusive: boolean }>();
 	/** What each BUILT instance guarantees, checked against its manifest (see {@link guaranteesOf}). */
 	private readonly guarantees = new WorkerTypeGuarantees();
@@ -157,17 +158,14 @@ export class WorkerTypeInstances {
 				// Recorded before any caller sees the instance. Not when the entry was disposed or replaced meanwhile: the
 				// answer of an instance nobody holds any more must not outlive it.
 				if (this.cache.get(sourceId) === created) {
+					// Already checked against the manifest by the build; only the normal form is stored.
+					const guarantees = [...new Set(built.guarantees ?? [])].sort();
 					this.exclusivity.set(sourceId, {
 						plugin: exclusivityKey(plugin, pluginsDir),
-						exclusive: built.exclusive === true,
+						exclusive: this.requirementOnlyOf(sourceId, built, guarantees),
 					});
 					this.workspaces.record(sourceId, exclusivityKey(plugin, pluginsDir), this.acceptedKinds.get(built));
-					// Already checked against the manifest by the build; only the normal form is stored.
-					this.guarantees.record(
-						sourceId,
-						exclusivityKey(plugin, pluginsDir),
-						[...new Set(built.guarantees ?? [])].sort()
-					);
+					this.guarantees.record(sourceId, exclusivityKey(plugin, pluginsDir), guarantees);
 				}
 				return built;
 			}),
@@ -207,17 +205,36 @@ export class WorkerTypeInstances {
 	}
 
 	/**
-	 * Whether the workers of a declared source may serve ONLY runs bound to their type (the instance's `exclusive`). Read
-	 * synchronously by the router, so it answers from what the built instance said and never builds anything.
+	 * What a built instance means for routing: REQUIREMENT-ONLY when it declares a non-empty `guarantees` list (the
+	 * `exclusive` flag is deprecated and ignored then). An `exclusive: true` without guarantees keeps the old effect (never
+	 * an unbound step) but can serve nobody now that `workerType` is gone, so it is reported once, naming the fix.
+	 */
+	private requirementOnlyOf(sourceId: string, built: WorkerTypeInstance, guarantees: string[]): boolean {
+		if (built.exclusive === true) {
+			this.log(
+				guarantees.length > 0 ? 'info' : 'error',
+				guarantees.length > 0
+					? `worker source "${sourceId}": the "exclusive" flag of its worker type is deprecated and ignored; declaring guarantees (${guarantees.join(', ')}) already makes the source serve only steps that require them. Remove "exclusive".`
+					: `warning: worker source "${sourceId}": its worker type says exclusive: true but declares no guarantees, so it can never receive work (it takes no step that requires nothing, and no step can require what it does not guarantee). Fix: declare the guarantees its workers enforce (the "guarantees" of the instance and of the manifest, for example "sandbox") and remove "exclusive".`
+			);
+		}
+		return isRequirementOnlyInstance({ exclusive: built.exclusive, guarantees });
+	}
+
+	/**
+	 * Whether the workers of a declared source are REQUIREMENT-ONLY: they never receive a step that requires nothing, they
+	 * serve only steps whose requirements the source fully guarantees, and they do not count against `queue.concurrency`.
+	 * True for a built instance that declares guarantees (or the deprecated `exclusive: true`). Read synchronously by the
+	 * router, so it answers from what the built instance said and never builds anything.
 	 *
 	 * FAIL-CLOSED: a source whose instance is not built (startup, build failed or timed out, disposed, declared again with
-	 * another plugin) is exclusive when its plugin comes from a plugins directory, because it may be a sandbox and an unbound
-	 * run must never reach one. A built-in is the daemon's own code and none of them is exclusive, so it is not held back
-	 * waiting for an instance (an inbound worker connects without any contact). A source with no plugin is never exclusive.
-	 * Cost: a non-exclusive disk plugin's workers take unbound steps only once its instance is built (the startup contact
-	 * builds it) and not at all if its build fails.
+	 * another plugin) is requirement-only when its plugin comes from a plugins directory, because it may be a sandbox and an
+	 * unbound run must never reach one. A built-in is the daemon's own code and none of them is requirement-only, so it is
+	 * not held back waiting for an instance (an inbound worker connects without any contact). A source with no plugin never
+	 * is. Cost: a disk plugin declaring no guarantees takes unbound steps only once its instance is built (the startup
+	 * contact builds it) and not at all if its build fails.
 	 */
-	isExclusive(entry: WorkerSourceEntry): boolean {
+	isRequirementOnly(entry: WorkerSourceEntry): boolean {
 		const { plugin, pluginsDir, sourceId } = entry;
 		if (plugin === undefined) {
 			return false;
@@ -231,7 +248,7 @@ export class WorkerTypeInstances {
 
 	/**
 	 * What the workers of a declared source guarantee, from its BUILT instance only (a worker's labels never count).
-	 * Synchronous and never builds anything, like {@link isExclusive}.
+	 * Synchronous and never builds anything, like {@link isRequirementOnly}.
 	 *
 	 * FAIL-CLOSED: no guarantee until the instance is built, none after a failed build, a dispose, or a re-declaration
 	 * with another plugin, and none for a source without a plugin or for a built-in worker type.

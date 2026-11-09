@@ -48,21 +48,20 @@ export interface WorkerTypeInstance {
 	/** Obtains workers for the source (worker-source v1, unchanged: no handle comes back). */
 	source: WorkerSourceProvider;
 	/**
-	 * `true` makes the type EXCLUSIVE: its workers serve only runs bound to its type (`workerType: <type>` in the flow)
-	 * and are never offered a step of an unbound run or of a run bound to another type, whatever labels, projects or
-	 * acceptance plugins say. Its source is not asked for a worker on behalf of unbound demand either. Declare it for a
-	 * type whose workers cannot run ordinary steps (for example a sandbox with no access to the host).
+	 * @deprecated Declare `guarantees` instead. A source that declares a non-empty `guarantees` list is REQUIREMENT-ONLY
+	 * by that fact alone: its workers are never offered a step that requires nothing (nor a step requiring something the
+	 * instance does not guarantee), its source is not asked for a worker on behalf of such demand, and its workers do not
+	 * count against `queue.concurrency`. When `guarantees` are declared this flag is ignored (a notice is logged).
 	 *
-	 * Exception: a step whose resolved `requires` are non-empty and entirely covered by this instance's `guarantees` may
-	 * be served by an exclusive source (asking for a guarantee is an explicit opt-in); a step that requires nothing, or
-	 * something the instance does not guarantee, is still never offered to it.
+	 * `true` WITHOUT guarantees keeps the old effect (never an unbound step) but nothing can require what the instance
+	 * does not guarantee, so the source can never receive work: the daemon logs a warning naming the fix when it builds
+	 * the instance. Omitted or `false`: nothing changes. When present it must be a boolean: anything else makes the
+	 * build fail.
 	 *
-	 * Omitted or `false`: the workers take any step they are eligible for, as before. When present it must be a boolean:
-	 * anything else makes the build fail.
-	 *
-	 * Until the daemon has built the instance (startup, or a build that failed) it cannot know this, and treats a type
-	 * loaded from a plugins directory as exclusive: fail-closed, so an unbound run is never routed to a worker that may
-	 * be sandboxed. The cost is that a non-exclusive plugin's workers take unbound steps only once its instance is built.
+	 * Until the daemon has built the instance (startup, or a build that failed) it cannot know whether guarantees are
+	 * declared, and treats a type loaded from a plugins directory as requirement-only: fail-closed, so an unbound run is
+	 * never routed to a worker that may be sandboxed. The cost is that a plugin declaring no guarantees takes unbound
+	 * steps only once its instance is built.
 	 */
 	exclusive?: boolean;
 	/**
