@@ -18,6 +18,21 @@ export interface SandboxableContext {
 	workspaceReadOnly?: unknown;
 }
 
+/** Resolves links and junctions of an existing directory to its real path (`fs.realpathSync.native`, without a `\\?\` prefix). */
+export type DirectoryResolver = (existingDirectory: string) => string;
+
+export const realDirectoryResolver: DirectoryResolver = existingDirectory => {
+	const real = fs.realpathSync.native(existingDirectory);
+	return /^\\\\\?\\[A-Za-z]:\\/.test(real) ? real.slice(4) : real;
+};
+
+/** The directories of a run: the spelling the engine uses, and the resolved real directories that are checked AND mounted. */
+export interface MountPaths {
+	workspaceDir: string;
+	workspaceMetaDir: string;
+	resolved: { workspaceDir: string; workspaceMetaDir: string };
+}
+
 /**
  * Which workspaces a sandboxed worker accepts, and where the run's `.meta` is.
  *
@@ -34,9 +49,20 @@ export interface SandboxableContext {
 export class SandboxableWorkspace {
 	/** The run's meta directory; throws a SandboxError saying what to change when this workspace must not be given to a sandbox. */
 	static metaDirectoryFor(context: SandboxableContext): string {
+		return SandboxableWorkspace.mountPathsFor(context).workspaceMetaDir;
+	}
+
+	/**
+	 * The run's directories with the layout check done on their RESOLVED form, and those resolved directories returned to be mounted:
+	 * each is resolved exactly once, so a link swapped after this call cannot change what the check saw and what is mounted
+	 * (nothing is resolved again between the check and `sbx create`; the mount is given the real path).
+	 */
+	static mountPathsFor(context: SandboxableContext, resolver: DirectoryResolver = realDirectoryResolver): MountPaths {
 		const metaDir = RunMetaDirectory.of(context);
-		const workspace = SandboxableWorkspace.resolve(context.workspaceDir);
-		const meta = SandboxableWorkspace.resolve(metaDir);
+		const realWorkspace = SandboxableWorkspace.resolveReal(context.workspaceDir, resolver);
+		const realMeta = SandboxableWorkspace.resolveReal(metaDir, resolver);
+		const workspace = SandboxableWorkspace.comparable(realWorkspace);
+		const meta = SandboxableWorkspace.comparable(realMeta);
 
 		if (SandboxableWorkspace.isInside(meta, workspace)) {
 			throw new SandboxError(
@@ -61,11 +87,20 @@ export class SandboxableWorkspace {
 					'sandboxed worker, because its gitdir lies outside the mounts and git cannot work in the sandbox. Declare "workspace: pool" in the flow.'
 			);
 		}
-		return metaDir;
+		return {
+			workspaceDir: context.workspaceDir,
+			workspaceMetaDir: metaDir,
+			resolved: { workspaceDir: realWorkspace, workspaceMetaDir: realMeta },
+		};
+	}
+
+	/** Case-insensitive on Windows, for comparisons only (never for a path that is mounted). */
+	private static comparable(resolved: string): string {
+		return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 	}
 
 	/** realpath of the longest existing ancestor (links and junctions resolved), plus the part that does not exist yet. */
-	private static resolve(target: string): string {
+	private static resolveReal(target: string, resolver: DirectoryResolver): string {
 		const missing: string[] = [];
 		let existing = path.resolve(target);
 		while (!fs.existsSync(existing)) {
@@ -74,9 +109,8 @@ export class SandboxableWorkspace {
 			missing.unshift(path.basename(existing));
 			existing = parent;
 		}
-		const real = fs.existsSync(existing) ? fs.realpathSync.native(existing) : existing;
-		const resolved = path.join(real, ...missing);
-		return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+		const real = fs.existsSync(existing) ? resolver(existing) : existing;
+		return path.join(real, ...missing);
 	}
 
 	/** `candidate` is `root` or below it. */

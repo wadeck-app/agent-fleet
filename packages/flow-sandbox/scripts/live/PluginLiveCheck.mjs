@@ -301,6 +301,41 @@ steps:
 	return file;
 }
 
+// Realpath mounts: the pool is reached through a junction/symlink in an ANCESTOR (the core refuses a link as the pool folder itself).
+// The wrapper must mount the RESOLVED directories it checked.
+const realParentDirectory = path.join(root, 'parent2');
+const linkedParentDirectory = path.join(root, 'via-link');
+const linkedPoolDirectory = path.join(linkedParentDirectory, 'pool2');
+function writeLinkedFlow() {
+	const file = path.join(projectDirectory, 'plugin-live-linked.yml');
+	fs.writeFileSync(
+		file,
+		`id: plugin-live-linked
+version: '1.0.0'
+name: Plugin live check, pool behind a link
+description: A script step in a pool reached through a link.
+
+requires: [sandbox]
+
+workspace: { provider: pool, dir: '${linkedPoolDirectory.replaceAll('\\', '/')}', prefix: slot-, count: 1 }
+
+steps:
+    - id: probe
+      name: Where am I
+      type: script
+      shell: bash
+      script: |
+          echo "cwd=$(pwd)"
+          echo "entries=$(ls | wc -l)"
+      output:
+          report:
+              type: string
+              from: stdout
+`
+	);
+	return file;
+}
+
 const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sandbox-live-art-'));
 const claimEvents = { seen: undefined, gone: undefined };
 // Sandboxes that exist before this check: only a sandbox created after this point may be removed by it.
@@ -621,6 +656,52 @@ try {
 			'the third sbx rm call',
 			90_000,
 			() => timings().filter(entry => entry.words[0] === 'rm').length >= 3
+		);
+		const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
+			entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+		);
+		expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
+	});
+
+	await step(
+		'a pool reached through a link: the wrapper mounts the resolved directory, the step runs in it',
+		async () => {
+			fs.mkdirSync(path.join(realParentDirectory, 'pool2', 'slot-1'), { recursive: true });
+			fs.symlinkSync(
+				realParentDirectory,
+				linkedParentDirectory,
+				process.platform === 'win32' ? 'junction' : 'dir'
+			);
+			const started = flow(['run', writeLinkedFlow(), '--json']);
+			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+			const executionId = match[1];
+			const linked = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
+				const shown = flow(['show', executionId, '--json']);
+				if (shown.status !== 0) return undefined;
+				const parsed = JSON.parse(shown.stdout);
+				return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+			});
+			expect(
+				linked.status === 'completed',
+				`linked-pool run is ${linked.status}: ${JSON.stringify(linked.steps)}`
+			);
+			const text = linked.steps?.probe?.io?.stdout?.text ?? '';
+			const cwd = (/^cwd=(.*)$/m.exec(text) ?? [])[1]?.trim() ?? '';
+			expect(
+				cwd.endsWith('/parent2/pool2/slot-1') && !cwd.includes('via-link'),
+				`the step did not run in the resolved slot: cwd=${cwd}`
+			);
+			evidence.linkedPool = { cwd };
+			return `ran in ${cwd}`;
+		}
+	);
+
+	await step('the linked-pool sandbox is removed too', async () => {
+		await waitFor(
+			'the fourth sbx rm call',
+			90_000,
+			() => timings().filter(entry => entry.words[0] === 'rm').length >= 4
 		);
 		const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
 			entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)

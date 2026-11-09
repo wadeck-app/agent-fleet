@@ -27,6 +27,55 @@ function expectRefused(
 	}
 }
 
+describe('PathTranslator spellings (the mounted directory is the resolved one, the engine keeps its own spelling)', () => {
+	// The translator is pure (the platform is a parameter): these rows run on every host.
+	const posixOnly = it;
+	const make = (): PathTranslator =>
+		new PathTranslator({
+			workspaceDir: '/real/slots/slot-1',
+			workspaceMetaDir: '/real/runs/r1.meta',
+			workspaceDirSpelling: '/links/slot-1',
+			workspaceMetaDirSpelling: '/links/r1.meta',
+			platform: 'linux',
+		});
+
+	posixOnly('translates both spellings of a mount to the sandbox form of the mounted directory', () => {
+		const translator = make();
+
+		expect(translator.toSandbox('/links/slot-1/a/b.txt', 'p')).toBe('/real/slots/slot-1/a/b.txt');
+		expect(translator.toSandbox('/real/slots/slot-1/a/b.txt', 'p')).toBe('/real/slots/slot-1/a/b.txt');
+		expect(translator.toSandbox('/links/r1.meta/outputs', 'p')).toBe('/real/runs/r1.meta/outputs');
+	});
+
+	posixOnly('maps a sandbox path back to the mounted (resolved) host spelling', () => {
+		expect(make().toHost('/real/slots/slot-1/a.txt', 'p')).toBe('/real/slots/slot-1/a.txt');
+	});
+
+	posixOnly('accepts either spelling as the mounted directory in an execution context', () => {
+		const translated = make().translateExecutionContext({
+			workspaceDir: '/links/slot-1',
+			outputsDir: '/links/r1.meta/outputs',
+			workspaceMetaDir: '/real/runs/r1.meta',
+			cwd: '/links/slot-1/sub',
+		});
+
+		expect(translated).toEqual({
+			workspaceDir: '/real/slots/slot-1',
+			outputsDir: '/real/runs/r1.meta/outputs',
+			workspaceMetaDir: '/real/runs/r1.meta',
+			cwd: '/real/slots/slot-1/sub',
+		});
+	});
+
+	posixOnly('still refuses anything outside both spellings, a path next to the link, and a .. segment', () => {
+		const translator = make();
+
+		expect(() => translator.toSandbox('/links/other/a.txt', 'p')).toThrow(/is outside the/);
+		expect(() => translator.toSandbox('/links/slot-1x/a.txt', 'p')).toThrow(/is outside the/);
+		expect(() => translator.toSandbox('/links/slot-1/../x', 'p')).toThrow();
+	});
+});
+
 describe('PathTranslator toSandbox (Windows host)', () => {
 	it('maps every accepted spelling of a path inside a mount', () => {
 		const cases: [string, string, string][] = [

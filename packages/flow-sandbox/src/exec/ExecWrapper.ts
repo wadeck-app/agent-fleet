@@ -6,7 +6,7 @@ import type { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import type { SandboxLifecycle } from '../SandboxLifecycle';
 import type { SandboxLog } from '../SandboxLog';
-import { SandboxableWorkspace } from '../SandboxableWorkspace';
+import { type DirectoryResolver, SandboxableWorkspace, realDirectoryResolver } from '../SandboxableWorkspace';
 import { DaemonFrameFit } from '../harness/DaemonFrameFit';
 import { DaemonReporter } from '../harness/DaemonReporter';
 import { type JsonObject, isJsonObject, isNonEmptyString } from '../harness/HarnessMessages';
@@ -69,7 +69,17 @@ export interface ExecWrapperDependencies {
 	 * The RunMounts of a run (workspace, `.meta` next to it). `readOnlyWorkspace` is true when the run requires `fs=readonly-enforced`:
 	 * the workspace must then be a `:ro` mount (the wrapper checks what comes back). Throws with an actionable message when they are unusable.
 	 */
-	createMounts: (workspaceDir: string, workspaceMetaDir: string, readOnlyWorkspace: boolean) => RunMounts;
+	createMounts: (
+		workspaceDir: string,
+		workspaceMetaDir: string,
+		readOnlyWorkspace: boolean,
+		resolved: { workspaceDir: string; workspaceMetaDir: string }
+	) => RunMounts;
+	/**
+	 * Resolves links and junctions of a directory (default: the file system's realpath). The layout check runs on the resolved
+	 * directories and those are what gets mounted, each resolved once (SandboxableWorkspace.mountPathsFor). Injected by tests only.
+	 */
+	resolveDirectory?: DirectoryResolver;
 	now: () => number;
 	/** Called once, when the wrapper is over (the daemon went away). The process should exit. */
 	onFinished: () => void;
@@ -445,14 +455,19 @@ export class ExecWrapper {
 			throw new SandboxError('invalid-argument', 'The assignment has no executionContext.workspaceDir.');
 		}
 		// Where the run's `.meta` lives depends on the workspace provider: derived from outputsDir (<meta>/outputs).
-		const mounts = this.dependencies.createMounts(
-			workspaceDir,
-			SandboxableWorkspace.metaDirectoryFor({
+		const paths = SandboxableWorkspace.mountPathsFor(
+			{
 				workspaceDir,
 				outputsDir: context['outputsDir'],
 				workspaceReadOnly: context['workspaceReadOnly'],
-			}),
-			wantsReadOnly
+			},
+			this.dependencies.resolveDirectory ?? realDirectoryResolver
+		);
+		const mounts = this.dependencies.createMounts(
+			paths.workspaceDir,
+			paths.workspaceMetaDir,
+			wantsReadOnly,
+			paths.resolved
 		);
 		// What the factory built must be what the run asked for: never a read/write workspace under fs=readonly-enforced.
 		if (mounts.readOnlyWorkspace !== wantsReadOnly) {

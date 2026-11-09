@@ -31,6 +31,78 @@ function link(target: string, name: string): string {
 const NEEDS_POOL =
 	/needs workspace: pool, the in-place workspace exposes <project>\/\.flow and \.git\/hooks to the sandbox/;
 
+describe('SandboxableWorkspace.mountPathsFor (the directories that are checked are the ones that get mounted)', () => {
+	const context = (): { workspaceDir: string; outputsDir: string } => {
+		const workspaceDir = directory('slots', 'slot-1');
+		directory('runs', 'r1.meta', 'outputs');
+		return { workspaceDir, outputsDir: path.join(root, 'runs', 'r1.meta', 'outputs') };
+	};
+
+	it('returns the spelling of the engine and the resolved directories to mount', () => {
+		const given = context();
+
+		const paths = SandboxableWorkspace.mountPathsFor(given);
+
+		expect(paths.workspaceDir).toBe(given.workspaceDir);
+		expect(paths.workspaceMetaDir).toBe(path.join(root, 'runs', 'r1.meta'));
+		expect(paths.resolved).toEqual({
+			workspaceDir: given.workspaceDir,
+			workspaceMetaDir: path.join(root, 'runs', 'r1.meta'),
+		});
+	});
+
+	it('resolves a link (junction or symlink) in the workspace path to its target, which is what must be mounted', () => {
+		const real = directory('real-slot');
+		const linked = link(real, 'linked-slot');
+		directory('runs', 'r1.meta', 'outputs');
+
+		const paths = SandboxableWorkspace.mountPathsFor({
+			workspaceDir: linked,
+			outputsDir: path.join(root, 'runs', 'r1.meta', 'outputs'),
+		});
+
+		expect(paths.workspaceDir).toBe(linked);
+		expect(paths.resolved.workspaceDir).toBe(real);
+	});
+
+	// A link swapped between the check and the mount: simulated by a resolver whose answers change over time.
+	it('resolves each directory exactly once, so a swap after the check cannot change what is mounted', () => {
+		const given = context();
+		const swapped = directory('elsewhere');
+		const answers = new Map<string, string[]>([
+			[given.workspaceDir, [given.workspaceDir, swapped]],
+			[path.join(root, 'runs', 'r1.meta'), [path.join(root, 'runs', 'r1.meta'), swapped]],
+		]);
+		const calls: string[] = [];
+		const resolver = (directoryPath: string): string => {
+			calls.push(directoryPath);
+			const queue = answers.get(directoryPath);
+			if (queue === undefined) return directoryPath;
+			return queue.length > 1 ? (queue.shift() as string) : (queue[0] as string);
+		};
+
+		const paths = SandboxableWorkspace.mountPathsFor(given, resolver);
+
+		expect(paths.resolved.workspaceDir).toBe(given.workspaceDir);
+		expect(paths.resolved.workspaceMetaDir).toBe(path.join(root, 'runs', 'r1.meta'));
+		expect(calls.filter(call => call === given.workspaceDir)).toHaveLength(1);
+		expect(calls.filter(call => call === path.join(root, 'runs', 'r1.meta'))).toHaveLength(1);
+	});
+
+	it('runs the layout check on the resolved directories: a meta that resolves into the workspace is refused', () => {
+		const given = context();
+		const inside = directory('slots', 'slot-1', 'inner');
+		const resolver = (directoryPath: string): string =>
+			directoryPath === path.join(root, 'runs', 'r1.meta') ? inside : directoryPath;
+
+		expect(() => SandboxableWorkspace.mountPathsFor(given, resolver)).toThrow(NEEDS_POOL);
+	});
+
+	it('keeps the same refusals as metaDirectoryFor (a missing outputsDir)', () => {
+		expect(() => SandboxableWorkspace.mountPathsFor({ workspaceDir: directory('ws') })).toThrow(/outputsDir/);
+	});
+});
+
 describe('SandboxableWorkspace.metaDirectoryFor', () => {
 	it('accepts a meta directory outside the workspace and returns it (pool, sibling meta), and refuses every layout that puts it inside (each case)', async () => {
 		interface Row {

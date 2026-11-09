@@ -45,6 +45,67 @@ afterEach(() => {
 	fs.rmSync(root, { recursive: true, force: true });
 });
 
+describe('RunMounts resolved directories (what was checked is what is mounted)', () => {
+	it('mounts the resolved directories and still translates the paths of the engine spelling', () => {
+		const realWorkspace = path.join(root, 'real-ws');
+		const realMeta = path.join(root, 'real-meta');
+		fs.mkdirSync(realWorkspace);
+		fs.mkdirSync(realMeta);
+		const built = new RunMounts({
+			workspaceDir: workspace,
+			workspaceMetaDir: meta,
+			resolved: { workspaceDir: realWorkspace, workspaceMetaDir: realMeta },
+			platform: process.platform,
+			log,
+		});
+
+		expect(built.sandboxMounts()).toEqual([{ hostPath: realWorkspace }, { hostPath: realMeta }]);
+		expect(built.toSandboxPath(path.join(workspace, 'a.txt'), 'p')).toBe(
+			sandboxForm(path.join(realWorkspace, 'a.txt'))
+		);
+		expect(built.toSandboxPath(path.join(realWorkspace, 'a.txt'), 'p')).toBe(
+			sandboxForm(path.join(realWorkspace, 'a.txt'))
+		);
+		expect(built.toSandboxPath(path.join(meta, 'outputs'), 'p')).toBe(sandboxForm(path.join(realMeta, 'outputs')));
+		expect(built.metaMount()).toEqual({ hostPath: realMeta });
+	});
+
+	it('refuses a link below the resolved root whichever spelling the path uses', () => {
+		const realWorkspace = path.join(root, 'real-ws');
+		fs.mkdirSync(realWorkspace);
+		fs.symlinkSync(
+			elsewhere,
+			path.join(realWorkspace, 'escape'),
+			process.platform === 'win32' ? 'junction' : 'dir'
+		);
+		const built = new RunMounts({
+			workspaceDir: workspace,
+			workspaceMetaDir: meta,
+			resolved: { workspaceDir: realWorkspace, workspaceMetaDir: meta },
+			platform: process.platform,
+			log,
+		});
+
+		expect(() => built.toSandboxPath(path.join(workspace, 'escape', 'secret.txt'), 'p')).toThrow(/link|junction/);
+		expect(() => built.toSandboxPath(path.join(realWorkspace, 'escape', 'secret.txt'), 'p')).toThrow(
+			/link|junction/
+		);
+	});
+
+	it('refuses resolved directories that are the same, or nested in each other', () => {
+		expect(
+			() =>
+				new RunMounts({
+					workspaceDir: workspace,
+					workspaceMetaDir: meta,
+					resolved: { workspaceDir: elsewhere, workspaceMetaDir: elsewhere },
+					platform: process.platform,
+					log,
+				})
+		).toThrow(/two separate directories/);
+	});
+});
+
 describe('RunMounts whole-run read-only workspace (fs=readonly-enforced)', () => {
 	// sbx needs the PRIMARY (first) mount read/write: with a read-only workspace the run's .meta is the primary and the workspace a :ro secondary.
 	it('puts .meta first (read/write) and the workspace second (:ro) when the workspace is read-only', () => {

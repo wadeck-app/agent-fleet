@@ -15,6 +15,12 @@ export interface PathTranslatorOptions {
 	workspaceMetaDir: string;
 	/** `win32`: host paths are `C:\x` and appear as `/c/x` in the sandbox. Anything else: same path on both sides. */
 	platform: NodeJS.Platform;
+	/**
+	 * Other spellings of the two mounted directories that the engine may use (the path before links and junctions were resolved):
+	 * `workspaceDir` / `workspaceMetaDir` above are what is mounted, these are accepted as the same directory and translated to it.
+	 */
+	workspaceDirSpelling?: string;
+	workspaceMetaDirSpelling?: string;
 }
 
 export interface HostExecutionPaths {
@@ -65,17 +71,32 @@ const UNC_PATH_IN_TEXT = /(?<![\\\w])\\\\[\w.$-]+\\[\w.$-]+[^\s"'<>|]*/g;
  */
 export class PathTranslator {
 	private readonly windows: boolean;
-	private readonly mounts: { name: string; host: CanonicalPath; hostSpelling: CanonicalPath }[];
+	private readonly mounts: {
+		name: string;
+		host: CanonicalPath;
+		hostSpelling: CanonicalPath;
+		aliases: CanonicalPath[];
+	}[];
 
 	constructor(options: PathTranslatorOptions) {
 		this.windows = options.platform === 'win32';
 		const mounts = [
-			{ name: 'workspaceDir', path: options.workspaceDir },
-			{ name: 'workspaceMetaDir', path: options.workspaceMetaDir },
+			{ name: 'workspaceDir', path: options.workspaceDir, spelling: options.workspaceDirSpelling },
+			{ name: 'workspaceMetaDir', path: options.workspaceMetaDir, spelling: options.workspaceMetaDirSpelling },
 		];
 		this.mounts = mounts.map(mount => {
 			const canonical = this.canonicalHost(mount.path, mount.name);
-			return { name: mount.name, host: this.lowered(canonical), hostSpelling: canonical };
+			const lowered = this.lowered(canonical);
+			const alias =
+				mount.spelling === undefined
+					? undefined
+					: this.lowered(this.canonicalHost(mount.spelling, `${mount.name} spelling`));
+			return {
+				name: mount.name,
+				host: lowered,
+				hostSpelling: canonical,
+				aliases: alias === undefined || this.sameSegments(alias, lowered) ? [] : [alias],
+			};
 		});
 		const [workspace, meta] = this.mounts;
 		if (
@@ -96,12 +117,15 @@ export class PathTranslator {
 		const canonical = this.canonicalHost(hostPath, label);
 		const lowered = this.lowered(canonical);
 		for (const mount of this.mounts) {
-			if (this.isInside(mount.host, lowered)) {
-				const rest = canonical.segments.slice(mount.host.segments.length);
-				return this.formatSandbox({
-					drive: mount.hostSpelling.drive,
-					segments: [...mount.hostSpelling.segments, ...rest],
-				});
+			// The mounted directory first, then the spellings the engine may use for it: both name the directory the sandbox sees.
+			for (const root of [mount.host, ...mount.aliases]) {
+				if (this.isInside(root, lowered)) {
+					const rest = canonical.segments.slice(root.segments.length);
+					return this.formatSandbox({
+						drive: mount.hostSpelling.drive,
+						segments: [...mount.hostSpelling.segments, ...rest],
+					});
+				}
 			}
 		}
 		throw this.outside(label, hostPath);
@@ -163,7 +187,7 @@ export class PathTranslator {
 	private requireMount(hostPath: string, label: string, mountIndex: number): void {
 		const mount = this.mounts[mountIndex];
 		const canonical = this.lowered(this.canonicalHost(hostPath, label));
-		if (mount === undefined || !this.sameSegments(mount.host, canonical)) {
+		if (mount === undefined || ![mount.host, ...mount.aliases].some(root => this.sameSegments(root, canonical))) {
 			throw new SandboxError(
 				'path-outside-mounts',
 				`${label} "${hostPath}" is not the mounted ${mount?.name ?? 'directory'}. The sandbox of this run only mounts ` +

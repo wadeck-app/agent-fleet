@@ -20,6 +20,11 @@ export interface RunMountsOptions {
 	 * (sbx needs the first mount read/write). Default false: the workspace is the read/write primary.
 	 */
 	readOnlyWorkspace?: boolean;
+	/**
+	 * The directories to MOUNT when they differ from the spellings above: the real paths (links and junctions resolved) that
+	 * SandboxableWorkspace checked. `workspaceDir` / `workspaceMetaDir` stay the spelling the engine uses and are translated to these.
+	 */
+	resolved?: { workspaceDir: string; workspaceMetaDir: string };
 }
 
 /**
@@ -48,18 +53,32 @@ export class RunMounts {
 	readonly readOnlyWorkspace: boolean;
 	private readonly flavor: path.PlatformPath;
 	private readonly roots: readonly string[];
+	/** The directories given to `sbx create` (the resolved ones when the caller resolved them, else the engine spelling). */
+	private readonly mounted: { workspaceDir: string; workspaceMetaDir: string };
+	/** Engine spelling -> mounted directory, for the two mounts. */
+	private readonly spellings: readonly { spelling: string; mounted: string }[];
 
 	constructor(private readonly options: RunMountsOptions) {
 		this.flavor = options.platform === 'win32' ? path.win32 : path.posix;
-		this.translator = new PathTranslator({
+		this.mounted = options.resolved ?? {
 			workspaceDir: options.workspaceDir,
 			workspaceMetaDir: options.workspaceMetaDir,
+		};
+		this.translator = new PathTranslator({
+			workspaceDir: this.mounted.workspaceDir,
+			workspaceMetaDir: this.mounted.workspaceMetaDir,
+			workspaceDirSpelling: options.workspaceDir,
+			workspaceMetaDirSpelling: options.workspaceMetaDir,
 			platform: options.platform,
 		});
 		this.readOnlyWorkspace = options.readOnlyWorkspace === true;
-		this.roots = [options.workspaceDir, options.workspaceMetaDir];
-		this.requireRealDirectory(options.workspaceDir, 'workspaceDir');
-		this.requireRealDirectory(options.workspaceMetaDir, 'workspaceMetaDir');
+		this.roots = [this.mounted.workspaceDir, this.mounted.workspaceMetaDir];
+		this.spellings = [
+			{ spelling: options.workspaceDir, mounted: this.mounted.workspaceDir },
+			{ spelling: options.workspaceMetaDir, mounted: this.mounted.workspaceMetaDir },
+		];
+		this.requireRealDirectory(this.mounted.workspaceDir, 'workspaceDir');
+		this.requireRealDirectory(this.mounted.workspaceMetaDir, 'workspaceMetaDir');
 		const warnings = this.inspectWorkspace();
 		for (const warning of warnings) options.log.warn(warning);
 		this.warnings = warnings;
@@ -68,13 +87,13 @@ export class RunMounts {
 	/** The workspace mount, `:ro` when the run requires `fs=readonly-enforced`. */
 	workspaceMount(): SandboxMount {
 		return this.readOnlyWorkspace
-			? { hostPath: this.options.workspaceDir, readOnly: true }
-			: { hostPath: this.options.workspaceDir };
+			? { hostPath: this.mounted.workspaceDir, readOnly: true }
+			: { hostPath: this.mounted.workspaceDir };
 	}
 
 	/** The run's `.meta` mount: always read/write (outputs, session store). */
 	metaMount(): SandboxMount {
-		return { hostPath: this.options.workspaceMetaDir };
+		return { hostPath: this.mounted.workspaceMetaDir };
 	}
 
 	/**
@@ -122,10 +141,20 @@ export class RunMounts {
 		}
 	}
 
-	private rejectLinks(hostPath: string, label: string): void {
+	/** A path written with the engine spelling of a mount, rewritten onto the mounted directory (the links of its prefix are already resolved). */
+	private rebase(hostPath: string): string {
+		for (const { spelling, mounted } of this.spellings) {
+			if (this.isUnder(mounted, hostPath) || !this.isUnder(spelling, hostPath)) continue;
+			return this.flavor.join(mounted, this.flavor.relative(spelling, hostPath));
+		}
+		return hostPath;
+	}
+
+	private rejectLinks(requested: string, label: string): void {
+		const hostPath = this.rebase(requested);
 		const root = this.roots.find(candidate => this.isUnder(candidate, hostPath));
 		if (root === undefined) {
-			throw new SandboxError('path-outside-mounts', `${label} "${hostPath}" is outside the mounts.`);
+			throw new SandboxError('path-outside-mounts', `${label} "${requested}" is outside the mounts.`);
 		}
 		let current = root;
 		for (const segment of this.segmentsBelow(root, hostPath)) {
@@ -137,7 +166,7 @@ export class RunMounts {
 				if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
 				throw error;
 			}
-			if (stats.isSymbolicLink()) throw this.linkError(label, hostPath, current);
+			if (stats.isSymbolicLink()) throw this.linkError(label, requested, current);
 		}
 	}
 
@@ -170,7 +199,8 @@ export class RunMounts {
 
 	private inspectWorkspace(): string[] {
 		const warnings: string[] = [];
-		const { workspaceDir, projectDir } = this.options;
+		const { projectDir } = this.options;
+		const workspaceDir = this.mounted.workspaceDir;
 		const gitEntry = this.gitEntryKind(workspaceDir);
 		if (projectDir !== undefined && this.sameDirectory(workspaceDir, projectDir)) {
 			warnings.push(

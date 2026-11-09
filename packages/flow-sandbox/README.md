@@ -262,6 +262,10 @@ A flow asks for the sandbox with `requires: [sandbox]` (flow level; a step may a
 
 NOT declared, on purpose: `net=filtered` (raw TCP to public destinations is unverified and an allow-all machine policy would make it false: see "Raw TCP"; it cannot be verified without an external receiver). A flow requiring it is refused at run start (no declared source provides it).
 
+### Mounts use the resolved directories
+
+The wrapper resolves the workspace and `.meta` paths of an assignment (links, junctions, 8.3 names) ONCE, runs the layout check on the resolved directories (`.meta` outside the workspace, pool only) and gives `sbx create` exactly those resolved paths: nothing is resolved again between the check and the mount. The engine keeps its own spelling in the execution context and in the paths it passes to the launcher; `PathTranslator` accepts both spellings and translates them to the sandbox form of the mounted directory, and paths reported back by the VM come out in the mounted (resolved) form. Limit: a real directory replaced or renamed after the resolution is not detected, which needs the same host access as editing the directory itself. Proof: unit tests with an injected resolver that answers differently the second time (`SandboxableWorkspace.test.ts`, `ExecWrapper.test.ts`) and a `PluginLiveCheck` step on real sbx with the pool reached through a junction in an ancestor directory (the core refuses a link as the pool folder itself; whether the core already resolves the slot path before the wrapper sees it was not established, so that step proves no regression with a link, not that the aliasing was needed).
+
 ### Read-only runs: `profile: inspect`
 
 `profile: inspect` is `agent` plus `fs=readonly-enforced`. The mounts of a run follow its resolved requirements (the assign's `requires`); the capability is declared by the source, but a run without the requirement keeps the normal read/write workspace.

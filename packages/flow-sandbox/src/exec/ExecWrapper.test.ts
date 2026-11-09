@@ -11,6 +11,7 @@ import { RunMounts } from '../RunMounts';
 import { SandboxCapacity } from '../SandboxCapacity';
 import { SandboxError } from '../SandboxError';
 import { SandboxLifecycle } from '../SandboxLifecycle';
+import { type DirectoryResolver, realDirectoryResolver } from '../SandboxableWorkspace';
 import type { JsonObject } from '../harness/HarnessMessages';
 import type { DaemonControl, DaemonHandlers } from '../harness/HarnessWrapper';
 import { RelayRegistration } from '../harness/RelayRegistration';
@@ -69,6 +70,8 @@ let executorContexts: StepExecutorContext[];
 let mountRequests: boolean[];
 /** When true the test factory builds read/write mounts whatever the wrapper asked: a wrong factory, to prove the wrapper checks. */
 let ignoreReadOnlyFlag: boolean;
+/** The directory resolver the wrapper under test uses; undefined = the real one. */
+let directoryResolver: DirectoryResolver | undefined;
 /** One entry per step the wrapper ran ON THE HOST (host: true), with the environment names the step declared. */
 let hostExecutions: { stepConfig: JsonObject; executionContext: JsonObject; declared: string[] }[];
 let executorCalls: { stepConfig: JsonObject; executionContext: JsonObject }[];
@@ -114,6 +117,7 @@ beforeEach(async () => {
 	executorContexts = [];
 	mountRequests = [];
 	ignoreReadOnlyFlag = false;
+	directoryResolver = undefined;
 	executorCalls = [];
 	hostExecutions = [];
 	behaviour = (_stepConfig, _context, send) => {
@@ -150,6 +154,8 @@ beforeEach(async () => {
 			};
 			return Promise.resolve(executor);
 		},
+		resolveDirectory: directory =>
+			directoryResolver === undefined ? realDirectoryResolver(directory) : directoryResolver(directory),
 		createHostExecutor: ({ declaredEnvironmentNames }) => ({
 			execute: (stepConfig, executionContext) => {
 				hostExecutions.push({ stepConfig, executionContext, declared: [...declaredEnvironmentNames].sort() });
@@ -161,11 +167,12 @@ beforeEach(async () => {
 			daemon.handlers = handlers;
 			return daemon;
 		},
-		createMounts: (workspaceDir, workspaceMetaDir, readOnlyWorkspace) => {
+		createMounts: (workspaceDir, workspaceMetaDir, readOnlyWorkspace, resolved) => {
 			mountRequests.push(readOnlyWorkspace);
 			return new RunMounts({
 				workspaceDir,
 				workspaceMetaDir,
+				resolved,
 				platform: process.platform,
 				log,
 				readOnlyWorkspace: ignoreReadOnlyFlag ? false : readOnlyWorkspace,
@@ -431,6 +438,54 @@ describe('ExecWrapper refuses a step the daemon did not route by a guarantee of 
 });
 
 const READONLY = 'fs=readonly-enforced';
+
+describe('ExecWrapper mounts the directories it checked (resolved once, before the sandbox is created)', () => {
+	const createdMounts = (): { hostPath: string }[] =>
+		(runtime.callsTo('create')[0]?.request as { mounts: { hostPath: string }[] }).mounts;
+
+	it('mounts the resolved workspace and meta while the engine keeps its own spelling in the context', async () => {
+		const realWorkspace = path.join(root, 'real-ws');
+		const realMeta = path.join(root, 'real-meta');
+		fs.mkdirSync(realWorkspace);
+		fs.mkdirSync(realMeta);
+		directoryResolver = directory =>
+			directory === workspace ? realWorkspace : directory === meta ? realMeta : directory;
+
+		await run(assign('probe'));
+
+		expect(createdMounts()).toEqual([{ hostPath: realWorkspace }, { hostPath: realMeta }]);
+		expect(executorContexts).toHaveLength(1);
+		expect(executorCalls[0]?.executionContext['workspaceDir']).toBe(workspace);
+	});
+
+	// A link swapped between the check and the mount: the resolver answers differently the second time. The wrapper asks once.
+	it('does not resolve again after the check: a swap afterwards cannot change what is mounted', async () => {
+		const elsewhere = path.join(root, 'elsewhere');
+		fs.mkdirSync(elsewhere);
+		const asked: string[] = [];
+		directoryResolver = directory => {
+			asked.push(directory);
+			return asked.filter(item => item === directory).length === 1 ? directory : elsewhere;
+		};
+
+		await run(assign('probe'));
+
+		expect(createdMounts()).toEqual([{ hostPath: workspace }, { hostPath: meta }]);
+		expect(asked.filter(item => item === workspace)).toHaveLength(1);
+		expect(asked.filter(item => item === meta)).toHaveLength(1);
+	});
+
+	it('refuses, before any sandbox exists, a workspace layout that is only wrong once resolved (meta resolving into the workspace)', async () => {
+		const inside = path.join(workspace, 'inner');
+		fs.mkdirSync(inside);
+		directoryResolver = directory => (directory === meta ? inside : directory);
+
+		await run(assign('probe'));
+
+		expect(runtime.callsTo('create')).toHaveLength(0);
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(/needs workspace: pool/);
+	});
+});
 
 describe('ExecWrapper whole-run read-only (the mounts follow the requirements of the run)', () => {
 	const createdMounts = (): { hostPath: string; readOnly?: boolean }[] =>
@@ -728,8 +783,15 @@ describe('ExecWrapper failures', () => {
 				daemon.handlers = handlers;
 				return daemon;
 			},
-			createMounts: (workspaceDir, workspaceMetaDir, readOnlyWorkspace) =>
-				new RunMounts({ workspaceDir, workspaceMetaDir, platform: process.platform, log, readOnlyWorkspace }),
+			createMounts: (workspaceDir, workspaceMetaDir, readOnlyWorkspace, resolved) =>
+				new RunMounts({
+					workspaceDir,
+					workspaceMetaDir,
+					platform: process.platform,
+					log,
+					readOnlyWorkspace,
+					resolved,
+				}),
 			requireGuarantees: true,
 			now: () => Date.now(),
 			onFinished: () => undefined,
