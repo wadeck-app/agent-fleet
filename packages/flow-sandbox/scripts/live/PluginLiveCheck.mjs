@@ -215,6 +215,36 @@ steps:
 	return file;
 }
 
+// Phase B: a model step that writes NO requires and NO profile. The daemon adds the agent profile because the declared source covers it.
+function writeImplicitFlow() {
+	const file = path.join(projectDirectory, 'plugin-live-implicit.yml');
+	fs.writeFileSync(
+		file,
+		`id: plugin-live-implicit
+version: '1.0.0'
+name: Plugin live check, implicit agent
+description: A model step without requirements.
+
+workspace: { provider: pool, dir: '${poolDirectory.replaceAll('\\', '/')}', prefix: slot-, count: 1 }
+
+steps:
+    - id: ask
+      name: One word
+      type: model
+      model: sonnet
+      env:
+          ANTHROPIC_DEFAULT_SONNET_MODEL: ${process.env.ANTHROPIC_DEFAULT_SONNET_MODEL ?? ''}
+      prompt: |
+          Reply with the single word OK and nothing else.
+      output:
+          answer:
+              type: string
+              from: last_message
+`
+	);
+	return file;
+}
+
 const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sandbox-live-art-'));
 const claimEvents = { seen: undefined, gone: undefined };
 // Sandboxes that exist before this check: only a sandbox created after this point may be removed by it.
@@ -400,6 +430,58 @@ try {
 			`the pool claim vanished ${removal.endedAt - claimEvents.gone} ms BEFORE sbx rm ended`
 		);
 		return `rm ended ${evidence.release.rmEndedMsBeforeRelease} ms before the claim was released (polling 20 ms)`;
+	});
+
+	await step(
+		'a model step WITHOUT requires is confined implicitly: served by the sandbox source, recorded as implicit, answers in the VM',
+		async () => {
+			const createsBefore = timings().filter(entry => entry.words[0] === 'create').length;
+			const started = flow(['run', writeImplicitFlow(), '--json']);
+			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+			const executionId = match[1];
+			const implicit = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
+				const shown = flow(['show', executionId, '--json']);
+				if (shown.status !== 0) return undefined;
+				const parsed = JSON.parse(shown.stdout);
+				return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+			});
+			expect(
+				implicit.status === 'completed',
+				`implicit-agent run is ${implicit.status}: ${JSON.stringify(implicit.steps)}`
+			);
+			expect(
+				implicit.steps?.ask?.sourceId === 'sandbox-live',
+				`model step served by ${implicit.steps?.ask?.sourceId}`
+			);
+			const added = implicit.requirements?.implicit;
+			expect(
+				added !== undefined &&
+					added.requires.join() === 'env=clean,fs=confined' &&
+					added.steps.join() === 'ask',
+				`requirements.implicit is ${JSON.stringify(added)}`
+			);
+			expect(
+				/\bOK\b/.test(JSON.stringify(implicit.steps?.ask?.output ?? implicit.steps?.ask ?? {})),
+				'the model step did not answer OK'
+			);
+			const creates = timings().filter(entry => entry.words[0] === 'create').length;
+			expect(creates === createsBefore + 1, `expected one more sandbox, ${creates - createsBefore} were created`);
+			evidence.implicitAgent = { executionId, requirements: implicit.requirements };
+			return `served by ${implicit.steps.ask.sourceId}, implicit ${added.requires.join(',')}`;
+		}
+	);
+
+	await step('the implicit-agent sandbox is removed too', async () => {
+		await waitFor(
+			'the second sbx rm call',
+			90_000,
+			() => timings().filter(entry => entry.words[0] === 'rm').length >= 2
+		);
+		const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
+			entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+		);
+		expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
 	});
 
 	await step('every sbx command of the run, with its duration', () => {

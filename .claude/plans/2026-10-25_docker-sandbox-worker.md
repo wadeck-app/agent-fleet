@@ -118,13 +118,13 @@ History of the earlier progress notes is in git; this section is the current sta
 | Secrets on Windows | Owner-only ACL on the plugin's secret and env files (`PrivateAcl`); protects against other OS users only |
 | D9 accepted workspace kinds | Core 1e3e5428 and plugin (`workspaces: ['pool']`): refused at run start with `WORKSPACE_KIND_NOT_ACCEPTED`, e2e on a real isolated daemon |
 | Host scripts, profiles, `workerType` removal | Core 0cbd9c7f, 57d0eacb, 24d770f2 and plugin (2026-11-09): `host: true` script steps run on the wrapper machine (`HostScriptEnvironment` allow-list); built-in profiles expand to requirements; `workerType` is the validation error `WORKER_TYPE_REMOVED`; `exclusive` is removed from the plugin (a source declaring guarantees is requirement-only and its workers do not count against `queue.concurrency`); e2e on a real isolated daemon, `PluginLiveCheck` 8/8 |
+| Implicit `agent` for model steps (phase B) | Core f6c53f8d and plugin (2026-11-09): `SandboxPluginE2e` pins that a requirement-less model step lands in the sandbox with `requirements.implicit` recorded, is refused in-place, that a daemon without the source routes as before with one warning per model step, that a partially covering source does not count, and that a requirement-less script never reaches the source; `flow worker source list` output in the README |
 | Requirements, step 1 | Core (flow-owner): `requires:`, guarantees from the source instance, hard filter. Plugin: guarantees `sandbox`, `fs=confined`, `env=clean`, `ports=private`, `clean=run`; `RequiresGuard` in the wrapper. Design: `2026-11-08_sandbox-step-requirements-design.md` |
 
 ### Pending
 
 | Item | Owner | Note |
 | --- | --- | --- |
-| Implicit `agent` for model steps (phase B) | core + plugin | Not started on the plugin side; when it lands, pin "a requirement-less model flow still lands in a sandbox" in `SandboxPluginE2e` (today the e2e pins that a requirement-less flow never reaches the sandbox source) |
 | Mixed-flow rule for `host: true` | core | Core warns (`HOST_SCRIPT_WITH_MODEL_STEPS`) instead of the ERROR the design note asked for |
 | `net=filtered` and `fs=readonly-enforced` guarantees | plugin | Need a public-destination measurement and a `:ro` primary design (note, O1) |
 | Realpath-resolved mounts (TOCTOU between check and `createMounts`) | plugin + core | Needs a path-translation change |

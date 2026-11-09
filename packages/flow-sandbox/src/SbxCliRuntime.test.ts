@@ -216,24 +216,26 @@ describe('SbxCliRuntime exec', () => {
 		}
 	);
 
+	// Deterministic: the mock prints line 1 and then WAITS for a gate file that this test creates when it receives line 1. A runtime
+	// that buffered until the end would never open the gate (the mock then prints a timeout marker instead of line 2).
 	it.concurrent('streams output while the command is still running', async ({ onTestFinished }) => {
-		const { runtime } = await boxed(onTestFinished);
-		const chunks: { text: string; at: number }[] = [];
-		const started = performance.now();
+		const { runtime, harness } = await boxed(onTestFinished);
+		const gate = path.join(harness.stateDir, 'stream-gate');
+		const chunks: string[] = [];
 
 		const result = await runtime.exec({
 			sandbox: 'box-1',
-			command: ['stream', '2', '150'],
-			onStdout: text => chunks.push({ text, at: performance.now() - started }),
+			command: ['stream-gated', gate],
+			onStdout: text => {
+				chunks.push(text);
+				fs.writeFileSync(gate, 'open');
+			},
 		});
-		const finished = performance.now() - started;
 
-		expect(chunks.map(chunk => chunk.text).join('')).toBe('line 1\nline 2\n');
+		expect(chunks.join('')).toBe('line 1\nline 2\n');
 		expect(result.stdout).toBe('line 1\nline 2\n');
-		expect(chunks.length).toBeGreaterThanOrEqual(2);
-		// The mock sleeps 150 ms between the lines (a sleep is never shorter): a runtime that buffered until the end
-		// would deliver the first chunk right before `finished`.
-		expect(finished - (chunks[0]?.at ?? finished)).toBeGreaterThanOrEqual(100);
+		// line 1 reached the callback before the command ended (it opened the gate that let line 2 be written).
+		expect(chunks[0]).toBe('line 1\n');
 	});
 
 	it.concurrent(

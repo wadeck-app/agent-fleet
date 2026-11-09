@@ -348,6 +348,28 @@ function runPseudoCommand(sandbox, command, cwd, env) {
 			}, delay);
 			return undefined;
 		}
+		case 'stream-gated': {
+			// stream-gated <gateFile>: prints "line 1", then waits (up to 10 s) for the gate file to exist and prints "line 2".
+			// Deterministic proof of streaming: the test creates the gate when it RECEIVES line 1, so a runtime that buffers until
+			// the end never opens it and the second line is replaced by a timeout marker (no timing assumption on the machine).
+			const gate = rest[0];
+			if (gate === undefined) throw new Error('stream-gated needs a gate file');
+			process.stdout.write('line 1\n');
+			const deadline = Date.now() + 10_000;
+			const timer = setInterval(() => {
+				if (fs.existsSync(gate)) {
+					clearInterval(timer);
+					process.stdout.write('line 2\n');
+					process.exit(0);
+				}
+				if (Date.now() > deadline) {
+					clearInterval(timer);
+					process.stdout.write('gate-timeout: line 1 was not delivered while the command was running\n');
+					process.exit(0);
+				}
+			}, 10);
+			return undefined;
+		}
 		case 'hang':
 			// Prints once, then waits to be killed (host-side abort); the sandbox state is left "running".
 			process.stdout.write('hanging\n');

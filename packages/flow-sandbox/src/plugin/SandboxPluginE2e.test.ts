@@ -45,6 +45,12 @@ const BOUND_WAIT_SECONDS = 6;
 
 interface ExecutionRecord {
 	status?: string;
+	/** What the daemon resolved when it accepted the run; `implicit` names the entries it added to model steps. */
+	requirements?: {
+		run?: string[];
+		steps?: Record<string, string[]>;
+		implicit?: { requires: string[]; steps: string[] };
+	};
 	steps?: Record<
 		string,
 		{ status?: string; error?: string; sourceId?: string; workerId?: string; io?: { stdout?: { text?: string } } }
@@ -65,7 +71,8 @@ class FlowWorld {
 	projectId = '';
 	daemon: ChildProcess | undefined;
 
-	constructor() {
+	/** @param scrubModelCredentials remove every ANTHROPIC_*, AWS_* and CLAUDE_* variable: a model step routed to a host worker must not be able to call a real model. */
+	constructor(scrubModelCredentials = false) {
 		fs.mkdirSync(this.projectDirectory, { recursive: true });
 		fs.mkdirSync(this.mockState, { recursive: true });
 		fs.mkdirSync(path.join(this.poolDirectory, 'slot-1'), { recursive: true });
@@ -82,6 +89,11 @@ class FlowWorld {
 			FLOW_DAEMON_PORT: '0',
 		};
 		delete this.env['SBX_MOCK_PATH'];
+		if (scrubModelCredentials) {
+			for (const name of Object.keys(this.env)) {
+				if (/^(ANTHROPIC_|AWS_|CLAUDE_)/i.test(name)) delete this.env[name];
+			}
+		}
 		DaemonIsolationGuard.assert({ env: this.env, isolatedRoot: this.root });
 		fs.writeFileSync(
 			path.join(this.isolation.configDir, 'config.yml'),
@@ -180,6 +192,33 @@ class FlowWorld {
 				'      type: script',
 				'      shell: bash',
 				'      script: echo hello',
+				'',
+			].join('\n')
+		);
+		return file;
+	}
+
+	/** A flow of model steps (ids ask1, ask2, ...) that writes no `requires` and no `profile`: the daemon decides. */
+	writeModelFlow(name: string, modelSteps: number, workspace: 'pool' | 'in-place' = 'pool'): string {
+		const file = path.join(this.projectDirectory, `${name}.yml`);
+		fs.writeFileSync(
+			file,
+			[
+				`id: ${name}`,
+				"version: '1.0.0'",
+				`name: ${name}`,
+				'description: Model steps without requirements.',
+				workspace === 'pool'
+					? `workspace: { provider: pool, dir: '${this.poolDirectory.replaceAll(path.sep, '/')}', prefix: slot-, count: 1 }`
+					: 'workspace: in-place',
+				'steps:',
+				...Array.from({ length: modelSteps }, (_unused, index) => [
+					`    - id: ask${index + 1}`,
+					`      name: Ask ${index + 1}`,
+					'      type: model',
+					'      model: sonnet',
+					'      prompt: Reply with the single word OK.',
+				]).flat(),
 				'',
 			].join('\n')
 		);
@@ -595,6 +634,147 @@ describe('sandbox plugin, real daemon, sbx mock: host: true script steps', () =>
 		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(1);
 		expect(world.log()).toContain('runs on the host (host: true)');
 	}, 150_000);
+});
+
+// Phase B (implicit confinement): a model step requires the `agent` profile (fs=confined, env=clean) when a configured source guarantees all
+// of it, with no opt-out. The mock runs no model: the proof is WHERE the daemon routes the step and what it records, not the model's answer.
+describe('sandbox plugin, real daemon, sbx mock: implicit agent confinement of model steps (a daemon WITH the source)', () => {
+	const world = new FlowWorld(true);
+	worlds.push(world);
+
+	beforeAll(async () => {
+		await world.registerProject();
+		world.declareSource('sandbox-agent', artifactDirectory, MOCK_SBX_PATH);
+		await world.startDaemon();
+	}, 150_000);
+
+	it('lands a requirement-less model step in the sandbox and records the implicit agent requirements', async () => {
+		const file = world.writeModelFlow('implicit-agent', 1);
+
+		const executionId = world.start(file);
+		const record = await world.settle(executionId);
+
+		// Routed to the sandbox source and recorded as implicit: the entries are already in the step's enforced set.
+		expect(record.steps?.['ask1']?.sourceId).toBe('sandbox-agent');
+		expect(record.requirements?.steps?.['ask1']).toEqual(expect.arrayContaining(['env=clean', 'fs=confined']));
+		expect(record.requirements?.implicit).toEqual({ requires: ['env=clean', 'fs=confined'], steps: ['ask1'] });
+		expect(sandboxesCreated(world.sbxCalls()).length).toBeGreaterThan(0);
+	}, 150_000);
+
+	it('refuses at run start a model step whose workspace the source does not accept (in-place): actionable message, no unconfined fallback', () => {
+		const createsBefore = sandboxesCreated(world.sbxCalls()).length;
+
+		const started = world.flow(['run', world.writeModelFlow('implicit-in-place', 1, 'in-place'), '--json']);
+
+		const output = `${started.stdout}${started.stderr}`;
+		expect(started.status).not.toBe(0);
+		expect(output).toContain('WORKSPACE_KIND_NOT_ACCEPTED');
+		expect(output).toMatch(/in-place[\s\S]*pool|pool[\s\S]*in-place/);
+		expect(output).not.toMatch(/"executionId"/);
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(createsBefore);
+	});
+
+	it('prints no unconfined warning when the source covers the set (a daemon with the source)', () => {
+		const started = world.flow(['run', world.writeModelFlow('implicit-covered', 1)]);
+		const executionId = started.stdout.trim();
+
+		expect(started.stderr).not.toContain('runs unconfined');
+		world.flow(['cancel', executionId]);
+	});
+
+	it('a script step without requirements still never reaches the sandbox source (the daemon has it, a model flow exists)', async () => {
+		const createsBefore = sandboxesCreated(world.sbxCalls()).length;
+
+		const record = await world.runAndRelease(world.writeFlow('implicit-script-only', false), false);
+
+		expect(record.status).toBe('completed');
+		expect(record.steps?.['probe']?.sourceId).not.toBe('sandbox-agent');
+		expect(record.requirements?.implicit).toBeUndefined();
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(createsBefore);
+	}, 120_000);
+
+	// The listing is what a user reads to see what the source gives; captured into the README.
+	it('prints the guarantees and the workspace kinds of the source in `flow worker source list`', () => {
+		const listed = world.flow(['worker', 'source', 'list']);
+
+		expect(listed.status).toBe(0);
+		expect(listed.stdout).toMatch(/sandbox-agent[^\n]*guarantees=[^\n]*sandbox/);
+		expect(listed.stdout).toMatch(/sandbox-agent[^\n]*workspaces=pool/);
+		expect(listed.stdout).toContain('requirement-only');
+		for (const guarantee of ['clean=run', 'env=clean', 'fs=confined', 'ports=private', 'sandbox']) {
+			expect(listed.stdout).toContain(guarantee);
+		}
+	});
+});
+
+// The core decides from the STATIC manifest list: a source covering only part of the agent profile does not count (no half confinement).
+describe('sandbox plugin, real daemon: a source that guarantees only part of the agent profile', () => {
+	const world = new FlowWorld(true);
+	worlds.push(world);
+
+	beforeAll(async () => {
+		// A copy of the built artifact whose manifest and instance declare fs=confined and sandbox but NOT env=clean.
+		const partial = path.join(world.root, 'partial-plugin');
+		fs.cpSync(artifactDirectory, partial, { recursive: true });
+		const config = path.join(partial, 'plugin-sandbox', 'plugin.config.js');
+		const original = fs.readFileSync(config, 'utf8');
+		const declared = "['clean=run', 'env=clean', 'fs=confined', 'ports=private', 'sandbox']";
+		if (!original.includes(declared))
+			throw new Error('the guarantees list of the artifact was not found: update this test');
+		fs.writeFileSync(
+			config,
+			original.replace(declared, () => "['fs=confined', 'sandbox']")
+		);
+		await world.registerProject();
+		world.declareSource('sandbox-partial', partial, MOCK_SBX_PATH);
+		await world.startDaemon();
+	}, 150_000);
+
+	it('does not count it: the model step runs as before, with the unconfined warning, and no implicit set is recorded', async () => {
+		const started = world.flow(['run', world.writeModelFlow('partial', 1)]);
+		const executionId = started.stdout.trim();
+
+		expect(started.stderr).toMatch(/Warning: model step ask1 runs unconfined: no worker source guarantees/);
+		const shown = JSON.parse(world.flow(['show', executionId, '--json']).stdout) as ExecutionRecord;
+		expect(shown.requirements?.implicit).toBeUndefined();
+		world.flow(['cancel', executionId]);
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(0);
+	});
+});
+
+describe('sandbox plugin, real daemon: model steps on a daemon WITHOUT the sandbox source', () => {
+	const world = new FlowWorld(true);
+	worlds.push(world);
+
+	beforeAll(async () => {
+		await world.registerProject();
+		await world.startDaemon();
+	}, 150_000);
+
+	it('routes as before and prints one stderr warning per model step', () => {
+		const started = world.flow(['run', world.writeModelFlow('unconfined-two', 2)]);
+		const executionId = started.stdout.trim();
+
+		const warnings = started.stderr.split(/\r?\n/).filter(line => line.includes('runs unconfined'));
+		expect(started.status).toBe(0);
+		expect(warnings).toHaveLength(2);
+		expect(warnings[0]).toMatch(/^Warning: model step ask1 runs unconfined: no worker source guarantees/);
+		expect(warnings[1]).toMatch(/model step ask2 runs unconfined: no worker source guarantees/);
+		expect(started.stderr).toContain('flow worker source list');
+		expect(started.stderr).toContain('profile: agent');
+		// Cancelled at once: the e2e must not wait for a host worker to start a model.
+		world.flow(['cancel', executionId]);
+	});
+
+	it('records no implicit requirements when no source covers the set', async () => {
+		const started = world.flow(['run', world.writeModelFlow('unconfined-record', 1), '--json']);
+		const executionId = (/"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout) ?? [])[1] as string;
+		world.flow(['cancel', executionId]);
+
+		const shown = JSON.parse(world.flow(['show', executionId, '--json']).stdout) as ExecutionRecord;
+
+		expect(shown.requirements?.implicit).toBeUndefined();
+	});
 });
 
 describe('sandbox plugin, real daemon, sbx mock: a source that cannot start', () => {

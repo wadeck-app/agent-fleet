@@ -276,6 +276,27 @@ An entry no declared source provides is refused when the run starts, with a "Did
 
 **Host-only steps FAIL in a bound run.** A strictly bound run never falls back to a host worker, so a step that cannot run in the sandbox (`cmd`, `pwsh`, a script that calls the flow daemon API, a `user_intervention` step, Codex or OpenCode steps) does not run elsewhere: it fails. Put host-only work in another flow. This supersedes the earlier plan that let such steps run on the host (design decision 27). The one exception is a script step marked `host: true` (next section).
 
+### Model steps are confined implicitly (phase B)
+
+A model step needs no `requires:` to land in the sandbox. When a daemon accepts a run it gives every model step the `agent` profile (`fs=confined`, `env=clean`) if at least one configured source declares ALL of it in its static manifest list; this plugin does.
+
+- **Depends on the machine.** The same flow is confined on a machine with this source declared and runs as before on one without. Without a covering source, `flow run` prints one stderr line per model step: `Warning: model step <id> runs unconfined: no worker source guarantees env=clean and fs=confined ...` (not with `--json` or `--quiet`; `flow validate` has no worker knowledge and says nothing).
+- **No opt-out.** While a covering source exists a model step is confined or the run is refused. A source that covers only part (for example `fs=confined` without `env=clean`) does not count.
+- **Workspace.** The source accepts only `workspace: pool`: a model step with another workspace is refused at run start (`WORKSPACE_KIND_NOT_ACCEPTED`, naming `pool`), never run unconfined.
+- **Record.** `flow show <id> --json` has `requirements.steps` (what is enforced) and `requirements.implicit` (`requires` and `steps` the daemon added). A resume uses the record, not the machine.
+- **Scripts are unchanged.** A script step without requirements never reaches the sandbox source, so a flow mixing both keeps its scripts on host workers unless it writes `requires` (or `host: true` for a script that must run on the worker machine).
+- Proof: `SandboxPluginE2e` (real isolated daemon, sbx mock) for the four cases above plus the partial-coverage source, and `PluginLiveCheck` on real sbx.
+
+What `flow worker source list` prints for this source (captured from the e2e daemon):
+
+```text
+sandbox-agent	sandbox	max=1	labels=(none)	plugin=sandbox.exec	guarantees=clean=run, env=clean, fs=confined, ports=private, sandbox	workspaces=pool	requirement-only
+
+Declared sources describe intent. Use "flow worker list" to see live workers.
+guarantees= is what the plugin manifest declares the source can enforce (a step requires it with requires: or profile:); workspaces= the workspace kinds it accepts.
+requirement-only: a step is routed to it only when it requires something it guarantees, and its workers do not count against queue.concurrency.
+```
+
 ### Host scripts (`host: true`)
 
 ```yaml
