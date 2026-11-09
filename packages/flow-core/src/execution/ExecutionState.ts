@@ -268,4 +268,17 @@ export interface RunRequirementsRecord {
 		/** Step-level profile of each declared step that names one. */
 		steps: Record<string, string>;
 	};
+	/**
+	 * Present when the daemon added requirements to model steps that the flow did not write (implicit confinement: a worker
+	 * source guaranteeing the `agent` profile was configured when the run was accepted). The entries are ALREADY in the
+	 * `steps` sets above and are what is enforced; this only says which ones were implicit, so the confinement of a run can be
+	 * audited. A resume uses the stored sets and never evaluates the machine again. Absent on older records, when no source
+	 * covered the set, and when every model step already required it.
+	 */
+	implicit?: {
+		/** The added entries, sorted. */
+		requires: string[];
+		/** The declared model steps that received them (an injected model step gets them too, from this field). */
+		steps: string[];
+	};
 }

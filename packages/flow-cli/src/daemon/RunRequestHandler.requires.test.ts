@@ -47,7 +47,13 @@ describe('RunRequestHandler -- requires', () => {
 	let order: string[];
 
 	function writeFlow(
-		lines: { flowRequires?: string; stepRequires?: string; flowProfile?: string; stepProfile?: string } = {}
+		lines: {
+			flowRequires?: string;
+			stepRequires?: string;
+			flowProfile?: string;
+			stepProfile?: string;
+			stepType?: 'script' | 'model';
+		} = {}
 	): string {
 		const poolPath = poolDir.replace(/\\/g, '/');
 		const text = [
@@ -62,8 +68,8 @@ describe('RunRequestHandler -- requires', () => {
 			'steps:',
 			'  - id: only',
 			'    name: Only',
-			'    type: script',
-			'    script: echo hi',
+			`    type: ${lines.stepType ?? 'script'}`,
+			lines.stepType === 'model' ? '    prompt: hi' : '    script: echo hi',
 			...(lines.stepRequires === undefined ? [] : [`    requires: ${lines.stepRequires}`]),
 			...(lines.stepProfile === undefined ? [] : [`    profile: ${lines.stepProfile}`]),
 			'',
@@ -282,8 +288,12 @@ describe('RunRequestHandler -- requires', () => {
 
 	describe('a waiting run that starts again after a restart', () => {
 		/** What a daemon that stopped while the run waited leaves behind; the definition says nothing about requirements. */
-		function leaveWaitingRecord(executionId: string, requirements: ExecutionState['requirements']): void {
-			const text = writeFlow();
+		function leaveWaitingRecord(
+			executionId: string,
+			requirements: ExecutionState['requirements'],
+			stepType: 'script' | 'model' = 'script'
+		): void {
+			const text = writeFlow({ stepType });
 			const resolver = new FlowDefinitionResolver(new DefinitionSnapshotStore(definitionsDirOf(daemonDir)));
 			const flow = {
 				id: 'needs-flow',
@@ -292,7 +302,11 @@ describe('RunRequestHandler -- requires', () => {
 				description: 'x',
 				inputs: {},
 				workspace: { provider: 'pool', dir: poolDir.replace(/\\/g, '/'), prefix: 'ws-', count: 2 },
-				steps: [{ id: 'only', name: 'Only', type: 'script', script: 'echo hi' }],
+				steps: [
+					stepType === 'model'
+						? { id: 'only', name: 'Only', type: 'model', prompt: 'hi' }
+						: { id: 'only', name: 'Only', type: 'script', script: 'echo hi' },
+				],
 			};
 			const resolved = resolver.forFile({ flowId: 'needs-flow', flow: flow as never, text, label: flowFile });
 			resolved.commit();
@@ -372,6 +386,45 @@ describe('RunRequestHandler -- requires', () => {
 			await vi.waitFor(() => expect(record('aaaa1111').workspaceWait).toBeUndefined());
 
 			expect(order).toContain('read-declaration');
+		});
+
+		it('keeps the implicit set of a model step recorded before the restart, although no source covers it any more', async () => {
+			const recorded = {
+				run: [],
+				steps: { only: ['env=clean', 'fs=confined'] },
+				implicit: { requires: ['env=clean', 'fs=confined'], steps: ['only'] },
+			};
+			leaveWaitingRecord('aaaa1111', recorded, 'model');
+			// The machine changed: nothing is declared any more. The stored set decides, and it is not re-evaluated.
+			declaredBySource = {};
+			const handler = newHandler();
+			store.reconcileInterruptedExecutions();
+
+			await handler.resumeWaitingExecutions(() => undefined);
+			await vi.waitFor(() => expect(record('aaaa1111').workspaceWait).toBeUndefined());
+			handler.tryDispatch();
+
+			expect(assigns()).toEqual([]);
+			expect(record('aaaa1111').requirements).toEqual(recorded);
+			// The stored set was enforced although the machine changed: the step fails closed, naming what is missing.
+			expect(record('aaaa1111').status).toBe('failed');
+			expect(record('aaaa1111').lastError).toMatch(
+				/Step "only" requires env=clean, fs=confined, but no declared worker source provides/
+			);
+		});
+
+		it('does not confine a model step of a run recorded without the set, although a source covers it now', async () => {
+			leaveWaitingRecord('aaaa1111', undefined, 'model');
+			// declaredBySource covers the agent set (default of this file): the record, not the machine, decides.
+			const handler = newHandler();
+			store.reconcileInterruptedExecutions();
+
+			await handler.resumeWaitingExecutions(() => undefined);
+			await vi.waitFor(() => expect(record('aaaa1111').workspaceWait).toBeUndefined());
+			handler.tryDispatch();
+
+			expect(assigns().map(assign => assign.stepId)).toEqual(['only']);
+			expect(record('aaaa1111')).not.toHaveProperty('requirements');
 		});
 
 		it('runs a record without requirements as before: any worker takes the step', async () => {

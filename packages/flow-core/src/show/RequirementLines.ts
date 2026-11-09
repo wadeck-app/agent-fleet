@@ -6,6 +6,7 @@ import type { RunRequirementsRecord } from '../execution/ExecutionState.js';
 export type ProfileExpander = (name: string) => readonly string[] | undefined;
 
 const CONTINUATION = '           ';
+const IMPLICIT_NOTE = '(implicit for model steps)';
 
 /**
  * Header lines of `flow show <file>` about requirements: the flow-level profile and `requires`, then what each profile in
@@ -63,6 +64,9 @@ export function executionRequirementLines(recorded: RunRequirementsRecord | unde
 	if (recorded.run.length > 0) {
 		lines.push(`Requires:  ${recorded.run.join(', ')}`);
 	}
+	if (recorded.implicit !== undefined && recorded.implicit.requires.length > 0) {
+		lines.push(`Requires:  ${recorded.implicit.requires.join(', ')} ${IMPLICIT_NOTE}`);
+	}
 	return lines;
 }
 
@@ -82,7 +86,8 @@ export function stepRecordedRequirementLines(
 		lines.push(`${indent}profile: ${profile}`);
 	}
 	if (set.join('\n') !== recorded.run.join('\n')) {
-		lines.push(`${indent}requires: ${set.join(', ')}`);
+		const implicit = recorded.implicit?.steps.includes(stepId) === true ? ` ${IMPLICIT_NOTE}` : '';
+		lines.push(`${indent}requires: ${set.join(', ')}${implicit}`);
 	}
 	return lines;
 }

@@ -149,3 +149,28 @@ describe('DeclaredGuarantees - which sources can provide a whole requirement set
 		]);
 	});
 });
+
+describe('DeclaredGuarantees.guaranteesOf', () => {
+	it('gives the sorted manifest declaration of one source, empty for a plugin that declares none', async () => {
+		const { guarantees } = build([source('sbx', 'p.x'), source('plain', 'q.y')], {
+			sbx: ['fs=confined', 'env=clean'],
+			plain: [],
+		});
+		await guarantees.refresh();
+
+		expect(guarantees.guaranteesOf('sbx')).toEqual(['env=clean', 'fs=confined']);
+		expect(guarantees.guaranteesOf('plain')).toEqual([]);
+	});
+
+	it('is undefined for a source that is not a plugin source, not declared, not read yet or unreadable (never an empty list that looks like "nothing")', async () => {
+		const { guarantees } = build([source('host'), source('broken', 'p.x'), source('later', 'q.y')], {
+			broken: new Error('cannot read'),
+		});
+		expect(guarantees.guaranteesOf('later')).toBeUndefined();
+		await guarantees.refresh();
+
+		expect(guarantees.guaranteesOf('host')).toBeUndefined();
+		expect(guarantees.guaranteesOf('broken')).toBeUndefined();
+		expect(guarantees.guaranteesOf('nobody')).toBeUndefined();
+	});
+});

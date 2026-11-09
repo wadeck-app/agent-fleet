@@ -19,13 +19,13 @@ import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import type { AllocatedWorkspace, ExecutionWorkspaces, WorkspaceWaiting } from './ExecutionWorkspaces.js';
 import type { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
 import { FlowWorkspaceKind } from './FlowWorkspaceKind.js';
+import { ImplicitConfinement } from './ImplicitConfinement.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
 import type { RunDefinitionLoader } from './RunDefinitionLoader.js';
 import { RunIdempotencyCache } from './RunIdempotencyCache';
 import { checkRunOrigin } from './RunOriginCheck.js';
 import { RunProjectResolver } from './RunProjectResolver.js';
 import type { RunProject } from './RunProjectResolver.js';
-import { resolveRunRequirements } from './RunRequirements.js';
 import type { RunStepPreparer } from './RunStepPreparer.js';
 import { describeConditionError } from './SchedulerConditionError.js';
 import { WorkspaceKindAcceptance } from './WorkspaceKindAcceptance.js';
@@ -72,14 +72,21 @@ export class RunRequestHandler {
 		private readonly projectResolver: RunProjectResolver = new RunProjectResolver(),
 		private readonly idempotency: RunIdempotencyCache<DaemonResponse> = new RunIdempotencyCache<DaemonResponse>(),
 		/** Read before a flow is checked: which requirements the declared sources may provide. Absent, requirements are checked for syntax only. */
-		private readonly declaredGuarantees?: Pick<DeclaredGuarantees, 'refresh' | 'providersOfAll' | 'workspacesOf'>
+		private readonly declaredGuarantees?: Pick<
+			DeclaredGuarantees,
+			'refresh' | 'providersOfAll' | 'workspacesOf' | 'unread'
+		>
 	) {
 		this.workspaceKinds =
 			declaredGuarantees === undefined ? undefined : new WorkspaceKindAcceptance(declaredGuarantees);
+		this.confinement = new ImplicitConfinement(declaredGuarantees);
 	}
 
 	/** Refuses, before any workspace exists, a run only sources that do not accept its workspace kind could serve. */
 	private readonly workspaceKinds: WorkspaceKindAcceptance | undefined;
+
+	/** Adds the `agent` set to model steps when a declared source can confine them; otherwise warns about each of them. */
+	private readonly confinement: ImplicitConfinement;
 
 	/** Forgets the remembered request ids (the daemon is stopping). */
 	forgetRequests(): void {
@@ -264,9 +271,11 @@ export class RunRequestHandler {
 
 		// Resolved once, here: what the run requires is then recorded and enforced as it is, whatever happens to the
 		// definition afterwards. The validator already refused a malformed `requires`; this is the guard for a path that skipped it.
+		// Model steps are confined implicitly when a declared source can do it, decided here and recorded like the explicit set.
 		let requirements: RunRequirementsRecord | undefined;
+		let confinementWarnings: string[];
 		try {
-			requirements = resolveRunRequirements(flow);
+			({ requirements, warnings: confinementWarnings } = this.confinement.resolve(flow));
 		} catch (err) {
 			return { response: { type: 'error', code: 'INVALID_REQUIREMENTS', message: normalizeError(err).message } };
 		}
@@ -308,7 +317,7 @@ export class RunRequestHandler {
 			secrets,
 			hookDispatcher,
 			requirements,
-			warnings: loaded.warnings,
+			warnings: [...loaded.warnings, ...confinementWarnings],
 		};
 	}
 

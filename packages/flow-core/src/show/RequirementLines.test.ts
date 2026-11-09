@@ -135,3 +135,31 @@ describe('stepRecordedRequirementLines', () => {
 		expect(stepRecordedRequirementLines(undefined, 'more', '      ')).toEqual([]);
 	});
 });
+
+describe('implicit confinement of model steps in the record', () => {
+	const recorded: RunRequirementsRecord = {
+		run: [],
+		steps: { agent: ['env=clean', 'fs=confined'], plain: [] },
+		implicit: { requires: ['env=clean', 'fs=confined'], steps: ['agent'] },
+	};
+
+	it('says on the run header which entries were added implicitly, not declared', () => {
+		expect(executionRequirementLines(recorded)).toEqual([
+			'Requires:  env=clean, fs=confined (implicit for model steps)',
+		]);
+	});
+
+	it('keeps the declared run set on its own line and the implicit one after it', () => {
+		expect(executionRequirementLines({ ...recorded, run: ['sandbox'] })).toEqual([
+			'Requires:  sandbox',
+			'Requires:  env=clean, fs=confined (implicit for model steps)',
+		]);
+	});
+
+	it('marks the set of a model step that got the implicit entries, and nothing for a step that did not', () => {
+		expect(stepRecordedRequirementLines(recorded, 'agent', '  ')).toEqual([
+			'  requires: env=clean, fs=confined (implicit for model steps)',
+		]);
+		expect(stepRecordedRequirementLines(recorded, 'plain', '  ')).toEqual([]);
+	});
+});

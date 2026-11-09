@@ -89,6 +89,15 @@ export class DeclaredGuarantees {
 			.sort((a, b) => a.missing.length - b.missing.length || a.sourceId.localeCompare(b.sourceId));
 	}
 
+	/**
+	 * What the manifest of one declared source guarantees, sorted. Undefined when it is not known (not a plugin source, not
+	 * declared, not read yet, or unreadable): never an empty list, which means "this plugin declares none".
+	 */
+	guaranteesOf(sourceId: string): string[] | undefined {
+		const declared = this.currentReads().find(read => read.sourceId === sourceId)?.read.declared;
+		return declared === undefined ? undefined : [...declared].sort();
+	}
+
 	/** The workspace kinds the declared source accepts, from its manifest; undefined: no restriction (or the source is not known). */
 	workspacesOf(sourceId: string): string[] | undefined {
 		return this.currentReads().find(read => read.sourceId === sourceId)?.read.workspaces;

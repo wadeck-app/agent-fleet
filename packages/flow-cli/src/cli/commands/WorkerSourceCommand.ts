@@ -8,6 +8,7 @@ import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress-start: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { redactNudgeUrl } from '../../daemon/NudgeUrlCheck.js';
 import { type WorkerSourceEntry, WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
+import { WorkerSourceDeclarations } from './WorkerSourceDeclarations';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -197,19 +198,23 @@ export function registerWorkerSourceCommand(program: Command): Command {
 			'--validate',
 			"Check each entry's backing process (where one was recorded) and show whether it is still alive"
 		)
-		.action((options: { json?: boolean; validate?: boolean }) => {
+		.action(async (options: { json?: boolean; validate?: boolean }) => {
 			try {
 				const registry = new WorkerSourceRegistry(flowConfigDir());
 				const entries = registry.list();
 				const liveness = options.validate
 					? new Map(entries.map(e => [e.sourceId, registry.livenessOf(e)]))
 					: undefined;
+				const declared = await WorkerSourceDeclarations.read(registry);
 
 				if (options.json) {
 					// Stored URLs may hold user info or query credentials (old or self-declared entries): print them redacted.
-					const shown = entries.map(redactedForListing);
-					const payload = liveness ? shown.map(e => ({ ...e, liveness: liveness.get(e.sourceId) })) : shown;
-					console.log(JSON.stringify(payload, null, 2));
+					const shown = entries.map(entry => ({
+						...redactedForListing(entry),
+						...declared.describe(entry),
+						...(liveness ? { liveness: liveness.get(entry.sourceId) } : {}),
+					}));
+					console.log(JSON.stringify(shown, null, 2));
 					return;
 				}
 				if (entries.length === 0) {
@@ -223,12 +228,22 @@ export function registerWorkerSourceCommand(program: Command): Command {
 					const pluginSuffix = entry.plugin === undefined ? '' : `	plugin=${entry.plugin}`;
 					const livenessSuffix = liveness ? `\tliveness=${liveness.get(entry.sourceId)}` : '';
 					console.log(
-						`${entry.sourceId}\t${entry.provider}\tmax=${String(entry.maxWorkers)}\tlabels=${labels}${pluginSuffix}${livenessSuffix}`
+						`${entry.sourceId}\t${entry.provider}\tmax=${String(entry.maxWorkers)}\tlabels=${labels}${pluginSuffix}${livenessSuffix}${declared.suffix(entry)}`
 					);
 				}
 				// Declared is not the same as available: only a live connection proves that.
 				console.log('');
 				console.log('Declared sources describe intent. Use "flow worker list" to see live workers.');
+				if (entries.some(entry => entry.plugin !== undefined)) {
+					console.log(
+						'guarantees= is what the plugin manifest declares the source can enforce (a step requires it with requires: or profile:); workspaces= the workspace kinds it accepts.'
+					);
+				}
+				if (entries.some(entry => declared.describe(entry).requirementOnly)) {
+					console.log(
+						'requirement-only: a step is routed to it only when it requires something it guarantees, and its workers do not count against queue.concurrency.'
+					);
+				}
 				if (options.validate) {
 					console.log(
 						'liveness=dead means the recorded pid is gone and the entry is safe to remove with "flow worker source prune".'

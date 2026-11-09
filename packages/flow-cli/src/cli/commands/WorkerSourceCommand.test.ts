@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FIXTURE_PLUGINS_DIR } from '../../test-utils/WorkerTypeFixture';
 import { registerWorkerSourceCommand } from './WorkerSourceCommand';
 
 // The registry rules (tokens hashed, duplicate ids, liveness...) are covered by WorkerSourceRegistry.test.ts; this
@@ -35,6 +36,12 @@ describe('flow worker source command', () => {
 		program.exitOverride();
 		registerWorkerSourceCommand(program);
 		program.parse(['node', 'test', 'worker', 'source', ...args]);
+	};
+	const runAsync = async (...args: string[]): Promise<void> => {
+		const program = new Command();
+		program.exitOverride();
+		registerWorkerSourceCommand(program);
+		await program.parseAsync(['node', 'test', 'worker', 'source', ...args]);
 	};
 	const printed = (): string => logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
 	const errors = (): string => errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
@@ -100,20 +107,20 @@ describe('flow worker source command', () => {
 	});
 
 	describe('list', () => {
-		it('points at the add command when nothing is declared', () => {
-			run('list');
+		it('points at the add command when nothing is declared', async () => {
+			await runAsync('list');
 			expect(printed()).toContain('No worker sources declared. Add one with: flow worker source add');
 		});
 
-		it('prints one tab-separated line per source and reminds that declared is not live', () => {
+		it('prints one tab-separated line per source and reminds that declared is not live', async () => {
 			run('add', 'gpu-box', '--provider', 'built-in:inbound', '--labels', 'gpu');
 			logSpy.mockClear();
-			run('list');
+			await runAsync('list');
 			expect(printed()).toContain('gpu-box\tbuilt-in:inbound\tmax=1\tlabels=gpu');
 			expect(printed()).toContain('Use "flow worker list" to see live workers.');
 		});
 
-		it('shows the plugin of a plugin source', () => {
+		it('shows the plugin of a plugin source', async () => {
 			run(
 				'add',
 				'sandbox',
@@ -125,28 +132,128 @@ describe('flow worker source command', () => {
 				path.join(xdgHome, 'plugins')
 			);
 			logSpy.mockClear();
-			run('list');
+			await runAsync('list');
 			expect(printed()).toContain('sandbox	docker-sandbox	max=1	labels=(none)	plugin=sandbox.docker');
 		});
 
-		it('--json prints the entries', () => {
+		it('--json prints the entries', async () => {
 			run('add', 'gpu-box', '--provider', 'built-in:inbound');
 			logSpy.mockClear();
-			run('list', '--json');
+			await runAsync('list', '--json');
 			expect(JSON.parse(printed())).toEqual([expect.objectContaining({ sourceId: 'gpu-box' })]);
 		});
 
-		it('--validate adds the liveness of each entry and explains the values', () => {
+		it('--validate adds the liveness of each entry and explains the values', async () => {
 			run('add', 'gpu-box', '--provider', 'built-in:inbound');
 			logSpy.mockClear();
-			run('list', '--validate');
+			await runAsync('list', '--validate');
 			expect(printed()).toMatch(/gpu-box\t.*\tliveness=\w+/);
 			expect(printed()).toContain('liveness=dead means');
 		});
 	});
 
+	// The requirement messages tell the user to run `flow worker source list`: it has to show what each source guarantees.
+	describe('list - guarantees declared by the plugin manifest', () => {
+		const declare = (sourceId: string, implementation: string): void => {
+			run(
+				'add',
+				sourceId,
+				'--provider',
+				'fixture',
+				'--plugin',
+				`fixture-sandbox.${implementation}`,
+				'--plugins-dir',
+				FIXTURE_PLUGINS_DIR
+			);
+		};
+
+		it('prints the guarantees of a plugin source and marks it requirement-only', async () => {
+			declare('sbx', 'confined');
+			logSpy.mockClear();
+
+			await runAsync('list');
+
+			expect(printed()).toMatch(/^sbx\t.*\tguarantees=env=clean, fs=confined, sandbox\trequirement-only$/m);
+			expect(printed()).toContain(
+				'requirement-only: a step is routed to it only when it requires something it guarantees'
+			);
+		});
+
+		it('prints guarantees=(none) for a plugin that declares none, with no requirement-only mark', async () => {
+			declare('plain', 'sandbox');
+			logSpy.mockClear();
+
+			await runAsync('list');
+
+			expect(printed()).toMatch(/^plain\t.*\tguarantees=\(none\)$/m);
+		});
+
+		it('prints the workspace kinds a source accepts when its manifest declares them', async () => {
+			declare('pooled', 'poolonly');
+			logSpy.mockClear();
+
+			await runAsync('list');
+
+			expect(printed()).toMatch(/^pooled\t.*\tguarantees=sandbox\tworkspaces=pool\trequirement-only$/m);
+		});
+
+		it('prints nothing about guarantees for a source that has no plugin', async () => {
+			run('add', 'gpu-box', '--provider', 'built-in:inbound');
+			logSpy.mockClear();
+
+			await runAsync('list');
+
+			expect(printed()).not.toContain('guarantees=');
+		});
+
+		it('says on stderr, with the fix, that a manifest cannot be read, and prints guarantees=(unreadable) without exiting', async () => {
+			declare('bad', 'badmanifestguarantees');
+			logSpy.mockClear();
+
+			await runAsync('list');
+
+			expect(printed()).toMatch(/^bad\t.*\tguarantees=\(unreadable\)$/m);
+			expect(errors()).toContain('bad');
+			expect(errors()).toMatch(/Fix|fix/);
+		});
+
+		it('--json adds guarantees (and workspaces when declared, and requirementOnly) to each entry', async () => {
+			declare('sbx', 'confined');
+			declare('pooled', 'poolonly');
+			declare('plain', 'sandbox');
+			run('add', 'gpu-box', '--provider', 'built-in:inbound');
+			declare('bad', 'badmanifestguarantees');
+			logSpy.mockClear();
+
+			await runAsync('list', '--json');
+
+			const listed = JSON.parse(printed()) as Record<string, unknown>[];
+			const byId = Object.fromEntries(listed.map(entry => [entry.sourceId as string, entry]));
+			expect(byId.sbx).toMatchObject({
+				guarantees: ['env=clean', 'fs=confined', 'sandbox'],
+				requirementOnly: true,
+			});
+			expect(byId.sbx).not.toHaveProperty('workspaces');
+			expect(byId.pooled).toMatchObject({ guarantees: ['sandbox'], workspaces: ['pool'], requirementOnly: true });
+			expect(byId.plain).toMatchObject({ guarantees: [], requirementOnly: false });
+			expect(byId['gpu-box']).toMatchObject({ guarantees: [], requirementOnly: false });
+			// null, not []: an unreadable manifest must not look like a plugin that guarantees nothing
+			expect(byId.bad).toMatchObject({ guarantees: null, requirementOnly: false });
+		});
+
+		it('--json keeps stdout parseable: the unreadable-manifest message goes to stderr', async () => {
+			declare('bad', 'badmanifestguarantees');
+			logSpy.mockClear();
+
+			await runAsync('list', '--json');
+
+			expect(() => JSON.parse(printed())).not.toThrow();
+			expect(errors()).toContain('bad');
+		});
+	});
+
 	describe('list --json - stored URLs are redacted', () => {
-		it('prints scheme, host and path of nudgeUrl and options.nudgeUrl, with no user info and no query values', () => {
+		it('prints scheme, host and path of nudgeUrl and options.nudgeUrl, with no user info and no query values', async () => {
 			fs.mkdirSync(path.dirname(registryFile()), { recursive: true });
 			fs.writeFileSync(
 				registryFile(),
@@ -167,7 +274,7 @@ describe('flow worker source command', () => {
 				'utf8'
 			);
 
-			run('list', '--json');
+			await runAsync('list', '--json');
 
 			const out = printed();
 			const [listed] = JSON.parse(out) as { nudgeUrl: string; options: Record<string, unknown> }[];
@@ -339,10 +446,10 @@ describe('flow worker source command', () => {
 			expect(printed()).toContain('Re-declare any sources you need');
 		});
 
-		it('a corrupt registry makes list fail with an exit code instead of a stack trace', () => {
+		it('a corrupt registry makes list fail with an exit code instead of a stack trace', async () => {
 			fs.mkdirSync(path.dirname(registryFile()), { recursive: true });
 			fs.writeFileSync(registryFile(), '{ broken');
-			expect(() => run('list')).toThrow('exit 1');
+			await expect(runAsync('list')).rejects.toThrow('exit 1');
 			expect(errors()).toMatch(/^\[fail\] /);
 		});
 	});

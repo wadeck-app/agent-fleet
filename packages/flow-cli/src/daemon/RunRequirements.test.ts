@@ -159,3 +159,86 @@ describe('profiles in requirementsForStep', () => {
 		);
 	});
 });
+
+describe('implicit requirements of model steps in resolveRunRequirements', () => {
+	const agent = ['env=clean', 'fs=confined'];
+	const model = (id: string, extra: Record<string, unknown> = {}) => ({
+		type: 'model',
+		id,
+		name: id,
+		prompt: 'hi',
+		...extra,
+	});
+
+	it('adds the implicit set to each model step only, and records which steps got it', () => {
+		const resolved = resolveRunRequirements(flow({}, [model('m'), script('s')]), agent);
+
+		expect(resolved).toEqual({
+			run: [],
+			steps: { m: agent, s: [] },
+			implicit: { requires: agent, steps: ['m'] },
+		});
+	});
+
+	it('adds to what the flow and the step already require', () => {
+		const resolved = resolveRunRequirements(
+			flow({ requires: ['sandbox'] }, [model('m', { requires: ['gpu'] }), script('s')]),
+			agent
+		);
+
+		expect(resolved?.steps).toEqual({ m: [...agent, 'gpu', 'sandbox'].sort(), s: ['sandbox'] });
+		expect(resolved?.run).toEqual(['sandbox']);
+	});
+
+	it('adds nothing, and records nothing implicit, to a step whose own requirements already cover the set', () => {
+		const resolved = resolveRunRequirements(
+			flow({}, [model('explicit', { profile: 'agent' }), model('stronger', { profile: 'untrusted-code' })]),
+			agent
+		);
+
+		expect(resolved?.steps.explicit).toEqual(agent);
+		expect(resolved).not.toHaveProperty('implicit');
+	});
+
+	it('lists only the model steps that really received something', () => {
+		const resolved = resolveRunRequirements(
+			flow({}, [model('explicit', { profile: 'agent' }), model('bare')]),
+			agent
+		);
+
+		expect(resolved?.implicit).toEqual({ requires: agent, steps: ['bare'] });
+	});
+
+	it('records nothing implicit for a flow without model step, and nothing at all when nothing is required', () => {
+		expect(resolveRunRequirements(flow({}, [script('s')]), agent)).toBeUndefined();
+	});
+
+	it('is unchanged without an implicit set (no source covers it)', () => {
+		expect(resolveRunRequirements(flow({}, [model('m')]))).toBeUndefined();
+	});
+});
+
+describe('implicit requirements in requirementsForStep', () => {
+	const agent = ['env=clean', 'fs=confined'];
+	const recorded = {
+		run: ['sandbox'],
+		steps: { m: [...agent, 'sandbox'] },
+		implicit: { requires: agent, steps: ['m'] },
+	};
+
+	it('gives an injected model step the implicit set on top of the run set', () => {
+		expect(requirementsForStep(recorded, 'injected', undefined, undefined, 'model')).toEqual([...agent, 'sandbox']);
+	});
+
+	it('gives an injected script step the run set only: scripts get what they declare', () => {
+		expect(requirementsForStep(recorded, 'injected', undefined, undefined, 'script')).toEqual(['sandbox']);
+	});
+
+	it('uses the recorded set of a declared step, whatever the machine looks like now', () => {
+		expect(requirementsForStep({ run: [], steps: { m: [] } }, 'm', undefined, undefined, 'model')).toEqual([]);
+	});
+
+	it('an injected model step of a run recorded without implicit set stays unconfined (the record decides, never the machine)', () => {
+		expect(requirementsForStep({ run: [], steps: {} }, 'injected', undefined, undefined, 'model')).toEqual([]);
+	});
+});

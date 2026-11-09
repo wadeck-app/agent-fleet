@@ -65,6 +65,8 @@ describe('requires: routed to the source that declares the guarantee', () => {
 	let sources: WorkerSourceRegistry;
 	let idle: ReturnType<typeof idleWorker>[];
 	let sent: string[];
+	/** The step each worker was handed, in order. */
+	let assigned: { worker: string; stepId: string }[];
 
 	function writeFlow(requires: string, profile?: string): string {
 		const file = path.join(tmpDir, 'needs.yml');
@@ -138,8 +140,13 @@ describe('requires: routed to the source that declares the guarantee', () => {
 		const pool = createMockWorkerPool();
 		pool.listIdle.mockImplementation(() => idle);
 		pool.summarize.mockImplementation(() => idle.map(candidate => candidate.worker));
-		pool.send.mockImplementation((ws: unknown) => {
+		assigned = [];
+		pool.send.mockImplementation((ws: unknown, message: unknown) => {
 			sent.push((ws as { name: string }).name);
+			assigned.push({
+				worker: (ws as { name: string }).name,
+				stepId: (message as { stepId?: string }).stepId ?? '',
+			});
 			return true;
 		});
 		const args: ConstructorParameters<typeof TrackedCommandHandler> = [];
@@ -258,6 +265,97 @@ describe('requires: routed to the source that declares the guarantee', () => {
 			expect(JSON.stringify(response)).toMatch(/profile .{1,6}inspect.{1,6} requires .{1,6}fs=readonly-enforced/);
 			expect(fixture.obtained).toEqual([]);
 			expect(fs.readdirSync(executionsDirOf(daemonDir))).toEqual([]);
+		});
+	});
+
+	// A model step requires the agent set (fs=confined, env=clean) on its own when a declared source guarantees all of it.
+	describe('implicit confinement of model steps', () => {
+		/** A model step and a script step with no dependency between them: both are ready at once. */
+		function writeMixedFlow(): string {
+			const file = path.join(tmpDir, 'mixed.yml');
+			fs.writeFileSync(
+				file,
+				[
+					'id: mixed-flow',
+					'version: "1.0.0"',
+					'name: Mixed Flow',
+					'description: x',
+					'inputs: {}',
+					`workspace: { provider: pool, dir: "${poolDir.replace(/\\/g, '/')}", prefix: ws-, count: 2 }`,
+					'steps:',
+					'  - { id: agent, name: Agent, type: model, prompt: hi }',
+					'  - { id: build, name: Build, type: script, script: echo hi }',
+					'',
+				].join('\n')
+			);
+			return file;
+		}
+		const startedWarnings = (response: { type: string; warnings?: string[] }): string[] => response.warnings ?? [];
+		const recordOf = (response: unknown): { requirements?: unknown } =>
+			JSON.parse(
+				fs.readFileSync(
+					path.join(executionsDirOf(daemonDir), `${(response as { executionId: string }).executionId}.json`),
+					'utf8'
+				)
+			) as { requirements?: unknown };
+
+		it('routes the model step only to the source that guarantees the set; the script step, which declares nothing, is unaffected', async () => {
+			const response = await handler.handleRun({ type: 'run', flowFile: writeMixedFlow(), cwd: tmpDir } as never);
+
+			expect(response.type).toBe('execution_started');
+			expect(startedWarnings(response as never)).toEqual([]);
+			// Only the script step was handed out, to a worker of a source that is not requirement-only.
+			expect(assigned.map(entry => entry.stepId)).toEqual(['build']);
+			expect(['w-host', 'w-plain']).toContain(assigned[0]!.worker);
+			await vi.waitFor(() => expect(fixture.obtained.map(entry => entry.sourceId)).toEqual(['sbx']));
+			idle.push(idleWorker('w-sbx', 'sbx'));
+			handler.tryDispatch();
+
+			expect(assigned.map(entry => `${entry.stepId}@${entry.worker}`)).toContain('agent@w-sbx');
+			expect(assigned.filter(entry => entry.stepId === 'agent').map(entry => entry.worker)).toEqual(['w-sbx']);
+		});
+
+		it('records the implicit set with the explicit ones, so the confinement of the run can be audited', async () => {
+			const response = await handler.handleRun({ type: 'run', flowFile: writeMixedFlow(), cwd: tmpDir } as never);
+
+			expect(recordOf(response).requirements).toEqual({
+				run: [],
+				steps: { agent: ['env=clean', 'fs=confined'], build: [] },
+				implicit: { requires: ['env=clean', 'fs=confined'], steps: ['agent'] },
+			});
+			// The source is asked for a worker asynchronously: let it finish so it cannot leak into the next test.
+			await vi.waitFor(() => expect(fixture.obtained).toHaveLength(1));
+		});
+
+		it('keeps routing as before and warns once for the model step when no declared source covers the set', async () => {
+			sources.remove('sbx');
+
+			const response = await handler.handleRun({ type: 'run', flowFile: writeMixedFlow(), cwd: tmpDir } as never);
+
+			expect(startedWarnings(response as never)).toHaveLength(1);
+			expect(startedWarnings(response as never)[0]).toMatch(
+				/^model step agent runs unconfined: no worker source guarantees/
+			);
+			expect(assigned.map(entry => entry.stepId)).toContain('agent');
+			expect(fixture.obtained).toEqual([]);
+			expect(recordOf(response).requirements).toBeUndefined();
+		});
+
+		it('does not count a source that guarantees only part of the set (here exclusive-only, not fs=confined and env=clean)', async () => {
+			sources.remove('sbx');
+			sources.declare({
+				sourceId: 'xsbx',
+				provider: 'fixture',
+				plugin: 'fixture-sandbox.exclusiveconfined',
+				pluginsDir: FIXTURE_PLUGINS_DIR,
+				labels: [],
+				maxWorkers: 1,
+			});
+
+			const response = await handler.handleRun({ type: 'run', flowFile: writeMixedFlow(), cwd: tmpDir } as never);
+
+			expect(startedWarnings(response as never)).toHaveLength(1);
+			expect(assigned.map(entry => entry.stepId)).toContain('agent');
 		});
 	});
 });

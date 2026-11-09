@@ -38,6 +38,13 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).not.toMatch(/`workerType` (is deprecated|keeps working)/);
 	});
 
+	it('documents the implicit confinement of model steps: when it applies, the warning without a covering source, and that validate is silent', () => {
+		expect(result).toMatch(/Model steps .*implicitly require `agent`/s);
+		expect(result).toMatch(/no opt-out/);
+		expect(result).toMatch(/warns once per model step/);
+		expect(result).toMatch(/`flow validate` says nothing about it/);
+	});
+
 	it('documents that a source declaring guarantees only serves the steps that require them', () => {
 		expect(result).toMatch(/declares? guarantees.*only/s);
 		expect(result).toContain('queue.concurrency');

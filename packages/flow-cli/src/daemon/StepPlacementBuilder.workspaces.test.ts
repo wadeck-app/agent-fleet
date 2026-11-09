@@ -28,3 +28,28 @@ describe('StepPlacementBuilder - workspace kind', () => {
 		expect(placement).not.toHaveProperty('workspaceKind');
 	});
 });
+
+describe('StepPlacementBuilder - implicit confinement', () => {
+	const agent = ['env=clean', 'fs=confined'];
+
+	function registryWithImplicit(): ExecutionRegistry {
+		const registry = new ExecutionRegistry();
+		registry.bindRequirements('e1', { run: [], steps: { m: agent }, implicit: { requires: agent, steps: ['m'] } });
+		return registry;
+	}
+	const injected = (type: string): ReadyStep => ({
+		stepId: 'injected',
+		stepConfig: { id: 'injected', type } as never,
+		executionContext: { executionId: 'e1' } as never,
+	});
+
+	it('requires the implicit set of an injected model step: it inherits the rule of its parent', () => {
+		expect(new StepPlacementBuilder(registryWithImplicit()).describe(injected('model')).requires).toEqual(agent);
+	});
+
+	it('requires nothing of an injected script step', () => {
+		expect(new StepPlacementBuilder(registryWithImplicit()).describe(injected('script'))).not.toHaveProperty(
+			'requires'
+		);
+	});
+});
