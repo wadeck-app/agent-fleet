@@ -102,7 +102,9 @@ describe('AssignmentRewriter paths', () => {
 		).toThrow(/\.\./);
 	});
 
-	it.runIf(process.platform === 'win32')('translates a Windows absolute workingDir and flowWorkingDir', () => {
+	// An absolute workingDir / flowWorkingDir is translated or refused on EVERY host: the rows for a Windows host and a POSIX host are in
+	// AssignmentRewriter.platform.test.ts (platform parameter), not skipped here.
+	it("translates the host's own absolute workingDir and flowWorkingDir inside the mounts, and refuses one outside", () => {
 		const inside = path.join(root, 'ws', 'sub');
 		fs.mkdirSync(inside);
 
@@ -112,9 +114,6 @@ describe('AssignmentRewriter paths', () => {
 
 		expect((message['stepConfig'] as JsonObject)['workingDir']).toBe(sandboxPath(inside));
 		expect((message['executionContext'] as JsonObject)['flowWorkingDir']).toBe(sandboxPath(inside));
-	});
-
-	it.runIf(process.platform === 'win32')('refuses a Windows absolute workingDir outside the mounts', () => {
 		expect(() => rewriter().rewrite(assign({ step: { workingDir: path.join(root, 'project') } }))).toThrow(
 			/outside the sandbox mounts/
 		);

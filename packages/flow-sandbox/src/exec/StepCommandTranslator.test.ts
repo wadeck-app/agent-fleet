@@ -8,6 +8,7 @@ import { FakeSandboxRuntime } from '../FakeSandboxRuntime';
 import { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import { eachRow } from '../testing/EachRow';
+import { PureMounts } from '../testing/PureMounts';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { StepCommandTranslator } from './StepCommandTranslator';
 import { VmEnvironmentFilter } from './VmEnvironmentFilter';
@@ -69,6 +70,22 @@ afterEach(() => {
 	fs.rmSync(root, { recursive: true, force: true });
 });
 
+/**
+ * The translator of a WINDOWS host, whatever machine runs the test: drive-letter paths are only host paths there, so the rows that use them
+ * run on it instead of being skipped on a POSIX machine. The POSIX counterparts are in StepCommandTranslator.platform.test.ts.
+ */
+function windowsHostTranslator(): StepCommandTranslator {
+	return new StepCommandTranslator({
+		mounts: new PureMounts({ workspaceDir: 'C:\\runs\\ws', workspaceMetaDir: 'C:\\runs\\ws.meta' }, 'win32'),
+		platform: 'win32',
+		stager: { isStageable: () => false } as unknown as VmFileStager,
+		environment: new VmEnvironmentFilter({}),
+		hostNodePath: 'C:\\Program Files\\nodejs\\node.exe',
+		log: new RecordingSandboxLog(),
+		declaredEnvironmentNames: new Set(),
+	});
+}
+
 function request(overrides: Partial<Parameters<StepCommandTranslator['translate']>[0]>) {
 	return {
 		sandbox: 'box',
@@ -113,7 +130,7 @@ describe('StepCommandTranslator program', () => {
 	])(
 		'refuses a host path to bash (%s): the engine must resolve the shell through the sandbox launcher',
 		async (_name, command) => {
-			const error = await refusal(translator.translate(request({ command, args: ['-c', 'echo'] })));
+			const error = await refusal(windowsHostTranslator().translate(request({ command, args: ['-c', 'echo'] })));
 
 			expect(error.message).toMatch(
 				/host path[\s\S]*resolve the shell through the sandbox launcher[\s\S]*flow-cli/
@@ -183,16 +200,13 @@ describe('StepCommandTranslator program', () => {
 			}
 		));
 
-	// Windows by nature (a drive-letter program): the same rule on a POSIX host (a program in a known host directory) is in
-	// StepCommandTranslator.platform.test.ts, "refuses a host path to a shell".
-	it.skipIf(process.platform !== 'win32')(
-		'refuses a host program the VM does not have (drive-letter path)',
-		async () => {
-			expect(
-				(await refusal(translator.translate(request({ command: 'C:\\tools\\mytool.exe' })))).message
-			).toMatch(/host path and the VM has no such program/);
-		}
-	);
+	// A drive-letter program is a host path on a Windows host: this row runs with a Windows-host translator on any machine (no skip). The POSIX
+	// rule (a program in a known host directory) is in StepCommandTranslator.refusals.test.ts.
+	it('refuses a host program the VM does not have (drive-letter path, Windows host)', async () => {
+		expect(
+			(await refusal(windowsHostTranslator().translate(request({ command: 'C:\\tools\\mytool.exe' })))).message
+		).toMatch(/host path and the VM has no such program/);
+	});
 
 	it('refuses a shell with arguments', async () => {
 		expect(

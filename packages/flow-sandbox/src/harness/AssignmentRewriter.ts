@@ -1,6 +1,7 @@
 import type { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import type { SandboxLog } from '../SandboxLog';
+import { UNC, WINDOWS_ABSOLUTE, flavorOf } from '../exec/HostPaths';
 import { AssignmentFields } from './AssignmentFields';
 import { type ActiveAssignment, type JsonObject, type SandboxStepType } from './HarnessMessages';
 
@@ -9,6 +10,8 @@ export interface AssignmentRewriterOptions {
 	/** Environment the wrapper owns for a step type (credentials, tool stores). It overrides the step's own values. */
 	injectedEnv: (stepType: SandboxStepType) => Readonly<Record<string, string>>;
 	log: SandboxLog;
+	/** The host's platform (default: this one): which working directories count as absolute. Tests pass `win32` and `linux` on any host. */
+	platform?: NodeJS.Platform;
 }
 
 export interface RewrittenAssignment {
@@ -16,8 +19,6 @@ export interface RewrittenAssignment {
 	message: JsonObject;
 	active: ActiveAssignment;
 }
-
-const WINDOWS_ABSOLUTE = /^[A-Za-z]:[\\/]/;
 
 /**
  * Daemon to inside: the `assign` message is the only one that is forwarded, rebuilt from its known fields, with
@@ -126,7 +127,8 @@ export class AssignmentRewriter {
 	}
 
 	private translateWorkingDirectory(value: string, label: string): string {
-		if (!WINDOWS_ABSOLUTE.test(value)) return value;
+		const posixAbsolute = flavorOf(this.options.platform ?? process.platform) === 'posix' && value.startsWith('/');
+		if (!posixAbsolute && !WINDOWS_ABSOLUTE.test(value) && !UNC.test(value)) return value;
 		return this.options.mounts.toSandboxPath(value, label);
 	}
 }

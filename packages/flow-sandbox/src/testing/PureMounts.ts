@@ -35,6 +35,10 @@ export class PureMounts {
 		});
 	}
 
+	metaMount(): { hostPath: string } {
+		return { hostPath: this.roots.workspaceMetaDir };
+	}
+
 	/** For code that is typed against the real class. */
 	asRunMounts(): RunMounts {
 		return this as unknown as RunMounts;
