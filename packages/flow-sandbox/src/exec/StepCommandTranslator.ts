@@ -135,7 +135,10 @@ export class StepCommandTranslator {
 					'it is a host path to a shell: the engine must resolve the shell through the sandbox launcher (update flow-cli to 2026.11.8-974 or later)'
 				);
 			}
-			throw this.refused(command, 'it is a host path and the VM has no such program');
+			throw this.refused(
+				command,
+				"it is a host path and the VM has no such program. Call a program that exists in the sandbox image, by its name or its VM path (the host's files are not in the VM)"
+			);
 		}
 		return { command, args, display: name };
 	}
@@ -149,7 +152,7 @@ export class StepCommandTranslator {
 		if (UNC.test(argument)) {
 			throw new SandboxError(
 				'path-outside-mounts',
-				`The argument "${argument}" is a UNC path; the sandbox mounts only the run's workspace and .meta.`
+				`The argument "${argument}" is a UNC path; the sandbox mounts only the run's workspace and .meta. If it is a file, copy it under the workspace and pass that path; a network path is never mounted.`
 			);
 		}
 		if (!this.isHostPath(argument)) return argument;
@@ -160,7 +163,22 @@ export class StepCommandTranslator {
 			return copy.vmPath;
 		}
 		// Inside the mounts: translated. Outside: refused by the mounts with the reason.
-		return this.options.mounts.toSandboxPath(argument, 'argument');
+		try {
+			return this.options.mounts.toSandboxPath(argument, 'argument');
+		} catch (error) {
+			// Under a mount the refusal is about a link or a `..` and already says so; elsewhere the value is a host path that is not mounted.
+			if (
+				!(error instanceof SandboxError) ||
+				error.kind !== 'path-outside-mounts' ||
+				this.options.mounts.contains(argument)
+			) {
+				throw error;
+			}
+			throw new SandboxError(
+				'path-outside-mounts',
+				`argument "${argument}" looks like a host path that is not mounted in the sandbox (the sandbox sees only the run's workspace and .meta). If it is a file, put it under the workspace and pass that path. If it is a literal value, not a file, do not pass it as a command-line argument: write it in the script text, which is never inspected. (${error.message})`
+			);
+		}
 	}
 
 	/**

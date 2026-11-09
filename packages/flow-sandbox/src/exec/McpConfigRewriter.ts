@@ -102,7 +102,7 @@ export class McpConfigRewriter {
 		if (!valid) {
 			throw new SandboxError(
 				'invalid-argument',
-				`The "flow" MCP server in ${source} is not "<host node> .../mcp-server.cjs" (command ${JSON.stringify(command)}, args ${JSON.stringify(args)}): the exec variant only knows how to relay the engine's own server.`
+				`The "flow" MCP server in ${source} is not "<host node> .../mcp-server.cjs" (command ${JSON.stringify(command)}, args ${JSON.stringify(args)}): the exec variant only knows how to relay the engine's own server. Run this step on a worker without the "sandbox" label if it needs another MCP server.`
 			);
 		}
 	}

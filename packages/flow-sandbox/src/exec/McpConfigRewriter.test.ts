@@ -106,6 +106,14 @@ describe.each(FLAVORS)('McpConfigRewriter on a $name', flavor => {
 		}
 	});
 
+	it("names the offending command and argument and says what to do when the server is not the engine's", () => {
+		const message = refusal(() => rewriter.rewrite(config({ args: [flavor.evilServer] }), 'x'));
+
+		expect(message).toContain(JSON.stringify(flavor.evilServer));
+		expect(message).toContain(JSON.stringify(flavor.node));
+		expect(message).toMatch(/worker without the "sandbox" label/);
+	});
+
 	it('refuses a missing or invalid callback port', () => {
 		expect(refusal(() => rewriter.rewrite(config({ env: {} }), 'x'))).toMatch(/no valid FLOW_MCP_CALLBACK_PORT/);
 		expect(refusal(() => rewriter.rewrite(config({ env: { FLOW_MCP_CALLBACK_PORT: '70000' } }), 'x'))).toMatch(

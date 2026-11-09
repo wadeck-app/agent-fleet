@@ -83,6 +83,20 @@ describe.each(FLAVORS)('ExecAssignment working directories on a $name', flavor =
 		}
 	});
 
+	it('names the offending workingDir and says where to point it instead', () => {
+		const outside = under(flavor.outside, 'sub');
+		let message = '';
+		try {
+			assignment.prepare(assign(flavor, { step: { workingDir: outside } }));
+		} catch (error) {
+			message = (error as Error).message;
+		}
+
+		expect(message).toContain(outside);
+		expect(message).toContain('workingDir');
+		expect(message).toMatch(/use a path inside one of them/);
+	});
+
 	it('accepts an absolute workingDir inside the mounts and a relative one, and keeps them as written', () => {
 		const inside = under(flavor.workspace, 'sub');
 
