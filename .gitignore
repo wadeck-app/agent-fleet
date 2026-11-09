@@ -74,7 +74,6 @@ _notes.txt
 # Generated entirely by CI — do not commit
 packages/flow-cli-dist/
 packages/flow-cli-darwin-arm64/
-packages/flow-cli-darwin-x64/
 packages/flow-cli-win32-x64/
 packages/task-cli-dist/
 packages/task-cli-darwin-arm64/

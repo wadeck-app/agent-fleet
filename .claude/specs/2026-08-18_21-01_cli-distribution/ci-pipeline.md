@@ -54,7 +54,7 @@ on:
 2. `npm ci` (full workspace install)
 3. `npm run build --workspaces` (tsc for all packages)
 4. `npm run bundle:all --workspace packages/flow-cli` (flow.cjs + task.cjs + flow-updater.cjs)
-5. `npm run build-launcher --workspace packages/flow-cli` (4 Go binaries: win32-x64, darwin-arm64, darwin-x64, linux-x64)
+5. `npm run build-launcher --workspace packages/flow-cli` (Go binaries; only win32-x64 and darwin-arm64 are published: Apple Silicon only, darwin-x64 dropped on 2026-11-09)
 6. `bash ci/scripts/compute-version.sh` (outputs VERSION and DIST_TAG to GITHUB_OUTPUT)
 7. `bash ci/scripts/copy-binaries.sh` (copies launcher binaries + flow.cjs into platform package dirs)
 8. Set version in all 5 packages: `npm version $VERSION --no-git-tag-version` for each
@@ -97,11 +97,9 @@ set -euo pipefail
 DIST=packages/flow-cli/launcher-go/dist
 cp "$DIST/flow_windows_release.exe"  packages/flow-cli-win32-x64/flow.exe
 cp "$DIST/flow_darwin_arm64_release" packages/flow-cli-darwin-arm64/flow
-cp "$DIST/flow_darwin_amd64_release" packages/flow-cli-darwin-x64/flow
 cp "$DIST/flow_linux_amd64_release"  packages/flow-cli-linux-x64/flow
 cp packages/flow-cli/dist-bundle/flow.cjs packages/flow-cli-dist/flow.cjs
 chmod +x packages/flow-cli-darwin-arm64/flow \
-         packages/flow-cli-darwin-x64/flow \
          packages/flow-cli-linux-x64/flow
 ```
 

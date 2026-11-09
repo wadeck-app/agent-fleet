@@ -59,14 +59,14 @@ jobs:
                   BUNDLE_VERSION: ${{ steps.version.outputs.version }}
 
             - name: Generate platform package directories
-              run: bash ci/scripts/generate-platform-packages.sh
+              run: PLATFORMS=win32-x64,darwin-arm64 bash ci/scripts/generate-platform-packages.sh flow:worker.cjs:app-module/:app-module-flow-chart/
 
             - name: Copy artifacts to platform packages
               run: bash ci/scripts/copy-binaries.sh
 
             - name: Set version in all packages
               run: |
-                  for pkg in flow-cli-dist flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64; do
+                  for pkg in flow-cli-dist flow-cli-win32-x64 flow-cli-darwin-arm64; do
                     (cd "packages/$pkg" && npm pkg set version="${{ steps.version.outputs.version }}")
                   done
 
@@ -134,11 +134,11 @@ jobs:
 
             # upload/download-artifact do not keep file modes: without this the darwin binary is packed as 0644.
             - name: Restore executable bits
-              run: bash ci/scripts/restore-exec-bits.sh
+              run: bash ci/scripts/restore-exec-bits.sh packages flow win32-x64,darwin-arm64
 
             - name: Publish platform packages
               run: |
-                  for pkg in flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-darwin-x64; do
+                  for pkg in flow-cli-win32-x64 flow-cli-darwin-arm64; do
                     (cd "packages/$pkg" && npm publish --tag ${{ needs.build-and-test.outputs.dist_tag }})
                   done
               env:
