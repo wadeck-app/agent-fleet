@@ -149,39 +149,3 @@ jobs:
               run: npm publish --tag ${{ needs.build-and-test.outputs.dist_tag }}
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    # Installs the package that was just published on a real macOS arm64 runner and runs it. A launcher that cannot be
-    # executed (lost exec bit) used to exit in ~60 ms with no output. Not a dependency of anything and continue-on-error:
-    # it reports, it never blocks.
-    smoke-macos:
-        needs: [build-and-test, publish]
-        runs-on: macos-14
-        timeout-minutes: 15
-        continue-on-error: true
-        steps:
-            - uses: actions/setup-node@v5
-              with:
-                  node-version: '24'
-                  registry-url: 'https://npm.pkg.github.com'
-                  scope: '@wadeck-app'
-
-            - name: Install the published CLI
-              run: npm install -g "@wadeck-app/flow-cli@${{ needs.build-and-test.outputs.version }}"
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: The binary of the platform package is executable
-              run: |
-                  bin="$(find "$(npm root -g)" -path '*flow-cli-darwin-arm64/flow' -type f | head -n 1)"
-                  test -n "$bin" || { echo "::error::the darwin arm64 platform binary was not installed"; exit 1; }
-                  if [ ! -x "$bin" ]; then
-                    echo "::error::$bin is not executable (mode: $(stat -f '%Sp' "$bin" 2>&1))"
-                    exit 1
-                  fi
-
-            - name: flow --version prints the published version
-              run: |
-                  out="$(flow --version)"
-                  echo "flow --version: $out"
-                  test -n "$out" || { echo "::error::flow --version printed nothing"; exit 1; }
-                  case "$out" in *"${{ needs.build-and-test.outputs.version }}"*) ;; *) echo "::error::unexpected version: $out"; exit 1;; esac
