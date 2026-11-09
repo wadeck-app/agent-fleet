@@ -80,6 +80,8 @@ The earlier proposal (unmarked scripts run on the worker host, plus an ordering 
 | Cons | A VM script cannot reach host tools or credentials; the first host marker forces explicit placement of all scripts in model flows. |
 | Recommendation | Ship the safe default now. Design the marker (name, flow-level or step-level) with the tool-provision plan, which is where host tools belong. |
 
+**Status: implemented (plugin side), 2026-11-09.** The marker is the step field `host: true` (script steps only, core validates); the assign carries it top-level only when true. The wrapper serves such a step itself, outside the sandbox lifecycle, with `requires` still enforced. Row f is closed by `HostScriptEnvironment` (allow-list, not the whole wrapper environment). Rows a to d are not closed by the plugin: they are the user's explicit choice, warned by core (`HOST_SCRIPT_WITH_MODEL_STEPS`). Deviation from the text above: core warns instead of erroring on a mixed flow. See README, "Host scripts".
+
 ### D5. Run affinity
 
 | | |

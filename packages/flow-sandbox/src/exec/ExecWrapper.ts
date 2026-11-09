@@ -46,12 +46,23 @@ export interface StepExecutorContext {
 	ensureRunning: () => Promise<void>;
 }
 
+/** What the wrapper knows when it builds the engine of a host script (`host: true`). */
+export interface HostExecutorContext {
+	/** Environment names the step declares (its `env` and `secrets`): the only ones besides the baseline a host process receives. */
+	declaredEnvironmentNames: ReadonlySet<string>;
+}
+
 export interface ExecWrapperDependencies {
 	registration: RelayRegistration;
 	lifecycle: SandboxLifecycle;
 	preparer: Pick<ExecSandboxPreparer, 'prepare'>;
 	/** Builds the engine for one step: a StepRunner with the sandbox launcher injected. May await (executable lookup). */
 	createExecutor: (context: StepExecutorContext) => Promise<StepExecutor>;
+	/**
+	 * Builds the engine for a script step marked `host: true`: the same engine with the machine's own launcher (environment
+	 * allow-listed), no sandbox. Such a step never touches the lifecycle, so it never creates or wakes the VM.
+	 */
+	createHostExecutor: (context: HostExecutorContext) => StepExecutor;
 	log: SandboxLog;
 	createDaemon: (handlers: DaemonHandlers) => DaemonControl;
 	/** The RunMounts of a run (workspace, `.meta` next to it). Throws with an actionable message when they are unusable. */
@@ -216,7 +227,17 @@ export class ExecWrapper {
 			// Before anything is created: a step routed here without asking for a guarantee of this worker is not run.
 			const refusal = this.dependencies.requireGuarantees ? RequiresGuard.refusal(raw['requires']) : undefined;
 			if (refusal !== undefined) throw new SandboxError('invalid-argument', refusal);
+			const onHost = this.placement(raw, ids.stepId) === 'host';
 			const mounts = this.mountsFor(raw, ids.executionId);
+			if (onHost) {
+				log.info(`script step "${ids.stepId}" runs on the host (host: true), not in the sandbox.`);
+				const assignment = new ExecAssignment({ mounts, log, injectedEnv: () => ({}) }).prepare(raw);
+				const executor = this.dependencies.createHostExecutor({
+					declaredEnvironmentNames: assignment.declaredEnvironmentNames,
+				});
+				reported = await this.runStep(executor, assignment);
+				return;
+			}
 			await lifecycle.runStep({ executionId: ids.executionId, mounts }, async ({ sandbox }) => {
 				timings.sandboxReady = now();
 				const preparedSandbox = await this.ensurePrepared(sandbox, mounts);
@@ -363,6 +384,44 @@ export class ExecWrapper {
 		}
 		if (!isNonEmptyString(context['executionId'])) return undefined;
 		return { assignmentId: raw['assignmentId'], stepId: raw['stepId'], executionId: context['executionId'] };
+	}
+
+	/**
+	 * Where the step runs. The daemon sends `host: true` on the message ONLY for a script step marked `host: true`, and keeps the
+	 * whole step, so a flow that spells the default out (`host: false`) arrives with the marker in the step alone: that is the VM.
+	 * Anything else than "both say true on a script step" is refused with the reason: a malformed marker must not silently put a
+	 * step in the VM when the message asks for the host, nor on the host.
+	 */
+	private placement(raw: JsonObject, stepId: string): 'host' | 'sandbox' {
+		const stepConfig = isJsonObject(raw['stepConfig']) ? raw['stepConfig'] : {};
+		const top = raw['host'];
+		const inStep = stepConfig['host'];
+		if (top !== undefined && top !== true) {
+			throw new SandboxError(
+				'invalid-argument',
+				`"host" must be true or absent on the assign message (found ${JSON.stringify(top)}); the step is not run.`
+			);
+		}
+		if (inStep !== undefined && typeof inStep !== 'boolean') {
+			throw new SandboxError(
+				'invalid-argument',
+				`"host" must be true or absent in the step (found ${JSON.stringify(inStep)}); the step is not run.`
+			);
+		}
+		if (top === undefined && inStep !== true) return 'sandbox';
+		if (top !== inStep) {
+			throw new SandboxError(
+				'invalid-argument',
+				`the "host" marker of the assign message (${JSON.stringify(top)}) and of the step (${JSON.stringify(inStep)}) disagree; the step is not run. This is a flow daemon / plugin version mismatch.`
+			);
+		}
+		if (stepConfig['type'] !== 'script') {
+			throw new SandboxError(
+				'invalid-argument',
+				`host: true is only for script steps, step "${stepId}" is of type ${JSON.stringify(stepConfig['type'])}. A model step always runs in the sandbox; remove host: true from it.`
+			);
+		}
+		return 'host';
 	}
 
 	private mountsFor(raw: JsonObject, executionId: string): RunMounts {

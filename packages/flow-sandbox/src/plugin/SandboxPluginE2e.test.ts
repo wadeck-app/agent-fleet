@@ -40,6 +40,7 @@ const repositoryRoot = path.resolve(fileURLToPath(new URL('../../../..', import.
 const flowIndex = path.join(repositoryRoot, 'packages', 'flow-cli', 'src', 'cli', 'FlowIndex.ts');
 const tsxUrl = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href;
 const CANNED = 'canned-output-of-the-mock';
+const CANARY = 'canary-of-the-wrapper-environment';
 const BOUND_WAIT_SECONDS = 6;
 
 interface ExecutionRecord {
@@ -73,6 +74,8 @@ class FlowWorld {
 			SBX_MOCK_STATE_DIR: this.mockState,
 			SBX_MOCK_SCENARIO: 'bash-canned',
 			SBX_MOCK_BASH_STDOUT: CANNED,
+			// A variable of the wrapper's environment that no step declares: a host script (host: true) must never see it.
+			FLOW_SANDBOX_E2E_CANARY: CANARY,
 			// A daemon with nothing to do stops after its idle check: keep it for the whole test.
 			FLOW_DAEMON_IDLE_CHECK_MS: '600000',
 			// The OS picks the daemon port: the user's own daemon (standard range) is never probed or competed with.
@@ -177,6 +180,46 @@ class FlowWorld {
 				'      type: script',
 				'      shell: bash',
 				'      script: echo hello',
+				'',
+			].join('\n')
+		);
+		return file;
+	}
+
+	/**
+	 * A pool flow bound with `requires: [sandbox]` whose steps are, in order, a script marked `host: true` (id `host`, it prints
+	 * the canary variable if it can see it) and/or an unmarked script (id `vm`).
+	 */
+	writeHostFlow(name: string, steps: ('host' | 'vm')[]): string {
+		const file = path.join(this.projectDirectory, `${name}.yml`);
+		const scripts = {
+			host: [
+				'    - id: host',
+				'      name: Host',
+				'      type: script',
+				'      host: true',
+				'      shell: bash',
+				'      script: echo "ran-on-host canary=${FLOW_SANDBOX_E2E_CANARY:-absent}"',
+			],
+			vm: [
+				'    - id: vm',
+				'      name: Vm',
+				'      type: script',
+				'      shell: bash',
+				'      script: echo hello',
+			],
+		};
+		fs.writeFileSync(
+			file,
+			[
+				`id: ${name}`,
+				"version: '1.0.0'",
+				`name: ${name}`,
+				'description: Host and VM script steps.',
+				'requires: [sandbox]',
+				`workspace: { provider: pool, dir: '${this.poolDirectory.replaceAll(path.sep, '/')}', prefix: slot-, count: 1 }`,
+				'steps:',
+				...steps.flatMap(step => scripts[step]),
 				'',
 			].join('\n')
 		);
@@ -482,6 +525,41 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		expect(world.sbxCalls()).toHaveLength(callsBefore);
 		expect(record.status).toBe('completed');
 	}, 120_000);
+});
+
+// host: true (design note D4): the sandbox worker serves the step on its own machine. The mock runs no VM, so the proof of
+// WHERE it ran is the output (really produced by bash on this machine, not the canned one) and the absence of any sbx call for it.
+describe('sandbox plugin, real daemon, sbx mock: host: true script steps', () => {
+	const world = new FlowWorld();
+	worlds.push(world);
+
+	beforeAll(async () => {
+		await world.registerProject();
+		world.declareSource('sandbox-host', artifactDirectory, MOCK_SBX_PATH);
+		await world.startDaemon();
+	}, 150_000);
+
+	it('runs a host-only run on the wrapper machine: real output, no canary of its environment, and no sandbox is created at all', async () => {
+		const record = await world.run(world.writeHostFlow('host-only', ['host']));
+
+		const step = record.steps?.['host'];
+		expect(record.status).toBe('completed');
+		expect(step).toMatchObject({ status: 'completed', sourceId: 'sandbox-host' });
+		expect(step?.io?.stdout?.text?.trim()).toBe('ran-on-host canary=absent');
+		expect(step?.io?.stdout?.text).not.toContain(CANARY);
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(0);
+		expect(world.sbxCalls().filter(call => call.argv[0] === 'exec' && call.argv.includes('-w'))).toHaveLength(0);
+	}, 120_000);
+
+	it('in one run, the host step runs on the machine and the unmarked step in the sandbox (canned output), with one sandbox', async () => {
+		const record = await world.runAndRelease(world.writeHostFlow('host-and-vm', ['host', 'vm']));
+
+		expect(record.status).toBe('completed');
+		expect(record.steps?.['host']?.io?.stdout?.text?.trim()).toBe('ran-on-host canary=absent');
+		expect(record.steps?.['vm']?.io?.stdout?.text).toBe(CANNED);
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(1);
+		expect(world.log()).toContain('runs on the host (host: true)');
+	}, 150_000);
 });
 
 describe('sandbox plugin, real daemon, sbx mock: a source that cannot start', () => {

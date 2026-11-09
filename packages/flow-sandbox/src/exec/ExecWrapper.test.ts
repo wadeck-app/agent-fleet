@@ -65,6 +65,8 @@ let daemon: FakeDaemon;
 let wrapper: ExecWrapper;
 let prepares: number;
 let executorContexts: StepExecutorContext[];
+/** One entry per step the wrapper ran ON THE HOST (host: true), with the environment names the step declared. */
+let hostExecutions: { stepConfig: JsonObject; executionContext: JsonObject; declared: string[] }[];
 let executorCalls: { stepConfig: JsonObject; executionContext: JsonObject }[];
 let behaviour: (
 	stepConfig: JsonObject,
@@ -107,6 +109,7 @@ beforeEach(async () => {
 	finished = ownFinished;
 	executorContexts = [];
 	executorCalls = [];
+	hostExecutions = [];
 	behaviour = (_stepConfig, _context, send) => {
 		send({ type: 'log', executionId: 'run1', stepId: 'probe', entry: { message: 'hello' } });
 		return Promise.resolve({ output: { stdout: 'ok' }, meta: { exit_code: 0 } });
@@ -141,6 +144,12 @@ beforeEach(async () => {
 			};
 			return Promise.resolve(executor);
 		},
+		createHostExecutor: ({ declaredEnvironmentNames }) => ({
+			execute: (stepConfig, executionContext) => {
+				hostExecutions.push({ stepConfig, executionContext, declared: [...declaredEnvironmentNames].sort() });
+				return Promise.resolve({ output: { stdout: 'host-ok' }, meta: { exit_code: 0 } });
+			},
+		}),
 		log,
 		createDaemon: handlers => {
 			daemon.handlers = handlers;
@@ -166,11 +175,19 @@ afterEach(async () => {
 /** `requires: 'absent'` leaves the field out, as a daemon does for a step that requires nothing. */
 function assign(
 	stepId: string,
-	overrides: { type?: string; executionId?: string; env?: JsonObject; requires?: unknown } = {}
+	overrides: {
+		type?: string;
+		executionId?: string;
+		env?: JsonObject;
+		requires?: unknown;
+		/** The top-level `host` of the message and the `host` inside the step, each left out when undefined (a daemon sends both for host: true). */
+		host?: { top?: unknown; config?: unknown };
+	} = {}
 ): JsonObject {
 	const requires = overrides.requires ?? ['sandbox'];
 	return {
 		...(requires === 'absent' ? {} : { requires }),
+		...(overrides.host?.top === undefined ? {} : { host: overrides.host.top }),
 		type: 'assign',
 		assignmentId: `a-${stepId}`,
 		stepId,
@@ -179,6 +196,7 @@ function assign(
 			type: overrides.type ?? 'script',
 			script: 'echo hi',
 			env: overrides.env ?? { FLOW_VAR: '1' },
+			...(overrides.host?.config === undefined ? {} : { host: overrides.host.config }),
 		},
 		executionContext: {
 			executionId: overrides.executionId ?? 'run1',
@@ -398,6 +416,99 @@ describe('ExecWrapper refuses a step the daemon did not route by a guarantee of 
 	});
 });
 
+const HOST = { top: true, config: true };
+
+describe('ExecWrapper host: true (a script that runs on the wrapper machine, not in the VM)', () => {
+	it('runs a marked script on the host: no sandbox, no preparation, the host executor gets the declared names and the workspace as cwd, and the host line is logged', async () => {
+		await run(assign('probe', { host: HOST }));
+
+		expect(runtime.callsTo('create')).toHaveLength(0);
+		expect(prepares).toBe(0);
+		expect(executorContexts).toHaveLength(0);
+		expect(hostExecutions).toHaveLength(1);
+		expect(hostExecutions[0]?.declared).toEqual(['FLOW_VAR']);
+		expect(hostExecutions[0]?.executionContext['cwd']).toBe(workspace);
+		expect(daemon.types()).toEqual(['ready', 'step_started', 'step_completed', 'ready']);
+		expect(daemon.ofType('step_completed')[0]).toMatchObject({ stepId: 'probe', output: { stdout: 'host-ok' } });
+		expect(log.text()).toContain('script step "probe" runs on the host (host: true)');
+	});
+
+	it.each([
+		['absent', undefined],
+		['no host field at all', { top: undefined, config: undefined }],
+		[
+			'host: false only in the step (a flow that spells the default out: the daemon sends no marker)',
+			{ top: undefined, config: false },
+		],
+	])('an unmarked script (%s) runs in the VM as before', async (_name, host) => {
+		await run(assign('probe', host === undefined ? {} : { host }));
+
+		expect(runtime.callsTo('create')).toHaveLength(1);
+		expect(hostExecutions).toHaveLength(0);
+		expect(executorContexts).toHaveLength(1);
+	});
+
+	it.each([
+		[
+			'host: true on a model step',
+			{ type: 'model', host: HOST },
+			/host: true is only for script steps[\s\S]*"probe"/,
+		],
+		[
+			'host: false (the daemon never sends it)',
+			{ host: { top: false, config: false } },
+			/"host" must be true or absent/,
+		],
+		[
+			'host in the step but not on the message',
+			{ host: { top: undefined, config: true } },
+			/disagree|does not match/,
+		],
+		[
+			'host on the message but not in the step',
+			{ host: { top: true, config: undefined } },
+			/disagree|does not match/,
+		],
+		['a host that is not a boolean', { host: { top: 'yes', config: 'yes' } }, /"host" must be true or absent/],
+	])('refuses %s with an actionable message, nothing runs anywhere', async (_name, overrides, message) => {
+		await run(assign('probe', overrides));
+
+		expect(runtime.callsTo('create')).toHaveLength(0);
+		expect(hostExecutions).toHaveLength(0);
+		expect(executorContexts).toHaveLength(0);
+		expect(daemon.types()).toEqual(['ready', 'step_failed', 'ready']);
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(message);
+	});
+
+	// The step still carries the run's requirements and the wrapper serves it either way: the guard applies to host steps too.
+	it.each([
+		['requires missing', 'absent', /no "requires"/],
+		['requires not guaranteed here', ['gpu'], /"gpu"/],
+	])('a host step still goes through the requires guard (%s)', async (_name, requires, message) => {
+		await run(assign('probe', { host: HOST, requires }));
+
+		expect(hostExecutions).toHaveLength(0);
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(message);
+	});
+
+	it('serves a host step and a VM step of the same run: one sandbox, created by the VM step only', async () => {
+		await run(assign('sync', { host: HOST }));
+		await run(assign('build'));
+
+		expect(hostExecutions.map(item => item.stepConfig['id'])).toEqual(['sync']);
+		expect(runtime.callsTo('create')).toHaveLength(1);
+		expect(executorContexts).toHaveLength(1);
+	});
+
+	it('does not apply the requires guard on a host step of the dev harness either way it is started, but still honours host', async () => {
+		requireGuarantees = false;
+
+		await run(assign('probe', { host: HOST, requires: 'absent' }));
+
+		expect(hostExecutions).toHaveLength(1);
+	});
+});
+
 describe('ExecWrapper a script step', () => {
 	it('creates the sandbox, prepares it once, runs the engine with host paths and reports the outcome', async () => {
 		await run(assign('probe'));
@@ -521,6 +632,9 @@ describe('ExecWrapper failures', () => {
 			),
 			preparer: { prepare: () => Promise.reject(new Error('credential endpoint refused')) },
 			createExecutor: () => Promise.reject(new Error('must not be reached')),
+			createHostExecutor: () => {
+				throw new Error('must not be reached');
+			},
 			log,
 			createDaemon: handlers => {
 				daemon.handlers = handlers;

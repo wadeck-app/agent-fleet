@@ -155,6 +155,50 @@ describe('AssignmentRewriter environment', () => {
 	});
 });
 
+describe('AssignmentRewriter step requirements and the host marker', () => {
+	it('carries the message requires through, as a copy, and leaves it out when the daemon sent none', () => {
+		const withRequires = { ...assign(), requires: ['sandbox', 'env=clean'] };
+
+		const { message } = rewriter().rewrite(withRequires);
+		expect(message['requires']).toEqual(['sandbox', 'env=clean']);
+		expect(message['requires']).not.toBe(withRequires.requires);
+
+		expect('requires' in rewriter().rewrite(assign()).message).toBe(false);
+	});
+
+	it('refuses a requires that is not a list of strings instead of dropping it', () =>
+		eachRow(
+			[
+				['a string', 'sandbox'],
+				['a list with a number', ['sandbox', 3]],
+				['an object', { sandbox: true }],
+			],
+			(_name, requires) => {
+				expect(() => rewriter().rewrite({ ...assign(), requires })).toThrow(/"requires"/);
+			}
+		));
+
+	// The relay variant runs everything in the VM through an inner worker that cannot honour the marker: forwarding it would
+	// silently run a step the flow author asked to run on the host in the VM.
+	it('lets a step that spells the default out (host: false in the step, no marker on the message) through, the step keeps it', () => {
+		const { message } = rewriter().rewrite(assign({ step: { host: false } }));
+
+		expect((message['stepConfig'] as JsonObject)['host']).toBe(false);
+		expect('host' in message).toBe(false);
+	});
+
+	it('refuses a host: true step (message or step), the exec wrapper is the one that serves it', () =>
+		eachRow(
+			[
+				['on the message', { ...assign(), host: true }],
+				['in the step', assign({ step: { host: true } })],
+			],
+			(_name, raw) => {
+				expect(() => rewriter().rewrite(raw)).toThrow(/host: true[\s\S]*exec wrapper/);
+			}
+		));
+});
+
 describe('AssignmentRewriter validation', () => {
 	it('refuses a (each case) step with the reason', () =>
 		eachRow([['user_intervention'], ['subflow'], ['nonsense']], type => {

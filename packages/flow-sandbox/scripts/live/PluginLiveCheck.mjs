@@ -75,6 +75,8 @@ const environment = {
 	AWS_PROFILE: profile,
 	SBX_REAL_PATH: realSbx,
 	SBX_TIMING_LOG: timingLog,
+	// A variable of the wrapper's environment that no step declares: the host: true script must NOT see it (design note D4).
+	PLUGIN_LIVE_CANARY: `canary-${randomBytes(6).toString('hex')}`,
 };
 delete environment.SBX_MOCK_PATH;
 // PLUGIN_HIDE_GIT_BASH=1: the daemon (and so the wrapper) is started with a PATH that has no directory of Git for Windows that holds bash.exe or
@@ -179,12 +181,27 @@ steps:
               type: string
               from: stdout
 
+    - id: onhost
+      name: Probe the wrapper machine (host)
+      type: script
+      host: true
+      shell: bash
+      depends:
+          - probe
+      script: |
+          echo "hostname=$(hostname)"
+          echo "user=$(id -un)"
+          echo "cwd=$(pwd)"
+          echo "canary=\${PLUGIN_LIVE_CANARY:-absent}"
+          echo "token=\${FLOW_WORKER_TOKEN:-absent}"
+          echo "hosthome=\${FLOW_SANDBOX_HOST_HOME:-absent}"
+
     - id: ask
       name: One word
       type: model
       model: sonnet
       depends:
-          - probe
+          - onhost
       env:
           ANTHROPIC_DEFAULT_SONNET_MODEL: ${process.env.ANTHROPIC_DEFAULT_SONNET_MODEL ?? ''}
       prompt: |
@@ -267,9 +284,12 @@ try {
 	}, 20);
 
 	let record;
-	await step('run the bound flow (script step and model step) to completion', async () => {
+	let runOutput = '';
+	await step('run the bound flow (VM script, host: true script and model step) to completion', async () => {
 		const file = writeFlow();
 		const started = flow(['run', file, '--json']);
+		const validated = flow(['validate', file]);
+		runOutput = `${validated.stdout}${validated.stderr}`;
 		const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
 		expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
 		const executionId = match[1];
@@ -311,6 +331,47 @@ try {
 		evidence.hiddenGitBashDirectories = hiddenFromPath;
 		return `vm ${fields.hostname}/${fields.user}/${fields.kernel}, script shell ${fields.bash_in_vm}${hiddenFromPath.length > 0 ? ' (Git bash hidden on the host)' : ''}`;
 	});
+
+	await step(
+		'the host: true script ran on the WRAPPER machine, with the user rights, without the wrapper secrets and canary',
+		() => {
+			expect(record !== undefined, 'no execution record');
+			const read = text =>
+				Object.fromEntries(
+					text
+						.split(/\r?\n/)
+						.filter(line => line.includes('='))
+						.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()])
+				);
+			const onHost = read(record.steps?.onhost?.io?.stdout?.text ?? '');
+			const inVm = read(record.steps?.probe?.io?.stdout?.text ?? '');
+			expect(
+				record.steps?.onhost?.sourceId === 'sandbox-live',
+				`onhost served by ${record.steps?.onhost?.sourceId}`
+			);
+			expect(
+				onHost.hostname === os.hostname(),
+				`host script hostname ${onHost.hostname} is not this machine's (${os.hostname()})`
+			);
+			expect(onHost.hostname !== inVm.hostname, `host and VM report the same hostname ${onHost.hostname}`);
+			expect(
+				onHost.user?.toLowerCase().endsWith(os.userInfo().username.toLowerCase()),
+				`host script user ${onHost.user} is not ${os.userInfo().username}`
+			);
+			expect(inVm.user !== os.userInfo().username, 'the unmarked script did not run in the VM');
+			// The workspace (the pool slot), not the project directory.
+			expect(/slot-1/.test(onHost.cwd ?? ''), `host script cwd ${onHost.cwd} is not the pool slot of the run`);
+			expect(onHost.canary === 'absent', `the wrapper canary reached the host script: ${onHost.canary}`);
+			expect(onHost.token === 'absent', 'FLOW_WORKER_TOKEN reached the host script');
+			expect(onHost.hosthome === 'absent', 'a FLOW_SANDBOX_HOST_* carrier reached the host script');
+			expect(
+				/has host: true in a flow that also has model steps/.test(runOutput),
+				'flow validate printed no host-script-with-model-steps warning for a flow that mixes a model step with a host script'
+			);
+			evidence.hostScript = { host: onHost, vm: inVm };
+			return `host ${onHost.hostname}/${onHost.user} vs vm ${inVm.hostname}/${inVm.user}; canary and token absent; cwd ${onHost.cwd}`;
+		}
+	);
 
 	await step('the sandbox is removed at the end of the run, and sbx rm took N ms', async () => {
 		const removal = await waitFor('the sbx rm call of the run', 90_000, () =>

@@ -1,6 +1,6 @@
 import { flowConfigDir } from 'flow-cli/src/config/FlowConfigDir';
 import { WorkerAdapter } from 'flow-cli/src/worker/WorkerAdapter';
-import { StepRunner, type StepRunnerConfig } from 'flow-engine';
+import { DefaultProcessLauncher, StepRunner, type StepRunnerConfig } from 'flow-engine';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -32,6 +32,8 @@ import { RelayRegistration } from '../harness/RelayRegistration';
 import { ExecSandboxPreparer } from './ExecSandboxPreparer';
 import { ExecWrapper, type StepExecutor } from './ExecWrapper';
 import { FlowSourceLookup } from './FlowSourceLookup';
+import { HostScriptEnvironment } from './HostScriptEnvironment';
+import { HostScriptLauncher } from './HostScriptLauncher';
 import { McpCallbackRules } from './McpCallbackRules';
 import { SbxProcessLauncher } from './SbxProcessLauncher';
 import { StepCommandTranslator } from './StepCommandTranslator';
@@ -192,15 +194,21 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 					} as StepRunnerConfig;
 					return new StepRunner(stepRunnerConfig);
 				});
-				const executor: StepExecutor = {
-					execute: (stepConfig, executionContext, send) =>
-						adapter.execute(
-							stepConfig as unknown as Parameters<WorkerAdapter['execute']>[0],
-							executionContext as unknown as Parameters<WorkerAdapter['execute']>[1],
-							send as unknown as Parameters<WorkerAdapter['execute']>[2]
-						) as unknown as ReturnType<StepExecutor['execute']>,
-				};
-				return executor;
+				return executorOver(adapter);
+			},
+			// A script step marked host: true: the same engine on the machine's own launcher, its environment allow-listed.
+			createHostExecutor: ({ declaredEnvironmentNames }) => {
+				const launcher = new HostScriptLauncher({
+					inner: new DefaultProcessLauncher(),
+					environment: new HostScriptEnvironment(),
+					declaredEnvironmentNames,
+					log,
+				});
+				return executorOver(
+					new WorkerAdapter(
+						() => new StepRunner({ interactive: false, processLauncher: launcher } as StepRunnerConfig)
+					)
+				);
 			},
 			log,
 			createDaemon: handlers => new DaemonLink({ url: config.daemonUrl, log, ...handlers }),
@@ -225,6 +233,17 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 			'exec wrapper stopped; a sandbox of the run, if any, is left STOPPED: `leftover list`, then `leftover remove <name>`.'
 		);
 	}
+}
+
+function executorOver(adapter: WorkerAdapter): StepExecutor {
+	return {
+		execute: (stepConfig, executionContext, send) =>
+			adapter.execute(
+				stepConfig as unknown as Parameters<WorkerAdapter['execute']>[0],
+				executionContext as unknown as Parameters<WorkerAdapter['execute']>[1],
+				send as unknown as Parameters<WorkerAdapter['execute']>[2]
+			) as unknown as ReturnType<StepExecutor['execute']>,
+	};
 }
 
 async function requirePrerequisites(

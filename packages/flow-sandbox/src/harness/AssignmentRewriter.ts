@@ -1,4 +1,5 @@
 import type { RunMounts } from '../RunMounts';
+import { SandboxError } from '../SandboxError';
 import type { SandboxLog } from '../SandboxLog';
 import { AssignmentFields } from './AssignmentFields';
 import { type ActiveAssignment, type JsonObject, type SandboxStepType } from './HarnessMessages';
@@ -38,6 +39,8 @@ export class AssignmentRewriter {
 			cannotPlace: 'the bridge cannot place the step in the sandbox.',
 		});
 		const stepType = AssignmentFields.requireStepType(stepConfig, stepId);
+		this.refuseHostMarker(raw, stepConfig, stepId);
+		const requires = this.requiresOf(raw);
 		const paths = this.translateContext(executionContext);
 		const context: JsonObject = { ...executionContext, ...paths };
 		if (typeof executionContext['flowWorkingDir'] === 'string') {
@@ -55,7 +58,14 @@ export class AssignmentRewriter {
 		}
 		AssignmentFields.warnAboutWindowsPaths(this.options.mounts, stepConfig, stepId, this.options.log);
 		return {
-			message: { type: 'assign', assignmentId, stepId, stepConfig: step, executionContext: context },
+			message: {
+				type: 'assign',
+				assignmentId,
+				stepId,
+				stepConfig: step,
+				executionContext: context,
+				...(requires === undefined ? {} : { requires }),
+			},
 			active: {
 				assignmentId,
 				executionId: String(executionContext['executionId']),
@@ -63,6 +73,28 @@ export class AssignmentRewriter {
 				stepType,
 			},
 		};
+	}
+
+	/** The additive `requires` of the daemon message, forwarded as a copy; anything but a list of strings is refused, never dropped. */
+	private requiresOf(raw: unknown): string[] | undefined {
+		const requires = (raw as JsonObject)['requires'];
+		if (requires === undefined) return undefined;
+		if (!Array.isArray(requires) || !requires.every(item => typeof item === 'string')) {
+			throw new SandboxError(
+				'invalid-argument',
+				'The "requires" of the assign message must be a list of strings; the step is not run.'
+			);
+		}
+		return [...(requires as string[])];
+	}
+
+	/** This variant runs every step in the VM through an inner worker; it cannot serve `host: true`, so it says so instead of running the step in the VM. */
+	private refuseHostMarker(raw: unknown, stepConfig: JsonObject, stepId: string): void {
+		if ((raw as JsonObject)['host'] === undefined && stepConfig['host'] !== true) return;
+		throw new SandboxError(
+			'invalid-argument',
+			`Step "${stepId}" is marked host: true, which runs a script on the wrapper's machine. The relay harness cannot do that; use the exec wrapper (the sandbox.exec worker type), or remove host: true.`
+		);
 	}
 
 	private translateContext(context: JsonObject): JsonObject {

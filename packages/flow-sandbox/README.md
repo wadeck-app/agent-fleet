@@ -142,17 +142,17 @@ Only `workspace: pool`. `in-place` and `readonly` hand the sandbox the project f
 
 The sandbox has a read/write mount of the slot, `.git` included, and can edit `<slot>/.git/config`, hooks, `.git/info/attributes` and `.gitattributes`. Measured on real sbx with `scripts/live/PoolSlotLiveCheck.mjs` (git 2.45.1.windows.1, 2026-11-08, each cell run twice, against the production helpers at e7905266). "Ran" means code planted from the sandbox ran on the HOST:
 
-| Planted from the sandbox | Plain git (control) | Daemon read probe (`GitFolderProbe`) | `hardenedGit` mutating (checkout, fetch) |
-| --- | --- | --- | --- |
-| `core.fsmonitor` | ran 2/2 | blocked 2/2 | not applicable (off) |
-| post-checkout hook, `core.hooksPath` | ran | blocked 2/2 (no hook runs in a status) | ran 2/2 |
-| `filter.*.clean`, stale index: in `.git/config`, worktree-scope config, an included file | ran 2/2 each | blocked 2/2 each | ran (1/2 to 2/2) |
-| odd driver names (dots, upper case, non-ASCII, backslash, quote) | ran 2/2 each | blocked 2/2 each | - |
-| driver name containing `=` | ran 2/2 | `FilterDriverListingError`, nothing ran, 2/2 | - |
-| name redefined from the user-level config (git-lfs-like) | planted ran | planted blocked; user-level-only driver still trusted, ran 2/2 | - |
-| `filter.*.smudge` | - | not applicable | ran 1/2 |
-| `core.sshCommand` (ssh remote) | - | not applicable | ran 2/2 at fetch |
-| `credential.helper` (http remote, 401) | - | not applicable | not triggered (inconclusive) |
+| Planted from the sandbox                                                                 | Plain git (control) | Daemon read probe (`GitFolderProbe`)                           | `hardenedGit` mutating (checkout, fetch) |
+| ---------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------------- | ---------------------------------------- |
+| `core.fsmonitor`                                                                         | ran 2/2             | blocked 2/2                                                    | not applicable (off)                     |
+| post-checkout hook, `core.hooksPath`                                                     | ran                 | blocked 2/2 (no hook runs in a status)                         | ran 2/2                                  |
+| `filter.*.clean`, stale index: in `.git/config`, worktree-scope config, an included file | ran 2/2 each        | blocked 2/2 each                                               | ran (1/2 to 2/2)                         |
+| odd driver names (dots, upper case, non-ASCII, backslash, quote)                         | ran 2/2 each        | blocked 2/2 each                                               | -                                        |
+| driver name containing `=`                                                               | ran 2/2             | `FilterDriverListingError`, nothing ran, 2/2                   | -                                        |
+| name redefined from the user-level config (git-lfs-like)                                 | planted ran         | planted blocked; user-level-only driver still trusted, ran 2/2 | -                                        |
+| `filter.*.smudge`                                                                        | -                   | not applicable                                                 | ran 1/2                                  |
+| `core.sshCommand` (ssh remote)                                                           | -                   | not applicable                                                 | ran 2/2 at fetch                         |
+| `credential.helper` (http remote, 401)                                                   | -                   | not applicable                                                 | not triggered (inconclusive)             |
 
 So the daemon's reads are safe from fsmonitor, hooks and filter drivers; mutating calls (the flow's sync step, your own tools) are not. Use dedicated slots, re-clone them, or restore `.git/config`, `hooks/`, `info/` and `.gitattributes` in the sync step before any mutating git call. Not covered: the legacy web-backend git service, FlowWorker git calls, the user's own tools. The user's global git config is out of reach of the sandbox: only the ancestors of the mounts are visible in the host user directory, and nothing could be created there as agent or root (this machine, one run).
 
@@ -251,30 +251,48 @@ What the flow must contain: `workerType: sandbox`, a string of letters, digits, 
 
 A flow asks for the sandbox with `requires: [sandbox]` (flow level; a step may add entries; injected steps inherit the flow's). The daemon matches each entry, by equality, against the guarantees of the AUTHENTICATED source instance, never against worker labels (a worker declares those itself), and filters in the router before any acceptance plugin. This plugin declares, in the manifest (static upper bound) and on the instance (what routing reads), the same list, kept equal to `SANDBOX_GUARANTEES` (`src/exec/RequiresGuard.ts`) by a test:
 
-| Guarantee | What backs it |
-| --- | --- |
-| `sandbox` | every step process runs in an sbx VM (`SbxProcessLauncher`); live: `ExecLiveCheck`, `PluginLiveCheck` |
-| `fs=confined` | the VM mounts exactly the run's workspace and `.meta` (`RunMounts`); only their ancestors are visible, nothing can be created beside them (`PoolSlotLiveCheck`, one machine). The pool slot itself is writable (T-16) |
-| `env=clean` | the host environment is not passed into the VM (`VmEnvironmentFilter`); `ExecLiveCheck` asserts no AWS key, no launch token, no ambient variable |
+| Guarantee       | What backs it                                                                                                                                                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sandbox`       | every step process runs in an sbx VM (`SbxProcessLauncher`); live: `ExecLiveCheck`, `PluginLiveCheck`                                                                                                                             |
+| `fs=confined`   | the VM mounts exactly the run's workspace and `.meta` (`RunMounts`); only their ancestors are visible, nothing can be created beside them (`PoolSlotLiveCheck`, one machine). The pool slot itself is writable (T-16)             |
+| `env=clean`     | the host environment is not passed into the VM (`VmEnvironmentFilter`); `ExecLiveCheck` asserts no AWS key, no launch token, no ambient variable                                                                                  |
 | `ports=private` | the plugin publishes no port; a listener started in a VM was not reachable from the host (`PortsLiveCheck`, one machine, sbx 0.51.0). Limit: VMs have identical private addressing, so a VM-to-VM probe by address cannot be made |
-| `clean=run` | a fresh VM per run, removed at the end of the run. The pool slot content (the workspace) persists |
+| `clean=run`     | a fresh VM per run, removed at the end of the run. The pool slot content (the workspace) persists                                                                                                                                 |
 
 NOT declared, on purpose: `net=filtered` (raw TCP to public destinations is unverified and an allow-all machine policy would make it false: see "Raw TCP"), `fs=readonly-enforced` (the exec variant has no `:ro` mount yet). A flow requiring either is refused at run start (no declared source provides it).
 
 Because the source stays `exclusive: true`, a step is offered to it only when its requirements are non-empty and all guaranteed; `requires: [fs=confined]` alone is enough, a step without requirements never reaches it. Write it like this:
 
 ```yaml
-requires: [sandbox]           # flow level: every step, injected ones included
+requires: [sandbox] # flow level: every step, injected ones included
 steps:
     - id: build
-      requires: [clean=run]   # a step adds to the flow's list
+      requires: [clean=run] # a step adds to the flow's list
 ```
 
 An entry no declared source provides is refused when the run starts, with a "Did you mean" for a typo. `flow validate` offline cannot know the sources, so it does not catch that.
 
 **The wrapper refuses a step the daemon did not route by a guarantee** (`RequiresGuard`, fail closed): an assignment with no `requires`, an empty one, a malformed one, or an entry this worker does not provide fails the step with a message naming what is missing and the flow syntax to add; no sandbox is created. This also means a run bound only by `workerType: sandbox` (no `requires`) is refused: add `requires: [sandbox]`. The plugin starts its wrapper with `--require-guarantees`; the dev harness scripts (routing by labels, no guarantees) do not, and the relay harness is unchanged.
 
-**Host-only steps FAIL in a bound run.** A strictly bound run never falls back to a host worker, so a step that cannot run in the sandbox (`cmd`, `pwsh`, a script that calls the flow daemon API, a `user_intervention` step, Codex or OpenCode steps) does not run elsewhere: it fails. Put host-only work in another flow. This supersedes the earlier plan that let such steps run on the host (design decision 27).
+**Host-only steps FAIL in a bound run.** A strictly bound run never falls back to a host worker, so a step that cannot run in the sandbox (`cmd`, `pwsh`, a script that calls the flow daemon API, a `user_intervention` step, Codex or OpenCode steps) does not run elsewhere: it fails. Put host-only work in another flow. This supersedes the earlier plan that let such steps run on the host (design decision 27). The one exception is a script step marked `host: true` (next section).
+
+### Host scripts (`host: true`)
+
+```yaml
+steps:
+    - id: sync
+      type: script
+      host: true # runs on the machine of the sandbox worker, not in the VM
+      script: git fetch
+```
+
+- Script steps only; the daemon refuses it elsewhere, and the wrapper refuses a `host: true` model step too. Absent or `host: false` = the VM, as before. Injected steps can never carry it.
+- Served by the wrapper itself, never handed to another worker. The `requires:` guard still applies (the step carries the run's requirements), and no sandbox is created or woken for it.
+- cwd is the run's workspace (the pool slot). Timeout, cancel, kill-tree and output capture are the engine's, identical to a VM step; the log has one line `script step "<id>" runs on the host (host: true)`.
+- **Environment is an allow-list** (`HostScriptEnvironment`): `PATH`, system and temp directories, home directories, locale, `FLOW_BASH_PATH`, plus the names the step declares in `env` / `secrets`. Everything else of the wrapper's environment is withheld, always including `FLOW_WORKER_*`, `FLOW_SANDBOX_HOST_*` and `AWS_*` unless the step declares the name itself. The log names the withheld variables (never values).
+- **Security statement.** A host script runs with YOUR rights, on files an agent may have written in the slot (hooks, `.git/config`, package scripts). `flow validate` and `flow run` warn `HOST_SCRIPT_WITH_MODEL_STEPS` when the flow also has a model step: remove `host: true`, or keep it only for a script that reads nothing a model wrote. The environment filter does not make that safe; it only keeps the wrapper's secrets out.
+- The relay harness (dev only) refuses `host: true`: it cannot serve it. It forwards `requires` to the inner worker.
+- Live proof: `PluginLiveCheck` runs a `host: true` script next to a VM script in one run (different hostname and user, a canary variable of the wrapper environment absent, cwd = the pool slot).
 
 The wrapper cannot see the flow, so it never claims isolation. At startup it reads the registry of worker sources it can see (`worker-sources.json`, the file `flow worker source list` prints; same user and `XDG_CONFIG_HOME` only) and logs one line: an info line naming the worker type when its source has a plugin ref, otherwise ONE `ISOLATION WARNING` (no plugin ref, source not found in that registry, or registry unreadable) saying label routing is not isolating. It does not read the daemon's own state, so a daemon with another config directory shows up as "could not be verified".
 
