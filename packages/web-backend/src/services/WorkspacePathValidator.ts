@@ -1,5 +1,5 @@
 import { access, constants, lstat } from 'node:fs/promises';
-import { isAbsolute, normalize, resolve, sep } from 'node:path';
+import nodePath, { type PlatformPath } from 'node:path';
 import { createLogger } from 'shared-common/logger';
 
 const log = createLogger('WorkspacePathValidator');
@@ -8,6 +8,12 @@ const log = createLogger('WorkspacePathValidator');
  * Service responsible for validating and securing workspace paths
  */
 export class WorkspacePathValidator {
+	/**
+	 * @param pathApi - Path flavour used to judge paths. Defaults to the host flavour; tests inject
+	 * `path.win32` / `path.posix` so both behaviours are covered on any host.
+	 */
+	constructor(private readonly pathApi: PlatformPath = nodePath) {}
+
 	// System directories that should never be used as workspace paths
 	private readonly FORBIDDEN_PATHS_WINDOWS = [
 		// violations-suppress: shared/no-out-of-repo-path these paths are listed to FORBID workspace creation inside system directories; they are matched against user input, not resolved
@@ -66,7 +72,7 @@ export class WorkspacePathValidator {
 	 * Check if path is absolute
 	 */
 	isPathAbsolute(path: string): boolean {
-		return isAbsolute(path);
+		return this.pathApi.isAbsolute(path);
 	}
 
 	/**
@@ -75,8 +81,8 @@ export class WorkspacePathValidator {
 	isPathSafe(path: string): boolean {
 		try {
 			// Normalize the path to resolve . and ..
-			const normalizedPath = normalize(path);
-			const resolvedPath = resolve(path);
+			const normalizedPath = this.pathApi.normalize(path);
+			const resolvedPath = this.pathApi.resolve(path);
 
 			// Check if normalized path differs significantly (indicates traversal attempt)
 			// After normalization, the path should be the same as the resolved path
@@ -87,7 +93,7 @@ export class WorkspacePathValidator {
 
 			// Check for .. segments in the normalized path
 			// After normalization, there should be no .. segments
-			if (normalizedPath.includes(`..${sep}`) || normalizedPath.includes(`${sep}..`)) {
+			if (normalizedPath.includes(`..${this.pathApi.sep}`) || normalizedPath.includes(`${this.pathApi.sep}..`)) {
 				log.warn('Path contains .. segments after normalization', { path, normalizedPath });
 				return false;
 			}
@@ -109,7 +115,7 @@ export class WorkspacePathValidator {
 	 * Check if path is in a system directory
 	 */
 	private isSystemDirectory(path: string): boolean {
-		const normalizedPath = normalize(path).toLowerCase();
+		const normalizedPath = this.pathApi.normalize(path).toLowerCase();
 
 		// Check Windows system paths
 		for (const forbiddenPath of this.FORBIDDEN_PATHS_WINDOWS) {
@@ -146,14 +152,14 @@ export class WorkspacePathValidator {
 				}
 			} else {
 				// Path doesn't exist, check if parent directory is writable
-				const parentPath = resolve(path, '..');
+				const parentPath = this.pathApi.resolve(path, '..');
 
 				// Check if parent exists
 				const parentExists = await this.pathExists(parentPath);
 				if (!parentExists) {
 					// Parent doesn't exist either, we'll need to create it
 					// Check grandparent directory instead
-					const grandparentPath = resolve(parentPath, '..');
+					const grandparentPath = this.pathApi.resolve(parentPath, '..');
 					const grandparentExists = await this.pathExists(grandparentPath);
 
 					if (!grandparentExists) {

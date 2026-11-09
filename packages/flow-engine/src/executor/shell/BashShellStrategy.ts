@@ -45,9 +45,11 @@ export class BashShellStrategy implements ShellStrategy {
 			if (fs.existsSync(loc)) return loc;
 		}
 
+		// Windows path semantics (';' delimiter, backslash join) whatever the host node:path flavour is
+		// (see WindowsShellStrategies.posixHost.test.ts)
 		const pathEnv = env['PATH'] ?? '';
-		for (const dir of pathEnv.split(path.delimiter)) {
-			const candidate = path.join(dir, 'bash.exe');
+		for (const dir of pathEnv.split(path.win32.delimiter)) {
+			const candidate = path.win32.join(dir, 'bash.exe');
 			if (fs.existsSync(candidate)) return candidate;
 		}
 

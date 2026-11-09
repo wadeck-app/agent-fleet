@@ -32,7 +32,8 @@ export class PwshShellStrategy implements ShellStrategy {
 		if (pwshPath) return pwshPath;
 
 		const systemRoot = env['SystemRoot'] ?? env['SYSTEMROOT'] ?? 'C:\\Windows';
-		const powershellPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+		// Windows path semantics whatever the host node:path flavour is (see WindowsShellStrategies.posixHost.test.ts)
+		const powershellPath = path.win32.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 		if (fs.existsSync(powershellPath)) return powershellPath;
 
 		throw new Error(

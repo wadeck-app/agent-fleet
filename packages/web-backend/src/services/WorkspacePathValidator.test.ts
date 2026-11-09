@@ -1,4 +1,5 @@
 import { access, constants, lstat } from 'fs/promises';
+import { posix, win32 } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkspacePathValidator } from './WorkspacePathValidator';
@@ -7,10 +8,14 @@ import { WorkspacePathValidator } from './WorkspacePathValidator';
 vi.mock('fs/promises');
 
 describe('WorkspacePathValidator', () => {
+	// The validator takes the path flavour as a dependency, so both flavours are tested on any
+	// host: the Windows cases run with path.win32 and the POSIX cases with path.posix.
 	let validator: WorkspacePathValidator;
+	let posixValidator: WorkspacePathValidator;
 
 	beforeEach(() => {
-		validator = new WorkspacePathValidator();
+		validator = new WorkspacePathValidator(win32);
+		posixValidator = new WorkspacePathValidator(posix);
 		vi.clearAllMocks();
 	});
 
@@ -23,9 +28,14 @@ describe('WorkspacePathValidator', () => {
 			// Test Windows path
 			await expect(validator.validatePath('C:\\Users\\test\\workspace')).resolves.toBeUndefined();
 
-			// Note: Unix paths are not tested on Windows due to path normalization differences
-			// On Windows, '/home/user/workspace' gets normalized to 'C:\home\user\workspace'
-			// which may trigger path traversal warnings
+			// Test POSIX path
+			await expect(posixValidator.validatePath('/home/user/workspace')).resolves.toBeUndefined();
+		});
+
+		it('should reject a Windows drive path when the host path flavour is POSIX', async () => {
+			await expect(posixValidator.validatePath('C:\\Users\\test\\workspace')).rejects.toThrow(
+				'Path must be absolute'
+			);
 		});
 
 		it('should reject relative paths', async () => {
@@ -68,25 +78,20 @@ describe('WorkspacePathValidator', () => {
 		});
 
 		it('should reject Unix system directories', async () => {
-			// Skip on Windows - Unix paths get normalized differently
-			if (process.platform === 'win32') {
-				return;
-			}
-
 			// Execute & Verify
-			await expect(validator.validatePath('/etc/config')).rejects.toThrow(
+			await expect(posixValidator.validatePath('/etc/config')).rejects.toThrow(
 				'Cannot create workspace in system directories'
 			);
 
-			await expect(validator.validatePath('/bin/script')).rejects.toThrow(
+			await expect(posixValidator.validatePath('/bin/script')).rejects.toThrow(
 				'Cannot create workspace in system directories'
 			);
 
-			await expect(validator.validatePath('/usr/bin/app')).rejects.toThrow(
+			await expect(posixValidator.validatePath('/usr/bin/app')).rejects.toThrow(
 				'Cannot create workspace in system directories'
 			);
 
-			await expect(validator.validatePath('/sys/device')).rejects.toThrow(
+			await expect(posixValidator.validatePath('/sys/device')).rejects.toThrow(
 				'Cannot create workspace in system directories'
 			);
 		});
@@ -132,7 +137,8 @@ describe('WorkspacePathValidator', () => {
 	describe('isPathAbsolute', () => {
 		it('should return true for absolute paths', () => {
 			expect(validator.isPathAbsolute('C:\\Users\\test\\workspace')).toBe(true);
-			expect(validator.isPathAbsolute('/home/user/workspace')).toBe(true);
+			expect(posixValidator.isPathAbsolute('/home/user/workspace')).toBe(true);
+			expect(posixValidator.isPathAbsolute('C:\\Users\\test\\workspace')).toBe(false);
 		});
 
 		it('should return false for relative paths', () => {
@@ -145,10 +151,7 @@ describe('WorkspacePathValidator', () => {
 	describe('isPathSafe', () => {
 		it('should return true for safe paths', () => {
 			expect(validator.isPathSafe('C:\\Users\\test\\workspace')).toBe(true);
-			// Skip Unix path test on Windows due to normalization differences
-			if (process.platform !== 'win32') {
-				expect(validator.isPathSafe('/home/user/workspace')).toBe(true);
-			}
+			expect(posixValidator.isPathSafe('/home/user/workspace')).toBe(true);
 		});
 
 		it('should return false for paths with null bytes', () => {

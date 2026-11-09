@@ -3,7 +3,6 @@
 // coverage of the resumability logic itself. Does not require a built worker binary: both
 // cases here are rejected before any step would ever be dispatched.
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { armLeakGuardBeforeAll } from '../test-utils/LeakGuardHooks';
@@ -48,7 +47,9 @@ describe('resume command (real daemon)', () => {
 		const registry = new RegisteredProjectFixture().useAsProcessEnv();
 		const projectFolder = registry.makeFolder('resume-e2e');
 		await registry.register('resume-e2e', { folder: projectFolder });
-		const flowYml = path.join(os.tmpdir(), `resume-e2e-flow-${Date.now()}.yml`);
+		// Inside the project folder (the run's cwd): the daemon refuses a flow file outside the cwd and the home directory,
+		// and the temp directory is under the home directory on some machines only (not on CI).
+		const flowYml = path.join(projectFolder, 'flow.yml');
 		fs.writeFileSync(flowYml, SIMPLE_SCRIPT_FLOW, 'utf8');
 
 		try {
@@ -60,7 +61,7 @@ describe('resume command (real daemon)', () => {
 				cwd: projectFolder,
 				inputs: {},
 			});
-			expect(runResponse.type).toBe('execution_started');
+			expect(runResponse.type, `run refused: ${JSON.stringify(runResponse)}`).toBe('execution_started');
 			if (runResponse.type !== 'execution_started') throw new Error('Expected execution_started');
 
 			const resumeResponse = await ctx.client.send('resume', {

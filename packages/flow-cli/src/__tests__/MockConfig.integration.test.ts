@@ -3,7 +3,6 @@
 // Run with: npx vitest run src/__tests__/MockConfig.integration.test.ts
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -54,12 +53,14 @@ steps:
 
 describe.skipIf(!workerRunnable)('--mock-config end-to-end (manual verification)', () => {
 	it('real run: model step actually calls the mock CLI and produces its own text', async () => {
-		const flowYml = path.join(os.tmpdir(), `mock-verify-real-${Date.now()}.yml`);
-		fs.writeFileSync(flowYml, TWO_STEP_FLOW, 'utf8');
 		// The in-process daemon resolves the project of the run from this process's registry.
 		const registry = new RegisteredProjectFixture().useAsProcessEnv();
 		const projectFolder = registry.makeFolder('mock-verify');
 		await registry.register('mock-verify', { folder: projectFolder });
+		// Inside the project folder (the run's cwd): the daemon refuses a flow file outside the cwd and the home directory,
+		// and the temp directory is under the home directory on some machines only (not on CI).
+		const flowYml = path.join(projectFolder, 'flow.yml');
+		fs.writeFileSync(flowYml, TWO_STEP_FLOW, 'utf8');
 		try {
 			await using ctx = await startTestDaemon();
 			const response = await ctx.client.send('run', {
@@ -71,7 +72,7 @@ describe.skipIf(!workerRunnable)('--mock-config end-to-end (manual verification)
 				// API call in this verification -- the per-step override is NOT exercised here.
 				mockEnv: { generate_flow: { OPENCODE_MOCK_PATH: mockPath } },
 			});
-			expect(response.type).toBe('execution_started');
+			expect(response.type, `run refused: ${JSON.stringify(response)}`).toBe('execution_started');
 			if (response.type !== 'execution_started') throw new Error('expected execution_started');
 			const finalState = await waitForExecution(ctx.daemonDir, response.executionId, 30000);
 			expect(finalState.status).toBe('completed');
@@ -82,12 +83,14 @@ describe.skipIf(!workerRunnable)('--mock-config end-to-end (manual verification)
 	}, 35000);
 
 	it('mocked run: --mock-config overrides generate_flow to a fixed string, zero real model behavior, downstream step receives exactly that string', async () => {
-		const flowYml = path.join(os.tmpdir(), `mock-verify-mocked-${Date.now()}.yml`);
-		fs.writeFileSync(flowYml, TWO_STEP_FLOW, 'utf8');
 		// The in-process daemon resolves the project of the run from this process's registry.
 		const registry = new RegisteredProjectFixture().useAsProcessEnv();
 		const projectFolder = registry.makeFolder('mock-verify');
 		await registry.register('mock-verify', { folder: projectFolder });
+		// Inside the project folder (the run's cwd): the daemon refuses a flow file outside the cwd and the home directory,
+		// and the temp directory is under the home directory on some machines only (not on CI).
+		const flowYml = path.join(projectFolder, 'flow.yml');
+		fs.writeFileSync(flowYml, TWO_STEP_FLOW, 'utf8');
 		try {
 			await using ctx = await startTestDaemon();
 			const response = await ctx.client.send('run', {
@@ -104,7 +107,7 @@ describe.skipIf(!workerRunnable)('--mock-config end-to-end (manual verification)
 				},
 				mockConfigPath: '/tmp/fixture-mock-config.yaml',
 			});
-			expect(response.type).toBe('execution_started');
+			expect(response.type, `run refused: ${JSON.stringify(response)}`).toBe('execution_started');
 			if (response.type !== 'execution_started') throw new Error('expected execution_started');
 			const finalState = await waitForExecution(ctx.daemonDir, response.executionId, 30000);
 			expect(finalState.status).toBe('completed');

@@ -17,7 +17,8 @@ export class CmdShellStrategy implements ShellStrategy {
 		}
 
 		const systemRoot = env['SystemRoot'] ?? env['SYSTEMROOT'] ?? 'C:\\Windows';
-		const cmdPath = path.join(systemRoot, 'System32', 'cmd.exe');
+		// Windows path semantics whatever the host node:path flavour is (see WindowsShellStrategies.posixHost.test.ts)
+		const cmdPath = path.win32.join(systemRoot, 'System32', 'cmd.exe');
 		if (fs.existsSync(cmdPath)) return cmdPath;
 
 		throw new Error(

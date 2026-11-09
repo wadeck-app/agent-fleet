@@ -251,7 +251,13 @@ describe('the packaged module through a real app-core server', () => {
 	it('packaged backend bundle stays free of the plugin implementations', () => {
 		const backendBundle = join(workDir, 'module', 'api-backend', 'backend.cjs');
 		expect(readFileSync(backendBundle, 'utf8')).not.toContain('execa');
-		// execa and its tree were ~60% of the bundle (a regression doubles it); 300 KB leaves room for the served-text code in flow-core.
-		expect(statSync(backendBundle).size).toBeLessThan(300_000);
+		// execa and its tree were ~60% of the bundle (a regression doubles it). Budget history: 300 KB when the bundle was
+		// ~252 KB (b3c71a51); raised to 330 KB for a measured 303.6 KB. The +52 KB is served-text and view code that moved into
+		// flow-core and the backend routes (step cost, log timeline, recorded definition versions, step I/O lines, retry
+		// badges, project routes, not-found notice); js-yaml (~104 KB) and singleton-daemon-kit (~44 KB) did not grow.
+		const size = statSync(backendBundle).size;
+		expect(size, `backend.cjs is ${size} bytes; see the budget history above before raising it again`).toBeLessThan(
+			330_000
+		);
 	});
 });

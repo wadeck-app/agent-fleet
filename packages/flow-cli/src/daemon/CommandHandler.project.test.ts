@@ -81,7 +81,9 @@ describe('CommandHandler project resolution', () => {
 			undefined,
 			undefined,
 			undefined,
-			false,
+			// These tests are about project resolution, not the flow-file access guard: the flow lives in a temp directory,
+			// which is only under the home directory on some machines (allowed there, refused as FLOW_NOT_FOUND elsewhere, e.g. CI).
+			true,
 			undefined,
 			undefined,
 			workspaceProviders()
@@ -177,7 +179,7 @@ describe('CommandHandler project resolution', () => {
 
 		const result = await build().handleRun({ type: 'run', flowFile, cwd: nested } as never);
 
-		expect(result.type).toBe('execution_started');
+		expect(result.type, `run refused: ${JSON.stringify(result)}`).toBe('execution_started');
 		expect(onlyRecord()).toMatchObject({ projectId: alpha.id, projectRoot: alpha.folder });
 	});
 
@@ -203,7 +205,7 @@ describe('CommandHandler project resolution', () => {
 		const added = await registry.register('later', { folder: later });
 		const result = await handler.handleRun({ type: 'run', flowFile, cwd: later } as never);
 
-		expect(result.type).toBe('execution_started');
+		expect(result.type, `run refused: ${JSON.stringify(result)}`).toBe('execution_started');
 		expect(onlyRecord().projectId).toBe(added.id);
 	});
 
@@ -213,7 +215,7 @@ describe('CommandHandler project resolution', () => {
 
 		const result = await build().handleRun({ type: 'run', flowFile, cwd: elsewhere, projectRef: 'alpha' } as never);
 
-		expect(result.type).toBe('execution_started');
+		expect(result.type, `run refused: ${JSON.stringify(result)}`).toBe('execution_started');
 		expect(onlyRecord()).toMatchObject({ projectId: alpha.id, projectRoot: alpha.folder });
 	});
 
@@ -223,7 +225,7 @@ describe('CommandHandler project resolution', () => {
 
 		const result = await build().handleRun({ type: 'run', flowFile, cwd: elsewhere, envProject: 'alpha' } as never);
 
-		expect(result.type).toBe('execution_started');
+		expect(result.type, `run refused: ${JSON.stringify(result)}`).toBe('execution_started');
 		expect(onlyRecord().projectId).toBe(alpha.id);
 	});
 
@@ -317,7 +319,9 @@ describe('CommandHandler run origin', () => {
 			undefined,
 			undefined,
 			undefined,
-			false,
+			// These tests are about project resolution, not the flow-file access guard: the flow lives in a temp directory,
+			// which is only under the home directory on some machines (allowed there, refused as FLOW_NOT_FOUND elsewhere, e.g. CI).
+			true,
 			undefined,
 			undefined,
 			workspaceProviders()
@@ -359,7 +363,7 @@ describe('CommandHandler run origin', () => {
 			origin,
 		} as never);
 
-		expect(result.type).toBe('execution_started');
+		expect(result.type, `run refused: ${JSON.stringify(result)}`).toBe('execution_started');
 		expect(records()).toEqual([expect.objectContaining({ origin })]);
 	});
 
