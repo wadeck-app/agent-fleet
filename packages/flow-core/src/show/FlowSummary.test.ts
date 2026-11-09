@@ -59,6 +59,22 @@ describe('renderFlowSummary - requirements and profiles', () => {
 		expect(row).toContain('profile:untrusted-code  requires:gpu');
 	});
 
+	it('marks a host script on its row, and only that one', () => {
+		const rows = renderFlowSummary(
+			{
+				...flow,
+				steps: [
+					{ id: 'lister', type: 'script', script: 'ls', host: true },
+					{ id: 'vm-one', type: 'script', script: 'ls' },
+				],
+			} as unknown as FlowDefinition,
+			expand
+		).split('\n');
+
+		expect(rows.find(line => line.includes('lister'))).toContain('host:true');
+		expect(rows.find(line => line.includes('vm-one'))).not.toContain('host:');
+	});
+
 	it('prints nothing about requirements for a flow without them (output unchanged)', () => {
 		const out = renderFlowSummary(flow, expand);
 

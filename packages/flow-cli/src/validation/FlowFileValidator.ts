@@ -10,6 +10,7 @@ import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { describeMissingFlowFile } from '../cli/commands/FlowReference';
+import { surfacedWarningsOf } from './SurfacedWarnings';
 
 export interface CliValidationError {
 	type: string;
@@ -24,16 +25,6 @@ export type ValidateResult =
 	| { exit: 3; errors: CliValidationError[] }
 	// The file is a flow registry (flows.yml format), not a single flow. The CLI maps it to process exit code 1.
 	| { exit: 4; message: string; flowIds: string[]; includes: string[] };
-
-const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([
-	ValidationCode.SUB_STEP_SIBLING_DEPENDENCY,
-	ValidationCode.SUB_STEP_WAVES_SINGLE_WAVE,
-	ValidationCode.WAVE_REDUNDANT_DEPENDS,
-	ValidationCode.SCRIPT_BODY_INTERPOLATION,
-	ValidationCode.WORKSPACE_DEPRECATED,
-	ValidationCode.WORKSPACE_WORKINGDIR_ABSOLUTE,
-	ValidationCode.WORKER_TYPE_DEPRECATED,
-]);
 
 // Same reserved key as FlowRegistry.loadProjectFlows
 const REGISTRY_INCLUDES_KEY = 'includes';
@@ -148,10 +139,8 @@ export function validateFlowFile(filePath: string, versions: DefinitionSnapshotS
 			errors: assessment.errors.map(message => ({ type: 'version', message, path: 'version' })),
 		};
 	}
-	// Only the warning codes in SURFACED_WARNING_CODES are reported: the other engine warnings (missing step name, no inputs...) stay out of the CLI output
-	const flowWarnings = result.issues
-		.filter((i: ValidationIssue) => i.severity === 'warning' && SURFACED_WARNING_CODES.has(i.code))
-		.map(issueToWarning);
+	// Only the surfaced warning codes are reported (see SurfacedWarnings): the other engine warnings (missing step name, no inputs...) stay out of the CLI output
+	const flowWarnings = surfacedWarningsOf(result.issues);
 	const notes = usesRequirements(flow) ? [REQUIREMENTS_RUN_START_NOTE] : [];
 	return {
 		exit: 0,
@@ -169,10 +158,6 @@ function usesRequirements(flow: FlowDefinition): boolean {
 	const declares = (target: { requires?: unknown; profile?: unknown }): boolean =>
 		target.requires !== undefined || target.profile !== undefined;
 	return declares(flow) || (Array.isArray(flow.steps) && flow.steps.some(step => declares(step)));
-}
-
-function issueToWarning(issue: ValidationIssue): string {
-	return issue.suggestion ? `${issue.message}. Fix: ${issue.suggestion}` : issue.message;
 }
 
 function issueToCliError(issue: ValidationIssue): CliValidationError {
@@ -205,6 +190,7 @@ export function validationCodeToType(code: ValidationCode): string {
 		case ValidationCode.SUB_STEP_SIBLING_DEPENDENCY:
 		case ValidationCode.OPENCODE_SHELL_NOT_FOUND:
 		case ValidationCode.WORKER_TYPE_DEPRECATED:
+		case ValidationCode.HOST_SCRIPT_WITH_MODEL_STEPS:
 			return 'schema';
 		case ValidationCode.WORKSPACE_READONLY_CONFLICT:
 		case ValidationCode.WORKSPACE_DEPRECATED:

@@ -835,6 +835,14 @@ export interface ScriptFlowStep extends BaseFlowStep {
 	 * Only script steps may use secrets. Values are supplied by the executing worker and never logged.
 	 */
 	secrets?: string[];
+
+	/**
+	 * `true` asks the worker that serves the run to execute this script on its own machine instead of inside its
+	 * isolation (a worker that isolates, e.g. a sandbox, runs every script in the VM by default). `false` is the
+	 * explicit spelling of the default. Static: the literal `true` or `false`, never a template. The core only carries
+	 * and validates it; the worker acts on it. Never allowed on an injected step.
+	 */
+	host?: boolean;
 }
 
 /**

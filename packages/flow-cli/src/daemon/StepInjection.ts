@@ -1,4 +1,4 @@
-import { ReadOnlyWorkspaceRules } from 'flow-engine';
+import { InjectedHostMarkerGuard, ReadOnlyWorkspaceRules } from 'flow-engine';
 import type { SchedulerStep } from 'flow-engine';
 import type { FlowStep } from 'flow-engine';
 
@@ -34,7 +34,14 @@ export class StepInjection {
 			);
 		}
 
-		const allKnownIds = new Set([...this.executions.knownStepIds(executionId), ...injectedSteps.map(s => s.id)]);
+		// Injected steps run in the run's confinement: none, at any depth, may ask to run on the worker's machine.
+		// The whole batch is refused (nothing stripped, nothing partially injected), whatever the parent declares.
+		const hostMarked = InjectedHostMarkerGuard.find(injectedSteps);
+		if (hostMarked.length > 0) {
+			throw new Error(InjectedHostMarkerGuard.refusal(hostMarked));
+		}
+
+		const allKnownIds =new Set([...this.executions.knownStepIds(executionId), ...injectedSteps.map(s => s.id)]);
 
 		const readOnly = this.executions.context(executionId)?.workspaceReadOnly === true;
 

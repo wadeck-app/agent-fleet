@@ -283,6 +283,22 @@ describe('FlowDefinitionResolver', () => {
 			expect(() => again.commit()).not.toThrow();
 		});
 
+		it('keeps the host marker of the stored definition, and adding host: true changes the hash', () => {
+			const withHost = (host: boolean | undefined): Record<string, unknown> => {
+				const base = definition('1.0.0');
+				const step = (base['steps'] as Record<string, unknown>[])[0]!;
+				return { ...base, steps: [host === undefined ? step : { ...step, host }] };
+			};
+			expect(hashDefinition(withHost(true))).not.toBe(hashDefinition(withHost(undefined)));
+			expect(hashDefinition(withHost(true))).not.toBe(hashDefinition(withHost(false)));
+
+			const first = fromFile(withHost(true));
+			// The file changed to drop the marker: the run must start again from what it was accepted with.
+			fromFile({ ...withHost(undefined), version: '1.1.0' });
+
+			expect(resolver.forSnapshotRef(first.definitionSnapshot, 'file').flow.steps[0]).toMatchObject({ host: true });
+		});
+
 		it('reads the snapshot even when the file it came from changed or disappeared', () => {
 			const first = fromFile(definition('1.0.0'));
 			fromFile(definition('1.1.0', 'echo changed'));

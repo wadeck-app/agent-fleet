@@ -445,3 +445,43 @@ describe('flow run: run that waits for a workspace', () => {
 		expect(stdout).toEqual(['{"executionId":"exec0001"}\n']);
 	});
 });
+
+describe('flow run: warnings of the accepted run', () => {
+	const warnings = [
+		"Script step 'lister' has host: true in a flow that also has model steps. Fix: Remove `host: true` from 'lister'",
+		"Script step 'other' has host: true in a flow that also has model steps. Fix: Remove `host: true` from 'other'",
+	];
+	const startedWithWarnings = (): void => {
+		harness.send.mockResolvedValue({ type: 'execution_started', executionId: 'exec0001', warnings });
+	};
+
+	it('prints one stderr line per warning the daemon reports, stdout stays the bare execution id', async () => {
+		startedWithWarnings();
+		createExecution('exec0001', { status: 'running' });
+		expect(await runCli(flowFile)).toBe(0);
+		expect(logs).toEqual(['exec0001']);
+		expect(errors).toEqual(warnings.map(warning => `Warning: ${warning}`));
+	});
+
+	it('prints nothing when the daemon reports none', async () => {
+		startedResponse();
+		createExecution('exec0001', { status: 'running' });
+		expect(await runCli(flowFile)).toBe(0);
+		expect(errors).toEqual([]);
+	});
+
+	it('keeps --json output untouched (the warnings are in the daemon response only)', async () => {
+		startedWithWarnings();
+		createExecution('exec0001', { status: 'running' });
+		expect(await runCli(flowFile, '--json')).toBe(0);
+		expect(errors).toEqual([]);
+		expect(stdout).toEqual(['{"executionId":"exec0001"}\n']);
+	});
+
+	it('stays silent with --quiet', async () => {
+		startedWithWarnings();
+		createExecution('exec0001', { status: 'running' });
+		expect(await runCli(flowFile, '--quiet')).toBe(0);
+		expect(errors).toEqual([]);
+	});
+});

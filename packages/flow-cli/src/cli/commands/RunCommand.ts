@@ -191,12 +191,20 @@ export function registerRunCommand(program: Command): void {
 					);
 				}
 
-				const { executionId } = response as { type: 'execution_started'; executionId: string };
+				const { executionId, warnings } = response as Extract<DaemonResponse, { type: 'execution_started' }>;
 				if (!executionId) {
 					console.error(
 						formatCliError('daemon returned a response without an executionId -- try restarting the daemon')
 					);
 					process.exit(1);
+				}
+
+				// What `flow validate` would have warned about, for a run that was accepted anyway: one stderr line each, so stdout stays
+				// the bare execution id; machine output (--json) and --quiet are left unchanged.
+				if (!options.quiet && !(options.json && !options.human)) {
+					for (const warning of warnings ?? []) {
+						console.error(`Warning: ${warning}`);
+					}
 				}
 
 				// stderr, so that stdout stays the bare execution id a script reads; machine output (--json) is left unchanged.

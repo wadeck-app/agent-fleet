@@ -591,6 +591,25 @@ Executes a shell script or command in the workspace.
           echo done
     ```
 
+#### `host`
+
+- **Type**: `boolean` (optional, script steps only). Default: absent, same as `false`.
+- **Meaning**: `true` asks the worker that serves the run to execute this script on its own machine, not in its isolation. A worker that isolates (the sandbox) runs EVERY script in the VM by default; mark only the script that must not (e.g. a plain `ls` of the host). A test suite that needs a dev server belongs in the VM: leave it unmarked. The core carries and validates the marker; the worker acts on it (see `WORKERS.md`, `assign`).
+- **Static**: write the literal `true` or `false`. A string (`"true"`) or a template (`${{ ... }}`, also inside a string) is a validation error: the marker is a fact of the definition, not computed from inputs or outputs. To choose, write two steps and select one with `when:`.
+- **Script only**: `host` on a model, subflow or user_intervention step is a validation error.
+- **Never injected**: `provideSteps` refuses any injected step with `host` other than `false`, at any nesting depth and whatever the parent declares. The whole batch is refused; nothing is stripped.
+- **Warning `HOST_SCRIPT_WITH_MODEL_STEPS`**: one per `host: true` script in a flow that also has a model step. It runs with the user's rights on a workspace an agent may have written (project files, `.git` config and hooks, package scripts). Fix: remove `host: true`, or keep it only when the script does not read files an agent wrote. `flow validate` prints it; `flow run` prints it on stderr when the run is accepted.
+- **Shown** by `flow show <file>` as `host:true` on the step row (not by `flow show <execution>`, whose record holds no definition). Part of the definition and its hash like any field; a resumed run keeps the stored marker.
+- **Example**:
+    ```yaml
+    - type: script
+      id: list-host
+      name: 'List the host folder'
+      shell: bash
+      host: true
+      script: ls
+    ```
+
 #### `timeout`
 
 - **Type**: positive number of **seconds** (optional, script steps; model steps use minutes). Max 2147483.

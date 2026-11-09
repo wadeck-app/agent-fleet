@@ -334,6 +334,35 @@ describe('StepDispatcher - requirements', () => {
 
 			expect(sent[0]?.message).not.toHaveProperty('requires');
 		});
+
+		// Additive: `host: true` is repeated at the top level so a wrapper does not parse stepConfig; the whole step
+		// definition (stepConfig) carries it as well.
+		it('carries `host: true` at the top level for a script step marked host, next to the full stepConfig', async () => {
+			const { dispatcher, enqueue, addWorker, sent } = await build();
+			addWorker(workerOf('w-sbx', 'sbx'));
+			enqueue('s1', { host: true });
+
+			dispatcher.tryDispatch();
+
+			expect(sent[0]?.message).toMatchObject({ type: 'assign', stepId: 's1', host: true });
+			expect((sent[0]?.message['stepConfig'] as { host?: unknown }).host).toBe(true);
+		});
+
+		it.each([
+			['host: false', { host: false }],
+			['no host', {}],
+			['a string "true" (only the literal boolean counts)', { host: 'true' }],
+			['a template', { host: '${{ inputs.x }}' }],
+			['host on a model step', { type: 'model', host: true }],
+		])('has no `host` field for %s', async (_label, config) => {
+			const { dispatcher, enqueue, addWorker, sent } = await build();
+			addWorker(workerOf('w-host'));
+			enqueue('s1', config);
+
+			dispatcher.tryDispatch();
+
+			expect(sent[0]?.message).not.toHaveProperty('host');
+		});
 	});
 
 	// Asking for a guarantee is an explicit opt-in: an exclusive source serves it, and still nothing that asks for nothing.

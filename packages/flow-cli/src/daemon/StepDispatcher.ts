@@ -276,6 +276,8 @@ export class StepDispatcher {
 			stepConfig: step.stepConfig,
 			executionContext,
 			...(requires === undefined ? {} : { requires }),
+			// Only the literal boolean on a script step counts; the validator and the injection guard already refused the rest.
+			...(step.stepConfig.type === 'script' && step.stepConfig.host === true ? { host: true as const } : {}),
 		});
 		if (sent) {
 			this.supervisor.watchHandedOver(assignmentId);

@@ -385,6 +385,30 @@ custom-flow:
 			expect(steps[1].strict).toBeUndefined();
 		});
 
+		it('should carry the script step host marker to the loaded step (not drop it)', async () => {
+			vi.mocked(fs.existsSync).mockReturnValue(true);
+			vi.mocked(fs.readFileSync).mockReturnValue('yaml');
+			vi.mocked(yaml.load).mockReturnValue({
+				'host-flow': {
+					version: '1.0.0',
+					name: 'Host Flow',
+					workspace: 'in-place',
+					steps: [
+						{ id: 'a', name: 'A', type: 'script', script: 'ls', shell: 'bash', host: true },
+						{ id: 'b', name: 'B', type: 'script', script: 'ls', shell: 'bash', host: false },
+						{ id: 'c', name: 'C', type: 'script', script: 'ls', shell: 'bash' },
+					],
+				},
+			});
+
+			await registry.loadProjectFlows();
+
+			const steps = registry.getFlow('host-flow')?.steps as any[];
+			expect(steps[0].host).toBe(true);
+			expect(steps[1].host).toBe(false);
+			expect(steps[2]).not.toHaveProperty('host');
+		});
+
 		it('should carry the script step timeout to the loaded step (not drop it)', async () => {
 			vi.mocked(fs.existsSync).mockReturnValue(true);
 			vi.mocked(fs.readFileSync).mockReturnValue('yaml');

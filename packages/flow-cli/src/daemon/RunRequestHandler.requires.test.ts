@@ -233,6 +233,43 @@ describe('RunRequestHandler -- requires', () => {
 		expect(order).toContain('read-declaration');
 	});
 
+	it('accepts a flow with a host script next to a model step and tells the client about it, in the answer only', async () => {
+		const poolPath = poolDir.replace(/\\/g, '/');
+		fs.writeFileSync(
+			flowFile,
+			[
+				'id: host-flow',
+				'version: "1.0.0"',
+				'name: Host Flow',
+				'description: x',
+				'inputs: {}',
+				`workspace: { provider: pool, dir: "${poolPath}", prefix: ws-, count: 2 }`,
+				'steps:',
+				'  - { id: agent, name: Agent, type: model, prompt: hi }',
+				'  - { id: lister, name: Lister, type: script, shell: bash, script: ls, host: true, depends: [agent] }',
+				'',
+			].join('\n')
+		);
+
+		const response = await newHandler().handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		if (response.type !== 'execution_started') {
+			throw new Error(`expected execution_started, got ${JSON.stringify(response)}`);
+		}
+		expect(response.warnings).toHaveLength(1);
+		expect(response.warnings![0]).toContain("'lister'");
+		expect(response.warnings![0]).toContain('Remove `host: true`');
+		expect(Object.keys(record(response.executionId))).not.toContain('warnings');
+	});
+
+	it('answers without a warnings field when the flow has nothing to warn about', async () => {
+		writeFlow();
+
+		const response = await newHandler().handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(response).not.toHaveProperty('warnings');
+	});
+
 	it('hands a step with requirements to no worker whose source guarantees nothing', async () => {
 		writeFlow({ flowRequires: '["fs=confined"]' });
 		const handler = newHandler();

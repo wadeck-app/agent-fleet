@@ -173,6 +173,7 @@ Additive to `workerType:` (both must hold). Field reference: `.claude/docs/flows
     - **Placement.** Same hard filter as `requires`, before S4 and S3: a step that requires something is never given to a worker whose source (built instance) does not accept the kind of its run; the kind travels as `StepPlacement.workspaceKind`. Fail-closed: an unbuilt instance accepts nothing, and a run whose kind is unknown goes only to unrestricted sources. Steps that require nothing are not filtered.
     - **Not checked offline.** `flow validate` has no knowledge of the worker sources; the check happens when the run starts.
 - **`assign` message**: carries the resolved set of the step as `requires?: string[]` (sorted; absent when empty), so a worker or wrapper that can verify a guarantee may refuse the step. The daemon does not require it to; a worker that ignores the field behaves as before.
+- **`assign` message, `host`**: `host?: true`, only present for a script step the flow marked `host: true` ("run this one on your own machine, not in your isolation"); absent otherwise, never `false`. The same marker is in `stepConfig.host`; the top-level copy saves a wrapper from parsing the step. Only the literal boolean on a script step counts. The daemon never sets it for an injected step (it refuses them, at any depth): a wrapper that isolates runs every other script in its VM, and may refuse a `host` step it is not allowed to run outside. Routing is not affected: `host` does not change which worker gets the step.
 
 ### Requirement profiles (`profile:`)
 

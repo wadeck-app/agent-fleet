@@ -69,6 +69,7 @@ export const SCRIPT_STEP_FIELDS: FieldList<ScriptFlowStep> = {
 	strict: true,
 	timeout: true,
 	secrets: true,
+	host: true,
 };
 
 export const SUBFLOW_STEP_FIELDS: FieldList<SubFlowStep> = {

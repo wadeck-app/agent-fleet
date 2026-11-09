@@ -85,6 +85,14 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).toContain('set -o pipefail');
 	});
 
+	it('documents the script step host marker: static literal, script only, never injected, the warning with model steps', () => {
+		expect(result).toMatch(/`host` \(boolean, optional, script steps only/);
+		expect(result).toContain('host: true');
+		expect(result).toMatch(/static|literal/i);
+		expect(result).toMatch(/injected steps? can never/i);
+		expect(result).toContain('HOST_SCRIPT_WITH_MODEL_STEPS');
+	});
+
 	it('documents the script step timeout: seconds, no default, tree kill, and the liveness rule', () => {
 		expect(result).toMatch(/`timeout` \(number of seconds/);
 		expect(result).toMatch(/no default/i);

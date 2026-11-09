@@ -72,6 +72,22 @@ describe('stepRequirementSuffix', () => {
 	});
 });
 
+describe('stepRequirementSuffix - host marker', () => {
+	it('shows host:true on a script step marked to run on the worker machine', () => {
+		expect(stepRequirementSuffix(stepOf({ host: true }))).toBe('  host:true');
+		expect(stepRequirementSuffix(stepOf({ profile: 'inspect', host: true }))).toBe('  profile:inspect  host:true');
+	});
+
+	it('shows nothing for host: false (the default) or without the field', () => {
+		expect(stepRequirementSuffix(stepOf({ host: false }))).toBe('');
+		expect(stepRequirementSuffix(stepOf({}))).toBe('');
+	});
+
+	it('does not show a malformed marker as if it were set', () => {
+		expect(stepRequirementSuffix(stepOf({ host: 'true' }))).toBe('');
+	});
+});
+
 describe('executionRequirementLines', () => {
 	it('prints nothing for a record without requirements (older daemons, nothing required)', () => {
 		expect(executionRequirementLines(undefined)).toEqual([]);

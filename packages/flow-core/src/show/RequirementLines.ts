@@ -39,12 +39,16 @@ export function flowRequirementLines(flow: FlowDefinition, expand?: ProfileExpan
 	return lines;
 }
 
-/** Suffix of a step row in `flow show <file>`: its own profile and requires (the flow-level ones are in the header). */
+/**
+ * Suffix of a step row in `flow show <file>`: its own profile and requires (the flow-level ones are in the header), then
+ * `host:true` for a script that asks to run on the worker's own machine (nothing for `host: false`, the default).
+ */
 export function stepRequirementSuffix(step: FlowStep): string {
 	const profile = step.profile === undefined ? '' : `  profile:${String(step.profile)}`;
 	const requires =
 		Array.isArray(step.requires) && step.requires.length > 0 ? `  requires:${step.requires.join(',')}` : '';
-	return `${profile}${requires}`;
+	const host = step.type === 'script' && step.host === true ? '  host:true' : '';
+	return `${profile}${requires}${host}`;
 }
 
 /** `Profile:` and `Requires:` lines of `flow show <execution>`: the profile name and the run set that is enforced. */

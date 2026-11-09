@@ -8,8 +8,15 @@ import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
 
 import type { ClientCommand, DaemonResponse } from '../ipc/Protocol.js';
 import type { LogWriter } from '../storage/LogWriter.js';
+import { surfacedWarningsOf } from '../validation/SurfacedWarnings.js';
 
-export type LoadedDefinition = { ok: true; resolved: ResolvedDefinition } | { ok: false; response: DaemonResponse };
+/** `warnings`: what `flow validate` would print for the accepted flow (surfaced engine warnings), one line each, for the run to tell. */
+export type LoadedDefinition =
+	| { ok: true; resolved: ResolvedDefinition; warnings: string[] }
+	| { ok: false; response: DaemonResponse };
+
+type Refused = Extract<LoadedDefinition, { ok: false }>;
+type Checked = Refused | { ok: true; warnings: string[] };
 
 type RunCommandMessage = Extract<ClientCommand, { type: 'run' }>;
 
@@ -129,19 +136,20 @@ export class RunDefinitionLoader {
 			return refuse('PARSE_ERROR', 'Flow file is empty or not a YAML object');
 		}
 
-		const invalid = this.validationRefusal(flow);
-		if (invalid) {
-			return invalid;
+		const checked = this.check(flow);
+		if (!checked.ok) {
+			return checked;
 		}
 		const resolved = this.resolver.forFile({ flowId: cmd.flowId ?? flow.id, flow, text, label: flowFile });
-		return { ok: true, resolved };
+		return { ok: true, resolved, warnings: checked.warnings };
 	}
 
 	private validated(resolved: ResolvedDefinition, checkRequirements = true): LoadedDefinition {
-		return this.validationRefusal(resolved.flow, checkRequirements) ?? { ok: true, resolved };
+		const checked = this.check(resolved.flow, checkRequirements);
+		return checked.ok ? { ok: true, resolved, warnings: checked.warnings } : checked;
 	}
 
-	private validationRefusal(flow: FlowDefinition, checkRequirements = true): LoadedDefinition | undefined {
+	private check(flow: FlowDefinition, checkRequirements = true): Checked {
 		let knownWorkerTypes: string[] | undefined;
 		if ((flow as { workerType?: unknown }).workerType !== undefined && this.knownWorkerTypes !== undefined) {
 			try {
@@ -162,7 +170,7 @@ export class RunDefinitionLoader {
 			structuredClone(flow)
 		);
 		if (result.valid) {
-			return undefined;
+			return { ok: true, warnings: surfacedWarningsOf(result.issues) };
 		}
 		const errors = JSON.stringify(result.issues.filter((i: { severity: string }) => i.severity === 'error'));
 		const unread = knownGuarantees === undefined ? [] : (this.guarantees?.unread() ?? []);

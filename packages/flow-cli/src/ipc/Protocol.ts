@@ -176,7 +176,11 @@ export type ClientCommand =
 export const DAEMON_STOPPING_CODE = 'DAEMON_STOPPING';
 
 export type DaemonResponse =
-	| { type: 'execution_started'; executionId: string }
+	/**
+	 * `warnings` (additive, absent when empty): what `flow validate` would have printed for the flow the run was accepted with,
+	 * one line each. `flow run` shows them on stderr; they never change the outcome of the run.
+	 */
+	| { type: 'execution_started'; executionId: string; warnings?: string[] }
 	| { type: 'execution_resumed'; executionId: string; stepId: string }
 	/** `alreadyCancelled`: the execution had been cancelled before this command, nothing was changed. */
 	| { type: 'execution_cancelled'; executionId: string; alreadyCancelled: boolean }
@@ -218,6 +222,14 @@ export type DaemonToWorker =
 			 * never by its labels); a worker that ignores the field behaves as before.
 			 */
 			requires?: string[];
+			/**
+			 * Additive, optional, only ever `true`. The step is a script the flow marked `host: true`: it asks to run on the
+			 * worker's own machine, not inside the worker's isolation (a wrapper that isolates, e.g. a sandbox, runs every
+			 * other script in its VM). Absent for every other step. The same marker is in `stepConfig.host`; the top-level
+			 * copy saves a wrapper from parsing the step. Never set for an injected step (the daemon refuses those).
+			 * A worker that ignores the field behaves as before.
+			 */
+			host?: true;
 	  }
 	// { type: 'idle' } is never sent by the daemon in v1 but is kept for forward compatibility.
 	// Worker handles it as a no-op.

@@ -47,6 +47,8 @@ interface AcceptedRun {
 	hookDispatcher: HookDispatcher | undefined;
 	/** Resolved when the run was accepted (or read back from the record when it starts again); undefined when nothing is required. */
 	requirements: RunRequirementsRecord | undefined;
+	/** Surfaced validation warnings of the flow, told to the client with the acceptance. Empty when a run starts again after a restart. */
+	warnings: string[];
 }
 
 /** Accepts a `run` request: validates it, allocates what the execution needs, records it and starts its scheduler. */
@@ -197,6 +199,7 @@ export class RunRequestHandler {
 					hookDispatcher: hooksFor(project),
 					// The record is the truth: the definition is never read again for what a run requires.
 					requirements: state.requirements,
+					warnings: [],
 				},
 				executionId,
 				true
@@ -305,6 +308,7 @@ export class RunRequestHandler {
 			secrets,
 			hookDispatcher,
 			requirements,
+			warnings: loaded.warnings,
 		};
 	}
 
@@ -361,7 +365,7 @@ export class RunRequestHandler {
 		this.waitSupervisor.watch(executionId, waiting, workspace => {
 			this.launch(accepted, executionId, workspace, true);
 		});
-		return { type: 'execution_started', executionId };
+		return { type: 'execution_started', executionId, ...startedWarnings(accepted) };
 	}
 
 	private launch(
@@ -483,7 +487,7 @@ export class RunRequestHandler {
 
 		this.tryDispatch();
 
-		return { type: 'execution_started', executionId };
+		return { type: 'execution_started', executionId, ...startedWarnings(accepted) };
 	}
 
 	private createRecord(
@@ -581,4 +585,9 @@ export class RunRequestHandler {
 
 function responseMessage(response: DaemonResponse): string {
 	return response.type === 'error' ? response.message : 'unknown';
+}
+
+/** The additive `warnings` field of the answer: absent when there is nothing to tell. */
+function startedWarnings(accepted: AcceptedRun): { warnings?: string[] } {
+	return accepted.warnings.length === 0 ? {} : { warnings: accepted.warnings };
 }

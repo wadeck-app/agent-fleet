@@ -138,3 +138,62 @@ describe('RunDefinitionLoader - requires', () => {
 		expect(message).toContain('unknown requirement');
 	});
 });
+
+/** What `flow validate` prints as warnings, the run reports back to `flow run` (a run that is accepted tells it too). */
+describe('RunDefinitionLoader - warnings of an accepted flow', () => {
+	let dir: string;
+
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-def-warnings-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true });
+	});
+
+	function loader(): RunDefinitionLoader {
+		const resolver = {
+			forFile: (request: { flow: unknown }): ResolvedDefinition =>
+				({ flow: request.flow }) as unknown as ResolvedDefinition,
+		} as unknown as FlowDefinitionResolver;
+		return new RunDefinitionLoader(resolver, { writeExecution: () => undefined } as unknown as LogWriter);
+	}
+
+	function load(steps: string[]) {
+		const file = path.join(dir, 'flow.yml');
+		fs.writeFileSync(
+			file,
+			['id: w', 'name: W', 'version: 1.0.0', 'description: d', 'workspace: in-place', 'steps:', ...steps, ''].join('\n')
+		);
+		return loader().load({ type: 'run', flowFile: file } as never, file);
+	}
+	const hostScript = (id: string, host: string): string[] => [
+		`  - { id: ${id}, name: ${id}, type: script, shell: bash, script: ls, host: ${host} }`,
+	];
+	const model = ['  - { id: agent, name: agent, type: model, prompt: p }'];
+
+	it('reports HOST_SCRIPT_WITH_MODEL_STEPS once per host script step', () => {
+		const loaded = load([...model, ...hostScript('a', 'true'), ...hostScript('b', 'true'), ...hostScript('c', 'false')]);
+
+		if (!loaded.ok) throw new Error(`expected the flow to be accepted: ${JSON.stringify(loaded.response)}`);
+		expect(loaded.warnings).toHaveLength(2);
+		expect(loaded.warnings[0]).toContain("'a'");
+		expect(loaded.warnings[1]).toContain("'b'");
+	});
+
+	it('reports nothing for a flow without host scripts, and accepts a host script without model step silently', () => {
+		const plain = load([...model, ...hostScript('a', 'false')]);
+		const noModel = load(hostScript('a', 'true'));
+
+		if (!plain.ok || !noModel.ok) throw new Error('expected both flows to be accepted');
+		expect(plain.warnings).toEqual([]);
+		expect(noModel.warnings).toEqual([]);
+	});
+
+	it('refuses a malformed marker with VALIDATION_FAILED', () => {
+		const loaded = load(hostScript('a', '"true"'));
+
+		expect(loaded.ok).toBe(false);
+		expect(JSON.stringify(loaded.ok ? undefined : loaded.response)).toContain('VALIDATION_FAILED');
+	});
+});

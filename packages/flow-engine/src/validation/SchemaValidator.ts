@@ -31,6 +31,7 @@ import type {
 import { ReadOnlyWorkspaceRules } from '../workspace/ReadOnlyWorkspaceRules';
 import { WorkspaceDeclarationParser } from '../workspace/WorkspaceDeclarationParser';
 import { WorktreeOptionRules } from '../workspace/WorktreeOptionRules';
+import { HostScriptMarkerValidator } from './HostScriptMarkerValidator';
 import { RequirementValidator } from './RequirementValidator';
 import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
@@ -69,9 +70,11 @@ export class SchemaValidator {
 		knownGuarantees?: readonly string[]
 	) {
 		this.requirementValidator = new RequirementValidator(issueCollector, knownGuarantees);
+		this.hostScriptMarker = new HostScriptMarkerValidator(issueCollector);
 	}
 
 	private readonly requirementValidator: RequirementValidator;
+	private readonly hostScriptMarker: HostScriptMarkerValidator;
 
 	/**
 	 * Validate flow schema
@@ -141,6 +144,7 @@ export class SchemaValidator {
 
 		// Validate steps
 		const stepIds = this.validateSteps(flow.steps);
+		this.hostScriptMarker.validateFlow(flow);
 
 		return { stepIds, normalizedInputs };
 	}
@@ -560,6 +564,7 @@ export class SchemaValidator {
 
 			this.validateStepLabels(step);
 			this.requirementValidator.validateStep(step);
+			this.hostScriptMarker.validateStep(step);
 
 			// Type-specific validation
 			this.validateStepType(step);
