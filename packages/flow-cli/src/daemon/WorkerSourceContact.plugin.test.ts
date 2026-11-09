@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PluginLoader } from '../config/PluginLoader.js';
 import {
@@ -106,16 +106,69 @@ describe('contactDeclaredSources - a source that hangs', () => {
 		expect(fixture.obtained.map(o => o.sourceId).sort()).toEqual(['fine', 'stuck']);
 	});
 
-	it('reports the hung source by name once its build is given up, and the others are unaffected', async () => {
-		const impatient = new WorkerTypeInstances(new PluginLoader(), () => {}, { buildTimeoutMs: 30 });
-
-		await contact([pluginEntry('stuck', { plugin: 'fixture-sandbox.hangs' }), pluginEntry('fine')], {
-			workerTypes: impatient,
+	// The build bound is shared by every source of a contact and it covers real disk I/O (module import, manifest
+	// reads). A wall-clock bound of a few ms made the test depend on the machine load: a 'fine' source that was slow to
+	// load was given up too and reported as well. The clock is therefore driven by hand: timers are faked, and the bound
+	// only elapses when the test says so.
+	describe('with a build bound driven by hand', () => {
+		afterEach(() => {
+			vi.useRealTimers();
 		});
 
-		expect(reported).toHaveLength(1);
-		expect(reported[0]).toContain('source "stuck"');
-		expect(reported[0]).toContain('did not finish loading');
-		expect(fixture.obtained.map(o => o.sourceId)).toEqual(['fine']);
+		// Resolves once `condition` holds, polling with real macrotasks (setImmediate is not faked), however slow the disk is.
+		const untilTrue = async (condition: () => boolean) => {
+			for (let attempt = 0; attempt < 10_000 && !condition(); attempt++) {
+				await new Promise<void>(resolve => setImmediate(resolve));
+			}
+			expect(condition()).toBe(true);
+		};
+
+		it('reports the hung source by name once its build is given up, and the others are unaffected', async () => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+			const impatient = new WorkerTypeInstances(new PluginLoader(), () => {}, { buildTimeoutMs: 30 });
+
+			const contacting = contact([pluginEntry('stuck', { plugin: 'fixture-sandbox.hangs' }), pluginEntry('fine')], {
+				workerTypes: impatient,
+			});
+			// 'fine' is built and asked before the bound is allowed to elapse, whatever the real time that took.
+			await untilTrue(() => fixture.obtained.length === 1);
+			await vi.advanceTimersByTimeAsync(30);
+			await contacting;
+
+			expect(reported).toHaveLength(1);
+			expect(reported[0]).toContain('source "stuck"');
+			expect(reported[0]).toContain('did not finish loading');
+			expect(fixture.obtained.map(o => o.sourceId)).toEqual(['fine']);
+		});
+
+		it('also reports a source that is merely slower than the bound (the cause of the former intermittent second report)', async () => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+			const realLoader = new PluginLoader();
+			let releaseFine: () => void = () => {};
+			const fineMayLoad = new Promise<void>(resolve => {
+				releaseFine = resolve;
+			});
+			// A loader whose 'fine' plugin takes longer than the bound, as a loaded machine does.
+			const slowDisk: ConstructorParameters<typeof WorkerTypeInstances>[0] = {
+				readDeclaredGuarantees: (...args) => realLoader.readDeclaredGuarantees(...args),
+				readDeclaredWorkspaces: (...args) => realLoader.readDeclaredWorkspaces(...args),
+				loadProvider: async (...args) => {
+					if ((args[2] as { sourceId: string }).sourceId === 'fine') {
+						await fineMayLoad;
+					}
+					return realLoader.loadProvider(...args);
+				},
+			};
+			const impatient = new WorkerTypeInstances(slowDisk, () => {}, { buildTimeoutMs: 30 });
+
+			const contacting = contact([pluginEntry('stuck', { plugin: 'fixture-sandbox.hangs' }), pluginEntry('fine')], {
+				workerTypes: impatient,
+			});
+			await vi.advanceTimersByTimeAsync(30);
+			releaseFine();
+			await contacting;
+
+			expect(reported.map(message => /source "(\w+)"/.exec(message)?.[1]).sort()).toEqual(['fine', 'stuck']);
+		});
 	});
 });
