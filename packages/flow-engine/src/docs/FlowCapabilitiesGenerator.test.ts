@@ -45,6 +45,11 @@ describe('FlowCapabilitiesGenerator', () => {
 		expect(result).toMatch(/`flow validate` says nothing about it/);
 	});
 
+	it('documents that the implicit confinement covers only the projects a source serves', () => {
+		expect(result).toMatch(/serves the project of the run/);
+		expect(result).toMatch(/`projects` option/);
+	});
+
 	it('documents that a source declaring guarantees only serves the steps that require them', () => {
 		expect(result).toMatch(/declares? guarantees.*only/s);
 		expect(result).toContain('queue.concurrency');

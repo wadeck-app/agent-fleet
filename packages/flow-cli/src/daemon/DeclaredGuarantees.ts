@@ -79,6 +79,32 @@ export class DeclaredGuarantees {
 			.map(({ sourceId }) => sourceId);
 	}
 
+	/**
+	 * The sources that may provide EVERY entry, split by whether they serve a project: `serving` when the source declares no
+	 * projects restriction or lists the project, `elsewhere` when it lists only other projects. Without a project id a source is
+	 * `serving` only if no declared source at all restricts its projects (nothing can then be told about the run, so
+	 * "serves everything" must hold for the whole machine).
+	 */
+	providersOfAllForProject(
+		required: readonly string[],
+		projectId: string | undefined
+	): { serving: string[]; elsewhere: string[] } {
+		const providers = this.providersOfAll(required);
+		const restricted = new Map(this.pluginSources().map(entry => [entry.sourceId, declaredProjects(entry)]));
+		const machineRestricted = [...restricted.values()].some(projects => projects !== undefined);
+		const serves = (sourceId: string): boolean => {
+			const projects = restricted.get(sourceId);
+			if (projectId === undefined) {
+				return !machineRestricted;
+			}
+			return projects === undefined || projects.includes(projectId);
+		};
+		return {
+			serving: providers.filter(serves),
+			elsewhere: providers.filter(sourceId => !serves(sourceId)),
+		};
+	}
+
 	/** What each declared source lacks of the set, the ones lacking the least first (then by id): for a failure message. */
 	shortfalls(required: readonly string[]): { sourceId: string; missing: string[] }[] {
 		return this.currentReads()
@@ -131,6 +157,25 @@ export class DeclaredGuarantees {
 			return read?.key === keyOf(entry) ? [{ sourceId: entry.sourceId, read }] : [];
 		});
 	}
+}
+
+/**
+ * The projects a source declares it serves: the `projects` option of its entry (`flow worker source add --option
+ * projects=a,b`, a comma separated string, or a list), read from the entry and never by loading the plugin. Undefined: the
+ * entry declares none, so the source is not restricted. Any other shape serves no project (fail closed).
+ */
+function declaredProjects(entry: WorkerSourceEntry): string[] | undefined {
+	const value = entry.options?.['projects'];
+	if (value === undefined) {
+		return undefined;
+	}
+	if (typeof value === 'string') {
+		return value.split(',');
+	}
+	if (Array.isArray(value) && value.every(item => typeof item === 'string')) {
+		return value as string[];
+	}
+	return [];
 }
 
 function keyOf(entry: WorkerSourceEntry): string {

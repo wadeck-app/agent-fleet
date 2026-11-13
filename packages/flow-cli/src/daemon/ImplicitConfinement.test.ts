@@ -23,13 +23,25 @@ const script = (id: string, extra: Record<string, unknown> = {}) => ({
 	...extra,
 });
 
-/** Declared sources by id; the fake answers like DeclaredGuarantees for the sets asked. */
-function declared(bySource: Record<string, string[]>, unread: string[] = []) {
+/**
+ * Declared sources by id; the fake answers like DeclaredGuarantees for the sets asked.
+ * @param restricted the projects of the sources that declare a projects restriction (the others serve every project)
+ */
+function declared(bySource: Record<string, string[]>, unread: string[] = [], restricted: Record<string, string[]> = {}) {
 	return {
-		providersOfAll: (required: readonly string[]) =>
-			Object.entries(bySource)
+		providersOfAllForProject: (required: readonly string[], projectId: string | undefined) => {
+			const providers = Object.entries(bySource)
 				.filter(([, entries]) => required.every(entry => entries.includes(entry)))
-				.map(([sourceId]) => sourceId),
+				.map(([sourceId]) => sourceId);
+			const serves = (sourceId: string): boolean => {
+				const projects = restricted[sourceId];
+				if (projectId === undefined) {
+					return Object.keys(restricted).length === 0;
+				}
+				return projects === undefined || projects.includes(projectId);
+			};
+			return { serving: providers.filter(serves), elsewhere: providers.filter(sourceId => !serves(sourceId)) };
+		},
 		unread: () => unread,
 	};
 }
@@ -101,6 +113,73 @@ describe('ImplicitConfinement', () => {
 			);
 
 			expect(requirements).toEqual({ run: ['gpu'], steps: { m: ['gpu'] } });
+		});
+	});
+
+	describe('the covering source serves only some projects', () => {
+		const sources = { sbx: [...AGENT, 'sandbox'] };
+		const restricted = { sbx: ['test-tasks'] };
+		const confinement = new ImplicitConfinement(declared(sources, [], restricted));
+
+		it('confines the model steps of a project it serves', () => {
+			const { requirements, warnings } = confinement.resolve(flow([model('m')]), 'test-tasks');
+
+			expect(requirements?.steps).toEqual({ m: AGENT });
+			expect(requirements?.implicit).toEqual({ requires: AGENT, steps: ['m'] });
+			expect(warnings).toEqual([]);
+		});
+
+		it('leaves the model steps of another project unrequired, with a warning that says why', () => {
+			const { requirements, warnings } = confinement.resolve(flow([model('m')]), 'test-flow');
+
+			expect(requirements).toBeUndefined();
+			expect(warnings).toEqual([
+				'model step m runs unconfined: no worker source serving project test-flow guarantees env=clean and fs=confined (sbx does, but serves other projects); declare a sandbox source for this project (flow worker source list) or write profile: agent to require it',
+			]);
+		});
+
+		it('names every source that serves other projects', () => {
+			const { warnings } = new ImplicitConfinement(
+				declared({ a: AGENT, b: AGENT }, [], { a: ['x'], b: ['y'] })
+			).resolve(flow([model('m')]), 'z');
+
+			expect(warnings[0]).toContain('(a, b do, but serve other projects)');
+		});
+
+		it('keeps the explicit profile of a step, whatever the project', () => {
+			const { requirements, warnings } = confinement.resolve(flow([model('m', { profile: 'agent' })]), 'test-flow');
+
+			expect(requirements?.steps).toEqual({ m: AGENT });
+			expect(warnings).toEqual([]);
+		});
+
+		it('does not cover a run without a project id (a source restricts its projects)', () => {
+			const { requirements, warnings } = confinement.resolve(flow([model('m')]));
+
+			expect(requirements).toBeUndefined();
+			expect(warnings).toHaveLength(1);
+			expect(warnings[0]).toContain('(sbx does, but serves other projects)');
+		});
+	});
+
+	describe('a covering source without a projects restriction', () => {
+		const confinement = new ImplicitConfinement(declared({ sbx: AGENT }));
+
+		it.each([['any-project'], [undefined]])('covers every run, project id %s', projectId => {
+			const { requirements, warnings } = confinement.resolve(flow([model('m')]), projectId);
+
+			expect(requirements?.steps).toEqual({ m: AGENT });
+			expect(warnings).toEqual([]);
+		});
+	});
+
+	describe('a mixed machine', () => {
+		const confinement = new ImplicitConfinement(declared({ mine: AGENT, theirs: AGENT }, [], { mine: ['a'], theirs: ['b'] }));
+
+		it('covers the project one of the sources serves, not the others', () => {
+			expect(confinement.resolve(flow([model('m')]), 'a').requirements?.steps).toEqual({ m: AGENT });
+			expect(confinement.resolve(flow([model('m')]), 'b').requirements?.steps).toEqual({ m: AGENT });
+			expect(confinement.resolve(flow([model('m')]), 'c').requirements).toBeUndefined();
 		});
 	});
 

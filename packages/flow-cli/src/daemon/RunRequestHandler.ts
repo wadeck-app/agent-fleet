@@ -74,7 +74,7 @@ export class RunRequestHandler {
 		/** Read before a flow is checked: which requirements the declared sources may provide. Absent, requirements are checked for syntax only. */
 		private readonly declaredGuarantees?: Pick<
 			DeclaredGuarantees,
-			'refresh' | 'providersOfAll' | 'workspacesOf' | 'unread'
+			'refresh' | 'providersOfAll' | 'providersOfAllForProject' | 'workspacesOf' | 'unread'
 		>
 	) {
 		this.workspaceKinds =
@@ -275,7 +275,7 @@ export class RunRequestHandler {
 		let requirements: RunRequirementsRecord | undefined;
 		let confinementWarnings: string[];
 		try {
-			({ requirements, warnings: confinementWarnings } = this.confinement.resolve(flow));
+			({ requirements, warnings: confinementWarnings } = this.confinement.resolve(flow, project.project.id));
 		} catch (err) {
 			return { response: { type: 'error', code: 'INVALID_REQUIREMENTS', message: normalizeError(err).message } };
 		}

@@ -174,3 +174,86 @@ describe('DeclaredGuarantees.guaranteesOf', () => {
 		expect(guarantees.guaranteesOf('nobody')).toBeUndefined();
 	});
 });
+
+describe('DeclaredGuarantees - which covering sources serve a project', () => {
+	const AGENT = ['env=clean', 'fs=confined'];
+
+	function withProjects(sourceId: string, projects: unknown): WorkerSourceEntry {
+		return {
+			...source(sourceId, 'p.x'),
+			...(projects === undefined ? {} : { options: { projects } }),
+		} as WorkerSourceEntry;
+	}
+
+	async function ready(entries: WorkerSourceEntry[], declared: Record<string, string[]>) {
+		const { guarantees } = build(entries, declared);
+		await guarantees.refresh();
+		return guarantees;
+	}
+
+	it('a source whose projects option lists the project serves it', async () => {
+		const guarantees = await ready([withProjects('sbx', 'test-tasks,other')], { sbx: AGENT });
+
+		expect(guarantees.providersOfAllForProject(AGENT, 'test-tasks')).toEqual({ serving: ['sbx'], elsewhere: [] });
+	});
+
+	it('a source whose projects option lists other projects serves elsewhere only, and is named as such', async () => {
+		const guarantees = await ready([withProjects('sbx', 'test-tasks')], { sbx: AGENT });
+
+		expect(guarantees.providersOfAllForProject(AGENT, 'test-flow')).toEqual({ serving: [], elsewhere: ['sbx'] });
+	});
+
+	it('a source with no projects option serves every project', async () => {
+		const guarantees = await ready([withProjects('sbx', undefined)], { sbx: AGENT });
+
+		expect(guarantees.providersOfAllForProject(AGENT, 'anything')).toEqual({ serving: ['sbx'], elsewhere: [] });
+	});
+
+	it('reads the projects option as a list of strings too', async () => {
+		const guarantees = await ready([withProjects('sbx', ['a', 'b'])], { sbx: AGENT });
+
+		expect(guarantees.providersOfAllForProject(AGENT, 'b').serving).toEqual(['sbx']);
+		expect(guarantees.providersOfAllForProject(AGENT, 'c').serving).toEqual([]);
+	});
+
+	it('a projects option of another shape serves no project (fail closed)', async () => {
+		const guarantees = await ready([withProjects('sbx', 42)], { sbx: AGENT });
+
+		expect(guarantees.providersOfAllForProject(AGENT, 'a')).toEqual({ serving: [], elsewhere: ['sbx'] });
+	});
+
+	it('only the sources that guarantee the whole set are listed', async () => {
+		const guarantees = await ready([withProjects('half', 'a'), withProjects('full', 'b')], {
+			half: ['fs=confined'],
+			full: AGENT,
+		});
+
+		expect(guarantees.providersOfAllForProject(AGENT, 'a')).toEqual({ serving: [], elsewhere: ['full'] });
+	});
+
+	it('a mixed machine: the unrestricted and the matching sources serve, the others are elsewhere', async () => {
+		const guarantees = await ready(
+			[withProjects('all', undefined), withProjects('mine', 'a'), withProjects('theirs', 'b')],
+			{ all: AGENT, mine: AGENT, theirs: AGENT }
+		);
+
+		expect(guarantees.providersOfAllForProject(AGENT, 'a')).toEqual({ serving: ['all', 'mine'], elsewhere: ['theirs'] });
+	});
+
+	describe('a run without a project id', () => {
+		it('is served by a covering source when no source on the machine restricts its projects', async () => {
+			const guarantees = await ready([withProjects('sbx', undefined)], { sbx: AGENT });
+
+			expect(guarantees.providersOfAllForProject(AGENT, undefined)).toEqual({ serving: ['sbx'], elsewhere: [] });
+		});
+
+		it('is served by none as soon as one source declares a projects restriction, whichever it is', async () => {
+			const guarantees = await ready([withProjects('all', undefined), withProjects('other', 'b')], {
+				all: AGENT,
+				other: [],
+			});
+
+			expect(guarantees.providersOfAllForProject(AGENT, undefined)).toEqual({ serving: [], elsewhere: ['all'] });
+		});
+	});
+});

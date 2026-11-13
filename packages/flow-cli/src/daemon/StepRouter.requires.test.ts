@@ -105,6 +105,17 @@ describe('StepRouter - requirements (hard filter on the guarantees of the source
 		expect(accepts).toHaveBeenCalledTimes(1);
 	});
 
+	// A source serving only project B never takes a step of project A, even one that requires exactly what it guarantees.
+	it('never places a step of project A on a confining worker that serves only project B', () => {
+		const router = new StepRouter(undefined, undefined, catalog);
+		const servingB = candidate('w-sbx-b', 'sbx', { ephemeral: false, attachedProjectIds: ['projB0001'] });
+		const servingA = candidate('w-sbx-a', 'sbx', { ephemeral: false, attachedProjectIds: ['projA0001'] });
+		const required = { requires: ['fs=confined', 'env=clean'], projectId: 'projA0001', projectRoot: 'C:/a' };
+
+		expect(router.select(step(required), [servingB])).toBeUndefined();
+		expect(router.select(step(required), [servingB, servingA])).toBe(servingA.ws);
+	});
+
 	it('fails closed, and says so on stderr, when the guarantees cannot be read', () => {
 		const broken = {
 			...catalog,

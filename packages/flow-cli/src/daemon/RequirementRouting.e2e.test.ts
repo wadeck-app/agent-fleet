@@ -341,6 +341,30 @@ describe('requires: routed to the source that declares the guarantee', () => {
 			expect(recordOf(response).requirements).toBeUndefined();
 		});
 
+		it('does not cover a run of a project the confining source does not serve: routes as before, and the warning says why', async () => {
+			sources.remove('sbx');
+			sources.declare({
+				sourceId: 'sbx',
+				provider: 'fixture',
+				plugin: 'fixture-sandbox.confined',
+				pluginsDir: FIXTURE_PLUGINS_DIR,
+				options: { projects: 'some-other-project' },
+				labels: [],
+				maxWorkers: 1,
+			});
+
+			const response = await handler.handleRun({ type: 'run', flowFile: writeMixedFlow(), cwd: tmpDir } as never);
+
+			expect(response.type).toBe('execution_started');
+			expect(startedWarnings(response as never)).toHaveLength(1);
+			expect(startedWarnings(response as never)[0]).toMatch(
+				/^model step agent runs unconfined: no worker source serving project \w+ guarantees env=clean and fs=confined \(sbx does, but serves other projects\)/
+			);
+			expect(assigned.map(entry => entry.stepId)).toContain('agent');
+			expect(fixture.obtained).toEqual([]);
+			expect(recordOf(response).requirements).toBeUndefined();
+		});
+
 		it('does not count a source that guarantees only part of the set (here exclusive-only, not fs=confined and env=clean)', async () => {
 			sources.remove('sbx');
 			sources.declare({
