@@ -10,9 +10,9 @@
  * Only an explicit, discovered Git Bash path is ever offered. The daemon's own SHELL (possibly an
  * MSYS style `/bin/bash.exe`) is never forwarded, and nothing is guessed when Git Bash is absent.
  */
-import * as path from 'node:path';
-
 import { resolveBashOnWindows } from '../executor/shell/WindowsBashEnvironment';
+// AbsolutePathSyntax is a dependency-free leaf, so processing -> validation creates no cycle.
+import { AbsolutePathSyntax } from '../validation/AbsolutePathSyntax';
 
 export type OpenCodeShellDecision =
 	/** Set `SHELL` to this Git Bash executable. */
@@ -25,7 +25,8 @@ export type OpenCodeShellDecision =
 	| { kind: 'not-found' };
 
 export interface OpenCodeShellProbe {
-	platform: NodeJS.Platform;
+	/** `NodeJS.Platform`, or 'browser' when there is no Node `process` (the flow editor's validator). */
+	platform: NodeJS.Platform | 'browser';
 	/** Returns an absolute Git Bash path, or null. */
 	findGitBash: (env: Record<string, string>) => string | null;
 }
@@ -36,7 +37,9 @@ export const OPENCODE_SHELL_NOT_FOUND_ADVICE =
 	'Install Git for Windows, or set FLOW_BASH_PATH (or SHELL in the step/flow env) to a bash.exe path.';
 
 export const defaultOpenCodeShellProbe: OpenCodeShellProbe = {
-	platform: process.platform,
+	// Evaluated at import, and the web frontend imports the validator in the browser where `process` is undefined:
+	// 'browser' is never 'win32', so the check is simply not applicable there.
+	platform: typeof process === 'undefined' ? 'browser' : process.platform,
 	findGitBash: findGitBashForOpenCode,
 };
 
@@ -52,7 +55,9 @@ function isWslBashStub(candidate: string): boolean {
  */
 export function findGitBashForOpenCode(env: Record<string, string>): string | null {
 	const resolved = resolveBashOnWindows(env);
-	if (!path.win32.isAbsolute(resolved) || isWslBashStub(resolved)) {
+	// Not `path.win32.isAbsolute`: node:path is an empty module in the browser build. The syntax check accepts
+	// POSIX roots too, but resolveBashOnWindows only ever returns a Windows path or the bare name `bash`.
+	if (!AbsolutePathSyntax.isAbsolute(resolved) || isWslBashStub(resolved)) {
 		return null;
 	}
 	return resolved;
