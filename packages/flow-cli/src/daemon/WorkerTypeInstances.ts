@@ -11,6 +11,7 @@ import type { RegisteredRelay } from './RelayRegistry.js';
 import { isRequirementOnlyInstance } from './RequirementOnlyInstance.js';
 import { PLUGIN_REF } from './WorkerSourcePluginReference.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
+import { WorkerTypeDeclaredOptions } from './WorkerTypeDeclaredOptions.js';
 import { WORKER_TYPE_POINT, failureOf, noDirectory, wiringMistake } from './WorkerTypeFailures.js';
 import { WorkerTypeGuarantees } from './WorkerTypeGuarantees.js';
 import { assertWorkerTypeInstance, withLaunchCredential } from './WorkerTypeInstanceShape.js';
@@ -88,7 +89,7 @@ export class WorkerTypeInstances {
 	constructor(
 		private readonly loader: Pick<
 			PluginLoader,
-			'loadProvider' | 'readDeclaredGuarantees' | 'readDeclaredWorkspaces'
+			'loadProvider' | 'readDeclaredGuarantees' | 'readDeclaredWorkspaces' | 'readDeclaredOptions'
 		>,
 		private readonly log: (level: 'info' | 'error', message: string) => void,
 		timeouts: WorkerTypeTimeouts = {},
@@ -284,6 +285,21 @@ export class WorkerTypeInstances {
 			return undefined;
 		}
 		return WorkerTypeWorkspaces.readDeclared(this.loader, entry, this.buildTimeoutMs);
+	}
+
+	/**
+	 * The option names the manifest of a source's plugin declares it accepts, read without building an instance. Undefined:
+	 * not declared (names are not checked), also for a source without a plugin and for a built-in worker type.
+	 *
+	 * @throws an error naming the source and the plugin when the manifest cannot be read or declares a malformed list.
+	 */
+	async declaredOptions(
+		entry: Pick<WorkerSourceEntry, 'sourceId' | 'plugin' | 'pluginsDir'>
+	): Promise<string[] | undefined> {
+		if (entry.plugin === undefined || this.lookupBuiltin(`plugins.${entry.plugin}`) !== undefined) {
+			return undefined;
+		}
+		return WorkerTypeDeclaredOptions.readDeclared(this.loader, entry, this.buildTimeoutMs);
 	}
 
 	/**

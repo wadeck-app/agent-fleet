@@ -181,6 +181,25 @@ export const manifest = {
 				guarantees: ['sandbox'],
 				provider: async context => makeInstance(context, { guarantees: ['sandbox'], workspaces: ['poool'] }),
 			},
+			// Option names (the accepted --option names, checked when a source is declared).
+			scoped: {
+				version: 1,
+				guarantees: ['sandbox'],
+				options: ['projects', 'image', 'region'],
+				provider: async context => makeInstance(context, { guarantees: ['sandbox'] }),
+			},
+			nooptions: {
+				version: 1,
+				guarantees: ['sandbox'],
+				options: [],
+				provider: async context => makeInstance(context, { guarantees: ['sandbox'] }),
+			},
+			badmanifestoptions: {
+				version: 1,
+				guarantees: ['sandbox'],
+				options: ['projects', 3],
+				provider: async context => makeInstance(context, { guarantees: ['sandbox'] }),
+			},
 			invalid: {
 				version: 1,
 				provider: async () => ({ nothing: true }),

@@ -154,6 +154,7 @@ describe('contactDeclaredSources - a source that hangs', () => {
 			const slowDisk: ConstructorParameters<typeof WorkerTypeInstances>[0] = {
 				readDeclaredGuarantees: (...args) => realLoader.readDeclaredGuarantees(...args),
 				readDeclaredWorkspaces: (...args) => realLoader.readDeclaredWorkspaces(...args),
+				readDeclaredOptions: (...args) => realLoader.readDeclaredOptions(...args),
 				loadProvider: async (...args) => {
 					await new Promise<void>(resolve => realSetTimeout(resolve, 300));
 					return realLoader.loadProvider(...args);
@@ -183,6 +184,7 @@ describe('contactDeclaredSources - a source that hangs', () => {
 			const slowDisk: ConstructorParameters<typeof WorkerTypeInstances>[0] = {
 				readDeclaredGuarantees: (...args) => realLoader.readDeclaredGuarantees(...args),
 				readDeclaredWorkspaces: (...args) => realLoader.readDeclaredWorkspaces(...args),
+				readDeclaredOptions: (...args) => realLoader.readDeclaredOptions(...args),
 				loadProvider: async (...args) => {
 					if ((args[2] as { sourceId: string }).sourceId === 'fine') {
 						await fineMayLoad;

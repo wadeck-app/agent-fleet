@@ -10,6 +10,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { BUILTIN_PLUGIN_MANIFESTS } from './BuiltinPlugins';
 import { ModuleImporter } from './ModuleImporter';
+import { OptionNameList } from './OptionNameList';
 import { WorkspaceKindList } from './WorkspaceKindList';
 
 interface ExtensionPointVersion {
@@ -33,6 +34,7 @@ interface PluginImplementation {
 	export?: string;
 	guarantees?: unknown;
 	workspaces?: unknown;
+	options?: unknown;
 	/** Dead metadata: read only to warn that it is not applied. */
 	sensitiveFields?: unknown;
 }
@@ -116,6 +118,21 @@ export class PluginLoader {
 	): Promise<string[] | undefined> {
 		const { impl } = await this.findImplementation(typeRef, extensionPoint, pluginsDir);
 		return WorkspaceKindList.normalise(impl.workspaces, `Plugin ${typeRef}: manifest workspaces`);
+	}
+
+	/**
+	 * The static `options` a plugin implementation declares in its manifest (worker-type only): the names of the options a
+	 * source of it accepts, read WITHOUT calling its provider. Undefined: not declared, names are not checked.
+	 *
+	 * @throws when the manifest or the implementation cannot be found, or the declaration is not a list of option names.
+	 */
+	async readDeclaredOptions(
+		typeRef: string,
+		extensionPoint: string,
+		pluginsDir?: string
+	): Promise<string[] | undefined> {
+		const { impl } = await this.findImplementation(typeRef, extensionPoint, pluginsDir);
+		return OptionNameList.normalise(impl.options, `Plugin ${typeRef}: manifest options`);
 	}
 
 	private async findImplementation(

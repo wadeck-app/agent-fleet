@@ -9,6 +9,7 @@ import { flowConfigDir } from '../../config/FlowConfigDir.js';
 import { redactNudgeUrl } from '../../daemon/NudgeUrlCheck.js';
 import { type WorkerSourceEntry, WorkerSourceRegistry } from '../../daemon/WorkerSourceRegistry';
 import { WorkerSourceDeclarations } from './WorkerSourceDeclarations';
+import { WorkerSourceOptionCheck } from './WorkerSourceOptionCheck';
 
 // violations-suppress-end: ts/no-deep-relative
 
@@ -87,6 +88,9 @@ function parseLabels(raw: string | undefined): string[] {
 export function registerWorkerSourceCommand(program: Command): Command {
 	const worker = program.command('worker').description('Run a worker, and manage worker sources');
 
+	// What the `add` pre-action hook found about the option names, printed by the action next to the registry's own warnings.
+	let pendingWarnings: string[] = [];
+
 	const source = worker.command('source').description('Declare and inspect the sources that can supply workers');
 
 	source
@@ -123,6 +127,33 @@ export function registerWorkerSourceCommand(program: Command): Command {
 			'Option handed to the plugin (repeatable); a sensitive key must be ${ENV_VAR}',
 			(value: string, previous: string[] = []) => [...previous, value]
 		)
+		// Before the action: a plugin loaded from a directory declares the option names it accepts, so a misspelt one is refused
+		// here and never stored. Synchronous (no manifest read) unless there is something to check.
+		.hook('preAction', (_command, actionCommand) => {
+			pendingWarnings = [];
+			try {
+				const sourceId = String(actionCommand.args[0]);
+				const { plugin, pluginsDir, option } = actionCommand.opts<{
+					plugin?: string;
+					pluginsDir?: string;
+					option?: string[];
+				}>();
+				const names = Object.keys(parseOptionPairs(option));
+				if (plugin === undefined || pluginsDir === undefined || names.length === 0) {
+					return undefined;
+				}
+				return WorkerSourceOptionCheck.check(sourceId, plugin, pluginsDir, names).then(
+					({ refusal, warning }) => {
+						if (refusal !== undefined) {
+							return fail(new Error(refusal));
+						}
+						pendingWarnings = warning === undefined ? [] : [warning];
+					}
+				);
+			} catch (err) {
+				return fail(err);
+			}
+		})
 		.action(
 			(
 				sourceId: string,
@@ -160,7 +191,7 @@ export function registerWorkerSourceCommand(program: Command): Command {
 					}
 					console.log(`     labels     : ${entry.labels.length > 0 ? entry.labels.join(', ') : '(none)'}`);
 					console.log(`     maxWorkers : ${String(entry.maxWorkers)}`);
-					for (const warning of warnings) {
+					for (const warning of [...warnings, ...pendingWarnings]) {
 						console.log(`[warn] ${warning}`);
 					}
 					if (entry.options?.command !== undefined) {

@@ -289,8 +289,8 @@ describe('flow worker source command', () => {
 	describe('add - a plugin source', () => {
 		const pluginsDir = (): string => path.join(xdgHome, 'plugins');
 
-		it('stores the plugin ref, the plugins directory and the --option values', () => {
-			run(
+		it('stores the plugin ref, the plugins directory and the --option values', async () => {
+			await runAsync(
 				'add',
 				'sandbox',
 				'--provider',
@@ -409,6 +409,96 @@ describe('flow worker source command', () => {
 			logSpy.mockClear();
 			run('remove', 'sandbox');
 			expect(printed()).toContain('at its next daemon contact or stop');
+		});
+	});
+
+	// The option names a plugin manifest declares (`options`) are checked when the source is declared: a misspelt `projects`
+	// would otherwise be stored and read by the core as a source that serves every project.
+	describe('add - option names declared by the plugin manifest', () => {
+		const addScoped = (implementation: string, ...options: string[]): Promise<void> =>
+			runAsync(
+				'add',
+				'sbx',
+				'--provider',
+				'fixture',
+				'--plugin',
+				`fixture-sandbox.${implementation}`,
+				'--plugins-dir',
+				FIXTURE_PLUGINS_DIR,
+				...options.flatMap(option => ['--option', option])
+			);
+
+		it('refuses an unknown option name: names it, lists the accepted ones, suggests the nearest, stores nothing', async () => {
+			await expect(addScoped('scoped', 'project=a')).rejects.toThrow('exit 1');
+
+			expect(errors()).toMatch(/^\[fail\] /m);
+			expect(errors()).toContain('option "project"');
+			expect(errors()).toContain('Did you mean "projects"?');
+			expect(errors()).toContain('Accepted options: image, projects, region.');
+			expect(errors()).toContain('fixture-sandbox.scoped');
+			expect(fs.existsSync(registryFile())).toBe(false);
+		});
+
+		it('accepts the declared names', async () => {
+			await addScoped('scoped', 'projects=a,b', 'image=x');
+
+			expect(storedSources()[0]).toMatchObject({ options: { projects: 'a,b', image: 'x' } });
+			expect(errors()).toBe('');
+		});
+
+		it('refuses every option when the manifest declares an empty list', async () => {
+			await expect(addScoped('nooptions', 'projects=a')).rejects.toThrow('exit 1');
+
+			expect(errors()).toContain('Accepted options: none.');
+		});
+
+		it('checks nothing when the manifest declares no options (older plugins)', async () => {
+			await addScoped('confined', 'whatever=a');
+
+			expect(storedSources()[0]).toMatchObject({ options: { whatever: 'a' } });
+		});
+
+		it('declares the source and warns, naming the reason, when the manifest cannot be read to check the names', async () => {
+			await addScoped('badmanifestoptions', 'projects=a');
+
+			expect(storedSources()).toHaveLength(1);
+			expect(printed()).toContain('[warn]');
+			expect(printed()).toContain('option names could not be checked');
+		});
+	});
+
+	describe('list - option names the manifest does not declare', () => {
+		it('prints one warning line on stderr naming the option and the nearest one, and still lists the source', async () => {
+			// declared before the manifest's option list existed, or by editing the registry by hand
+			fs.mkdirSync(path.dirname(registryFile()), { recursive: true });
+			fs.writeFileSync(
+				registryFile(),
+				JSON.stringify({
+					sources: [
+						{
+							sourceId: 'sbx',
+							provider: 'fixture',
+							labels: [],
+							maxWorkers: 1,
+							plugin: 'fixture-sandbox.scoped',
+							pluginsDir: FIXTURE_PLUGINS_DIR,
+							options: { project: 'a' },
+							tokenHash: 'h',
+							createdAt: '2026-11-14T00:00:00.000Z',
+						},
+					],
+				})
+			);
+
+			await runAsync('list');
+
+			const warnings = errors()
+				.split('\n')
+				.filter(line => line.includes('option "project"'));
+			expect(warnings).toHaveLength(1);
+			expect(warnings[0]).toContain('[warn]');
+			expect(warnings[0]).toContain('Did you mean "projects"?');
+			expect(printed()).toMatch(/^sbx\t/m);
 		});
 	});
 

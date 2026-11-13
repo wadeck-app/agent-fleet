@@ -31,7 +31,7 @@ export interface WorkerTypeRouting {
 	/** What the declared sources may provide: read at run start (which requirements exist) and at dispatch. */
 	declaredGuarantees: Pick<
 		DeclaredGuarantees,
-		'entries' | 'providersOfAll' | 'providersOfAllForProject' | 'shortfalls' | 'unread' | 'refresh' | 'workspacesOf' | 'acceptsWorkspace'
+		'entries' | 'providersOfAll' | 'providersOfAllForProject' | 'projectsOf' | 'shortfalls' | 'unread' | 'refresh' | 'workspacesOf' | 'acceptsWorkspace'
 	>;
 }
 

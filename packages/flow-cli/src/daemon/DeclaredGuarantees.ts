@@ -1,11 +1,14 @@
+import { SourceOptionNames, type UnknownOption } from './SourceOptionNames.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 
 interface Read {
-	/** What the declaration was read from: another plugin or directory for the same source means read again. */
+	/** What the declaration was read from: another plugin, directory or set of option names for the same source means read again. */
 	key: string;
 	declared: string[];
 	/** The workspace kinds the source accepts; undefined: no restriction. */
 	workspaces: string[] | undefined;
+	/** The option names the manifest accepts; undefined: not declared, names are not checked. */
+	options: string[] | undefined;
 }
 
 /**
@@ -33,6 +36,8 @@ export class DeclaredGuarantees {
 		private readonly reader: {
 			declaredGuarantees(entry: WorkerSourceEntry): Promise<string[]>;
 			declaredWorkspaces?(entry: WorkerSourceEntry): Promise<string[] | undefined>;
+			/** The option names the source accepts (`options` of the manifest); a reader without it checks no names. */
+			declaredOptions?(entry: WorkerSourceEntry): Promise<string[] | undefined>;
 		},
 		private readonly log: (message: string) => void
 	) {}
@@ -46,10 +51,18 @@ export class DeclaredGuarantees {
 					return;
 				}
 				try {
-					// Both or none: a source whose workspace kinds cannot be read must not look unrestricted.
+					// All or none: a source whose workspace kinds cannot be read must not look unrestricted.
 					const declared = await this.reader.declaredGuarantees(entry);
 					const workspaces = await this.reader.declaredWorkspaces?.(entry);
-					this.read.set(entry.sourceId, { key, declared, workspaces });
+					const options = await this.reader.declaredOptions?.(entry);
+					this.read.set(entry.sourceId, { key, declared, workspaces, options });
+					// Once per read (the key holds the option names). Routing does not change, but the entry is not silent.
+					if (options !== undefined) {
+						const unknown = SourceOptionNames.unknown(optionNamesOf(entry), options);
+						if (unknown.length > 0) {
+							this.log(unknownOptionsMessage(entry.sourceId, unknown, options));
+						}
+					}
 				} catch (err) {
 					this.read.delete(entry.sourceId);
 					this.log(
@@ -138,6 +151,25 @@ export class DeclaredGuarantees {
 		return accepted === undefined || (kind !== undefined && accepted.includes(kind));
 	}
 
+	/**
+	 * The option names stored with the source that its manifest does not declare (`options`), each with the nearest accepted
+	 * names. Empty when the manifest declares none (nothing is checked) or the source is not known.
+	 */
+	unknownOptionsOf(sourceId: string): UnknownOption[] {
+		const current = this.currentReads().find(read => read.sourceId === sourceId);
+		const entry = this.pluginSources().find(candidate => candidate.sourceId === sourceId);
+		if (current?.read.options === undefined || entry === undefined) {
+			return [];
+		}
+		return SourceOptionNames.unknown(optionNamesOf(entry), current.read.options);
+	}
+
+	/** The projects a declared source serves, from its `projects` option; undefined: it declares none (serves every project). */
+	projectsOf(sourceId: string): string[] | undefined {
+		const entry = this.pluginSources().find(candidate => candidate.sourceId === sourceId);
+		return entry === undefined ? undefined : declaredProjects(entry);
+	}
+
 	/** The plugin sources whose declaration is not known (not read yet, or unreadable). */
 	unread(): string[] {
 		const known = new Set(this.currentReads().map(({ sourceId }) => sourceId));
@@ -179,5 +211,18 @@ function declaredProjects(entry: WorkerSourceEntry): string[] | undefined {
 }
 
 function keyOf(entry: WorkerSourceEntry): string {
-	return JSON.stringify([entry.plugin, entry.pluginsDir]);
+	return JSON.stringify([entry.plugin, entry.pluginsDir, optionNamesOf(entry)]);
+}
+
+/** The names of the options stored with the entry, sorted. */
+function optionNamesOf(entry: WorkerSourceEntry): string[] {
+	return Object.keys(entry.options ?? {}).sort();
+}
+
+function unknownOptionsMessage(sourceId: string, unknown: UnknownOption[], accepted: readonly string[]): string {
+	return (
+		`worker source "${sourceId}": ${SourceOptionNames.describe(unknown, accepted)} ` +
+		`The daemon reads only the declared names: a misspelt "projects" leaves the source serving every project. ` +
+		`Fix: flow worker source remove ${sourceId}, then declare it again with the right option name.`
+	);
 }

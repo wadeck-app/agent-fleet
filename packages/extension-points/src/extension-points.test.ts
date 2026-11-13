@@ -286,6 +286,25 @@ describe('worker-type v1 guarantees (additive field)', () => {
 	});
 });
 
+describe('worker-type v1 options (additive manifest field)', () => {
+	it('a manifest implementation declares the option names a source accepts, and an older one need not', () => {
+		const manifest: PluginManifest = {
+			pluginId: 'sbx',
+			manifestVersion: '1',
+			implementations: {
+				'worker-type': {
+					exec: { version: 1, options: ['projects', 'image'] },
+					legacy: { version: 1 },
+				},
+			},
+		};
+		expect([
+			manifest.implementations['worker-type']?.['exec']?.options,
+			manifest.implementations['worker-type']?.['legacy']?.options,
+		]).toEqual([['projects', 'image'], undefined]);
+	});
+});
+
 describe('worker-type v1 workspaces (additive field)', () => {
 	it('an instance may narrow the workspace provider kinds it accepts, and an old instance need not', () => {
 		const old: WorkerTypeInstance = {

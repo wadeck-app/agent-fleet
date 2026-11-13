@@ -49,6 +49,12 @@ class TrackedLoader {
 		return this.real.readDeclaredWorkspaces(...args);
 	}
 
+	readDeclaredOptions(
+		...args: Parameters<PluginLoader['readDeclaredOptions']>
+	): ReturnType<PluginLoader['readDeclaredOptions']> {
+		return this.real.readDeclaredOptions(...args);
+	}
+
 	loadProvider(...args: Parameters<PluginLoader['loadProvider']>): ReturnType<PluginLoader['loadProvider']> {
 		const loading = this.real.loadProvider(...args);
 		// A factory that never settles never writes to the fixture either: nothing to wait for.

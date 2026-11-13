@@ -34,4 +34,14 @@ export interface PluginImplementation {
 	 * to load. Absent: no restriction.
 	 */
 	workspaces?: string[];
+	/**
+	 * `worker-type` only: the NAMES of the options this implementation accepts (the `--option name=value` of `flow worker
+	 * source add`), declared statically so flow refuses an unknown name when the source is declared, before any instance is
+	 * built, with the nearest accepted name as a hint. Without it a misspelt `projects` would be stored and read by the core
+	 * as a source that serves every project. A source already stored with an unknown name is reported by a warning in
+	 * `flow worker source list` and in the daemon log; routing does not change. Names only: values stay the plugin's to
+	 * validate at build time. Case sensitive, each a non-empty string without spaces or "=". `[]`: the implementation takes
+	 * no option. Absent: no check (older plugins).
+	 */
+	options?: string[];
 }

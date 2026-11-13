@@ -230,6 +230,98 @@ describe('RunRequestHandler -- requires', () => {
 		expect(fs.readdirSync(executionsDirOf(daemonDir))).toEqual([]);
 	});
 
+	describe('a source that guarantees the set but serves other projects', () => {
+		const AGENT_SET = ['env=clean', 'fs=confined'];
+		let projectsBySource: Record<string, string | undefined>;
+
+		/** Like newHandler, with `projects` options on the declared sources. */
+		function newScopedHandler(): CommandHandler {
+			const sources = Object.keys(declaredBySource).map(
+				sourceId =>
+					({
+						sourceId,
+						provider: 'x',
+						plugin: `${sourceId}.impl`,
+						pluginsDir: '/p',
+						labels: [],
+						maxWorkers: 1,
+						tokenHash: 'h',
+						createdAt: 'x',
+						...(projectsBySource[sourceId] === undefined
+							? {}
+							: { options: { projects: projectsBySource[sourceId] } }),
+					}) as WorkerSourceEntry
+			);
+			const declared = new DeclaredGuarantees(
+				{ list: () => sources },
+				{ declaredGuarantees: async entry => declaredBySource[entry.sourceId] ?? [] },
+				() => {}
+			);
+			const routing: WorkerTypeRouting = {
+				...emptyWorkerRouting(),
+				workerTypes: new WorkerTypeCatalog({ list: () => sources }, { isRequirementOnly: () => false }),
+				boundStepWaitMs: DEFAULT_BOUND_STEP_WAIT_MS,
+				contactErrors: new SourceContactErrors(),
+				declaredGuarantees: declared,
+			};
+			const args: ConstructorParameters<typeof TrackedCommandHandler> = [];
+			args[0] = daemonDir;
+			args[1] = pool as never;
+			args[2] = pool as never;
+			args[4] = store;
+			args[ROUTING_INDEX] = routing;
+			const handler = new TrackedCommandHandler(...args);
+			handlers.push(handler);
+			return handler;
+		}
+
+		beforeEach(() => {
+			declaredBySource = { sbx: AGENT_SET };
+			projectsBySource = { sbx: 'some-other-project' };
+		});
+
+		it('refuses at run start a flow profile no source serving the project guarantees, before anything is recorded', async () => {
+			writeFlow({ flowProfile: 'agent' });
+
+			const response = await newScopedHandler().handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+			expect(response).toMatchObject({ type: 'error', code: 'REQUIREMENT_NOT_SERVED_FOR_PROJECT' });
+			const message = (response as { message: string }).message;
+			expect(message).toContain('profile: agent');
+			expect(message).toContain('sbx (serves projects: some-other-project)');
+			expect(message).toContain('--option projects=');
+			expect(fs.readdirSync(executionsDirOf(daemonDir))).toEqual([]);
+		});
+
+		it('refuses an explicit requires: the same way', async () => {
+			writeFlow({ stepRequires: '["fs=confined"]' });
+
+			const response = await newScopedHandler().handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+			expect(response).toMatchObject({ type: 'error', code: 'REQUIREMENT_NOT_SERVED_FOR_PROJECT' });
+		});
+
+		it('starts the run when the source declares no projects (unscoped path unchanged)', async () => {
+			projectsBySource = {};
+			writeFlow({ flowProfile: 'agent' });
+
+			const response = await newScopedHandler().handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+			expect(response.type).toBe('execution_started');
+		});
+
+		it('does not refuse the implicit set of a model step: it keeps routing as before, with the warning', async () => {
+			writeFlow({ stepType: 'model' });
+
+			const response = await newScopedHandler().handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+			if (response.type !== 'execution_started') {
+				throw new Error(`expected execution_started, got ${JSON.stringify(response)}`);
+			}
+			expect(response.warnings?.join('\n')).toContain('serves other projects');
+		});
+	});
+
 	it('reads the declarations of the sources before it checks the flow (the daemon may have just started)', async () => {
 		writeFlow({ flowRequires: '["fs=confined"]' });
 
