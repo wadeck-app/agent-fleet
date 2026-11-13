@@ -16,6 +16,9 @@
  * Usage (repository root): SBX_LIVE=1 node --import tsx packages/flow-sandbox/scripts/live/PluginLiveCheck.mjs
  * Env: SBX_LIVE=1 (required), PLUGIN_HIDE_GIT_BASH=1 (start the daemon with Git's bash/sh removed from ITS PATH, see below), SBX_PATH (real sbx; default install dir), PLUGIN_IMAGE (default flow-sandbox:m6), PLUGIN_PROFILE (AWS
  * profile, default AWS_PROFILE), PLUGIN_REGION (default: the profile's region), PLUGIN_OUTPUT (default .claude/temp/sbx-0-51/plugin-results.json).
+ * PLUGIN_KEEP=1 keeps the isolated directory (project, pool, daemon log) and prints its path; on any failure the FULL daemon log is copied next to the
+ * results file (`<results>.daemon.log`) and its tail is printed. A source that cannot be built or loaded makes every wait fail AT ONCE with the daemon
+ * log lines that say why (no 120 s step wait, no 90 s `sbx rm` wait for a run that never started).
  * Exit code: 0 all assertions passed, 1 one failed, 2 refused to run.
  */
 import { addProject } from '@wadeck-app/project-sdk';
@@ -136,9 +139,38 @@ function expect(condition, message) {
 	if (!condition) throw new Error(message);
 }
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+/**
+ * The daemon log lines that say the sandbox source cannot be built or reached (the plugin failed to load, its preflight refused the machine, the wrapper
+ * could not start), or undefined. Read by every wait below so that a source that never works fails the check at once, with the reason.
+ */
+function sourceFailure() {
+	const lines = readIfExists(daemonLog).split('\n');
+	const first = lines.findIndex(
+		line =>
+			/Last contact with source "sandbox-live" failed/.test(line) ||
+			(/sandbox-live/.test(line) &&
+				/(could not obtain a worker|could not be built|could not build|failed to (load|build)|plugin .*(refused|failed))/i.test(
+					line
+				))
+	);
+	// The line that names the source and the lines after it (the preflight findings and the real cause come right after).
+	return first < 0
+		? undefined
+		: lines
+				.slice(first, first + 14)
+				.join('\n')
+				.trim();
+}
+
 async function waitFor(description, timeoutMs, probe) {
 	const deadline = Date.now() + timeoutMs;
 	for (;;) {
+		const failure = sourceFailure();
+		if (failure !== undefined) {
+			throw new Error(
+				`the sandbox source cannot work, so waiting for ${description} is pointless. The daemon says: ${failure}`
+			);
+		}
 		const value = await probe();
 		if (value) return value;
 		if (Date.now() > deadline) throw new Error(`timed out after ${timeoutMs} ms waiting for ${description}`);
@@ -1105,7 +1137,23 @@ try {
 	fs.mkdirSync(path.dirname(output), { recursive: true });
 	fs.writeFileSync(output, JSON.stringify({ evidence, results }, null, 2));
 	fs.rmSync(artifactRoot, { recursive: true, force: true });
-	isolation.cleanup();
+	const failed = results.some(result => !result.ok);
+	const keep = process.env.PLUGIN_KEEP === '1';
+	if (failed) {
+		// The isolated directory (and with it the daemon log) is removed below: keep a full copy next to the results, and show the end of it.
+		const copy = `${output}.daemon.log`;
+		const full = readIfExists(daemonLog);
+		fs.writeFileSync(copy, full);
+		console.log(`--- daemon log (last 60 lines of ${full.split('\n').length}; the full log: ${copy}) ---`);
+		console.log(full.split('\n').slice(-60).join('\n'));
+	}
+	if (keep) {
+		console.log(
+			`PLUGIN_KEEP=1: the isolated directory is kept: ${root} (daemon log: ${daemonLog}). Remove it yourself when done.`
+		);
+	} else {
+		isolation.cleanup();
+	}
 	const passed = results.filter(result => result.ok).length;
 	console.log(`${passed}/${results.length} passed. Evidence: ${output}`);
 	process.exit(passed === results.length ? 0 : 1);
