@@ -111,6 +111,12 @@ jobs:
             - name: Unit tests
               run: npm run test:agent -- --type=unit
 
+            # The runner log only holds the suite summary (the failing test names are in test-errors.log): print the file
+            # so a red job can be read without downloading the artifact.
+            - name: Print test errors
+              if: failure()
+              run: cat test-errors.log || echo "::warning::test-errors.log was not written"
+
             - name: Upload test errors
               if: failure()
               uses: actions/upload-artifact@v4
