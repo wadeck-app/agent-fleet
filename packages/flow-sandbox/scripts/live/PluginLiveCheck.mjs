@@ -1045,8 +1045,15 @@ try {
 		);
 	}
 
-	for (const tool of ['codex', 'opencode'].filter(
-		candidate => toolsOnly === undefined || toolsOnly === 'both' || toolsOnly === candidate
+	// A full run (PLUGIN_TOOLS_ONLY unset) covers opencode, which the profile of the other sections may call; codex needs its own profile, so it is
+	// only run on request, and a full run SAYS so.
+	if (toolsOnly === undefined) {
+		console.log(
+			'NOTE  the codex step is not part of a full run (its models need another profile): PLUGIN_TOOLS_ONLY=codex PLUGIN_PROFILE=<the Codex profile>'
+		);
+	}
+	for (const tool of ['codex', 'opencode'].filter(candidate =>
+		toolsOnly === undefined ? candidate === 'opencode' : toolsOnly === 'both' || toolsOnly === candidate
 	)) {
 		await step(
 			`a ${tool} step answers in the sandbox as a plain prompt (real Bedrock): tool-aware credentials, store on the .meta mount`,

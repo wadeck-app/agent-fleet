@@ -118,10 +118,14 @@ class FlowWorld {
 		);
 	}
 
-	flow(args: string[], timeoutMs = 120_000): { status: number | null; stdout: string; stderr: string } {
+	flow(
+		args: string[],
+		timeoutMs = 120_000,
+		cwd: string = this.projectDirectory
+	): { status: number | null; stdout: string; stderr: string } {
 		const result = spawnSync(process.execPath, ['--import', tsxUrl, flowIndex, ...args], {
 			env: this.env,
-			cwd: this.projectDirectory,
+			cwd,
 			encoding: 'utf8',
 			timeout: timeoutMs,
 			windowsHide: true,
@@ -159,7 +163,21 @@ class FlowWorld {
 		this.projectId = (await addProject(registry, { name: 'e2e', path: this.projectDirectory })).id;
 	}
 
-	declareSource(sourceId: string, pluginsDirectory: string, sbxPath: string): void {
+	/** A second registered project, with its own directory (the flows of a project are looked up and run from its directory). */
+	async registerOtherProject(name: string): Promise<{ id: string; directory: string }> {
+		const directory = path.join(this.root, name);
+		fs.mkdirSync(directory, { recursive: true });
+		const registry = path.join(String(this.env['XDG_CONFIG_HOME']), 'project');
+		return { id: (await addProject(registry, { name, path: directory })).id, directory };
+	}
+
+	/** `projects` is the option that scopes the source (the core reads that name from the declared entry). Default: the first registered project. */
+	declareSource(
+		sourceId: string,
+		pluginsDirectory: string,
+		sbxPath: string,
+		projects: string = this.projectId
+	): void {
 		const declared = this.flow([
 			'worker',
 			'source',
@@ -172,7 +190,7 @@ class FlowWorld {
 			'--plugins-dir',
 			pluginsDirectory,
 			'--option',
-			`projects=${this.projectId}`,
+			`projects=${projects}`,
 			'--option',
 			'region=us-east-1',
 			'--option',
@@ -272,8 +290,13 @@ class FlowWorld {
 	}
 
 	/** A flow of model steps (ids ask1, ask2, ...) that writes no `requires` and no `profile`: the daemon decides. */
-	writeModelFlow(name: string, modelSteps: number, workspace: 'pool' | 'in-place' = 'pool'): string {
-		const file = path.join(this.projectDirectory, `${name}.yml`);
+	writeModelFlow(
+		name: string,
+		modelSteps: number,
+		workspace: 'pool' | 'in-place' = 'pool',
+		directory: string = this.projectDirectory
+	): string {
+		const file = path.join(directory, `${name}.yml`);
 		fs.writeFileSync(
 			file,
 			[
@@ -862,6 +885,49 @@ describe('sandbox plugin, real daemon, sbx mock: implicit agent confinement of m
 		for (const guarantee of ['clean=run', 'env=clean', 'fs=confined', 'ports=private', 'sandbox']) {
 			expect(listed.stdout).toContain(guarantee);
 		}
+	});
+});
+
+// Implicit confinement is PER PROJECT (core cb097f7f): a source covers a run only if its declared entry lists the run's project (--option projects=...).
+describe('sandbox plugin, real daemon, sbx mock: implicit confinement only for the projects the source serves', () => {
+	const world = new FlowWorld(true);
+	worlds.push(world);
+	let other: { id: string; directory: string };
+
+	beforeAll(async () => {
+		await world.registerProject();
+		other = await world.registerOtherProject('project-b');
+		// The source is declared for project A only.
+		world.declareSource('sandbox-a', artifactDirectory, MOCK_SBX_PATH, world.projectId);
+		await world.startDaemon();
+	}, 150_000);
+
+	it('confines a model step of the project the source serves: routed to it, implicit requirements recorded', async () => {
+		const record = await world.runAndRelease(world.writeModelFlow('scoped-a', 1));
+
+		expect(record.steps?.['ask1']?.sourceId).toBe('sandbox-a');
+		expect(record.requirements?.implicit).toEqual({ requires: ['env=clean', 'fs=confined'], steps: ['ask1'] });
+	}, 150_000);
+
+	it('does not route a model step of ANOTHER project to it: one warning naming the source that serves other projects, no implicit requirements', () => {
+		const file = world.writeModelFlow('scoped-b', 1, 'pool', other.directory);
+
+		const started = world.flow(['run', file], 120_000, other.directory);
+		const executionId = started.stdout.trim();
+
+		expect(started.status, started.stderr).toBe(0);
+		const warnings = started.stderr.split(/\r?\n/).filter(line => line.includes('runs unconfined'));
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toMatch(/^Warning: model step ask1 runs unconfined: no worker source serving project/);
+		expect(warnings[0]).toContain('sandbox-a');
+		expect(warnings[0]).toMatch(/serves other projects/);
+		const shown = JSON.parse(
+			world.flow(['show', executionId, '--json'], 120_000, other.directory).stdout
+		) as ExecutionRecord;
+		expect(shown.requirements?.implicit).toBeUndefined();
+		// Cancelled at once: no model is started on a host worker by this test.
+		world.flow(['cancel', executionId], 120_000, other.directory);
+		expect(sandboxesCreated(world.sbxCalls()).length).toBeGreaterThanOrEqual(1);
 	});
 });
 
