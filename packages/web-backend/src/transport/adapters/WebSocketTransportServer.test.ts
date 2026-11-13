@@ -84,7 +84,6 @@ describe('WebSocketTransportServer', () => {
 		const mockOrchestrator = {
 			getWsServer: vi.fn(),
 			getTaskManager: vi.fn(),
-			getWorkspaceManager: vi.fn(),
 			getInterventionManager: vi.fn(),
 			getBackendEventBridge: vi.fn(),
 		} as unknown as Orchestrator;

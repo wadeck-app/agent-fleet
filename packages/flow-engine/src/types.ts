@@ -28,19 +28,9 @@ export type ModelProviderName = 'claude' | 'opencode' | 'codex';
 export type { McpServer } from './processing/ModelProvider';
 
 /**
- * Workspace modes determine isolation and concurrency behavior
+ * Mode recorded on a Workspace (isolated, shared, manual). Kept as a record type only: the native workspace manager that chose it was removed, so no code here allocates by mode any more.
  */
 export type WorkspaceMode = 'isolated' | 'shared' | 'manual';
-
-/**
- * Git strategy defines which branches can be used
- */
-export type GitStrategy = 'main-only' | 'feature-branch' | 'any' | 'worktree' | 'none';
-
-/**
- * Reuse policy determines when workspaces can be reused
- */
-export type ReusePolicy = 'never' | 'if-available' | 'always';
 
 /**
  * Variable types supported in flow inputs and outputs
@@ -383,23 +373,6 @@ export interface ValidationRule {
  * validator refuses it (see WorkspaceDeclarationParser).
  */
 export type WorkspaceDeclaration = string | ({ provider?: string } & Record<string, unknown>);
-
-/**
- * Workspace configuration of the native workspace manager (removed together with it)
- */
-export interface WorkspaceConfig {
-	/** Workspace isolation mode */
-	mode: WorkspaceMode;
-
-	/** Git branching strategy */
-	gitStrategy: GitStrategy;
-
-	/** Workspace reuse policy */
-	reusePolicy: ReusePolicy;
-
-	/** Optional concurrency key for grouping compatible workspaces */
-	concurrencyKey?: string;
-}
 
 /**
  * Output extraction configuration for a single variable

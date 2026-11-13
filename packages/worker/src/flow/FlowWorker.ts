@@ -2,7 +2,7 @@
  * Flow Worker (Refactored)
  *
  * Executes flows defined in the Flow Engine via FlowExecutor.
- * Integrates WorkspaceManager, FlowRegistry, and FlowExecutor with the orchestrator.
+ * Integrates FlowRegistry and FlowExecutor with the orchestrator.
  *
  * This class handles:
  * - WebSocket communication with orchestrator
@@ -17,8 +17,7 @@ import type {
 	InterventionResponse,
 } from 'flow-engine/executor/InterventionHandler';
 import { FlowRegistry } from 'flow-engine/registry/FlowRegistry';
-import type { FlowMetadata, FlowTrace, Workspace, WorkspaceConfig } from 'flow-engine/types';
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
+import type { FlowDefinition, FlowMetadata, FlowTrace, Workspace } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
 import type { ChildProcess } from 'node:child_process';
 import { execSync } from 'node:child_process';
@@ -82,7 +81,6 @@ export class FlowWorker implements Shutdownable {
 	// Flow engine components
 	private flowRegistry: FlowRegistry;
 	private flowExecutor: FlowExecutor;
-	private workspaceManager: WorkspaceManager;
 	private interactive: boolean;
 	private projectRoot: string;
 	private projectId: string = '';
@@ -146,7 +144,6 @@ export class FlowWorker implements Shutdownable {
 		// Initialize Flow Engine components
 		this.flowRegistry = new FlowRegistry(projectRoot);
 		this.flowExecutor = new FlowExecutor(interactive, this.flowRegistry);
-		this.workspaceManager = new WorkspaceManager(projectRoot);
 
 		// Load project flows
 		this.runDetached('load flows', this.loadFlows());
@@ -930,47 +927,12 @@ export class FlowWorker implements Shutdownable {
 		this.logger.info(` Executing flow: ${flow.name} (${flow.id})`);
 		this.sendTaskStarted(TaskStatus.IN_PROGRESS);
 
-		let workspace: Workspace | null = null;
-
 		try {
 			// Allocate workspace based on flow configuration
 			this.sendTaskProgress('Allocating workspace...');
 
-			// This worker predates the workspace providers of flow-cli: it only knows the legacy block (mode/gitStrategy/reusePolicy).
-			// Anything else is refused here, naming the way out, rather than allocated as something it is not.
-			const declared = flow.workspace;
-			if (typeof declared !== 'object' || declared === null || !('mode' in declared)) {
-				throw new Error(
-					`Flow "${flow.id}" declares workspace ${JSON.stringify(declared)}, a workspace provider. This worker only runs the legacy workspace block (mode, gitStrategy, reusePolicy). Run the flow with flow-cli (flow run), which supports workspace providers.`
-				);
-			}
-			const legacyWorkspace = declared as unknown as WorkspaceConfig;
-
-			// Determine workspace path
-			let workspacePath: string | undefined;
-
-			// If task specifies a workspace path, use it (OVERRIDE)
-			if (task.workspacePath) {
-				workspacePath = task.workspacePath;
-				this.logger.info(` Using task-specified workspace override: ${workspacePath}`);
-			}
-			// Otherwise, if manual mode but no path specified, use current working directory
-			else if (legacyWorkspace.mode === 'manual') {
-				workspacePath = process.cwd();
-				this.logger.info(` Using current working directory as manual workspace: ${workspacePath}`);
-			}
-
-			workspace = await this.workspaceManager.allocate({
-				taskId: task.id,
-				config: legacyWorkspace,
-				existingPath: workspacePath,
-				taskMetadata: {
-					description: task.description,
-					priority: task.priority,
-					workspaceId: task.metadata?.workspaceId, // Track workspace ID
-					...task.metadata,
-				},
-			});
+			// The native workspace manager is gone: this throws for every flow (see acquireWorkspace)
+			const workspace = await this.acquireWorkspace(flow);
 
 			this.logger.info(` Workspace allocated: ${workspace.id} (${workspace.path})`);
 			this.sendTaskProgress(`Workspace ready: ${workspace.path}`);
@@ -1116,20 +1078,28 @@ export class FlowWorker implements Shutdownable {
 				this.currentTask?.ticketId,
 				failureTicketStatus
 			);
-		} finally {
-			// Release workspace
-			if (workspace) {
-				try {
-					this.logger.info(` Releasing workspace ${workspace.id}...`);
-					await this.workspaceManager.release(workspace.id, task.id);
-					this.logger.info(` Workspace released`);
-				} catch (error) {
-					this.logger.error(` Failed to release workspace:`, error);
-				}
-			}
 		}
 	}
 
+	/**
+	 * Workspace of a flow run. The native workspace manager (modes isolated, shared, manual) was removed, so this worker
+	 * has no way to provide one: every flow is refused, naming the flow, what it declared and the way out. No fallback to
+	 * the task workspacePath or the working directory. Wiring the workspace providers of flow-cli here is not done.
+	 */
+	private acquireWorkspace(flow: FlowDefinition): Promise<Workspace> {
+		const declared = flow.workspace;
+		const described =
+			typeof declared === 'object' && declared !== null && 'mode' in declared
+				? `mode ${JSON.stringify(declared.mode)}`
+				: `declared workspace ${JSON.stringify(declared)}`;
+		return Promise.reject(
+			new Error(
+				`Flow "${flow.id}" needs a workspace (${described}), but this legacy worker no longer has a workspace manager: ` +
+					'the native one (isolated, shared and manual modes) was removed. ' +
+					'Run the flow with "flow run", which supports the in-place, readonly, worktree and pool workspaces.'
+			)
+		);
+	}
 	/**
 	 * Send task started notification
 	 */
@@ -1406,9 +1376,6 @@ export class FlowWorker implements Shutdownable {
 
 		// Cleanup Claude process manager
 		this.claudeProcessManager.shutdown();
-
-		// Cleanup all workspaces
-		this.runDetached('cleanup workspaces', this.workspaceManager.cleanupAll());
 
 		// Close WebSocket connection
 		this.stopHeartbeat();

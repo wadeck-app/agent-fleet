@@ -4,15 +4,7 @@
  * Factory functions to create test data objects with sensible defaults.
  * Use the overrides parameter to customize specific properties.
  */
-import type {
-	FlowDefinition,
-	FlowTrace,
-	GitStrategy,
-	ModelFlowStep,
-	ReusePolicy,
-	Workspace,
-	WorkspaceMode,
-} from 'flow-engine/types';
+import type { FlowDefinition, FlowTrace, ModelFlowStep, Workspace, WorkspaceMode } from 'flow-engine/types';
 import type { TaskStatus } from 'shared-orch-worker/domain-types';
 import { type Task, type WorkerInfo } from 'shared-orch-worker/domain-types';
 
@@ -45,11 +37,7 @@ export function createMockFlow(overrides?: Partial<FlowDefinition>): FlowDefinit
 		version: '1.0.0',
 		name: 'Test Flow',
 		description: 'Test flow description',
-		workspace: {
-			mode: 'isolated' as WorkspaceMode,
-			gitStrategy: 'feature-branch' as GitStrategy,
-			reusePolicy: 'if-available' as ReusePolicy,
-		},
+		workspace: 'in-place',
 		inputs: {},
 		steps: [
 			{

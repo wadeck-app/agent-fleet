@@ -6,7 +6,6 @@
  * Note: The orchestrator module auto-starts when imported, so we focus on testing
  * the behavior of the orchestrator components and their interactions.
  */
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import type { MockedObject } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,7 +19,6 @@ import { TaskManager } from './TaskManager';
 vi.mock('./TaskManager');
 vi.mock('./RestAPI');
 vi.mock('../websocket/WorkerWebSocketServer');
-vi.mock('flow-engine/workspace/WorkspaceManager');
 
 // Mock the logger module - createLogger returns a mock logger instance
 vi.mock('shared-common/logger', () => ({
@@ -43,7 +41,6 @@ describe('Orchestrator', () => {
 	let mockTaskManager: MockedObject<TaskManager>;
 	let mockRestAPI: MockedObject<RestAPI>;
 	let mockWsServer: MockedObject<WorkerWebSocketServer>;
-	let mockWorkspaceManager: MockedObject<WorkspaceManager>;
 
 	// Store original process properties
 	let originalTitle: string;
@@ -90,15 +87,6 @@ describe('Orchestrator', () => {
 		} as any;
 		vi.mocked(WorkerWebSocketServer).mockImplementation(function (this: any) {
 			return mockWsServer;
-		} as any);
-
-		// Mock WorkspaceManager
-		mockWorkspaceManager = {
-			getAllWorkspaces: vi.fn().mockReturnValue([]),
-			cleanupAll: vi.fn().mockResolvedValue(undefined),
-		} as any;
-		vi.mocked(WorkspaceManager).mockImplementation(function (this: any) {
-			return mockWorkspaceManager;
 		} as any);
 	});
 
@@ -324,16 +312,6 @@ describe('Orchestrator', () => {
 			expect(wsServerOrder).toBeLessThan(restAPIOrder);
 		});
 
-		it('should initialize WorkspaceManager before REST API', async () => {
-			orchestrator = new Orchestrator();
-			await orchestrator.start();
-
-			const workspaceManagerOrder = vi.mocked(WorkspaceManager).mock.invocationCallOrder[0];
-			const restAPIOrder = vi.mocked(RestAPI).mock.invocationCallOrder[0];
-
-			expect(workspaceManagerOrder).toBeLessThan(restAPIOrder);
-		});
-
 		it('should provide access to all services after start', async () => {
 			orchestrator = new Orchestrator();
 			await orchestrator.start();
@@ -341,7 +319,8 @@ describe('Orchestrator', () => {
 			expect(orchestrator.getTaskManager()).toBe(mockTaskManager);
 			expect(orchestrator.getWsServer()).toBe(mockWsServer);
 			expect(orchestrator.getRestAPI()).toBe(mockRestAPI);
-			expect(orchestrator.getWorkspaceManager()).toBe(mockWorkspaceManager);
+			// The native workspace manager was removed
+			expect(orchestrator).not.toHaveProperty('getWorkspaceManager');
 		});
 	});
 
@@ -372,16 +351,6 @@ describe('Orchestrator', () => {
 
 			orchestrator = new Orchestrator();
 			await expect(orchestrator.start()).rejects.toThrow('Port 3737 is already in use');
-		});
-
-		it('should handle WorkspaceManager initialization failure', async () => {
-			const error = new Error('Cannot create workspace directory');
-			vi.mocked(WorkspaceManager).mockImplementation(function (this: any) {
-				throw error;
-			} as any);
-
-			orchestrator = new Orchestrator();
-			await expect(orchestrator.start()).rejects.toThrow('Cannot create workspace directory');
 		});
 	});
 

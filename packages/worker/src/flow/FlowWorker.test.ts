@@ -3,14 +3,7 @@
  *
  * Comprehensive unit tests for FlowWorker functionality.
  */
-import type {
-	FlowDefinition,
-	FlowExecutionResult,
-	GitStrategy,
-	ReusePolicy,
-	Workspace,
-	WorkspaceMode,
-} from 'flow-engine/types';
+import type { FlowDefinition, FlowExecutionResult, Workspace } from 'flow-engine/types';
 import type { TaskStatus } from 'shared-orch-worker/domain-types';
 import { type Task } from 'shared-orch-worker/domain-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,7 +50,6 @@ vi.mock('ws', () => ({
 
 // Store mock instances for access in tests
 let mockFlowRegistryInstance: any;
-let mockWorkspaceManagerInstance: any;
 let mockFlowExecutorInstance: any;
 
 // Mock FlowRegistry
@@ -65,15 +57,6 @@ vi.mock('flow-engine/registry/FlowRegistry', () => ({
 	FlowRegistry: class {
 		constructor(projectRoot: string) {
 			return mockFlowRegistryInstance;
-		}
-	},
-}));
-
-// Mock WorkspaceManager
-vi.mock('flow-engine/workspace/WorkspaceManager', () => ({
-	WorkspaceManager: class {
-		constructor(projectRoot: string) {
-			return mockWorkspaceManagerInstance;
 		}
 	},
 }));
@@ -90,7 +73,6 @@ vi.mock('flow-engine/executor/FlowExecutor', () => ({
 describe('FlowWorker', () => {
 	let worker: FlowWorker;
 	let mockFlowRegistry: any;
-	let mockWorkspaceManager: any;
 	let mockFlowExecutor: any;
 	let mockTask: Task;
 	let mockFlow: FlowDefinition;
@@ -121,13 +103,8 @@ describe('FlowWorker', () => {
 		};
 		mockFlowRegistryInstance = mockFlowRegistry;
 
-		// Mock WorkspaceManager
-		mockWorkspaceManager = {
-			allocate: vi.fn().mockResolvedValue(mockWorkspace),
-			release: vi.fn().mockResolvedValue(undefined),
-			cleanupAll: vi.fn().mockResolvedValue(undefined),
-		};
-		mockWorkspaceManagerInstance = mockWorkspaceManager;
+		// The legacy worker has no workspace allocator any more (see acquireWorkspace): the execution tests stub it.
+		// The refusal itself is tested in the "removed workspace manager" block with the real method.
 
 		// Mock FlowExecutor
 		mockFlowExecutor = {
@@ -141,6 +118,7 @@ describe('FlowWorker', () => {
 
 		// Create worker with test project root
 		worker = new FlowWorker('ws://localhost:3738', '/test/project', false);
+		vi.spyOn(worker as any, 'acquireWorkspace').mockResolvedValue(mockWorkspace);
 	});
 
 	afterEach(() => {
@@ -267,22 +245,7 @@ describe('FlowWorker', () => {
 			await (worker as any).executeTask(mockTask);
 
 			expect(mockFlowRegistry.getFlow).toHaveBeenCalledWith('test-flow');
-			expect(mockWorkspaceManager.allocate).toHaveBeenCalled();
 			expect(mockFlowExecutor.execute).toHaveBeenCalled();
-		});
-
-		it('should allocate workspace with correct configuration', async () => {
-			await (worker as any).executeTask(mockTask);
-
-			expect(mockWorkspaceManager.allocate).toHaveBeenCalledWith({
-				taskId: 'task-1',
-				config: mockFlow.workspace,
-				existingPath: undefined,
-				taskMetadata: {
-					description: 'Test flow task',
-					priority: 'medium',
-				},
-			});
 		});
 
 		it('should pass flowInputs to execution', async () => {
@@ -322,12 +285,6 @@ describe('FlowWorker', () => {
 					steps: [],
 				}),
 			});
-		});
-
-		it('should release workspace after successful execution', async () => {
-			await (worker as any).executeTask(mockTask);
-
-			expect(mockWorkspaceManager.release).toHaveBeenCalledWith('workspace-1', 'task-1');
 		});
 
 		it('should use default status transitions when not configured', async () => {
@@ -374,17 +331,6 @@ describe('FlowWorker', () => {
 			});
 		});
 
-		it('should handle workspace allocation error', async () => {
-			mockWorkspaceManager.allocate.mockRejectedValue(new Error('Allocation failed'));
-
-			await (worker as any).executeTask(mockTask);
-
-			expect(mockTask.flowResult).toEqual({
-				status: 'failed',
-				error: 'Allocation failed',
-			});
-		});
-
 		it('should handle flow executor error', async () => {
 			mockFlowExecutor.execute.mockRejectedValue(new Error('Execution failed'));
 
@@ -394,119 +340,6 @@ describe('FlowWorker', () => {
 				status: 'failed',
 				error: 'Execution failed',
 			});
-		});
-
-		it('should release workspace even on error', async () => {
-			mockFlowExecutor.execute.mockRejectedValue(new Error('Execution failed'));
-
-			await (worker as any).executeTask(mockTask);
-
-			expect(mockWorkspaceManager.release).toHaveBeenCalledWith('workspace-1', 'task-1');
-		});
-
-		it('should handle workspace release error gracefully', async () => {
-			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-			mockWorkspaceManager.release.mockRejectedValue(new Error('Release failed'));
-
-			await (worker as any).executeTask(mockTask);
-
-			expect(consoleSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Failed to release workspace'),
-				expect.any(Error)
-			);
-
-			consoleSpy.mockRestore();
-		});
-
-		it('should not attempt to release workspace if allocation failed', async () => {
-			mockWorkspaceManager.allocate.mockRejectedValue(new Error('Allocation failed'));
-
-			await (worker as any).executeTask(mockTask);
-
-			expect(mockWorkspaceManager.release).not.toHaveBeenCalled();
-		});
-	});
-
-	describe('executeTask - Workspace Modes', () => {
-		it('should handle manual workspace mode with provided path', async () => {
-			const manualFlow = createMockFlow({
-				workspace: {
-					mode: 'manual' as WorkspaceMode,
-					gitStrategy: 'any' as GitStrategy,
-					reusePolicy: 'always' as ReusePolicy,
-				},
-			});
-			mockFlowRegistry.getFlow.mockReturnValue(manualFlow);
-
-			const taskWithWorkspace = createMockTask({
-				flowId: 'test-flow',
-				workspacePath: '/custom/workspace',
-			});
-
-			await (worker as any).executeTask(taskWithWorkspace);
-
-			expect(mockWorkspaceManager.allocate).toHaveBeenCalledWith(
-				expect.objectContaining({
-					existingPath: '/custom/workspace',
-				})
-			);
-		});
-
-		it('should use current working directory for manual mode without path', async () => {
-			const manualFlow = createMockFlow({
-				workspace: {
-					mode: 'manual' as WorkspaceMode,
-					gitStrategy: 'any' as GitStrategy,
-					reusePolicy: 'always' as ReusePolicy,
-				},
-			});
-			mockFlowRegistry.getFlow.mockReturnValue(manualFlow);
-
-			await (worker as any).executeTask(mockTask);
-
-			expect(mockWorkspaceManager.allocate).toHaveBeenCalledWith(
-				expect.objectContaining({
-					existingPath: process.cwd(),
-				})
-			);
-		});
-
-		it('should not set existingPath for isolated mode', async () => {
-			const isolatedFlow = createMockFlow({
-				workspace: {
-					mode: 'isolated' as WorkspaceMode,
-					gitStrategy: 'feature-branch' as GitStrategy,
-					reusePolicy: 'never' as ReusePolicy,
-				},
-			});
-			mockFlowRegistry.getFlow.mockReturnValue(isolatedFlow);
-
-			await (worker as any).executeTask(mockTask);
-
-			expect(mockWorkspaceManager.allocate).toHaveBeenCalledWith(
-				expect.objectContaining({
-					existingPath: undefined,
-				})
-			);
-		});
-
-		it('should not set existingPath for shared mode', async () => {
-			const sharedFlow = createMockFlow({
-				workspace: {
-					mode: 'shared' as WorkspaceMode,
-					gitStrategy: 'main-only' as GitStrategy,
-					reusePolicy: 'always' as ReusePolicy,
-				},
-			});
-			mockFlowRegistry.getFlow.mockReturnValue(sharedFlow);
-
-			await (worker as any).executeTask(mockTask);
-
-			expect(mockWorkspaceManager.allocate).toHaveBeenCalledWith(
-				expect.objectContaining({
-					existingPath: undefined,
-				})
-			);
 		});
 	});
 
@@ -529,6 +362,7 @@ describe('FlowWorker', () => {
 
 		it('should set CLAUDE_CODE_STOPPABLE to true in interactive mode', async () => {
 			const interactiveWorker = new FlowWorker(undefined, '/test/project', true);
+			vi.spyOn(interactiveWorker as any, 'acquireWorkspace').mockResolvedValue(mockWorkspace);
 
 			await (interactiveWorker as any).executeTask(mockTask);
 
@@ -555,27 +389,6 @@ describe('FlowWorker', () => {
 	});
 
 	describe('executeTask - Task Metadata', () => {
-		it('should pass task metadata to workspace allocation', async () => {
-			const taskWithMetadata = createMockTask({
-				flowId: 'test-flow',
-				description: 'Test flow task',
-				metadata: { custom: 'data', tag: 'test' },
-			});
-
-			await (worker as any).executeTask(taskWithMetadata);
-
-			expect(mockWorkspaceManager.allocate).toHaveBeenCalledWith(
-				expect.objectContaining({
-					taskMetadata: {
-						description: 'Test flow task',
-						priority: 'medium',
-						custom: 'data',
-						tag: 'test',
-					},
-				})
-			);
-		});
-
 		it('should pass task metadata to executor', async () => {
 			const taskWithMetadata = createMockTask({
 				flowId: 'test-flow',
@@ -766,12 +579,6 @@ describe('FlowWorker', () => {
 			}).not.toThrow();
 		});
 
-		it('should cleanup all workspaces', () => {
-			worker.shutdown();
-
-			expect(mockWorkspaceManager.cleanupAll).toHaveBeenCalled();
-		});
-
 		it('should handle shutdown when WebSocket server is null', () => {
 			// ClaudeLifecycleManager handles this internally
 			expect(() => {
@@ -802,9 +609,7 @@ describe('FlowWorker', () => {
 
 			// Verify execution order
 			expect(mockFlowRegistry.getFlow).toHaveBeenCalledWith('test-flow');
-			expect(mockWorkspaceManager.allocate).toHaveBeenCalled();
 			expect(mockFlowExecutor.execute).toHaveBeenCalled();
-			expect(mockWorkspaceManager.release).toHaveBeenCalled();
 		});
 
 		it('should handle multiple sequential tasks', async () => {
@@ -815,8 +620,6 @@ describe('FlowWorker', () => {
 			await (worker as any).executeTask(task2);
 
 			expect(mockFlowExecutor.execute).toHaveBeenCalledTimes(2);
-			expect(mockWorkspaceManager.allocate).toHaveBeenCalledTimes(2);
-			expect(mockWorkspaceManager.release).toHaveBeenCalledTimes(2);
 		});
 
 		it('should handle tasks with different flows', async () => {
@@ -837,21 +640,6 @@ describe('FlowWorker', () => {
 	});
 
 	describe('Error Recovery', () => {
-		it('should recover from workspace allocation failure', async () => {
-			mockWorkspaceManager.allocate
-				.mockRejectedValueOnce(new Error('Allocation failed'))
-				.mockResolvedValueOnce(mockWorkspace);
-
-			const task1 = createMockTask({ id: 'task-1', flowId: 'test-flow' });
-			const task2 = createMockTask({ id: 'task-2', flowId: 'test-flow' });
-
-			await (worker as any).executeTask(task1);
-			expect(task1.flowResult?.status).toBe('failed');
-
-			await (worker as any).executeTask(task2);
-			expect(task2.flowResult?.status).toBe('completed');
-		});
-
 		it('should recover from flow execution failure', async () => {
 			mockFlowExecutor.execute
 				.mockResolvedValueOnce({
@@ -972,20 +760,6 @@ describe('FlowWorker', () => {
 			expect(mockFlowExecutor.execute).toHaveBeenCalled();
 		});
 
-		it('should handle workspace with no git state', async () => {
-			const workspaceNoGit = createMockWorkspace();
-			delete (workspaceNoGit as any).git;
-			mockWorkspaceManager.allocate.mockResolvedValue(workspaceNoGit);
-
-			await (worker as any).executeTask(mockTask);
-
-			expect(mockFlowExecutor.execute).toHaveBeenCalledWith(
-				expect.objectContaining({
-					workspace: workspaceNoGit,
-				})
-			);
-		});
-
 		it('should handle flow execution with no outputs', async () => {
 			mockFlowExecutor.execute.mockResolvedValue({
 				success: true,
@@ -1019,6 +793,61 @@ describe('FlowWorker', () => {
 				error: undefined,
 				trace: { id: 'trace-1', steps: [] },
 			});
+		});
+	});
+
+	// The native workspace manager (modes isolated, shared, manual) was removed: no flow can get a workspace from this worker.
+	describe('executeTask - removed workspace manager', () => {
+		let refusingWorker: FlowWorker;
+
+		beforeEach(() => {
+			// No stub of acquireWorkspace here: the real method is under test
+			refusingWorker = new FlowWorker('ws://localhost:3738', '/test/project', false);
+		});
+
+		afterEach(() => {
+			refusingWorker.shutdown();
+		});
+
+		const declarations: Array<[string, unknown, string]> = [
+			['isolated', { mode: 'isolated', gitStrategy: 'feature-branch', reusePolicy: 'never' }, 'mode "isolated"'],
+			['shared', { mode: 'shared', gitStrategy: 'main-only', reusePolicy: 'always' }, 'mode "shared"'],
+			['manual', { mode: 'manual', gitStrategy: 'any', reusePolicy: 'always' }, 'mode "manual"'],
+			['provider name', 'in-place', 'declared workspace "in-place"'],
+			['provider object', { provider: 'pool', size: 2 }, 'declared workspace {"provider":"pool","size":2}'],
+		];
+
+		it.each(declarations)(
+			'fails the %s workspace loudly and names the flow, the declaration and flow run',
+			async (_label, declared, described) => {
+				mockFlowRegistry.getFlow.mockReturnValue(
+					createMockFlow({ id: 'my-flow', workspace: declared as never })
+				);
+				const task = createMockTask({ id: 'task-9', flowId: 'my-flow' });
+
+				await (refusingWorker as any).executeTask(task);
+
+				expect(task.flowResult).toEqual({
+					status: 'failed',
+					error:
+						`Flow "my-flow" needs a workspace (${described}), but this legacy worker no longer has a workspace manager: ` +
+						'the native one (isolated, shared and manual modes) was removed. ' +
+						'Run the flow with "flow run", which supports the in-place, readonly, worktree and pool workspaces.',
+				});
+				expect(mockFlowExecutor.execute).not.toHaveBeenCalled();
+			}
+		);
+
+		it('does not fall back to the task workspacePath or the working directory', async () => {
+			mockFlowRegistry.getFlow.mockReturnValue(
+				createMockFlow({ workspace: { mode: 'manual', gitStrategy: 'any', reusePolicy: 'always' } as never })
+			);
+			const task = createMockTask({ flowId: 'test-flow', workspacePath: '/custom/workspace' });
+
+			await (refusingWorker as any).executeTask(task);
+
+			expect(task.flowResult?.status).toBe('failed');
+			expect(mockFlowExecutor.execute).not.toHaveBeenCalled();
 		});
 	});
 });

@@ -278,44 +278,6 @@ export class OrchestratorRepository {
 	}
 
 	/**
-	 * Get all workspaces from orchestrator
-	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
-	 */
-	async getWorkspaces(): Promise<unknown[]> {
-		// Library mode - direct access via WorkspaceManager
-		if (this.orchestratorWrapper) {
-			const orchestrator = this.orchestratorWrapper.getOrchestrator();
-			const workspaceManager = orchestrator.getWorkspaceManager();
-			if (!workspaceManager) {
-				return [];
-			}
-			return workspaceManager.getAllWorkspaces();
-		}
-
-		// HTTP mode - not supported for now
-		throw new Error('HTTP mode for getWorkspaces not yet implemented');
-	}
-
-	/**
-	 * Get single workspace by ID
-	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
-	 */
-	async getWorkspace(workspaceId: string): Promise<unknown | null> {
-		// Library mode - direct access via WorkspaceManager
-		if (this.orchestratorWrapper) {
-			const orchestrator = this.orchestratorWrapper.getOrchestrator();
-			const workspaceManager = orchestrator.getWorkspaceManager();
-			if (!workspaceManager) {
-				return null;
-			}
-			return workspaceManager.getWorkspace(workspaceId) || null;
-		}
-
-		// HTTP mode - not supported for now
-		throw new Error('HTTP mode for getWorkspace not yet implemented');
-	}
-
-	/**
 	 * Get all interventions from orchestrator
 	 * Note: Library mode now uses direct Orchestrator access instead of wrapper
 	 */

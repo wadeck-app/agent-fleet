@@ -233,20 +233,6 @@ export function createMockStateManager() {
 }
 
 /**
- * Create a mock WorkspaceManager
- */
-export function createMockWorkspaceManager() {
-	return {
-		allocate: vi.fn(),
-		release: vi.fn(),
-		cleanup: vi.fn(),
-		cleanupAll: vi.fn(),
-		getWorkspace: vi.fn(),
-		listWorkspaces: vi.fn(),
-	};
-}
-
-/**
  * Create a mock FlowExecutor
  */
 export function createMockFlowExecutor() {

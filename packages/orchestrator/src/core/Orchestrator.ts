@@ -1,4 +1,3 @@
-import { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { BackendEventBridge } from 'orchestrator/core/BackendEventBridge';
 import { InterventionManager } from 'orchestrator/core/InterventionManager';
 import { RestAPI } from 'orchestrator/core/RestAPI';
@@ -43,7 +42,6 @@ export class Orchestrator implements Shutdownable {
 	private interventionManager?: InterventionManager;
 	private wsServer?: WorkerWebSocketServer;
 	private restAPI?: RestAPI;
-	private workspaceManager?: WorkspaceManager;
 	// private uiInstance?: any;
 	private isRunning: boolean = false;
 
@@ -108,9 +106,6 @@ export class Orchestrator implements Shutdownable {
 		const flowRegistry = this.wsServer.getConnectionManager().getFlowDiscoveryRegistry();
 		this.taskManager.setFlowDiscoveryRegistry(flowRegistry);
 
-		// Create workspace manager
-		this.workspaceManager = new WorkspaceManager(this.projectRoot);
-
 		// Initialize new UI-related services
 		this.snapshotService = new StateSnapshotService(this.taskManager, this.wsServer);
 
@@ -124,7 +119,7 @@ export class Orchestrator implements Shutdownable {
 		// Create REST API only if not in library mode
 		// In library mode, the backend (Fastify) handles HTTP/WebSocket communication
 		if (!this.libraryMode) {
-			this.restAPI = new RestAPI(this.taskManager, this.wsServer, this.restPort, this.workspaceManager);
+			this.restAPI = new RestAPI(this.taskManager, this.wsServer, this.restPort);
 		} else {
 			log.info('Orchestrator', 'REST API disabled (library mode)');
 		}
@@ -238,13 +233,6 @@ export class Orchestrator implements Shutdownable {
 	 */
 	getRestAPI(): RestAPI | undefined {
 		return this.restAPI;
-	}
-
-	/**
-	 * Get the workspace manager instance
-	 */
-	getWorkspaceManager(): WorkspaceManager | undefined {
-		return this.workspaceManager;
 	}
 
 	/**

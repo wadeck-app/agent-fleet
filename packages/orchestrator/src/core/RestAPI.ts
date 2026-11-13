@@ -1,5 +1,4 @@
 import express, { type Express, type Request, type RequestHandler, type Response } from 'express';
-import type { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { readFileSync } from 'node:fs';
 import type { Server as HttpServer } from 'node:http';
 import path from 'node:path';
@@ -30,20 +29,13 @@ export class RestAPI {
 	private app: Express;
 	private taskManager: TaskManager;
 	private wsServer: WorkerWebSocketServer;
-	private workspaceManager: WorkspaceManager | null;
 	private port: number;
 	private server: HttpServer | null = null;
 	private startTime: number;
 
-	constructor(
-		taskManager: TaskManager,
-		wsServer: WorkerWebSocketServer,
-		port: number = 3737,
-		workspaceManager: WorkspaceManager | null = null
-	) {
+	constructor(taskManager: TaskManager, wsServer: WorkerWebSocketServer, port: number = 3737) {
 		this.taskManager = taskManager;
 		this.wsServer = wsServer;
-		this.workspaceManager = workspaceManager;
 		this.port = port;
 		this.startTime = Date.now();
 		this.app = express();
@@ -347,44 +339,6 @@ export class RestAPI {
 				});
 			} catch (error) {
 				log.error('[API] Error getting task trace:', error);
-				res.status(500).json({ error: (error as Error).message });
-			}
-		});
-
-		// List all active workspaces
-		this.app.get('/workspaces', (req: Request, res: Response) => {
-			try {
-				if (!this.workspaceManager) {
-					res.status(503).json({ error: 'Workspace manager not available' });
-					return;
-				}
-
-				const workspaces = this.workspaceManager.getAllWorkspaces();
-				res.json(workspaces);
-			} catch (error) {
-				log.error('[API] Error listing workspaces:', error);
-				res.status(500).json({ error: (error as Error).message });
-			}
-		});
-
-		// Get a specific workspace by ID
-		this.app.get('/workspaces/:id', (req: Request, res: Response) => {
-			try {
-				if (!this.workspaceManager) {
-					res.status(503).json({ error: 'Workspace manager not available' });
-					return;
-				}
-
-				const workspace = this.workspaceManager.getWorkspace(req.params.id);
-
-				if (!workspace) {
-					res.status(404).json({ error: 'Workspace not found' });
-					return;
-				}
-
-				res.json(workspace);
-			} catch (error) {
-				log.error('[API] Error getting workspace:', error);
 				res.status(500).json({ error: (error as Error).message });
 			}
 		});

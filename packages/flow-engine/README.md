@@ -12,7 +12,7 @@ Owns everything required to load a flow definition from YAML and execute it step
 - Graph validation -- flows support bounded cycles via `onFailure.goto`; the graph is NOT required to be a strict DAG
 - Step execution: StepRunner drives individual steps, FlowExecutor runs a full flow, FlowOrchestrator coordinates multi-flow scenarios
 - Claude process launching via ClaudeLauncher
-- Workspace management (per-flow working directories) via WorkspaceManager
+- Workspace declaration parsing (WorkspaceDeclarationParser), readonly rules and startup pruning; the workspaces themselves are provided by flow-cli (the native WorkspaceManager was removed)
 - Flow auto-discovery and registration via FlowRegistry
 - Template rendering for step inputs
 - Output extraction from step results

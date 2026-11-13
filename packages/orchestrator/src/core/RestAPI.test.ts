@@ -4,7 +4,6 @@
  * Comprehensive unit tests for the REST API endpoints.
  * Tests all HTTP endpoints with success and error cases.
  */
-import type { WorkspaceManager } from 'flow-engine/workspace/WorkspaceManager';
 import { createMockTask as createMockTaskUtil } from 'orchestrator/test-utils/MockOrchestrator';
 import { logger } from 'shared-common/logger';
 import type { StateManager } from 'shared-orch-worker/StateManager';
@@ -21,7 +20,6 @@ import type { TaskManager } from './TaskManager';
 // Mock all dependencies
 vi.mock('./TaskManager');
 vi.mock('../websocket/WorkerWebSocketServer');
-vi.mock('flow-engine/workspace/WorkspaceManager');
 vi.mock('shared-common/StateManager');
 vi.mock('shared-common/logger', () => ({
 	createLogger: () => ({
@@ -42,7 +40,6 @@ describe('RestAPI', () => {
 	let api: RestAPI;
 	let mockTaskManager: TaskManager;
 	let mockWsServer: WorkerWebSocketServer;
-	let mockWorkspaceManager: WorkspaceManager;
 	let mockStateManager: StateManager;
 	let mockConnectionManager: any;
 	let mockFlowDiscoveryRegistry: any;
@@ -112,17 +109,11 @@ describe('RestAPI', () => {
 			tryAssignTasksToIdleWorkers: vi.fn().mockImplementation(() => {}),
 		} as any;
 
-		// Mock WorkspaceManager
-		mockWorkspaceManager = {
-			getAllWorkspaces: vi.fn().mockReturnValue([]),
-			getWorkspace: vi.fn().mockReturnValue(undefined),
-		} as any;
-
 		// Mock Logger static methods
 		logger.info = vi.fn();
 		logger.error = vi.fn();
 
-		// Create API instance without workspace manager by default
+		// Create API instance
 		api = new RestAPI(mockTaskManager, mockWsServer, 3737);
 		app = (api as any).app;
 	});
@@ -839,123 +830,12 @@ describe('RestAPI', () => {
 		});
 	});
 
-	describe('GET /workspaces', () => {
-		it('should return 503 when workspace manager not available', async () => {
-			const response = await request(app).get('/workspaces');
-
-			expect(response.status).toBe(503);
-			expect(response.body).toEqual({ error: 'Workspace manager not available' });
-		});
-
-		it('should return list of workspaces when manager available', async () => {
-			api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
-			app = (api as any).app;
-
-			const mockWorkspaces = [
-				{
-					id: 'ws-1',
-					path: '/tmp/workspaces/ws-1',
-					taskId: 'task-1',
-					status: 'active',
-					createdAt: '2024-01-01T00:00:00.000Z',
-				},
-				{
-					id: 'ws-2',
-					path: '/tmp/workspaces/ws-2',
-					taskId: 'task-2',
-					status: 'active',
-					createdAt: '2024-01-01T00:01:00.000Z',
-				},
-			];
-			mockWorkspaceManager.getAllWorkspaces = vi.fn().mockReturnValue(mockWorkspaces as any);
-
-			const response = await request(app).get('/workspaces');
-
-			expect(response.status).toBe(200);
-			expect(response.body).toEqual(mockWorkspaces);
-			expect(mockWorkspaceManager.getAllWorkspaces).toHaveBeenCalled();
-		});
-
-		it('should return empty array when no workspaces', async () => {
-			api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
-			app = (api as any).app;
-
-			mockWorkspaceManager.getAllWorkspaces = vi.fn().mockReturnValue([]);
-
-			const response = await request(app).get('/workspaces');
-
-			expect(response.status).toBe(200);
-			expect(response.body).toEqual([]);
-		});
-
-		it('should return 500 when listing workspaces fails', async () => {
-			api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
-			app = (api as any).app;
-
-			mockWorkspaceManager.getAllWorkspaces = vi.fn().mockImplementation(() => {
-				throw new Error('Workspace error');
-			});
-
-			const response = await request(app).get('/workspaces');
-
-			expect(response.status).toBe(500);
-			expect(response.body).toEqual({ error: 'Workspace error' });
-		});
-	});
-
-	describe('GET /workspaces/:id', () => {
-		it('should return 503 when workspace manager not available', async () => {
-			const response = await request(app).get('/workspaces/ws-1');
-
-			expect(response.status).toBe(503);
-			expect(response.body).toEqual({ error: 'Workspace manager not available' });
-		});
-
-		it('should return a specific workspace', async () => {
-			api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
-			app = (api as any).app;
-
-			const mockWorkspace = {
-				id: 'ws-1',
-				path: '/tmp/workspaces/ws-1',
-				taskId: 'task-1',
-				status: 'active',
-				createdAt: '2024-01-01T00:00:00.000Z',
-				gitBranch: 'feature/test',
-			};
-			mockWorkspaceManager.getWorkspace = vi.fn().mockReturnValue(mockWorkspace as any);
-
-			const response = await request(app).get('/workspaces/ws-1');
-
-			expect(response.status).toBe(200);
-			expect(response.body).toEqual(mockWorkspace);
-			expect(mockWorkspaceManager.getWorkspace).toHaveBeenCalledWith('ws-1');
-		});
-
-		it('should return 404 when workspace not found', async () => {
-			api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
-			app = (api as any).app;
-
-			mockWorkspaceManager.getWorkspace = vi.fn().mockReturnValue(undefined);
-
-			const response = await request(app).get('/workspaces/non-existent');
+	// The native workspace manager was removed: the orchestrator no longer lists workspaces (flow-cli owns them)
+	describe('removed /workspaces routes', () => {
+		it.each(['/workspaces', '/workspaces/ws-1'])('GET %s is not served any more (404)', async route => {
+			const response = await request(app).get(route);
 
 			expect(response.status).toBe(404);
-			expect(response.body).toEqual({ error: 'Workspace not found' });
-		});
-
-		it('should return 500 when getting workspace fails', async () => {
-			api = new RestAPI(mockTaskManager, mockWsServer, 3737, mockWorkspaceManager);
-			app = (api as any).app;
-
-			mockWorkspaceManager.getWorkspace = vi.fn().mockImplementation(() => {
-				throw new Error('Workspace error');
-			});
-
-			const response = await request(app).get('/workspaces/ws-1');
-
-			expect(response.status).toBe(500);
-			expect(response.body).toEqual({ error: 'Workspace error' });
 		});
 	});
 
