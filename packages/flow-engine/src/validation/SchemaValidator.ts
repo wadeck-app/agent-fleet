@@ -12,8 +12,6 @@
  * This validator focuses on STRUCTURE, not semantics (e.g., it doesn't validate
  * that step references are valid - that's done by other validators).
  */
-import * as path from 'node:path';
-
 import type {
 	FlowDefinition,
 	FlowStep,
@@ -31,6 +29,7 @@ import type {
 import { ReadOnlyWorkspaceRules } from '../workspace/ReadOnlyWorkspaceRules';
 import { WorkspaceDeclarationParser } from '../workspace/WorkspaceDeclarationParser';
 import { WorktreeOptionRules } from '../workspace/WorktreeOptionRules';
+import { AbsolutePathSyntax } from './AbsolutePathSyntax';
 import { HostScriptMarkerValidator } from './HostScriptMarkerValidator';
 import { RequirementValidator } from './RequirementValidator';
 import type { IssueCollector } from './ValidationTypes';
@@ -224,9 +223,7 @@ export class SchemaValidator {
 	 * `workingDir` field and always run in the workspace.
 	 */
 	private warnAbsoluteWorkingDirs(flow: FlowDefinition, provider: string): void {
-		// Checked for both path flavours: a flow written on Windows can be validated on Linux, and the reverse.
-		const isAbsolute = (value: unknown): value is string =>
-			typeof value === 'string' && (path.posix.isAbsolute(value) || path.win32.isAbsolute(value));
+		const isAbsolute = AbsolutePathSyntax.isAbsolute;
 		const warn = (workingDir: string, stepId: string | undefined, where: string): void => {
 			this.issueCollector.addIssue({
 				severity: 'warning',
