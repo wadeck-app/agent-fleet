@@ -1,5 +1,6 @@
 import { readPortFile, writePortFile } from '@wadeck-app/singleton-daemon-kit';
 import { removeTempDirectory } from 'flow-core/testing';
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
@@ -39,6 +40,32 @@ afterEach(async () => {
 	removeTempDirectory(dir);
 });
 
+/** What spawn() returns: only what the spawner uses (unref, the exit event, a pid). */
+function fakeChild(): EventEmitter & { unref: () => void; pid: number } {
+	return Object.assign(new EventEmitter(), { unref: () => undefined, pid: 4242 });
+}
+
+/** What a starting daemon writes first, under its own lock (see Daemon.ts startDaemon): its pid. */
+function writeStartLock(pid: number, token: string): void {
+	fs.writeFileSync(
+		path.join(dir, 'daemon-start.lock'),
+		JSON.stringify({ pid, token, acquiredAt: new Date().toISOString() })
+	);
+}
+
+/** A clock that only moves when the spawner sleeps; `onTick` lets a test make the daemon do something at a given time. */
+function fakeClock(onTick: (nowMs: number) => void = () => undefined) {
+	let nowMs = 0;
+	return {
+		now: () => nowMs,
+		sleep: (ms: number) => {
+			nowMs += ms;
+			onTick(nowMs);
+			return Promise.resolve();
+		},
+	};
+}
+
 /** What a daemon does when it comes up: listen, then publish the port. */
 async function bringUpDaemon(): Promise<number> {
 	const server = net.createServer(socket => socket.destroy());
@@ -63,7 +90,7 @@ describe('spawnDaemonBackground', () => {
 		// The spawned process takes a moment to come up, like a real daemon.
 		harness.spawn.mockImplementation(() => {
 			void delay(150).then(bringUpDaemon);
-			return { unref: () => undefined };
+			return fakeChild();
 		});
 
 		await Promise.all([1, 2, 3, 4].map(() => spawnDaemonBackground(dir, 5000)));
@@ -75,7 +102,7 @@ describe('spawnDaemonBackground', () => {
 		await writePortFile(dir, 1, process.pid);
 		harness.spawn.mockImplementation(() => {
 			void delay(50).then(bringUpDaemon);
-			return { unref: () => undefined };
+			return fakeChild();
 		});
 
 		await spawnDaemonBackground(dir, 5000);
@@ -91,7 +118,7 @@ describe('spawnDaemonBackground when the daemon dies while starting', () => {
 			void delay(100).then(() =>
 				recordDaemonStartError(dir, new Error('"/p/.flow/config.yml" is no longer read.\nMove it: mv a b'), {})
 			);
-			return { unref: () => undefined };
+			return fakeChild();
 		});
 		const startedAt = Date.now();
 
@@ -108,14 +135,14 @@ describe('spawnDaemonBackground when the daemon dies while starting', () => {
 		recordDaemonStartError(dir, new Error('old failure'), {});
 		harness.spawn.mockImplementation(() => {
 			void delay(50).then(bringUpDaemon);
-			return { unref: () => undefined };
+			return fakeChild();
 		});
 
 		await expect(spawnDaemonBackground(dir, 5000)).resolves.toBe(true);
 	});
 
 	it('keeps the timeout message, with where to look, when no cause was recorded', async () => {
-		harness.spawn.mockImplementation(() => ({ unref: () => undefined }));
+		harness.spawn.mockImplementation(() => fakeChild());
 
 		const failure = await spawnDaemonBackground(dir, 300).catch((err: unknown) => err as Error);
 
@@ -124,12 +151,180 @@ describe('spawnDaemonBackground when the daemon dies while starting', () => {
 	});
 });
 
+describe('spawnDaemonBackground while the daemon process is alive but slow', () => {
+	const alive = () => true;
+	const portFile = () => path.join(dir, 'config.port');
+
+	it('keeps waiting past the 10 s grace while the daemon process holds its start lock, then succeeds', async () => {
+		const clock = fakeClock(nowMs => {
+			if (nowMs >= 25_000 && !fs.existsSync(portFile())) {
+				fs.writeFileSync(portFile(), '1');
+			}
+		});
+		harness.spawn.mockImplementation(() => {
+			writeStartLock(process.pid, 'daemon-1');
+			return fakeChild();
+		});
+
+		await expect(spawnDaemonBackground(dir, 10_000, { ...clock, isProcessAlive: alive, env: {} })).resolves.toBe(true);
+
+		expect(clock.now()).toBeGreaterThanOrEqual(25_000);
+	});
+
+	it('gives up at the grace when no daemon process ever showed itself, and says so', async () => {
+		const clock = fakeClock();
+		harness.spawn.mockImplementation(() => fakeChild());
+
+		const failure = await spawnDaemonBackground(dir, 10_000, { ...clock, isProcessAlive: alive, env: {} }).catch(
+			(err: unknown) => err as Error
+		);
+
+		expect((failure as Error).message).toContain('did not start within 10000ms');
+		expect((failure as Error).message).toContain('no daemon process was seen');
+		expect(clock.now()).toBeLessThan(10_500);
+	});
+
+	it('fails at once, naming the pid, when the process that held the start lock is gone', async () => {
+		const clock = fakeClock();
+		harness.spawn.mockImplementation(() => {
+			writeStartLock(999_999, 'daemon-dead');
+			return fakeChild();
+		});
+
+		const failure = await spawnDaemonBackground(dir, 10_000, { ...clock, isProcessAlive: () => false, env: {} }).catch(
+			(err: unknown) => err as Error
+		);
+
+		expect((failure as Error).message).toContain('pid 999999');
+		expect((failure as Error).message).toContain('exited');
+		expect((failure as Error).message).toContain('flow logs');
+		expect(clock.now()).toBeLessThan(1000);
+	});
+
+	it('does not take the lock a crashed daemon left earlier for the daemon just spawned', async () => {
+		writeStartLock(999_999, 'left-by-a-crash');
+		const clock = fakeClock(nowMs => {
+			if (nowMs >= 12_000 && !fs.existsSync(portFile())) {
+				fs.writeFileSync(portFile(), '1');
+			}
+		});
+		harness.spawn.mockImplementation(() => {
+			writeStartLock(process.pid, 'daemon-2');
+			return fakeChild();
+		});
+
+		await expect(
+			spawnDaemonBackground(dir, 10_000, { ...clock, isProcessAlive: pid => pid === process.pid, env: {} })
+		).resolves.toBe(true);
+	});
+
+	it('does not read a leftover lock as a sign of life when no daemon was spawned', async () => {
+		writeStartLock(process.pid, 'left-by-a-crash');
+		const clock = fakeClock();
+		harness.spawn.mockImplementation(() => fakeChild());
+
+		const failure = await spawnDaemonBackground(dir, 10_000, { ...clock, isProcessAlive: alive, env: {} }).catch(
+			(err: unknown) => err as Error
+		);
+
+		expect((failure as Error).message).toContain('no daemon process was seen');
+		expect(clock.now()).toBeLessThan(10_500);
+	});
+
+	it('stops at the hard cap and says: still running (pid), elapsed time, FLOW_DAEMON_START_TIMEOUT_MS, flow logs', async () => {
+		const clock = fakeClock();
+		harness.spawn.mockImplementation(() => {
+			writeStartLock(process.pid, 'daemon-3');
+			return fakeChild();
+		});
+
+		const failure = await spawnDaemonBackground(dir, 10_000, {
+			...clock,
+			isProcessAlive: alive,
+			env: { FLOW_DAEMON_START_TIMEOUT_MS: '30000' },
+		}).catch((err: unknown) => err as Error);
+
+		const message = (failure as Error).message;
+		expect(message).toContain(`still running (pid ${String(process.pid)})`);
+		expect(message).toContain('did not start within 30000ms');
+		expect(message).toMatch(/elapsed 30\d{3}ms/);
+		expect(message).toContain('FLOW_DAEMON_START_TIMEOUT_MS');
+		expect(message).toContain('flow logs');
+		expect(clock.now()).toBeGreaterThanOrEqual(30_000);
+		expect(clock.now()).toBeLessThan(31_000);
+	});
+
+	it('lets the variable shorten the grace as well (a cap of 4 s is 4 s even without a sign of life)', async () => {
+		const clock = fakeClock();
+		harness.spawn.mockImplementation(() => fakeChild());
+
+		const failure = await spawnDaemonBackground(dir, 10_000, {
+			...clock,
+			isProcessAlive: alive,
+			env: { FLOW_DAEMON_START_TIMEOUT_MS: '4000' },
+		}).catch((err: unknown) => err as Error);
+
+		expect((failure as Error).message).toContain('did not start within 4000ms');
+		expect(clock.now()).toBeLessThan(4500);
+	});
+
+	it.each(['abc', '0', '-1', '2.5'])('refuses FLOW_DAEMON_START_TIMEOUT_MS=%s before spawning anything', async value => {
+		const failure = await spawnDaemonBackground(dir, 10_000, { env: { FLOW_DAEMON_START_TIMEOUT_MS: value } }).catch(
+			(err: unknown) => err as Error
+		);
+
+		expect((failure as Error).message).toContain('FLOW_DAEMON_START_TIMEOUT_MS');
+		expect(harness.spawn).not.toHaveBeenCalled();
+	});
+});
+
+// Elsewhere than Windows the spawned process IS the daemon (on Windows it is the short-lived wscript wrapper), so its exit is a signal.
+describe('spawnDaemonBackground when the spawned process exits before the daemon is up (not Windows)', () => {
+	const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+	beforeEach(() => {
+		Object.defineProperty(process, 'platform', { ...platform, value: 'linux' });
+	});
+	afterEach(() => {
+		Object.defineProperty(process, 'platform', platform);
+	});
+
+	it('fails at once with its pid and exit code instead of waiting', async () => {
+		const clock = fakeClock();
+		harness.spawn.mockImplementation(() => {
+			const child = fakeChild();
+			void Promise.resolve().then(() => child.emit('exit', 3, null));
+			return child;
+		});
+
+		const failure = await spawnDaemonBackground(dir, 10_000, { ...clock, env: {} }).catch((err: unknown) => err as Error);
+
+		expect((failure as Error).message).toContain('pid 4242');
+		expect((failure as Error).message).toContain('exit code 3');
+		expect((failure as Error).message).toContain('flow logs');
+		expect(clock.now()).toBeLessThan(1000);
+	});
+
+	it('prefers the recorded start-up error when there is one', async () => {
+		const clock = fakeClock();
+		harness.spawn.mockImplementation(() => {
+			const child = fakeChild();
+			recordDaemonStartError(dir, new Error('config is invalid'), {});
+			void Promise.resolve().then(() => child.emit('exit', 1, null));
+			return child;
+		});
+
+		const failure = await spawnDaemonBackground(dir, 10_000, { ...clock, env: {} }).catch((err: unknown) => err as Error);
+
+		expect((failure as Error).message).toContain('config is invalid');
+	});
+});
+
 // The launcher script only exists on Windows (elsewhere the bundle is spawned directly).
 describe.skipIf(process.platform !== 'win32')('spawnDaemonBackground launcher script (Windows)', () => {
 	function launchWithMockedWscript(): string {
 		harness.spawn.mockImplementation(() => {
 			void delay(30).then(bringUpDaemon);
-			return { unref: () => undefined };
+			return fakeChild();
 		});
 		return '';
 	}

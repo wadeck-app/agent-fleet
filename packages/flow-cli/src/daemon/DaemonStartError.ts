@@ -13,6 +13,12 @@ import { writeDaemonLog } from './DaemonLog.js';
  */
 export const DAEMON_START_ERROR_FILE = 'daemon-start-error.json';
 
+/**
+ * The lock a daemon holds from the moment it starts until its port is published (Daemon.ts). Its content names the
+ * daemon's pid, which is how the command that spawned it tells "still starting" from "gone".
+ */
+export const DAEMON_START_LOCK_FILE = 'daemon-start.lock';
+
 export interface DaemonStartError {
 	message: string;
 	pid?: number;

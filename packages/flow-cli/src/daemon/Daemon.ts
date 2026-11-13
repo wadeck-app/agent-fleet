@@ -20,6 +20,7 @@ import { createDaemonForkWorkers } from './DaemonForkWorkers.js';
 import { buildDaemonHealth } from './DaemonHealth';
 import { DaemonIdleShutdown, IDLE_WATCHDOG_INTERVAL_MS } from './DaemonIdleShutdown.js';
 import { writeDaemonLog } from './DaemonLog.js';
+import { DAEMON_START_LOCK_FILE } from './DaemonStartError.js';
 import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DaemonShutdownSequence } from './DaemonShutdownSequence.js';
@@ -68,7 +69,7 @@ async function startDaemon(
 	// Before the lock and any side effect.
 	assertValidStartDaemonOptions(options);
 	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });
-	const release = await ExclusiveFileLock.acquire(path.join(resolvedDaemonDir, 'daemon-start.lock'), {
+	const release = await ExclusiveFileLock.acquire(path.join(resolvedDaemonDir, DAEMON_START_LOCK_FILE), {
 		timeoutMs: START_LOCK_TIMEOUT_MS,
 		purpose: 'start the flow daemon (another daemon is starting)',
 	});
