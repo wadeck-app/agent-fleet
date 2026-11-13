@@ -30,13 +30,16 @@ export interface TimeScheduler {
  * Real-time scheduler for production (uses setTimeout)
  */
 export class RealTimeScheduler implements TimeScheduler {
+	// Uses globalThis (not window): the health check loop re-arms itself from a timer callback,
+	// which can fire after the DOM environment is torn down (e.g. jsdom in test workers),
+	// where `window` no longer exists but timers still do.
 	schedule(callback: () => void, delay: number): number {
-		// violations-suppress: ts/no-unsafe-type-cast window.setTimeout return type varies by environment; browser always returns number
-		return window.setTimeout(callback, delay) as unknown as number;
+		// violations-suppress: ts/no-unsafe-type-cast setTimeout return type varies by environment (number in browsers, Timeout in Node)
+		return globalThis.setTimeout(callback, delay) as unknown as number;
 	}
 
 	cancel(timerId: number): void {
-		window.clearTimeout(timerId);
+		globalThis.clearTimeout(timerId);
 	}
 
 	now(): number {
