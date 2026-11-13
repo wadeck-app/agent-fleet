@@ -182,25 +182,30 @@ describe.each(FLAVORS)('StepCommandTranslator on a $name', flavor => {
 describe.each(FLAVORS)('StepCommandTranslator codex and opencode on a $name', flavor => {
 	const translator = translatorFor(flavor);
 
-	// On a Windows host the engine cannot find codex or opencode through the sandbox launcher (its resolvers branch on the HOST platform) and falls
-	// back to "the bare name with shell: true". In the VM that is simply the program with its arguments.
-	it.each(['codex', 'opencode'])(
-		'runs the bare name %s with arguments and shell: true as that program in the VM, no shell',
-		async program => {
+	// Since the engine resolvers ask the launcher (flow-engine SandboxExecutableLookup), the program the engine starts is the VM path of the lookup,
+	// on every host: nothing special is left to do for codex and opencode.
+	it.each([
+		['codex', '/home/agent/.local/bin/codex'],
+		['opencode', '/home/agent/.local/bin/opencode'],
+	])(
+		'runs the VM path the engine got from the lookup for %s, with its arguments, unchanged',
+		async (program, vmPath) => {
 			const translated = await translator.translate(
-				request({ command: program, args: ['exec', '--json', '--', 'a prompt; with $chars'], shell: true })
+				request({ command: vmPath, args: ['exec', '--json', '--', 'a prompt; with $chars'] })
 			);
 
-			expect(translated.command).toEqual([program, 'exec', '--json', '--', 'a prompt; with $chars']);
+			expect(translated.command).toEqual([vmPath, 'exec', '--json', '--', 'a prompt; with $chars']);
 			expect(translated.program).toBe(program);
 		}
 	);
 
 	it.each([
-		['another bare name', 'git'],
-		['a name with a space', 'codex --dangerously-bypass-approvals-and-sandbox'],
-		['a path', '/usr/bin/codex'],
-	])('still refuses shell: true with arguments for %s', async (_name, command) => {
+		['codex', 'a bare name (the old Windows-host fallback of the engine: no special case any more)'],
+		['opencode', 'a bare name (the old Windows-host fallback of the engine: no special case any more)'],
+		['git', 'another bare name'],
+		['codex --dangerously-bypass-approvals-and-sandbox', 'a name with a space'],
+		['/usr/bin/codex', 'a path'],
+	])('refuses shell: true with arguments for %s (%s)', async (command, _name) => {
 		const error = await refusal(translator.translate(request({ command, args: ['x'], shell: true })));
 
 		expect(error.message).toMatch(/both arguments and a shell/);

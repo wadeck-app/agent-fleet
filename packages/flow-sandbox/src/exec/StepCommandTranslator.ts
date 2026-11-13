@@ -38,12 +38,6 @@ export interface TranslatedCommand {
 const CLEANUP_SCRIPT = 'n=$1; shift; files=("${@:1:n}"); shift "$n"; "$@"; rc=$?; rm -f -- "${files[@]}"; exit $rc';
 /** Shells a `shell:` spawn option may name (resolved by the VM's own PATH). */
 const SHELLS_IN_VM = new Set(['bash', 'sh']);
-/**
- * Model CLIs the engine may name as a bare command with `shell: true` and arguments: on a WINDOWS host its resolvers (CodexModelProvider,
- * OpenCodeBinaryResolver) look for `.cmd` files on the host and fall back to the bare name through a shell, whatever launcher they were given. In the
- * VM that is the program itself, started without a shell. Any other name keeps the refusal.
- */
-const BARE_MODEL_CLIS = new Set(['codex', 'opencode']);
 const REFUSED_PROGRAMS = new Map<string, string>([
 	['cmd', 'cmd.exe does not exist in the VM'],
 	['powershell', 'PowerShell does not exist in the VM'],
@@ -120,9 +114,6 @@ export class StepCommandTranslator {
 			}
 			const shellName = typeof shell === 'string' ? this.programName(shell) : 'sh';
 			return { command: shellName === 'bash' ? 'bash' : '/bin/sh', args: ['-c', command], display: shellName };
-		}
-		if (shell === true && BARE_MODEL_CLIS.has(command)) {
-			return { command, args, display: command };
 		}
 		if (shell !== undefined && shell !== false) {
 			throw this.refused(command, 'a spawn with both arguments and a shell is not supported');
