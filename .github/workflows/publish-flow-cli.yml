@@ -69,6 +69,12 @@ jobs:
                   for pkg in flow-cli-dist flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-linux-x64; do
                     (cd "packages/$pkg" && npm pkg set version="${{ steps.version.outputs.version }}")
                   done
+                  # The generated optionalDependencies use the range ">=0.0.0-0", which a PRERELEASE version such as
+                  # 2026.11.13-1007-ffa3e2df does not satisfy (semver): npm then installs no platform package at all
+                  # (seen on macOS: "added 1 package"). Pin each platform package to the exact version of this build.
+                  for platform in win32-x64 darwin-arm64 linux-x64; do
+                    (cd packages/flow-cli-dist && npm pkg set "optionalDependencies.@wadeck-app/flow-cli-$platform=${{ steps.version.outputs.version }}")
+                  done
 
             - name: Upload artifacts
               uses: actions/upload-artifact@v4
