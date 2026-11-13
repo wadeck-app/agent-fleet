@@ -46,6 +46,12 @@ const WIRING = ' This is a wiring mistake in the daemon, not a configuration err
  * Fork is the daemon's own fallback, never a declared source: it is built only from `host.fork`, which the daemon alone
  * has. A declared entry names no such host, so building it for one is refused as a configuration error. It is registered
  * statically (BuiltinWorkerTypes) like the other built-ins, so the single-file bundle contains it.
+ *
+ * Single source of truth: the daemon does NOT call `create` (nothing sets `host.fork` in production, see
+ * WorkerTypeInstances); it calls {@link buildForkWorkerType} directly through DaemonForkWorkers, and `create` calls that
+ * same factory. So the two paths cannot diverge in behaviour; the plugin's own job in production is the refusal above.
+ * ForkWorkerTypePlugin.test.ts asserts that both build the same worker. Routing the daemon through `create` was left
+ * undone on purpose: it would make a synchronous startup step async and add a failure path for no behaviour gain.
  */
 export const forkWorkerTypePlugin: FlowPlugin<WorkerTypeInstance> = {
 	extensionPoint: 'worker-type',

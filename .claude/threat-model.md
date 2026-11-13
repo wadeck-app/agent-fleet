@@ -8,6 +8,7 @@
 | T-02 | Plugin reads secrets it should not access            | Accepted (v1)     | v1 plugins are developer-written only; no sandbox. Subprocess isolation deferred to v2.                         |
 | T-03 | Misconfigured workspace plugin corrupts source files | Accepted (opt-in) | `none` provider uses `process.cwd()` — user's explicit choice. `worktree` provider exposes only allocated path. |
 | T-06 | Cross-task intervention spoofing via web UI          | **OPEN**          | Orchestrator approval plugin must not ship until this is resolved.                                              |
+| T-02-load | Third-party code loaded by absolute path or bare package (`PluginModuleLoader` / `loadPlugin`) runs in the daemon or worker with its rights | **OPEN-gate** (no production consumer yet) | Guard test `packages/flow-cli/src/config/PluginLoadGate.test.ts` fails when a production file outside its allowlist uses the loader. Whoever first wires it writes the note first: where the path/package comes from, who can write it, what code runs with which rights. |
 
 ## Flow execution
 

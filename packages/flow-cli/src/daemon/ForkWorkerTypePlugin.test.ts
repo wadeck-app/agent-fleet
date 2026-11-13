@@ -99,6 +99,26 @@ describe('fork worker-type plugin', () => {
 		expect(instance.source).toBeInstanceOf(ForkWorkerSource);
 	});
 
+	it('builds the same worker as the daemon path: same spawn command, arguments and environment', async () => {
+		const viaPlugin = (await forkWorkerTypePlugin.create({
+			sourceId: 'built-in:fork',
+			host: { fork: { httpPort: 100, wsPort: () => 200, claudePath: 'C:/claude.exe' } },
+		})) as ReturnType<typeof buildForkWorkerType>;
+		const viaDaemon = createDaemonForkWorkers({
+			port: 100,
+			wsPort: () => 200,
+			claudePath: 'C:/claude.exe',
+			logsDir: 'C:/logs',
+			maskText: text => text,
+		});
+
+		await viaPlugin.source.obtainWorker(request);
+		await viaDaemon.source.obtainWorker(request);
+
+		const [pluginSpawn, daemonSpawn] = spawnMock.mock.calls as [unknown[], unknown[]];
+		expect(daemonSpawn).toEqual(pluginSpawn);
+	});
+
 	it('refuses to be built for a declared source, as a configuration error that says how to fix it', async () => {
 		const error = await forkWorkerTypePlugin.create({ sourceId: 'laptop', options: {} }).then(
 			() => undefined,
