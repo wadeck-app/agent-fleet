@@ -45,6 +45,7 @@ import { DefaultProcessLauncher } from './DefaultProcessLauncher';
 import type { LaunchOptions, ModelBackgroundResult, ModelInteractiveResult, ModelProvider } from './ModelProvider';
 import { PromptTooLargeError, validateLaunchOptions } from './ModelProvider';
 import type { ProcessLauncher } from './ProcessLauncher';
+import { runsElsewhere, whichInSandboxOrThrow } from './SandboxExecutableLookup';
 
 const MAX_PROMPT_BYTES = 32 * 1024; // 32KB
 
@@ -327,6 +328,10 @@ export class CodexModelProvider implements ModelProvider {
 				return { parts: ['node', mockPath], needsShell: false };
 			}
 			return { parts: [mockPath], needsShell: false };
+		}
+		// A sandbox launcher answers from where the process runs: no host platform branch, no host filesystem probe.
+		if (runsElsewhere(this.processLauncher)) {
+			return { parts: [whichInSandboxOrThrow(this.processLauncher, 'codex')], needsShell: false };
 		}
 		if (process.platform === 'win32') {
 			// On Windows, codex.cmd is a Node.js wrapper: node @openai/codex/bin/codex.js

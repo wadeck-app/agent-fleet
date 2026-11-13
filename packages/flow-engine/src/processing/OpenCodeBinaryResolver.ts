@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { ProcessLauncher } from './ProcessLauncher';
+import { runsElsewhere, whichInSandboxOrThrow } from './SandboxExecutableLookup';
 
 export interface ResolvedOpenCodeCommand {
 	/** Executable first, then any prefix arguments (e.g. `['node', '/path/mock.mjs']`). */
@@ -26,6 +27,10 @@ export function resolveOpenCodeCommand(env: NodeJS.ProcessEnv, launcher: Process
 			return { parts: ['node', mockPath], needsShell: false, isMock: true };
 		}
 		return { parts: [mockPath], needsShell: false, isMock: true };
+	}
+	// A sandbox launcher answers from where the process runs: no host platform branch, no host filesystem probe.
+	if (runsElsewhere(launcher)) {
+		return { parts: [whichInSandboxOrThrow(launcher, 'opencode')], needsShell: false, isMock: false };
 	}
 	if (process.platform === 'win32') {
 		// On Windows, find the real opencode.exe next to opencode.cmd in the npm global bin dir.

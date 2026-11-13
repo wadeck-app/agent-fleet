@@ -7,6 +7,7 @@
  */
 import { DefaultProcessLauncher } from './DefaultProcessLauncher';
 import type { ProcessLauncher } from './ProcessLauncher';
+import { runsElsewhere, whichInSandboxOrThrow } from './SandboxExecutableLookup';
 import { type StreamJsonEvent, type StreamJsonEventCallback, StreamJsonParser } from './StreamJsonParser';
 import { type ToolName, buildClaudeToolsArg } from './ToolAccess';
 
@@ -119,6 +120,10 @@ export class ClaudeLauncher {
 		// Allow tests -- and a per-step mock-config overlay (options.env) -- to inject a mock Claude binary
 		if (env['CLAUDE_MOCK_PATH']) {
 			return env['CLAUDE_MOCK_PATH'];
+		}
+		// A sandbox launcher answers from where the process runs: `which`, whatever the host platform, and no fallback.
+		if (runsElsewhere(this.processLauncher)) {
+			return whichInSandboxOrThrow(this.processLauncher, 'claude');
 		}
 		try {
 			if (process.platform === 'win32') {
