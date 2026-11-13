@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HostEnvironment } from '../HostEnvironment';
+import { ImageReference } from '../ImageReference';
 import { SANDBOX_WORKSPACE_KINDS } from '../SandboxableWorkspace';
 import { SANDBOX_GUARANTEES } from '../exec/RequiresGuard';
 import { eachRow } from '../testing/EachRow';
@@ -283,6 +284,12 @@ describe('sandbox plugin: options are flat strings and parsed strictly', () => {
 					label: 'an image that is an option (leading dash)',
 					options: { ...GOOD, image: '--pull' },
 					fragment: 'must not start with "-"',
+					example: 'image=flow-sandbox:m7',
+				},
+				{
+					label: 'a bare image tag (the image preflight can only match repository:tag)',
+					options: { ...GOOD, image: 'm6' },
+					fragment: 'repository:tag',
 					example: 'image=flow-sandbox:m7',
 				},
 				{
@@ -685,5 +692,31 @@ describe('sandbox plugin: dispose', () => {
 
 		await expect(instance.source.obtainWorker(request())).rejects.toThrow('disposed');
 		expect(launches()).toHaveLength(1);
+	});
+});
+
+describe('sandbox plugin: the image rule is the package rule', () => {
+	// plugin.config.js is plain JavaScript that imports nothing from the package, so its image rule is a copy of ImageReference: kept equal here.
+	it.each([
+		'flow-sandbox:m6',
+		'docker.io/library/flow-sandbox:m6',
+		'localhost:5000/team/x:1',
+		'x@sha256:abc',
+		'm6',
+		'x',
+		'x:',
+		':m6',
+		'localhost:5000/x',
+	])('accepts or refuses %j exactly like ImageReference', async image => {
+		const plugin = await load();
+
+		let accepted = true;
+		try {
+			plugin.internals.parseOptions({ ...GOOD, image });
+		} catch {
+			accepted = false;
+		}
+
+		expect(accepted).toBe(ImageReference.problem(image) === undefined);
 	});
 });

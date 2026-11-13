@@ -90,6 +90,13 @@ describe('WrapperPreflight (what "flow-sandbox preflight" checks before a worker
 					outcome: 'sbx login',
 				},
 				{
+					label: 'a bare image tag: refused before the listing is read, with the repository:tag form',
+					report: OK,
+					listing: () => Promise.reject(new Error('must not be read')),
+					config: { ...CONFIG, image: 'm6' },
+					outcome: 'flow-sandbox:m6',
+				},
+				{
 					label: 'an image this machine does not know',
 					report: OK,
 					listing: () => Promise.resolve(LISTING),

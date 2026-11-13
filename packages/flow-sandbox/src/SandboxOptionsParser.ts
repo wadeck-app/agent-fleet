@@ -1,3 +1,4 @@
+import { ImageReference } from './ImageReference';
 import { NetworkResourceRule } from './NetworkResourceRule';
 import { SandboxError } from './SandboxError';
 
@@ -192,6 +193,8 @@ export class SandboxOptionsParser {
 				`Option "image" must be an image reference without whitespace, found ${describeFound(value)}`
 			);
 		}
+		const problem = ImageReference.problem(value);
+		if (problem !== undefined) throw this.error(`Option "image": ${problem}`);
 		return value;
 	}
 

@@ -2,6 +2,7 @@ import { parseArgs } from 'node:util';
 
 import { requireAwsRegion } from '../AwsRegion';
 import { HostEnvironment } from '../HostEnvironment';
+import { ImageReference } from '../ImageReference';
 import { NetworkResourceRule } from '../NetworkResourceRule';
 import { PresenceDirectory } from '../PresenceDirectory';
 import { RunSandboxName } from '../RunSandboxName';
@@ -153,6 +154,10 @@ export class HarnessConfigParser {
 			fail(error instanceof Error ? error.message : String(error));
 		}
 
+		const image = values['image'] as string | undefined;
+		const imageProblem = image === undefined ? undefined : ImageReference.problem(image);
+		if (imageProblem !== undefined) fail(`--image: ${imageProblem}.`);
+
 		const pull = values['pull'] as string | undefined;
 		if (pull !== undefined && pull !== 'always' && pull !== 'missing' && pull !== 'never') {
 			fail(`--pull must be always, missing or never, got ${JSON.stringify(pull)}.`);
@@ -202,7 +207,7 @@ export class HarnessConfigParser {
 			hostProfile,
 			region: region as string,
 			agent: (values['agent'] as string | undefined) ?? 'claude',
-			image: values['image'] as string | undefined,
+			image: image,
 			pull: pull as HarnessConfig['pull'],
 			cpus: positiveInteger(values['cpus'] as string | undefined, SANDBOX_OPTION_DEFAULTS.cpus, '--cpus', fail),
 			memory: (values['memory'] as string | undefined) ?? SANDBOX_OPTION_DEFAULTS.memory,

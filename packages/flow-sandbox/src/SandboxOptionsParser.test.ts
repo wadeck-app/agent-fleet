@@ -121,6 +121,7 @@ describe('SandboxOptionsParser refusals', () => {
 				'Option "image" must be an image reference without whitespace',
 			],
 			['an empty image', { image: '' }, 'Option "image"'],
+			['a bare tag', { image: 'm6' }, 'repository:tag'],
 		];
 		for (const [label, raw, message] of cases) {
 			const error = sandboxFailure(() => parser.parse(raw), label);

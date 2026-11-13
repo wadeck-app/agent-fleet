@@ -68,6 +68,17 @@ function whole(name, value) {
 }
 
 /** The flat `--option key=value` strings as a checked object. Every problem names the option and gives an example. */
+/** `repository:tag` (registry, namespace and registry port allowed) or `repository@digest`. */
+function isTaggedImage(image) {
+	if (image.includes('@')) {
+		const [repository = '', digest = ''] = image.split('@');
+		return repository !== '' && /^[a-z0-9]+:[A-Za-z0-9]+$/.test(digest);
+	}
+	const lastSegment = image.slice(image.lastIndexOf('/') + 1);
+	const separator = lastSegment.indexOf(':');
+	return separator > 0 && separator < lastSegment.length - 1;
+}
+
 function parseOptions(raw) {
 	if (raw === undefined || raw === null) raw = {};
 	if (typeof raw !== 'object' || Array.isArray(raw))
@@ -134,6 +145,14 @@ function parseOptions(raw) {
 		if (/\s/.test(raw.image)) throw optionError('image', 'must not contain whitespace');
 		if (raw.image.startsWith('-'))
 			throw optionError('image', 'must not start with "-" (it would be read as an option)');
+		// repository:tag (or repository@digest): the image preflight matches `sbx template ls` rows, which a bare tag such as `m6` can never match. The same
+		// rule as src/ImageReference.ts (a test keeps them equal); refused, not completed: a guessed repository would run another image than the one written here.
+		if (!isTaggedImage(raw.image)) {
+			throw optionError(
+				'image',
+				`must be a repository:tag reference such as flow-sandbox:m7 (the tag you gave to build-image.mjs --tag; \`sbx template ls\` lists them), found "${raw.image}"`
+			);
+		}
 		parsed.image = raw.image;
 	}
 	if (raw.pull !== undefined) {

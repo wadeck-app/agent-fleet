@@ -127,6 +127,10 @@ describe('HarnessConfigParser', () => {
 			expect(() => parse(BASE, env)).toThrow(new RegExp(`${name} is not set[\\s\\S]*built-in:command`));
 		}));
 
+	it('refuses a bare image tag with the repository:tag form (the preflight can only match that)', () => {
+		expect(() => parse([...BASE, '--image', 'm6'])).toThrow(/repository:tag[\s\S]*flow-sandbox:m6/);
+	});
+
 	it('refuses (each case) with the usage', () =>
 		eachRow(
 			[
