@@ -1,5 +1,6 @@
 import { writePortFile } from '@wadeck-app/singleton-daemon-kit';
 import { removeTempDirectory } from 'flow-core/testing';
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
@@ -45,7 +46,8 @@ describe('flow start', () => {
 	it('starts ONE daemon when several `flow start` run at once on a cold machine', async () => {
 		harness.spawn.mockImplementation(() => {
 			void delay(150).then(bringUpDaemon);
-			return { unref: () => undefined };
+			// Elsewhere than Windows the spawner watches the spawned process itself (once('exit'), pid): a bare { unref } is not a child.
+			return Object.assign(new EventEmitter(), { unref: () => undefined, pid: 4242 });
 		});
 		const lines: string[] = [];
 
