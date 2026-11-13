@@ -59,7 +59,11 @@ jobs:
                   BUNDLE_VERSION: ${{ steps.version.outputs.version }}
 
             - name: Generate platform package directories
-              run: PLATFORMS=win32-x64,darwin-arm64,linux-x64 bash ci/scripts/generate-platform-packages.sh flow:worker.cjs:app-module/:app-module-flow-chart/
+              run: bash ci/scripts/generate-platform-packages.sh flow:worker.cjs:app-module/:app-module-flow-chart/
+              env:
+                  PLATFORMS: win32-x64,darwin-arm64,linux-x64
+                  # Pins the optionalDependencies of the main package to this exact version (the range >=0.0.0-0 does not match a prerelease).
+                  PKG_VERSION: ${{ steps.version.outputs.version }}
 
             - name: Copy artifacts to platform packages
               run: bash ci/scripts/copy-binaries.sh
@@ -68,12 +72,6 @@ jobs:
               run: |
                   for pkg in flow-cli-dist flow-cli-win32-x64 flow-cli-darwin-arm64 flow-cli-linux-x64; do
                     (cd "packages/$pkg" && npm pkg set version="${{ steps.version.outputs.version }}")
-                  done
-                  # The generated optionalDependencies use the range ">=0.0.0-0", which a PRERELEASE version such as
-                  # 2026.11.13-1007-ffa3e2df does not satisfy (semver): npm then installs no platform package at all
-                  # (seen on macOS: "added 1 package"). Pin each platform package to the exact version of this build.
-                  for platform in win32-x64 darwin-arm64 linux-x64; do
-                    (cd packages/flow-cli-dist && npm pkg set "optionalDependencies.@wadeck-app/flow-cli-$platform=${{ steps.version.outputs.version }}")
                   done
 
             - name: Upload artifacts
