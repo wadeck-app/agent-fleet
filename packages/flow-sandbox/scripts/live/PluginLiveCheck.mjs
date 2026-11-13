@@ -424,6 +424,58 @@ function sbxText(...words) {
 }
 const linesMentioning = (text, name) => text.split(/\r?\n/).filter(line => line.includes(name)).length;
 
+// Codex and OpenCode as plain prompts through Bedrock (one short prompt each). Models: PLUGIN_CODEX_MODEL (default openai.gpt-5.6-terra),
+// PLUGIN_OPENCODE_MODEL (default amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0: the catalog bundled in the image must know the id, see README). The account behind the profile must be allowed to call them.
+// PLUGIN_TOOLS_ONLY=codex|opencode|both runs only the codex and opencode steps, so that each can use the profile that is allowed to call its models
+// (for example PLUGIN_PROFILE=<the Codex profile> PLUGIN_TOOLS_ONLY=codex). Unset: every section.
+const toolsOnly = process.env.PLUGIN_TOOLS_ONLY;
+if (toolsOnly !== undefined && !['codex', 'opencode', 'both'].includes(toolsOnly))
+	refuse('PLUGIN_TOOLS_ONLY must be codex, opencode or both.');
+const codexModel = process.env.PLUGIN_CODEX_MODEL ?? 'openai.gpt-5.6-terra';
+const opencodeModel = process.env.PLUGIN_OPENCODE_MODEL ?? 'amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0';
+function writeToolsFlow(only) {
+	const file = path.join(projectDirectory, `plugin-live-tools-${only}.yml`);
+	const steps = [];
+	if (only !== 'opencode') {
+		steps.push(`    - id: codex
+      name: Codex one word
+      type: model
+      provider: codex
+      model: ${codexModel}
+      prompt: Reply with the single word OK and nothing else.
+      output:
+          answer:
+              type: string
+              from: last_message`);
+	}
+	if (only !== 'codex') {
+		steps.push(`    - id: opencode
+      name: OpenCode one word
+      type: model
+      provider: opencode
+      model: ${opencodeModel}
+      prompt: Reply with the single word OK and nothing else.
+      output:
+          answer:
+              type: string
+              from: last_message`);
+	}
+	fs.writeFileSync(
+		file,
+		`id: plugin-live-tools-${only}
+version: '1.0.0'
+name: Plugin live check, codex and opencode
+description: One short prompt per tool.
+
+workspace: { provider: pool, dir: '${poolDirectory.replaceAll('\\', '/')}', prefix: slot-, count: 1 }
+
+steps:
+${steps.join('\n\n')}
+`
+	);
+	return file;
+}
+
 const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sandbox-live-art-'));
 const claimEvents = { seen: undefined, gone: undefined };
 // Sandboxes that exist before this check: only a sandbox created after this point may be removed by it.
@@ -496,451 +548,519 @@ try {
 	}, 20);
 
 	let record;
-	let runOutput = '';
-	await step('run the bound flow (VM script, host: true script and model step) to completion', async () => {
-		const file = writeFlow();
-		const started = flow(['run', file, '--json']);
-		const validated = flow(['validate', file]);
-		runOutput = `${validated.stdout}${validated.stderr}`;
-		const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
-		expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
-		const executionId = match[1];
-		evidence.executionId = executionId;
-		record = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
-			const shown = flow(['show', executionId, '--json']);
-			if (shown.status !== 0) return undefined;
-			const parsed = JSON.parse(shown.stdout);
-			return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+	if (toolsOnly === undefined) {
+		let runOutput = '';
+		await step('run the bound flow (VM script, host: true script and model step) to completion', async () => {
+			const file = writeFlow();
+			const started = flow(['run', file, '--json']);
+			const validated = flow(['validate', file]);
+			runOutput = `${validated.stdout}${validated.stderr}`;
+			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+			const executionId = match[1];
+			evidence.executionId = executionId;
+			record = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
+				const shown = flow(['show', executionId, '--json']);
+				if (shown.status !== 0) return undefined;
+				const parsed = JSON.parse(shown.stdout);
+				return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+			});
+			const statuses = Object.fromEntries(Object.entries(record.steps ?? {}).map(([id, s]) => [id, s.status]));
+			expect(record.status === 'completed', `execution is ${record.status}: ${JSON.stringify(statuses)}`);
+			return JSON.stringify(statuses);
 		});
-		const statuses = Object.fromEntries(Object.entries(record.steps ?? {}).map(([id, s]) => [id, s.status]));
-		expect(record.status === 'completed', `execution is ${record.status}: ${JSON.stringify(statuses)}`);
-		return JSON.stringify(statuses);
-	});
 
-	await step('the script step ran INSIDE the VM, the model step answered, both through the sandbox source', () => {
-		expect(record !== undefined, 'no execution record');
-		const probe = record.steps?.probe?.io?.stdout?.text ?? '';
-		const fields = Object.fromEntries(
-			probe
-				.split(/\r?\n/)
-				.filter(line => line.includes('='))
-				.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
+		await step(
+			'the script step ran INSIDE the VM, the model step answered, both through the sandbox source',
+			() => {
+				expect(record !== undefined, 'no execution record');
+				const probe = record.steps?.probe?.io?.stdout?.text ?? '';
+				const fields = Object.fromEntries(
+					probe
+						.split(/\r?\n/)
+						.filter(line => line.includes('='))
+						.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
+				);
+				expect(
+					fields.hostname && fields.hostname !== os.hostname(),
+					`hostname ${fields.hostname} is the host's or missing`
+				);
+				expect(
+					fields.user && fields.user !== os.userInfo().username,
+					`user ${fields.user} is the host user or missing`
+				);
+				expect(
+					/\bOK\b/.test(JSON.stringify(record.steps?.ask?.output ?? record.steps?.ask ?? {})),
+					'the model step did not answer OK'
+				);
+				expect(
+					record.steps?.probe?.sourceId === 'sandbox-live',
+					`probe served by ${record.steps?.probe?.sourceId}`
+				);
+				expect(fields.bash_in_vm?.startsWith('/'), `bash_in_vm=${fields.bash_in_vm}: not a path of the VM`);
+				evidence.hiddenGitBashDirectories = hiddenFromPath;
+				return `vm ${fields.hostname}/${fields.user}/${fields.kernel}, script shell ${fields.bash_in_vm}${hiddenFromPath.length > 0 ? ' (Git bash hidden on the host)' : ''}`;
+			}
 		);
-		expect(
-			fields.hostname && fields.hostname !== os.hostname(),
-			`hostname ${fields.hostname} is the host's or missing`
-		);
-		expect(
-			fields.user && fields.user !== os.userInfo().username,
-			`user ${fields.user} is the host user or missing`
-		);
-		expect(
-			/\bOK\b/.test(JSON.stringify(record.steps?.ask?.output ?? record.steps?.ask ?? {})),
-			'the model step did not answer OK'
-		);
-		expect(record.steps?.probe?.sourceId === 'sandbox-live', `probe served by ${record.steps?.probe?.sourceId}`);
-		expect(fields.bash_in_vm?.startsWith('/'), `bash_in_vm=${fields.bash_in_vm}: not a path of the VM`);
-		evidence.hiddenGitBashDirectories = hiddenFromPath;
-		return `vm ${fields.hostname}/${fields.user}/${fields.kernel}, script shell ${fields.bash_in_vm}${hiddenFromPath.length > 0 ? ' (Git bash hidden on the host)' : ''}`;
-	});
 
-	await step(
-		'the host: true script ran on the WRAPPER machine, with the user rights, without the wrapper secrets and canary',
-		() => {
-			expect(record !== undefined, 'no execution record');
-			const read = text =>
-				Object.fromEntries(
+		await step(
+			'the host: true script ran on the WRAPPER machine, with the user rights, without the wrapper secrets and canary',
+			() => {
+				expect(record !== undefined, 'no execution record');
+				const read = text =>
+					Object.fromEntries(
+						text
+							.split(/\r?\n/)
+							.filter(line => line.includes('='))
+							.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()])
+					);
+				const onHost = read(record.steps?.onhost?.io?.stdout?.text ?? '');
+				const inVm = read(record.steps?.probe?.io?.stdout?.text ?? '');
+				expect(
+					record.steps?.onhost?.sourceId === 'sandbox-live',
+					`onhost served by ${record.steps?.onhost?.sourceId}`
+				);
+				expect(
+					onHost.hostname === os.hostname(),
+					`host script hostname ${onHost.hostname} is not this machine's (${os.hostname()})`
+				);
+				expect(onHost.hostname !== inVm.hostname, `host and VM report the same hostname ${onHost.hostname}`);
+				expect(
+					onHost.user?.toLowerCase().endsWith(os.userInfo().username.toLowerCase()),
+					`host script user ${onHost.user} is not ${os.userInfo().username}`
+				);
+				expect(inVm.user !== os.userInfo().username, 'the unmarked script did not run in the VM');
+				// The workspace (the pool slot), not the project directory.
+				expect(
+					/slot-1/.test(onHost.cwd ?? ''),
+					`host script cwd ${onHost.cwd} is not the pool slot of the run`
+				);
+				expect(onHost.canary === 'absent', `the wrapper canary reached the host script: ${onHost.canary}`);
+				expect(onHost.token === 'absent', 'FLOW_WORKER_TOKEN reached the host script');
+				expect(onHost.hosthome === 'absent', 'a FLOW_SANDBOX_HOST_* carrier reached the host script');
+				expect(
+					/has host: true in a flow that also has model steps/.test(runOutput),
+					'flow validate printed no host-script-with-model-steps warning for a flow that mixes a model step with a host script'
+				);
+				evidence.hostScript = { host: onHost, vm: inVm };
+				return `host ${onHost.hostname}/${onHost.user} vs vm ${inVm.hostname}/${inVm.user}; canary and token absent; cwd ${onHost.cwd}`;
+			}
+		);
+
+		await step('the sandbox is removed at the end of the run, and sbx rm took N ms', async () => {
+			const removal = await waitFor('the sbx rm call of the run', 90_000, () =>
+				timings().find(entry => entry.words[0] === 'rm')
+			);
+			evidence.sbxRm = { ...removal, durationMs: removal.endedAt - removal.startedAt };
+			const left = new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } });
+			const remaining = (await left.list()).filter(
+				entry => entry.name.startsWith('flow-sbx-') && entry.status !== undefined
+			);
+			evidence.sandboxesAfter = remaining.map(entry => entry.name);
+			expect(removal.exitCode === 0, `sbx rm exited ${removal.exitCode}`);
+			return `sbx rm --force: ${evidence.sbxRm.durationMs} ms (exit ${removal.exitCode})`;
+		});
+
+		await step('the sandbox was removed BEFORE the daemon released the pool slot (ack after removal)', async () => {
+			await waitFor('the daemon to release the pool slot', 60_000, () => claimEvents.gone);
+			const removal = evidence.sbxRm;
+			expect(claimEvents.seen !== undefined, 'the claim folder was never seen (the pool was not used?)');
+			evidence.release = {
+				claimSeenMsBeforeRmStart: removal.startedAt - claimEvents.seen,
+				rmEndedMsBeforeRelease: claimEvents.gone - removal.endedAt,
+			};
+			expect(
+				claimEvents.gone >= removal.endedAt,
+				`the pool claim vanished ${removal.endedAt - claimEvents.gone} ms BEFORE sbx rm ended`
+			);
+			return `rm ended ${evidence.release.rmEndedMsBeforeRelease} ms before the claim was released (polling 20 ms)`;
+		});
+
+		await step(
+			'a model step WITHOUT requires is confined implicitly: served by the sandbox source, recorded as implicit, answers in the VM',
+			async () => {
+				const createsBefore = timings().filter(entry => entry.words[0] === 'create').length;
+				const started = flow(['run', writeImplicitFlow(), '--json']);
+				const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+				expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+				const executionId = match[1];
+				const implicit = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
+					const shown = flow(['show', executionId, '--json']);
+					if (shown.status !== 0) return undefined;
+					const parsed = JSON.parse(shown.stdout);
+					return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+				});
+				expect(
+					implicit.status === 'completed',
+					`implicit-agent run is ${implicit.status}: ${JSON.stringify(implicit.steps)}`
+				);
+				expect(
+					implicit.steps?.ask?.sourceId === 'sandbox-live',
+					`model step served by ${implicit.steps?.ask?.sourceId}`
+				);
+				const added = implicit.requirements?.implicit;
+				expect(
+					added !== undefined &&
+						added.requires.join() === 'env=clean,fs=confined' &&
+						added.steps.join() === 'ask',
+					`requirements.implicit is ${JSON.stringify(added)}`
+				);
+				expect(
+					/\bOK\b/.test(JSON.stringify(implicit.steps?.ask?.output ?? implicit.steps?.ask ?? {})),
+					'the model step did not answer OK'
+				);
+				const creates = timings().filter(entry => entry.words[0] === 'create').length;
+				expect(
+					creates === createsBefore + 1,
+					`expected one more sandbox, ${creates - createsBefore} were created`
+				);
+				evidence.implicitAgent = { executionId, requirements: implicit.requirements };
+				return `served by ${implicit.steps.ask.sourceId}, implicit ${added.requires.join(',')}`;
+			}
+		);
+
+		await step('the implicit-agent sandbox is removed too', async () => {
+			await waitFor(
+				'the second sbx rm call',
+				90_000,
+				() => timings().filter(entry => entry.words[0] === 'rm').length >= 2
+			);
+			const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
+				entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+			);
+			expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
+		});
+
+		await step(
+			'profile: inspect on real sbx: the repo is readable, a write to the workspace fails read-only, .meta is writable, the model step answers',
+			async () => {
+				const slot = path.join(poolDirectory, 'slot-1');
+				const repoFile = path.join(slot, 'repo.txt');
+				fs.writeFileSync(repoFile, INSPECT_REPO_CONTENT);
+				const createsBefore = timings().filter(entry => entry.words[0] === 'create').length;
+				const started = flow(['run', writeInspectFlow(), '--json']);
+				const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+				expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+				const executionId = match[1];
+				const inspect = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
+					const shown = flow(['show', executionId, '--json']);
+					if (shown.status !== 0) return undefined;
+					const parsed = JSON.parse(shown.stdout);
+					return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+				});
+				const statuses = Object.fromEntries(
+					Object.entries(inspect.steps ?? {}).map(([id, s]) => [id, s.status])
+				);
+				expect(
+					inspect.status === 'completed',
+					`inspect run is ${inspect.status}: ${JSON.stringify(statuses)} ${JSON.stringify(inspect.steps)}`
+				);
+				const text = inspect.steps?.probe?.io?.stdout?.text ?? '';
+				const fields = Object.fromEntries(
 					text
 						.split(/\r?\n/)
 						.filter(line => line.includes('='))
 						.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()])
 				);
-			const onHost = read(record.steps?.onhost?.io?.stdout?.text ?? '');
-			const inVm = read(record.steps?.probe?.io?.stdout?.text ?? '');
-			expect(
-				record.steps?.onhost?.sourceId === 'sandbox-live',
-				`onhost served by ${record.steps?.onhost?.sourceId}`
-			);
-			expect(
-				onHost.hostname === os.hostname(),
-				`host script hostname ${onHost.hostname} is not this machine's (${os.hostname()})`
-			);
-			expect(onHost.hostname !== inVm.hostname, `host and VM report the same hostname ${onHost.hostname}`);
-			expect(
-				onHost.user?.toLowerCase().endsWith(os.userInfo().username.toLowerCase()),
-				`host script user ${onHost.user} is not ${os.userInfo().username}`
-			);
-			expect(inVm.user !== os.userInfo().username, 'the unmarked script did not run in the VM');
-			// The workspace (the pool slot), not the project directory.
-			expect(/slot-1/.test(onHost.cwd ?? ''), `host script cwd ${onHost.cwd} is not the pool slot of the run`);
-			expect(onHost.canary === 'absent', `the wrapper canary reached the host script: ${onHost.canary}`);
-			expect(onHost.token === 'absent', 'FLOW_WORKER_TOKEN reached the host script');
-			expect(onHost.hosthome === 'absent', 'a FLOW_SANDBOX_HOST_* carrier reached the host script');
-			expect(
-				/has host: true in a flow that also has model steps/.test(runOutput),
-				'flow validate printed no host-script-with-model-steps warning for a flow that mixes a model step with a host script'
-			);
-			evidence.hostScript = { host: onHost, vm: inVm };
-			return `host ${onHost.hostname}/${onHost.user} vs vm ${inVm.hostname}/${inVm.user}; canary and token absent; cwd ${onHost.cwd}`;
-		}
-	);
-
-	await step('the sandbox is removed at the end of the run, and sbx rm took N ms', async () => {
-		const removal = await waitFor('the sbx rm call of the run', 90_000, () =>
-			timings().find(entry => entry.words[0] === 'rm')
-		);
-		evidence.sbxRm = { ...removal, durationMs: removal.endedAt - removal.startedAt };
-		const left = new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } });
-		const remaining = (await left.list()).filter(
-			entry => entry.name.startsWith('flow-sbx-') && entry.status !== undefined
-		);
-		evidence.sandboxesAfter = remaining.map(entry => entry.name);
-		expect(removal.exitCode === 0, `sbx rm exited ${removal.exitCode}`);
-		return `sbx rm --force: ${evidence.sbxRm.durationMs} ms (exit ${removal.exitCode})`;
-	});
-
-	await step('the sandbox was removed BEFORE the daemon released the pool slot (ack after removal)', async () => {
-		await waitFor('the daemon to release the pool slot', 60_000, () => claimEvents.gone);
-		const removal = evidence.sbxRm;
-		expect(claimEvents.seen !== undefined, 'the claim folder was never seen (the pool was not used?)');
-		evidence.release = {
-			claimSeenMsBeforeRmStart: removal.startedAt - claimEvents.seen,
-			rmEndedMsBeforeRelease: claimEvents.gone - removal.endedAt,
-		};
-		expect(
-			claimEvents.gone >= removal.endedAt,
-			`the pool claim vanished ${removal.endedAt - claimEvents.gone} ms BEFORE sbx rm ended`
-		);
-		return `rm ended ${evidence.release.rmEndedMsBeforeRelease} ms before the claim was released (polling 20 ms)`;
-	});
-
-	await step(
-		'a model step WITHOUT requires is confined implicitly: served by the sandbox source, recorded as implicit, answers in the VM',
-		async () => {
-			const createsBefore = timings().filter(entry => entry.words[0] === 'create').length;
-			const started = flow(['run', writeImplicitFlow(), '--json']);
-			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
-			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
-			const executionId = match[1];
-			const implicit = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
-				const shown = flow(['show', executionId, '--json']);
-				if (shown.status !== 0) return undefined;
-				const parsed = JSON.parse(shown.stdout);
-				return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
-			});
-			expect(
-				implicit.status === 'completed',
-				`implicit-agent run is ${implicit.status}: ${JSON.stringify(implicit.steps)}`
-			);
-			expect(
-				implicit.steps?.ask?.sourceId === 'sandbox-live',
-				`model step served by ${implicit.steps?.ask?.sourceId}`
-			);
-			const added = implicit.requirements?.implicit;
-			expect(
-				added !== undefined &&
-					added.requires.join() === 'env=clean,fs=confined' &&
-					added.steps.join() === 'ask',
-				`requirements.implicit is ${JSON.stringify(added)}`
-			);
-			expect(
-				/\bOK\b/.test(JSON.stringify(implicit.steps?.ask?.output ?? implicit.steps?.ask ?? {})),
-				'the model step did not answer OK'
-			);
-			const creates = timings().filter(entry => entry.words[0] === 'create').length;
-			expect(creates === createsBefore + 1, `expected one more sandbox, ${creates - createsBefore} were created`);
-			evidence.implicitAgent = { executionId, requirements: implicit.requirements };
-			return `served by ${implicit.steps.ask.sourceId}, implicit ${added.requires.join(',')}`;
-		}
-	);
-
-	await step('the implicit-agent sandbox is removed too', async () => {
-		await waitFor(
-			'the second sbx rm call',
-			90_000,
-			() => timings().filter(entry => entry.words[0] === 'rm').length >= 2
-		);
-		const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
-			entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
-		);
-		expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
-	});
-
-	await step(
-		'profile: inspect on real sbx: the repo is readable, a write to the workspace fails read-only, .meta is writable, the model step answers',
-		async () => {
-			const slot = path.join(poolDirectory, 'slot-1');
-			const repoFile = path.join(slot, 'repo.txt');
-			fs.writeFileSync(repoFile, INSPECT_REPO_CONTENT);
-			const createsBefore = timings().filter(entry => entry.words[0] === 'create').length;
-			const started = flow(['run', writeInspectFlow(), '--json']);
-			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
-			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
-			const executionId = match[1];
-			const inspect = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
-				const shown = flow(['show', executionId, '--json']);
-				if (shown.status !== 0) return undefined;
-				const parsed = JSON.parse(shown.stdout);
-				return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
-			});
-			const statuses = Object.fromEntries(Object.entries(inspect.steps ?? {}).map(([id, s]) => [id, s.status]));
-			expect(
-				inspect.status === 'completed',
-				`inspect run is ${inspect.status}: ${JSON.stringify(statuses)} ${JSON.stringify(inspect.steps)}`
-			);
-			const text = inspect.steps?.probe?.io?.stdout?.text ?? '';
-			const fields = Object.fromEntries(
-				text
-					.split(/\r?\n/)
-					.filter(line => line.includes('='))
-					.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()])
-			);
-			expect(fields.read === INSPECT_REPO_CONTENT, `the repo was not readable: read=${fields.read}`);
-			expect(
-				fields.write_exit !== '0' && /Read-only file system/.test(fields.write_error ?? ''),
-				`the write to the workspace did not fail read-only: exit ${fields.write_exit}, ${fields.write_error}`
-			);
-			expect(
-				fields.create_exit !== '0' && /Read-only file system/.test(fields.create_error ?? ''),
-				`creating a file in the workspace did not fail read-only: exit ${fields.create_exit}, ${fields.create_error}`
-			);
-			expect(
-				/\bro\b/.test(fields.workspace_mount ?? ''),
-				`the workspace mount options do not show ro: ${fields.workspace_mount}`
-			);
-			expect(
-				fields.meta_write_exit === '0',
-				`the write to .meta failed: exit ${fields.meta_write_exit}, meta=${fields.meta}`
-			);
-			// The verdict is taken on the HOST.
-			expect(fs.readFileSync(repoFile, 'utf8') === INSPECT_REPO_CONTENT, 'the host file repo.txt changed');
-			expect(!fs.existsSync(path.join(slot, 'new-file.txt')), 'a file was created in the slot on the host');
-			const runsDirectory = path.join(projectDirectory, '.flow', 'runs');
-			const written = fs
-				.readdirSync(runsDirectory)
-				.map(name => path.join(runsDirectory, name, 'outputs', 'inspect-write.txt'))
-				.find(candidate => fs.existsSync(candidate));
-			expect(written !== undefined, 'the file written to .meta/outputs from the VM is not on the host');
-			expect(
-				/\bOK\b/.test(JSON.stringify(inspect.steps?.ask?.output ?? inspect.steps?.ask ?? {})),
-				'the model step did not answer OK under inspect'
-			);
-			expect(
-				inspect.steps?.probe?.sourceId === 'sandbox-live' && inspect.steps?.ask?.sourceId === 'sandbox-live',
-				'a step was not served by the sandbox source'
-			);
-			const required = inspect.requirements?.steps?.probe ?? [];
-			expect(
-				required.includes('fs=readonly-enforced'),
-				`the record does not show fs=readonly-enforced: ${JSON.stringify(inspect.requirements)}`
-			);
-			const creates = timings().filter(entry => entry.words[0] === 'create');
-			expect(creates.length === createsBefore + 1, 'expected exactly one more sandbox');
-			// TimedSbx records only the first two words of a command, so the :ro of the create line is proven by the VM (mount options) and by the mock e2e.
-			evidence.inspect = { fields, requirements: inspect.requirements };
-			return `read ok, write: ${fields.write_error}, workspace mount options ${fields.workspace_mount}, .meta write ok, host file unchanged`;
-		}
-	);
-
-	await step('the inspect sandbox is removed too', async () => {
-		await waitFor(
-			'the third sbx rm call',
-			90_000,
-			() => timings().filter(entry => entry.words[0] === 'rm').length >= 3
-		);
-		const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
-			entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
-		);
-		expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
-	});
-
-	await step(
-		'a pool reached through a link: the wrapper mounts the resolved directory, the step runs in it',
-		async () => {
-			fs.mkdirSync(path.join(realParentDirectory, 'pool2', 'slot-1'), { recursive: true });
-			fs.symlinkSync(
-				realParentDirectory,
-				linkedParentDirectory,
-				process.platform === 'win32' ? 'junction' : 'dir'
-			);
-			const started = flow(['run', writeLinkedFlow(), '--json']);
-			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
-			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
-			const executionId = match[1];
-			const linked = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
-				const shown = flow(['show', executionId, '--json']);
-				if (shown.status !== 0) return undefined;
-				const parsed = JSON.parse(shown.stdout);
-				return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
-			});
-			expect(
-				linked.status === 'completed',
-				`linked-pool run is ${linked.status}: ${JSON.stringify(linked.steps)}`
-			);
-			const text = linked.steps?.probe?.io?.stdout?.text ?? '';
-			const cwd = (/^cwd=(.*)$/m.exec(text) ?? [])[1]?.trim() ?? '';
-			expect(
-				cwd.endsWith('/parent2/pool2/slot-1') && !cwd.includes('via-link'),
-				`the step did not run in the resolved slot: cwd=${cwd}`
-			);
-			evidence.linkedPool = { cwd };
-			return `ran in ${cwd}`;
-		}
-	);
-
-	await step('the linked-pool sandbox is removed too', async () => {
-		await waitFor(
-			'the fourth sbx rm call',
-			90_000,
-			() => timings().filter(entry => entry.words[0] === 'rm').length >= 4
-		);
-		const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
-			entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
-		);
-		expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
-	});
-
-	await step(
-		'a STOPPED sandbox is restarted by the next step: mounts, credentials and rules still in place, with the time it takes',
-		async () => {
-			fs.mkdirSync(path.join(poolDirectory, 'slot-1'), { recursive: true });
-			const rmBefore = timings().filter(entry => entry.words[0] === 'rm').length;
-			const started = flow(['run', writeRestartFlow(), '--json']);
-			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
-			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
-			const executionId = match[1];
-			const probe = new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } });
-			// Sample the sandbox status while the run goes; when it reads stopped, look at what sbx still holds for it.
-			const samples = [];
-			let stoppedSnapshot;
-			let sandboxName;
-			const settled = (async () => {
-				for (;;) {
-					const shown = flow(['show', executionId, '--json']);
-					const parsed = shown.status === 0 ? JSON.parse(shown.stdout) : undefined;
-					if (parsed && ['completed', 'failed', 'cancelled'].includes(parsed.status)) return parsed;
-					await sleep(300);
-				}
-			})();
-			const sampler = (async () => {
-				for (;;) {
-					const mine = (await probe.list()).filter(
-						entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
-					);
-					const entry = mine[0];
-					if (entry !== undefined) {
-						sandboxName = entry.name;
-						if (samples.at(-1)?.status !== entry.status)
-							samples.push({ at: Date.now(), status: entry.status });
-						if (entry.status === 'stopped' && stoppedSnapshot === undefined) {
-							stoppedSnapshot = {
-								policy: linesMentioning(sbxText('policy', 'ls'), entry.name),
-								secret: linesMentioning(sbxText('secret', 'ls'), entry.name),
-							};
-						}
-					}
-					if (await Promise.race([settled.then(() => true), sleep(500).then(() => false)])) return;
-				}
-			})();
-			const record = await settled;
-			await sampler;
-			const statuses = Object.fromEntries(Object.entries(record.steps ?? {}).map(([id, s]) => [id, s.status]));
-			expect(
-				record.status === 'completed',
-				`restart run is ${record.status}: ${JSON.stringify(statuses)} ${JSON.stringify(record.steps)}`
-			);
-			const read = id => {
-				const out = record.steps?.[id]?.io?.stdout?.text ?? '';
-				return Object.fromEntries(
-					out
-						.split(/\r?\n/)
-						.filter(line => line.includes('='))
-						.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()])
+				expect(fields.read === INSPECT_REPO_CONTENT, `the repo was not readable: read=${fields.read}`);
+				expect(
+					fields.write_exit !== '0' && /Read-only file system/.test(fields.write_error ?? ''),
+					`the write to the workspace did not fail read-only: exit ${fields.write_exit}, ${fields.write_error}`
 				);
-			};
-			const before = read('before');
-			const after = read('after');
-			expect(
-				samples.some(sample => sample.status === 'stopped'),
-				`sbx never reported the sandbox stopped: ${JSON.stringify(samples)}`
-			);
-			expect(stoppedSnapshot !== undefined, 'no snapshot of the rules and secrets while stopped');
-			const log = readIfExists(daemonLog);
-			expect(
-				/restarted for the next step/.test(log),
-				'the wrapper log has no "restarted for the next step" line'
-			);
-			expect(
-				after.marker?.startsWith('restart-marker-'),
-				`the file written before the gap is not in the workspace after the restart: marker=${after.marker}`
-			);
-			expect(
-				after.hostname === before.hostname,
-				`another sandbox answered: ${before.hostname} then ${after.hostname}`
-			);
-			expect(
-				after.workspace_write_exit === '0',
-				`the workspace is not writable after the restart: exit ${after.workspace_write_exit}`
-			);
-			expect(
-				after.meta_write_exit === '0',
-				`.meta is not writable after the restart: exit ${after.meta_write_exit}`
-			);
-			expect(
-				/\bOK\b/.test(JSON.stringify(record.steps?.ask?.output ?? record.steps?.ask ?? {})),
-				'the model step did not answer OK after the restart (credentials, secret or rules lost)'
-			);
-			expect(
-				stoppedSnapshot.policy > 0,
-				`no network rule for the stopped sandbox in \`sbx policy ls\`: ${JSON.stringify(stoppedSnapshot)}`
-			);
-			// Timing lines of the wrapper: toSandboxReadyMs is the create for the first step and the restart for the one after the gap.
-			const timing = id => {
-				const matches = [...log.matchAll(new RegExp(`timing (\\{"stepId":"${id}"[^}]*\\})`, 'g'))];
-				const last = matches.at(-1);
-				return last === undefined ? undefined : JSON.parse(last[1]);
-			};
-			const first = timing('before');
-			const second = timing('after');
-			expect(
-				first !== undefined && second !== undefined,
-				'the wrapper timing lines of the two steps were not found in the daemon log'
-			);
+				expect(
+					fields.create_exit !== '0' && /Read-only file system/.test(fields.create_error ?? ''),
+					`creating a file in the workspace did not fail read-only: exit ${fields.create_exit}, ${fields.create_error}`
+				);
+				expect(
+					/\bro\b/.test(fields.workspace_mount ?? ''),
+					`the workspace mount options do not show ro: ${fields.workspace_mount}`
+				);
+				expect(
+					fields.meta_write_exit === '0',
+					`the write to .meta failed: exit ${fields.meta_write_exit}, meta=${fields.meta}`
+				);
+				// The verdict is taken on the HOST.
+				expect(fs.readFileSync(repoFile, 'utf8') === INSPECT_REPO_CONTENT, 'the host file repo.txt changed');
+				expect(!fs.existsSync(path.join(slot, 'new-file.txt')), 'a file was created in the slot on the host');
+				const runsDirectory = path.join(projectDirectory, '.flow', 'runs');
+				const written = fs
+					.readdirSync(runsDirectory)
+					.map(name => path.join(runsDirectory, name, 'outputs', 'inspect-write.txt'))
+					.find(candidate => fs.existsSync(candidate));
+				expect(written !== undefined, 'the file written to .meta/outputs from the VM is not on the host');
+				expect(
+					/\bOK\b/.test(JSON.stringify(inspect.steps?.ask?.output ?? inspect.steps?.ask ?? {})),
+					'the model step did not answer OK under inspect'
+				);
+				expect(
+					inspect.steps?.probe?.sourceId === 'sandbox-live' &&
+						inspect.steps?.ask?.sourceId === 'sandbox-live',
+					'a step was not served by the sandbox source'
+				);
+				const required = inspect.requirements?.steps?.probe ?? [];
+				expect(
+					required.includes('fs=readonly-enforced'),
+					`the record does not show fs=readonly-enforced: ${JSON.stringify(inspect.requirements)}`
+				);
+				const creates = timings().filter(entry => entry.words[0] === 'create');
+				expect(creates.length === createsBefore + 1, 'expected exactly one more sandbox');
+				// TimedSbx records only the first two words of a command, so the :ro of the create line is proven by the VM (mount options) and by the mock e2e.
+				evidence.inspect = { fields, requirements: inspect.requirements };
+				return `read ok, write: ${fields.write_error}, workspace mount options ${fields.workspace_mount}, .meta write ok, host file unchanged`;
+			}
+		);
+
+		await step('the inspect sandbox is removed too', async () => {
 			await waitFor(
-				'the restart run sandbox to be removed',
+				'the third sbx rm call',
 				90_000,
-				() => timings().filter(entry => entry.words[0] === 'rm').length > rmBefore
+				() => timings().filter(entry => entry.words[0] === 'rm').length >= 3
 			);
-			const afterRun = {
-				sandboxes: (await probe.list()).filter(entry => entry.name === sandboxName).length,
-				policy: linesMentioning(sbxText('policy', 'ls'), sandboxName),
-				secret: linesMentioning(sbxText('secret', 'ls'), sandboxName),
-			};
-			expect(
-				afterRun.sandboxes === 0 && afterRun.policy === 0 && afterRun.secret === 0,
-				`something of the run is left after its end: ${JSON.stringify(afterRun)}`
+			const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
+				entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
 			);
-			evidence.restart = {
-				sandbox: sandboxName,
-				createMs: first.toSandboxReadyMs,
-				restartMs: second.toSandboxReadyMs,
-				beforeStep: first,
-				afterStep: second,
-				boot: { before: before.boot, after: after.boot, same: before.boot === after.boot },
-				uptime: { before: before.uptime, after: after.uptime },
-				vmFileSystem: {
-					tmpMarker: after.vm_tmp_marker,
-					homeMarker: after.vm_home_marker,
-					stagedFilesAfter: after.vm_staged,
-				},
-				proxy: { before: before.proxy, after: after.proxy },
-				statusSamples: samples,
-				whileStopped: stoppedSnapshot,
-				afterRun,
-			};
-			return `create ${first.toSandboxReadyMs} ms, restart ${second.toSandboxReadyMs} ms; boot id ${before.boot === after.boot ? 'unchanged' : 'changed'}, uptime ${before.uptime} s then ${after.uptime} s; rules while stopped ${stoppedSnapshot.policy}, secrets ${stoppedSnapshot.secret}; nothing left after the run`;
-		}
-	);
+			expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
+		});
+
+		await step(
+			'a pool reached through a link: the wrapper mounts the resolved directory, the step runs in it',
+			async () => {
+				fs.mkdirSync(path.join(realParentDirectory, 'pool2', 'slot-1'), { recursive: true });
+				fs.symlinkSync(
+					realParentDirectory,
+					linkedParentDirectory,
+					process.platform === 'win32' ? 'junction' : 'dir'
+				);
+				const started = flow(['run', writeLinkedFlow(), '--json']);
+				const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+				expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+				const executionId = match[1];
+				const linked = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
+					const shown = flow(['show', executionId, '--json']);
+					if (shown.status !== 0) return undefined;
+					const parsed = JSON.parse(shown.stdout);
+					return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+				});
+				expect(
+					linked.status === 'completed',
+					`linked-pool run is ${linked.status}: ${JSON.stringify(linked.steps)}`
+				);
+				const text = linked.steps?.probe?.io?.stdout?.text ?? '';
+				const cwd = (/^cwd=(.*)$/m.exec(text) ?? [])[1]?.trim() ?? '';
+				expect(
+					cwd.endsWith('/parent2/pool2/slot-1') && !cwd.includes('via-link'),
+					`the step did not run in the resolved slot: cwd=${cwd}`
+				);
+				evidence.linkedPool = { cwd };
+				return `ran in ${cwd}`;
+			}
+		);
+
+		await step('the linked-pool sandbox is removed too', async () => {
+			await waitFor(
+				'the fourth sbx rm call',
+				90_000,
+				() => timings().filter(entry => entry.words[0] === 'rm').length >= 4
+			);
+			const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
+				entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+			);
+			expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
+		});
+
+		await step(
+			'a STOPPED sandbox is restarted by the next step: mounts, credentials and rules still in place, with the time it takes',
+			async () => {
+				fs.mkdirSync(path.join(poolDirectory, 'slot-1'), { recursive: true });
+				const rmBefore = timings().filter(entry => entry.words[0] === 'rm').length;
+				const started = flow(['run', writeRestartFlow(), '--json']);
+				const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+				expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+				const executionId = match[1];
+				const probe = new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } });
+				// Sample the sandbox status while the run goes; when it reads stopped, look at what sbx still holds for it.
+				const samples = [];
+				let stoppedSnapshot;
+				let sandboxName;
+				const settled = (async () => {
+					for (;;) {
+						const shown = flow(['show', executionId, '--json']);
+						const parsed = shown.status === 0 ? JSON.parse(shown.stdout) : undefined;
+						if (parsed && ['completed', 'failed', 'cancelled'].includes(parsed.status)) return parsed;
+						await sleep(300);
+					}
+				})();
+				const sampler = (async () => {
+					for (;;) {
+						const mine = (await probe.list()).filter(
+							entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+						);
+						const entry = mine[0];
+						if (entry !== undefined) {
+							sandboxName = entry.name;
+							if (samples.at(-1)?.status !== entry.status)
+								samples.push({ at: Date.now(), status: entry.status });
+							if (entry.status === 'stopped' && stoppedSnapshot === undefined) {
+								stoppedSnapshot = {
+									policy: linesMentioning(sbxText('policy', 'ls'), entry.name),
+									secret: linesMentioning(sbxText('secret', 'ls'), entry.name),
+								};
+							}
+						}
+						if (await Promise.race([settled.then(() => true), sleep(500).then(() => false)])) return;
+					}
+				})();
+				const record = await settled;
+				await sampler;
+				const statuses = Object.fromEntries(
+					Object.entries(record.steps ?? {}).map(([id, s]) => [id, s.status])
+				);
+				expect(
+					record.status === 'completed',
+					`restart run is ${record.status}: ${JSON.stringify(statuses)} ${JSON.stringify(record.steps)}`
+				);
+				const read = id => {
+					const out = record.steps?.[id]?.io?.stdout?.text ?? '';
+					return Object.fromEntries(
+						out
+							.split(/\r?\n/)
+							.filter(line => line.includes('='))
+							.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()])
+					);
+				};
+				const before = read('before');
+				const after = read('after');
+				expect(
+					samples.some(sample => sample.status === 'stopped'),
+					`sbx never reported the sandbox stopped: ${JSON.stringify(samples)}`
+				);
+				expect(stoppedSnapshot !== undefined, 'no snapshot of the rules and secrets while stopped');
+				const log = readIfExists(daemonLog);
+				expect(
+					/restarted for the next step/.test(log),
+					'the wrapper log has no "restarted for the next step" line'
+				);
+				expect(
+					after.marker?.startsWith('restart-marker-'),
+					`the file written before the gap is not in the workspace after the restart: marker=${after.marker}`
+				);
+				expect(
+					after.hostname === before.hostname,
+					`another sandbox answered: ${before.hostname} then ${after.hostname}`
+				);
+				expect(
+					after.workspace_write_exit === '0',
+					`the workspace is not writable after the restart: exit ${after.workspace_write_exit}`
+				);
+				expect(
+					after.meta_write_exit === '0',
+					`.meta is not writable after the restart: exit ${after.meta_write_exit}`
+				);
+				expect(
+					/\bOK\b/.test(JSON.stringify(record.steps?.ask?.output ?? record.steps?.ask ?? {})),
+					'the model step did not answer OK after the restart (credentials, secret or rules lost)'
+				);
+				expect(
+					stoppedSnapshot.policy > 0,
+					`no network rule for the stopped sandbox in \`sbx policy ls\`: ${JSON.stringify(stoppedSnapshot)}`
+				);
+				// Timing lines of the wrapper: toSandboxReadyMs is the create for the first step and the restart for the one after the gap.
+				const timing = id => {
+					const matches = [...log.matchAll(new RegExp(`timing (\\{"stepId":"${id}"[^}]*\\})`, 'g'))];
+					const last = matches.at(-1);
+					return last === undefined ? undefined : JSON.parse(last[1]);
+				};
+				const first = timing('before');
+				const second = timing('after');
+				expect(
+					first !== undefined && second !== undefined,
+					'the wrapper timing lines of the two steps were not found in the daemon log'
+				);
+				await waitFor(
+					'the restart run sandbox to be removed',
+					90_000,
+					() => timings().filter(entry => entry.words[0] === 'rm').length > rmBefore
+				);
+				const afterRun = {
+					sandboxes: (await probe.list()).filter(entry => entry.name === sandboxName).length,
+					policy: linesMentioning(sbxText('policy', 'ls'), sandboxName),
+					secret: linesMentioning(sbxText('secret', 'ls'), sandboxName),
+				};
+				expect(
+					afterRun.sandboxes === 0 && afterRun.policy === 0 && afterRun.secret === 0,
+					`something of the run is left after its end: ${JSON.stringify(afterRun)}`
+				);
+				evidence.restart = {
+					sandbox: sandboxName,
+					createMs: first.toSandboxReadyMs,
+					restartMs: second.toSandboxReadyMs,
+					beforeStep: first,
+					afterStep: second,
+					boot: { before: before.boot, after: after.boot, same: before.boot === after.boot },
+					uptime: { before: before.uptime, after: after.uptime },
+					vmFileSystem: {
+						tmpMarker: after.vm_tmp_marker,
+						homeMarker: after.vm_home_marker,
+						stagedFilesAfter: after.vm_staged,
+					},
+					proxy: { before: before.proxy, after: after.proxy },
+					statusSamples: samples,
+					whileStopped: stoppedSnapshot,
+					afterRun,
+				};
+				return `create ${first.toSandboxReadyMs} ms, restart ${second.toSandboxReadyMs} ms; boot id ${before.boot === after.boot ? 'unchanged' : 'changed'}, uptime ${before.uptime} s then ${after.uptime} s; rules while stopped ${stoppedSnapshot.policy}, secrets ${stoppedSnapshot.secret}; nothing left after the run`;
+			}
+		);
+	}
+
+	for (const tool of ['codex', 'opencode'].filter(
+		candidate => toolsOnly === undefined || toolsOnly === 'both' || toolsOnly === candidate
+	)) {
+		await step(
+			`a ${tool} step answers in the sandbox as a plain prompt (real Bedrock): tool-aware credentials, store on the .meta mount`,
+			async () => {
+				const started = flow(['run', writeToolsFlow(tool), '--json']);
+				const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+				expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+				const executionId = match[1];
+				const record = await waitFor(`execution ${executionId} to settle`, 240_000, () => {
+					const shown = flow(['show', executionId, '--json']);
+					if (shown.status !== 0) return undefined;
+					const parsed = JSON.parse(shown.stdout);
+					return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+				});
+				const stepRecord = record.steps?.[tool];
+				expect(
+					record.status === 'completed',
+					`${tool} run is ${record.status}: ${stepRecord?.error ?? ''} | stderr: ${String(stepRecord?.io?.stderr?.text ?? '').slice(-900)} | stdout: ${String(stepRecord?.io?.stdout?.text ?? '').slice(-900)} | ${JSON.stringify(stepRecord).slice(0, 500)}`
+				);
+				expect(stepRecord.sourceId === 'sandbox-live', `served by ${stepRecord.sourceId}`);
+				expect(
+					/\bOK\b/.test(JSON.stringify(stepRecord.output ?? stepRecord)),
+					`the ${tool} step did not answer OK: ${JSON.stringify(stepRecord.output ?? {})}`
+				);
+				evidence[`${tool}Step`] = {
+					model: tool === 'codex' ? codexModel : opencodeModel,
+					sessionId: stepRecord.meta?.session_id,
+					durationMs: stepRecord.meta?.duration_ms,
+				};
+				// Its session store is on the run's .meta mount, on the host.
+				const runsDirectory = path.join(projectDirectory, '.flow', 'runs');
+				const stores = fs
+					.readdirSync(runsDirectory)
+					.filter(name => fs.existsSync(path.join(runsDirectory, name, 'sessions', tool)));
+				expect(stores.length > 0, `no session store of ${tool} under ${runsDirectory}/<run>.meta/sessions`);
+				return `answered OK (${tool === 'codex' ? codexModel : opencodeModel}), store on the mount: ${stores.at(-1)}`;
+			}
+		);
+		await step(`the ${tool} sandbox is removed too`, async () => {
+			await sleep(1500);
+			const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
+				entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+			);
+			expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
+		});
+	}
 
 	await step('every sbx command of the run, with its duration', () => {
 		const lines = timings().map(
