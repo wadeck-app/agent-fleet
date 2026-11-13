@@ -112,26 +112,32 @@ export class WorkspacePathValidator {
 	}
 
 	/**
-	 * Check if path is in a system directory
+	 * Check if path is a system directory or lies below one.
+	 *
+	 * Decision: compare on path-segment boundaries (equal to the system directory, or starting with
+	 * it followed by a separator) instead of a raw `startsWith`, which refused near-miss names such
+	 * as `/etcetera`, `/usr2` or `C:\WindowsFoo`. The path is normalized first (so `/etc/../etcetera`
+	 * is judged as `/etcetera`) and trailing separators are dropped. Case folding follows the injected
+	 * flavour: insensitive on win32, sensitive on posix. Each flavour is checked against its own list.
 	 */
 	private isSystemDirectory(path: string): boolean {
-		const normalizedPath = this.pathApi.normalize(path).toLowerCase();
-
-		// Check Windows system paths
-		for (const forbiddenPath of this.FORBIDDEN_PATHS_WINDOWS) {
-			if (normalizedPath.startsWith(forbiddenPath.toLowerCase())) {
-				return true;
+		const isWindows = this.pathApi.sep === '\\';
+		const fold = (value: string): string => (isWindows ? value.toLowerCase() : value);
+		const stripTrailingSeparators = (value: string): string => {
+			let end = value.length;
+			while (end > 1 && (value[end - 1] === this.pathApi.sep || value[end - 1] === '/')) {
+				end--;
 			}
-		}
+			return value.slice(0, end);
+		};
 
-		// Check Unix system paths
-		for (const forbiddenPath of this.FORBIDDEN_PATHS_UNIX) {
-			if (normalizedPath.startsWith(forbiddenPath.toLowerCase())) {
-				return true;
-			}
-		}
+		const candidate = fold(stripTrailingSeparators(this.pathApi.normalize(path)));
+		const forbiddenPaths = isWindows ? this.FORBIDDEN_PATHS_WINDOWS : this.FORBIDDEN_PATHS_UNIX;
 
-		return false;
+		return forbiddenPaths.some((forbiddenPath) => {
+			const forbidden = fold(stripTrailingSeparators(this.pathApi.normalize(forbiddenPath)));
+			return candidate === forbidden || candidate.startsWith(forbidden + this.pathApi.sep);
+		});
 	}
 
 	/**

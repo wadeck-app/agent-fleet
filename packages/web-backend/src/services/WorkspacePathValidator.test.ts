@@ -96,6 +96,81 @@ describe('WorkspacePathValidator', () => {
 			);
 		});
 
+		describe('system directory matching (segment boundaries)', () => {
+			const systemDirectoryError = 'Cannot create workspace in system directories';
+
+			beforeEach(() => {
+				// Everything else is permitted so that only the system directory rule decides
+				vi.mocked(lstat).mockResolvedValue({ isSymbolicLink: () => false } as any);
+				vi.mocked(access).mockResolvedValue(undefined);
+			});
+
+			it.each([
+				'C:\\WindowsFoo',
+				'C:\\WindowsFoo\\work',
+				'C:\\Program Files (x86)Foo',
+				'C:\\Program FilesFoo\\app',
+				'C:\\ProgramDataX',
+				'C:\\Systems\\work',
+			])('win32: accepts the near-miss name %s', async (path) => {
+				await expect(validator.validatePath(path)).resolves.toBeUndefined();
+			});
+
+			it.each(['/etcetera', '/etcetera/work', '/usr2', '/usr2/bin', '/binaries', '/boot2/x', '/usr/binary'])(
+				'posix: accepts the near-miss name %s',
+				async (path) => {
+					await expect(posixValidator.validatePath(path)).resolves.toBeUndefined();
+				}
+			);
+
+			it.each([
+				'C:\\Windows',
+				'C:\\Windows\\System32',
+				'c:\\windows',
+				'C:\\WINDOWS\\system32',
+				'C:\\Program Files (x86)',
+				'C:\\Program Files (x86)\\App',
+				'C:\\ProgramData',
+				'C:\\System\\x',
+			])('win32: refuses %s (equal to or below a system directory, any case)', async (path) => {
+				await expect(validator.validatePath(path)).rejects.toThrow(systemDirectoryError);
+			});
+
+			it.each(['/etc', '/etc/passwd.d', '/usr/bin', '/usr/bin/app', '/proc/1', '/boot'])(
+				'posix: refuses %s (equal to or below a system directory)',
+				async (path) => {
+					await expect(posixValidator.validatePath(path)).rejects.toThrow(systemDirectoryError);
+				}
+			);
+
+			// A trailing separator is stopped earlier by isPathSafe (normalize keeps it, resolve drops it),
+			// so the refusal reason differs; what matters is that the path is still refused.
+			it.each(['/etc/', '/etc//', '/usr/bin/'])('posix: still refuses %s with a trailing separator', async (path) => {
+				await expect(posixValidator.validatePath(path)).rejects.toThrow();
+			});
+
+			it('win32: still refuses C:\\Windows\\ with a trailing separator', async () => {
+				await expect(validator.validatePath('C:\\Windows\\')).rejects.toThrow();
+			});
+
+			it('posix: is case-sensitive', async () => {
+				await expect(posixValidator.validatePath('/ETC/work')).resolves.toBeUndefined();
+				await expect(posixValidator.validatePath('/Etc')).resolves.toBeUndefined();
+			});
+
+			it('posix: normalisation of .. does not misjudge /etc/../etcetera as below /etc', async () => {
+				await expect(posixValidator.validatePath('/etc/../etcetera')).resolves.toBeUndefined();
+			});
+
+			it('posix: normalisation of .. does not hide a system directory', async () => {
+				await expect(posixValidator.validatePath('/home/../etc/x')).rejects.toThrow();
+			});
+
+			it('win32: normalisation of .. does not misjudge C:\\Windows\\..\\WindowsFoo', async () => {
+				await expect(validator.validatePath('C:\\Windows\\..\\WindowsFoo')).resolves.toBeUndefined();
+			});
+		});
+
 		it('should reject paths without write permissions', async () => {
 			// Setup mock to indicate permission denied
 			vi.mocked(lstat).mockRejectedValue({ code: 'ENOENT' }); // Path doesn't exist
