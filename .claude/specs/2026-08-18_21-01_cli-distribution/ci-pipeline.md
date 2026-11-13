@@ -54,7 +54,7 @@ on:
 2. `npm ci` (full workspace install)
 3. `npm run build --workspaces` (tsc for all packages)
 4. `npm run bundle:all --workspace packages/flow-cli` (flow.cjs + task.cjs + flow-updater.cjs)
-5. `npm run build-launcher --workspace packages/flow-cli` (Go binaries; only win32-x64 and darwin-arm64 are published: Apple Silicon only, darwin-x64 dropped on 2026-11-09)
+5. `npm run build-launcher --workspace packages/flow-cli` (Go binaries; only win32-x64, darwin-arm64 and linux-x64 are published: Apple Silicon only, darwin-x64 dropped on 2026-11-09; linux-arm64 is built but not published)
 6. `bash ci/scripts/compute-version.sh` (outputs VERSION and DIST_TAG to GITHUB_OUTPUT)
 7. `bash ci/scripts/copy-binaries.sh` (copies launcher binaries + flow.cjs into platform package dirs)
 8. Set version in all 5 packages: `npm version $VERSION --no-git-tag-version` for each

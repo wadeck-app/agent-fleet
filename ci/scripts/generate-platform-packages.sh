@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copied from C:/Workspace_Tooling/ci-templates commit 0099d00 (scripts/generate-platform-packages.sh): re-sync from there, do not edit here.
+# Copied from C:/Workspace_Tooling/ci-templates commit c3bec19 (scripts/generate-platform-packages.sh): re-sync from there, do not edit here.
 # Generates platform package directories for npm publish.
 # Called by CI before copy-binaries.sh. Not needed locally.
 #
@@ -19,7 +19,7 @@
 #                   Defaults to <script-dir>/../templates.
 #   REGISTRY        npm registry URL (default: https://npm.pkg.github.com/).
 #   PKG_SCOPE       npm scope without leading '@' (default: wadeck-app).
-#   PLATFORMS       Comma list of platforms to generate and support, among win32-x64, darwin-arm64, darwin-x64
+#   PLATFORMS       Comma list of platforms to generate and support, among win32-x64, darwin-arm64, darwin-x64, linux-x64
 #                   (default: all three). The same list is baked into the shim as {{PLATFORMS}}: any other host
 #                   is refused by the shim with "unsupported platform". Set it explicitly in every consumer.
 set -euo pipefail
@@ -36,8 +36,9 @@ platform_os_cpu() {
     win32-x64)    echo "win32 x64" ;;
     darwin-arm64) echo "darwin arm64" ;;
     darwin-x64)   echo "darwin x64" ;;
+    linux-x64)    echo "linux x64" ;;
     *)
-      echo "Error: unsupported platform '$1' in PLATFORMS='${PLATFORMS}'. Allowed: win32-x64, darwin-arm64, darwin-x64." >&2
+      echo "Error: unsupported platform '$1' in PLATFORMS='${PLATFORMS}'. Allowed: win32-x64, darwin-arm64, darwin-x64, linux-x64." >&2
       return 1
       ;;
   esac
