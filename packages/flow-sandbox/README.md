@@ -86,6 +86,21 @@ Live check: `SBX_LIVE=1 node --import tsx packages/flow-sandbox/scripts/live/Lif
 
 Limits: `endRun('daemon_stopping')` stops without removing and does not mark the run ended (a later step restarts the sandbox); execution ids that are not lowercase `[a-z0-9-]` are refused (flow's real id format is unchecked); a recycled pid makes a dead wrapper look alive (removal refused); `remove` checks liveness then acts (no lock); `scripts/` is outside the eslint config.
 
+### Restart of a stopped sandbox (measured, sbx 0.51.0, one machine, 2026-11-13)
+
+`PluginLiveCheck` (`idleStopMinutes=0.2`) runs: a VM step, a `host: true` step that sleeps 24 s (the wrapper stops the idle VM after 12 s), a VM step, a model step. Two runs gave the same picture.
+
+| What                        | Measured                                                                                                                                                                                                                                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Who restarts it             | the wrapper, at the next step (`SandboxLifecycle.restart`, an `exec true`); `sbx ls` read `running`, `stopped`, `running`                                                                                                                                                                              |
+| Time                        | create 5.7 to 5.8 s to be ready (first step), restart 2.1 to 2.2 s (second run: 2089 and 2168 ms; `toSandboxReadyMs` of the wrapper timing line); the whole step 2.6 s                                                                                                                                 |
+| The VM                      | it is rebooted: `boot_id` changes, uptime restarts at about 2 s. Processes of the VM are gone                                                                                                                                                                                                          |
+| Files                       | the files the VM wrote on its own disk (`/tmp`, `$HOME`) are still there; the mounts are in place (workspace file written before the gap read back, workspace and `.meta` writable); the hostname and the proxy variables are unchanged                                                                |
+| Credentials, rules, secrets | still in place: the model step after the restart answered (credential endpoint, network rules and secret work); while stopped `sbx policy ls` still lists the sandbox's rules (1 to 2 lines) and `sbx secret ls` its secret (0 to 1 line: the count varied between the two runs and I do not know why) |
+| Leak                        | none found: at the end of the run the sandbox, its rules and its secret are gone (`sbx ls`, `policy ls`, `secret ls`); the script copies staged in `/tmp/flow-staged` are removed at the end of each process (the one file seen is the running step's own)                                             |
+
+What this does NOT show: a restart after sbx's own idle stop (the check uses the wrapper's), a restart under heavy host load, or the behaviour on another host. Files an agent leaves on the VM's disk survive a stop: nothing here removes them before the next step, only the removal at the end of the run does.
+
 ## M4: development harness (relay variant, not a product)
 
 A standalone wrapper that a `built-in:command` worker source starts. It registers with the daemon as one worker, runs each assigned step inside a sandbox with the real flow worker bundle, and relays the messages. No core change: routing is by label (`--labels sandbox` on the source, `labels: [sandbox]` in the flow).

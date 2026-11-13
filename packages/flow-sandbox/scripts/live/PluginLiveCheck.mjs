@@ -19,7 +19,7 @@
  * Exit code: 0 all assertions passed, 1 one failed, 2 refused to run.
  */
 import { addProject } from '@wadeck-app/project-sdk';
-import { spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -336,6 +336,94 @@ steps:
 	return file;
 }
 
+// Restart of a STOPPED sandbox: the VM is stopped by the wrapper's idle timer during a host: true gap, then the next step restarts it.
+function writeRestartFlow() {
+	const file = path.join(projectDirectory, 'plugin-live-restart.yml');
+	fs.writeFileSync(
+		file,
+		`id: plugin-live-restart
+version: '1.0.0'
+name: Plugin live check, restart of a stopped sandbox
+description: A VM step, an idle gap on the host, a VM step in the restarted sandbox, a model step.
+
+requires: [sandbox]
+
+workspace: { provider: pool, dir: '${poolDirectory.replaceAll('\\', '/')}', prefix: slot-, count: 1 }
+
+steps:
+    - id: before
+      name: Before the gap
+      type: script
+      shell: bash
+      script: |
+          echo "restart-marker-$$" > restart-marker.txt
+          echo "hostname=$(hostname)"
+          echo "boot=$(cat /proc/sys/kernel/random/boot_id)"
+          echo "uptime=$(cut -d' ' -f1 /proc/uptime)"
+          echo "proxy=\${HTTPS_PROXY:-none}"
+          echo vm-tmp > /tmp/vm-marker
+          echo vm-home > "$HOME/vm-marker"
+
+    - id: gap
+      name: Idle gap on the host (the VM idles)
+      type: script
+      host: true
+      shell: bash
+      depends:
+          - before
+      script: |
+          sleep 24
+          echo gap-done
+
+    - id: after
+      name: After the gap, in the restarted sandbox
+      type: script
+      shell: bash
+      strict: false
+      depends:
+          - gap
+      script: |
+          echo "marker=$(cat restart-marker.txt)"
+          echo "hostname=$(hostname)"
+          echo "boot=$(cat /proc/sys/kernel/random/boot_id)"
+          echo "uptime=$(cut -d' ' -f1 /proc/uptime)"
+          echo "proxy=\${HTTPS_PROXY:-none}"
+          echo "vm_tmp_marker=$(cat /tmp/vm-marker 2>/dev/null || echo gone)"
+          echo "vm_home_marker=$(cat "$HOME/vm-marker" 2>/dev/null || echo gone)"
+          echo "vm_staged=$(ls /tmp/flow-staged 2>/dev/null | wc -l)"
+          written=$({ echo again > restart-after.txt; } 2>&1); echo "workspace_write_exit=$?"
+          meta=$(awk '{print $5}' /proc/self/mountinfo | grep '\\.meta$' | head -1)
+          mkdir -p "$meta/outputs" && echo restarted > "$meta/outputs/restart-write.txt"; echo "meta_write_exit=$?"
+
+    - id: ask
+      name: One word (credentials after the restart)
+      type: model
+      model: sonnet
+      depends:
+          - after
+      env:
+          ANTHROPIC_DEFAULT_SONNET_MODEL: ${process.env.ANTHROPIC_DEFAULT_SONNET_MODEL ?? ''}
+      prompt: |
+          Reply with the single word OK and nothing else.
+      output:
+          answer:
+              type: string
+              from: last_message
+`
+	);
+	return file;
+}
+
+/** What the host's sbx says about rules and secrets, as text (read-only commands). */
+function sbxText(...words) {
+	try {
+		return execFileSync(realSbx, words, { encoding: 'utf8', timeout: 60_000, windowsHide: true });
+	} catch (error) {
+		return `(sbx ${words.join(' ')} failed: ${error instanceof Error ? error.message : String(error)})`;
+	}
+}
+const linesMentioning = (text, name) => text.split(/\r?\n/).filter(line => line.includes(name)).length;
+
 const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sandbox-live-art-'));
 const claimEvents = { seen: undefined, gone: undefined };
 // Sandboxes that exist before this check: only a sandbox created after this point may be removed by it.
@@ -382,6 +470,9 @@ try {
 			// Accepted openly: ssh.agentForwardingEnabled is on by default on this machine and this check never changes a setting.
 			'--option',
 			'acceptSshAgentForwarding=true',
+			// The wrapper stops an idle sandbox after 12 s (sbx itself would after about 30 s): the restart step below needs the wrapper's own stop.
+			'--option',
+			'idleStopMinutes=0.2',
 		]);
 		expect(declared.status === 0, `flow worker source add failed: ${declared.stderr}${declared.stdout}`);
 	});
@@ -708,6 +799,148 @@ try {
 		);
 		expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
 	});
+
+	await step(
+		'a STOPPED sandbox is restarted by the next step: mounts, credentials and rules still in place, with the time it takes',
+		async () => {
+			fs.mkdirSync(path.join(poolDirectory, 'slot-1'), { recursive: true });
+			const rmBefore = timings().filter(entry => entry.words[0] === 'rm').length;
+			const started = flow(['run', writeRestartFlow(), '--json']);
+			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+			const executionId = match[1];
+			const probe = new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } });
+			// Sample the sandbox status while the run goes; when it reads stopped, look at what sbx still holds for it.
+			const samples = [];
+			let stoppedSnapshot;
+			let sandboxName;
+			const settled = (async () => {
+				for (;;) {
+					const shown = flow(['show', executionId, '--json']);
+					const parsed = shown.status === 0 ? JSON.parse(shown.stdout) : undefined;
+					if (parsed && ['completed', 'failed', 'cancelled'].includes(parsed.status)) return parsed;
+					await sleep(300);
+				}
+			})();
+			const sampler = (async () => {
+				for (;;) {
+					const mine = (await probe.list()).filter(
+						entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+					);
+					const entry = mine[0];
+					if (entry !== undefined) {
+						sandboxName = entry.name;
+						if (samples.at(-1)?.status !== entry.status)
+							samples.push({ at: Date.now(), status: entry.status });
+						if (entry.status === 'stopped' && stoppedSnapshot === undefined) {
+							stoppedSnapshot = {
+								policy: linesMentioning(sbxText('policy', 'ls'), entry.name),
+								secret: linesMentioning(sbxText('secret', 'ls'), entry.name),
+							};
+						}
+					}
+					if (await Promise.race([settled.then(() => true), sleep(500).then(() => false)])) return;
+				}
+			})();
+			const record = await settled;
+			await sampler;
+			const statuses = Object.fromEntries(Object.entries(record.steps ?? {}).map(([id, s]) => [id, s.status]));
+			expect(
+				record.status === 'completed',
+				`restart run is ${record.status}: ${JSON.stringify(statuses)} ${JSON.stringify(record.steps)}`
+			);
+			const read = id => {
+				const out = record.steps?.[id]?.io?.stdout?.text ?? '';
+				return Object.fromEntries(
+					out
+						.split(/\r?\n/)
+						.filter(line => line.includes('='))
+						.map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()])
+				);
+			};
+			const before = read('before');
+			const after = read('after');
+			expect(
+				samples.some(sample => sample.status === 'stopped'),
+				`sbx never reported the sandbox stopped: ${JSON.stringify(samples)}`
+			);
+			expect(stoppedSnapshot !== undefined, 'no snapshot of the rules and secrets while stopped');
+			const log = readIfExists(daemonLog);
+			expect(
+				/restarted for the next step/.test(log),
+				'the wrapper log has no "restarted for the next step" line'
+			);
+			expect(
+				after.marker?.startsWith('restart-marker-'),
+				`the file written before the gap is not in the workspace after the restart: marker=${after.marker}`
+			);
+			expect(
+				after.hostname === before.hostname,
+				`another sandbox answered: ${before.hostname} then ${after.hostname}`
+			);
+			expect(
+				after.workspace_write_exit === '0',
+				`the workspace is not writable after the restart: exit ${after.workspace_write_exit}`
+			);
+			expect(
+				after.meta_write_exit === '0',
+				`.meta is not writable after the restart: exit ${after.meta_write_exit}`
+			);
+			expect(
+				/\bOK\b/.test(JSON.stringify(record.steps?.ask?.output ?? record.steps?.ask ?? {})),
+				'the model step did not answer OK after the restart (credentials, secret or rules lost)'
+			);
+			expect(
+				stoppedSnapshot.policy > 0,
+				`no network rule for the stopped sandbox in \`sbx policy ls\`: ${JSON.stringify(stoppedSnapshot)}`
+			);
+			// Timing lines of the wrapper: toSandboxReadyMs is the create for the first step and the restart for the one after the gap.
+			const timing = id => {
+				const matches = [...log.matchAll(new RegExp(`timing (\\{"stepId":"${id}"[^}]*\\})`, 'g'))];
+				const last = matches.at(-1);
+				return last === undefined ? undefined : JSON.parse(last[1]);
+			};
+			const first = timing('before');
+			const second = timing('after');
+			expect(
+				first !== undefined && second !== undefined,
+				'the wrapper timing lines of the two steps were not found in the daemon log'
+			);
+			await waitFor(
+				'the restart run sandbox to be removed',
+				90_000,
+				() => timings().filter(entry => entry.words[0] === 'rm').length > rmBefore
+			);
+			const afterRun = {
+				sandboxes: (await probe.list()).filter(entry => entry.name === sandboxName).length,
+				policy: linesMentioning(sbxText('policy', 'ls'), sandboxName),
+				secret: linesMentioning(sbxText('secret', 'ls'), sandboxName),
+			};
+			expect(
+				afterRun.sandboxes === 0 && afterRun.policy === 0 && afterRun.secret === 0,
+				`something of the run is left after its end: ${JSON.stringify(afterRun)}`
+			);
+			evidence.restart = {
+				sandbox: sandboxName,
+				createMs: first.toSandboxReadyMs,
+				restartMs: second.toSandboxReadyMs,
+				beforeStep: first,
+				afterStep: second,
+				boot: { before: before.boot, after: after.boot, same: before.boot === after.boot },
+				uptime: { before: before.uptime, after: after.uptime },
+				vmFileSystem: {
+					tmpMarker: after.vm_tmp_marker,
+					homeMarker: after.vm_home_marker,
+					stagedFilesAfter: after.vm_staged,
+				},
+				proxy: { before: before.proxy, after: after.proxy },
+				statusSamples: samples,
+				whileStopped: stoppedSnapshot,
+				afterRun,
+			};
+			return `create ${first.toSandboxReadyMs} ms, restart ${second.toSandboxReadyMs} ms; boot id ${before.boot === after.boot ? 'unchanged' : 'changed'}, uptime ${before.uptime} s then ${after.uptime} s; rules while stopped ${stoppedSnapshot.policy}, secrets ${stoppedSnapshot.secret}; nothing left after the run`;
+		}
+	);
 
 	await step('every sbx command of the run, with its duration', () => {
 		const lines = timings().map(
