@@ -1,6 +1,6 @@
 # flow-cli Plugins
 
-Two extension points: `workspace` (how a task gets a working directory) and `approval` (how a `user_intervention` step reaches a human or script). Both are configured in the project config under `plugins:`.
+Two extension points are configured per project under `plugins:`: `workspace` (how a task gets a working directory) and `approval` (how a `user_intervention` step reaches a human or script). They are not the only ones: `packages/extension-points/extension-points.json` registers every extension point with its status (for example `worker-type`, see `WORKERS.md`).
 
 `workspace` is required -- the daemon refuses to start without one. `approval` is optional; a worker without one reports `interactive: false` and rejects `user_intervention` steps.
 
