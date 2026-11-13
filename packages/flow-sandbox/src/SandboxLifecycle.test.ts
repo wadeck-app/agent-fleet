@@ -937,3 +937,72 @@ describe('SandboxLifecycle interleavings', () => {
 		expect(life.current()?.status).toBe('running');
 	});
 });
+
+// Spec decisions 5, 26 and 29: one sandbox per run, removed at the end of the run, a FRESH sandbox at the first assignment of every run. Nothing
+// the VM keeps on its own disk (/tmp, $HOME survive a stop) may reach another run. Pinned here: the name carries the execution id, a stopped
+// leftover is never restarted by a later run nor removed by it, and a leftover of the SAME execution is refused, not reused.
+describe('SandboxLifecycle: no sandbox is reused across runs', () => {
+	it('gives a later run its own sandbox: the first run is removed at its end and its VM files do not exist in the second', async () => {
+		const life = lifecycle();
+		await life.beginStep('run1', mounts);
+		runtime.seedFile(NAME, '/tmp/left-by-run1');
+		await life.endStep('run1');
+		await life.endRun('run1', 'completed');
+		expect(runtime.has(NAME)).toBe(false);
+
+		const second = await life.beginStep('run2', mounts);
+
+		expect(second).toBe('flow-sbx-w1-run2');
+		expect(second).not.toBe(NAME);
+		expect(runtime.state(second).files.has('/tmp/left-by-run1')).toBe(false);
+		expect(count('create')).toBe(2);
+	});
+
+	it('does not restart or remove a stopped leftover of an earlier run when a new run starts on the same wrapper (decision 26: only the explicit command removes it)', async () => {
+		const first = lifecycle();
+		await first.beginStep('run1', mounts);
+		runtime.seedFile(NAME, '/tmp/left-by-run1');
+		await first.shutdown();
+		expect(runtime.state(NAME).status).toBe('stopped');
+		const startsBefore = count('start');
+
+		const restarted = lifecycle();
+		const name = await restarted.beginStep('run2', mounts);
+
+		expect(name).toBe('flow-sbx-w1-run2');
+		expect(runtime.has(NAME)).toBe(true);
+		expect(runtime.state(NAME).status).toBe('stopped');
+		expect(runtime.state(NAME).files.has('/tmp/left-by-run1')).toBe(true);
+		expect(runtime.state(name).files.has('/tmp/left-by-run1')).toBe(false);
+		expect(count('start')).toBe(startsBefore);
+		expect(count('remove')).toBe(0);
+	});
+
+	it('refuses, instead of reusing, a leftover sandbox of the SAME execution (a resumed run after a wrapper restart): already-exists, nothing restarted or removed', async () => {
+		const first = lifecycle();
+		await first.beginStep('run1', mounts);
+		runtime.seedFile(NAME, '/tmp/left-by-run1');
+		await first.shutdown();
+		const startsBefore = count('start');
+
+		const error = await rejection(lifecycle().beginStep('run1', mounts));
+
+		expect(error.kind).toBe('already-exists');
+		expect(error.message).toContain(`leftover remove ${NAME}`);
+		expect(count('start')).toBe(startsBefore);
+		expect(count('remove')).toBe(0);
+		expect(runtime.state(NAME).files.has('/tmp/left-by-run1')).toBe(true);
+	});
+
+	it('refuses a late step of a run that already ended: its sandbox is not created again under the same name', async () => {
+		const life = lifecycle();
+		await life.beginStep('run1', mounts);
+		await life.endStep('run1');
+		await life.endRun('run1', 'completed');
+
+		const error = await rejection(life.beginStep('run1', mounts));
+
+		expect(error.kind).toBe('run-ended');
+		expect(count('create')).toBe(1);
+	});
+});
