@@ -563,6 +563,9 @@ export const manifest = {
 				version: 1,
 				guarantees: [...GUARANTEES],
 				workspaces: [...WORKSPACES],
+				// The option names, read by `flow worker source add` to refuse a misspelt --option. Taken from the table that parseOptions
+				// reports unknown names against (EXAMPLES), never a second list; a test keeps it equal to the names the parser reads.
+				options: Object.keys(EXAMPLES),
 				provider: async context => createInstance(context),
 			},
 		},

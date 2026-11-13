@@ -929,6 +929,40 @@ describe('sandbox plugin, real daemon, sbx mock: implicit agent confinement of m
 	});
 });
 
+// flow refuses an unknown --option when the source is declared (core 0ad2cee6 reads the names from the plugin manifest): a misspelt `projects` is not stored
+// (it would be read as a source that serves every project).
+describe('sandbox plugin, real flow CLI: a misspelt option is refused when the source is declared', () => {
+	const world = new FlowWorld();
+	worlds.push(world);
+
+	it('refuses --option project=<id> with the nearest name (projects), exit 1, and stores nothing', async () => {
+		await world.registerProject();
+
+		const refused = world.flow([
+			'worker',
+			'source',
+			'add',
+			'sandbox-typo',
+			'--provider',
+			'sandbox',
+			'--plugin',
+			'sandbox.exec',
+			'--plugins-dir',
+			artifactDirectory,
+			'--option',
+			`project=${world.projectId}`,
+			'--option',
+			'region=us-east-1',
+			'--option',
+			'profiles=claude=mock-profile',
+		]);
+
+		expect(refused.status).toBe(1);
+		expect(`${refused.stdout}${refused.stderr}`).toMatch(/project[\s\S]*Did you mean[\s\S]*projects/i);
+		expect(world.flow(['worker', 'source', 'list']).stdout).not.toContain('sandbox-typo');
+	}, 120_000);
+});
+
 // Implicit confinement is PER PROJECT (core cb097f7f): a source covers a run only if its declared entry lists the run's project (--option projects=...).
 describe('sandbox plugin, real daemon, sbx mock: implicit confinement only for the projects the source serves', () => {
 	const world = new FlowWorld(true);

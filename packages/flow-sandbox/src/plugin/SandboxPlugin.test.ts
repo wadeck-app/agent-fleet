@@ -42,6 +42,7 @@ interface PluginModule {
 					version: number;
 					guarantees?: string[];
 					workspaces?: string[];
+					options?: string[];
 					provider(context: { sourceId: string; options: unknown }): Promise<Instance>;
 				}
 			>
@@ -149,6 +150,43 @@ describe('sandbox plugin: the manifest', () => {
 		expect(plugin.manifest.pluginId).toBe('sandbox');
 		expect(implementation?.version).toBe(1);
 		expect((await build()).run).toBeUndefined();
+	});
+});
+
+describe('sandbox plugin: the manifest declares the option names (flow refuses an unknown --option when the source is declared)', () => {
+	const names = async (): Promise<string[]> => {
+		const plugin = await load();
+		return plugin.manifest.implementations['worker-type']?.['exec']?.options ?? [];
+	};
+
+	it('lists every name the option parser accepts and nothing else: both directions, taken from the parser table', async () => {
+		const declared = await names();
+		const source = fs.readFileSync(PLUGIN_FILE, 'utf8');
+		// The names the parser READS (raw.<name> in parseOptions): every one is declared.
+		const read = [...new Set([...source.matchAll(/\braw\.([A-Za-z]+)/g)].map(match => match[1] as string))].sort();
+
+		expect(declared.length).toBeGreaterThan(0);
+		expect([...declared].sort()).toEqual(read);
+	});
+
+	it('is accepted name for name by the parser: no declared name is reported as unknown, and a name that is not declared is', async () => {
+		const plugin = await load();
+		for (const name of await names()) {
+			let message = '';
+			try {
+				plugin.internals.parseOptions({ ...GOOD, [name]: 'x' });
+			} catch (error) {
+				message = (error as Error).message;
+			}
+			expect(message, name).not.toContain(`Unknown option "${name}"`);
+		}
+		expect(() => plugin.internals.parseOptions({ ...GOOD, notAnOption: 'x' })).toThrow(
+			'Unknown option "notAnOption"'
+		);
+	});
+
+	it('uses names flow accepts as option names: case-sensitive, no space, no "="', async () => {
+		for (const name of await names()) expect(name, name).toMatch(/^[A-Za-z][A-Za-z0-9]*$/);
 	});
 });
 
