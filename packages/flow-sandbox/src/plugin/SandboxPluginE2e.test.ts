@@ -42,6 +42,13 @@ const tsxUrl = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href
 const CANNED = 'canned-output-of-the-mock';
 const CANARY = 'canary-of-the-wrapper-environment';
 const BOUND_WAIT_SECONDS = 6;
+/** `flow stop` of one world and the wait for its daemon process to leave: the two bounds of {@link FlowWorld.stop}. */
+const STOP_COMMAND_BOUND_MS = 30_000;
+const DAEMON_EXIT_BOUND_MS = 15_000;
+/** The longest one world can take to stop (the worlds are stopped TOGETHER, so this is also the bound of all of them), plus its 300 ms pause. */
+const WORLD_STOP_BOUND_MS = STOP_COMMAND_BOUND_MS + DAEMON_EXIT_BOUND_MS + 1_000;
+/** Removing the plugin artifact after the stops: a bound for a hang, not a wait. */
+const ARTIFACT_REMOVAL_BOUND_MS = 30_000;
 
 interface ExecutionRecord {
 	status?: string;
@@ -365,7 +372,10 @@ class FlowWorld {
 	start(file: string): string {
 		const started = this.flow(['run', file, '--json']);
 		const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
-		if (match === null) throw new Error(`no executionId from flow run: ${started.stdout}${started.stderr}`);
+		if (match === null)
+			throw new Error(
+				`no executionId from flow run: ${started.stdout}${started.stderr}\n${this.describeDaemon()}`
+			);
 		return match[1] as string;
 	}
 
@@ -374,7 +384,10 @@ class FlowWorld {
 		// Asynchronous start: the claim watcher of runAndRelease must tick while `flow run` is running (see flowAsync).
 		const started = await this.flowAsync(['run', file, '--json']);
 		const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
-		if (match === null) throw new Error(`no executionId from flow run: ${started.stdout}${started.stderr}`);
+		if (match === null)
+			throw new Error(
+				`no executionId from flow run: ${started.stdout}${started.stderr}\n${this.describeDaemon()}`
+			);
 		return this.settle(match[1] as string, timeoutMs);
 	}
 
@@ -473,18 +486,41 @@ class FlowWorld {
 		return fs.existsSync(this.daemonLog) ? fs.readFileSync(this.daemonLog, 'utf8') : '';
 	}
 
-	/** Stops the daemon THIS world started (never another one); its wrapper leaves when the connection closes. */
+	/** What a failing test needs to know about this world's daemon: is its process alive, and the end of its log. */
+	describeDaemon(): string {
+		const daemon = this.daemon;
+		const state =
+			daemon === undefined
+				? 'never started'
+				: daemon.exitCode === null && daemon.signalCode === null
+					? `pid ${String(daemon.pid)} alive`
+					: `pid ${String(daemon.pid)} EXITED (code ${String(daemon.exitCode)}, signal ${String(daemon.signalCode)})`;
+		return `daemon: ${state}; log tail:\n${this.log().slice(-2500)}`;
+	}
+
+	/**
+	 * Stops the daemon THIS world started (never another one); its wrapper leaves when the connection closes. Bounded by
+	 * {@link WORLD_STOP_BOUND_MS}; a failure names the world and shows the end of its daemon log (the cleanup still runs).
+	 */
 	async stop(): Promise<void> {
 		const daemon = this.daemon;
-		if (daemon?.pid !== undefined && daemon.exitCode === null) {
-			this.flow(['stop'], 30_000);
-			await waitFor('the daemon to exit', 15_000, () => daemon.exitCode !== null || undefined).catch(
-				() => undefined
-			);
-			if (daemon.exitCode === null) daemon.kill();
+		try {
+			if (daemon?.pid !== undefined && daemon.exitCode === null) {
+				// Asynchronous: the daemons of all worlds are stopped together (afterAll), and a blocking spawn per world would add up.
+				await this.flowAsync(['stop'], STOP_COMMAND_BOUND_MS);
+				await waitFor(
+					'the daemon to exit',
+					DAEMON_EXIT_BOUND_MS,
+					() => daemon.exitCode !== null || undefined
+				).catch(() => undefined);
+				if (daemon.exitCode === null) daemon.kill();
+			}
+			await new Promise(resolve => setTimeout(resolve, 300));
+		} catch (error) {
+			throw new Error(`stopping the world in ${this.root} failed: ${String(error)}\n${this.describeDaemon()}`);
+		} finally {
+			this.isolation.cleanup();
 		}
-		await new Promise(resolve => setTimeout(resolve, 300));
-		this.isolation.cleanup();
 	}
 }
 
@@ -522,10 +558,15 @@ beforeAll(async () => {
 	await new PluginBundler().bundle(artifactDirectory);
 }, 120_000);
 
+// Every world owns a real daemon. Stopped one after the other they needed several seconds each on a busy machine and vitest's default hook limit is
+// 10 s (captured under CPU contention: "Hook timed out in 10000ms" here, after every test had passed). They are stopped together, the limit is the bound of
+// one stop plus the artifact removal, and a failed stop is reported with its world's daemon log instead of a bare timeout.
 afterAll(async () => {
-	for (const world of worlds) await world.stop();
+	const outcomes = await Promise.allSettled(worlds.map(world => world.stop()));
 	fs.rmSync(artifactRoot, { recursive: true, force: true });
-});
+	const failures = outcomes.flatMap(outcome => (outcome.status === 'rejected' ? [String(outcome.reason)] : []));
+	if (failures.length > 0) throw new Error(failures.join('\n\n'));
+}, WORLD_STOP_BOUND_MS + ARTIFACT_REMOVAL_BOUND_MS);
 
 describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 	const world = new FlowWorld();
