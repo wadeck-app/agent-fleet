@@ -132,7 +132,7 @@ History of the earlier progress notes is in git; this section is the current sta
 | --- | --- | --- |
 | Mixed-flow rule for `host: true` | core | Core warns (`HOST_SCRIPT_WITH_MODEL_STEPS`) instead of the ERROR the design note asked for |
 | `net=filtered` guarantee | plugin | Needs a public-destination measurement with an external receiver; not declared |
-| Read-only step inside a read/write run | plugin | Needs a second sandbox with the workspace `:ro` (note, D6); not implemented |
+| Read-only step inside a read/write run | plugin | DECIDED not now (2026-11-13). The wrapper refuses the step and the message names both fixes (flow-level `fs=readonly-enforced`, or `profile: inspect`). Design if a flow needs it: a `Held` LIST keyed by `(run, mode)` in `SandboxLifecycle` (today one `held`), a second sandbox with the workspace `:ro` (+ about 8 s), the first one stopped while it runs, a name that `RunSandboxName.parse` and `LeftoverSandboxes` can tell from the first (the execution id may contain hyphens, so a plain suffix is ambiguous), one idle timer and one capacity slot per sandbox, a preparer cache per sandbox (credential grant, rules, secret), `ExecRunEnd` removing both before the ack, presence naming the run once. Estimate 1.5 to 2 days with tests and a live proof. A VM-side remount is no substitute: the VM's root can undo it |
 | Codex and OpenCode steps in the exec variant | plugin | Refused today |
 | Relay harness | - | Parked prototype; its guard and requirements are not wired |
 | Tool-provision MCP | user | Separate plan to write after the sandbox work: a generic MCP the worker offers a model, tools defined in the step, host credentials kept out of the VM, operator allow-list open point |

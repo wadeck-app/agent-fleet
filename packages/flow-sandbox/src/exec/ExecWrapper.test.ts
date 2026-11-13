@@ -511,7 +511,7 @@ describe('ExecWrapper whole-run read-only (the mounts follow the requirements of
 
 		expect(runtime.callsTo('create')).toHaveLength(1);
 		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(
-			/"second"[\s\S]*fs=readonly-enforced[\s\S]*read\/write[\s\S]*flow level/
+			/"second"[\s\S]*fs=readonly-enforced[\s\S]*read\/write[\s\S]*flow level[\s\S]*profile: inspect[\s\S]*second sandbox/
 		);
 		expect(executorContexts).toHaveLength(1);
 	});
@@ -520,7 +520,9 @@ describe('ExecWrapper whole-run read-only (the mounts follow the requirements of
 		await run(assign('first', { requires: ['sandbox', READONLY] }));
 		await run(assign('second', { requires: ['sandbox'] }));
 
-		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(/"second"[\s\S]*read-only[\s\S]*flow level/);
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(
+			/"second"[\s\S]*read-only[\s\S]*flow level[\s\S]*profile: inspect[\s\S]*second sandbox/
+		);
 		expect(executorContexts).toHaveLength(1);
 	});
 

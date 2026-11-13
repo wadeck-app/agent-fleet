@@ -92,6 +92,11 @@ export interface ExecWrapperDependencies {
 	requireGuarantees: boolean;
 }
 
+/** The two ways out when the steps of one run disagree on the read-only requirement (a step read-only inside a read/write run needs a second sandbox: not implemented). */
+const READ_ONLY_FIXES =
+	`Fix: put ${READ_ONLY_GUARANTEE} at flow level so every step of the run has it, or use profile: inspect at flow level (it includes it), or give no step the requirement. ` +
+	'A read-only step inside a read/write run would need a second sandbox, which is not supported.';
+
 /**
  * The exec variant of the sandbox worker. It registers with the daemon as one worker (labels incl. `sandbox`) and, for
  * each `assign`, runs the step with a normal flow engine ON THE HOST whose `ProcessLauncher` is the sandbox launcher: the
@@ -489,8 +494,8 @@ export class ExecWrapper {
 		throw new SandboxError(
 			'invalid-argument',
 			wantsReadOnly
-				? `step "${stepId}" requires ${READ_ONLY_GUARANTEE} but the sandbox of this run was created with a read/write workspace (the mounts are fixed when the sandbox is created). Put ${READ_ONLY_GUARANTEE} at flow level (or use profile: inspect) so every step of the run has it.`
-				: `step "${stepId}" does not require ${READ_ONLY_GUARANTEE} but the sandbox of this run was created with a read-only workspace (the mounts are fixed when the sandbox is created). Give every step the same requirements at flow level.`
+				? `step "${stepId}" requires ${READ_ONLY_GUARANTEE} but the sandbox of this run was created with a read/write workspace (the mounts are fixed when the sandbox is created). ${READ_ONLY_FIXES}`
+				: `step "${stepId}" does not require ${READ_ONLY_GUARANTEE} but the sandbox of this run was created with a read-only workspace (the mounts are fixed when the sandbox is created). ${READ_ONLY_FIXES}`
 		);
 	}
 
