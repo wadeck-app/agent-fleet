@@ -455,21 +455,25 @@ class FlowWorld {
 	}
 
 	private async waitForClaimRelease(watch: ReturnType<FlowWorld['watchClaim']>): Promise<void> {
+		let goneAt: number;
 		try {
-			await waitFor(
+			// The run is over when this is called and its claim was created before `flow run` answered, so a claim absent NOW is a released one,
+			// even if no 20 ms tick ever saw it present (a run that needs no sandbox is released within a few ms of its end; a starved CI runner
+			// can skip the whole window, and the watcher alone would then wait for a state change that already happened).
+			goneAt = await waitFor(
 				`the daemon to release the pool slot (${this.claimFolder} to disappear after the wrapper's ack)`,
 				30_000,
-				() => watch.goneAt()
+				() => watch.goneAt() ?? (fs.existsSync(this.claimFolder) ? undefined : Date.now())
 			);
 		} catch (error) {
 			const calls = this.sbxCalls().map(call => call.argv.slice(0, 2).join(' '));
 			throw new Error(
-				`${String(error)}. The wrapper removes the sandbox, then acknowledges the end of the run; if the claim never goes, the ack did not arrive.\nsbx calls:\n${calls.join('\n')}\ndaemon log (tail):\n${this.log().slice(-3000)}`
+				`${String(error)}. The wrapper removes the sandbox, then acknowledges the end of the run; if the claim never goes, the ack did not arrive. Claim ever seen by the watcher: ${watch.seenAt() === undefined ? 'no' : 'yes'}; present now: ${String(fs.existsSync(this.claimFolder))}.\nsbx calls:\n${calls.join('\n')}\ndaemon log (tail):\n${this.log().slice(-3000)}`
 			);
 		} finally {
 			watch.stop();
 		}
-		this.releases.push({ seenAt: watch.seenAt(), goneAt: watch.goneAt() as number });
+		this.releases.push({ seenAt: watch.seenAt(), goneAt });
 	}
 
 	sbxCalls(): MockSbxCall[] {
