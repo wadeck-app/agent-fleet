@@ -180,6 +180,25 @@ describe('sandbox plugin: options are flat strings and parsed strictly', () => {
 					fragment: 'Unknown option "cpu"',
 					example: 'cpus',
 				},
+				// `projects` also scopes the source in the core (the only name it reads), so its misspellings matter most.
+				{
+					label: 'project instead of projects: the nearest option is named',
+					options: { ...GOOD, project: 'ab12cd34' },
+					fragment: 'Did you mean "projects"',
+					example: 'projects=ab12cd34',
+				},
+				{
+					label: 'a typo that is two letters away from an option',
+					options: { ...GOOD, regon: 'us-east-1' },
+					fragment: 'Did you mean "region"',
+					example: 'region=us-east-1',
+				},
+				{
+					label: 'a name that resembles nothing: no suggestion, the supported ones are listed',
+					options: { ...GOOD, zzzzzzzz: '1' },
+					fragment: 'Supported options:',
+					example: 'cpus',
+				},
 				{
 					label: 'an empty value',
 					options: { ...GOOD, image: '' },

@@ -79,14 +79,43 @@ function isTaggedImage(image) {
 	return separator > 0 && separator < lastSegment.length - 1;
 }
 
+/** The supported option whose name is at most two edits away from `name` (case-insensitive), if exactly one is the closest. */
+function nearestOption(name) {
+	const lower = name.toLowerCase();
+	let best;
+	let bestDistance = 3;
+	for (const known of Object.keys(EXAMPLES)) {
+		const distance = editDistance(lower, known.toLowerCase());
+		if (distance < bestDistance) {
+			best = known;
+			bestDistance = distance;
+		}
+	}
+	return best;
+}
+
+function editDistance(left, right) {
+	let previous = Array.from({ length: right.length + 1 }, (_unused, index) => index);
+	for (let row = 1; row <= left.length; row += 1) {
+		const current = [row];
+		for (let column = 1; column <= right.length; column += 1) {
+			const substitution = previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1);
+			current[column] = Math.min(previous[column] + 1, current[column - 1] + 1, substitution);
+		}
+		previous = current;
+	}
+	return previous[right.length];
+}
+
 function parseOptions(raw) {
 	if (raw === undefined || raw === null) raw = {};
 	if (typeof raw !== 'object' || Array.isArray(raw))
 		throw fail('worker type sandbox: the source options must be key=value pairs');
 	for (const name of Object.keys(raw)) {
 		if (!Object.hasOwn(EXAMPLES, name)) {
+			const near = nearestOption(name);
 			throw fail(
-				`worker type sandbox: Unknown option "${name}". Supported options: ${Object.keys(EXAMPLES).join(', ')}. Nothing was applied, so fix the name rather than assuming a default took effect. Example: --option ${EXAMPLES.cpus}`
+				`worker type sandbox: Unknown option "${name}".${near === undefined ? '' : ` Did you mean "${near}"?`} Supported options: ${Object.keys(EXAMPLES).join(', ')}. Nothing was applied, so fix the name rather than assuming a default took effect. Example: --option ${EXAMPLES[near ?? 'cpus']}`
 			);
 		}
 		const value = raw[name];
