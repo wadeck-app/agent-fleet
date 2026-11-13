@@ -93,6 +93,69 @@ describe('ExecutionWorkspaces.releaseWithRetry', () => {
 		);
 	});
 
+	it('logs at info level that the workspace was released, after releaseWithRetry', async () => {
+		const release = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+		const workspaces = await allocated(release);
+
+		await workspaces.releaseWithRetry('abcd1234');
+
+		expect(writeExecution).toHaveBeenCalledWith(
+			'abcd1234',
+			expect.stringMatching(/^workspace released: execution abcd1234 (.*task-1.*)$/),
+			'info'
+		);
+	});
+
+	it('logs the release after a retry that worked, and not when both attempts failed', async () => {
+		vi.useFakeTimers();
+		const failing = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('EBUSY'));
+		const workspaces = await allocated(failing);
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+		try {
+			const done = workspaces.releaseWithRetry('abcd1234');
+			await vi.advanceTimersByTimeAsync(2_500);
+			await done;
+		} finally {
+			stderr.mockRestore();
+		}
+
+		expect(writeExecution).not.toHaveBeenCalledWith('abcd1234', expect.stringContaining('workspace released'), 'info');
+	});
+
+	it('logs at info level that the workspace was released, after release()', async () => {
+		const release = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+		const workspaces = await allocated(release);
+
+		workspaces.release('abcd1234');
+
+		await vi.waitFor(() =>
+			expect(writeExecution).toHaveBeenCalledWith(
+				'abcd1234',
+				expect.stringContaining('workspace released: execution abcd1234'),
+				'info'
+			)
+		);
+	});
+
+	it('warns in the execution log, naming the cause, when release() fails', async () => {
+		const release = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('EBUSY'));
+		const workspaces = await allocated(release);
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+		try {
+			workspaces.release('abcd1234');
+			await vi.waitFor(() =>
+				expect(writeExecution).toHaveBeenCalledWith(
+					'abcd1234',
+					expect.stringMatching(/Releasing.*task-1.*EBUSY/s),
+					'warning'
+				)
+			);
+		} finally {
+			stderr.mockRestore();
+		}
+	});
+
 	it('does nothing for an execution that holds no workspace', async () => {
 		const workspaces = new ExecutionWorkspaces(
 			{ writeExecution } as unknown as LogWriter,

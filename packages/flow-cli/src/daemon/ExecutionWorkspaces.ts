@@ -243,11 +243,19 @@ export class ExecutionWorkspaces {
 		const pluginWs = this.pluginHandles.get(executionId);
 		if (pluginWs) {
 			this.pluginHandles.delete(executionId);
-			void releaseWorkspace(pluginWs.provider, pluginWs.handle, priorError).catch((err: unknown) => {
-				process.stderr.write(
-					`[CommandHandler] Failed to release plugin workspace "${pluginWs.handle.path}" for ${executionId}: ${String(err)}. Remove it by hand if nothing uses it.\n`
-				);
-			});
+			void releaseWorkspace(pluginWs.provider, pluginWs.handle, priorError).then(
+				() => this.logReleased(executionId, pluginWs.handle),
+				(err: unknown) => {
+					this.logWriter.writeExecution(
+						executionId,
+						`Releasing the workspace "${pluginWs.handle.path}" (${pluginWs.handle.id}) failed: ${getErrorMessage(err)}. It is not retried.`,
+						'warning'
+					);
+					process.stderr.write(
+						`[CommandHandler] Failed to release plugin workspace "${pluginWs.handle.path}" for ${executionId}: ${String(err)}. Remove it by hand if nothing uses it.\n`
+					);
+				}
+			);
 		}
 	}
 
@@ -267,13 +275,25 @@ export class ExecutionWorkspaces {
 		const pluginWs = this.pluginHandles.get(executionId);
 		this.pluginHandles.delete(executionId);
 		if (pluginWs) {
-			await this.releaseTwice(
+			const released = await this.releaseTwice(
 				executionId,
 				pluginWs.handle.path,
 				() => pluginWs.provider.release(pluginWs.handle),
 				retryDelayMs
 			);
+			if (released) {
+				this.logReleased(executionId, pluginWs.handle);
+			}
 		}
+	}
+
+	/** The trace that says a run's workspace (for a pool: its slot claim) is gone, to tell a stuck release from a late one. */
+	private logReleased(executionId: string, handle: WorkspaceHandle): void {
+		this.logWriter.writeExecution(
+			executionId,
+			`workspace released: execution ${executionId} (${handle.id}, ${handle.path})`,
+			'info'
+		);
 	}
 
 	private async releaseTwice(
@@ -281,10 +301,10 @@ export class ExecutionWorkspaces {
 		where: string,
 		attempt: () => Promise<void>,
 		retryDelayMs: number
-	): Promise<void> {
+	): Promise<boolean> {
 		try {
 			await attempt();
-			return;
+			return true;
 		} catch (firstErr) {
 			this.logWriter.writeExecution(
 				executionId,
@@ -295,10 +315,12 @@ export class ExecutionWorkspaces {
 		await new Promise<void>(resolve => setTimeout(resolve, retryDelayMs));
 		try {
 			await attempt();
+			return true;
 		} catch (err) {
 			const message = `Failed to release the workspace "${where}" after a retry: ${getErrorMessage(err)}. Nothing else will remove it: delete it by hand once nothing uses it.`;
 			this.logWriter.writeExecution(executionId, message, 'error');
 			process.stderr.write(`[CommandHandler] execution ${executionId}: ${message}\n`);
+			return false;
 		}
 	}
 }

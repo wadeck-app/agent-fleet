@@ -257,6 +257,63 @@ describe('RunEndCoordinator -- run end, acknowledgement, then the follow-up', ()
 	});
 });
 
+describe('RunEndCoordinator -- traces for a stuck release', () => {
+	it('logs at info level which worker acknowledged run_end', async () => {
+		const { coordinator, connect, serve, supervisor, sentTo, registry, writeExecution } = setup();
+		const worker = connect();
+		const workerId = registry.describe(worker)!.workerId;
+		supervisor.settleAssignment(serve(worker, 'e1'));
+		const finished = coordinator.begin('e1', 'completed')!.finish(vi.fn().mockResolvedValue(undefined));
+		await vi.waitFor(() => expect(sentTo(worker)).toHaveLength(1));
+
+		coordinator.handleAck(worker, 'e1');
+		await finished;
+
+		expect(writeExecution).toHaveBeenCalledWith(
+			'e1',
+			`run_end_ack received: execution e1 from ${workerId}`,
+			'info'
+		);
+	});
+
+	it('warns that the settle wait expired, naming the bound and the workers', async () => {
+		vi.useFakeTimers();
+		const { coordinator, connect, serve, registry, writeExecution } = setup();
+		const worker = connect();
+		const workerId = registry.describe(worker)!.workerId;
+		serve(worker, 'e1', 'sibling');
+		const finished = coordinator.begin('e1', 'failed')!.finish(vi.fn().mockResolvedValue(undefined));
+
+		await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+
+		expect(writeExecution).toHaveBeenCalledWith(
+			'e1',
+			`run_end settle wait expired after ${String(ACK_TIMEOUT_MS)} ms: execution e1, workers [${workerId}]`,
+			'warning'
+		);
+		coordinator.handleAck(worker, 'e1');
+		await finished;
+	});
+
+	it('warns that the ack wait expired, naming the bound and the workers that did not answer', async () => {
+		vi.useFakeTimers();
+		const { coordinator, connect, serve, supervisor, registry, writeExecution } = setup();
+		const worker = connect();
+		const workerId = registry.describe(worker)!.workerId;
+		supervisor.settleAssignment(serve(worker, 'e1'));
+		const finished = coordinator.begin('e1', 'completed')!.finish(vi.fn().mockResolvedValue(undefined));
+
+		await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+		await finished;
+
+		expect(writeExecution).toHaveBeenCalledWith(
+			'e1',
+			`run_end ack wait expired after ${String(ACK_TIMEOUT_MS)} ms: execution e1, workers [${workerId}]`,
+			'warning'
+		);
+	});
+});
+
 describe('RunEndCoordinator -- daemon stop', () => {
 	it('tells the workers of every run in progress, once, with the reason daemon_stopping', async () => {
 		const { coordinator, connect, serve, sentTo } = setup();

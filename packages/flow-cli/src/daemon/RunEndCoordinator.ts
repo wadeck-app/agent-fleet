@@ -138,6 +138,8 @@ export class RunEndCoordinator {
 			);
 			return;
 		}
+		const workerId = this.registry.describe(ws)?.workerId ?? 'unknown worker';
+		this.logWriter.writeExecution(executionId, `run_end_ack received: execution ${executionId} from ${workerId}`, 'info');
 		pending.check();
 	}
 
@@ -233,6 +235,11 @@ export class RunEndCoordinator {
 		if (outcome === 'timeout') {
 			this.logWriter.writeExecution(
 				run.executionId,
+				`run_end settle wait expired after ${String(this.settings.ackTimeoutMs)} ms: execution ${run.executionId}, workers [${run.recipients.map(recipient => recipient.workerId).join(', ')}]`,
+				'warning'
+			);
+			this.logWriter.writeExecution(
+				run.executionId,
 				`Worker(s) ${run.recipients.map(describeRecipient).join(', ')} still hold steps of this run after ${seconds(this.settings.ackTimeoutMs)}s; telling them the run ended anyway. In-flight steps may still report after run_end; their results are dropped.`,
 				'warning'
 			);
@@ -301,6 +308,12 @@ export class RunEndCoordinator {
 		try {
 			const outcome = await raceWithTimeout(allAnswered, this.settings.ackTimeoutMs);
 			if (outcome === 'timeout') {
+				const silent = told.filter(r => awaiting.has(r.ws));
+				this.logWriter.writeExecution(
+					executionId,
+					`run_end ack wait expired after ${String(this.settings.ackTimeoutMs)} ms: execution ${executionId}, workers [${silent.map(r => r.workerId).join(', ')}]`,
+					'warning'
+				);
 				for (const recipient of told.filter(r => awaiting.has(r.ws))) {
 					this.reportError(
 						executionId,
