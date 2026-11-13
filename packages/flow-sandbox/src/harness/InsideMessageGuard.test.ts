@@ -319,6 +319,16 @@ describe('InsideMessageGuard: returned paths stay inside the two mounts', () => 
 		expect(meta['files_written']).toEqual([path.join(root, 'ws', 'out.txt')]);
 	});
 
+	// The engine reports `session_file: ''` for a step that has no session file (a codex or opencode step: their sessions are ids, not files).
+	it('passes an empty session_file through (no file, so nothing to translate or check)', () => {
+		const meta = forwarded(
+			guard().handle(scoped('step_completed', { meta: { session_file: '', session_id: 'abc' } }))
+		)['meta'] as JsonObject;
+
+		expect(meta['session_file']).toBe('');
+		expect(meta['session_id']).toBe('abc');
+	});
+
 	it('removes files_written entries outside the mounts and logs them', () => {
 		const instance = guard();
 		const inside = mounts.toSandboxPath(path.join(root, 'ws', 'a.txt'), 'x');

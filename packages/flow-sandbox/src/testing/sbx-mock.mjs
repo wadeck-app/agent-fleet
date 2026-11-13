@@ -18,9 +18,12 @@
  *   SBX_MOCK_SCENARIO    Comma separated: not-signed-in, policy-uninitialized, daemon-down, ssh-off,
  *                        network-deny-all, network-allow-all, version:<x.y.z>, diagnose-garbage, diagnose-without-auth,
  *                        daemon-unhealthy, policy-garbage, settings-garbage, ssh-setting-missing, ssh-setting-string,
+ *   SBX_MOCK_CODEX_CLI / SBX_MOCK_OPENCODE_CLI   Path of a mock model CLI script (flow-engine's codex-mock.mjs, opencode-mock.mjs). `exec codex ...` /
+ *                        `exec opencode ...` then runs that script with the same arguments, environment and standard input (SYNTHETIC: no VM).
  *                        bash-canned (SYNTHETIC: `bash` in exec prints SBX_MOCK_BASH_STDOUT instead of running a script, and
  *                        answers the executable lookup; the mock has no VM and no bash), no-bash (SYNTHETIC: every bash exits 127).
  */
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -317,6 +320,24 @@ function runPseudoCommand(sandbox, command, cwd, env) {
 		case 'pwd':
 			process.stdout.write(`${cwd ?? '/home/agent'}\n`);
 			return 0;
+		case 'codex':
+		case 'opencode': {
+			const script = process.env[name === 'codex' ? 'SBX_MOCK_CODEX_CLI' : 'SBX_MOCK_OPENCODE_CLI'];
+			if (script === undefined || script === '') {
+				process.stderr.write(`bash: ${name}: command not found\n`);
+				return 127;
+			}
+			const result = spawnSync(process.execPath, [script, ...rest], {
+				stdio: 'inherit',
+				// A VM does not see the environment of the host process: only the exec environment (the step env), plus what node itself needs to start.
+				env: {
+					...(process.env.SystemRoot === undefined ? {} : { SystemRoot: process.env.SystemRoot }),
+					...(process.env.PATH === undefined ? {} : { PATH: process.env.PATH }),
+					...env,
+				},
+			});
+			return result.status ?? 1;
+		}
 		case 'whoami':
 			process.stdout.write('agent\n');
 			return 0;

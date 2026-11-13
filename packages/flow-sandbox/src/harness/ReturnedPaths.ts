@@ -31,7 +31,9 @@ export class ReturnedPaths {
 					`The sandbox reported a session_file that is not a path (${JSON.stringify(sessionFile)}).`
 				);
 			}
-			translated['session_file'] = this.mounts.toHostPath(sessionFile, 'meta.session_file');
+			// '' is the engine's "no session file" (codex and opencode keep a session id, not a file): nothing to translate.
+			if (sessionFile !== '')
+				translated['session_file'] = this.mounts.toHostPath(sessionFile, 'meta.session_file');
 		}
 
 		const filesWritten = meta['files_written'];

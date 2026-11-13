@@ -53,6 +53,67 @@ function assign(overrides: { step?: JsonObject; context?: JsonObject } = {}): Js
 
 const refusal = failure;
 
+describe('ExecAssignment model tools (claude, codex, opencode)', () => {
+	const model = (step: JsonObject = {}): JsonObject => assign({ step: { type: 'model', prompt: 'hi', ...step } });
+
+	it('reads the tool from the step provider: claude by default, codex and opencode when named, none for a script', () => {
+		expect(assignment.prepare(model()).tool).toBe('claude');
+		expect(assignment.prepare(model({ provider: 'codex' })).tool).toBe('codex');
+		expect(assignment.prepare(model({ provider: 'opencode' })).tool).toBe('opencode');
+		expect(assignment.prepare(assign()).tool).toBeUndefined();
+	});
+
+	it('asks the wrapper environment of the step type AND of its tool', () => {
+		const seen: unknown[] = [];
+		const asking = new ExecAssignment({
+			mounts: new RunMounts({ workspaceDir: workspace, workspaceMetaDir: meta, platform: process.platform, log }),
+			injectedEnv: (type, tool) => {
+				seen.push([type, tool]);
+				return {};
+			},
+			log,
+		});
+
+		asking.prepare(model({ provider: 'codex' }));
+		asking.prepare(assign());
+
+		expect(seen).toEqual([
+			['model', 'codex'],
+			['script', undefined],
+		]);
+	});
+
+	it('refuses a provider that is not a known model tool, listing the known ones', () => {
+		const error = refusal(() => assignment.prepare(model({ provider: 'gemini' })));
+
+		expect(error.kind).toBe('invalid-argument');
+		expect(error.message).toMatch(/gemini[\s\S]*claude, codex, opencode/);
+	});
+
+	// A codex or opencode step in the sandbox is a plain prompt: the engine's MCP servers and tool hooks name host programs and host files.
+	it.each([
+		['mcpServers', [{ name: 'x', command: 'npx', args: ['server'] }], /mcpServers/],
+		['toolHooks', [{ event: 'before', command: 'echo' }], /toolHooks/],
+	])('refuses %s on a codex or opencode step, naming the step, the tool and what to do', (field, value, pattern) => {
+		for (const provider of ['codex', 'opencode']) {
+			const error = refusal(() => assignment.prepare(model({ provider, [field]: value })));
+
+			expect(error.kind).toBe('invalid-argument');
+			expect(error.message).toMatch(pattern);
+			expect(error.message).toContain('"s1"');
+			expect(error.message).toContain(provider);
+			expect(error.message).toMatch(/Remove it|without the "sandbox" label/);
+		}
+	});
+
+	it('accepts the empty lists, and keeps mcpServers and toolHooks on a claude step (the claude path rewrites its MCP config)', () => {
+		expect(assignment.prepare(model({ provider: 'codex', mcpServers: [], toolHooks: [] })).tool).toBe('codex');
+		expect(assignment.prepare(model({ mcpServers: [{ name: 'x' }], toolHooks: [{ event: 'before' }] })).tool).toBe(
+			'claude'
+		);
+	});
+});
+
 describe('ExecAssignment', () => {
 	it('keeps host paths and the step as is for a script step, and declares the env names (wrapper values included) and the secrets of a model step', () => {
 		const prepared = assignment.prepare(assign());

@@ -81,6 +81,23 @@ class FlowWorld {
 			SBX_MOCK_STATE_DIR: this.mockState,
 			SBX_MOCK_SCENARIO: 'bash-canned',
 			SBX_MOCK_BASH_STDOUT: CANNED,
+			// The engine's own mock model CLIs (CLAUDE.md: every model provider is tested with mocks, never real APIs): `exec codex ...` runs this script.
+			SBX_MOCK_CODEX_CLI: path.join(
+				repositoryRoot,
+				'packages',
+				'flow-engine',
+				'src',
+				'testing',
+				'codex-mock.mjs'
+			),
+			SBX_MOCK_OPENCODE_CLI: path.join(
+				repositoryRoot,
+				'packages',
+				'flow-engine',
+				'src',
+				'testing',
+				'opencode-mock.mjs'
+			),
 			// A variable of the wrapper's environment that no step declares: a host script (host: true) must never see it.
 			FLOW_SANDBOX_E2E_CANARY: CANARY,
 			// A daemon with nothing to do stops after its idle check: keep it for the whole test.
@@ -218,6 +235,36 @@ class FlowWorld {
 				'      type: script',
 				'      shell: bash',
 				'      script: echo hello',
+				'',
+			].join('\n')
+		);
+		return file;
+	}
+
+	/** One model step per entry (ids ask1, ask2, ...), each with its own provider, model and prompt; no `requires`, no `profile`: the daemon decides. */
+	writeToolFlow(name: string, steps: { provider?: string; model: string; prompt: string }[]): string {
+		const file = path.join(this.projectDirectory, `${name}.yml`);
+		fs.writeFileSync(
+			file,
+			[
+				`id: ${name}`,
+				"version: '1.0.0'",
+				`name: ${name}`,
+				'description: Model steps of several tools.',
+				`workspace: { provider: pool, dir: '${this.poolDirectory.replaceAll(path.sep, '/')}', prefix: slot-, count: 1 }`,
+				'steps:',
+				...steps.flatMap((step, index) => [
+					`    - id: ask${index + 1}`,
+					`      name: Ask ${index + 1}`,
+					'      type: model',
+					...(step.provider === undefined ? [] : [`      provider: ${step.provider}`]),
+					`      model: ${step.model}`,
+					`      prompt: ${step.prompt}`,
+					'      output:',
+					'          answer:',
+					'              type: string',
+					'              from: last_message',
+				]),
 				'',
 			].join('\n')
 		);
@@ -743,6 +790,33 @@ describe('sandbox plugin, real daemon, sbx mock: implicit agent confinement of m
 		expect(record.requirements?.steps?.['ask1']).toEqual(expect.arrayContaining(['env=clean', 'fs=confined']));
 		expect(record.requirements?.implicit).toEqual({ requires: ['env=clean', 'fs=confined'], steps: ['ask1'] });
 		expect(sandboxesCreated(world.sbxCalls()).length).toBeGreaterThan(0);
+	}, 150_000);
+
+	// codex and opencode steps are plain prompts in the sandbox. The mock model CLIs of the engine run INSIDE the sbx mock, so the whole chain is
+	// exercised: provider -> tool-aware preparation -> translator -> sandbox exec. The mocks echo what they were given.
+	it('runs a codex step and an opencode step as plain prompts: their own store and credentials in the environment, no host path, no injected MCP server', async () => {
+		const file = world.writeToolFlow('tools-plain', [
+			{ provider: 'codex', model: 'openai.gpt-5.6-terra', prompt: 'echo_env:CODEX_HOME' },
+			{ provider: 'codex', model: 'openai.gpt-5.6-terra', prompt: 'echo_env:AWS_CONFIG_FILE' },
+			{ provider: 'opencode', model: 'amazon-bedrock/example', prompt: 'echo_xdg' },
+			{ provider: 'opencode', model: 'amazon-bedrock/example', prompt: 'echo_config' },
+		]);
+
+		const record = await world.runAndRelease(file);
+
+		const answer = (id: string): string => JSON.stringify(record.steps?.[id] ?? {});
+		expect(record.steps?.['ask1']?.sourceId).toBe('sandbox-agent');
+		expect(record.status, JSON.stringify(record.steps)).toBe('completed');
+		expect(answer('ask1')).toMatch(/CODEX_HOME=[^"\\]*sessions\/codex/);
+		expect(answer('ask2')).toContain('AWS_CONFIG_FILE=/home/agent/.flow-credentials/aws-config');
+		// opencode: the isolated XDG_CONFIG_HOME of the engine (a host temp directory) is not forwarded, and there is no inline config (no MCP server, no hook).
+		expect(answer('ask3')).toContain('XDG_CONFIG_HOME:not-set');
+		expect(answer('ask4')).toContain('OPENCODE_CONFIG:no-config');
+		const rules = world
+			.sbxCalls()
+			.filter(call => call.argv[0] === 'policy' && call.argv[1] === 'allow')
+			.map(call => call.argv.join(' '));
+		expect(rules.some(rule => rule.includes('bedrock-mantle'))).toBe(true);
 	}, 150_000);
 
 	it('refuses at run start a model step whose workspace the source does not accept (in-place): actionable message, no unconfined fallback', () => {

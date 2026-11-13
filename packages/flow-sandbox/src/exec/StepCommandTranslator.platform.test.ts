@@ -179,6 +179,56 @@ describe.each(FLAVORS)('StepCommandTranslator on a $name', flavor => {
 	});
 });
 
+describe.each(FLAVORS)('StepCommandTranslator codex and opencode on a $name', flavor => {
+	const translator = translatorFor(flavor);
+
+	// On a Windows host the engine cannot find codex or opencode through the sandbox launcher (its resolvers branch on the HOST platform) and falls
+	// back to "the bare name with shell: true". In the VM that is simply the program with its arguments.
+	it.each(['codex', 'opencode'])(
+		'runs the bare name %s with arguments and shell: true as that program in the VM, no shell',
+		async program => {
+			const translated = await translator.translate(
+				request({ command: program, args: ['exec', '--json', '--', 'a prompt; with $chars'], shell: true })
+			);
+
+			expect(translated.command).toEqual([program, 'exec', '--json', '--', 'a prompt; with $chars']);
+			expect(translated.program).toBe(program);
+		}
+	);
+
+	it.each([
+		['another bare name', 'git'],
+		['a name with a space', 'codex --dangerously-bypass-approvals-and-sandbox'],
+		['a path', '/usr/bin/codex'],
+	])('still refuses shell: true with arguments for %s', async (_name, command) => {
+		const error = await refusal(translator.translate(request({ command, args: ['x'], shell: true })));
+
+		expect(error.message).toMatch(/both arguments and a shell/);
+	});
+
+	it('does not forward the isolated XDG_CONFIG_HOME the engine makes for opencode in the host temp directory (the VM has no such directory)', async () => {
+		const isolated = flavor.pathModule.join(flavor.temp, 'opencode-run-123e4567-e89b-12d3-a456-426614174000');
+
+		const translated = await translator.translate(
+			request({
+				command: '/usr/bin/opencode',
+				args: ['run'],
+				env: { XDG_CONFIG_HOME: isolated, XDG_DATA_HOME: '/mnt/store' },
+			})
+		);
+
+		expect(translated.env).toEqual({ XDG_DATA_HOME: '/mnt/store' });
+	});
+
+	it('keeps an XDG_CONFIG_HOME that is not the engine isolated directory', async () => {
+		const translated = await translator.translate(
+			request({ command: '/usr/bin/opencode', args: ['run'], env: { XDG_CONFIG_HOME: '/home/agent/.config' } })
+		);
+
+		expect(translated.env).toEqual({ XDG_CONFIG_HOME: '/home/agent/.config' });
+	});
+});
+
 describe('StepCommandTranslator rule for an absolute path on a POSIX host', () => {
 	// On a POSIX host a host path and a VM path look alike: only the mounts and the known host directories identify a host file.
 	// A path elsewhere is assumed to be a VM path. This is the documented limit, pinned so that it changes on purpose.

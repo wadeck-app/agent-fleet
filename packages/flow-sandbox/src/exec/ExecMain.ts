@@ -160,7 +160,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 				modelEnvironment: config.modelEnvironment,
 				extraAllowedHosts: config.extraAllowedHosts,
 			}),
-			createExecutor: async ({ sandbox, mounts, stopSandbox, ensureRunning, declaredEnvironmentNames }) => {
+			createExecutor: async ({ sandbox, tool, mounts, stopSandbox, ensureRunning, declaredEnvironmentNames }) => {
 				await lookup.prime(sandbox);
 				const launcher = new SbxProcessLauncher({
 					runtime,
@@ -193,7 +193,8 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 					const stepRunnerConfig = {
 						interactive: false,
 						processLauncher: launcher,
-						...(mcpServers.length > 0 ? { mcpServers } : {}),
+						// The engine always offers its own MCP server (provideSteps). Only the claude path can rewrite it for the VM; a codex or opencode step is a plain prompt.
+						...(tool === 'claude' && mcpServers.length > 0 ? { mcpServers } : {}),
 					} as StepRunnerConfig;
 					return new StepRunner(stepRunnerConfig);
 				});

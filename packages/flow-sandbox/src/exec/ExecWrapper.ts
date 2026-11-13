@@ -2,6 +2,7 @@ import { WORKER_FEATURE_RUN_EVENTS } from 'flow-cli/src/ipc/Protocol';
 import { declaredOutputNames } from 'flow-cli/src/worker/StepResultFrame';
 
 import { describeError } from '../ErrorText';
+import type { ModelTool } from '../ModelTool';
 import type { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import type { SandboxLifecycle } from '../SandboxLifecycle';
@@ -37,6 +38,8 @@ export interface StepExecutor {
 
 export interface StepExecutorContext {
 	sandbox: string;
+	/** The model CLI of the step (claude when its provider is absent); undefined for a script. */
+	tool: ModelTool | undefined;
 	mounts: RunMounts;
 	/** Environment names the step declares; any other variable that merely copies the host environment must not reach the VM. */
 	declaredEnvironmentNames: ReadonlySet<string>;
@@ -245,6 +248,10 @@ export class ExecWrapper {
 			// Before anything is created: a step routed here without asking for a guarantee of this worker is not run.
 			const refusal = this.dependencies.requireGuarantees ? RequiresGuard.refusal(raw['requires']) : undefined;
 			if (refusal !== undefined) throw new SandboxError('invalid-argument', refusal);
+			const tool = ExecAssignment.checkedToolOf(
+				isJsonObject(raw['stepConfig']) ? raw['stepConfig'] : {},
+				ids.stepId
+			);
 			const onHost = this.placement(raw, ids.stepId) === 'host';
 			const wantsReadOnly = RequiresGuard.wantsReadOnly(raw['requires']);
 			if (onHost && wantsReadOnly) {
@@ -265,14 +272,16 @@ export class ExecWrapper {
 			}
 			await lifecycle.runStep({ executionId: ids.executionId, mounts }, async ({ sandbox }) => {
 				timings.sandboxReady = now();
-				const preparedSandbox = await this.ensurePrepared(sandbox, mounts);
+				const preparedSandbox = await this.ensurePrepared(sandbox, mounts, tool);
+				if (tool !== undefined) await preparedSandbox.ensureTool(tool);
 				const assignment = new ExecAssignment({
 					mounts,
 					log,
-					injectedEnv: stepType => preparedSandbox.envFor(stepType),
+					injectedEnv: (stepType, stepTool) => preparedSandbox.envFor(stepType, stepTool),
 				}).prepare(raw);
 				const executor = await this.dependencies.createExecutor({
 					sandbox,
+					tool,
 					mounts,
 					declaredEnvironmentNames: assignment.declaredEnvironmentNames,
 					stopSandbox: () => lifecycle.stopForKill(ids.executionId),
@@ -499,9 +508,13 @@ export class ExecWrapper {
 		);
 	}
 
-	private async ensurePrepared(sandbox: string, mounts: RunMounts): Promise<ExecPreparedSandbox> {
+	private async ensurePrepared(
+		sandbox: string,
+		mounts: RunMounts,
+		tool: ModelTool | undefined
+	): Promise<ExecPreparedSandbox> {
 		if (this.prepared?.sandbox === sandbox) return this.prepared.value;
-		const value = await this.dependencies.preparer.prepare(sandbox, mounts);
+		const value = await this.dependencies.preparer.prepare(sandbox, mounts, tool);
 		this.prepared = { sandbox, value };
 		return value;
 	}

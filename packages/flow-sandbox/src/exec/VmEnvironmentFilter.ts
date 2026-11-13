@@ -1,4 +1,5 @@
 import type { SandboxLog } from '../SandboxLog';
+import { basenameBySyntax } from './HostPaths';
 
 /**
  * Variables that describe the HOST machine: the engine copies them from its own environment into every step
@@ -42,6 +43,12 @@ export interface FilteredEnvironment {
 	windowsPathNames: string[];
 }
 
+/**
+ * `XDG_CONFIG_HOME` that the engine points at a throw-away directory it makes in the HOST temp directory for each opencode process
+ * (`opencode-run-<uuid>`, holding a copy of the user's global opencode config): it does not exist in the VM and is not forwarded.
+ */
+const ENGINE_ISOLATED_CONFIG_DIRECTORY = /^opencode-run-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const WINDOWS_PATH = /(?<![A-Za-z0-9])[A-Za-z]:[\\/]/;
 
 /**
@@ -81,6 +88,10 @@ export class VmEnvironmentFilter {
 			if (value === undefined) continue;
 			const key = name.toUpperCase();
 			if (HOST_ONLY_NAMES.has(key)) {
+				result.droppedHostOnly.push(name);
+				continue;
+			}
+			if (key === 'XDG_CONFIG_HOME' && ENGINE_ISOLATED_CONFIG_DIRECTORY.test(basenameBySyntax(value))) {
 				result.droppedHostOnly.push(name);
 				continue;
 			}

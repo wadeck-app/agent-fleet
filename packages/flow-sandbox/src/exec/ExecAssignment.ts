@@ -1,4 +1,6 @@
+import { type ModelTool, requireModelTool } from '../ModelTool';
 import type { RunMounts } from '../RunMounts';
+import { SandboxError } from '../SandboxError';
 import type { SandboxLog } from '../SandboxLog';
 import { AssignmentFields } from '../harness/AssignmentFields';
 import { type JsonObject, isJsonObject } from '../harness/HarnessMessages';
@@ -10,6 +12,8 @@ export interface PreparedAssignment {
 	stepId: string;
 	executionId: string;
 	stepType: ExecStepType;
+	/** The model CLI of a model step (`provider`, claude by default); undefined for a script. */
+	tool: ModelTool | undefined;
 	/** The step as the engine will run it, with the wrapper's environment merged in. Paths stay HOST paths. */
 	stepConfig: JsonObject;
 	executionContext: JsonObject;
@@ -34,12 +38,26 @@ export class ExecAssignment {
 	constructor(
 		private readonly options: {
 			mounts: RunMounts;
-			injectedEnv: (stepType: ExecStepType) => Readonly<Record<string, string>>;
+			injectedEnv: (stepType: ExecStepType, tool: ModelTool | undefined) => Readonly<Record<string, string>>;
 			log: SandboxLog;
 			/** The host's platform (default: this one): which paths count as absolute. Tests pass `win32` and `linux` on any host. */
 			platform?: NodeJS.Platform;
 		}
 	) {}
+
+	/** The model CLI a step runs: its `provider` (claude when absent) for a model step, undefined for any other step. */
+	static toolOf(stepConfig: JsonObject): ModelTool | undefined {
+		if (stepConfig['type'] !== 'model') return undefined;
+		const provider = stepConfig['provider'];
+		return requireModelTool(provider === undefined ? 'claude' : String(provider));
+	}
+
+	/** {@link toolOf} plus the refusal of what a codex or opencode step cannot do in a sandbox. Throws before anything exists, so the wrapper calls it first. */
+	static checkedToolOf(stepConfig: JsonObject, stepId: string): ModelTool | undefined {
+		const tool = ExecAssignment.toolOf(stepConfig);
+		ExecAssignment.refuseWhatTheToolCannotDo(stepConfig, stepId, tool);
+		return tool;
+	}
 
 	prepare(raw: JsonObject): PreparedAssignment {
 		const { assignmentId, stepId, stepConfig, executionContext } = AssignmentFields.parse(raw, {
@@ -47,6 +65,7 @@ export class ExecAssignment {
 			cannotPlace: 'the step cannot be placed in the sandbox.',
 		});
 		const stepType = AssignmentFields.requireStepType(stepConfig, stepId);
+		const tool = ExecAssignment.checkedToolOf(stepConfig, stepId);
 		const { mounts, log } = this.options;
 		mounts.toSandboxPath(String(executionContext['workspaceDir']), 'workspaceDir');
 		mounts.toSandboxPath(String(executionContext['outputsDir']), 'outputsDir');
@@ -64,7 +83,7 @@ export class ExecAssignment {
 		}
 		const step: JsonObject = {
 			...stepConfig,
-			env: AssignmentFields.mergeEnv(stepConfig, this.options.injectedEnv(stepType), log),
+			env: AssignmentFields.mergeEnv(stepConfig, this.options.injectedEnv(stepType, tool), log),
 		};
 		if (typeof stepConfig['workingDir'] === 'string') this.requireMounted(stepConfig['workingDir'], 'workingDir');
 		AssignmentFields.warnAboutWindowsPaths(mounts, stepConfig, stepId, log);
@@ -73,10 +92,32 @@ export class ExecAssignment {
 			stepId,
 			executionId: String(executionContext['executionId']),
 			stepType,
+			tool,
 			stepConfig: step,
 			executionContext: context,
 			declaredEnvironmentNames: this.declaredNames(step),
 		};
+	}
+
+	/**
+	 * A codex or opencode step in the sandbox is a plain prompt. The MCP servers and the tool hooks of such a step name host programs and host files
+	 * (the engine writes the hooks as scripts in the host temp directory), which the VM does not have: refused, not half-supported.
+	 */
+	private static refuseWhatTheToolCannotDo(
+		stepConfig: JsonObject,
+		stepId: string,
+		tool: ModelTool | undefined
+	): void {
+		if (tool === undefined || tool === 'claude') return;
+		for (const field of ['mcpServers', 'toolHooks']) {
+			const value = stepConfig[field];
+			if (Array.isArray(value) && value.length > 0) {
+				throw new SandboxError(
+					'invalid-argument',
+					`Step "${stepId}" is a ${tool} step with "${field}": in a sandbox a ${tool} step is a plain prompt, because ${field === 'mcpServers' ? 'an MCP server names a host program and host paths' : 'a tool hook is a script the engine writes on the host'} that the VM does not have. Remove it, or run the step on a worker without the "sandbox" label.`
+				);
+			}
+		}
 	}
 
 	private declaredNames(step: JsonObject): ReadonlySet<string> {

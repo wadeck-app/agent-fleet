@@ -138,6 +138,7 @@ beforeEach(async () => {
 			prepare: () => {
 				prepares += 1;
 				return Promise.resolve({
+					ensureTool: () => Promise.resolve(),
 					envFor: (type): Record<string, string> =>
 						type === 'model' ? { MODEL_ONLY: '1', AWS_PROFILE: 'claude' } : {},
 					detach: () => Promise.resolve(),
@@ -558,6 +559,57 @@ describe('ExecWrapper whole-run read-only (the mounts follow the requirements of
 
 		expect(mountRequests).toEqual([false]);
 		expect(createdMounts()[0]).toEqual({ hostPath: workspace });
+	});
+});
+
+describe('ExecWrapper model tools (claude, codex, opencode)', () => {
+	const modelStep = (provider: string | undefined, extra: JsonObject = {}): JsonObject => {
+		const message = assign('ask', { type: 'model' });
+		(message['stepConfig'] as JsonObject)['prompt'] = 'hi';
+		if (provider !== undefined) (message['stepConfig'] as JsonObject)['provider'] = provider;
+		Object.assign(message['stepConfig'] as JsonObject, extra);
+		return message;
+	};
+
+	it('hands the tool of the step (provider, claude by default) to the executor builder, so the engine of a codex step is built without the injected MCP server', async () => {
+		await run(modelStep(undefined));
+		await run(modelStep('codex'));
+		await run(modelStep('opencode'));
+
+		expect(executorContexts.map(context => context.tool)).toEqual(['claude', 'codex', 'opencode']);
+	});
+
+	it('refuses a codex step with an MCP server or hooks BEFORE any sandbox is created, saying what to do', async () => {
+		await run(modelStep('codex', { mcpServers: [{ name: 'x', command: 'npx' }] }));
+
+		expect(runtime.callsTo('create')).toHaveLength(0);
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(
+			/"ask"[\s\S]*codex[\s\S]*mcpServers[\s\S]*Remove it/
+		);
+	});
+
+	it('prepares the sandbox for the tool of the first step and for a later tool when it comes', async () => {
+		const prepared: (string | undefined)[] = [];
+		const ensured: string[] = [];
+		(wrapper as unknown as { dependencies: { preparer: unknown } }).dependencies.preparer = {
+			prepare: (_sandbox: string, _mounts: unknown, tool: string | undefined) => {
+				prepared.push(tool);
+				return Promise.resolve({
+					ensureTool: (next: string) => {
+						ensured.push(next);
+						return Promise.resolve();
+					},
+					envFor: () => ({}),
+					detach: () => Promise.resolve(),
+				});
+			},
+		};
+
+		await run(modelStep('codex'));
+		await run(modelStep('opencode'));
+
+		expect(prepared).toEqual(['codex']);
+		expect(ensured).toEqual(['codex', 'opencode']);
 	});
 });
 
