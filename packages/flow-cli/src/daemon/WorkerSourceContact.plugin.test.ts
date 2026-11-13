@@ -10,6 +10,9 @@ import { contactDeclaredSources } from './WorkerSourceContact.js';
 import type { WorkerSourceEntry } from './WorkerSourceRegistry.js';
 import { WorkerTypeInstances } from './WorkerTypeInstances.js';
 
+// The real timer, taken before any test fakes the global one: waits on real I/O must not depend on the fake clock.
+const realSetTimeout = setTimeout;
+
 let fixture: WorkerTypeFixtureState;
 let reported: string[];
 let workerTypes: WorkerTypeInstances;
@@ -115,10 +118,12 @@ describe('contactDeclaredSources - a source that hangs', () => {
 			vi.useRealTimers();
 		});
 
-		// Resolves once `condition` holds, polling with real macrotasks (setImmediate is not faked), however slow the disk is.
+		// Resolves once `condition` holds, polling on the REAL clock (the global timers are faked here), however slow the
+		// disk is. Bounded by real time, never by a count of polls: a count of setImmediate turns lasts a few ms.
 		const untilTrue = async (condition: () => boolean) => {
-			for (let attempt = 0; attempt < 10_000 && !condition(); attempt++) {
-				await new Promise<void>(resolve => setImmediate(resolve));
+			const deadline = Date.now() + 30_000;
+			while (!condition() && Date.now() < deadline) {
+				await new Promise<void>(resolve => realSetTimeout(resolve, 5));
 			}
 			expect(condition()).toBe(true);
 		};
@@ -139,6 +144,32 @@ describe('contactDeclaredSources - a source that hangs', () => {
 			expect(reported[0]).toContain('source "stuck"');
 			expect(reported[0]).toContain('did not finish loading');
 			expect(fixture.obtained.map(o => o.sourceId)).toEqual(['fine']);
+		});
+
+		// The wait for 'fine' must be bounded by real time, not by a count of polls: 10 000 setImmediate turns last a few
+		// ms, and a first import from disk on a loaded machine takes longer (seen failing in the full daemon run).
+		it('waits for a fine source whose load takes real time, then still reports only the hung one', async () => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+			const realLoader = new PluginLoader();
+			const slowDisk: ConstructorParameters<typeof WorkerTypeInstances>[0] = {
+				readDeclaredGuarantees: (...args) => realLoader.readDeclaredGuarantees(...args),
+				readDeclaredWorkspaces: (...args) => realLoader.readDeclaredWorkspaces(...args),
+				loadProvider: async (...args) => {
+					await new Promise<void>(resolve => realSetTimeout(resolve, 300));
+					return realLoader.loadProvider(...args);
+				},
+			};
+			const impatient = new WorkerTypeInstances(slowDisk, () => {}, { buildTimeoutMs: 30 });
+
+			const contacting = contact([pluginEntry('stuck', { plugin: 'fixture-sandbox.hangs' }), pluginEntry('fine')], {
+				workerTypes: impatient,
+			});
+			await untilTrue(() => fixture.obtained.length === 1);
+			await vi.advanceTimersByTimeAsync(30);
+			await contacting;
+
+			expect(reported).toHaveLength(1);
+			expect(reported[0]).toContain('source "stuck"');
 		});
 
 		it('also reports a source that is merely slower than the bound (the cause of the former intermittent second report)', async () => {
