@@ -227,7 +227,7 @@ describe('ShowCommand', () => {
 
 			expect(logged()).toContain("tools of step 'triage':");
 			expect(logged()).toContain(
-				'queue-task-show [read] task args(id:string) cwd=workspace (default), timeout=12s, output<=65536 bytes (default)'
+				'queue-task-show [read] task args(id:string) cwd=none (default), timeout=12s, output<=65536 bytes (default)'
 			);
 			expect(logged()).not.toContain('HOST_TOOL_UNDER_CONFINED_PROFILE');
 		});

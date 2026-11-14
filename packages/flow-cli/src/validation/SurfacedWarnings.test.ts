@@ -11,6 +11,7 @@ describe('surfacedWarningsOf - host tool warnings are never silent', () => {
 		ValidationCode.HOST_TOOL_UNDER_CONFINED_PROFILE,
 		ValidationCode.HOST_TOOL_UNUSED_ARG,
 		ValidationCode.HOST_TOOL_LOG_SENSITIVE,
+		ValidationCode.HOST_TOOL_CWD_WORKSPACE_CONFIG_DRIVEN,
 	])('prints the warning %s', code => {
 		expect(surfacedWarningsOf([warning(code)])).toEqual([`m ${code}`]);
 	});

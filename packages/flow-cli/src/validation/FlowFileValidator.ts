@@ -220,6 +220,7 @@ export function validationCodeToType(code: ValidationCode): string {
 		case ValidationCode.HOST_TOOL_UNDER_CONFINED_PROFILE:
 		case ValidationCode.HOST_TOOL_UNUSED_ARG:
 		case ValidationCode.HOST_TOOL_LOG_SENSITIVE:
+		case ValidationCode.HOST_TOOL_CWD_WORKSPACE_CONFIG_DRIVEN:
 			return 'schema';
 		case ValidationCode.WORKSPACE_READONLY_CONFLICT:
 		case ValidationCode.WORKSPACE_DEPRECATED:

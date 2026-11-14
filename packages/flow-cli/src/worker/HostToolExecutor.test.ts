@@ -103,6 +103,16 @@ describe('HostToolExecutor (real processes)', () => {
 	});
 
 	describe('working directory (F-13)', () => {
+		// Fail closed: no cwd written means a fresh empty directory, never the workspace the model can write.
+		it('default (no cwd written): a fresh empty directory, not the run workspace', async () => {
+			fs.writeFileSync(path.join(workspace, 'planted.txt'), 'x');
+			const result = await run(fixtures.tool('cwd.cjs'));
+			const listing = JSON.parse(
+				/<tool-output[^>]*>\n([\s\S]*?)\n<\/tool-output>/.exec(result.reply.text)![1]!
+			) as { entries: string[] };
+			expect(listing.entries).toEqual([]);
+		});
+
 		it('workspace: the process starts in the run workspace', async () => {
 			const result = await run(fixtures.tool('echo.cjs', [], { cwd: 'workspace' }));
 			expect(fs.realpathSync(echoed(result).cwd)).toBe(fs.realpathSync(workspace));
@@ -128,7 +138,7 @@ describe('HostToolExecutor (real processes)', () => {
 		});
 
 		it('refuses with a named error when the workspace directory does not exist', async () => {
-			const tool = fixtures.tool('echo.cjs');
+			const tool = fixtures.tool('echo.cjs', [], { cwd: 'workspace' });
 			const result = await executor.execute({
 				stepId: 'triage',
 				tool,

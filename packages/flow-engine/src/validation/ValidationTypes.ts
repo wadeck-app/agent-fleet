@@ -90,6 +90,8 @@ export enum ValidationCode {
 	HOST_TOOL_UNUSED_ARG = 'HOST_TOOL_UNUSED_ARG',
 	/** `log: true` on an argument whose name looks like a credential. */
 	HOST_TOOL_LOG_SENSITIVE = 'HOST_TOOL_LOG_SENSITIVE',
+	/** `cwd: workspace` on a tool whose executable reads config from its working directory (the model can plant it). */
+	HOST_TOOL_CWD_WORKSPACE_CONFIG_DRIVEN = 'HOST_TOOL_CWD_WORKSPACE_CONFIG_DRIVEN',
 	SUB_STEP_WAVES_SINGLE_WAVE = 'SUB_STEP_WAVES_SINGLE_WAVE',
 	WAVE_REDUNDANT_DEPENDS = 'WAVE_REDUNDANT_DEPENDS',
 	SECRET_IN_SCRIPT_TEXT = 'SECRET_IN_SCRIPT_TEXT',

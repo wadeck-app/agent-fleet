@@ -61,13 +61,13 @@ hostTools:
     args:
       id: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", required: true }   # a value starting with "-" is refused unless the arg sets allowLeadingDash: true
       status: { type: enum, values: [open, done] }   # enum | string+pattern | integer(min,max) | boolean
-    cwd: workspace               # optional; workspace | none ; no arbitrary paths in slice 1
+    cwd: none                    # optional; none (default) | workspace ; no arbitrary paths in slice 1
     env: [TASK_PROFILE]          # optional; names only; values come from the worker env, never from the model
     timeoutSeconds: 30           # optional; max 300
     maxOutputBytes: 65536        # optional; max 1 MiB; truncation is reported to the model
 ```
 
-Defaults are NOT in the schema: `cwd`, `timeoutSeconds`, `maxOutputBytes`, concurrency and call-count limits are optional fields stored as written (no `.default()` in the entity schema: it makes a PATCH/round-trip rewrite the field, `.claude/kb/lessons-learned.md:28`). They are resolved at the use site, one function `HostToolLimits.resolve(tool)` in flow-cli, called by `HostToolRunner` and by `flow show` (so what is displayed is what is applied): `cwd` = workspace, `timeoutSeconds` = 30, `maxOutputBytes` = 64 KiB, concurrency 2, max 100 calls per step. The schema only validates the maxima (300 s, 1 MiB).
+Defaults are NOT in the schema: `cwd`, `timeoutSeconds`, `maxOutputBytes`, concurrency and call-count limits are optional fields stored as written (no `.default()` in the entity schema: it makes a PATCH/round-trip rewrite the field, `.claude/kb/lessons-learned.md:28`). They are resolved at the use site, one function `HostToolLimits.resolve(tool)` in flow-cli, called by `HostToolRunner` and by `flow show` (so what is displayed is what is applied): `cwd` = none, `timeoutSeconds` = 30, `maxOutputBytes` = 64 KiB, concurrency 2, max 100 calls per step. The schema only validates the maxima (300 s, 1 MiB).
 
 | Field | Decision |
 |---|---|
@@ -75,7 +75,7 @@ Defaults are NOT in the schema: `cwd`, `timeoutSeconds`, `maxOutputBytes`, concu
 | `args` | closed schema; each arg has a type and a pattern/enum/range; no free-form string without a `pattern` (validation error); values starting with `-` are refused unless the pattern allows them explicitly; optional `log: true` lets the audit log keep the value (F-17) |
 | `sideEffect` | label shown in `flow show` and in the tool description sent to the model; `write` tools need `readOnly` workspace compatibility check (`ReadOnlyWorkspaceRules` is advisory today) |
 | `env` | allowlist of NAMES read from the worker process environment; baseline env = PATH-like minimum as in `HostScriptEnvironment`; no literal values in the step (credentials live with the worker) |
-| `cwd` | workspace of the run or none |
+| `cwd` | `none` (default: fresh empty directory) or `workspace` of the run, written explicitly. DECIDED 2026-11-14 (fail closed): the model can write the workspace and plant config the tool reads (.git/config core.fsmonitor, .npmrc, Makefile, conftest.py), so the default is `none`; an explicit `cwd: workspace` with a config-driven executable (git, npm, make, python, node, ...) is a `flow validate`/`flow run` warning `HOST_TOOL_CWD_WORKSPACE_CONFIG_DRIVEN` |
 | limits | timeout, output cap, concurrency, call count: defaults resolved at the use site (see above) |
 
 ### D3. Execution location and trust
@@ -158,7 +158,7 @@ Naming: ids continue the `F-nn` series of the "Flow execution" section of `.clau
 | F-10 | Model widens its own tools via `provideSteps` | `InjectedStepGuard` whitelist, `hostTools` absent from `ALLOWED_KEYS`, test asserts it (D6) | A future edit that adds the key; the test is the guard |
 | F-11 | Flow file from an untrusted source declares tools | Slice 1: local worker only (a script step on a host worker already runs with the worker's whole environment, `.claude/plans/2026-11-13_host-script-environment.md` section 0 item 2); slice 2: executable allowlist mandatory on sandbox workers; run-start refusal; `flow show` lists tools; warning when `write` | An allowlisted binary with a dangerous subcommand: authors review argv templates |
 | F-12 | DoS (call flood, huge output, hang) | Timeout, output cap, concurrency 2, 100 calls; kill process tree on timeout; per-call timer (D3) | Cost of an allowed slow CLI |
-| F-13 | Path/cwd escape | `cwd` only `workspace`/`none`; no path args unless pattern-constrained | A path arg with a loose pattern |
+| F-13 | Path/cwd escape | `cwd` only `none` (default) or `workspace` (explicit; warning for config-driven executables, decision 2026-11-14); no path args unless pattern-constrained | A path arg with a loose pattern; `cwd: workspace` with an executable outside the warned list |
 | F-14 | Stale/forged tool list in VM | Host re-validates id and args per call from its own registry, never from the VM's list | None |
 | F-15 | Write tool in read-only workspace run | Slice 1 has no write tools; later a compatibility check | Advisory today (`ReadOnlyWorkspaceRules`) |
 | F-16 | TOCTOU on the resolved executable: path swapped between run-start resolution and spawn | Absolute path + (size, mtime) recorded at run start, re-checked right before each spawn, spawn by absolute path, never by name | A same-user process can still swap between the re-check and `exec`; same user already owns the worker, so no new authority. Slice 2 allowlist entries pin the directory, not the name |

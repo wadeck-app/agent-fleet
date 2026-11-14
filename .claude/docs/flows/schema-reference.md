@@ -448,7 +448,7 @@ Executes a task using an AI model (Claude).
 
 - **Type**: `HostTool[]` (optional, model steps only)
 - **Description**: Tools the worker runs on its host for this step (closed argv, typed arguments, `sideEffect: read` only). Validated today; **not served to the model yet** (execution lands in later steps of slice 1).
-- **Details**: [host-tools.md](host-tools.md). Never allowed on steps added by `provideSteps`.
+- **Details**: [host-tools.md](host-tools.md). Never allowed on steps added by `provideSteps`. A tool's `cwd` defaults to `none` (fresh empty directory); `cwd: workspace` must be written and warns for config-driven executables (git, npm, make, ...).
 
 #### Other Properties
 

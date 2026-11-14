@@ -555,6 +555,76 @@ describe('HostToolValidator - warnings', () => {
 		expect(issues[0]!.message).toContain('Fix:');
 	});
 
+	describe('cwd: workspace with a config-driven executable', () => {
+		const warningsFor = (command: string[], cwd?: string): ValidationIssue[] =>
+			issuesOf(modelStep([tool({ args: undefined, command, ...(cwd === undefined ? {} : { cwd }) })])).filter(
+				issue => issue.code === ValidationCode.HOST_TOOL_CWD_WORKSPACE_CONFIG_DRIVEN
+			);
+
+		it.each([
+			'git',
+			'npm',
+			'npx',
+			'pnpm',
+			'yarn',
+			'make',
+			'python',
+			'python3',
+			'node',
+			'pip',
+			'cargo',
+			'go',
+			'dotnet',
+			'mvn',
+			'gradle',
+			'ruby',
+			'php',
+			'pwsh',
+			'bash',
+			'sh',
+		])('warns for %s', executable => {
+			const issues = warningsFor([executable, 'status'], 'workspace');
+			expect(issues).toHaveLength(1);
+			expect(issues[0]!.severity).toBe('warning');
+			expect(issues[0]!.message).toContain('Fix:');
+			expect(issues[0]!.message).toContain("tool 'queue-task-show'");
+		});
+
+		it.each([
+			['an absolute path with a Windows extension', 'C:\\Program Files\\Git\\bin\\GIT.EXE'],
+			['an absolute posix path', '/usr/bin/python3'],
+			['an upper-case name', 'NPM'],
+			['an exe name', 'node.exe'],
+		])('warns for %s', (_label, executable) => {
+			expect(warningsFor([executable, 'x'], 'workspace')).toHaveLength(1);
+		});
+
+		it('names the planting vectors, the model write access and the safer setting', () => {
+			const message = warningsFor(['git', 'status'], 'workspace')[0]!.message;
+			for (const part of [
+				'.git/config',
+				'core.fsmonitor',
+				'Makefile',
+				'conftest.py',
+				'package.json',
+				'cwd: none',
+			]) {
+				expect(message).toContain(part);
+			}
+			expect(message).toMatch(/model.*(write|plant)/i);
+			expect(message).toMatch(/path argument/);
+		});
+
+		it.each([
+			['an unlisted executable', ['task', 'show'], 'workspace'],
+			['a lookalike name', ['gitx', 'status'], 'workspace'],
+			['cwd: none', ['git', 'status'], 'none'],
+			['no cwd written', ['git', 'status'], undefined],
+		])('stays silent for %s', (_label, command, cwd) => {
+			expect(warningsFor(command, cwd)).toEqual([]);
+		});
+	});
+
 	it.each(['apiToken', 'secretValue', 'password', 'userCredential', 'PASSWD'])(
 		'warns when log: true is set on the argument %s',
 		name => {

@@ -19,7 +19,8 @@ export interface ResolvedHostToolLimits {
  */
 export class HostToolLimits {
 	static readonly DEFAULTS: Readonly<ResolvedHostToolLimits> = {
-		cwd: 'workspace',
+		// Fail closed: the model can write the workspace, so a tool only runs there when its author wrote `cwd: workspace`.
+		cwd: 'none',
 		timeoutSeconds: 30,
 		maxOutputBytes: 65_536,
 		concurrency: 2,

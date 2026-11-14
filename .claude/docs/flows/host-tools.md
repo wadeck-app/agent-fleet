@@ -16,12 +16,12 @@ A model step declares tools the worker runs on its own host, behind a closed arg
 | `sideEffect`     | yes      | No default. Only `read`; `write` is refused (`sideEffect: write is not supported yet (slice 3); use read`).                                                         |
 | `command`        | yes      | argv array, never a string. First element is a literal executable.                                                                                                  |
 | `args`           | no       | Closed set of typed arguments (below). Every `{name}` in `command` must be declared here.                                                                           |
-| `cwd`            | no       | `workspace` or `none`. No paths.                                                                                                                                    |
+| `cwd`            | no       | `none` (default) or `workspace`. No paths. `workspace` warns for config-driven executables (see Working directory).                                                 |
 | `env`            | no       | Variable NAMES taken from the worker environment (`^[A-Za-z_][A-Za-z0-9_]*$`). Never `NAME=value`. `FLOW_WORKER_*` and `FLOW_MCP_*` are refused (case-insensitive). |
 | `timeoutSeconds` | no       | Integer 1..300.                                                                                                                                                     |
 | `maxOutputBytes` | no       | Integer 1..1048576.                                                                                                                                                 |
 
-Optional fields are stored as written; defaults are applied where the tool runs (flow-cli `HostToolLimits`): `cwd: workspace`, `timeoutSeconds: 30`, `maxOutputBytes: 65536`, concurrency 2, 100 calls per step.
+Optional fields are stored as written; defaults are applied where the tool runs (flow-cli `HostToolLimits`): `cwd: none`, `timeoutSeconds: 30`, `maxOutputBytes: 65536`, concurrency 2, 100 calls per step.
 
 ### `command`
 
@@ -117,6 +117,7 @@ Path: `McpServer` -> `HostToolCallService` (the `HostToolCallHandler`) -> `HostT
 `HostToolExecutableResolver` resolves once at run start and records absolute path, size and mtime; the executor re-verifies them right before every spawn and refuses a change with a named error.
 
 - Bare name: searched on the worker's `PATH` (with `PATHEXT` on Windows). Absolute path: used as given. Relative path (`./x`, `bin/x`): refused in slice 1.
+- A relative or empty `PATH` entry (`.`, `node_modules/.bin`, `::`) refuses the resolution of a bare name, with an error naming the entry. It is not skipped: it resolves against the worker's current directory, which can hold a file the model planted. Fix: give the worker an absolute-only `PATH`, or write an absolute `command[0]`. An absolute `command[0]` ignores `PATH`.
 - Windows `.cmd`/`.bat`: refused (cmd.exe re-parses arguments); point `command[0]` to the `.exe`.
 - Not found: the error names step, tool, executable and the PATH searched.
 
@@ -126,7 +127,15 @@ The child gets a fixed baseline (PATH, PATHEXT, SYSTEMROOT, TEMP, HOME, USERPROF
 
 ### Working directory (F-13)
 
-`workspace`: the run's workspace directory (must exist). `none`: a fresh empty subdirectory of the OS temp directory (never the temp directory itself), removed after the call.
+`none` (default): a fresh empty subdirectory of the OS temp directory (never the temp directory itself), removed after the call. `workspace`: the run's workspace directory (must exist), only when the tool writes `cwd: workspace`.
+
+#### Why the default is `none` (warning `HOST_TOOL_CWD_WORKSPACE_CONFIG_DRIVEN`)
+
+The model can write the workspace. Many executables read configuration or scripts from their working directory and run them: `.git/config` (`core.fsmonitor`), `.npmrc`, `Makefile`, `conftest.py`, `package.json` scripts. With `cwd: workspace`, a steered model plants such a file and the next call executes it on the host, outside any permission mode.
+
+Changed 2026-11-14: the default was `workspace`, it is now `none`. A tool that needs the workspace writes `cwd: workspace`; when it takes a directory, pass it as a path argument instead (for example `git -C {path} ...`).
+
+`flow validate` and `flow run` print a HARD warning for an explicit `cwd: workspace` when the basename of `command[0]` (lower-cased, `.exe` removed) is one of: git, npm, npx, pnpm, yarn, make, python, python3, node, pip, cargo, go, dotnet, mvn, gradle, ruby, php, pwsh, bash, sh (`ConfigDrivenExecutables`, flow-engine). No warning does not mean safe: other executables are not checked.
 
 ### Limits (F-12)
 
@@ -146,15 +155,15 @@ One `[host-tool] {json}` line per call, sent as an `info`/`system` log entry of 
 
 ## Threat rows (steps 1-3)
 
-| Row       | Status in code                                                                                |
-| --------- | --------------------------------------------------------------------------------------------- |
-| F-03/F-04 | Checker + argv array + `shell:false`; injection corpus tested through the whole call path.    |
-| F-05      | Env allowlist and deny list, canary tests with `FLOW_WORKER_TOKEN` and `FLOW_MCP_TOOL_TOKEN`. |
-| F-07      | Untrusted data block; slice 1 tools are `read` only.                                          |
-| F-12      | Timeout with tree kill (grandchild test), output cap, concurrency, call count.                |
-| F-13      | `cwd` is `workspace` or a fresh empty directory.                                              |
-| F-16      | Identity recheck before each spawn; residual: a same-user swap between recheck and exec.      |
-| F-17      | Audit as above.                                                                               |
+| Row       | Status in code                                                                                                 |
+| --------- | -------------------------------------------------------------------------------------------------------------- |
+| F-03/F-04 | Checker + argv array + `shell:false`; injection corpus tested through the whole call path.                     |
+| F-05      | Env allowlist and deny list, canary tests with `FLOW_WORKER_TOKEN` and `FLOW_MCP_TOOL_TOKEN`.                  |
+| F-07      | Untrusted data block; slice 1 tools are `read` only.                                                           |
+| F-12      | Timeout with tree kill (grandchild test), output cap, concurrency, call count.                                 |
+| F-13      | `cwd` is a fresh empty directory (default) or `workspace` if declared (warning for config-driven executables). |
+| F-16      | Identity recheck before each spawn; residual: a same-user swap between recheck and exec.                       |
+| F-17      | Audit as above.                                                                                                |
 
 ## Tested end to end
 
@@ -199,7 +208,7 @@ A step with `hostTools` whose requirements include `fs=confined` (profiles `agen
 
 ```
 tools of step 'triage':
-  queue-task-show [read] task args(id:string) cwd=workspace (default), timeout=12s, output<=65536 bytes (default)
+  queue-task-show [read] task args(id:string) cwd=none (default), timeout=12s, output<=65536 bytes (default)
 ```
 
 The confined-profile finding follows, as `warning: ...` or `error: ...` with the mode text. Rendering lives in flow-core (`HostToolLines`, limits describer injected by flow-cli); the execution view does not list tools yet.

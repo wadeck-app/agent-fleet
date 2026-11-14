@@ -228,7 +228,9 @@ describe('host tools end to end through the real MCP server, callback and execut
 			expect(reply.text.trimEnd().endsWith('exit code: 0')).toBe(true);
 			const printed = JSON.parse(outputOf(reply.text));
 			expect(printed.argv).toEqual([needle, '--count=3']);
-			expect(printed.cwd).toBe(fs.realpathSync(workspace));
+			// No cwd written: a fresh empty directory, never the run workspace.
+			expect(path.basename(printed.cwd)).toMatch(/^flow-hosttool-none-/);
+			expect(fs.realpathSync(path.dirname(printed.cwd))).not.toBe(fs.realpathSync(workspace));
 
 			const [entry, ...others] = audit(step);
 			expect(others).toEqual([]);

@@ -13,7 +13,7 @@ const BASE: HostTool = {
 describe('HostToolLimits.resolve - defaults are applied here, never stored in the definition', () => {
 	it('applies every default to a tool that sets nothing', () => {
 		expect(HostToolLimits.resolve(BASE)).toEqual({
-			cwd: 'workspace',
+			cwd: 'none',
 			timeoutSeconds: 30,
 			maxOutputBytes: 65_536,
 			concurrency: 2,
@@ -21,9 +21,15 @@ describe('HostToolLimits.resolve - defaults are applied here, never stored in th
 		});
 	});
 
+	// A model can write the workspace: a default of 'workspace' lets it plant config the tool reads (.git/config, .npmrc, Makefile).
+	it('defaults cwd to none, so a tool only runs in the workspace when the author wrote cwd: workspace', () => {
+		expect(HostToolLimits.resolve(BASE).cwd).toBe('none');
+		expect(HostToolLimits.DEFAULTS.cwd).toBe('none');
+	});
+
 	it('exposes the defaults for display', () => {
 		expect(HostToolLimits.DEFAULTS).toEqual({
-			cwd: 'workspace',
+			cwd: 'none',
 			timeoutSeconds: 30,
 			maxOutputBytes: 65_536,
 			concurrency: 2,
@@ -32,7 +38,7 @@ describe('HostToolLimits.resolve - defaults are applied here, never stored in th
 	});
 
 	it.each([
-		['cwd', { cwd: 'none' as const }, { cwd: 'none' }],
+		['cwd', { cwd: 'workspace' as const }, { cwd: 'workspace' }],
 		['timeoutSeconds', { timeoutSeconds: 300 }, { timeoutSeconds: 300 }],
 		['maxOutputBytes', { maxOutputBytes: 1_048_576 }, { maxOutputBytes: 1_048_576 }],
 		[
@@ -70,10 +76,10 @@ describe('HostToolLimits.resolve - defaults are applied here, never stored in th
 describe('HostToolLimits.describe', () => {
 	it('renders the applied values, marking what is a default', () => {
 		expect(HostToolLimits.describe({ ...BASE, timeoutSeconds: 5 })).toBe(
-			'cwd=workspace (default), timeout=5s, output<=65536 bytes (default)'
+			'cwd=none (default), timeout=5s, output<=65536 bytes (default)'
 		);
-		expect(HostToolLimits.describe({ ...BASE, cwd: 'none', maxOutputBytes: 100 })).toBe(
-			'cwd=none, timeout=30s (default), output<=100 bytes'
+		expect(HostToolLimits.describe({ ...BASE, cwd: 'workspace', maxOutputBytes: 100 })).toBe(
+			'cwd=workspace, timeout=30s (default), output<=100 bytes'
 		);
 	});
 });

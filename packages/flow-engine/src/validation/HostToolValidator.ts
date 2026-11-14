@@ -1,3 +1,4 @@
+import { ConfigDrivenExecutables } from '../hosttools/ConfigDrivenExecutables';
 import { HostToolModelView } from '../hosttools/HostToolModelView';
 import { HostToolSchemaLimits } from '../hosttools/HostToolSchemaLimits';
 import type { HostTool } from '../hosttools/HostToolTypes';
@@ -113,6 +114,7 @@ export class HostToolValidator {
 			}
 		}
 		this.validateCwd(fields['cwd'], reporter);
+		this.warnWorkspaceCwdWithConfigDrivenExecutable(fields['cwd'], fields['command'], reporter);
 		this.environment.validate(fields['env'], reporter);
 		this.validateLimit(
 			fields['timeoutSeconds'],
@@ -221,6 +223,23 @@ export class HostToolValidator {
 			'cwd',
 			`cwd ${JSON.stringify(cwd)} is not accepted: arbitrary paths are not allowed`,
 			`use cwd: ${CWD_VALUES.join(' or cwd: ')}`
+		);
+	}
+
+	private warnWorkspaceCwdWithConfigDrivenExecutable(
+		cwd: unknown,
+		command: unknown,
+		reporter: HostToolIssueReporter
+	): void {
+		const executable = Array.isArray(command) ? (command as unknown[])[0] : undefined;
+		if (cwd !== 'workspace' || typeof executable !== 'string' || !ConfigDrivenExecutables.includes(executable)) {
+			return;
+		}
+		reporter.warning(
+			ValidationCode.HOST_TOOL_CWD_WORKSPACE_CONFIG_DRIVEN,
+			'cwd',
+			`cwd: workspace with '${executable}', which reads configuration and scripts from its working directory. The model (the agent) can write the workspace, so it can plant a file the tool then executes on the host, outside any permission mode: .git/config (core.fsmonitor), .npmrc, Makefile, conftest.py, package.json scripts, and similar`,
+			'use cwd: none (the default) and pass the directory as a path argument (for example git -C {path}), or keep cwd: workspace only when the tool is a fixed program that reads no configuration from its working directory'
 		);
 	}
 
