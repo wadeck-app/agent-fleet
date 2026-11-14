@@ -1,4 +1,4 @@
-import type { StepRunner } from 'flow-engine';
+import type { HostTool, StepRunner } from 'flow-engine';
 import type { TemplateContext } from 'flow-engine/processing/TemplateRenderer';
 import type { ToolCallInFlight, ToolProgress } from 'flow-engine/processing/ToolCallTracker';
 import type { LiveLogEntry, ModelFlowStep, ScriptFlowStep, StepMeta, Workspace } from 'flow-engine/types';
@@ -15,6 +15,7 @@ import type {
 } from '../ipc/Protocol';
 import { TOOL_ACTIVITY_SUMMARY_MAX_LENGTH } from '../ipc/Protocol';
 import { SecretMasker } from '../secrets/SecretMasker';
+import { HostToolStepWiring } from './HostToolStepWiring';
 import type { McpServerConfig } from './McpServer';
 import { McpServer } from './McpServer';
 import { buildStepIoCapture } from './StepIoCaptureBuilder';
@@ -113,7 +114,11 @@ export interface StepResult {
 export class WorkerAdapter {
 	private readonly stepRunnerFactory: StepRunnerFactory;
 
-	constructor(stepRunnerFactory: StepRunnerFactory) {
+	constructor(
+		stepRunnerFactory: StepRunnerFactory,
+		/** Declared env names of host tools are read here, and their executables searched on its PATH. */
+		private readonly workerEnvironment: Readonly<Record<string, string | undefined>> = process.env
+	) {
 		this.stepRunnerFactory = stepRunnerFactory;
 	}
 
@@ -223,7 +228,30 @@ export class WorkerAdapter {
 				sendMessage({ type: 'inject_steps', executionId: context.executionId, steps });
 			};
 
-			const mcpServer = new McpServer(context.executionId, onInjectSteps);
+			// Resolves the executables of the step's host tools; a failure ends the step here, before the server and the model start.
+			const hostTools = HostToolStepWiring.prepare({
+				stepId: step.id,
+				hostTools: (step as { hostTools?: HostTool[] }).hostTools,
+				workspaceDir: context.workspaceDir,
+				workerEnvironment: this.workerEnvironment,
+				writeAuditLine: line =>
+					sendMessage({
+						type: 'log',
+						executionId: context.executionId,
+						stepId: step.id,
+						entry: {
+							id: randomUUID(),
+							timestamp: Date.now(),
+							level: 'info',
+							message: line,
+							eventType: 'system',
+						},
+					}),
+			});
+			const mcpServer =
+				hostTools === undefined
+					? new McpServer(context.executionId, onInjectSteps)
+					: new McpServer(context.executionId, onInjectSteps, { hostTools });
 			const { mcpServer: mcpServerConfig } = await mcpServer.start();
 
 			// Create a runner with MCP servers baked into the factory call

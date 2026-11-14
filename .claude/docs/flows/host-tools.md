@@ -2,7 +2,7 @@
 
 A model step declares tools the worker runs on its own host, behind a closed argv. The model gets the capability, never a shell or the host credentials.
 
-> **Status (slice 1, steps 1-2 of the plan `.claude/plans/2026-11-14_generic-tool-provision-mcp.md`):** the field is parsed and validated, and the wire protocol and the MCP helper exist. **Execution is not wired yet**: `WorkerAdapter` does not pass the tools to `McpServer` and no handler runs a command, so a flow declaring `hostTools` validates today but the tool is not served to the model (the runner and the routing follow in steps 3-5).
+> **Status (slice 1, steps 1-3 of the plan `.claude/plans/2026-11-14_generic-tool-provision-mcp.md`):** the field is parsed and validated, the wire protocol and the MCP helper exist, and `WorkerAdapter` now resolves the executables, builds the call service and passes it to `McpServer`. **Routing is not done yet** (step 4: the daemon sending `hostTools` steps only to workers declaring `host-tools`; step 5: end-to-end test). Until then a worker that receives such a step serves it, but nothing guarantees the daemon sends it to the right worker.
 > Slice 1 scope once wired: provider `claude`, local (non-sandbox) worker, `sideEffect: read` only. Codex/opencode and sandbox workers are later slices.
 
 ## Fields
@@ -99,6 +99,62 @@ A token presented for the wrong kind destroys the connection (logged without the
 ### The helper (`mcp-server.cjs`)
 
 `FLOW_MCP_TOOLS` is the only way tools reach it: a JSON array of `{name, description, inputSchema, timeoutSeconds}` built by `McpServer` from `HostToolModelView` (never the command). `tools/list` returns `provideSteps` then these; `tools/call` forwards the v2 line and returns the reply text (`isError: true` on `ok:false`). A malformed `FLOW_MCP_TOOLS`, or tools without `FLOW_MCP_TOOL_TOKEN`, make the helper exit 1 with a message on stderr. A connection closed without a reply is reported as `host too old for host tools` (old host, or the execution ended).
+
+## Execution (worker, `packages/flow-cli/src/worker/`)
+
+Path: `McpServer` -> `HostToolCallService` (the `HostToolCallHandler`) -> `HostToolExecutor`. Built per step by `HostToolStepWiring.prepare`; counters die with the step.
+
+| Stage     | Rule                                                                                                                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run start | Every `command[0]` is resolved; failure ends the step before the server and the model start (`Step 'S' tool 'T': ...`). An `env` name on the deny list is also refused here.                      |
+| Per call  | Count the call, find the tool, `HostToolCallChecker`, concurrency, then execute. A refusal text goes back to the model (`Tool 'T' was not run: ...`).                                             |
+| argv      | `command[1..]` with `{name}` replaced by the checked value, nothing else: one element per value, no shell, no globbing, no second substitution. An optional argument not given drops its element. |
+| Spawn     | `spawn(absolutePath, argv, {shell: false, windowsHide: true})`, no stdin.                                                                                                                         |
+| Timeout   | At `timeoutSeconds` the whole process tree is killed (`killProcessTree`: `taskkill /T /F` on Windows, descendants on POSIX); reply `ok:false, timedOut:true`.                                     |
+
+### Executable resolution (F-16)
+
+`HostToolExecutableResolver` resolves once at run start and records absolute path, size and mtime; the executor re-verifies them right before every spawn and refuses a change with a named error.
+
+- Bare name: searched on the worker's `PATH` (with `PATHEXT` on Windows). Absolute path: used as given. Relative path (`./x`, `bin/x`): refused in slice 1.
+- Windows `.cmd`/`.bat`: refused (cmd.exe re-parses arguments); point `command[0]` to the `.exe`.
+- Not found: the error names step, tool, executable and the PATH searched.
+
+### Environment (F-05)
+
+The child gets a fixed baseline (PATH, PATHEXT, SYSTEMROOT, TEMP, HOME, USERPROFILE, APPDATA, locale `LC_*`, ... see `HostToolEnvironment`) plus the names the tool declares in `env`, read from the worker's environment. Never passed, even when declared: `FLOW_WORKER_*`, `FLOW_MCP_*`, `FLOW_SANDBOX_HOST_*`, `FLOW_EXECUTION_ID` (case-insensitive). Declaring one fails the step at run start; the executor also drops it and the audit line lists it in `envDenied`. A declared name the worker lacks is listed in `envMissing`.
+
+### Working directory (F-13)
+
+`workspace`: the run's workspace directory (must exist). `none`: a fresh empty subdirectory of the OS temp directory (never the temp directory itself), removed after the call.
+
+### Limits (F-12)
+
+| Limit          | Behaviour                                                                                                                                                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Concurrency    | 2 running calls per tool. A third is refused at once ("already running ... Retry"), not queued: the per-call timer starts at arrival and a queue would spend it waiting.                                                |
+| Calls per step | 100, every call counted, refused ones too.                                                                                                                                                                              |
+| Output         | The whole reply text is at most `maxOutputBytes` (the connection drops anything larger). stdout is cut on a UTF-8 boundary and followed by `[output truncated at N bytes]`, `truncated: true`. stderr: last 4096 bytes. |
+
+### Reply to the model (F-07)
+
+stdout and the stderr tail are DATA inside `<tool-output tool="id" untrusted="true">...</tool-output>`, followed by `exit code: N`. A `</tool-output` inside the output is escaped so it cannot end the block. A non-zero exit, a signal or a timeout is `ok:false` with a first line saying so.
+
+### Audit (F-17)
+
+One `[host-tool] {json}` line per call, sent as an `info`/`system` log entry of the step through the worker's masked log channel: `stepId, toolId, callId, outcome (ok|failed|timed_out|denied|error), reason, args {name: {sha256, value?}}, exitCode, durationMs, outputBytes, truncated, timedOut, envDenied, envMissing`. A value appears only for an argument declared `log: true` on a call that passed the argument check. Never logged: output content, environment values, tokens, values of denied calls. Argument names from the model are cut to 64 characters, at most 32 names.
+
+## Threat rows (steps 1-3)
+
+| Row       | Status in code                                                                                |
+| --------- | --------------------------------------------------------------------------------------------- |
+| F-03/F-04 | Checker + argv array + `shell:false`; injection corpus tested through the whole call path.    |
+| F-05      | Env allowlist and deny list, canary tests with `FLOW_WORKER_TOKEN` and `FLOW_MCP_TOOL_TOKEN`. |
+| F-07      | Untrusted data block; slice 1 tools are `read` only.                                          |
+| F-12      | Timeout with tree kill (grandchild test), output cap, concurrency, call count.                |
+| F-13      | `cwd` is `workspace` or a fresh empty directory.                                              |
+| F-16      | Identity recheck before each spawn; residual: a same-user swap between recheck and exec.      |
+| F-17      | Audit as above.                                                                               |
 
 ## Confined profiles
 
