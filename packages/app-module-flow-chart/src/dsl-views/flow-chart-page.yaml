@@ -2,6 +2,8 @@
 # The component loads GET /api/modules/flow-chart/graph itself, to show the API's own error text. The way back to
 # the flow list is the breadcrumb of the shell.
 $type: PageContent
+# The chart and its step panel need the whole width of the page (PageContent defaults to max-w-6xl).
+maxWidth: full
 sections:
     - $type: flow-chart:FlowGraph
       flowId: $route.flowId

@@ -213,6 +213,17 @@ function pageStack(): Record<string, unknown> {
 	return sections[0]!;
 }
 
+describe('page width', () => {
+	it('only the flow chart page takes the full width of the shell, the other pages keep the default column', () => {
+		const widths = Object.fromEntries(viewFiles.map(file => [file, parseView(file).document['maxWidth']]));
+		expect(widths).toEqual({
+			'execution-chart-page.yaml': undefined,
+			'flow-chart-page.yaml': 'full',
+			'flows-page.yaml': undefined,
+		});
+	});
+});
+
 describe('flows page has no A/B test left', () => {
 	it('declares no AbTest: the table with health chips is the plain page', () => {
 		expect(collectNodes(flowsPage(), 'AbTest')).toEqual([]);
