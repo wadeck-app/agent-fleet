@@ -1,0 +1,85 @@
+# Worker detail, mounted at /modules/flow/workers/:workerId. ":workerId" of the manifest path is $route.workerId.
+# The worker as the daemon lists it, then the tail of the output the daemon captured for it (stdout and stderr, secrets
+# masked when written, GET /workers/:workerId/logs). Only workers the daemon forked have a log: for the others (external,
+# or the file was removed) the route says why in `reason`, shown as the notice below instead of an empty viewer.
+# ?lines=<n> sets the tail size (default 200, at most 2000). Only live workers are listed: one that exited answers the
+# not-found notice (NotFoundNotice.ts).
+$sources:
+    worker:
+        url: GET /api/modules/flow/workers/{workerId}/logs
+        params:
+            workerId: $route.workerId
+            lines: $urlParam.lines
+
+$type: PageContent
+sections:
+    # Content only for a worker that is connected: a missing one answers the notice below.
+    - $type: VerticalStack
+      $if: $sources.worker.found
+      gap: gap-4
+      items:
+          - $type: PageHeader
+            title: $sources.worker.workerId
+            subtitle: Worker output as captured by the daemon
+
+          - $type: DataTable
+            rows: $sources.worker.summary
+            columns:
+                - { key: 'state', label: 'State', nowrap: true, badge: { idle: default, busy: info } }
+                - { key: 'pid', label: 'PID', nowrap: true, mono: true }
+                - { key: 'version', label: 'Version', nowrap: true, mono: true }
+                - { key: 'sourceId', label: 'Source', truncate: true }
+                - { key: 'origin', label: 'Origin', nowrap: true }
+                - { key: 'hasUserInterface', label: 'Interactive', nowrap: true }
+
+          - $type: HorizontalStack
+            gap: gap-3
+            align: items-center
+            items:
+                - $type: CompactSelect
+                  urlParam: lines
+                  ariaLabel: Lines
+                  placeholder: Last 200 lines
+                  options:
+                      - { value: '200', label: Last 200 lines }
+                      - { value: '1000', label: Last 1000 lines }
+                      - { value: '2000', label: Last 2000 lines }
+
+          # Why there is no output to show (external worker, file removed); '' = there is a log.
+          - {
+                $type: Badge,
+                $if: $sources.worker.hasReason,
+                label: $sources.worker.reason,
+                variant: warning,
+                tone: subtle,
+            }
+
+          - $type: Section
+            $if: $sources.worker.available
+            title: Output (oldest first, the last lines of the capture)
+            items:
+                - $type: JsonViewer
+                  $if: $sources.worker.hasLines
+                  row: $sources.worker
+                  field: text
+                  maxHeight: 40rem
+                - {
+                      $type: Badge,
+                      $if: $sources.worker.lacksLines,
+                      label: This worker has written nothing yet,
+                      variant: default,
+                  }
+
+    # Same not-found state as the other detail pages (texts from the route, NotFoundNotice.ts).
+    - $type: VerticalStack
+      $if: $sources.worker.notFound
+      gap: gap-3
+      items:
+          - { $type: PageHeader, title: $sources.worker.title, subtitle: $sources.worker.message }
+          - {
+                $type: ButtonLink,
+                size: sm,
+                variant: secondary,
+                label: $sources.worker.listLabel,
+                to: $sources.worker.listHref,
+            }

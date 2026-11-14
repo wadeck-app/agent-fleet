@@ -1323,3 +1323,63 @@ describe('tooltips that explain the status words', () => {
 		expect(plain[0]).toMatchObject({ label: '$sources.execution.statusText' });
 	});
 });
+
+describe('worker pages', () => {
+	const detail = parseView('worker-detail-page.yaml');
+	// Every field the page reads: WorkerRoutes.test.ts checks the route sends each one (a typo would render empty).
+	const FIELDS_SENT_BY_ROUTE = [
+		'found',
+		'notFound',
+		'workerId',
+		'summary',
+		'available',
+		'hasReason',
+		'reason',
+		'hasLines',
+		'lacksLines',
+		'text',
+		'title',
+		'message',
+		'listLabel',
+		'listHref',
+	];
+
+	it('reads the logs route of its own worker, with the id of the page path and the tail size of the URL', () => {
+		expect(sourcesOf(detail).map(source => ({ url: source.spec.url, params: source.spec.params }))).toEqual([
+			{
+				url: `GET ${MODULE_API_PREFIX}/workers/{workerId}/logs`,
+				params: { workerId: '$route.workerId', lines: '$urlParam.lines' },
+			},
+		]);
+	});
+
+	it('is the page of the manifest route /workers/:workerId, the one the workers list links to', () => {
+		const point = manifest.extensionPoints.find(candidate => candidate.path === '/workers/:workerId');
+		expect(point, 'manifest.json declares no /workers/:workerId route').toBeDefined();
+		expect(point!.view.value).toBe('./src/dsl-views/worker-detail-page.yaml');
+		const links = collectNodes(parseView('workers-page.yaml').document, 'DataTable')
+			.flatMap(table => table['columns'] as Record<string, unknown>[])
+			.filter(column => column['type'] === 'link');
+		expect(links.map(link => link['to'])).toEqual([`${MODULE_PAGE_PREFIX}/workers/{workerId}`]);
+	});
+
+	it('reads only fields the route sends', () => {
+		const references = JSON.stringify(detail.document).match(/\$sources\.worker\.\w+/g) ?? [];
+		expect(references.length).toBeGreaterThan(0);
+		for (const reference of references) {
+			expect(FIELDS_SENT_BY_ROUTE, reference).toContain(reference.replace('$sources.worker.', ''));
+		}
+	});
+
+	it('shows the reason of an unavailable log and an explicit message for an empty one', () => {
+		const badges = collectNodes(detail.document, 'Badge');
+		expect(badges.map(badge => badge['$if'])).toEqual(
+			expect.arrayContaining(['$sources.worker.hasReason', '$sources.worker.lacksLines'])
+		);
+		expect(collectNodes(detail.document, 'JsonViewer')[0]).toMatchObject({
+			row: '$sources.worker',
+			field: 'text',
+			$if: '$sources.worker.hasLines',
+		});
+	});
+});

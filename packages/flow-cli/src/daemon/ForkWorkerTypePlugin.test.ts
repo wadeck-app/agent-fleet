@@ -109,6 +109,7 @@ describe('fork worker-type plugin', () => {
 			wsPort: () => 200,
 			claudePath: 'C:/claude.exe',
 			logsDir: 'C:/logs',
+			workerLogsDir: join(dir, 'workers'),
 			maskText: text => text,
 		});
 
@@ -116,7 +117,11 @@ describe('fork worker-type plugin', () => {
 		await viaDaemon.source.obtainWorker(request);
 
 		const [pluginSpawn, daemonSpawn] = spawnMock.mock.calls as [unknown[], unknown[]];
-		expect(daemonSpawn).toEqual(pluginSpawn);
+		// The daemon path also captures the worker's stdout (stdio[1] piped instead of ignored): the one deliberate difference.
+		const withoutStdio = (spawn: unknown[]) => [spawn[0], spawn[1], { ...(spawn[2] as object), stdio: undefined }];
+		expect(withoutStdio(daemonSpawn)).toEqual(withoutStdio(pluginSpawn));
+		expect((pluginSpawn[2] as { stdio: unknown }).stdio).toEqual(['ignore', 'ignore', 'pipe']);
+		expect((daemonSpawn[2] as { stdio: unknown }).stdio).toEqual(['ignore', 'pipe', 'pipe']);
 	});
 
 	it('refuses to be built for a declared source, as a configuration error that says how to fix it', async () => {
@@ -172,6 +177,7 @@ describe('the daemon fork collaborator', () => {
 			wsPort: () => boundPort,
 			claudePath: 'C:/claude.exe',
 			logsDir: 'C:/logs',
+			workerLogsDir: join(dir, 'workers'),
 			maskText,
 		});
 
@@ -197,6 +203,7 @@ describe('the daemon fork collaborator', () => {
 			wsPort: () => 2,
 			claudePath: undefined,
 			logsDir: 'C:/logs',
+			workerLogsDir: join(dir, 'workers'),
 			maskText,
 		});
 
@@ -219,6 +226,7 @@ describe('the daemon fork collaborator', () => {
 			wsPort: () => 2,
 			claudePath: undefined,
 			logsDir: 'C:/logs',
+			workerLogsDir: join(dir, 'workers'),
 			maskText: text => text,
 		});
 
@@ -241,6 +249,7 @@ describe('the daemon fork collaborator', () => {
 			wsPort: () => 2,
 			claudePath: undefined,
 			logsDir: 'C:/logs',
+			workerLogsDir: join(dir, 'workers'),
 			maskText: text => text,
 		});
 		await workers.source.obtainWorker(request);

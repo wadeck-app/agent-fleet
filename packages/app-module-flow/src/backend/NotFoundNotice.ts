@@ -1,5 +1,5 @@
 import type { ModuleRouteHandler } from '@wadeck-app/app-core-sdk';
-import { ExecutionLookupError, UnknownPluginError, errorMessage } from 'flow-core';
+import { ExecutionLookupError, UnknownPluginError, UnknownWorkerError, errorMessage } from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
 
@@ -23,6 +23,7 @@ export interface NotFoundNotice {
 
 const EXECUTIONS_HREF = '/modules/flow/executions';
 const PLUGINS_HREF = '/modules/flow/plugins';
+const WORKERS_HREF = '/modules/flow/workers';
 
 function executionNotice(id: string): NotFoundNotice {
 	return {
@@ -48,6 +49,18 @@ function pluginNotice(id: string): NotFoundNotice {
 	};
 }
 
+function workerNotice(id: string): NotFoundNotice {
+	return {
+		found: false,
+		notFound: true,
+		id,
+		title: 'Worker not found',
+		message: `Worker ${id} is not connected. It may have exited (only live workers are listed), or the id is wrong.`,
+		listLabel: 'See all workers',
+		listHref: WORKERS_HREF,
+	};
+}
+
 /**
  * The notice for a lookup failure that means "this record is not there", `undefined` for any other failure (an ambiguous
  * prefix, a corrupt file, a bad query, a bug), which the error reply keeps answering with its own status and message.
@@ -60,6 +73,9 @@ export function notFoundNoticeOf(err: unknown, id: string): NotFoundNotice | und
 	}
 	if (err instanceof UnknownPluginError) {
 		return pluginNotice(id);
+	}
+	if (err instanceof UnknownWorkerError) {
+		return workerNotice(id);
 	}
 	return undefined;
 }

@@ -16,6 +16,8 @@ sections:
             rows: $sources.workers.workers
             emptyMessage: No worker is connected
             columns:
+                # The icon link to the worker's page (its summary and captured output): same pattern as the executions list.
+                - { type: link, to: '/modules/flow/workers/{workerId}', icon: eye, label: Open worker, position: start }
                 - { key: 'workerId', label: 'Worker', truncate: true, mono: true }
                 # The state is idle or busy (WorkerSummary); a shell older than dsl-ui 122 shows the word as it is.
                 - { key: 'state', label: 'State', nowrap: true, badge: { idle: default, busy: info } }

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { MASKING_FAILED, MIN_SECRET_LENGTH, SecretMasker } from '../secrets/SecretMasker.js';
 import { BoundedLineBuffer } from './BoundedLineBuffer.js';
+import { WorkerLogFile } from './WorkerLogFile.js';
 
 /** What is kept of a worker's stderr to explain its death: the tail, in lines and in bytes. */
 const STDERR_TAIL_LINES = 40;
@@ -19,6 +20,11 @@ export interface ForkWorkerSourceOptions {
 	log?: WorkerLog;
 	/** Hides secrets in the stderr tail before it is logged (the daemon passes the executions' maskers). */
 	maskText?: (text: string) => string;
+	/**
+	 * Directory where each worker's stdout and stderr are captured (`worker-<pid>.log`, masked like the stderr tail, see
+	 * WorkerLogFile). Absent: the output is not captured and stdout stays discarded, as before.
+	 */
+	workerLogsDir?: string;
 }
 
 function stderrLog(level: 'info' | 'error', message: string): void {
@@ -55,6 +61,7 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 	private readonly claudePath: string;
 	private readonly log: WorkerLog;
 	private readonly maskText: (text: string) => string;
+	private readonly workerLogsDir: string | undefined;
 
 	constructor(
 		private readonly httpPort: number,
@@ -66,6 +73,7 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 		this.claudePath = claudePath ?? '';
 		this.log = options.log ?? stderrLog;
 		this.maskText = options.maskText ?? ((text: string) => text);
+		this.workerLogsDir = options.workerLogsDir;
 
 		// Dev mode: compiled Worker.js plus the tsx loader for extension-less ESM imports.
 		const devWorkerPath = fileURLToPath(new URL('../../dist/worker/Worker.js', import.meta.url));
@@ -115,7 +123,8 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 		// violations-suppress: cli/no-spawn-without-windows-hide windowsHide strips the console handle, so the worker's own children allocate a visible console; the worker must inherit the daemon's hidden console (d032e7e). Guarded by ForkWorkerSource.windows-console.test.ts
 		const child = spawn(process.execPath, spawnArgs, {
 			env: this.buildEnv(),
-			stdio: ['ignore', 'ignore', 'pipe'],
+			// stdout is piped only when it is captured: otherwise an unread pipe could fill up and block the worker.
+			stdio: ['ignore', this.workerLogsDir === undefined ? 'ignore' : 'pipe', 'pipe'],
 		});
 
 		if (child.pid === undefined) {
@@ -140,12 +149,17 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 		this.pendingConnects.set(pid, connectTimeout);
 
 		const stderrTail = new BoundedLineBuffer(STDERR_TAIL_LINES, STDERR_TAIL_BYTES);
+		const outputFile =
+			this.workerLogsDir === undefined
+				? undefined
+				: new WorkerLogFile(this.workerLogsDir, pid, text => this.mask(text), this.log);
 		let reported = false;
 		const report = (code: number | null, signal: NodeJS.Signals | null): void => {
 			if (reported) {
 				return;
 			}
 			reported = true;
+			outputFile?.close();
 			this.reportExit(pid, code, signal, stderrTail.snapshot());
 		};
 
@@ -170,8 +184,10 @@ export class ForkWorkerSource implements WorkerSourceProvider {
 		child.stderr?.on('data', (data: Buffer) => {
 			const text = data.toString();
 			stderrTail.append(text);
+			outputFile?.append('stderr', text);
 			process.stderr.write(`[worker] ${text}`);
 		});
+		child.stdout?.on('data', (data: Buffer) => outputFile?.append('stdout', data.toString()));
 	}
 
 	/**

@@ -1,4 +1,4 @@
-import { ExecutionLookupError, InvalidQueryError, UnknownPluginError } from 'flow-core';
+import { ExecutionLookupError, InvalidQueryError, UnknownPluginError, UnknownWorkerError } from 'flow-core';
 import { describe, expect, it } from 'vitest';
 
 import { notFoundNoticeOf } from './NotFoundNotice.js';
@@ -51,6 +51,19 @@ describe('notFoundNoticeOf', () => {
 			message: 'Plugin nope was not found. The id may be wrong.',
 			listLabel: 'See all plugins',
 			listHref: '/modules/flow/plugins',
+		});
+	});
+
+	it('words a worker that is not connected and links to the worker list', () => {
+		expect(notFoundNoticeOf(new UnknownWorkerError('w9'), 'w9')).toEqual({
+			found: false,
+			notFound: true,
+			id: 'w9',
+			title: 'Worker not found',
+			message:
+				'Worker w9 is not connected. It may have exited (only live workers are listed), or the id is wrong.',
+			listLabel: 'See all workers',
+			listHref: '/modules/flow/workers',
 		});
 	});
 

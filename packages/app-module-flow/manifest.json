@@ -81,6 +81,13 @@
 		},
 		{
 			"kind": "page",
+			"slot": "route",
+			"label": "Worker",
+			"path": "/workers/:workerId",
+			"view": { "type": "path", "value": "./src/dsl-views/worker-detail-page.yaml" }
+		},
+		{
+			"kind": "page",
 			"slot": "nav",
 			"label": "Flow Logs",
 			"path": "/logs",

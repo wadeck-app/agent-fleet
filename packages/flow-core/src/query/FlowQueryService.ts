@@ -37,6 +37,7 @@ import {
 } from '../show/ExecutionDetail.js';
 import { readWorkerList } from '../worker/WorkerList.js';
 import { type DaemonStatus, describeNoLiveWorkers } from '../worker/WorkerListing.js';
+import { UnknownWorkerError, type WorkerLogsView, readWorkerLogs } from '../worker/WorkerLogs.js';
 import { type DeclaredWorkerSource, readDeclaredWorkerSources } from '../worker/WorkerSources.js';
 import type { WorkerSummary } from '../worker/WorkerSummary.js';
 
@@ -247,6 +248,19 @@ export class FlowQueryService {
 			...(declaredSourcesError !== undefined ? { declaredSourcesError } : {}),
 			emptyExplanation: describeNoLiveWorkers(declaredSources, daemon, this.now()),
 		};
+	}
+
+	/**
+	 * One live worker and the tail of its captured output. Throws UnknownWorkerError when no connected worker has the id
+	 * (only live workers are listed), FlowCoreError for a bad `lines`, WorkerListError as listWorkers does.
+	 */
+	async readWorkerLogs(workerId: string, lines: number): Promise<{ worker: WorkerSummary; logs: WorkerLogsView }> {
+		const { workers } = await readWorkerList(this.directories.daemonDir);
+		const worker = workers.find(candidate => candidate.workerId === workerId);
+		if (worker === undefined) {
+			throw new UnknownWorkerError(workerId);
+		}
+		return { worker, logs: readWorkerLogs(this.directories.configDir, worker, lines) };
 	}
 
 	/** Tail of one day's daemon log (default: today). */

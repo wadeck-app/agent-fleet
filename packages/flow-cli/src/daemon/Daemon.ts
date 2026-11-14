@@ -1,6 +1,6 @@
 import { HookDispatcher } from '@wadeck-app/shared-cli/HookDispatcher';
 import { type DaemonHandle, createDaemon } from '@wadeck-app/singleton-daemon-kit';
-import { executionsDirOf, logsDirOf } from 'flow-core';
+import { executionsDirOf, logsDirOf, workerLogsDirOf } from 'flow-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getErrorMessage } from 'shared-common/utils/getErrorMessage';
@@ -280,6 +280,7 @@ async function startOwningDaemon(
 					wsPort: () => listener.boundPort ?? wsServer.port,
 					claudePath,
 					logsDir,
+					workerLogsDir: workerLogsDirOf(resolvedDaemonDir),
 					maskText: text => daemonSecrets.masks.maskAll(text),
 				});
 				terminateForkedWorkers = forkWorkers.terminate;

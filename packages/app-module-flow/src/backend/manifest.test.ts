@@ -95,6 +95,7 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 				'page:route:/executions/:id',
 				'page:route:/executions/:id/logs',
 				'page:nav:/workers',
+				'page:route:/workers/:workerId',
 				'page:nav:/logs',
 				'page:nav:/plugins',
 				'page:route:/plugins/:id',
@@ -109,6 +110,7 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 			'/executions/:id/logs=Logs',
 			'/executions/:id=Execution',
 			'/plugins/:id=Plugin',
+			'/workers/:workerId=Worker',
 		]);
 	});
 

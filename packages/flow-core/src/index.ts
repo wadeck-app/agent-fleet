@@ -150,6 +150,16 @@ export {
 } from './worker/WorkerSources.js';
 export type { DeclaredWorkerSource, WorkerSourceEntry, WorkerSourceRegistryFile } from './worker/WorkerSources.js';
 export type { WorkerSummary } from './worker/WorkerSummary.js';
+export {
+	UnknownWorkerError,
+	WORKER_LOG_DEFAULT_LINES,
+	WORKER_LOG_MAX_LINES,
+	isWorkerLogFileName,
+	readWorkerLogs,
+	workerLogFileName,
+	workerLogsDirOf,
+} from './worker/WorkerLogs.js';
+export type { WorkerLogsView } from './worker/WorkerLogs.js';
 
 export { formatLogContent, formatLogLine, tailLines } from './logs/LogFormat.js';
 export { LOG_LEVELS, attemptOf, formatRecordedStepOutput, readExecutionLogs } from './logs/ExecutionLogs.js';

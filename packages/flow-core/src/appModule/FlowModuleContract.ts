@@ -41,6 +41,7 @@ export const FLOW_PAGE_PATHS: readonly string[] = [
 	'/executions/:id',
 	'/executions/:id/logs',
 	'/workers',
+	'/workers/:workerId',
 	'/logs',
 	'/plugins',
 	'/plugins/:id',

@@ -28,11 +28,12 @@ export interface ForkWorkerTypeInstance extends WorkerTypeInstance {
  * effect of disposing the instance. No `run` hook.
  */
 export function buildForkWorkerType(inputs: ForkWorkerInputs): ForkWorkerTypeInstance {
-	const { httpPort, wsPort, claudePath, log, maskText } = inputs;
+	const { httpPort, wsPort, claudePath, log, maskText, workerLogsDir } = inputs;
 	return {
 		source: new ForkWorkerSource(httpPort, wsPort, claudePath, {
 			...(log === undefined ? {} : { log }),
 			...(maskText === undefined ? {} : { maskText }),
+			...(workerLogsDir === undefined ? {} : { workerLogsDir }),
 		}),
 		dispose: () => Promise.resolve(),
 	};
