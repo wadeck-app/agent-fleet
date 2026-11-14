@@ -6,6 +6,8 @@ Status: draft plan, 2026-11-14. Separate plan/spec from the sandbox worker plan 
 
 Goal: a step declares host tools (id, description, command template, allowed arguments); the worker exposes them to ANY model (claude, codex, opencode) on ANY worker (local, sandbox exec, sandbox relay) through ONE generic MCP server. The model gets the capability, never the host credentials or a shell.
 
+End state = the goal above (all models, all workers). Delivery is phased (D10): slice 1 is claude on a local worker only; codex/opencode and sandbox workers are DEFERRED to later slices, not out of scope.
+
 Non-goals: arbitrary third-party MCP servers in a sandbox (stays refused); a policy engine; per-call human approval UI; replacing `host: true` scripts; tools that mutate the flow graph (that is `provideSteps`).
 
 ## User constraints (verbatim, 2026-11-08)
@@ -27,7 +29,8 @@ Non-goals: arbitrary third-party MCP servers in a sandbox (stays refused); a pol
 | OpenCode: `{mcp:{name:{type:local,command,environment}}}`, inline `OPENCODE_CONFIG_CONTENT` (file `OPENCODE_CONFIG` above a size cap) | `OpenCodeModelProvider.ts:162-184,303-323` |
 | Codex: `-c mcp_servers.<name>.command/args/env/required=true/default_tools_approval_mode="approve"` | `CodexConfigBuilder.ts:65-92` |
 | Sandbox exec, claude only: the engine config is rewritten to `node /opt/flow/mcp-callback-forwarder.cjs` (VM loopback -> `host.docker.internal:<port>`); any server not named `flow` or not `<host node> .../mcp-server.cjs` is refused | `McpConfigRewriter.ts:34-108` |
-| Sandbox exec, codex/opencode: a step with non-empty `mcpServers` or `toolHooks` is refused ("plain prompt"); the engine's own server is dropped for them (`tool === 'claude'` gate) | `ExecAssignment.ts:102-121`; `ExecMain.ts:192-200` |
+| Sandbox exec, codex/opencode: a step with non-empty `mcpServers` or `toolHooks` is refused ("plain prompt"); the engine's own server is dropped for them (`tool === 'claude'` gate), so today a codex/opencode step in the sandbox has NO MCP at all, not even `provideSteps` | `ExecAssignment.ts:106-121`; `ExecMain.ts:196-197` |
+| Injected steps are whitelisted by key: `hostTools` is not in `ALLOWED_KEYS`, so it is refused today; `mcpServers` and `toolHooks` too. `mcp-server.cjs` still advertises `additionalProperties: true` for step items (wider than the daemon accepts; flow-owner aligns it) | `InjectedStepGuard.ts:21-45,81-89`; `StepInjection.ts:45-47`; `mcp-server.cjs` step items schema |
 | Callback port gets a per-step, per-sandbox network rule `localhost:<port>`, removed with the process (T-08) | `McpCallbackRules.ts:6-48`; `.claude/specs/2026-10-25_docker-sandbox-worker/threat-model.md:62` |
 | The worker engine (`WorkerAdapter` + `StepRunner`) runs on the HOST even for the exec variant; only the model process runs in the VM | `ExecMain.ts:191-200` |
 | Precedent for "leave the confinement": `host: true` on SCRIPT steps only; never on injected steps, whole batch refused | `schema-reference.md:596-603`; `InjectedHostMarkerGuard.ts:10-30`; `StepInjection.ts:37-42` |
@@ -45,7 +48,7 @@ Consequence: the host-side execution point already exists (worker process on hos
 | B. Named on the worker source, referenced by id (`hostTools: [task-show]`) | Host owner controls what can run; flow carries no commands; reuse | Not what the user literally asked; flow not self-describing; every worker needs config before a flow runs |
 | C. Both: the step MAY declare inline definitions, but a definition only runs if the worker-side policy allows its binary (allowlist), and a step MAY reference a named tool of the source | Flexible; host keeps the final say | Two mechanisms, precedence rules, more docs |
 
-Recommendation: C, phased. Slice 1 ships A + a worker-side binary allowlist (executable must be on the allowlist, else tool refused at validation and at run start). B (named tools, referenced by id) is slice 2. Precedence: a step-inline id equal to a named id is a validation error (no shadowing).
+Recommendation: C, phased. Slice 1 ships A only, on a LOCAL worker, with no allowlist (safe: see D10). Slice 2 adds the worker-side executable allowlist, which becomes mandatory for any sandbox worker; B (named tools, referenced by id) follows. Precedence: a step-inline id equal to a named id is a validation error (no shadowing). Note: the user asked for step-defined tools (A); the allowlist-first ordering was our proposal, see O1.
 
 ### D2. Tool definition schema
 
@@ -58,37 +61,43 @@ hostTools:
     args:
       id: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", required: true }
       status: { type: enum, values: [open, done] }   # enum | string+pattern | integer(min,max) | boolean
-    cwd: workspace               # workspace (default) | none ; no arbitrary paths in slice 1
-    env: [TASK_PROFILE]          # names only; values come from the worker env, never from the model
-    timeoutSeconds: 30           # default 30, max 300
-    maxOutputBytes: 65536        # default 64 KiB, hard max 1 MiB; truncation is reported to the model
+    cwd: workspace               # optional; workspace | none ; no arbitrary paths in slice 1
+    env: [TASK_PROFILE]          # optional; names only; values come from the worker env, never from the model
+    timeoutSeconds: 30           # optional; max 300
+    maxOutputBytes: 65536        # optional; max 1 MiB; truncation is reported to the model
 ```
+
+Defaults are NOT in the schema: `cwd`, `timeoutSeconds`, `maxOutputBytes`, concurrency and call-count limits are optional fields stored as written (no `.default()` in the entity schema: it makes a PATCH/round-trip rewrite the field, `.claude/kb/lessons-learned.md:28`). They are resolved at the use site, one function `HostToolLimits.resolve(tool)` in flow-cli, called by `HostToolRunner` and by `flow show` (so what is displayed is what is applied): `cwd` = workspace, `timeoutSeconds` = 30, `maxOutputBytes` = 64 KiB, concurrency 2, max 100 calls per step. The schema only validates the maxima (300 s, 1 MiB).
 
 | Field | Decision |
 |---|---|
 | `command` | argv array; `{name}` placeholders must be a whole argv element or an `--flag={name}` value; each placeholder must be declared in `args` |
-| `args` | closed schema; each arg has a type and a pattern/enum/range; no free-form string without a `pattern` (validation error); values starting with `-` are refused unless the pattern allows them explicitly |
+| `args` | closed schema; each arg has a type and a pattern/enum/range; no free-form string without a `pattern` (validation error); values starting with `-` are refused unless the pattern allows them explicitly; optional `log: true` lets the audit log keep the value (F-17) |
 | `sideEffect` | label shown in `flow show` and in the tool description sent to the model; `write` tools need `readOnly` workspace compatibility check (`ReadOnlyWorkspaceRules` is advisory today) |
 | `env` | allowlist of NAMES read from the worker process environment; baseline env = PATH-like minimum as in `HostScriptEnvironment`; no literal values in the step (credentials live with the worker) |
 | `cwd` | workspace of the run or none |
-| limits | timeout, output cap, max concurrent calls per step (default 2), max calls per step (default 100) |
+| limits | timeout, output cap, concurrency, call count: defaults resolved at the use site (see above) |
 
 ### D3. Execution location and trust
 
 Decision: execute on the worker's HOST, in the worker process (`WorkerAdapter` side), never in the VM, never by the model process.
 
 - Path: model -> MCP `tools/call` -> `mcp-server.cjs` (VM or host) -> callback TCP -> `McpCallbackConnection` (host worker) -> `HostToolRunner` -> `spawn(argv, {shell:false})` -> reply on the same connection.
-- Requires a protocol extension: callback messages get a `kind` (`inject_steps` | `call_tool`) and a reply line `{ok, text, truncated, exitCode}`. The current one-way protocol is kept for `inject_steps`.
+- Protocol (callback v2). Today the connection is one-way and strict: a line without `steps` fails `isInjectedStepList` and the socket is destroyed (`McpCallbackConnection.ts:99-107,122-127`), the idle timer is `socket.setTimeout(idleTimeoutMs)`, default 30 s (`:56-57`, `DEFAULT_CALLBACK_IDLE_TIMEOUT_MS`), and `onInjectSteps` errors are only logged, never answered (`:117-119`). Design:
+    - Wire shapes: v1 (legacy, unchanged) `{token, executionId, steps}` = inject; v2 `{v:2, kind:'call_tool', token, executionId, callId, toolId, args}`. A line with `v` or `kind` is routed by `kind`; a line without them is v1. Unknown `kind`/`v` keeps today's behaviour: reject and destroy. The host accepts both because the VM image carries its own copy of the helper (`/opt/flow/...`, `McpConfigRewriter.ts:5`): helper and host can differ in version. A new helper against an old host gets a destroyed connection, which the helper reports as "host too old for host tools" (actionable).
+    - Reply: one line `{v:2, callId, ok, text, truncated, exitCode}` on the same socket, then the host ends it. One call per connection (as inject today); `maxConnections` 8 > concurrency 2.
+    - Timeouts: while a call is in flight the idle timer is replaced by a per-call timer `timeoutSeconds + 5 s` (kill the child at `timeoutSeconds`, reply `ok:false, timedOut:true`, then close); the idle timer returns after the reply. Any extra line while a call is in flight is a protocol violation (destroy). No keepalive: the TCP connection stays open and silent. The helper's own socket timeout (`mcp-server.cjs:230`, 5 s, written for inject) must become `timeoutSeconds + 10 s` for `call_tool`. `mcp-callback-forwarder.cjs` has no timeout (grep: none), so it adds none.
+    - Reply size: capped by `maxOutputBytes` (max 1 MiB) + envelope, under `MAX_CALLBACK_LINE_BYTES` (2 MiB, `McpCallbackConnection.ts:7`); the helper reads the reply with the same cap.
 - Model controls only: tool id (must be declared) and arg values (validated against the declared schema). It never controls: argv[0], flags, cwd, env, timeout, limits.
-- No shell: `spawn` with an argv array; on Windows `.cmd`/`.bat` targets are refused in slice 1 (cmd.exe re-parses arguments); executable resolved once at run start to an absolute path and recorded.
+- No shell: `spawn` with an argv array; on Windows `.cmd`/`.bat` targets are refused in slice 1 (cmd.exe re-parses arguments); executable resolved at run start to an absolute path + file identity (size, mtime) and recorded; re-resolved at each spawn, refused with a named error if the path or identity changed (TOCTOU, see D9).
 - No credential passing: env allowlist by name only; the per-step token and the `flow` credentials (`FLOW_WORKER_TOKEN`) are never in the child env (explicit deny list tested with a canary).
-- Per-step bearer: the existing callback token (random per model step, constant-time compare) authorises tool calls too; scoped to this step's declared ids; dies with `McpServer.stop()`.
-- Audit: one execution-log entry per call (`stepId, toolId, args hash + redacted args, exitCode, durationMs, bytes, truncated`), written by the host, not by the model-visible server; denied calls logged too.
+- Per-step bearers, one per scope: the existing token (`McpServer.ts:61`) stays valid for `inject` only; a second random token, issued only when the step declares tools, is valid for `call_tool` only and for this step's declared ids. A token presented for the wrong `kind` is a protocol violation (destroy). Both die with `McpServer.stop()`. Honest limit: the helper and the model process share the VM env, so the split narrows what a leaked token buys (a step without tools has no tool token), not who holds it.
+- Audit: one execution-log entry per call (`stepId, toolId, callId, argument names + sha256 of each value, exitCode, durationMs, bytes, truncated, timedOut`), written by the host, not by the model-visible server; denied calls logged too. Redaction: argument VALUES are logged only for args declared `log: true` (never for env, never the tokens: `McpCallbackConnection.ts:18` already forbids logging them); output content is never logged, only its length; everything passes the existing masker.
 - Reply to the model: stdout (capped), stderr tail (capped), exit code; errors are actionable text (`isError: true`).
 
 ### D4. One generic server for all models
 
-Decision: extend `mcp-server.cjs` into the single generic server. `tools/list` = `provideSteps` + the step's host tools. The tool list is passed by env `FLOW_MCP_TOOLS` (JSON: id, description, input schema, no command) set in `buildMcpServerConfig`; the command never leaves the host worker, so the VM sees descriptions and schemas only. (If env size matters, a temp file read by the server; cap 256 KiB.)
+Decision: extend `mcp-server.cjs` into the single generic server. `tools/list` = `provideSteps` + the step's host tools. The tool list is passed by ONE mechanism: env `FLOW_MCP_TOOLS` (JSON: id, description, input schema, no command) set in `buildMcpServerConfig` (`McpServer.ts:106-116`); the command never leaves the host worker, so the VM sees descriptions and schemas only. Cap: 16 KiB serialized and 16 tools per step (well under the per-variable limits of the OSes; the Windows 32,767-char limit is an OS fact, not checked in the repo). Above the cap there is no fallback: the step fails at run start (static check in `flow validate` too) with `Step 'X': host tools description is N bytes, the limit is 16384. Fix: shorten descriptions or declare fewer tools.`
 
 | Provider | Consumption | Change |
 |---|---|---|
@@ -106,21 +115,21 @@ The server name stays `flow`; tool names are `flow` server tools `provideSteps`,
 | Question | Decision |
 |---|---|
 | Allowed in a confined profile (`fs=confined`, `env=clean`)? | Yes: the whole point. The tool runs on the host with a closed argv, so it is a controlled hole, not full host access |
-| Required guarantee? | No new guarantee in slice 1. The worker advertises `hostTools=supported` as a capability; a step with `hostTools` on a worker that does not support them fails at run start with a named error (never silently dropped) |
+| Required guarantee? | No new guarantee in slice 1. The worker declares a protocol feature `WORKER_FEATURE_HOST_TOOLS = 'host-tools'` in `WorkerReady.features` (`ipc/Protocol.ts:372-376`, constants `:84-105`, list built at `WorkerLaunch.ts:172-176`); a step with `hostTools` is routed only to workers declaring it (the dispatcher already reads `WORKER_FEATURE_*`, `StepDispatcher.ts`), and when none can serve it the step fails at run start with a named error (never silently dropped). A worker that ignores the feature is never given the step, so the `assign` field below is defence in depth only |
 | `host: true` analog? | Not needed; `hostTools` IS the narrow analog. Warning `HOST_TOOL_WITH_WRITE` for `sideEffect: write` in a flow with `profile: untrusted-code`/`hermetic-test`; suggest `read` tools only |
 | `profile:` expansion | Unchanged; profiles do not grant host tools. A future `host-tools=none` guarantee can be required by hermetic profiles (open decision O3) |
 | Source policy | Source/plugin config holds the executable allowlist (D1 C); a tool whose `command[0]` is not allowed is refused at run start, naming the source setting to change |
 
 ### D6. Injected steps (provideSteps)
 
-Decision: injected steps do NOT inherit host tools, and may NOT declare `hostTools`. Same mechanism as `InjectedHostMarkerGuard`: any injected step (any depth) carrying `hostTools` is refused, whole batch, nothing stripped. Rationale: a model steered by hostile content must not widen its own reach. A flow that wants a later tool-using step writes it in the definition. Same check also needed for injected `mcpServers` (see "Unverified").
+Decision: injected steps do NOT inherit host tools, and may NOT declare `hostTools`. No new guard: `InjectedStepGuard` whitelists injected keys (`ALLOWED_KEYS`, `InjectedStepGuard.ts:21-45`), `hostTools` is not on the list, so any injected step at any depth carrying it already gets the whole batch refused (`:81-89`, wired at `StepInjection.ts:45-47`). The new field stays refused BY DEFAULT; the rule to keep is "never add `hostTools` to `ALLOWED_KEYS`", enforced by a test asserting its absence. Rationale: a model steered by hostile content must not widen its own reach. A flow that wants a later tool-using step writes it in the definition. This also settles the earlier doubt about injected `mcpServers`/`toolHooks`: both are refused by the same whitelist (message at `:60`). Gap to close separately (flow-owner): `mcp-server.cjs` advertises `additionalProperties: true` on step items (`:64`) while the daemon refuses unknown keys, so a model is told it may send keys that the daemon then rejects.
 
 ### D7. Validation
 
 | When | Check | Error shape |
 |---|---|---|
-| `flow validate` (static) | schema, unique ids, id charset, no `provideSteps` clash, every `{placeholder}` declared in `args`, every arg typed with pattern/enum/range, `sideEffect` present, argv array, limits in range, step type is `model` (else error), no `hostTools` inside `steps/subSteps` of an injected-looking path | `HOST_TOOL_*` codes with `Fix:` line and `Did you mean` for unknown names |
-| Run start (daemon) | executable on the worker allowlist and resolvable; worker supports `hostTools`; named tool (slice 2) exists on the source | `VALIDATION_FAILED` naming step, tool id, setting to change |
+| `flow validate` (static) | schema, unique ids, id charset, no `provideSteps` clash, every `{placeholder}` declared in `args`, every arg typed with pattern/enum/range, `sideEffect` present, argv array, limits in range, step type is `model` (else error), serialized tool description within the 16 KiB / 16 tools cap | `HOST_TOOL_*` codes with `Fix:` line and `Did you mean` for unknown names |
+| Run start (daemon) | executable resolvable (slice 2: and on the worker allowlist); a connected or launchable worker declares `host-tools`; named tool (slice 2) exists on the source | `VALIDATION_FAILED` naming step, tool id, setting to change |
 | Per call | caller token, id declared, args match schema, caps not exceeded | `isError` text naming the violated rule and the allowed shape |
 
 ### D8. UX / DX
@@ -135,47 +144,55 @@ Decision: injected steps do NOT inherit host tools, and may NOT declare `hostToo
 
 | # | Threat | Mitigation | Residual |
 |---|---|---|---|
-| H-1 | Argument injection (`--exec`, `-o`, `../`) | Typed args with pattern/enum; leading `-` refused by default; argv array | A pattern that is too loose, flow-author error; `flow validate` rejects unpatterned strings |
-| H-2 | Shell interpolation | `spawn` argv, `shell:false`; `.cmd/.bat` refused on Windows | None known; test with `; & | $()` canaries |
-| H-3 | Credential exposure to model or tool | Env by NAME allowlist; token and `FLOW_WORKER_TOKEN` stripped; model never sees env | The allowed CLI may read its own config (`~/.config/task`): that is the intended host authority |
-| H-4 | Tool output exfiltrates host secrets into the model | Output cap; `sideEffect` labelling; secret masking via the existing masker | A read tool returns whatever its CLI prints; choose tools accordingly |
-| H-5 | Local process abuses the callback port | Existing token + executionId constant-time check; loopback; per-step rule in sandbox | Same as today (T-08); VM model process can read the token from its own env, now it can call declared tools only (by design) |
-| H-6 | Model widens its own tools via `provideSteps` | D6 guard | Verify `mcpServers` guard (unverified) |
-| H-7 | Flow file from untrusted source declares tools | Worker executable allowlist; run-start refusal; `flow show` lists them; warning when `write` | An allowlisted binary with a dangerous subcommand: flow authors review argv templates |
-| H-8 | DoS (call flood, huge output, hang) | Timeout, output cap, concurrency 2, max 100 calls; kill process tree on timeout | Cost of an allowed slow CLI |
-| H-9 | Path/cwd escape | `cwd` only `workspace`/`none`; no path args unless pattern-constrained | A path arg with a loose pattern |
-| H-10 | Stale/forged tool list in VM | Host re-validates id and args per call from its own registry, never from the VM's list | None |
-| H-11 | Write tool in read-only workspace run | Compatibility check at validation | Advisory today (`ReadOnlyWorkspaceRules`) |
+Naming: ids continue the `F-nn` series of the "Flow execution" section of `.claude/threat-model.md` (F-01, F-02 exist; these start at F-03) so the rows can be copied there unchanged when slice 1 lands.
 
-Add the table rows to `.claude/threat-model.md` (Flow execution section) when slice 1 lands.
+| # | Threat | Mitigation | Residual |
+|---|---|---|---|
+| F-03 | Argument injection (`--exec`, `-o`, `../`) | Typed args with pattern/enum; leading `-` refused by default; argv array | A pattern that is too loose, flow-author error; `flow validate` rejects unpatterned strings |
+| F-04 | Shell interpolation | `spawn` argv, `shell:false`; `.cmd/.bat` refused on Windows | None known; test with `; & | $()` canaries |
+| F-05 | Credential exposure to model or tool | Env by NAME allowlist; tokens and `FLOW_WORKER_TOKEN` stripped; model never sees env | The allowed CLI may read its own config (`~/.config/task`): that is the intended host authority |
+| F-06 | Tool output exfiltrates host secrets into the model | Output cap; `sideEffect` labelling; existing masker | A read tool returns whatever its CLI prints; choose tools accordingly |
+| F-07 | Indirect prompt injection: the OUTPUT of a tool (task titles, issue text, file content) returns into the model context and can steer it | Output is returned as data inside a delimited block marked untrusted; slice 1 tools are `read` only; injected steps cannot gain `hostTools`, `mcpServers`, `toolHooks`, `host` (D6); args are schema-closed so a steered model cannot reach beyond the declared argv shapes | Real and not removable: a steered model can still call every declared tool with any valid args and relay the output to its own outputs. Keep tool sets minimal, do not combine with write tools or network-capable tools in one step |
+| F-08 | Local process abuses the callback port | Token + executionId constant-time check; loopback; per-step network rule in sandbox | Same as T-08: the VM model process can read the tokens from its env and call the declared tools only (by design) |
+| F-09 | One token authorises both `inject_steps` and `call_tool` | Two tokens, one per scope; tool token only issued when the step has tools; wrong-kind token destroys the connection (D3) | Same holder (helper + model share env): scope split limits what a leaked token buys, it does not hide it |
+| F-10 | Model widens its own tools via `provideSteps` | `InjectedStepGuard` whitelist, `hostTools` absent from `ALLOWED_KEYS`, test asserts it (D6) | A future edit that adds the key; the test is the guard |
+| F-11 | Flow file from an untrusted source declares tools | Slice 1: local worker only (a script step on a host worker already runs with the worker's whole environment, `.claude/plans/2026-11-13_host-script-environment.md` section 0 item 2); slice 2: executable allowlist mandatory on sandbox workers; run-start refusal; `flow show` lists tools; warning when `write` | An allowlisted binary with a dangerous subcommand: authors review argv templates |
+| F-12 | DoS (call flood, huge output, hang) | Timeout, output cap, concurrency 2, 100 calls; kill process tree on timeout; per-call timer (D3) | Cost of an allowed slow CLI |
+| F-13 | Path/cwd escape | `cwd` only `workspace`/`none`; no path args unless pattern-constrained | A path arg with a loose pattern |
+| F-14 | Stale/forged tool list in VM | Host re-validates id and args per call from its own registry, never from the VM's list | None |
+| F-15 | Write tool in read-only workspace run | Slice 1 has no write tools; later a compatibility check | Advisory today (`ReadOnlyWorkspaceRules`) |
+| F-16 | TOCTOU on the resolved executable: path swapped between run-start resolution and spawn | Absolute path + (size, mtime) recorded at run start, re-checked right before each spawn, spawn by absolute path, never by name | A same-user process can still swap between the re-check and `exec`; same user already owns the worker, so no new authority. Slice 2 allowlist entries pin the directory, not the name |
+| F-17 | Audit log leaks secrets or becomes an exfiltration channel | Argument VALUES logged only for args declared `log: true`, otherwise names + sha256; output content never logged (length only); env values never; tokens never; masker applied | An author marks a secret arg `log: true`; `flow validate` warns on `log: true` for args named like `token`/`secret`/`password` |
 
 ### D10. Phasing and work split
 
-Slice 1 (minimal, claude local + claude sandbox exec, inline A, read-only tools):
+Slice 1 = smallest end-to-end: claude + LOCAL (non-sandbox) worker + inline `hostTools`, `sideEffect: read` only, no allowlist config. Safe without the allowlist because on a local worker the flow author already has equal authority (a `script:` step runs on the host with the worker's environment), and the model only gets typed, closed argv shapes. It is NOT safe on a sandbox worker (the flow was written for confinement): so in slice 1 a step with `hostTools` that lands on a sandbox worker is refused by `ExecAssignment` with a named error (extend `refuseWhatTheToolCannotDo`, `ExecAssignment.ts:106-121`), never run without a check.
 
-| Part | Work |
+| Part | Slice 1 work |
 |---|---|
-| core (flow-engine) | `HostTool` type + step field `hostTools`; static validator (`HOST_TOOL_*`); `InjectedHostToolGuard` next to `InjectedHostMarkerGuard`; `flow show` rendering; schema docs |
-| worker (flow-cli) | callback protocol `call_tool` + reply; `HostToolRunner` (argv spawn, env allowlist, caps, audit log); `mcp-server.cjs` `tools/list` + `tools/call` from `FLOW_MCP_TOOLS`; worker capability + executable allowlist setting |
-| plugin (flow-sandbox) | no new rule needed (same callback port); `McpConfigRewriter` passes through the extra env (`FLOW_MCP_TOOLS`) and keeps refusing other servers; relay variant check; `T-08` note updated |
-| tests | canary env, injection corpus, timeout/output cap, VM->host e2e world, injected-step refusal, codex/opencode config snapshots |
+| core (flow-engine) | `HostTool` type + optional step field `hostTools` (no `.default()`); static validator `HOST_TOOL_*` (model steps only, size cap); `flow show` rendering; test that `InjectedStepGuard.ALLOWED_KEYS` lacks `hostTools`; schema docs |
+| protocol (flow-cli `ipc/Protocol.ts`) | `WORKER_FEATURE_HOST_TOOLS = 'host-tools'`; `AssignableStep` carries `hostTools` inside `stepConfig` (no new top-level `assign` field: unlike `requires`/`host`, the worker must read `stepConfig` anyway to build the server, and a top-level copy would be a second source of truth) |
+| worker (flow-cli) | add the feature to `WORKER_FEATURES` (`WorkerLaunch.ts:172-176`); callback v2 `call_tool` + reply + per-call timer + second token (D3); `HostToolLimits` + `HostToolRunner` (argv spawn, env allowlist, caps, audit); `mcp-server.cjs` `tools/list` + `tools/call` from `FLOW_MCP_TOOLS`; daemon routes `hostTools` steps only to workers declaring `host-tools` and fails at run start otherwise |
+| plugin (flow-sandbox) | slice 1: only the refusal above. No rewriter or port-rule change |
+| tests | canary env (incl. `FLOW_WORKER_TOKEN`), injection corpus (`; & | $()`, leading `-`, `../`), timeout and output cap, wrong-kind token, v1 inject still works, claude local e2e with one read tool, sandbox refusal |
 
-Slice 2: codex + opencode in sandbox exec (D4 table), named tools on the source (B), `write` tools. Slice 3 (optional): `host-tools=none` guarantee, per-tool call quotas, dry-run lint.
+Slice 2: claude on sandbox exec (rewriter passes `FLOW_MCP_TOOLS`, forwarder path, T-08 note), executable allowlist (mandatory on sandbox workers), named tools on the source (B), relay variant. Slice 3: codex and opencode (host and sandbox exec; needs per-provider VM rewriters), `write` tools, optional `host-tools=none` guarantee, quotas, dry-run lint.
 
 ## Open decisions for the user
 
-| # | Decision | Recommended default |
-|---|---|---|
-| O1 | Declaration site: A only, B only, or A+B with allowlist | A + worker executable allowlist now; B in slice 2 |
-| O2 | Allow `sideEffect: write` tools in slice 1 | No: read only first; write behind a warning in slice 2 |
-| O3 | Should hermetic/untrusted profiles forbid host tools (new guarantee `host-tools=none`) | Not in slice 1; revisit when a profile user asks |
-| O4 | Executable allowlist location: worker env var, source config in `plugin.config.js`, or `~/.config/flow` | Source/worker config (host owner), never the flow file |
-| O5 | Should codex/opencode in sandbox exec stay "plain prompt" unless the step has `hostTools` | Yes: only the engine `flow` server is relayed, user `mcpServers` stay refused |
-| O6 | Per-call approval for `write` tools | No; declared + allowlisted is the approval |
+| # | Owner | Decision | Recommended default | Consequence of each answer |
+|---|---|---|---|---|
+| O1 | USER | Declaration site: A inline only (what he asked), B named on the worker only, or A + executable allowlist | A inline in slice 1 on local workers; allowlist mandatory before any sandbox worker accepts a tool (slice 2) | A-only everywhere: simplest and literal, but any flow file defines what runs on the host, also under a sandbox. B-only: host owner controls, but contradicts "définies dans la step" and needs worker config before a flow runs. Recommended: literal ask now, safety gate where the confinement is |
+| O3 | USER | Should confined profiles (`hermetic-test`, `untrusted-code`) be able to forbid host tools via a new guarantee `host-tools=none`? | No guarantee in slice 1; revisit in slice 3 | A host tool is a hole in those profiles: without the guarantee a hermetic run can still reach host CLIs and nothing in the profile says so (`flow show` and a warning do). With it: profiles can refuse tools, at the cost of a new guarantee on every source |
+| O6 | USER | Per-call human approval for `write` tools | No: declared in the flow = approved; `write` tools do not exist before slice 3 | No approval: unattended runs work, but a steered model can trigger any declared write call. With approval: needs an interactive channel (`user_intervention`-style) and blocks headless runs |
+| O2 | ours (decided) | `sideEffect: write` in slice 1 | No: read only; write in slice 3 behind a `flow validate` warning | |
+| O4 | ours (decided) | Allowlist location (slice 2) | Source/worker config (host owner), never the flow file | |
+| O5 | ours (decided) | codex/opencode in sandbox exec | Stay a plain prompt (no MCP, today's behaviour) until slice 3; user `mcpServers` stay refused (`ExecAssignment.ts:112-119`) | |
 
 ## Unverified in code
 
-- Whether `StepInjection` refuses `mcpServers` (or `toolHooks`) on an injected model step: lines 1-80 show only the `host` guard; `StepFieldCopier.ts:36` copies `mcpServers`. If not refused, an injected step could ask for an arbitrary host MCP server today: check and fix independently of this plan.
+- Whether the exec wrapper worker (`ExecMain`) builds its `WorkerReady` with the same `WORKER_FEATURES` list (only `WorkerLaunch.ts:172-176,189-190,246` was read): needed for routing in slice 2.
+- Line numbers in `mcp-server.cjs` and `StepInjection.ts` moved while this plan was revised (flow-owner's injection fix is in the tree); re-check them at implementation.
 - Sandbox relay variant: whether it runs the model step engine on the host and passes MCP config the same way (only the exec variant was read).
 - Codex/opencode forwarder rewrite in the VM: `McpConfigRewriter` only parses the claude `{mcpServers}` shape; the opencode (`mcp`) and codex (`-c`) shapes in the VM have no rewriter yet.
 - Whether `ModelStepExecutor.ts:323` leaves room for the engine server to be re-added per provider without name clash.
@@ -183,7 +200,8 @@ Slice 2: codex + opencode in sandbox exec (D4 table), named tools on the source 
 
 ## Not in scope
 
-- Third-party/arbitrary MCP servers inside the sandbox.
+- Third-party/arbitrary MCP servers inside the sandbox (user `mcpServers` on codex/opencode stay refused there even after slice 3; only the engine `flow` server is relayed).
+- Not out of scope, only deferred: codex/opencode support and sandbox workers (slices 2-3).
 - Tools that run inside the VM (the VM already has its own shell).
 - Interactive approval UI, quotas across runs, remote (non-local) workers.
 - Changing `provideSteps` semantics or limits.
