@@ -272,13 +272,15 @@ export interface RunRequirementsRecord {
 	 * Present when the daemon added requirements to model steps that the flow did not write (implicit confinement: a worker
 	 * source guaranteeing the `agent` profile was configured when the run was accepted). The entries are ALREADY in the
 	 * `steps` sets above and are what is enforced; this only says which ones were implicit, so the confinement of a run can be
-	 * audited. A resume uses the stored sets and never evaluates the machine again. Absent on older records, when no source
-	 * covered the set, and when every model step already required it.
+	 * audited. A resume uses the stored sets and never evaluates the machine again. Also inherited by every step injected while
+	 * the run goes (any type, script included). Present whenever a source covered the set and the flow has a model step, even
+	 * when `steps` is empty (every model step already required it). Absent on older records, when no source covered the set,
+	 * and for a flow without model step.
 	 */
 	implicit?: {
 		/** The added entries, sorted. */
 		requires: string[];
-		/** The declared model steps that received them (an injected model step gets them too, from this field). */
+		/** The declared model steps that received them: possibly empty, never lists an injected step. */
 		steps: string[];
 	};
 }

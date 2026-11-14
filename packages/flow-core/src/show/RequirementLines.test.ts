@@ -162,4 +162,10 @@ describe('implicit confinement of model steps in the record', () => {
 		]);
 		expect(stepRecordedRequirementLines(recorded, 'plain', '  ')).toEqual([]);
 	});
+
+	it('prints no header line when the implicit set reached no declared step (output unchanged for such runs)', () => {
+		const untouched: RunRequirementsRecord = { ...recorded, implicit: { requires: recorded.implicit?.requires ?? [], steps: [] } };
+
+		expect(executionRequirementLines(untouched)).toEqual([]);
+	});
 });

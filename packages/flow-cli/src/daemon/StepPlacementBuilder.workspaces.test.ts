@@ -47,9 +47,30 @@ describe('StepPlacementBuilder - implicit confinement', () => {
 		expect(new StepPlacementBuilder(registryWithImplicit()).describe(injected('model')).requires).toEqual(agent);
 	});
 
-	it('requires nothing of an injected script step', () => {
-		expect(new StepPlacementBuilder(registryWithImplicit()).describe(injected('script'))).not.toHaveProperty(
-			'requires'
-		);
+	it('requires the implicit set of an injected script step: code the agent adds must stay in the sandbox', () => {
+		expect(new StepPlacementBuilder(registryWithImplicit()).describe(injected('script')).requires).toEqual(agent);
+	});
+
+	it('still requires nothing of a script step the flow defines', () => {
+		const registry = new ExecutionRegistry();
+		registry.bindRequirements('e1', {
+			run: [],
+			steps: { m: agent, s: [] },
+			implicit: { requires: agent, steps: ['m'] },
+		});
+		const placement = new StepPlacementBuilder(registry).describe({
+			stepId: 's',
+			stepConfig: { id: 's', type: 'script' } as never,
+			executionContext: { executionId: 'e1' } as never,
+		});
+
+		expect(placement).not.toHaveProperty('requires');
+	});
+
+	it('adds nothing to an injected script step of a run recorded without implicit set', () => {
+		const registry = new ExecutionRegistry();
+		registry.bindRequirements('e1', { run: [], steps: { m: [] } });
+
+		expect(new StepPlacementBuilder(registry).describe(injected('script'))).not.toHaveProperty('requires');
 	});
 });

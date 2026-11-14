@@ -64,7 +64,8 @@ export function executionRequirementLines(recorded: RunRequirementsRecord | unde
 	if (recorded.run.length > 0) {
 		lines.push(`Requires:  ${recorded.run.join(', ')}`);
 	}
-	if (recorded.implicit !== undefined && recorded.implicit.requires.length > 0) {
+	// Only when a declared step received it: a record that only carries the set for steps injected later shows as before.
+	if (recorded.implicit !== undefined && recorded.implicit.requires.length > 0 && recorded.implicit.steps.length > 0) {
 		lines.push(`Requires:  ${recorded.implicit.requires.join(', ')} ${IMPLICIT_NOTE}`);
 	}
 	return lines;

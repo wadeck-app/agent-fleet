@@ -58,10 +58,10 @@ describe('ImplicitConfinement', () => {
 			expect(warnings).toEqual([]);
 		});
 
-		it('adds nothing to a step that already requires the agent set', () => {
+			it('adds nothing to a step that already requires the agent set, but records the set for the steps injected later', () => {
 			const { requirements } = confinement.resolve(flow([model('m', { profile: 'agent' })]));
 
-			expect(requirements?.implicit).toBeUndefined();
+			expect(requirements?.implicit).toEqual({ requires: AGENT, steps: [] });
 		});
 	});
 

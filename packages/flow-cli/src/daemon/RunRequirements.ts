@@ -11,7 +11,7 @@ import { normaliseStepRequirements } from './RequirementMatcher.js';
  * changes what a running execution requires.
  *
  * @param implicit what the daemon adds to every model step on top of what the flow wrote (the `agent` profile when a worker
- *        source guaranteeing it is configured, see {@link ImplicitConfinement}); absent: nothing is added. Script steps never get it.
+ *        source guaranteeing it is configured, see {@link ImplicitConfinement}); absent: nothing is added. Declared script steps never get it; steps injected later do (see {@link requirementsForStep}).
  * @returns undefined when nothing in the flow requires anything (nothing to record or enforce)
  * @throws when a `requires` is malformed or a `profile` is unknown. The validator already refuses such a flow, so this is
  *         the guard for a path that skipped it; the message names the flow or the step.
@@ -49,8 +49,12 @@ export function resolveRunRequirements(
 		flow.profile === undefined && Object.keys(stepProfiles).length === 0
 			? {}
 			: { profiles: { ...(flow.profile === undefined ? {} : { run: flow.profile }), steps: stepProfiles } };
+	// Recorded as soon as the flow has a model step (the only kind that can inject steps), even when every one of them already
+	// requires the set: a step injected later inherits it from this record. A flow without model step records nothing.
 	const implicitRecord =
-		implicitSteps.length > 0 ? { implicit: { requires: [...new Set(implicit)].sort(), steps: implicitSteps } } : {};
+		implicit.length > 0 && flow.steps.some(step => step.type === MODEL_STEP_TYPE)
+			? { implicit: { requires: [...new Set(implicit)].sort(), steps: implicitSteps } }
+			: {};
 	const required = run.length > 0 || Object.values(steps).some(entries => entries.length > 0);
 	return required ? { run, steps, ...profiles, ...implicitRecord } : undefined;
 }
@@ -63,10 +67,10 @@ export const MODEL_STEP_TYPE = 'model';
  * other step (one injected at run time) inherits the run's (flow `requires` and flow `profile`), plus its own `requires`
  * and `profile`, read at each placement.
  *
- * An injected MODEL step also gets the implicit set the record holds (`recorded.implicit`): it is a model step too. The record
- * decides, never the current machine.
+ * An injected step of ANY type (script included) also gets the implicit set the record holds (`recorded.implicit`): code the
+ * agent adds while the flow runs must stay where the agent is confined. The record decides, never the current machine; a run
+ * recorded without implicit set adds nothing. Steps of the flow definition keep their recorded set (scripts: none implicit).
  *
- * @param stepType the step's `type`; only `model` receives the implicit set
  * @throws when an injected step's `requires` is malformed or its `profile` unknown; the caller fails that step with this
  *         message.
  */
@@ -74,15 +78,14 @@ export function requirementsForStep(
 	recorded: RunRequirementsRecord | undefined,
 	stepId: string,
 	stepRequires: unknown,
-	stepProfile?: unknown,
-	stepType?: string
+	stepProfile?: unknown
 ): string[] {
 	const declared = recorded?.steps[stepId];
 	if (declared !== undefined) {
 		return declared;
 	}
 	const own = normaliseStepRequirements(recorded?.run ?? [], stepRequires, stepId, stepProfile);
-	if (stepType !== MODEL_STEP_TYPE || recorded?.implicit === undefined) {
+	if (recorded?.implicit === undefined) {
 		return own;
 	}
 	return [...new Set([...own, ...recorded.implicit.requires])].sort();

@@ -190,14 +190,14 @@ describe('implicit requirements of model steps in resolveRunRequirements', () =>
 		expect(resolved?.run).toEqual(['sandbox']);
 	});
 
-	it('adds nothing, and records nothing implicit, to a step whose own requirements already cover the set', () => {
+	it('adds nothing to a step whose own requirements already cover the set, but still records the set (an injected step inherits it)', () => {
 		const resolved = resolveRunRequirements(
 			flow({}, [model('explicit', { profile: 'agent' }), model('stronger', { profile: 'untrusted-code' })]),
 			agent
 		);
 
 		expect(resolved?.steps.explicit).toEqual(agent);
-		expect(resolved).not.toHaveProperty('implicit');
+		expect(resolved?.implicit).toEqual({ requires: agent, steps: [] });
 	});
 
 	it('lists only the model steps that really received something', () => {
@@ -227,18 +227,30 @@ describe('implicit requirements in requirementsForStep', () => {
 	};
 
 	it('gives an injected model step the implicit set on top of the run set', () => {
-		expect(requirementsForStep(recorded, 'injected', undefined, undefined, 'model')).toEqual([...agent, 'sandbox']);
+		expect(requirementsForStep(recorded, 'injected', undefined, undefined)).toEqual([...agent, 'sandbox']);
 	});
 
-	it('gives an injected script step the run set only: scripts get what they declare', () => {
-		expect(requirementsForStep(recorded, 'injected', undefined, undefined, 'script')).toEqual(['sandbox']);
+	it('gives an injected script step the implicit set too: code the agent adds stays in the sandbox', () => {
+		expect(requirementsForStep(recorded, 'injected', undefined, undefined)).toEqual([...agent, 'sandbox']);
+	});
+
+	it('gives a declared script step only what it declares', () => {
+		const withScript = { ...recorded, steps: { ...recorded.steps, s: ['sandbox'] } };
+
+		expect(requirementsForStep(withScript, 's', undefined, undefined)).toEqual(['sandbox']);
 	});
 
 	it('uses the recorded set of a declared step, whatever the machine looks like now', () => {
-		expect(requirementsForStep({ run: [], steps: { m: [] } }, 'm', undefined, undefined, 'model')).toEqual([]);
+		expect(requirementsForStep({ run: [], steps: { m: [] } }, 'm', undefined, undefined)).toEqual([]);
+	});
+
+	it('gives an injected script step the set of a run whose declared model steps all required it themselves', () => {
+		const explicit = { run: [], steps: { m: agent }, implicit: { requires: agent, steps: [] } };
+
+		expect(requirementsForStep(explicit, 'injected', undefined, undefined)).toEqual(agent);
 	});
 
 	it('an injected model step of a run recorded without implicit set stays unconfined (the record decides, never the machine)', () => {
-		expect(requirementsForStep({ run: [], steps: {} }, 'injected', undefined, undefined, 'model')).toEqual([]);
+		expect(requirementsForStep({ run: [], steps: {} }, 'injected', undefined, undefined)).toEqual([]);
 	});
 });
