@@ -14,6 +14,7 @@ import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import { HostToolRouting } from './HostToolRouting.js';
 import { ReRunKindTracker } from './ReRunKindTracker.js';
 import type { ReadyStep, ReadyStepQueue } from './ReadyStepQueue.js';
+import { RequirementOnlyHint } from './RequirementOnlyHint.js';
 import { RequirementShortage } from './RequirementShortage.js';
 import { StepPlacementBuilder } from './StepPlacementBuilder.js';
 import { StepRouter } from './StepRouter.js';
@@ -21,9 +22,6 @@ import type { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 import type { GuaranteeLookup, RequirementOnlyLookup } from './WorkerTypeCatalog.js';
-
-/** The most workers named in the hint about requirement-only sources. */
-const MAX_REQUIREMENT_ONLY_WORKERS_NAMED = 5;
 
 /** Hands queued steps to the idle workers that may run them. */
 export class StepDispatcher {
@@ -37,6 +35,8 @@ export class StepDispatcher {
 	private readonly shortage: RequirementShortage | undefined;
 	/** What is read from the declared sources, answering the safe way when they cannot be read */
 	private readonly lookups: DispatchLookups;
+	/** Tells, once per step, which connected requirement-only workers did not take it */
+	private readonly requirementOnlyHint: RequirementOnlyHint;
 	/** Tells a retry from another re-run when a step starts again, for the attempt history */
 	private readonly reRunKinds = new ReRunKindTracker();
 	/** When each interactive step started waiting, so an S9 policy can bound its own wait */
@@ -66,14 +66,12 @@ export class StepDispatcher {
 		this.hostToolRouting = new HostToolRouting(this.router);
 		this.placements = new StepPlacementBuilder(executions);
 		this.lookups = new DispatchLookups(routing.workerTypes, logWriter);
+		this.requirementOnlyHint = new RequirementOnlyHint(registry, this.router, logWriter);
 		this.shortage =
 			routing.declaredGuarantees === undefined
 				? undefined
 				: new RequirementShortage(this.router, routing.declaredGuarantees, routing.wait, routing.contactErrors);
 	}
-
-	/** `executionId:stepId` of the steps already told that requirement-only workers are connected but do not take them. */
-	private readonly requirementOnlyHintReported = new Set<string>();
 
 	/** Drops the timers of the steps waiting for a worker that meets their requirements, for the daemon stop. */
 	stop(): void {
@@ -84,11 +82,7 @@ export class StepDispatcher {
 	forgetExecution(executionId: string): void {
 		this.routing.wait.forgetExecution(executionId);
 		this.lookups.forgetExecution(executionId);
-		for (const key of [...this.requirementOnlyHintReported]) {
-			if (key.startsWith(`${executionId}:`)) {
-				this.requirementOnlyHintReported.delete(key);
-			}
-		}
+		this.requirementOnlyHint.forgetExecution(executionId);
 		for (const key of this.interactiveWaitSince.keys()) {
 			if (key.startsWith(`${executionId}:`)) {
 				this.interactiveWaitSince.delete(key);
@@ -185,7 +179,7 @@ export class StepDispatcher {
 				this.dispatchTo(idleWorker, step, placement.requires);
 			} else {
 				if (requirementOnly !== undefined) {
-					this.hintAboutRequirementOnlyWorkers(step, placement, requirementOnly);
+					this.requirementOnlyHint.report(step, placement, requirementOnly);
 				}
 				unplaced.push(step);
 				for (const sourceId of sourcesToAsk) {
@@ -383,37 +377,5 @@ export class StepDispatcher {
 			return undefined;
 		}
 		return decision.sources;
-	}
-
-	/**
-	 * Once per step that requires nothing and found no worker: names the connected workers of requirement-only sources
-	 * that would have taken it, and the fix. Without it the step just waits (or runs on a forked host worker) and nothing
-	 * says why a connected sandbox worker stays idle.
-	 */
-	private hintAboutRequirementOnlyWorkers(
-		step: ReadyStep,
-		placement: StepPlacement,
-		isRequirementOnly: RequirementOnlyLookup
-	): void {
-		const key = `${step.executionContext.executionId}:${step.stepId}`;
-		if (this.requirementOnlyHintReported.has(key)) {
-			return;
-		}
-		const skipped = this.registry
-			.listConnected()
-			.filter(
-				worker => isRequirementOnly(worker.sourceId) && this.router.refusalOf(placement, worker) === undefined
-			);
-		if (skipped.length === 0) {
-			return;
-		}
-		this.requirementOnlyHintReported.add(key);
-		const names = skipped.slice(0, MAX_REQUIREMENT_ONLY_WORKERS_NAMED).map(worker => worker.workerId);
-		const more = skipped.length - names.length;
-		this.logWriter.writeExecution(
-			step.executionContext.executionId,
-			`Step '${step.stepId}' is not run by the connected worker(s) ${names.join(', ')}${more > 0 ? ` and ${String(more)} more` : ''}: their sources declare guarantees, so they serve only steps that require them. Add requires: [<guarantee>] or profile: <name> to the step (or the flow) to run it there (flow worker source list shows the guarantees); otherwise it waits for a host worker (one is forked when none is connected).`,
-			'warning'
-		);
 	}
 }

@@ -2,7 +2,7 @@
 
 A model step declares tools the worker runs on its own host, behind a closed argv. The model gets the capability, never a shell or the host credentials.
 
-> **Status (slice 1, steps 1-4 of the plan `.claude/plans/2026-11-14_generic-tool-provision-mcp.md`):** the field is parsed and validated, the wire protocol, the MCP helper and the host-side execution exist, the daemon routes `hostTools` steps only to workers declaring `host-tools`, a sandbox worker refuses them, and `flow show` lists them. **Not done yet** (step 5): the end-to-end run of a claude step on a local worker.
+> **Status (slice 1, steps 1-5 of the plan `.claude/plans/2026-11-14_generic-tool-provision-mcp.md`):** the field is parsed and validated, the wire protocol, the MCP helper and the host-side execution exist, the daemon routes `hostTools` steps only to workers declaring `host-tools`, a sandbox worker refuses them, `flow show` lists them, and the chain is tested end to end with real components (see [Tested end to end](#tested-end-to-end)). **Not proven:** a real model CLI calling a tool.
 > Slice 1 scope: provider `claude`, local (non-sandbox) worker, `sideEffect: read` only. Codex/opencode and sandbox workers are later slices.
 
 ## Fields
@@ -155,6 +155,23 @@ One `[host-tool] {json}` line per call, sent as an `info`/`system` log entry of 
 | F-13      | `cwd` is `workspace` or a fresh empty directory.                                              |
 | F-16      | Identity recheck before each spawn; residual: a same-user swap between recheck and exec.      |
 | F-17      | Audit as above.                                                                               |
+
+## Tested end to end
+
+`worker/HostToolEndToEnd.test.ts` runs the real `McpServer` (loopback TCP, issued tokens), `HostToolStepWiring` / call service / executor / audit log on fixture executables, and the real `mcp-server.cjs` as a child process speaking MCP over stdio (`test-utils/McpStdioTestClient`). The helper gets only the command and env `McpServer` hands out. No fake host.
+
+Proven:
+
+- The MCP session: `initialize`, `notifications/initialized` (no reply: a bug fixed with this test, the helper answered it with a `Method not found` error), `tools/list`, `tools/call`.
+- `tools/list` shows description and input schema; the command, executable path, env names and values, and every token appear nowhere the model can read (tool list, `FLOW_MCP_TOOLS`, helper stdout/stderr).
+- A valid call returns the fixture's stdout in the untrusted-data block; the audit line has names and sha256 only (value only for `log: true`, never output).
+- Injection corpus (`;`, `$()`, backticks, `&&`, newline, pipe, `../..`, 1000 characters): one inert argv element, marker file never written. Leading `-`, over 1024 characters and NUL: refused naming the rule.
+- Undeclared id (helper and raw callback), wrong type, out-of-range, missing, unknown argument: actionable error, session usable afterwards.
+- Timeout at 1 s: `timed out` reply and the detached grandchild stops. Output cap: marker, reply within the cap, audit `truncated`.
+- Child environment: undeclared worker variables, `FLOW_*` and the tokens never arrive; a declared name does. Declaring `FLOW_WORKER_*`, `FLOW_MCP_*`, `FLOW_EXECUTION_ID`, `FLOW_SANDBOX_HOST_*` fails at run start.
+- A step without tools: only `provideSteps`, no tool token, v1 inject unchanged. After `McpServer.stop()` both a tool call and `provideSteps` fail with the helper's `cannot reach the flow host callback ... the execution may have ended` message.
+
+Not proven: a real model CLI choosing and calling the tool (the claude mock CLI has no MCP support, so no automated test can), the daemon-to-worker assignment of `stepConfig.hostTools` through a live daemon.
 
 ## Confined profiles
 

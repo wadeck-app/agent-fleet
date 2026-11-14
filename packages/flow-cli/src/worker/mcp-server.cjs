@@ -465,6 +465,11 @@ function validateSteps(steps) {
 async function handle(req) {
 	const id = req.id ?? null;
 
+	// A notification (`notifications/initialized`, `notifications/cancelled`, ...) carries no id and gets no response, whatever its name.
+	if (req.id === undefined && typeof req.method === 'string' && req.method.startsWith('notifications/')) {
+		return;
+	}
+
 	switch (req.method) {
 		case 'initialize':
 			respond(id, {

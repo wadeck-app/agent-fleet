@@ -1,7 +1,8 @@
-import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import * as net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { McpStdioTestClient } from '../test-utils/McpStdioTestClient';
 
 const SERVER_PATH = fileURLToPath(new URL('./mcp-server.cjs', import.meta.url));
 const COMMAND_CANARY = 'secret-binary-CANARY';
@@ -28,9 +29,7 @@ describe('mcp-server.cjs host tools over stdio', () => {
 	let requests: Array<Record<string, unknown>>;
 	let rawLines: string[];
 	let behaviour: HostBehaviour;
-	let child: ChildProcessWithoutNullStreams | null;
-	let stdoutLines: string[];
-	let stderrText: string;
+	let client: McpStdioTestClient | null;
 
 	const answerOk: HostBehaviour = (socket, line) => {
 		socket.write(
@@ -50,9 +49,7 @@ describe('mcp-server.cjs host tools over stdio', () => {
 		requests = [];
 		rawLines = [];
 		behaviour = answerOk;
-		child = null;
-		stdoutLines = [];
-		stderrText = '';
+		client = null;
 		host = net.createServer(socket => {
 			let buffer = '';
 			socket.on('error', () => {});
@@ -73,45 +70,27 @@ describe('mcp-server.cjs host tools over stdio', () => {
 	});
 
 	afterEach(async () => {
-		child?.kill();
+		client?.kill();
 		await new Promise<void>(resolve => host.close(() => resolve()));
 	});
 
-	const startHelper = (env: Record<string, string> = {}): ChildProcessWithoutNullStreams => {
-		child = spawn(process.execPath, [SERVER_PATH], {
-			env: {
-				...process.env,
-				FLOW_MCP_CALLBACK_PORT: String(hostPort),
-				FLOW_MCP_CALLBACK_TOKEN: 'inject-token',
-				FLOW_MCP_TOOL_TOKEN: TOOL_TOKEN,
-				FLOW_EXECUTION_ID: 'exec-1',
-				FLOW_MCP_TOOLS: JSON.stringify([SHOW]),
-				...env,
-			},
+	const startHelper = (env: Record<string, string> = {}): McpStdioTestClient => {
+		client = new McpStdioTestClient([process.execPath, SERVER_PATH], {
+			...process.env,
+			FLOW_MCP_CALLBACK_PORT: String(hostPort),
+			FLOW_MCP_CALLBACK_TOKEN: 'inject-token',
+			FLOW_MCP_TOOL_TOKEN: TOOL_TOKEN,
+			FLOW_EXECUTION_ID: 'exec-1',
+			FLOW_MCP_TOOLS: JSON.stringify([SHOW]),
+			...env,
 		});
-		let pending = '';
-		child.stdout.on('data', chunk => {
-			pending += chunk.toString('utf8');
-			let newline: number;
-			while ((newline = pending.indexOf('\n')) !== -1) {
-				stdoutLines.push(pending.slice(0, newline));
-				pending = pending.slice(newline + 1);
-			}
-		});
-		child.stderr.on('data', chunk => (stderrText += chunk.toString('utf8')));
-		return child;
+		return client;
 	};
 
-	/** Sends one JSON-RPC request and resolves with the response carrying the same id. */
-	const rpc = async (method: string, params: unknown, id = 1): Promise<Record<string, any>> => {
-		child?.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
-		let found: Record<string, any> | undefined;
-		await expect
-			.poll(() => (found = stdoutLines.map(l => JSON.parse(l)).find(message => message.id === id)), {
-				timeout: 5000,
-			})
-			.toBeDefined();
-		return found as Record<string, any>;
+	/** Sends one JSON-RPC request and resolves with the response carrying its id. */
+	const rpc = async (method: string, params: unknown): Promise<Record<string, any>> => {
+		if (client === null) throw new Error('startHelper() must be called before rpc()');
+		return (await client.request(method, params)) as Record<string, any>;
 	};
 
 	it('lists provideSteps then the step tools, and never a command', async () => {
@@ -120,7 +99,7 @@ describe('mcp-server.cjs host tools over stdio', () => {
 		const names = response['result'].tools.map((tool: { name: string }) => tool.name);
 		expect(names).toEqual(['provideSteps', 'queue-task-show']);
 		expect(Object.keys(response['result'].tools[1]).sort()).toEqual(['description', 'inputSchema', 'name']);
-		expect(stdoutLines.join('\n')).not.toContain(COMMAND_CANARY);
+		expect(client?.everythingWritten).not.toContain(COMMAND_CANARY);
 	});
 
 	it('lists only provideSteps when the step has no host tools', async () => {
@@ -238,9 +217,8 @@ describe('mcp-server.cjs host tools over stdio', () => {
 		['the reserved name', { FLOW_MCP_TOOLS: JSON.stringify([{ ...SHOW, name: 'provideSteps' }]) }, 'reserves'],
 		['tools without a tool token', { FLOW_MCP_TOOL_TOKEN: '' }, 'FLOW_MCP_TOOL_TOKEN'],
 	])('exits with an actionable message on %s', async (_name, env, message) => {
-		const process = startHelper(env);
-		const code = await new Promise<number | null>(resolve => process.once('exit', resolve));
-		expect(code).toBe(1);
-		expect(stderrText).toContain(message);
+		const helper = startHelper(env);
+		expect(await helper.exited).toBe(1);
+		expect(helper.stderrText).toContain(message);
 	});
 });
