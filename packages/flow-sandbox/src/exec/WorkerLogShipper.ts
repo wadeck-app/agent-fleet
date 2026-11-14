@@ -1,14 +1,10 @@
+import { WORKER_FEATURE_WORKER_LOGS, WORKER_LOG_CHUNK_MAX_CHARS } from 'flow-cli/src/ipc/Protocol';
+
 import type { Clock } from '../Clock';
 import type { CancelScheduled, Scheduler } from '../Scheduler';
 
-/**
- * The `worker-logs` protocol of the flow daemon (flow-cli `Protocol.ts`: `WORKER_FEATURE_WORKER_LOGS`,
- * `WORKER_LOG_CHUNK_MAX_CHARS`, message `worker_log`). This branch's copy of flow-cli predates it, so the values are
- * declared here; replace them with the import once flow-cli on this branch has them.
- */
-export const WORKER_FEATURE_WORKER_LOGS = 'worker-logs';
-/** Most characters of one `worker_log` text. */
-export const WORKER_LOG_CHUNK_MAX_CHARS = 16 * 1024;
+// The `worker-logs` protocol of the flow daemon (message `worker_log`) is defined in flow-cli `Protocol.ts`.
+export { WORKER_FEATURE_WORKER_LOGS, WORKER_LOG_CHUNK_MAX_CHARS };
 
 /** What is kept while the daemon has not enabled shipping (the banner, the first lines): the newest of it. */
 export const SHIPPER_BACKLOG_MAX_CHARS = 64 * 1024;
