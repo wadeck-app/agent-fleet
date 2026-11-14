@@ -499,7 +499,22 @@ class FlowWorld {
 				: daemon.exitCode === null && daemon.signalCode === null
 					? `pid ${String(daemon.pid)} alive`
 					: `pid ${String(daemon.pid)} EXITED (code ${String(daemon.exitCode)}, signal ${String(daemon.signalCode)})`;
-		return `daemon: ${state}; log tail:\n${this.log().slice(-2500)}`;
+		return `daemon: ${state}; log tail:\n${this.log().slice(-2500)}\n${this.daemonOwnLogTail()}`;
+	}
+
+	/**
+	 * The daemons' OWN log (`<config>/logs/*.ndjson`: idle decisions, "failed to start", yield to an incumbent), written by every daemon of
+	 * this world, also one that `flow run` started by itself and that never wrote to {@link daemonLog}.
+	 */
+	private daemonOwnLogTail(): string {
+		const directory = path.join(this.isolation.configDir, 'logs');
+		if (!fs.existsSync(directory)) return `no daemon log directory (${directory})`;
+		const tails = fs
+			.readdirSync(directory)
+			.filter(name => name.endsWith('.ndjson'))
+			.sort()
+			.map(name => `${name}:\n${fs.readFileSync(path.join(directory, name), 'utf8').slice(-2500)}`);
+		return `daemon own log (${directory}):\n${tails.join('\n') || '(no file)'}`;
 	}
 
 	/**
