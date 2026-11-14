@@ -93,6 +93,10 @@ steps:
   prompt: Search for ${{ inputs.query }}
 ```
 
+## Host tools
+
+To give a model a tool that runs a CLI on the worker's host (closed argv, typed arguments), use `hostTools`, not `mcpServers`: see [host-tools.md](host-tools.md). Slice 1 validates the field; serving it is not wired yet.
+
 ## Selecting the provider
 
 Set `provider: opencode` or `provider: claude` on the step (defaults to `claude`). The `mcpServers` and `toolHooks` fields are identical regardless of provider.

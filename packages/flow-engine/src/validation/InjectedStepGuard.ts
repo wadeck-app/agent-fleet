@@ -60,7 +60,7 @@ export class InjectedStepGuard {
 			`provideSteps: refused, injected step(s) not allowed: ${named}. ` +
 			`Injected steps must have type ${ALLOWED_TYPES.map(type => `'${type}'`).join(' or ')} and may only carry: ${InjectedStepGuard.ALLOWED_KEYS.join(', ')} ` +
 			'(`skipPermissions` only as false, `host` only as false). ' +
-			'Privileged settings (mcpServers, toolHooks, permission mode, working directory, ...) belong to the flow definition, not to a step added while the flow runs. ' +
+			'Privileged settings (mcpServers, toolHooks, hostTools, permission mode, working directory, ...) belong to the flow definition, not to a step added while the flow runs. ' +
 			'Remove the listed keys, or move the step to the flow definition.'
 		);
 	}

@@ -10,6 +10,9 @@ const SURFACED_WARNING_CODES: ReadonlySet<ValidationCode> = new Set([
 	ValidationCode.WORKSPACE_DEPRECATED,
 	ValidationCode.WORKSPACE_WORKINGDIR_ABSOLUTE,
 	ValidationCode.HOST_SCRIPT_WITH_MODEL_STEPS,
+	ValidationCode.HOST_TOOL_UNDER_CONFINED_PROFILE,
+	ValidationCode.HOST_TOOL_UNUSED_ARG,
+	ValidationCode.HOST_TOOL_LOG_SENSITIVE,
 ]);
 
 /** One printable line per surfaced warning: the message, then the fix when there is one. */

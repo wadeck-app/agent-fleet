@@ -25,6 +25,7 @@
  * Phase 7: Contract validation (pre/post conditions) - only if schema valid
  * Phase 8: Simulation validation (execution paths) - only if all previous valid
  */
+import type { HostToolsConfinementPolicy } from '../hosttools/HostToolsConfinementPolicy';
 import type { FlowRegistry } from '../registry/FlowRegistry';
 import type { FlowDefinition } from '../types';
 import { ContractValidator } from './ContractValidator';
@@ -82,12 +83,26 @@ export class FlowValidator implements IssueCollector {
 	 * @param flowRegistry - Optional FlowRegistry for subflow validation
 	 * @param validTaskStatuses - Valid task status values for statusTransitions validation; if empty, values are not validated
 	 * @param knownGuarantees - Guarantee entries declared by the worker sources; absent = offline syntax-only validation of `requires` (the exact check happens in the daemon at run start)
+	 * @param hostToolsConfinement - Mode (warn | error) and its description for "hostTools under a confined profile", read from the user's setting by the caller; absent = a warning saying the setting was not consulted
+	 * @param implicitRequires - Requirements the daemon adds to every model step (the implicit `agent` profile); absent = none
 	 */
-	constructor(flowRegistry?: FlowRegistry, validTaskStatuses: string[] = [], knownGuarantees?: readonly string[]) {
+	constructor(
+		flowRegistry?: FlowRegistry,
+		validTaskStatuses: string[] = [],
+		knownGuarantees?: readonly string[],
+		hostToolsConfinement?: HostToolsConfinementPolicy,
+		implicitRequires: readonly string[] = []
+	) {
 		this.flowRegistry = flowRegistry;
 
 		// Initialize specialized validators with this as IssueCollector
-		this.schemaValidator = new SchemaValidator(this, validTaskStatuses, knownGuarantees);
+		this.schemaValidator = new SchemaValidator(
+			this,
+			validTaskStatuses,
+			knownGuarantees,
+			hostToolsConfinement,
+			implicitRequires
+		);
 		this.secretValidator = new SecretValidator(this);
 		this.scriptInterpolationValidator = new ScriptInterpolationValidator(this);
 		this.graphValidator = new GraphValidator(this, flowRegistry);

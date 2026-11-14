@@ -1,3 +1,4 @@
+import type { HostTool } from './hosttools/HostToolTypes';
 import type { McpServer } from './processing/ModelProvider';
 import type { ValidationIssue } from './validation/ValidationTypes';
 
@@ -26,6 +27,8 @@ export type ModelProviderName = 'claude' | 'opencode' | 'codex';
  * Re-exported from ModelProvider for use in flow definitions.
  */
 export type { McpServer } from './processing/ModelProvider';
+
+export type { HostTool } from './hosttools/HostToolTypes';
 
 /**
  * Mode recorded on a Workspace (isolated, shared, manual). Kept as a record type only: the native workspace manager that chose it was removed, so no code here allocates by mode any more.
@@ -668,6 +671,14 @@ export interface ModelFlowStep extends BaseFlowStep {
 	 * Each entry provides a named external MCP server over stdio.
 	 */
 	mcpServers?: McpServer[];
+
+	/**
+	 * Tools the worker runs on its host for this step (a closed argv per tool, typed arguments), served to the model through
+	 * the engine's `flow` MCP server. Model steps only; never allowed on an injected step. Stored as written: defaults are
+	 * applied where the tool runs.
+	 * @see HostTool
+	 */
+	hostTools?: HostTool[];
 
 	/**
 	 * Hooks to intercept tool calls made during this step.

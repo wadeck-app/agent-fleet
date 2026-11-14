@@ -444,6 +444,12 @@ Executes a task using an AI model (Claude).
 - **Common Mistakes**: Not providing enough context, forgetting to declare dependencies
 - **Related Fields**: Variables used must match `depends` declarations
 
+#### `hostTools`
+
+- **Type**: `HostTool[]` (optional, model steps only)
+- **Description**: Tools the worker runs on its host for this step (closed argv, typed arguments, `sideEffect: read` only). Validated today; **not served to the model yet** (execution lands in later steps of slice 1).
+- **Details**: [host-tools.md](host-tools.md). Never allowed on steps added by `provideSteps`.
+
 #### Other Properties
 
 See [Common Step Properties](#common-step-properties) for `context`, `output`, `depends`, `when`, `skipOnLoop`, `retry`, `onFailure`, `contract`.

@@ -34,6 +34,7 @@ export const MODEL_STEP_FIELDS: FieldList<ModelFlowStep> = {
 	subStepFeedbackPrompt: true,
 	session: true,
 	mcpServers: true,
+	hostTools: true,
 	toolHooks: true,
 	tools: true,
 	skipPermissions: true,

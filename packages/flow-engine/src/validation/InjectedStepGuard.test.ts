@@ -87,13 +87,58 @@ describe('InjectedStepGuard', () => {
 	});
 
 	it('refusal names steps, problems, the allowlist and where privileged settings belong', () => {
-		const message = InjectedStepGuard.refusal([{ stepId: 'deep', path: 'outer > deep', problem: 'key `mcpServers`' }]);
+		const message = InjectedStepGuard.refusal([
+			{ stepId: 'deep', path: 'outer > deep', problem: 'key `mcpServers`' },
+		]);
 		expect(message).toContain("'deep' (outer > deep): key `mcpServers`");
 		expect(message).toContain('may only carry');
 		for (const key of InjectedStepGuard.ALLOWED_KEYS) {
 			expect(message).toContain(key);
 		}
-		expect(message).toMatch(/mcpServers, toolHooks, permission mode, working directory.*flow definition/s);
+		expect(message).toMatch(
+			/mcpServers, toolHooks, hostTools, permission mode, working directory.*flow definition/s
+		);
+	});
+});
+
+// A model steered by hostile content must not widen its own reach: hostTools belongs to the flow definition (design D6).
+describe('InjectedStepGuard - hostTools is never injectable', () => {
+	const HOST_TOOLS = [{ id: 't', description: 'd', sideEffect: 'read', command: ['x'] }];
+
+	it('does not list hostTools among the allowed keys', () => {
+		expect(InjectedStepGuard.ALLOWED_KEYS).not.toContain('hostTools');
+	});
+
+	it.each([
+		['a script step', script({ hostTools: HOST_TOOLS }), 'a'],
+		['a model step', { id: 'm', type: 'model', prompt: 'p', hostTools: HOST_TOOLS }, 'm'],
+		['an empty list', script({ hostTools: [] }), 'a'],
+		['a null value', script({ hostTools: null }), 'a'],
+	])('refuses the batch when %s carries hostTools at depth 1', (_label, step, id) => {
+		expect(InjectedStepGuard.find([step])).toEqual([{ stepId: id, path: id, problem: 'key `hostTools`' }]);
+	});
+
+	it.each([
+		['steps', 'outer > mid > deep'],
+		['subSteps', 'outer > mid > deep'],
+	])('refuses hostTools nested under %s, reporting the path', (nestedKey, path) => {
+		const found = InjectedStepGuard.find([
+			script({
+				id: 'outer',
+				[nestedKey]: [script({ id: 'mid', [nestedKey]: [script({ id: 'deep', hostTools: HOST_TOOLS })] })],
+			}),
+		]);
+		expect(found).toEqual([{ stepId: 'deep', path, problem: 'key `hostTools`' }]);
+	});
+
+	it('names hostTools among the privileged settings in the refusal, so the model knows where it belongs', () => {
+		const message = InjectedStepGuard.refusal([{ stepId: 'a', path: 'a', problem: 'key `hostTools`' }]);
+		expect(message).toMatch(/Privileged settings \([^)]*hostTools[^)]*\) belong to the flow definition/);
+	});
+
+	it('refuses a batch where only one of several steps carries hostTools', () => {
+		const found = InjectedStepGuard.find([script({ id: 'ok' }), script({ id: 'bad', hostTools: HOST_TOOLS })]);
+		expect(found.map(entry => entry.stepId)).toEqual(['bad']);
 	});
 });
 

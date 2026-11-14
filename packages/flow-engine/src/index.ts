@@ -18,6 +18,24 @@ export type { ValidationIssue, ValidationResult } from './validation/FlowValidat
 export { ValidationCode } from './validation/ValidationTypes';
 export { InjectedHostMarkerGuard } from './validation/InjectedHostMarkerGuard';
 export type { InjectedHostMarker } from './validation/InjectedHostMarkerGuard';
+export { HostToolCallChecker } from './hosttools/HostToolCallChecker';
+export type { HostToolCallCheck } from './hosttools/HostToolCallChecker';
+export { HostToolModelView } from './hosttools/HostToolModelView';
+export type { HostToolModelDescription } from './hosttools/HostToolModelView';
+export { HostToolSchemaLimits } from './hosttools/HostToolSchemaLimits';
+export { HOST_TOOL_ARG_TYPES } from './hosttools/HostToolTypes';
+export type {
+	HostTool,
+	HostToolArg,
+	HostToolBooleanArg,
+	HostToolCwd,
+	HostToolEnumArg,
+	HostToolIntegerArg,
+	HostToolSideEffect,
+	HostToolStringArg,
+} from './hosttools/HostToolTypes';
+export { HOST_TOOLS_POLICY_NOT_CONSULTED } from './hosttools/HostToolsConfinementPolicy';
+export type { HostToolsConfinementPolicy } from './hosttools/HostToolsConfinementPolicy';
 export { InjectedStepGuard } from './validation/InjectedStepGuard';
 export type { InjectedStepViolation } from './validation/InjectedStepGuard';
 export type { InterventionHandler, InterventionRequest, InterventionResponse } from './executor/InterventionHandler';

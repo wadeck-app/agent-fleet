@@ -192,6 +192,30 @@ export function validationCodeToType(code: ValidationCode): string {
 		case ValidationCode.WORKER_TYPE_DEPRECATED:
 		case ValidationCode.WORKER_TYPE_REMOVED:
 		case ValidationCode.HOST_SCRIPT_WITH_MODEL_STEPS:
+		case ValidationCode.HOST_TOOL_STEP_TYPE:
+		case ValidationCode.HOST_TOOL_INVALID_SHAPE:
+		case ValidationCode.HOST_TOOL_INVALID_ID:
+		case ValidationCode.HOST_TOOL_DUPLICATE_ID:
+		case ValidationCode.HOST_TOOL_RESERVED_ID:
+		case ValidationCode.HOST_TOOL_MISSING_DESCRIPTION:
+		case ValidationCode.HOST_TOOL_INVALID_COMMAND:
+		case ValidationCode.HOST_TOOL_TEMPLATE_IN_COMMAND:
+		case ValidationCode.HOST_TOOL_INVALID_PLACEHOLDER:
+		case ValidationCode.HOST_TOOL_UNDECLARED_PLACEHOLDER:
+		case ValidationCode.HOST_TOOL_INVALID_ARG:
+		case ValidationCode.HOST_TOOL_ARG_NO_PATTERN:
+		case ValidationCode.HOST_TOOL_ARG_LEADING_DASH:
+		case ValidationCode.HOST_TOOL_INVALID_SIDE_EFFECT:
+		case ValidationCode.HOST_TOOL_WRITE_UNSUPPORTED:
+		case ValidationCode.HOST_TOOL_INVALID_CWD:
+		case ValidationCode.HOST_TOOL_INVALID_ENV:
+		case ValidationCode.HOST_TOOL_FORBIDDEN_ENV:
+		case ValidationCode.HOST_TOOL_LIMIT_EXCEEDED:
+		case ValidationCode.HOST_TOOL_TOO_MANY:
+		case ValidationCode.HOST_TOOL_DESCRIPTION_TOO_LARGE:
+		case ValidationCode.HOST_TOOL_UNDER_CONFINED_PROFILE:
+		case ValidationCode.HOST_TOOL_UNUSED_ARG:
+		case ValidationCode.HOST_TOOL_LOG_SENSITIVE:
 			return 'schema';
 		case ValidationCode.WORKSPACE_READONLY_CONFLICT:
 		case ValidationCode.WORKSPACE_DEPRECATED:

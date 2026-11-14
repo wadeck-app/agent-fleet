@@ -12,6 +12,8 @@
  * This validator focuses on STRUCTURE, not semantics (e.g., it doesn't validate
  * that step references are valid - that's done by other validators).
  */
+import type { HostToolsConfinementPolicy } from '../hosttools/HostToolsConfinementPolicy';
+import { HOST_TOOLS_POLICY_NOT_CONSULTED } from '../hosttools/HostToolsConfinementPolicy';
 import type {
 	FlowDefinition,
 	FlowStep,
@@ -31,6 +33,8 @@ import { WorkspaceDeclarationParser } from '../workspace/WorkspaceDeclarationPar
 import { WorktreeOptionRules } from '../workspace/WorktreeOptionRules';
 import { AbsolutePathSyntax } from './AbsolutePathSyntax';
 import { HostScriptMarkerValidator } from './HostScriptMarkerValidator';
+import { HostToolValidator } from './HostToolValidator';
+import { HostToolsConfinementValidator } from './HostToolsConfinementValidator';
 import { RequirementValidator } from './RequirementValidator';
 import type { IssueCollector } from './ValidationTypes';
 import { ValidationCode } from './ValidationTypes';
@@ -61,14 +65,29 @@ export class SchemaValidator {
 		 * Guarantee entries (`fs=confined`, `sandbox`) declared by the worker sources, to check `requires` against.
 		 * Absent: offline syntax-only validation; the exact check happens in the daemon at run start.
 		 */
-		knownGuarantees?: readonly string[]
+		knownGuarantees?: readonly string[],
+		/**
+		 * The user's setting for "hostTools under a confined profile" (mode and the text describing it), passed by the caller
+		 * that read the configuration. Absent: the finding is still reported, as a warning that says the setting was not consulted.
+		 */
+		hostToolsConfinement: HostToolsConfinementPolicy = HOST_TOOLS_POLICY_NOT_CONSULTED,
+		/** Requirements the daemon adds to every model step (the implicit `agent` profile); empty offline. */
+		implicitRequires: readonly string[] = []
 	) {
 		this.requirementValidator = new RequirementValidator(issueCollector, knownGuarantees);
 		this.hostScriptMarker = new HostScriptMarkerValidator(issueCollector);
+		this.hostToolValidator = new HostToolValidator(issueCollector);
+		this.hostToolsConfinementValidator = new HostToolsConfinementValidator(
+			issueCollector,
+			hostToolsConfinement,
+			implicitRequires
+		);
 	}
 
 	private readonly requirementValidator: RequirementValidator;
 	private readonly hostScriptMarker: HostScriptMarkerValidator;
+	private readonly hostToolValidator: HostToolValidator;
+	private readonly hostToolsConfinementValidator: HostToolsConfinementValidator;
 
 	/**
 	 * Validate flow schema
@@ -138,6 +157,7 @@ export class SchemaValidator {
 		// Validate steps
 		const stepIds = this.validateSteps(flow.steps);
 		this.hostScriptMarker.validateFlow(flow);
+		this.hostToolsConfinementValidator.validateFlow(flow);
 
 		return { stepIds, normalizedInputs };
 	}
@@ -556,6 +576,7 @@ export class SchemaValidator {
 			this.validateStepLabels(step);
 			this.requirementValidator.validateStep(step);
 			this.hostScriptMarker.validateStep(step);
+			this.hostToolValidator.validateStep(step);
 
 			// Type-specific validation
 			this.validateStepType(step);
