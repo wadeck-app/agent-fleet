@@ -47,6 +47,18 @@ function declared(bySource: Record<string, string[]>, unread: string[] = [], res
 }
 
 describe('ImplicitConfinement', () => {
+	describe('implicitSetFor', () => {
+		it('is the agent set when a source serves the project', () => {
+			const confinement = new ImplicitConfinement(declared({ sbx: AGENT }, [], { sbx: ['p1'] }));
+			expect(confinement.implicitSetFor('p1')).toEqual(AGENT);
+		});
+
+		it('is empty when the only covering source serves other projects, or none is declared', () => {
+			expect(new ImplicitConfinement(declared({ sbx: AGENT }, [], { sbx: ['p1'] })).implicitSetFor('p2')).toEqual([]);
+			expect(new ImplicitConfinement(undefined).implicitSetFor('p1')).toEqual([]);
+		});
+	});
+
 	describe('a declared source covers the agent set', () => {
 		const confinement = new ImplicitConfinement(declared({ sbx: [...AGENT, 'sandbox'] }));
 

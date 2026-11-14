@@ -28,6 +28,16 @@ export class ImplicitConfinement {
 	constructor(private readonly declared: Pick<DeclaredGuarantees, 'providersOfAllForProject' | 'unread'> | undefined) {}
 
 	/**
+	 * The implicit set a model step of a run of this project receives (the `agent` profile entries), or an empty list when no
+	 * declared source covers the project. Same decision as {@link resolve}, for callers that only need the set.
+	 */
+	implicitSetFor(projectId?: string): readonly string[] {
+		const agent = ProfileCatalog.expand(IMPLICIT_PROFILE, 'The implicit profile');
+		const covered = (this.declared?.providersOfAllForProject(agent, projectId).serving.length ?? 0) > 0;
+		return covered ? agent : [];
+	}
+
+	/**
 	 * Resolves the requirements of a flow with the implicit set, or the warnings for the model steps left unconfined.
 	 *
 	 * @param projectId the registry id of the project of the run; absent: not covered as soon as a source restricts its projects
