@@ -5,7 +5,7 @@ import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { InjectedStep } from '../ipc/Protocol';
 import { HostToolFixtureDirectory } from '../test-utils/HostToolFixtureDirectory';
@@ -214,7 +214,8 @@ describe('host tools end to end through the real MCP server, callback and execut
 			const steps = [{ id: 'a', type: 'script', script: 'echo' }];
 			const reply = await call(step, 'provideSteps', { steps });
 			expect(reply.isError).toBe(false);
-			expect(step.injected).toEqual(steps);
+			// The v1 inject message is fire-and-forget: the model gets its reply when the helper wrote it, before the worker handled it.
+			await vi.waitFor(() => expect(step.injected).toEqual(steps));
 		});
 	});
 
@@ -432,7 +433,8 @@ describe('host tools end to end through the real MCP server, callback and execut
 
 				const steps = [{ id: 'a', type: 'script', script: 'echo' }];
 				expect((await call(step, 'provideSteps', { steps })).isError).toBe(false);
-				expect(step.injected).toEqual(steps);
+				// Fire-and-forget v1 message (see above): wait for the worker to handle it.
+				await vi.waitFor(() => expect(step.injected).toEqual(steps));
 
 				const unknown = await step.client.request('tools/call', { name: 'echo-args', arguments: {} });
 				expect(unknown.error?.message).toContain('Available tools: provideSteps');
