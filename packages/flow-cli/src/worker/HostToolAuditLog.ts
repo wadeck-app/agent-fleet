@@ -1,5 +1,6 @@
 import type { HostTool } from 'flow-engine';
 import * as crypto from 'node:crypto';
+import { isRecord } from 'shared-common/utils/isRecord';
 
 export type HostToolCallOutcome = 'ok' | 'failed' | 'timed_out' | 'denied' | 'error' | 'aborted';
 
@@ -74,8 +75,10 @@ export class HostToolAuditLog {
 	private describeArguments(entry: HostToolAuditEntry): Record<string, { sha256: string; value?: unknown }> {
 		const described: Record<string, { sha256: string; value?: unknown }> = {};
 		const raw = entry.rawArgs;
-		if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return described;
-		for (const [name, value] of Object.entries(raw as Record<string, unknown>).slice(0, MAX_ARGUMENT_NAMES)) {
+		if (!isRecord(raw)) {
+			return described;
+		}
+		for (const [name, value] of Object.entries(raw).slice(0, MAX_ARGUMENT_NAMES)) {
 			const shortName = HostToolAuditLog.clean(name, MAX_NAME_LENGTH);
 			const keepValue =
 				entry.validated && entry.tool?.args !== undefined && Object.hasOwn(entry.tool.args, name)
@@ -95,7 +98,9 @@ export class HostToolAuditLog {
 		let cleaned = '';
 		for (const character of text) {
 			const replacement = isControlCharacter(character) ? (VISIBLE_ESCAPES[character] ?? '?') : character;
-			if (cleaned.length + replacement.length > maxLength) break;
+			if (cleaned.length + replacement.length > maxLength) {
+				break;
+			}
 			cleaned += replacement;
 		}
 		return cleaned;

@@ -1,5 +1,6 @@
 import type { HostTool } from 'flow-engine';
 import { HostToolCallChecker } from 'flow-engine';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import type { HostToolAuditEntry, HostToolAuditLog, HostToolCallOutcome } from './HostToolAuditLog';
 import type { HostToolCallHandler, HostToolCallReply, HostToolCallRequest } from './HostToolCallTypes';
@@ -117,7 +118,7 @@ export class HostToolCallService implements HostToolCallHandler {
 			return reply;
 		} catch (error) {
 			// An executor bug must not leave the model without an answer, nor hide behind a stack trace.
-			const message = error instanceof Error ? error.message : String(error);
+			const message = normalizeError(error).message;
 			const text = `Tool '${tool.id}' was not run: internal error in the host tool runner: ${message}`;
 			this.options.audit.record({
 				...this.baseEntry(request, tool, true),
@@ -172,8 +173,12 @@ export class HostToolCallService implements HostToolCallHandler {
 	}
 
 	private static outcomeOf(reply: HostToolCallReply, problem: string | undefined): HostToolCallOutcome {
-		if (problem !== undefined) return 'error';
-		if (reply.timedOut === true) return 'timed_out';
+		if (problem !== undefined) {
+			return 'error';
+		}
+		if (reply.timedOut === true) {
+			return 'timed_out';
+		}
 		return reply.ok ? 'ok' : 'failed';
 	}
 }

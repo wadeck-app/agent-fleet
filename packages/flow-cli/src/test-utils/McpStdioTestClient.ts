@@ -3,7 +3,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 /** One JSON-RPC message read from the server's stdout. */
 export interface JsonRpcMessage {
 	jsonrpc?: string;
-	id?: number | string | null;
+	id?: number | null;
 	// The shape of a result is what each test asserts on, so it is left untyped here.
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	result?: any;
@@ -30,7 +30,7 @@ export class McpStdioTestClient {
 		if (executable === undefined) {
 			throw new Error('McpStdioTestClient: the command is empty. Fix: pass the executable as the first element.');
 		}
-		this.child = spawn(executable, args, { env: { ...env } });
+		this.child = spawn(executable, args, { env: { ...env }, windowsHide: true });
 		this.exited = new Promise(resolve => this.child.once('exit', code => resolve(code)));
 		let pending = '';
 		this.child.stdout.on('data', chunk => {
@@ -71,7 +71,9 @@ export class McpStdioTestClient {
 			}, timeoutMs);
 			const check = (): void => {
 				const found = find();
-				if (found === undefined) return;
+				if (found === undefined) {
+					return;
+				}
 				clearTimeout(timer);
 				this.listeners.delete(check);
 				resolve(found);

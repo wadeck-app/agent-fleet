@@ -32,7 +32,9 @@ export interface HostToolStepWiringOptions {
 export class HostToolStepWiring {
 	static prepare(options: HostToolStepWiringOptions): HostToolServing | undefined {
 		const tools = options.hostTools;
-		if (tools === undefined || tools.length === 0) return undefined;
+		if (tools === undefined || tools.length === 0) {
+			return undefined;
+		}
 		for (const tool of tools) {
 			for (const name of tool.env ?? []) {
 				if (HostToolEnvironment.isDenied(name)) {

@@ -12,7 +12,7 @@ export class HostToolExecutableError extends Error {
 	}
 }
 
-/** The executable of a tool as found at run start: absolute path plus the identity re-checked before every spawn (F-16). */
+/** The executable of a tool as found at run start: absolute path plus the identity re-checked before every launch (F-16). */
 export interface ResolvedHostExecutable {
 	toolId: string;
 	/** `command[0]` as the author wrote it. */
@@ -80,7 +80,9 @@ export class HostToolExecutableResolver {
 		for (const directory of searched) {
 			for (const name of this.candidateNames(command)) {
 				const candidate = path.join(directory, name);
-				if (this.isRunnable(candidate)) return this.accept(label, tool.id, command, candidate);
+				if (this.isRunnable(candidate)) {
+					return this.accept(label, tool.id, command, candidate);
+				}
 			}
 		}
 		// Never resolved through: only checked, so that the author is told why a command that exists is refused.
@@ -163,7 +165,9 @@ export class HostToolExecutableResolver {
 	private searchPath(): { absolute: string[]; relative: string[] } {
 		const entry = Object.entries(this.options.environment).find(([name]) => name.toUpperCase() === 'PATH');
 		const value = entry?.[1] ?? '';
-		if (value === '') return { absolute: [], relative: [] };
+		if (value === '') {
+			return { absolute: [], relative: [] };
+		}
 		const parts = value.split(path.delimiter);
 		return {
 			absolute: parts.filter(part => part !== '' && path.isAbsolute(part)),
@@ -172,18 +176,26 @@ export class HostToolExecutableResolver {
 	}
 
 	private candidateNames(command: string): string[] {
-		if (this.platform !== 'win32') return [command];
+		if (this.platform !== 'win32') {
+			return [command];
+		}
 		const entry = Object.entries(this.options.environment).find(([name]) => name.toUpperCase() === 'PATHEXT');
 		const extensions = (entry?.[1] ?? DEFAULT_PATHEXT).split(';').filter(part => part !== '');
 		const own = path.extname(command).toLowerCase();
-		if (own !== '' && extensions.some(extension => extension.toLowerCase() === own)) return [command];
+		if (own !== '' && extensions.some(extension => extension.toLowerCase() === own)) {
+			return [command];
+		}
 		return extensions.map(extension => command + extension);
 	}
 
 	private isRunnable(candidate: string): boolean {
 		try {
-			if (!fs.statSync(candidate).isFile()) return false;
-			if (this.platform !== 'win32') fs.accessSync(candidate, fs.constants.X_OK);
+			if (!fs.statSync(candidate).isFile()) {
+				return false;
+			}
+			if (this.platform !== 'win32') {
+				fs.accessSync(candidate, fs.constants.X_OK);
+			}
 			return true;
 		} catch {
 			return false;

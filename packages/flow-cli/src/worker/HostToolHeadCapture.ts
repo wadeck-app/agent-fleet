@@ -9,7 +9,9 @@ export class HostToolHeadCapture {
 	push(chunk: Buffer): void {
 		this.total += chunk.length;
 		const room = this.limitBytes - this.kept;
-		if (room <= 0) return;
+		if (room <= 0) {
+			return;
+		}
 		const piece = chunk.length <= room ? chunk : chunk.subarray(0, room);
 		this.chunks.push(piece);
 		this.kept += piece.length;

@@ -1,3 +1,5 @@
+import { isRecord } from 'shared-common/utils/isRecord';
+
 import { ConfigDrivenExecutables } from '../hosttools/ConfigDrivenExecutables';
 import { HostToolModelView } from '../hosttools/HostToolModelView';
 import { HostToolSchemaLimits } from '../hosttools/HostToolSchemaLimits';
@@ -83,10 +85,7 @@ export class HostToolValidator {
 	}
 
 	private validateTool(tool: unknown, index: number, seen: Set<string>, stepReporter: HostToolIssueReporter): void {
-		const fields =
-			typeof tool === 'object' && tool !== null && !Array.isArray(tool)
-				? (tool as Record<string, unknown>)
-				: undefined;
+		const fields = isRecord(tool) ? tool : undefined;
 		const reporter = stepReporter.forTool(index, fields?.['id']);
 		if (fields === undefined) {
 			reporter.error(

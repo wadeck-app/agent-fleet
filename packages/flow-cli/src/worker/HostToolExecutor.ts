@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
 import { HostToolArgv } from './HostToolArgv';
 import type { HostToolCallReply } from './HostToolCallTypes';
@@ -76,8 +77,8 @@ interface RawOutcome {
 const KILL_GRACE_MS = 5_000;
 
 /**
- * Runs ONE validated host tool call on the worker's host: `spawn(absolutePath, argv, {shell:false})`, no shell, no
- * globbing. The environment is the baseline plus the NAMES the tool declares (never the worker's credentials or the
+ * Runs ONE validated host tool call on the worker's host: a direct launch of `absolutePath` with `argv` and
+ * `shell:false`, no shell, no globbing. The environment is the baseline plus the NAMES the tool declares (never the worker's credentials or the
  * per-step tokens), the working directory is the workspace or a fresh empty directory removed afterwards, and the
  * process tree is ended when `timeoutSeconds` elapse. The reply is capped and wrapped as untrusted data
  * ({@link HostToolReplyFormatter}). Never throws for a tool problem: it answers `ok:false` with an actionable text.
@@ -119,7 +120,9 @@ export class HostToolExecutor {
 			...refuse(`the call was aborted (${String(execution.signal?.reason)}) before the process started`),
 			aborted: true,
 		});
-		if (HostToolExecutor.isAborted(execution.signal)) return abortedBeforeSpawn();
+		if (HostToolExecutor.isAborted(execution.signal)) {
+			return abortedBeforeSpawn();
+		}
 
 		let argv: string[];
 		try {
@@ -127,14 +130,14 @@ export class HostToolExecutor {
 			this.options.resolver.verify(stepId, executable);
 			argv = HostToolArgv.build(tool, execution.values);
 		} catch (error) {
-			return refuse(error instanceof Error ? error.message : String(error));
+			return refuse(normalizeError(error).message);
 		}
 
 		let directory: { cwd: string; remove: () => Promise<string | undefined> };
 		try {
 			directory = await this.prepareDirectory(execution);
 		} catch (error) {
-			return refuse(error instanceof Error ? error.message : String(error));
+			return refuse(normalizeError(error).message);
 		}
 
 		// The directory was prepared asynchronously: the signal may have fired meanwhile, and nothing must be spawned then.
@@ -142,8 +145,12 @@ export class HostToolExecutor {
 			? undefined
 			: await this.run(execution, argv, directory.cwd, environment.env);
 		const removalProblem = await directory.remove();
-		if (outcome === undefined) return abortedBeforeSpawn();
-		if (removalProblem !== undefined) outcome.notes.push(removalProblem);
+		if (outcome === undefined) {
+			return abortedBeforeSpawn();
+		}
+		if (removalProblem !== undefined) {
+			outcome.notes.push(removalProblem);
+		}
 		const result = {
 			durationMs: Date.now() - started,
 			stdoutBytes: outcome.stdout.totalBytes,
@@ -224,7 +231,7 @@ export class HostToolExecutor {
 					await fs.promises.rm(cwd, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 					return undefined;
 				} catch (error) {
-					return `Could not remove the temporary working directory '${cwd}': ${error instanceof Error ? error.message : String(error)}.`;
+					return `Could not remove the temporary working directory '${cwd}': ${normalizeError(error).message}.`;
 				}
 			},
 		};
@@ -259,26 +266,33 @@ export class HostToolExecutor {
 					stdio: ['ignore', 'pipe', 'pipe'],
 				});
 			} catch (error) {
-				outcome.startFailure = error instanceof Error ? error.message : String(error);
+				outcome.startFailure = normalizeError(error).message;
 				resolve(outcome);
 				return;
 			}
 			let settled = false;
 			let deadline: NodeJS.Timeout | undefined;
 			const settle = (): void => {
-				if (settled) return;
+				if (settled) {
+					return;
+				}
 				settled = true;
 				execution.signal?.removeEventListener('abort', onAbort);
 				clearTimeout(timer);
-				if (deadline !== undefined) clearTimeout(deadline);
+				if (deadline !== undefined) {
+					clearTimeout(deadline);
+				}
 				resolve(outcome);
 			};
 			child.stdout!.on('data', (chunk: Buffer) => outcome.stdout.push(chunk));
 			child.stderr!.on('data', (chunk: Buffer) => outcome.stderr.push(chunk));
 			child.once('error', error => {
 				// Before the process exists this is a start failure; later it is only worth a note.
-				if (child.pid === undefined) outcome.startFailure = error.message;
-				else outcome.notes.push(`Process error: ${error.message}`);
+				if (child.pid === undefined) {
+					outcome.startFailure = normalizeError(error).message;
+				} else {
+					outcome.notes.push(`Process error: ${normalizeError(error).message}`);
+				}
 				settle();
 			});
 			child.once('close', (code, signal) => {
@@ -288,7 +302,9 @@ export class HostToolExecutor {
 			});
 			// Sync: the tree is killed before the abort() that triggered this returns; the reply is dropped by the caller.
 			const onAbort = (): void => {
-				if (settled) return;
+				if (settled) {
+					return;
+				}
 				outcome.aborted = true;
 				this.stopTree(child, outcome);
 				child.stdout!.destroy();
@@ -318,16 +334,20 @@ export class HostToolExecutor {
 	}
 
 	private stopTree(child: ChildProcess, outcome: RawOutcome): void {
-		if (child.pid === undefined) return;
+		if (child.pid === undefined) {
+			return;
+		}
 		try {
 			this.killTree(child.pid);
 		} catch (error) {
 			outcome.notes.push(
-				`Could not stop the process tree: ${error instanceof Error ? error.message : String(error)}. The tool may still be running.`
+				`Could not stop the process tree: ${normalizeError(error).message}. The tool may still be running.`
 			);
 			child.kill();
 		}
-		if (this.platform !== 'win32') this.killProcessGroup(child.pid, outcome);
+		if (this.platform !== 'win32') {
+			this.killProcessGroup(child.pid, outcome);
+		}
 	}
 
 	/** After the tree kill (which needs the parent links): whatever is left in the tool's group, double-forked ones included. */
@@ -336,9 +356,11 @@ export class HostToolExecutor {
 			this.signalProcess(-pid, 'SIGKILL');
 		} catch (error) {
 			// ESRCH: the group has no member left, which is the goal.
-			if ((error as NodeJS.ErrnoException).code === 'ESRCH') return;
+			if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+				return;
+			}
 			outcome.notes.push(
-				`Could not stop the process group: ${error instanceof Error ? error.message : String(error)}. The tool may still be running.`
+				`Could not stop the process group: ${normalizeError(error).message}. The tool may still be running.`
 			);
 		}
 	}

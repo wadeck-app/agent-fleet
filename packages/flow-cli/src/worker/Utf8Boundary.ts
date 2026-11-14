@@ -2,7 +2,9 @@
 export class Utf8Boundary {
 	/** The longest prefix of at most `maxBytes` bytes that ends on a character boundary. */
 	static prefix(buffer: Buffer, maxBytes: number): Buffer {
-		if (buffer.length <= maxBytes) return buffer;
+		if (buffer.length <= maxBytes) {
+			return buffer;
+		}
 		let end = Math.max(0, maxBytes);
 		// The first excluded byte is a continuation byte: the cut is inside a character, step back to its first byte.
 		while (end > 0 && (buffer[end]! & 0xc0) === 0x80) end--;
@@ -14,7 +16,9 @@ export class Utf8Boundary {
 		const earliest = Math.max(0, buffer.length - 4);
 		for (let index = buffer.length - 1; index >= earliest; index--) {
 			const byte = buffer[index]!;
-			if ((byte & 0xc0) === 0x80) continue;
+			if ((byte & 0xc0) === 0x80) {
+				continue;
+			}
 			const length = byte >= 0xf0 ? 4 : byte >= 0xe0 ? 3 : byte >= 0xc0 ? 2 : 1;
 			return index + length > buffer.length ? buffer.subarray(0, index) : buffer;
 		}
@@ -30,7 +34,9 @@ export class Utf8Boundary {
 
 	/** The longest suffix of at most `maxBytes` bytes that starts on a character boundary. */
 	static suffix(buffer: Buffer, maxBytes: number): Buffer {
-		if (buffer.length <= maxBytes) return buffer;
+		if (buffer.length <= maxBytes) {
+			return buffer;
+		}
 		let start = buffer.length - Math.max(0, maxBytes);
 		while (start < buffer.length && (buffer[start]! & 0xc0) === 0x80) start++;
 		return buffer.subarray(start);

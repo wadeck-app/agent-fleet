@@ -29,7 +29,9 @@ export class HostToolWorkspaceExecutableWarning {
 			const inside = files.some(file =>
 				workspaces.some(workspace => HostToolWorkspaceExecutableWarning.contains(workspace, file, pathApi))
 			);
-			if (!inside) continue;
+			if (!inside) {
+				continue;
+			}
 			warnings.push(
 				`[host-tool] WARNING Step '${options.stepId}' tool '${toolId}': executable '${executable.absolutePath}' is inside the workspace '${options.workspaceDir}'. The model can write the workspace, so it could replace the executable between calls; the size and modified-time check does not stop a writer who restores both. Fix: use an executable outside the workspace.`
 			);

@@ -158,7 +158,9 @@ export class McpServer {
 	/** The one mechanism by which the helper learns the tools: what the model sees plus each timeout, never the command. */
 	private hostToolEnv(): Record<string, string> {
 		const tools = this.declaredTools();
-		if (tools.length === 0 || this.toolToken === null) return {};
+		if (tools.length === 0 || this.toolToken === null) {
+			return {};
+		}
 		const entries = tools.map(tool => ({
 			...HostToolModelView.describe(tool),
 			timeoutSeconds: HostToolLimits.resolve(tool).timeoutSeconds,
@@ -168,7 +170,9 @@ export class McpServer {
 
 	private callToolConfig(): McpCallToolConfig | null {
 		const serving = this.options.hostTools;
-		if (serving === undefined || this.toolToken === null) return null;
+		if (serving === undefined || this.toolToken === null) {
+			return null;
+		}
 		return {
 			toolToken: this.toolToken,
 			declared: serving.tools.map(tool => {
@@ -183,7 +187,9 @@ export class McpServer {
 	/** No fallback: a set the helper cannot be given makes the step fail at run start. */
 	private assertToolsFit(): void {
 		const serving = this.options.hostTools;
-		if (serving === undefined || serving.tools.length === 0) return;
+		if (serving === undefined || serving.tools.length === 0) {
+			return;
+		}
 		const label = `Step '${serving.stepId}'`;
 		if (serving.tools.length > HostToolSchemaLimits.MAX_TOOLS_PER_STEP) {
 			throw new HostToolSetTooLargeError(

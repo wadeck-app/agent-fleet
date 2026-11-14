@@ -1,3 +1,5 @@
+import { isRecord } from 'shared-common/utils/isRecord';
+
 import { HostToolSchemaLimits } from './HostToolSchemaLimits';
 import type { HostTool, HostToolArg } from './HostToolTypes';
 import { NearestName } from './NearestName';
@@ -17,11 +19,11 @@ export type HostToolCallCheck = { ok: true; values: Readonly<Record<string, stri
 export class HostToolCallChecker {
 	static check(tool: HostTool, args: unknown): HostToolCallCheck {
 		const given = args === undefined ? {} : args;
-		if (typeof given !== 'object' || given === null || Array.isArray(given)) {
+		if (!isRecord(given)) {
 			return HostToolCallChecker.refuse(tool, 'the arguments must be an object of named values');
 		}
 		const declared = tool.args ?? {};
-		const record = given as Record<string, unknown>;
+		const record = given;
 		for (const key of Object.keys(record)) {
 			if (!Object.hasOwn(declared, key)) {
 				const names = Object.keys(declared);

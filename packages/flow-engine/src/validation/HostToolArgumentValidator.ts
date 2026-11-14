@@ -24,8 +24,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Checks the `args` of one host tool: closed set of typed arguments (enum | string with a mandatory pattern | integer with
- * bounds | boolean). A free-form string is refused: the pattern is what keeps a steered model inside the shapes the author
+ * Checks the `args` of one host tool: closed set of typed arguments (an enum, a string with a mandatory pattern, an integer
+ * with bounds, or a boolean). A free-form string is refused: the pattern is what keeps a steered model inside the shapes the author
  * meant.
  */
 export class HostToolArgumentValidator {

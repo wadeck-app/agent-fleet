@@ -66,7 +66,9 @@ export class ExecAssignment {
 	 */
 	private static refuseHostTools(stepConfig: JsonObject, stepId: string): void {
 		const value = stepConfig['hostTools'];
-		if (value === undefined || (Array.isArray(value) && value.length === 0)) return;
+		if (value === undefined || (Array.isArray(value) && value.length === 0)) {
+			return;
+		}
 		throw new SandboxError(
 			'invalid-argument',
 			`Step "${stepId}" declares hostTools, but hostTools are not available in the sandbox in this version (they run on the host, and a sandbox worker does not offer them). Remove hostTools from the step, or run it on a worker without the "sandbox" label.`

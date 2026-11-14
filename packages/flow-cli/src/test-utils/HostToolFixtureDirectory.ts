@@ -11,10 +11,12 @@ const SCRIPTS: Readonly<Record<string, string>> = {
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const grandchild = spawn(process.execPath, [path.join(__dirname, 'beat.cjs'), process.argv[2]], { stdio: 'ignore', detached: true });
+const grandchild = spawn(process.execPath, [path.join(__dirname, 'beat.cjs'), process.argv[2]], { stdio: 'ignore', detached: true, windowsHide: true });
 grandchild.unref();
 // Optional third argument: a file receiving "<own pid>,<grandchild pid>", so a test can prove both are gone.
-if (process.argv[3]) fs.writeFileSync(process.argv[3], process.pid + ',' + grandchild.pid);
+if (process.argv[3]) {
+	fs.writeFileSync(process.argv[3], process.pid + ',' + grandchild.pid);
+}
 process.stdout.write('started');
 setInterval(() => {}, 1000);
 `,

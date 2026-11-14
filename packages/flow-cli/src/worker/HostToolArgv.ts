@@ -18,13 +18,17 @@ export class HostToolArgv {
 			const whole = WHOLE_PLACEHOLDER.exec(element);
 			if (whole !== null) {
 				const value = HostToolArgv.valueOf(values, whole[1]!);
-				if (value !== undefined) argv.push(value);
+				if (value !== undefined) {
+					argv.push(value);
+				}
 				continue;
 			}
 			const flag = FLAG_PLACEHOLDER.exec(element);
 			if (flag !== null) {
 				const value = HostToolArgv.valueOf(values, flag[2]!);
-				if (value !== undefined) argv.push(`${flag[1]!}=${value}`);
+				if (value !== undefined) {
+					argv.push(`${flag[1]!}=${value}`);
+				}
 				continue;
 			}
 			if (EMBEDDED_PLACEHOLDER.test(element)) {

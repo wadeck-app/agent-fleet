@@ -84,7 +84,9 @@ export class HostToolReplyFormatter {
 	): string {
 		const lines = [...input.notes];
 		const status = HostToolReplyFormatter.statusLine(input);
-		if (status !== undefined) lines.push(status);
+		if (status !== undefined) {
+			lines.push(status);
+		}
 		const header = lines.length === 0 ? '' : `${lines.join('\n')}\n`;
 		const marker = truncated ? `\n[output truncated at ${keptBytes} bytes]` : '';
 		const errorBlock = stderr === '' ? '' : `\nstderr:\n${stderr}`;
@@ -105,7 +107,9 @@ export class HostToolReplyFormatter {
 	}
 
 	private static exitLine(input: HostToolFormatInput): string {
-		if (input.exitCode !== null) return `exit code: ${input.exitCode}`;
+		if (input.exitCode !== null) {
+			return `exit code: ${input.exitCode}`;
+		}
 		return input.timedOut ? 'exit code: none (timed out)' : `exit code: none (signal ${String(input.signal)})`;
 	}
 

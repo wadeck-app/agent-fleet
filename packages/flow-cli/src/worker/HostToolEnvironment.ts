@@ -75,14 +75,24 @@ export class HostToolEnvironment {
 		}
 		const found = new Set<string>();
 		for (const [name, value] of Object.entries(workerEnvironment)) {
-			if (value === undefined) continue;
+			if (value === undefined) {
+				continue;
+			}
 			const key = name.toUpperCase();
-			if (HostToolEnvironment.isDenied(name)) continue;
-			if (declared.has(key)) found.add(key);
-			if (declared.has(key) || HostToolEnvironment.isBaseline(key)) result.env[name] = value;
+			if (HostToolEnvironment.isDenied(name)) {
+				continue;
+			}
+			if (declared.has(key)) {
+				found.add(key);
+			}
+			if (declared.has(key) || HostToolEnvironment.isBaseline(key)) {
+				result.env[name] = value;
+			}
 		}
 		for (const [key, name] of declared) {
-			if (!found.has(key)) result.missing.push(name);
+			if (!found.has(key)) {
+				result.missing.push(name);
+			}
 		}
 		return result;
 	}

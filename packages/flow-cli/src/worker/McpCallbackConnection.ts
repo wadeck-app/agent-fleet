@@ -102,8 +102,9 @@ export class McpCallbackConnection {
 			config.stopSignal?.removeEventListener('abort', this.onStop);
 			this.abortCall(HOST_TOOL_ABORT_REASONS.connectionClosed);
 		});
-		if (config.stopSignal?.aborted === true) this.onStop();
-		else config.stopSignal?.addEventListener('abort', this.onStop, { once: true });
+		if (config.stopSignal?.aborted === true) {
+			this.onStop();
+		} else config.stopSignal?.addEventListener('abort', this.onStop, { once: true });
 	}
 
 	/** The server stopped: the call in flight (if any) is aborted FIRST, so its process tree is ended before the socket goes. */
@@ -115,7 +116,9 @@ export class McpCallbackConnection {
 
 	/** Tells the handler of the call in flight to stop; its late result is dropped (the call counts as answered). */
 	private abortCall(reason: string): void {
-		if (this.callState !== 'inFlight') return;
+		if (this.callState !== 'inFlight') {
+			return;
+		}
 		this.callState = 'done';
 		this.pendingTool = null;
 		this.pendingAbort?.abort(reason);
@@ -200,7 +203,9 @@ export class McpCallbackConnection {
 			this.reject('unexpected payload shape');
 			return;
 		}
-		if (!this.authenticate(payload['token'], 'inject')) return;
+		if (!this.authenticate(payload['token'], 'inject')) {
+			return;
+		}
 		if (!safeEqual(payload['executionId'], this.config.executionId)) {
 			this.reject('executionId mismatch');
 			return;
@@ -229,7 +234,9 @@ export class McpCallbackConnection {
 			this.reject('unexpected payload shape');
 			return;
 		}
-		if (!this.authenticate(token, 'call_tool')) return;
+		if (!this.authenticate(token, 'call_tool')) {
+			return;
+		}
 		if (!safeEqual(executionId, this.config.executionId)) {
 			this.reject('executionId mismatch');
 			return;
@@ -243,8 +250,12 @@ export class McpCallbackConnection {
 		const isInjectToken = safeEqual(token, this.config.token);
 		const toolToken = this.config.callTool?.toolToken;
 		const isToolToken = toolToken !== undefined && safeEqual(token, toolToken);
-		if (kind === 'inject' && isInjectToken) return true;
-		if (kind === 'call_tool' && isToolToken) return true;
+		if (kind === 'inject' && isInjectToken) {
+			return true;
+		}
+		if (kind === 'call_tool' && isToolToken) {
+			return true;
+		}
 		this.reject(isInjectToken || isToolToken ? `token not valid for ${kind}` : 'invalid token');
 		return false;
 	}
@@ -306,12 +317,16 @@ export class McpCallbackConnection {
 	 * `tool` is the tool whose output cap applies to a handler reply; null for a reply the host wrote itself.
 	 */
 	private finishCall(reply: HostToolCallReply, tool: DeclaredHostTool | null): void {
-		if (this.callState !== 'inFlight') return;
+		if (this.callState !== 'inFlight') {
+			return;
+		}
 		this.callState = 'done';
 		this.pendingTool = null;
 		this.pendingAbort = null;
 		this.socket.setTimeout(this.config.idleTimeoutMs);
-		if (this.closed) return;
+		if (this.closed) {
+			return;
+		}
 		this.replyAndEnd(this.pendingCallId, tool === null ? reply : this.capReply(reply, tool));
 	}
 
@@ -347,7 +362,9 @@ export class McpCallbackConnection {
 	}
 
 	private replyAndEnd(callId: string, reply: HostToolCallReply): void {
-		if (this.closed) return;
+		if (this.closed) {
+			return;
+		}
 		this.socket.write(this.serialize(callId, reply));
 		this.socket.setTimeout(this.config.idleTimeoutMs);
 		this.socket.end();
