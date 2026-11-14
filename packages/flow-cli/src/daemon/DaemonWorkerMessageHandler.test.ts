@@ -408,3 +408,84 @@ describe('DaemonWorkerMessageHandler -- the log of a worker the daemon did not f
 		expect(() => handler.handleMessage(ws, { type: 'worker_log', stream: 'stdout', text: 'x' })).not.toThrow();
 	});
 });
+
+describe('DaemonWorkerMessageHandler -- a message the daemon cannot handle never takes it down', () => {
+	function makeSurvivingHandler(registered: { workerId: string } | undefined, onStepStarted?: () => void) {
+		const logsDir = createTempDirectory('dwmh-unhandled-');
+		const commandHandler = { onStepStarted: onStepStarted ?? vi.fn(), onRunEndAck: vi.fn() };
+		const workerRegistry = { describe: vi.fn().mockReturnValue(registered) };
+		const handler = new DaemonWorkerMessageHandler(
+			logsDir,
+			() => ({ commandHandler, workerRegistry }) as unknown as DaemonRuntime,
+			() => {}
+		);
+		const logged = (): string[] =>
+			readdirSync(logsDir).flatMap(file =>
+				readFileSync(path.join(logsDir, file), 'utf8')
+					.split('\n')
+					.filter(Boolean)
+					.map(line => (JSON.parse(line) as { msg: string }).msg)
+			);
+		return { handler, commandHandler, logged };
+	}
+
+	it('logs an unknown type with the worker id and the type only, never the body, and does not throw', () => {
+		const { handler, logged } = makeSurvivingHandler({ workerId: 'w-1' });
+
+		expect(() => handler.handleMessage(ws, { type: 'from_the_future', token: 'sk-SECRET' } as never)).not.toThrow();
+
+		const lines = logged();
+		expect(lines).toHaveLength(1);
+		expect(lines[0]).toContain('Worker w-1');
+		expect(lines[0]).toContain('"from_the_future"');
+		expect(lines.join('\n')).not.toContain('sk-SECRET');
+	});
+
+	it('says "unregistered" for a connection that never sent ready', () => {
+		const { handler, logged } = makeSurvivingHandler(undefined);
+
+		handler.handleMessage(ws, { type: 'from_the_future' } as never);
+
+		expect(logged()[0]).toContain('Worker unregistered');
+	});
+
+	it.each([
+		['null', null],
+		['a number', 42],
+		['a string', 'ready'],
+		['an object without type', { token: 'sk-SECRET' }],
+		['an object whose type is not a string', { type: { token: 'sk-SECRET' } }],
+	])('drops %s without throwing and without logging its content', (_name, message) => {
+		const { handler, logged } = makeSurvivingHandler({ workerId: 'w-1' });
+
+		expect(() => handler.handleMessage(ws, message as never)).not.toThrow();
+
+		expect(logged()).toHaveLength(1);
+		expect(logged().join('\n')).not.toContain('sk-SECRET');
+	});
+
+	it('cuts a very long type in the log', () => {
+		const { handler, logged } = makeSurvivingHandler({ workerId: 'w-1' });
+
+		handler.handleMessage(ws, { type: 'x'.repeat(10_000) } as never);
+
+		expect(logged()[0]?.length).toBeLessThan(500);
+	});
+
+	it('survives a handler that throws in a known branch and keeps serving the next message', () => {
+		const onStepStarted = vi
+			.fn()
+			.mockImplementationOnce(() => {
+				throw new Error('store is corrupt');
+			})
+			.mockImplementation(() => {});
+		const { handler, commandHandler, logged } = makeSurvivingHandler({ workerId: 'w-1' }, onStepStarted);
+
+		expect(() => handler.handleMessage(ws, { type: 'step_started', ...base })).not.toThrow();
+		handler.handleMessage(ws, { type: 'run_end_ack', executionId: 'e1' });
+
+		expect(logged()[0]).toContain('"step_started"');
+		expect(logged()[0]).toContain('store is corrupt');
+		expect(commandHandler.onRunEndAck).toHaveBeenCalledWith(ws, 'e1');
+	});
+});

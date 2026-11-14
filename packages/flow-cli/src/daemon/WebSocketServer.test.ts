@@ -430,3 +430,56 @@ describe('WebSocketServer - close() leaves nothing that keeps the process alive'
 		expect(attempts).toEqual([45_440]);
 	});
 });
+
+describe('WebSocketServer - a message the handler cannot take', () => {
+	async function connect(onMessage: ConstructorParameters<typeof WebSocketServer>[1], log: (m: string) => void) {
+		server = new WebSocketServer(0, onMessage, () => {}, { log: (_level, message) => log(message) });
+		const port = await server.start();
+		const client = new WebSocket(`ws://127.0.0.1:${String(port)}`);
+		await new Promise<void>((resolve, reject) => {
+			client.once('open', () => resolve());
+			client.once('error', reject);
+		});
+		return client;
+	}
+
+	it('closes a connection whose frame is not JSON, with a reason, and never logs the frame', async () => {
+		const logs: string[] = [];
+		const client = await connect(
+			() => {},
+			m => logs.push(m)
+		);
+		const closed = new Promise<{ code: number; reason: string }>(resolve => {
+			client.once('close', (code, reason) => resolve({ code, reason: reason.toString() }));
+		});
+
+		client.send('sk-SECRET not json');
+
+		const { code, reason } = await closed;
+		expect(code).toBe(1003);
+		expect(reason).toContain('not valid JSON');
+		expect(logs.join('\n')).toContain('not valid JSON');
+		expect(logs.join('\n')).not.toContain('sk-SECRET');
+	});
+
+	it('keeps the connection and serves the next message when the handler throws', async () => {
+		const logs: string[] = [];
+		const received: unknown[] = [];
+		const client = await connect(
+			(_ws, message) => {
+				if ((message as { type: string }).type === 'boom') throw new Error('sk-SECRET');
+				received.push(message);
+			},
+			m => logs.push(m)
+		);
+
+		client.send(JSON.stringify({ type: 'boom' }));
+		client.send(JSON.stringify({ type: 'ready', pid: 1 }));
+
+		await vi.waitFor(() => expect(received).toHaveLength(1));
+		expect(client.readyState).toBe(WebSocket.OPEN);
+		expect(logs.join('\n')).toContain('message handler failed');
+		expect(logs.join('\n')).not.toContain('sk-SECRET');
+		client.close();
+	});
+});

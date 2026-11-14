@@ -7,6 +7,21 @@ import { injectedStepState } from './InjectedStepState.js';
 import type { WorkerConnectionLogs } from './WorkerConnectionLogs.js';
 import { WorkerConnectionTracker } from './WorkerConnectionTracker.js';
 
+const MAX_LOGGED_TYPE_LENGTH = 64;
+
+/** The type of a message for a log line: quoted, cut, and a placeholder when it is not a string. Never anything else of the message. */
+function describeMessageType(message: unknown): string {
+	const type = typeof message === 'object' && message !== null ? (message as { type?: unknown }).type : undefined;
+	if (typeof type !== 'string') {
+		return `<${message === null ? 'null' : typeof message === 'object' ? 'no string type' : typeof message}>`;
+	}
+	return JSON.stringify(type.length > MAX_LOGGED_TYPE_LENGTH ? `${type.slice(0, MAX_LOGGED_TYPE_LENGTH)}...` : type);
+}
+
+function errorSummary(err: unknown): string {
+	return err instanceof Error ? `${err.name}: ${err.message}` : 'a non-Error value was thrown';
+}
+
 /** Reacts to what connected workers and relays say, and to their sockets closing. */
 export class DaemonWorkerMessageHandler {
 	/** Workers already warned about for reporting a failure without metrics: once each, not once per failure. */
@@ -23,7 +38,41 @@ export class DaemonWorkerMessageHandler {
 		private readonly workerLogs?: WorkerConnectionLogs
 	) {}
 
+	/**
+	 * A message the daemon cannot handle (unknown type from a newer worker, wrong shape, a handler that throws) is
+	 * logged and dropped: it must never reach the socket's event emitter, where an exception becomes an uncaughtException
+	 * that takes the daemon down with every other worker's work. The connection stays open.
+	 *
+	 * The log names the worker and the message type only: the body can hold secrets.
+	 */
 	handleMessage(ws: WebSocket, message: WorkerToDaemon): void {
+		try {
+			this.dispatchMessage(ws, message);
+		} catch (err) {
+			const line = `Worker ${this.describeSender(ws)}: message of type ${describeMessageType(message)} not handled, dropped (connection kept): ${errorSummary(err)}`;
+			process.stderr.write(`[daemon] ${line}
+`);
+			writeDaemonLog(this.logsDir, 'error', line);
+		}
+	}
+
+	/** The worker id, or 'unregistered' (also when the registry cannot say: this runs while reporting a failure). */
+	private describeSender(ws: WebSocket): string {
+		try {
+			return this.runtime().workerRegistry.describe(ws)?.workerId ?? 'unregistered';
+		} catch {
+			return 'unregistered';
+		}
+	}
+
+	private dispatchMessage(ws: WebSocket, message: WorkerToDaemon): void {
+		if (
+			typeof message !== 'object' ||
+			message === null ||
+			typeof (message as { type?: unknown }).type !== 'string'
+		) {
+			throw new Error('the message has no string "type" field');
+		}
 		// Output the worker ships is not a sign of what it was doing: it must not become the "last message" of a disconnect report.
 		if (message.type === 'worker_log') {
 			this.workerLogs?.ship(ws, message);
@@ -96,7 +145,8 @@ export class DaemonWorkerMessageHandler {
 			}
 			default: {
 				const _exhaustive: never = message;
-				throw new Error(`Unknown worker message type: ${JSON.stringify(_exhaustive)}`);
+				// Only the type: the rest of the message can hold secrets and ends up in the daemon log.
+				throw new Error(`Unknown worker message type ${describeMessageType(_exhaustive)}`);
 			}
 		}
 	}

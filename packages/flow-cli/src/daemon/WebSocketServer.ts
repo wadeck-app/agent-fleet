@@ -16,6 +16,8 @@ export type ConnectionLog = (level: 'info' | 'error', message: string) => void;
 
 const NORMAL_CLOSE_CODES = new Set([1000, 1001]);
 const CLOSE_CODE_MESSAGE_TOO_BIG = 1009;
+const CLOSE_CODE_UNSUPPORTED_DATA = 1003;
+const NOT_JSON_CLOSE_REASON = 'frame is not valid JSON: the daemon only accepts JSON messages';
 
 function stderrLog(level: 'info' | 'error', message: string): void {
 	process.stderr.write(`[WebSocketServer] ${level}: ${message}\n`);
@@ -176,9 +178,24 @@ export class WebSocketServer {
 			try {
 				message = JSON.parse(data.toString()) as WorkerToDaemon;
 			} catch {
+				// Never the frame itself: it can hold secrets. A peer that sends text we cannot read is not speaking our protocol.
+				this.log(
+					'error',
+					`worker sent a frame that is not valid JSON (${String(data.length)} bytes); closing the connection`
+				);
+				ws.close(CLOSE_CODE_UNSUPPORTED_DATA, NOT_JSON_CLOSE_REASON);
 				return;
 			}
-			this.onMessage(ws, message);
+			try {
+				this.onMessage(ws, message);
+			} catch (err) {
+				// Last resort: the handler reports what it cannot handle itself. An exception here would leave the
+				// emitter as an uncaughtException and take the daemon down.
+				this.log(
+					'error',
+					`message handler failed, message dropped: ${err instanceof Error ? err.name : typeof err}`
+				);
+			}
 		});
 		ws.on('close', (code: number, reason: Buffer) => {
 			const reasonText = reason.toString();
