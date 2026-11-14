@@ -57,6 +57,8 @@ A model step can inject steps (`provideSteps`); today an injected step carries n
 | Cons | Injected steps cannot ask for less than their parent. |
 | Recommendation | An injected step gets the resolved requirements of its parent plus the run's. The daemon ALWAYS sends the resolved requirement set in the assign message; the wrapper REFUSES an assign without the field (fail closed, no default), so an old daemon or a bug cannot downgrade a step. |
 
+Status (2026-11-14 addition): an injected step (`provideSteps`) of ANY type, script included, inherits the run's effective requirements, the implicit `agent` set included (core cf068dba, 01b52cdd, 59ce5512; `StepPlacementBuilder` / `RunRequirements` no longer test `type === 'model'` for injected steps; `InjectedStepGuard`, 3fa132ab, limits type to script|model and `skipPermissions` / `host` to false). The run records `requirements.implicit` whenever a source covers the set and the flow has a model step (`steps` may be `[]`); `implicit.steps` lists the declared model steps that received it, injected steps are not listed. Unit-tested in the core only, not run end to end. Not pinned by an e2e of ours: the engine's Claude mock cannot call `provideSteps` and a test client cannot stand in for the sandbox worker holding the model step; flow-owner's requested e2e (an injected `type: script` in an implicit-only run lands in the sandbox, never on a host worker) is documented, not written.
+
 Implicit `agent` for model steps is NOT part of the first steps (H5): on a machine without a sandbox source every existing model flow would become unplaceable. It arrives with the step that removes `workerType`, together with a clear failure message.
 
 ### D4. Where a script runs on a sandbox-bound run (revised)

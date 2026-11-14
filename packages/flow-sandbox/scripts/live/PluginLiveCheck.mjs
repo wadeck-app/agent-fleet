@@ -464,6 +464,10 @@ const linesMentioning = (text, name) => text.split(/\r?\n/).filter(line => line.
 const toolsOnly = process.env.PLUGIN_TOOLS_ONLY;
 if (toolsOnly !== undefined && !['codex', 'opencode', 'both'].includes(toolsOnly))
 	refuse('PLUGIN_TOOLS_ONLY must be codex, opencode or both.');
+const scenario = process.env.PLUGIN_TOOLS_SCENARIO ?? 'plain';
+if (!['plain', 'resume', 'shell', 'mixed'].includes(scenario)) refuse('PLUGIN_TOOLS_SCENARIO must be plain, resume, shell or mixed.');
+if (scenario !== 'plain' && toolsOnly === undefined)
+	refuse('PLUGIN_TOOLS_SCENARIO=' + scenario + ' needs PLUGIN_TOOLS_ONLY=codex|opencode|both.');
 const codexModel = process.env.PLUGIN_CODEX_MODEL ?? 'openai.gpt-5.6-terra';
 const opencodeModel = process.env.PLUGIN_OPENCODE_MODEL ?? 'amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0';
 function writeToolsFlow(only) {
@@ -1053,8 +1057,181 @@ try {
 			'NOTE  the codex step is not part of a full run (its models need another profile): PLUGIN_TOOLS_ONLY=codex PLUGIN_PROFILE=<the Codex profile>'
 		);
 	}
+	// PLUGIN_TOOLS_SCENARIO=resume|shell|mixed (with PLUGIN_TOOLS_ONLY=codex|opencode|both; `mixed` also runs a Claude step, always with
+	// the profile given): what the plain prompt above does not show.
+	//   resume: per tool, a second step with `session: continue` must recall a word of the first (same sandbox, store on the .meta mount).
+	//   shell:  per tool, skipPermissions + a shell command, a `tools` allow-list with bash, and one WITHOUT bash (it must not run it).
+	//   mixed:  a Claude, then an OpenCode, then a Codex step in ONE run (one sandbox, one preparation per tool). With the Claude profile the
+	//           Codex step fails at Bedrock (403 bedrock-mantle): the check accepts exactly that and says so.
+	if (scenario !== 'plain') {
+		const scenarioTools =
+			scenario === 'mixed'
+				? ['claude', 'opencode', 'codex']
+				: ['codex', 'opencode'].filter(candidate => toolsOnly === 'both' || toolsOnly === candidate);
+		const modelOf = tool => (tool === 'claude' ? 'sonnet' : tool === 'codex' ? codexModel : opencodeModel);
+		const modelStepYaml = (tool, id, { depends, extra = '', prompt }) =>
+			`    - id: ${id}
+      name: ${id}
+      type: model
+${tool === 'claude' ? '' : `      provider: ${tool}\n`}      model: ${modelOf(tool)}
+${extra}${depends ? `      depends:\n          - ${depends}\n` : ''}      prompt: |
+          ${prompt}
+      output:
+          answer:
+              type: string
+              from: last_message
+`;
+		const scenarioSteps = [];
+		for (const tool of scenarioTools) {
+			if (scenario === 'resume') {
+				scenarioSteps.push(
+					modelStepYaml(tool, `${tool}-first`, {
+						prompt: 'The project codename is PINEAPPLE. Note it, then reply with the single word OK and nothing else.',
+					}),
+					modelStepYaml(tool, `${tool}-second`, {
+						depends: `${tool}-first`,
+						extra: '      session:\n          continue: ' + `${tool}-first` + '\n          mode: append\n',
+						prompt: 'What is the project codename I gave you in my previous message? Reply with that single word and nothing else.',
+					})
+				);
+			} else if (scenario === 'shell') {
+				const command = 'Run this exact shell command with your shell tool: echo flow$((6*7))ok-$(hostname) . Then reply with its exact output and nothing else.';
+				scenarioSteps.push(
+					modelStepYaml(tool, `${tool}-skip`, { extra: '      skipPermissions: true\n', prompt: command }),
+					modelStepYaml(tool, `${tool}-allow`, { extra: '      tools: [bash, read]\n', prompt: command }),
+					modelStepYaml(tool, `${tool}-deny`, {
+						extra: '      tools: [read]\n',
+						prompt:
+							'Try to run this exact shell command with a shell tool: echo flow$((6*7))ok-$(hostname) . If you have no shell tool, reply with the single word NOSHELL and nothing else; otherwise reply with the output.',
+					})
+				);
+			} else {
+				scenarioSteps.push(
+					// A chain, Codex last: with the Claude profile its step fails at Bedrock and a failed step ends the run, so the others must have run before.
+					modelStepYaml(tool, tool, {
+						depends: scenarioTools[scenarioTools.indexOf(tool) - 1],
+						prompt: 'Reply with the single word OK and nothing else.',
+					})
+				);
+			}
+		}
+		const scenarioFile = path.join(projectDirectory, `plugin-live-${scenario}-${toolsOnly ?? 'mixed'}.yml`);
+		fs.writeFileSync(
+			scenarioFile,
+			`id: plugin-live-${scenario}
+version: '1.0.0'
+name: Plugin live check, ${scenario}
+description: Scenario ${scenario}.
+
+workspace: { provider: pool, dir: '${poolDirectory.replaceAll('\\', '/')}', prefix: slot-, count: 1 }
+
+steps:
+${scenarioSteps.join('\n')}
+`
+		);
+		await step(`scenario ${scenario} (${scenarioTools.join(', ')}): real Bedrock, one run`, async () => {
+			const creationsBefore = timings().filter(entry => entry.words[0] === 'create').length;
+			const started = flow(['run', scenarioFile, '--json']);
+			const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+			expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+			const executionId = match[1];
+			const record = await waitFor(`execution ${executionId} to settle`, 600_000, () => {
+				const shown = flow(['show', executionId, '--json']);
+				if (shown.status !== 0) return undefined;
+				const parsed = JSON.parse(shown.stdout);
+				return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+			});
+			// The model's reply is the step's `response` output (the flow's own `output:` block is not recorded under a plain key).
+			const textOf = stepRecord => stepRecord?.io?.outputs?.response?.text ?? stepRecord?.io?.stdout?.text ?? '';
+			const describeStep = id => {
+				const stepRecord = record.steps?.[id] ?? {};
+				return `${id}: ${stepRecord.status} ${stepRecord.error ?? ''} | answer ${JSON.stringify(textOf(stepRecord)).slice(0, 300)} | session ${stepRecord.meta?.session_id ?? '-'} | tool calls ${JSON.stringify(stepRecord.meta?.tool_calls ?? {})} | stderr ${String(stepRecord.io?.stderr?.text ?? '').slice(-400)}`;
+			};
+			const answerOf = id => JSON.stringify(textOf(record.steps?.[id]));
+			evidence[`scenario-${scenario}`] = Object.fromEntries(
+				Object.keys(record.steps ?? {}).map(id => [id, describeStep(id)])
+			);
+			const lines = [];
+			const failures = [];
+			const check = (condition, message) => {
+				if (!condition) failures.push(message);
+			};
+			for (const tool of scenarioTools) {
+				if (scenario === 'resume') {
+					check(
+						record.steps?.[`${tool}-first`]?.status === 'completed',
+						`${tool}-first not completed: ${describeStep(`${tool}-first`)}`
+					);
+					check(
+						/PINEAPPLE/i.test(answerOf(`${tool}-second`)),
+						`${tool}-second did not recall PINEAPPLE: ${describeStep(`${tool}-second`)}`
+					);
+					check(
+						record.steps?.[`${tool}-first`]?.meta?.session_id === record.steps?.[`${tool}-second`]?.meta?.session_id,
+						`${tool}: the second step did not continue the session of the first`
+					);
+					lines.push(
+						`${tool}: first session ${record.steps?.[`${tool}-first`]?.meta?.session_id}, second session ${record.steps?.[`${tool}-second`]?.meta?.session_id}, answer ${answerOf(`${tool}-second`)}`
+					);
+				} else if (scenario === 'shell') {
+					for (const kind of ['skip', 'allow']) {
+						const answer = answerOf(`${tool}-${kind}`);
+						check(
+							/flow42ok-\w+/.test(answer) && !answer.toLowerCase().includes(os.hostname().toLowerCase()),
+							`${tool}-${kind} did not return the shell output of the VM (flow42ok-<VM host name>): ${describeStep(`${tool}-${kind}`)}`
+						);
+						check(
+							(record.steps?.[`${tool}-${kind}`]?.meta?.tool_calls?.total ?? 0) >= 1,
+							`${tool}-${kind} made no tool call: ${describeStep(`${tool}-${kind}`)}`
+						);
+					}
+					check(
+						!/flow42ok/.test(answerOf(`${tool}-deny`)),
+						`${tool}-deny ran the shell although bash is not in tools: ${describeStep(`${tool}-deny`)}`
+					);
+					lines.push(`${tool}: skip ${answerOf(`${tool}-skip`)}, allow ${answerOf(`${tool}-allow`)}, deny ${answerOf(`${tool}-deny`)}`);
+				} else {
+					const stepRecord = record.steps?.[tool];
+					const mantleDenied =
+						tool === 'codex' && /bedrock-mantle|403|AccessDenied/i.test(describeStep(tool));
+					check(
+						stepRecord?.status === 'completed' || mantleDenied,
+						`${tool} neither completed nor was refused by Bedrock authorization: ${describeStep(tool)}`
+					);
+					lines.push(
+						`${tool}: ${stepRecord?.status}${mantleDenied ? ' (Bedrock refused the Claude profile for codex: the request reached Bedrock with the sandbox credentials)' : ''}`
+					);
+				}
+			}
+			const creations = timings().filter(entry => entry.words[0] === 'create').length - creationsBefore;
+			check(creations === 1, `${creations} sandboxes were created for the run, expected 1`);
+			const runsDirectory = path.join(projectDirectory, '.flow', 'runs');
+			for (const tool of scenarioTools) {
+				check(
+					fs
+						.readdirSync(runsDirectory)
+						.some(name => fs.existsSync(path.join(runsDirectory, name, 'sessions', tool))),
+					`no session store of ${tool} on the mount`
+				);
+			}
+			expect(failures.length === 0, `${failures.join(' || ')} | run ${record.status}`);
+			return `${lines.join(' ; ')} ; one sandbox`;
+		});
+		await step(`the ${scenario} sandbox is removed too`, async () => {
+			await sleep(1500);
+			const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
+				entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+			);
+			expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
+		});
+	}
+
 	for (const tool of ['codex', 'opencode'].filter(candidate =>
-		toolsOnly === undefined ? candidate === 'opencode' : toolsOnly === 'both' || toolsOnly === candidate
+		scenario !== 'plain'
+			? false
+			: toolsOnly === undefined
+				? candidate === 'opencode'
+				: toolsOnly === 'both' || toolsOnly === candidate
 	)) {
 		await step(
 			`a ${tool} step answers in the sandbox as a plain prompt (real Bedrock): tool-aware credentials, store on the .meta mount`,
