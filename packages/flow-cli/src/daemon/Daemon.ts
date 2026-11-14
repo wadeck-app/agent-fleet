@@ -178,7 +178,8 @@ async function startOwningDaemon(
 				clearInterval(stalledSweep);
 			}
 		},
-		() => daemonHandle.stop('idle')
+		() => daemonHandle.stop('idle'),
+		options.idleStopDisabled ?? false
 	);
 	const stopWhenIdle = options.stopWhenIdle ?? true;
 	const workerMessages = new DaemonWorkerMessageHandler(logsDir, getRuntime, () => {

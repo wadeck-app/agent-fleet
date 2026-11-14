@@ -14,6 +14,7 @@ import { writeDaemonLog } from '../daemon/DaemonLog.js';
 import { clearDaemonStartError, recordDaemonStartError } from '../daemon/DaemonStartError.js';
 import { resolveDaemonPort } from '../daemon/resolveDaemonPort.js';
 import { resolveIdleCheckInterval } from '../daemon/resolveIdleCheckInterval.js';
+import { resolveIdleStopDisabled } from '../daemon/resolveIdleStopDisabled.js';
 import { createFlowEventPublisher } from '../events/createFlowEventPublisher.js';
 import { describeCommandLine } from './CommandLineLog';
 import { consumeDaemonModeFlag } from './DaemonModeFlag';
@@ -62,6 +63,7 @@ Environment variables:
   FLOW_DAEMON_MODE  Internal - set to "1" by "flow start" to launch daemon mode
   FLOW_DAEMON_PORT  Daemon command port, 0 to let the OS pick one (default: standard range 47823-47833)
   FLOW_DAEMON_IDLE_CHECK_MS  Internal - how often the daemon checks whether it is idle and can stop (default: 30000)
+  FLOW_DAEMON_NO_IDLE_STOP  Internal - set to "1" to keep the daemon alive when idle, for tests that must not depend on the idle stop
 
 Daemon-required commands: run, start, stop, status
 Standalone commands:      show, validate, history, versions, docs, logs, cli`;
@@ -127,6 +129,7 @@ async function main(): Promise<void> {
 		);
 		const port = resolveDaemonPort(process.env);
 		const idleCheckIntervalMs = resolveIdleCheckInterval(process.env);
+		const idleStopDisabled = resolveIdleStopDisabled(process.env);
 		await Daemon.start(config, DAEMON_DIR, {
 			// Started by `flow run` / `flow start` because none answered: if one answers by now (concurrent runs each
 			// start one), it stays, with its executions.
@@ -135,6 +138,7 @@ async function main(): Promise<void> {
 			eventPublisher,
 			...(port === undefined ? {} : { port }),
 			...(idleCheckIntervalMs === undefined ? {} : { idleCheckIntervalMs }),
+			...(idleStopDisabled ? { idleStopDisabled } : {}),
 		});
 		// Up: the reason of an earlier failed start no longer describes anything.
 		clearDaemonStartError(DAEMON_DIR);

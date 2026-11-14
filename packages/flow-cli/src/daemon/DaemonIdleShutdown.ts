@@ -43,7 +43,9 @@ export class DaemonIdleShutdown {
 		private readonly runtime: () => DaemonRuntime,
 		/** Stops the periodic work that must not outlive the decision to stop. */
 		private readonly stopPeriodicWork: () => void,
-		private readonly stopDaemon: () => Promise<void>
+		private readonly stopDaemon: () => Promise<void>,
+		/** FLOW_DAEMON_NO_IDLE_STOP=1: idleness never stops the daemon (no check, no grace stop, no watchdog). */
+		private readonly idleStopDisabled = false
 	) {}
 
 	/**
@@ -55,6 +57,14 @@ export class DaemonIdleShutdown {
 	 * @throws when already started: two timers would double every decision.
 	 */
 	startWatchdog(intervalMs: number): void {
+		if (this.idleStopDisabled) {
+			writeDaemonLog(
+				this.logsDir,
+				'info',
+				'idle shutdown disabled by FLOW_DAEMON_NO_IDLE_STOP=1: the daemon only stops on flow stop, an update or a signal'
+			);
+			return;
+		}
 		if (this.watchdog !== undefined) {
 			throw new Error('The idle watchdog is already running; startWatchdog() must be called once per daemon.');
 		}
@@ -139,7 +149,7 @@ export class DaemonIdleShutdown {
 	 * recheck below see activity, at which point the schedule is dropped without acting.
 	 */
 	checkShutdown(): void {
-		if (this.shuttingDown) {
+		if (this.idleStopDisabled || this.shuttingDown) {
 			return;
 		}
 		if (!this.isIdle()) {
@@ -170,7 +180,7 @@ export class DaemonIdleShutdown {
 	}
 
 	private stopIfStillIdle(): void {
-		if (this.shuttingDown) {
+		if (this.idleStopDisabled || this.shuttingDown) {
 			return;
 		}
 		if (!this.isIdle()) {

@@ -185,6 +185,60 @@ describe('DaemonIdleShutdown', () => {
 		});
 	});
 
+	// FLOW_DAEMON_NO_IDLE_STOP=1: an isolated test daemon that must outlive its idle periods.
+	describe('idle stop disabled', () => {
+		beforeEach(() => {
+			const runtime = {
+				commandHandler: {
+					isQueueEmpty: () => true,
+					hasActiveExecutions: () => false,
+					hasResumableInterventions: () => false,
+					hasPendingRunEnds: () => false,
+					hasWaitingRuns: () => false,
+					describeIdleState: () => 'state',
+					stopBackgroundWork: vi.fn(),
+				},
+				workerRegistry: {
+					hasBusyWorkers: () => false,
+					liveCount: 0,
+					idleCount: 0,
+					broadcastToEphemeral: vi.fn(),
+					disconnectExternal: vi.fn(),
+				},
+				wsServer: { close: wsClose },
+			} as unknown as DaemonRuntime;
+			shutdown = new DaemonIdleShutdown(logsDir, () => runtime, stopPeriodicWork, stopDaemon, true);
+		});
+
+		it('never schedules nor stops on a message-triggered check, even when idle', () => {
+			shutdown.checkShutdown();
+			vi.advanceTimersByTime(SHUTDOWN_GRACE_MS * 5);
+
+			expect(stopDaemon).not.toHaveBeenCalled();
+			expect(shutdown.isStopping).toBe(false);
+			expect(fs.readdirSync(logsDir)).toEqual([]);
+		});
+
+		it('never stops through the watchdog, even long after its interval', () => {
+			shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS);
+
+			vi.advanceTimersByTime(IDLE_WATCHDOG_INTERVAL_MS * 5 + SHUTDOWN_GRACE_MS);
+
+			expect(stopDaemon).not.toHaveBeenCalled();
+			expect(shutdown.isStopping).toBe(false);
+			expect(logLines().filter(msg => msg.startsWith('Idle detected'))).toEqual([]);
+		});
+
+		it('logs one line saying why, when the watchdog is started', () => {
+			shutdown.startWatchdog(IDLE_WATCHDOG_INTERVAL_MS);
+			vi.advanceTimersByTime(IDLE_WATCHDOG_INTERVAL_MS * 3);
+
+			expect(logLines()).toEqual([
+				'idle shutdown disabled by FLOW_DAEMON_NO_IDLE_STOP=1: the daemon only stops on flow stop, an update or a signal',
+			]);
+		});
+	});
+
 	describe('admitting commands', () => {
 		it('refuses a command once it decided to stop, without running it', async () => {
 			shutdown.checkShutdown();

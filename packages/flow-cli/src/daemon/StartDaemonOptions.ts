@@ -22,6 +22,11 @@ export interface StartDaemonOptions {
 	 */
 	idleCheckIntervalMs?: number;
 	/**
+	 * The daemon never stops because it is idle (`FLOW_DAEMON_NO_IDLE_STOP=1`); only `flow stop`, an update restart or a
+	 * signal end it. Omitted means false. Unlike `stopWhenIdle: false` it is logged at start.
+	 */
+	idleStopDisabled?: boolean;
+	/**
 	 * The packaged app-module to register with app-core on start. Omitted means the daemon does not
 	 * talk to app-core at all (tests and embedders); the CLI entry always passes it.
 	 */
