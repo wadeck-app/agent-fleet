@@ -1,6 +1,6 @@
 # Generic host-tool provisioning through one MCP server
 
-Status: draft plan, 2026-11-14. Separate plan/spec from the sandbox worker plan (`2026-10-25_docker-sandbox-worker.md`), as the user asked.
+Status: slice 1 IMPLEMENTED on branch `sbx/requirements` (2026-11-14, commits `586d203d` to `e33b2499`: schema and validation, callback protocol v2 and generic MCP server, host-side execution, `host-tools` capability and routing, sandbox refusal, `flow show`, end-to-end test); not merged. Proof level: unit and integration tests with mock CLIs only; the real MCP server, callback and executor are exercised together (`HostToolEndToEnd.test.ts`), a real model CLI calling a tool and a live daemon assigning a hostTools step to a local worker are NOT shown (the engine claude mock has no MCP). Documented gaps: `flow validate` cannot know the daemon implicit set (flagged at `flow run`); no run-start check for the capability (dispatch-time failure only); the sandbox refusal in `ExecAssignment` is covered by unit tests and a mutation, the e2e stops earlier at the routing message. Single user-facing doc: `.claude/docs/flows/host-tools.md`. Slices 2 and 3 are not started. Draft plan, 2026-11-14. Separate plan/spec from the sandbox worker plan (`2026-10-25_docker-sandbox-worker.md`), as the user asked.
 
 ## Goal / non-goals
 
