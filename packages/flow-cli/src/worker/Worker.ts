@@ -134,6 +134,9 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 		case 'done':
 			ws.close();
 			break;
+		case 'worker_logs_enabled':
+			// Never sent to a worker the daemon forked (its process output is captured by the daemon): nothing to do.
+			break;
 		default: {
 			const _exhaustive: never = message;
 			process.stderr.write(`Unknown daemon message: ${JSON.stringify(_exhaustive)}\n`);

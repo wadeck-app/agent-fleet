@@ -112,6 +112,17 @@ export const WORKER_FEATURE_RUN_EVENTS = 'run-events';
  */
 export const WORKER_FEATURE_HOST_TOOLS = 'host-tools';
 
+/**
+ * The worker can ship its own output to the daemon (`worker_log`), to be kept in the worker's log (`flow` Workers page).
+ * It sends nothing until the daemon answers `worker_logs_enabled`: only a daemon that knows the message answers, so a
+ * newer worker never sends `worker_log` to an older daemon (which would reject the unknown message type). The daemon answers
+ * only workers it did not fork (a forked worker's process output is captured by the daemon itself).
+ */
+export const WORKER_FEATURE_WORKER_LOGS = 'worker-logs';
+
+/** Most characters of one `worker_log` text; the worker splits larger chunks. Far below the frame limit. */
+export const WORKER_LOG_CHUNK_MAX_CHARS = 16 * 1024;
+
 export type ClientCommand =
 	| {
 			type: 'run';
@@ -249,7 +260,12 @@ export type DaemonToWorker =
 	 *
 	 * In-flight steps may still report after `run_end`; their results are dropped.
 	 */
-	| { type: 'run_end'; executionId: string; reason: RunEndReason };
+	| { type: 'run_end'; executionId: string; reason: RunEndReason }
+	/**
+	 * Answer to a `ready` that declared {@link WORKER_FEATURE_WORKER_LOGS}, sent once per connection to a worker the daemon
+	 * did not fork: from now on the worker may send `worker_log`. Never sent to a worker that did not declare the feature.
+	 */
+	| { type: 'worker_logs_enabled' };
 
 /**
  * A relay that supplies workers, connected to the daemon (D#17, D#19).
@@ -480,7 +496,14 @@ export type WorkerToDaemon =
 	  }
 	| { type: 'inject_steps'; assignmentId: string; executionId: string; steps: InjectedStep[] }
 	/** Answer to `run_end`: the worker is done with the run. Not bound to an assignment: it concerns the whole run. */
-	| { type: 'run_end_ack'; executionId: string };
+	| { type: 'run_end_ack'; executionId: string }
+	/**
+	 * A piece of the worker's own output (what it prints: connection state, step start and end, warnings, errors), for the
+	 * worker's log. Only sent after `worker_logs_enabled`. Not bound to an assignment: it concerns the worker. `text` may hold
+	 * several lines; the daemon cuts lines, masks secrets and caps the volume. `dropped` counts the characters of output the
+	 * worker threw away before this one (its own rate cap), so the log can say so instead of hiding a gap.
+	 */
+	| { type: 'worker_log'; stream: 'stdout' | 'stderr'; text: string; dropped?: number };
 
 /**
  * A worker-to-daemon message about the step currently being executed, before its

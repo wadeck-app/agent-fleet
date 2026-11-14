@@ -115,6 +115,9 @@ export async function handleWorkerMessage(
 				`[warn] received run_end for execution ${message.executionId} although this worker does not declare run-events; ignoring it. Please report this.`
 			);
 			break;
+		case 'worker_logs_enabled':
+			// Handled by WorkerConnection, which owns the output shipper; kept here so the switch stays exhaustive.
+			break;
 		default: {
 			const exhaustive: never = message;
 			console.error(`[warn] unknown daemon message: ${JSON.stringify(exhaustive)}`);

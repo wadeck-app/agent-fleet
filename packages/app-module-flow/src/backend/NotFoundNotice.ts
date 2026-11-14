@@ -55,7 +55,7 @@ function workerNotice(id: string): NotFoundNotice {
 		notFound: true,
 		id,
 		title: 'Worker not found',
-		message: `Worker ${id} is not connected. It may have exited (only live workers are listed), or the id is wrong.`,
+		message: `Worker ${id} is not connected and no log of it was found. It may have exited more than 7 days ago (worker logs are kept 7 days), or the id is wrong.`,
 		listLabel: 'See all workers',
 		listHref: WORKERS_HREF,
 	};

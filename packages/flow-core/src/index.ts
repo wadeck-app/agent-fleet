@@ -151,15 +151,24 @@ export {
 export type { DeclaredWorkerSource, WorkerSourceEntry, WorkerSourceRegistryFile } from './worker/WorkerSources.js';
 export type { WorkerSummary } from './worker/WorkerSummary.js';
 export {
+	RECENT_WORKER_LOG_LIMIT,
 	UnknownWorkerError,
 	WORKER_LOG_DEFAULT_LINES,
 	WORKER_LOG_MAX_LINES,
 	isWorkerLogFileName,
+	isWorkerLogKey,
+	listRecentWorkerLogs,
+	originOfWorkerLogKey,
+	readWorkerLogByKey,
 	readWorkerLogs,
 	workerLogFileName,
+	workerLogFileNameOfKey,
+	workerLogFileNameOfWorkerId,
+	workerLogKeyOf,
+	workerLogKeyOfFileName,
 	workerLogsDirOf,
 } from './worker/WorkerLogs.js';
-export type { WorkerLogsView } from './worker/WorkerLogs.js';
+export type { RecentWorkerLog, WorkerLogsView, WorkerOrigin } from './worker/WorkerLogs.js';
 
 export { formatLogContent, formatLogLine, tailLines } from './logs/LogFormat.js';
 export { LOG_LEVELS, attemptOf, formatRecordedStepOutput, readExecutionLogs } from './logs/ExecutionLogs.js';
@@ -186,6 +195,7 @@ export type {
 	QueriedExecutions,
 	RenderedHistory,
 	WorkerListResult,
+	WorkerLogTarget,
 } from './query/FlowQueryService.js';
 
 export { classifyFlowError, httpAnswerOfFlowError, httpStatusOfFlowError } from './ErrorClassification.js';

@@ -39,6 +39,7 @@ import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { removeStaleDaemonFiles } from './StaleDaemonFiles.js';
 import { type StartDaemonOptions, assertValidStartDaemonOptions } from './StartDaemonOptions.js';
 import { guardRunAgainstStop } from './StoppingDaemonRunGuard.js';
+import { WorkerConnectionLogs } from './WorkerConnectionLogs.js';
 import { WorkerProvisioner } from './WorkerProvisioner.js';
 import { WorkerRegistry } from './WorkerRegistry.js';
 import { WorkerSourceRegistry } from './WorkerSourceRegistry.js';
@@ -183,11 +184,23 @@ async function startOwningDaemon(
 		options.idleStopDisabled ?? false
 	);
 	const stopWhenIdle = options.stopWhenIdle ?? true;
-	const workerMessages = new DaemonWorkerMessageHandler(logsDir, getRuntime, () => {
-		if (stopWhenIdle) {
-			idleShutdown.checkShutdown();
-		}
-	});
+	const workerMessages = new DaemonWorkerMessageHandler(
+		logsDir,
+		getRuntime,
+		() => {
+			if (stopWhenIdle) {
+				idleShutdown.checkShutdown();
+			}
+		},
+		undefined,
+		// The logs of workers this daemon did not fork (forked ones are captured by ForkWorkerSource). Masked like them;
+		// the runtime exists by the time a worker can connect.
+		new WorkerConnectionLogs(
+			workerLogsDirOf(resolvedDaemonDir),
+			text => getRuntime().daemonSecrets.masks.maskAll(text),
+			(level, message) => writeDaemonLog(logsDir, level, message)
+		)
+	);
 
 	fs.mkdirSync(resolvedDaemonDir, { recursive: true, mode: 0o700 });
 

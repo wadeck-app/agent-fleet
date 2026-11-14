@@ -44,8 +44,9 @@ describe('backend entry', () => {
 			'GET /related/project/:projectId',
 			'GET /widgets/executions',
 			'GET /workers',
-		'GET /workers/:workerId/logs',
+			'GET /workers/:workerId/logs',
 			'GET /workers/count',
+			'GET /workers/recent',
 		]);
 	});
 

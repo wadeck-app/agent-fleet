@@ -1,4 +1,4 @@
-import { isWorkerLogFileName, workerLogFileName } from 'flow-core';
+import { isWorkerLogFileName, workerLogFileName, workerLogFileNameOfWorkerId } from 'flow-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -8,8 +8,8 @@ import type { WorkerLog } from './ForkWorkerSource.js';
 export const WORKER_LOG_MAX_BYTES = 1024 * 1024;
 /** Files not written for this long are deleted at daemon start. */
 export const WORKER_LOG_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
-/** The short tag written in front of each line. */
-const STREAM_LABEL = { stdout: 'out', stderr: 'err' } as const;
+/** The short tag written in front of each line: the worker's stdout (out), its stderr (err), or what the daemon observed (dmn). */
+const STREAM_LABEL = { stdout: 'out', stderr: 'err', daemon: 'dmn' } as const;
 
 export type WorkerStream = keyof typeof STREAM_LABEL;
 
@@ -19,8 +19,9 @@ export interface WorkerLogFileOptions {
 }
 
 /**
- * The captured output of one forked worker: `<dir>/worker-<pid>.log`, one line per output line as
- * `<ISO time> <out|err> <masked text>`.
+ * The log of one worker: `<dir>/worker-<pid>.log` for a worker the daemon forked (its process output), or
+ * `<dir>/worker-<workerId>.log` for any other (what the daemon observed and the worker shipped). One line per line as
+ * `<ISO time> <out|err|dmn> <masked text>`.
  *
  * Chunks are cut into lines before masking (a secret split across two chunks would escape a per-chunk masker), and every
  * line goes through `mask` -- the same masking as the stderr tail the daemon logs on exit. A line still open at `close`
@@ -30,7 +31,7 @@ export interface WorkerLogFileOptions {
  */
 export class WorkerLogFile {
 	readonly filePath: string;
-	private readonly partial: Record<WorkerStream, string> = { stdout: '', stderr: '' };
+	private readonly partial: Record<WorkerStream, string> = { stdout: '', stderr: '', daemon: '' };
 	private readonly maxBytes: number;
 	private readonly now: () => Date;
 	private size = 0;
@@ -38,12 +39,16 @@ export class WorkerLogFile {
 
 	constructor(
 		dir: string,
-		private readonly pid: number,
+		/** A pid (a worker the daemon forked) or a worker id (any other worker). */
+		private readonly subject: number | string,
 		private readonly mask: (text: string) => string,
 		private readonly log: WorkerLog,
 		options: WorkerLogFileOptions = {}
 	) {
-		this.filePath = path.join(dir, workerLogFileName(pid));
+		this.filePath = path.join(
+			dir,
+			typeof subject === 'number' ? workerLogFileName(subject) : workerLogFileNameOfWorkerId(subject)
+		);
 		this.maxBytes = options.maxBytes ?? WORKER_LOG_MAX_BYTES;
 		this.now = options.now ?? (() => new Date());
 		try {
@@ -63,7 +68,7 @@ export class WorkerLogFile {
 
 	/** Flushes the lines still open (a worker that died mid-line). */
 	close(): void {
-		for (const stream of ['stdout', 'stderr'] as const) {
+		for (const stream of ['stdout', 'stderr', 'daemon'] as const) {
 			const rest = this.partial[stream];
 			this.partial[stream] = '';
 			if (rest !== '') {
@@ -103,7 +108,7 @@ export class WorkerLogFile {
 		this.failed = true;
 		this.log(
 			'error',
-			`worker pid ${String(this.pid)}: cannot ${action} its output file ${this.filePath}, its output will not be captured: ${err instanceof Error ? err.message : String(err)}`
+			`worker ${typeof this.subject === 'number' ? `pid ${String(this.subject)}` : this.subject}: cannot ${action} its output file ${this.filePath}, its output will not be captured: ${err instanceof Error ? err.message : String(err)}`
 		);
 	}
 }

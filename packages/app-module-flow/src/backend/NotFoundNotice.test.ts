@@ -61,7 +61,7 @@ describe('notFoundNoticeOf', () => {
 			id: 'w9',
 			title: 'Worker not found',
 			message:
-				'Worker w9 is not connected. It may have exited (only live workers are listed), or the id is wrong.',
+				'Worker w9 is not connected and no log of it was found. It may have exited more than 7 days ago (worker logs are kept 7 days), or the id is wrong.',
 			listLabel: 'See all workers',
 			listHref: '/modules/flow/workers',
 		});

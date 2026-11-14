@@ -373,6 +373,28 @@ describe('WorkerCommand -- connection, messages and banner (characterization)', 
 		expect(ws.send).not.toHaveBeenCalled();
 	});
 
+	// An older daemon rejects the unknown `worker_log` message: the worker may only ship once the daemon answered it knows it.
+	it('ships what the process prints only after the daemon answered worker_logs_enabled', async () => {
+		await startWorker();
+		const ws = hoisted.wsInstances[0];
+		ws.emit('open');
+		process.stdout.write('shipper-marker-before-enable\n');
+		await flush();
+		expect(sentTypes(ws)).not.toContain('worker_log');
+
+		ws.emit('message', Buffer.from(JSON.stringify({ type: 'worker_logs_enabled' })));
+		await flush();
+
+		type Frame = { type: string; stream?: string; text?: string };
+		const shipped = (ws.send.mock.calls as unknown[][])
+			.map(call => JSON.parse(String(call[0])) as Frame)
+			.filter((message: Frame) => message.type === 'worker_log');
+		expect(shipped.map(message => message.text).join('')).toContain('shipper-marker-before-enable');
+		expect(shipped.every(message => message.stream === 'stdout')).toBe(true);
+		// No "unknown daemon message" warning: the message is known.
+		expect(errored()).not.toContain('unknown daemon message');
+	});
+
 	it('explains that no approval plugin is configured when the worker cannot answer checkpoints', async () => {
 		await startWorker();
 

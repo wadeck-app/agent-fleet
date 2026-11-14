@@ -35,11 +35,30 @@ import {
 	renderExecutionDetail,
 	resolveExecution,
 } from '../show/ExecutionDetail.js';
-import { readWorkerList } from '../worker/WorkerList.js';
+import { WorkerListError, readWorkerList } from '../worker/WorkerList.js';
 import { type DaemonStatus, describeNoLiveWorkers } from '../worker/WorkerListing.js';
-import { UnknownWorkerError, type WorkerLogsView, readWorkerLogs } from '../worker/WorkerLogs.js';
+import {
+	type RecentWorkerLog,
+	UnknownWorkerError,
+	type WorkerLogsView,
+	type WorkerOrigin,
+	listRecentWorkerLogs,
+	originOfWorkerLogKey,
+	readWorkerLogByKey,
+	readWorkerLogs,
+	workerLogKeyOf,
+} from '../worker/WorkerLogs.js';
 import { type DeclaredWorkerSource, readDeclaredWorkerSources } from '../worker/WorkerSources.js';
 import type { WorkerSummary } from '../worker/WorkerSummary.js';
+
+/** A worker's log and what is known of the worker: `worker` only while it is connected. */
+export interface WorkerLogTarget {
+	worker: WorkerSummary | undefined;
+	/** The id the route accepts for this log once the worker is gone. */
+	key: string;
+	origin: WorkerOrigin;
+	logs: WorkerLogsView;
+}
 
 export interface FlowQueryDirectories {
 	/** Where the daemon persists one `<id>.json` per execution. */
@@ -251,16 +270,57 @@ export class FlowQueryService {
 	}
 
 	/**
-	 * One live worker and the tail of its captured output. Throws UnknownWorkerError when no connected worker has the id
-	 * (only live workers are listed), FlowCoreError for a bad `lines`, WorkerListError as listWorkers does.
+	 * The tail of the log of one worker, live or exited. `workerId` is a live worker's id, or the log key of a worker that
+	 * is gone (a pid for a forked worker, its worker id otherwise; see `RecentWorkerLog.key`). A live worker is answered
+	 * with `worker`; a gone one is read from its file, and so is any worker when no daemon runs. Throws UnknownWorkerError
+	 * when the id is neither live nor the key of a log, FlowCoreError for a bad `lines`, and WorkerListError when the
+	 * daemon failed AND no file answers.
 	 */
-	async readWorkerLogs(workerId: string, lines: number): Promise<{ worker: WorkerSummary; logs: WorkerLogsView }> {
-		const { workers } = await readWorkerList(this.directories.daemonDir);
-		const worker = workers.find(candidate => candidate.workerId === workerId);
-		if (worker === undefined) {
-			throw new UnknownWorkerError(workerId);
+	async readWorkerLogs(workerId: string, lines: number): Promise<WorkerLogTarget> {
+		let live: WorkerSummary[] = [];
+		let listError: WorkerListError | undefined;
+		try {
+			live = (await readWorkerList(this.directories.daemonDir)).workers;
+		} catch (err) {
+			if (!(err instanceof WorkerListError)) {
+				throw err;
+			}
+			listError = err;
 		}
-		return { worker, logs: readWorkerLogs(this.directories.configDir, worker, lines) };
+		const worker = live.find(candidate => candidate.workerId === workerId);
+		if (worker !== undefined) {
+			return {
+				worker,
+				key: workerLogKeyOf(worker),
+				origin: worker.ephemeral ? 'started by the daemon' : 'external',
+				logs: readWorkerLogs(this.directories.configDir, worker, lines),
+			};
+		}
+		const logs = readWorkerLogByKey(this.directories.configDir, workerId, lines);
+		if (logs !== undefined) {
+			return { worker: undefined, key: workerId, origin: originOfWorkerLogKey(workerId), logs };
+		}
+		if (listError !== undefined) {
+			throw listError;
+		}
+		throw new UnknownWorkerError(workerId);
+	}
+
+	/**
+	 * The workers that are not connected (any more) but whose log is still on disk, newest first. Read from the files, so
+	 * it works with no daemon running. Live workers are left out (the live table has them).
+	 */
+	async listRecentWorkers(): Promise<RecentWorkerLog[]> {
+		let live: WorkerSummary[] = [];
+		try {
+			live = (await readWorkerList(this.directories.daemonDir)).workers;
+		} catch (err) {
+			// Listing the files does not need the daemon: a failing daemon only means live workers cannot be left out.
+			if (!(err instanceof WorkerListError)) {
+				throw err;
+			}
+		}
+		return listRecentWorkerLogs(this.directories.configDir, new Set(live.map(workerLogKeyOf)));
 	}
 
 	/** Tail of one day's daemon log (default: today). */

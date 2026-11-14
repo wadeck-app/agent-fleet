@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { WORKER_LOG_CHUNK_MAX_CHARS } from '../ipc/Protocol';
 import { MAX_WORKER_FRAME_BYTES } from '../ipc/WorkerFrameLimit';
 import { WorkerFrameTooLargeError, serializeWorkerFrame } from './WorkerFrame';
 
@@ -114,6 +115,28 @@ describe('serializeWorkerFrame', () => {
 			const frame = logFrame('hello');
 
 			expect(serializeWorkerFrame(frame)).toBe(JSON.stringify(frame));
+		});
+	});
+
+	// The wire shape of the output the worker ships (the daemon parses it with JSON.parse, see WebSocketServer).
+	describe('worker_log frames', () => {
+		it('round-trips through JSON with its optional dropped count', () => {
+			const frame = { type: 'worker_log', stream: 'stderr', text: '[warn] x\n', dropped: 12 } as const;
+			expect(JSON.parse(serializeWorkerFrame(frame))).toEqual(frame);
+			expect(JSON.parse(serializeWorkerFrame({ type: 'worker_log', stream: 'stdout', text: 'y' }))).toEqual({
+				type: 'worker_log',
+				stream: 'stdout',
+				text: 'y',
+			});
+		});
+
+		it('fits the limit at the largest chunk the worker sends, even all 3-byte characters', () => {
+			const serialized = serializeWorkerFrame({
+				type: 'worker_log',
+				stream: 'stdout',
+				text: String.fromCharCode(0x20ac).repeat(WORKER_LOG_CHUNK_MAX_CHARS),
+			});
+			expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThanOrEqual(MAX_WORKER_FRAME_BYTES);
 		});
 	});
 

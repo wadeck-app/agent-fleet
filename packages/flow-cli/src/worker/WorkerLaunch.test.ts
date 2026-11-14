@@ -8,6 +8,7 @@ import {
 	WORKER_FEATURE_HOST_TOOLS,
 	WORKER_FEATURE_PROJECT_ID,
 	WORKER_FEATURE_SUB_STEP_SESSION_RESUME,
+	WORKER_FEATURE_WORKER_LOGS,
 } from '../ipc/Protocol.js';
 import {
 	buildRegistration,
@@ -151,6 +152,14 @@ describe('buildRegistration', () => {
 
 		expect(WORKER_FEATURE_HOST_TOOLS).toBe('host-tools');
 		expect(reg.features).toContain(WORKER_FEATURE_HOST_TOOLS);
+	});
+
+	// Shipping starts only when the daemon answers; the declaration is what makes it answer.
+	it('declares the worker-logs feature under its wire name', () => {
+		const reg = buildRegistration({ projects: [PROJ], isTty: false, canPrompt: false, pid: 7 });
+
+		expect(WORKER_FEATURE_WORKER_LOGS).toBe('worker-logs');
+		expect(reg.features).toContain(WORKER_FEATURE_WORKER_LOGS);
 	});
 
 	it('serves every project it is given, in order', () => {

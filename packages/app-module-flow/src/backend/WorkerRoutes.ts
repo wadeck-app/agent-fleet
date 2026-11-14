@@ -29,18 +29,44 @@ export function registerWorkerRoutes(ctx: ModuleContext, service: FlowQueryServi
 	ctx.registerRoute('GET', '/workers', async (_req, reply) => {
 		try {
 			// Awaited before reply.code(): a failure must not leave a 200 status set on the error answer.
-			const workers = await service.listWorkers();
-			return reply.code(200).send(workers);
+			const result = await service.listWorkers();
+			return reply.code(200).send({
+				...result,
+				// The origin as words, for the table (the summary only has the `ephemeral` flag).
+				workers: result.workers.map(worker => ({
+					...worker,
+					origin: worker.ephemeral ? 'started by the daemon' : 'external',
+				})),
+			});
 		} catch (err) {
 			return replyWithError(reply, err);
 		}
 	});
 
 	/**
-	 * `GET /workers/:workerId/logs?lines=N` (default 200, at most 2000): the worker and the tail of the output the daemon
-	 * captured for it (stdout and stderr, secrets masked when written). Only workers the daemon forked have one:
-	 * `available: false` and a `reason` say why there is none (external worker, file removed), never an empty list alone.
-	 * An unknown id answers the not-found notice (a worker that exited is not listed any more).
+	 * `GET /workers/recent`: the workers that are not connected (any more) but whose log is still on disk (7 days), newest
+	 * first, each with its origin, size, last write and last line. Read from the files: works with no daemon running.
+	 */
+	ctx.registerRoute('GET', '/workers/recent', async (_req, reply) => {
+		try {
+			const recent = await service.listRecentWorkers();
+			return reply.code(200).send({
+				recent: recent.map(entry => ({ ...entry, lastLine: stripForServing(entry.lastLine) })),
+				count: recent.length,
+			});
+		} catch (err) {
+			return replyWithError(reply, err);
+		}
+	});
+
+	/**
+	 * `GET /workers/:workerId/logs?lines=N` (default 200, at most 2000): the tail of the log the daemon keeps for a worker,
+	 * secrets masked when written. `:workerId` is a live worker's id, or the key of the log of a worker that is gone (a pid
+	 * for a forked worker, a worker id otherwise; see `GET /workers/recent`): an exited worker (`state: 'exited'`) is
+	 * served from its file, also when no daemon runs. A worker the daemon forked has its process output; any other has what
+	 * the daemon observed of it (connection, steps) and, when it ships them, its own output lines.
+	 * `available: false` and a `reason` say why there is nothing (file removed, daemon predates the logs), never an empty
+	 * list alone. An id that is neither live nor a key answers the not-found notice.
 	 */
 	ctx.registerRoute('GET', '/workers/:workerId/logs', async (req, reply) => {
 		const { workerId } = req.params as { workerId: string };
@@ -48,7 +74,7 @@ export function registerWorkerRoutes(ctx: ModuleContext, service: FlowQueryServi
 		try {
 			const lines =
 				optionalInteger(query, 'lines', { min: 1, max: WORKER_LOG_MAX_LINES }) ?? WORKER_LOG_DEFAULT_LINES;
-			const { worker, logs } = await service.readWorkerLogs(workerId, lines);
+			const { worker, key, origin, logs } = await service.readWorkerLogs(workerId, lines);
 			const served = logs.lines.map(line => stripForServing(line));
 			return reply.code(200).send({
 				...logs,
@@ -62,16 +88,19 @@ export function registerWorkerRoutes(ctx: ModuleContext, service: FlowQueryServi
 				hasLines: served.length > 0,
 				lacksLines: served.length === 0,
 				hasReason: logs.reason !== undefined,
+				live: worker !== undefined,
 				// A DataTable takes rows: one row.
 				summary: [
 					{
-						workerId: worker.workerId,
-						state: worker.state,
-						pid: worker.pid,
-						version: worker.version ?? '',
-						sourceId: worker.sourceId ?? '',
-						origin: worker.ephemeral ? 'started by the daemon' : 'external',
-						hasUserInterface: worker.hasUserInterface,
+						workerId: worker?.workerId ?? key,
+						state: worker?.state ?? 'exited',
+						pid: worker?.pid ?? (origin === 'started by the daemon' ? Number(key) : ''),
+						version: worker?.version ?? '',
+						sourceId: worker?.sourceId ?? '',
+						origin,
+						hasUserInterface: worker?.hasUserInterface ?? '',
+						sizeBytes: logs.sizeBytes,
+						lastWritten: logs.modifiedAt ?? '',
 					},
 				],
 			});

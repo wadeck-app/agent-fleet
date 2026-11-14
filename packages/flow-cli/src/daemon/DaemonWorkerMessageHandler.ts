@@ -4,6 +4,7 @@ import type { SourceReady, WorkerToDaemon } from '../ipc/Protocol';
 import { writeDaemonLog } from './DaemonLog.js';
 import type { DaemonRuntime } from './DaemonRuntime.js';
 import { injectedStepState } from './InjectedStepState.js';
+import type { WorkerConnectionLogs } from './WorkerConnectionLogs.js';
 import { WorkerConnectionTracker } from './WorkerConnectionTracker.js';
 
 /** Reacts to what connected workers and relays say, and to their sockets closing. */
@@ -17,10 +18,17 @@ export class DaemonWorkerMessageHandler {
 		/** Called after anything that may have left the daemon with nothing to do. */
 		private readonly checkShutdown: () => void,
 		/** Remembers what each connection last said, so a disconnect can be explained. */
-		private readonly connections: WorkerConnectionTracker = new WorkerConnectionTracker()
+		private readonly connections: WorkerConnectionTracker = new WorkerConnectionTracker(),
+		/** The per-worker logs of workers the daemon did not fork; absent = they are not kept. */
+		private readonly workerLogs?: WorkerConnectionLogs
 	) {}
 
 	handleMessage(ws: WebSocket, message: WorkerToDaemon): void {
+		// Output the worker ships is not a sign of what it was doing: it must not become the "last message" of a disconnect report.
+		if (message.type === 'worker_log') {
+			this.workerLogs?.ship(ws, message);
+			return;
+		}
 		this.connections.noteMessage(ws, message as { type: string; executionId?: string; stepId?: string });
 		// A relay registering as a source arrives on the same listener but is not a worker: it
 		// presents a different credential and is never dispatched to (T-04, T-11).
@@ -37,6 +45,7 @@ export class DaemonWorkerMessageHandler {
 				if (!workerProvisioner.registerWorker(ws, message)) {
 					break;
 				}
+				this.openWorkerLog(ws);
 				commandHandler.tryDispatch();
 				this.checkShutdown();
 				break;
@@ -57,6 +66,7 @@ export class DaemonWorkerMessageHandler {
 				// Only changes how a later disconnect is classified (D#65); nothing else acts on it.
 				const { assignmentId, executionId, stepId } = message;
 				this.runtime().commandHandler.onStepStarted(ws, assignmentId, executionId, stepId);
+				this.workerLogs?.note(ws, `step ${stepId} started (execution ${executionId})`);
 				break;
 			}
 			case 'step_progress': {
@@ -102,6 +112,7 @@ export class DaemonWorkerMessageHandler {
 			...(registered !== undefined && { workerId: registered.workerId, pid: registered.pid }),
 		});
 		writeDaemonLog(this.logsDir, report.lostStartedStep ? 'error' : 'info', report.logLine);
+		this.workerLogs?.close(ws, report.logLine);
 		// A disconnected worker can no longer report on its assignments; leaving them
 		// outstanding would let a reconnecting socket be matched against stale work.
 		// Classifies each interrupted step and re-queues the ones that never started (D#65).
@@ -117,6 +128,18 @@ export class DaemonWorkerMessageHandler {
 		this.checkShutdown();
 	}
 
+	/** Starts the log of a worker the daemon did not fork and, when it can ship its output, tells it so (once per connection). */
+	private openWorkerLog(ws: WebSocket): void {
+		if (this.workerLogs === undefined) {
+			return;
+		}
+		const { workerRegistry } = this.runtime();
+		const registered = workerRegistry.describe(ws);
+		if (registered !== undefined && this.workerLogs.open(ws, registered)) {
+			workerRegistry.send(ws, { type: 'worker_logs_enabled' });
+		}
+	}
+
 	private handleStepCompleted(ws: WebSocket, message: Extract<WorkerToDaemon, { type: 'step_completed' }>): void {
 		const { commandHandler, executionStore, logWriter } = this.runtime();
 		try {
@@ -127,6 +150,7 @@ export class DaemonWorkerMessageHandler {
 			// The outcome is accepted from here on, so the assignment is closed and
 			// the same result cannot be replayed.
 			commandHandler.settleAssignment(assignmentId);
+			this.workerLogs?.note(ws, `step ${stepId} completed (execution ${executionId})`);
 			executionStore.markStepCompleted(executionId, stepId, meta, {
 				capture: io,
 				outputs: output,
@@ -193,6 +217,7 @@ export class DaemonWorkerMessageHandler {
 				return;
 			}
 			commandHandler.settleAssignment(assignmentId);
+			this.workerLogs?.note(ws, `step ${stepId} failed (execution ${executionId}): ${error.slice(0, 500)}`);
 			this.warnOnceIfNoMetrics(ws, executionId, stepId, meta);
 			executionStore.markStepFailed(
 				executionId,

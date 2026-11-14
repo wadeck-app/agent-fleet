@@ -35,6 +35,18 @@ describe('WorkerLogFile', () => {
 		]);
 	});
 
+	it('is keyed by worker id for a worker that is not a pid, and tags what the daemon observed as dmn', () => {
+		const file = new WorkerLogFile(dir, '3f2a-77b0', identity, vi.fn(), { now: fixedNow });
+		file.append('daemon', 'connected\n');
+		file.append('stdout', 'shipped\n');
+		expect(file.filePath).toBe(path.join(dir, 'worker-3f2a-77b0.log'));
+		expect(read(file)).toEqual(['2026-11-14T10:00:00.000Z dmn connected', '2026-11-14T10:00:00.000Z out shipped']);
+	});
+
+	it('refuses a worker id that could leave the directory', () => {
+		expect(() => new WorkerLogFile(dir, '../evil', identity, vi.fn())).toThrow(/Invalid worker log key/);
+	});
+
 	it('joins a line split across chunks and flushes an open line on close', () => {
 		const file = new WorkerLogFile(dir, 7, identity, vi.fn(), { now: fixedNow });
 		file.append('stdout', 'par');

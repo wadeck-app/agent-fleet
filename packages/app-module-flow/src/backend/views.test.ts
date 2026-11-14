@@ -1360,7 +1360,24 @@ describe('worker pages', () => {
 		const links = collectNodes(parseView('workers-page.yaml').document, 'DataTable')
 			.flatMap(table => table['columns'] as Record<string, unknown>[])
 			.filter(column => column['type'] === 'link');
-		expect(links.map(link => link['to'])).toEqual([`${MODULE_PAGE_PREFIX}/workers/{workerId}`]);
+		// The live table links by worker id, the recent table (exited workers) by log key: both open the same page.
+		expect(links.map(link => link['to'])).toEqual([
+			`${MODULE_PAGE_PREFIX}/workers/{workerId}`,
+			`${MODULE_PAGE_PREFIX}/workers/{key}`,
+		]);
+	});
+
+	it('the workers page reads the live list and the recent logs, and each table column is a field its route sends', () => {
+		const page = parseView('workers-page.yaml');
+		expect(sourcesOf(page).map(source => source.spec.url)).toEqual([
+			`GET ${MODULE_API_PREFIX}/workers`,
+			`GET ${MODULE_API_PREFIX}/workers/recent`,
+		]);
+		const [live, recent] = collectNodes(page.document, 'DataTable').slice(0, 2);
+		const keys = (table: Record<string, unknown> | undefined): unknown[] =>
+			((table?.['columns'] as Record<string, unknown>[]) ?? []).map(column => column['key']).filter(Boolean);
+		expect(keys(live)).toContain('origin');
+		expect(keys(recent)).toEqual(['key', 'origin', 'modifiedAt', 'sizeBytes', 'lastLine']);
 	});
 
 	it('reads only fields the route sends', () => {

@@ -2,6 +2,8 @@
 $sources:
     workers:
         url: GET /api/modules/flow/workers
+    recent:
+        url: GET /api/modules/flow/workers/recent
 
 $type: PageContent
 sections:
@@ -24,7 +26,24 @@ sections:
                 - { key: 'pid', label: 'PID', nowrap: true, mono: true }
                 - { key: 'version', label: 'Version', nowrap: true, mono: true }
                 - { key: 'sourceId', label: 'Source', truncate: true }
+                - { key: 'origin', label: 'Origin', nowrap: true }
                 - { key: 'hasUserInterface', label: 'Interactive', nowrap: true }
+
+    # Workers that are gone but whose log is still on disk (7 days): the way to see why one ended. Read from the log files,
+    # so it also works when no daemon runs. The key is a pid (started by the daemon) or a worker id.
+    - $type: Section
+      title: Recent workers (exited, log kept 7 days)
+      items:
+          - $type: DataTable
+            rows: $sources.recent.recent
+            emptyMessage: No worker log on disk
+            columns:
+                - { type: link, to: '/modules/flow/workers/{key}', icon: eye, label: Open worker log, position: start }
+                - { key: 'key', label: 'Worker', truncate: true, mono: true }
+                - { key: 'origin', label: 'Origin', nowrap: true }
+                - { key: 'modifiedAt', label: 'Last written', nowrap: true, format: datetime, dateStyle: short }
+                - { key: 'sizeBytes', label: 'Size (bytes)', nowrap: true, mono: true }
+                - { key: 'lastLine', label: 'Last line', truncate: true, mono: true }
 
     - $type: Section
       title: Declared sources (capacity that can be started, not workers)

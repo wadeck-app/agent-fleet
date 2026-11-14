@@ -19,6 +19,7 @@ import {
 	resolveSourceId,
 	resolveWorkerToken,
 } from '../../worker/WorkerLaunch';
+import { WorkerOutputShipper } from '../../worker/WorkerOutputShipper';
 import { resolveWorkerProjects } from '../../worker/WorkerProjects';
 import { WorkerConnection } from './WorkerConnection';
 import { registerWorkerListCommand } from './WorkerListCommand';
@@ -157,6 +158,17 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		);
 	}
 
+	// Copies what this process prints to the daemon (once the daemon enables it), installed before the banner so it is part of
+	// the worker's log. Only the stream `write`s are wrapped: the terminal output is unchanged.
+	const outputShipper = new WorkerOutputShipper({
+		onSendFailure: err =>
+			report(
+				'[warn]',
+				`cannot send the worker output to the daemon, it will not be in the worker log: ${normalizeError(err).message}`
+			),
+	});
+	outputShipper.install(process.stdout, process.stderr);
+
 	printWorkerStartupBanner({
 		projects,
 		registration,
@@ -217,6 +229,7 @@ async function runWorker(options: WorkerOptions): Promise<void> {
 		resolveToken: () => resolveWorkerToken({ token: options.token, sourceId }, daemonDir),
 		interactive: options.interactive === true,
 		busyTracker: selfUpdate.busyTracker,
+		outputShipper,
 	}).connect(undefined, 0);
 
 	// Accept typed input when the terminal is interactive: lines are echoed as notes so the

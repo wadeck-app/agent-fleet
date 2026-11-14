@@ -1,9 +1,10 @@
 # Worker detail, mounted at /modules/flow/workers/:workerId. ":workerId" of the manifest path is $route.workerId.
-# The worker as the daemon lists it, then the tail of the output the daemon captured for it (stdout and stderr, secrets
-# masked when written, GET /workers/:workerId/logs). Only workers the daemon forked have a log: for the others (external,
-# or the file was removed) the route says why in `reason`, shown as the notice below instead of an empty viewer.
-# ?lines=<n> sets the tail size (default 200, at most 2000). Only live workers are listed: one that exited answers the
-# not-found notice (NotFoundNotice.ts).
+# The worker (live, or "exited" when only its log is left), then the tail of its log (secrets masked when written,
+# GET /workers/:workerId/logs). A worker the daemon forked has its process output (stdout, stderr); any other has what the
+# daemon observed of it (connection, steps, disconnect) plus its own output lines when it ships them. The route says in
+# `reason` when there is nothing to show (file removed, daemon predates the logs), shown as the notice below instead of an
+# empty viewer. ?lines=<n> sets the tail size (default 200, at most 2000). An id that is neither live nor the key of a log
+# answers the not-found notice (NotFoundNotice.ts).
 $sources:
     worker:
         url: GET /api/modules/flow/workers/{workerId}/logs
@@ -20,17 +21,19 @@ sections:
       items:
           - $type: PageHeader
             title: $sources.worker.workerId
-            subtitle: Worker output as captured by the daemon
+            subtitle: Worker log as kept by the daemon
 
           - $type: DataTable
             rows: $sources.worker.summary
             columns:
-                - { key: 'state', label: 'State', nowrap: true, badge: { idle: default, busy: info } }
+                - { key: 'state', label: 'State', nowrap: true, badge: { idle: default, busy: info, exited: warning } }
                 - { key: 'pid', label: 'PID', nowrap: true, mono: true }
                 - { key: 'version', label: 'Version', nowrap: true, mono: true }
                 - { key: 'sourceId', label: 'Source', truncate: true }
                 - { key: 'origin', label: 'Origin', nowrap: true }
                 - { key: 'hasUserInterface', label: 'Interactive', nowrap: true }
+                - { key: 'lastWritten', label: 'Log last written', nowrap: true, format: datetime, dateStyle: short }
+                - { key: 'sizeBytes', label: 'Log size (bytes)', nowrap: true, mono: true }
 
           - $type: HorizontalStack
             gap: gap-3
@@ -56,7 +59,7 @@ sections:
 
           - $type: Section
             $if: $sources.worker.available
-            title: Output (oldest first, the last lines of the capture)
+            title: Log (oldest first; out/err = the worker's output, dmn = what the daemon observed)
             items:
                 - $type: JsonViewer
                   $if: $sources.worker.hasLines

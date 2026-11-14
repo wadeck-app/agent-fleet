@@ -7,6 +7,7 @@ import {
 	WORKER_FEATURE_PROJECT_ID,
 	WORKER_FEATURE_SECRETS,
 	WORKER_FEATURE_SUB_STEP_SESSION_RESUME,
+	WORKER_FEATURE_WORKER_LOGS,
 } from '../ipc/Protocol.js';
 import { buildForkedWorkerReady } from './WorkerLaunch.js';
 
@@ -53,6 +54,8 @@ describe('buildForkedWorkerReady', () => {
 			WORKER_FEATURE_SECRETS,
 			WORKER_FEATURE_PROJECT_ID,
 			WORKER_FEATURE_HOST_TOOLS,
+			// Declared by every worker; the daemon never enables it for one it forked (it captures that output itself).
+			WORKER_FEATURE_WORKER_LOGS,
 		]);
 		expect(ready.shellCapabilities).toEqual([]);
 	});

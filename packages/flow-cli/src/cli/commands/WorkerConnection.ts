@@ -17,6 +17,7 @@ import {
 	scheduleReconnectTimer,
 	withFreshToken,
 } from '../../worker/WorkerLaunch';
+import type { WorkerOutputShipper } from '../../worker/WorkerOutputShipper';
 import { report, ts } from './WorkerReport';
 import type { BusyTracker } from './WorkerSelfUpdate';
 // violations-suppress-end: ts/no-deep-relative
@@ -42,6 +43,8 @@ export interface WorkerConnectionConfig {
 	interactive: boolean;
 	/** Shared across reconnects (see runWorker): a step in flight across a reconnect is still busy. */
 	busyTracker: BusyTracker;
+	/** Copies the process output to the daemon once it enabled it (see {@link WorkerOutputShipper}); absent = nothing is shipped. */
+	outputShipper?: WorkerOutputShipper;
 }
 
 /**
@@ -99,6 +102,11 @@ export class WorkerConnection {
 				report('[warn]', `ignored an unparseable daemon message: ${String(err)}`);
 				return;
 			}
+			if (message.type === 'worker_logs_enabled') {
+				// The daemon knows `worker_log`: only now may the output of this process be sent to it.
+				this.config.outputShipper?.attach(send);
+				return;
+			}
 			void handleWorkerMessage(message, adapter, send, registration, display, this.config.busyTracker);
 		});
 
@@ -108,6 +116,8 @@ export class WorkerConnection {
 		});
 
 		ws.on('close', () => {
+			// Output printed while disconnected is kept for the next connection (the line below is part of it).
+			this.config.outputShipper?.detach();
 			const delay = reconnectDelayMs(attempt + 1);
 			console.log(`[${ts()}] [wait] daemon connection closed; next attempt in ${formatDelay(delay)}`);
 			this.scheduleReconnect(attempt + 1);

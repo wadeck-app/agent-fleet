@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler';
+import { WorkerConnectionLogs } from './WorkerConnectionLogs.js';
 import { WorkerConnectionTracker } from './WorkerConnectionTracker';
 
 function makeHandler(verified: boolean) {
@@ -299,5 +300,111 @@ describe('DaemonWorkerMessageHandler -- run_end_ack', () => {
 		expect(commandHandler.onRunEndAck).toHaveBeenCalledWith(ws, 'e1');
 		// It concerns the whole run, not an assignment: nothing to bind it to.
 		expect(commandHandler.verifyAssignment).not.toHaveBeenCalled();
+	});
+});
+
+describe('DaemonWorkerMessageHandler -- the log of a worker the daemon did not fork', () => {
+	function makeLoggingHandler(registered: Record<string, unknown>) {
+		const dir = createTempDirectory('dwmh-worker-logs-');
+		const commandHandler = {
+			verifyAssignment: vi.fn().mockReturnValue(true),
+			settleAssignment: vi.fn(),
+			onStepStarted: vi.fn(),
+			onStepFailed: vi.fn(),
+			dispatchHook: vi.fn(),
+			handleWorkerDisconnect: vi.fn(),
+			tryDispatch: vi.fn(),
+		};
+		const workerRegistry = {
+			describe: vi.fn().mockReturnValue(registered),
+			send: vi.fn().mockReturnValue(true),
+			remove: vi.fn(),
+		};
+		const handler = new DaemonWorkerMessageHandler(
+			'/logs',
+			() =>
+				({
+					commandHandler,
+					workerRegistry,
+					relayRegistry: { remove: vi.fn() },
+					workerProvisioner: { registerWorker: vi.fn().mockReturnValue(true) },
+					executionStore: { markStepFailed: vi.fn() },
+					logWriter: { writeExecution: vi.fn() },
+					daemonSecrets: { masks: { mask: (_executionId: string, text: string) => text } },
+				}) as unknown as DaemonRuntime,
+			() => {},
+			undefined,
+			new WorkerConnectionLogs(dir, text => text, vi.fn())
+		);
+		const lines = (): string[] =>
+			readFileSync(path.join(dir, 'worker-w-ext.log'), 'utf8')
+				.split('\n')
+				.filter(Boolean)
+				.map(line => line.replace(/^\S+ /, ''));
+		return { handler, workerRegistry, lines, dir };
+	}
+
+	const external = {
+		workerId: 'w-ext',
+		pid: 5,
+		version: 'sandbox-exec-m7',
+		labels: [],
+		features: ['worker-logs'],
+		ephemeral: false,
+	};
+
+	// The old daemon rejects an unknown message type, so the worker may only ship after this answer.
+	it('answers worker_logs_enabled once, on the first ready of a worker declaring the feature', () => {
+		const { handler, workerRegistry } = makeLoggingHandler(external);
+
+		handler.handleMessage(ws, { type: 'ready', pid: 5 });
+		handler.handleMessage(ws, { type: 'ready', pid: 5 });
+
+		expect(workerRegistry.send).toHaveBeenCalledTimes(1);
+		expect(workerRegistry.send).toHaveBeenCalledWith(ws, { type: 'worker_logs_enabled' });
+	});
+
+	it('never answers a worker that does not declare the feature, but still keeps its log (daemon observations only)', () => {
+		const { handler, workerRegistry, lines } = makeLoggingHandler({ ...external, features: [] });
+
+		handler.handleMessage(ws, { type: 'ready', pid: 5 });
+
+		expect(workerRegistry.send).not.toHaveBeenCalled();
+		expect(lines()[1]).toContain('does not ship its own output');
+	});
+
+	it('records the lifecycle the daemon observes: steps started, completed or failed, and the disconnect', () => {
+		const { handler, lines } = makeLoggingHandler({ ...external, features: [] });
+		handler.handleMessage(ws, { type: 'ready', pid: 5 });
+
+		handler.handleMessage(ws, { type: 'step_started', ...base });
+		handler.handleMessage(ws, { type: 'step_failed', ...base, error: 'boom' } as never);
+		handler.handleClose(ws, 1006, '');
+
+		expect(lines().slice(2)).toEqual([
+			'dmn step s1 started (execution e1)',
+			expect.stringMatching(/^dmn step s1 failed \(execution e1\): boom$/),
+			expect.stringMatching(/^dmn worker w-ext \(pid 5\) disconnected \(close code 1006/),
+		]);
+	});
+
+	it('writes the shipped output into the worker log, and does not count it as the last message of the disconnect report', () => {
+		const { handler, lines } = makeLoggingHandler(external);
+		handler.handleMessage(ws, { type: 'ready', pid: 5 });
+
+		handler.handleMessage(ws, { type: 'worker_log', stream: 'stdout', text: '[wait] hello\n' });
+		handler.handleClose(ws, 1006, '');
+
+		expect(lines()).toContain('out [wait] hello');
+		expect(lines().at(-1)).toContain('last message received: ready');
+	});
+
+	it('does not throw on worker_log when the per-worker logs are not configured (a daemon built without them)', () => {
+		const handler = new DaemonWorkerMessageHandler(
+			'/logs',
+			() => ({}) as unknown as DaemonRuntime,
+			() => {}
+		);
+		expect(() => handler.handleMessage(ws, { type: 'worker_log', stream: 'stdout', text: 'x' })).not.toThrow();
 	});
 });
