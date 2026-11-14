@@ -57,6 +57,49 @@ describe('HostToolStepWiring.prepare', () => {
 		expect(attempt).toThrow(/Step 'triage' tool 'show'.*definitely-not-installed-xyz/);
 	});
 
+	describe('executable inside the workspace (F-16 residual)', () => {
+		/** A runnable file (it is never run here) at `directory/name`. */
+		const plant = (directory: string, name: string): string => {
+			fs.mkdirSync(directory, { recursive: true });
+			const file = path.join(directory, name);
+			fs.writeFileSync(file, 'x');
+			fs.chmodSync(file, 0o755);
+			return file;
+		};
+		const warnings = (lines: string[]): string[] => lines.filter(line => line.includes('WARNING'));
+
+		it('warns once per such tool at step start: tool id, path, why, Fix; the step still starts', () => {
+			const inside = plant(path.join(workspace, 'bin'), 'local-tool.exe');
+			const outside = plant(fs.mkdtempSync(path.join(os.tmpdir(), 'flow-hosttool-outside-')), 'other-tool.exe');
+			const lines: string[] = [];
+			const serving = prepare(
+				[
+					tool({ id: 'local', command: [inside] }),
+					tool({ id: 'elsewhere', command: [outside] }),
+					tool({ id: 'local-again', command: [inside, 'x'] }),
+				],
+				lines
+			);
+			expect(serving).toBeDefined();
+			const found = warnings(lines);
+			expect(found).toHaveLength(2);
+			expect(found[0]).toContain("tool 'local'");
+			expect(found[0]).toContain(inside);
+			expect(found[0]).toMatch(/model can write the workspace/);
+			expect(found[0]).toMatch(/Fix: use an executable outside the workspace\./);
+			expect(found[1]).toContain("tool 'local-again'");
+			expect(found.join('\n')).not.toContain("tool 'elsewhere'");
+			// Nothing is written per call or at construction beyond the warnings.
+			expect(lines).toEqual(found);
+		});
+
+		it('writes no warning for an executable outside the workspace', () => {
+			const lines: string[] = [];
+			prepare([tool()], lines);
+			expect(lines).toEqual([]);
+		});
+	});
+
 	it.each([['FLOW_WORKER_TOKEN'], ['flow_mcp_tool_token']])(
 		'fails loudly when a tool declares the forbidden env name %s',
 		name => {

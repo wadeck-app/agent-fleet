@@ -1,4 +1,5 @@
 import type { HostTool } from 'flow-engine';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -270,6 +271,92 @@ describe('HostToolExecutor (real processes)', () => {
 			// Aborting afterwards must not throw nor touch anything.
 			expect(() => controller.abort('step ended')).not.toThrow();
 		});
+	});
+
+	describe('process group kill on POSIX (platform injected)', () => {
+		interface Recorded {
+			spawnOptions: Array<Record<string, unknown>>;
+			signals: Array<[number, string | number | undefined]>;
+			pids: number[];
+		}
+
+		/** Records the spawn options, then runs the process for real WITHOUT `detached` (a detached child on Windows is not what is under test). */
+		const instrumented = (
+			platform: NodeJS.Platform,
+			signalProcess?: (pid: number, signal?: string | number) => true
+		): { executor: HostToolExecutor; recorded: Recorded } => {
+			const recorded: Recorded = { spawnOptions: [], signals: [], pids: [] };
+			const instrumentedExecutor = new HostToolExecutor({
+				workerEnvironment,
+				resolver,
+				platform,
+				spawnProcess: (command, args, options) => {
+					recorded.spawnOptions.push({ ...options });
+					const child = spawn(command, args, { ...options, detached: false });
+					if (child.pid !== undefined) recorded.pids.push(child.pid);
+					return child;
+				},
+				signalProcess:
+					signalProcess ??
+					((pid, signal) => {
+						recorded.signals.push([pid, signal]);
+						return true;
+					}),
+			});
+			return { executor: instrumentedExecutor, recorded };
+		};
+
+		const timeOut = (executorUnderTest: HostToolExecutor): Promise<HostToolExecutionResult> => {
+			const tool = fixtures.tool('sleep.cjs', [path.join(workspace, 'group-heartbeat.txt')], {
+				timeoutSeconds: 1,
+			});
+			return executorUnderTest.execute({
+				stepId: 'triage',
+				tool,
+				executable: resolver.resolve('triage', tool),
+				values: {},
+				limits: HostToolLimits.resolve(tool),
+				workspaceDir: workspace,
+			});
+		};
+
+		it.each([
+			{ platform: 'linux' as const, detached: true, groupKill: true },
+			{ platform: 'darwin' as const, detached: true, groupKill: true },
+			{ platform: 'win32' as const, detached: false, groupKill: false },
+		])(
+			'$platform: spawn detached=$detached, kill of the process group=$groupKill',
+			async ({ platform, detached, groupKill }) => {
+				const { executor: subject, recorded } = instrumented(platform);
+				const result = await timeOut(subject);
+				expect(result.reply.timedOut).toBe(true);
+				expect(recorded.spawnOptions[0]?.['detached'] === true).toBe(detached);
+				if (groupKill) {
+					// A negative pid addresses the whole process group of the tool.
+					expect(recorded.signals).toEqual([[-recorded.pids[0]!, 'SIGKILL']]);
+				} else {
+					expect(recorded.signals).toEqual([]);
+				}
+			},
+			20_000
+		);
+
+		it('an already-ended group (ESRCH) is not a problem', async () => {
+			const { executor: subject } = instrumented('linux', () => {
+				throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' });
+			});
+			const result = await timeOut(subject);
+			expect(result.reply.timedOut).toBe(true);
+			expect(result.reply.text).not.toContain('Could not stop');
+		}, 20_000);
+
+		it('another failure of the group kill is reported in the reply, never swallowed', async () => {
+			const { executor: subject } = instrumented('linux', () => {
+				throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
+			});
+			const result = await timeOut(subject);
+			expect(result.reply.text).toMatch(/Could not stop the process group: kill EPERM/);
+		}, 20_000);
 	});
 
 	describe('executable identity is checked before every spawn (F-16)', () => {

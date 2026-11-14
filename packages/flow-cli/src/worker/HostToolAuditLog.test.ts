@@ -139,4 +139,53 @@ describe('HostToolAuditLog', () => {
 		log.record(entry({ outcome: 'denied', reason: 'r'.repeat(5000) }));
 		expect((parse(lines[0]!)['reason'] as string).length).toBeLessThanOrEqual(300);
 	});
+
+	describe('model-controlled text is sanitised (control characters, length)', () => {
+		const hasControlCharacter = (text: string): boolean =>
+			[...text].some(character => {
+				const code = character.codePointAt(0)!;
+				return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+			});
+
+		it.each([
+			{ name: 'CR', input: 'a\rb', expected: 'a\\rb' },
+			{ name: 'LF', input: 'a\nb', expected: 'a\\nb' },
+			{ name: 'CRLF', input: 'a\r\nb', expected: 'a\\r\\nb' },
+			{ name: 'ESC (an ANSI sequence)', input: 'a\u001b[31mred', expected: 'a?[31mred' },
+			{ name: 'NUL', input: 'a\u0000b', expected: 'a?b' },
+			{ name: 'DEL and a C1 control', input: 'a\u007fb\u0085c', expected: 'a?b?c' },
+			{ name: 'a tab', input: 'a\tb', expected: 'a\\tb' },
+			{ name: 'plain text, accents included', input: 'Écrit: ok', expected: 'Écrit: ok' },
+		])('$name in the reason, the tool id, the call id and an argument name', ({ input, expected }) => {
+			const { lines, log } = make();
+			log.record(
+				entry({
+					tool: undefined,
+					toolId: `t${input}`,
+					callId: `c${input}`,
+					reason: `r${input}`,
+					validated: false,
+					rawArgs: { [`n${input}`]: 'value' },
+				})
+			);
+			// One physical line, whatever the model put in the text.
+			expect(hasControlCharacter(lines[0]!)).toBe(false);
+			const parsed = parse(lines[0]!);
+			expect(parsed['reason']).toBe(`r${expected}`);
+			expect(parsed['toolId']).toBe(`t${expected}`);
+			expect(parsed['callId']).toBe(`c${expected}`);
+			expect(Object.keys(parsed['args'] as object)).toEqual([`n${expected}`]);
+		});
+
+		it.each([
+			{ name: 'a very long reason', reason: 'x'.repeat(100_000) },
+			{ name: 'a very long run of control characters', reason: '\n'.repeat(100_000) },
+		])('caps $name after sanitising, so an escape is never cut in half', ({ reason }) => {
+			const { lines, log } = make();
+			log.record(entry({ outcome: 'denied', reason }));
+			const written = parse(lines[0]!)['reason'] as string;
+			expect(written.length).toBeLessThanOrEqual(300);
+			expect(written).not.toMatch(/\\$/);
+		});
+	});
 });

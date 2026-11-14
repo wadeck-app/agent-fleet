@@ -6,6 +6,7 @@ import type { HostToolServing } from './HostToolCallTypes';
 import { HostToolEnvironment } from './HostToolEnvironment';
 import { HostToolExecutableResolver } from './HostToolExecutableResolver';
 import { HostToolExecutor } from './HostToolExecutor';
+import { HostToolWorkspaceExecutableWarning } from './HostToolWorkspaceExecutableWarning';
 
 export interface HostToolStepWiringOptions {
 	stepId: string;
@@ -21,7 +22,8 @@ export interface HostToolStepWiringOptions {
 
 /**
  * Builds what `McpServer` needs to serve the host tools of one model step: resolves every executable (the step fails
- * here, before the server and the model start, with a named error when one cannot be resolved), refuses an `env` name
+ * here, before the server and the model start, with a named error when one cannot be resolved; one inside the workspace
+ * is warned about, once, in the step log), refuses an `env` name
  * that must never reach a tool, and wires the call service with its executor and audit log. A step without tools gets
  * `undefined`: nothing changes for it.
  */
@@ -40,6 +42,14 @@ export class HostToolStepWiring {
 		}
 		const resolver = new HostToolExecutableResolver({ environment: options.workerEnvironment });
 		const executables = resolver.resolveAll(options.stepId, tools);
+		// A warning, not a refusal: the model can write the workspace, so an executable inside it could be replaced.
+		for (const warning of HostToolWorkspaceExecutableWarning.find({
+			stepId: options.stepId,
+			executables,
+			workspaceDir: options.workspaceDir,
+		})) {
+			options.writeAuditLine(warning);
+		}
 		const handler = new HostToolCallService({
 			stepId: options.stepId,
 			tools,

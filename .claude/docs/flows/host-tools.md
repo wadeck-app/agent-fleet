@@ -104,14 +104,14 @@ A token presented for the wrong kind destroys the connection (logged without the
 
 Path: `McpServer` -> `HostToolCallService` (the `HostToolCallHandler`) -> `HostToolExecutor`. Built per step by `HostToolStepWiring.prepare`; counters die with the step.
 
-| Stage     | Rule                                                                                                                                                                                              |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Run start | Every `command[0]` is resolved; failure ends the step before the server and the model start (`Step 'S' tool 'T': ...`). An `env` name on the deny list is also refused here.                      |
-| Per call  | Count the call, find the tool, `HostToolCallChecker`, concurrency, then execute. A refusal text goes back to the model (`Tool 'T' was not run: ...`).                                             |
-| argv      | `command[1..]` with `{name}` replaced by the checked value, nothing else: one element per value, no shell, no globbing, no second substitution. An optional argument not given drops its element. |
-| Spawn     | `spawn(absolutePath, argv, {shell: false, windowsHide: true})`, no stdin.                                                                                                                         |
-| Timeout   | At `timeoutSeconds` the whole process tree is killed (`killProcessTree`: `taskkill /T /F` on Windows, descendants on POSIX); reply `ok:false, timedOut:true`.                                     |
-| Abort     | `McpServer.stop()` or a callback socket closing while a call is in flight aborts it: the tree is killed at once, no reply is written, audit `aborted`. See [Abort](#abort-of-a-call-in-flight).   |
+| Stage     | Rule                                                                                                                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run start | Every `command[0]` is resolved; failure ends the step before the server and the model start (`Step 'S' tool 'T': ...`). An `env` name on the deny list is also refused here.                                  |
+| Per call  | Count the call, find the tool, `HostToolCallChecker`, concurrency, then execute. A refusal text goes back to the model (`Tool 'T' was not run: ...`).                                                         |
+| argv      | `command[1..]` with `{name}` replaced by the checked value, nothing else: one element per value, no shell, no globbing, no second substitution. An optional argument not given drops its element.             |
+| Spawn     | `spawn(absolutePath, argv, {shell: false, windowsHide: true})`, no stdin.                                                                                                                                     |
+| Timeout   | At `timeoutSeconds` the whole process tree is killed (`killProcessTree`: `taskkill /T /F` on Windows, descendants on POSIX, then the tool's whole process group, see below); reply `ok:false, timedOut:true`. |
+| Abort     | `McpServer.stop()` or a callback socket closing while a call is in flight aborts it: the tree is killed at once, no reply is written, audit `aborted`. See [Abort](#abort-of-a-call-in-flight).               |
 
 ### Executable resolution (F-16)
 
@@ -121,6 +121,14 @@ Path: `McpServer` -> `HostToolCallService` (the `HostToolCallHandler`) -> `HostT
 - A relative or empty `PATH` entry (`.`, `node_modules/.bin`, `::`) refuses the resolution of a bare name, with an error naming the entry. It is not skipped: it resolves against the worker's current directory, which can hold a file the model planted. Fix: give the worker an absolute-only `PATH`, or write an absolute `command[0]`. An absolute `command[0]` ignores `PATH`.
 - Windows `.cmd`/`.bat`: refused (cmd.exe re-parses arguments); point `command[0]` to the `.exe`.
 - Not found: the error names step, tool, executable and the PATH searched.
+- Inside the workspace: the size and mtime check does not stop a writer who restores both, and the model can write the workspace. When the resolved path (real path and lexical path, case-insensitive on Windows) lies inside the workspace, `HostToolStepWiring` writes one warning per tool at step start, through the audit channel: `[host-tool] WARNING Step 'S' tool 'T': executable 'P' is inside the workspace 'W'. ... Fix: use an executable outside the workspace.` It is a warning, not an error.
+
+### Process tree kill (timeout and abort)
+
+- Windows: `taskkill /T /F` (unchanged).
+- POSIX: the tool is spawned `detached: true`, as the leader of its own process group. After the `pgrep -P` tree kill, the group gets `SIGKILL` (`process.kill(-pid)`), which also reaches a double-forked descendant whose parent is gone (`pgrep -P` cannot follow it). `ESRCH` (group already empty) is the goal, not an error; any other failure is added to the reply as `Could not stop the process group: ...`.
+- A descendant that moves to a new session or group (`setsid`) escapes the group kill and is reached only through the parent links.
+- Not covered by an automated test on a POSIX host: tests inject the platform and check the spawn options and the signalled pid (`-pid`).
 
 ### Environment (F-05)
 
@@ -163,17 +171,24 @@ stdout and the stderr tail are DATA inside `<tool-output tool="id" untrusted="tr
 
 One `[host-tool] {json}` line per call, sent as an `info`/`system` log entry of the step through the worker's masked log channel: `stepId, toolId, callId, outcome (ok|failed|timed_out|denied|error|aborted), reason, args {name: {sha256, value?}}, exitCode, durationMs, outputBytes, truncated, timedOut, envDenied, envMissing`. A value appears only for an argument declared `log: true` on a call that passed the argument check. Never logged: output content, environment values, tokens, values of denied calls. Argument names from the model are cut to 64 characters, at most 32 names.
 
+Text the model controls (argument names, tool and call ids, `reason`) is made single-line: CR, LF and tab become `\r`, `\n`, `\t`, any other control character (C0, DEL, C1) becomes `?`; the cut (64 characters for names and ids, 300 for `reason`) comes after, on a whole replacement.
+
+#### Limits of the audit and the masker
+
+- Audit lines go through the worker's secret masker (the step's known secrets are replaced). Output returned to the model does NOT: stdout and the stderr tail of a tool are passed to the model as produced, so a tool that prints a secret (a token in a config dump, a header in `--verbose`) hands it to the model. Choose tools and arguments that do not print secrets; masking known secrets in the reply is not done because the masker is not reachable from the call service without threading it through the worker, and a replacement can make the text longer than `maxOutputBytes`.
+- The masker only knows the step's declared secrets: a secret it was not given is not masked anywhere, in the audit line either.
+
 ## Threat rows (steps 1-3)
 
-| Row       | Status in code                                                                                                 |
-| --------- | -------------------------------------------------------------------------------------------------------------- |
-| F-03/F-04 | Checker + argv array + `shell:false`; injection corpus tested through the whole call path.                     |
-| F-05      | Env allowlist and deny list, canary tests with `FLOW_WORKER_TOKEN` and `FLOW_MCP_TOOL_TOKEN`.                  |
-| F-07      | Untrusted data block; slice 1 tools are `read` only.                                                           |
-| F-12      | Timeout with tree kill (grandchild test), output cap, concurrency, call count.                                 |
-| F-13      | `cwd` is a fresh empty directory (default) or `workspace` if declared (warning for config-driven executables). |
-| F-16      | Identity recheck before each spawn; residual: a same-user swap between recheck and exec.                       |
-| F-17      | Audit as above.                                                                                                |
+| Row       | Status in code                                                                                                                           |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| F-03/F-04 | Checker + argv array + `shell:false`; injection corpus tested through the whole call path.                                               |
+| F-05      | Env allowlist and deny list, canary tests with `FLOW_WORKER_TOKEN` and `FLOW_MCP_TOOL_TOKEN`.                                            |
+| F-07      | Untrusted data block; slice 1 tools are `read` only.                                                                                     |
+| F-12      | Timeout and abort with tree kill and POSIX group kill (grandchild test), output cap, concurrency, call count.                            |
+| F-13      | `cwd` is a fresh empty directory (default) or `workspace` if declared (warning for config-driven executables).                           |
+| F-16      | Identity recheck before each spawn; warning for an executable inside the workspace; residual: a same-user swap between recheck and exec. |
+| F-17      | Audit as above, control characters sanitised; tool output to the model is not masked (documented).                                       |
 
 ## Tested end to end
 

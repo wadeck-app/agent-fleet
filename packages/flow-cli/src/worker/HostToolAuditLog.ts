@@ -32,6 +32,12 @@ const MAX_ARGUMENT_NAMES = 32;
 const MAX_NAME_LENGTH = 64;
 const MAX_REASON_LENGTH = 300;
 const LINE_PREFIX = '[host-tool] ';
+const VISIBLE_ESCAPES: Readonly<Record<string, string>> = { '\r': '\\r', '\n': '\\n', '\t': '\\t' };
+/** C0 (including NUL, ESC), DEL and C1 control characters. */
+const isControlCharacter = (character: string): boolean => {
+	const code = character.codePointAt(0) ?? 0;
+	return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+};
 
 /**
  * One execution-log line per host tool call (F-17): step, tool, call id, argument NAMES with the sha256 of each value
@@ -49,10 +55,10 @@ export class HostToolAuditLog {
 	record(entry: HostToolAuditEntry): void {
 		const line = {
 			stepId: this.stepId,
-			toolId: entry.toolId.slice(0, MAX_NAME_LENGTH),
-			callId: entry.callId.slice(0, MAX_NAME_LENGTH),
+			toolId: HostToolAuditLog.clean(entry.toolId, MAX_NAME_LENGTH),
+			callId: HostToolAuditLog.clean(entry.callId, MAX_NAME_LENGTH),
 			outcome: entry.outcome,
-			...(entry.reason === undefined ? {} : { reason: entry.reason.slice(0, MAX_REASON_LENGTH) }),
+			...(entry.reason === undefined ? {} : { reason: HostToolAuditLog.clean(entry.reason, MAX_REASON_LENGTH) }),
 			args: this.describeArguments(entry),
 			exitCode: entry.exitCode,
 			durationMs: entry.durationMs,
@@ -70,7 +76,7 @@ export class HostToolAuditLog {
 		const raw = entry.rawArgs;
 		if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return described;
 		for (const [name, value] of Object.entries(raw as Record<string, unknown>).slice(0, MAX_ARGUMENT_NAMES)) {
-			const shortName = name.slice(0, MAX_NAME_LENGTH);
+			const shortName = HostToolAuditLog.clean(name, MAX_NAME_LENGTH);
 			const keepValue =
 				entry.validated && entry.tool?.args !== undefined && Object.hasOwn(entry.tool.args, name)
 					? entry.tool.args[name]!.log === true
@@ -78,6 +84,21 @@ export class HostToolAuditLog {
 			described[shortName] = { sha256: HostToolAuditLog.hash(value), ...(keepValue ? { value } : {}) };
 		}
 		return described;
+	}
+
+	/**
+	 * Text the model controls (argument names, tool and call ids, error text quoting them) made single-line and printable:
+	 * CR, LF and tab become the two characters `\r`, `\n`, `\t`; any other control character becomes `?`. The cut comes
+	 * AFTER the replacement, on a whole replacement, so no escape is split.
+	 */
+	private static clean(text: string, maxLength: number): string {
+		let cleaned = '';
+		for (const character of text) {
+			const replacement = isControlCharacter(character) ? (VISIBLE_ESCAPES[character] ?? '?') : character;
+			if (cleaned.length + replacement.length > maxLength) break;
+			cleaned += replacement;
+		}
+		return cleaned;
 	}
 
 	private static hash(value: unknown): string {

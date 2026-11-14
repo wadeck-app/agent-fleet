@@ -1,5 +1,5 @@
 import { DefaultProcessLauncher, type HostTool } from 'flow-engine';
-import type { ChildProcess } from 'node:child_process';
+import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -21,6 +21,12 @@ export interface HostToolExecutorOptions {
 	resolver: HostToolExecutableResolver;
 	/** Ends a process and everything it started. Injected for tests; the default is the repo's tree killer. */
 	killProcessTree?: (pid: number) => void;
+	/** Defaults to the real platform; tests inject another to exercise the POSIX rules everywhere. */
+	platform?: NodeJS.Platform;
+	/** `child_process.spawn`; tests wrap it to see the options. */
+	spawnProcess?: (command: string, args: string[], options: SpawnOptions) => ChildProcess;
+	/** `process.kill`; a negative pid addresses a process group. Tests record the calls. */
+	signalProcess?: (pid: number, signal: NodeJS.Signals) => unknown;
 }
 
 /** One validated call, ready to run. */
@@ -78,8 +84,14 @@ const KILL_GRACE_MS = 5_000;
  */
 export class HostToolExecutor {
 	private readonly killTree: (pid: number) => void;
+	private readonly platform: NodeJS.Platform;
+	private readonly spawnProcess: NonNullable<HostToolExecutorOptions['spawnProcess']>;
+	private readonly signalProcess: NonNullable<HostToolExecutorOptions['signalProcess']>;
 
 	constructor(private readonly options: HostToolExecutorOptions) {
+		this.platform = options.platform ?? process.platform;
+		this.spawnProcess = options.spawnProcess ?? spawn;
+		this.signalProcess = options.signalProcess ?? ((pid, signal) => process.kill(pid, signal));
 		// The tree kill goes through the ProcessLauncher seam like every other process end (flow-engine ProcessLauncherSeam guard).
 		this.killTree =
 			options.killProcessTree ?? ((pid: number): void => new DefaultProcessLauncher().killTree(pid, 'SIGKILL'));
@@ -236,9 +248,12 @@ export class HostToolExecutor {
 			};
 			let child: ChildProcess;
 			try {
-				child = spawn(executable.absolutePath, argv, {
+				child = this.spawnProcess(executable.absolutePath, argv, {
 					shell: false,
 					windowsHide: true,
+					// POSIX: the tool leads its own process group, so the whole group can be signalled even when a
+					// descendant was double-forked (its parent gone, which `pgrep -P` cannot follow). Windows: taskkill /T.
+					detached: this.platform !== 'win32',
 					cwd,
 					env,
 					stdio: ['ignore', 'pipe', 'pipe'],
@@ -311,6 +326,20 @@ export class HostToolExecutor {
 				`Could not stop the process tree: ${error instanceof Error ? error.message : String(error)}. The tool may still be running.`
 			);
 			child.kill();
+		}
+		if (this.platform !== 'win32') this.killProcessGroup(child.pid, outcome);
+	}
+
+	/** After the tree kill (which needs the parent links): whatever is left in the tool's group, double-forked ones included. */
+	private killProcessGroup(pid: number, outcome: RawOutcome): void {
+		try {
+			this.signalProcess(-pid, 'SIGKILL');
+		} catch (error) {
+			// ESRCH: the group has no member left, which is the goal.
+			if ((error as NodeJS.ErrnoException).code === 'ESRCH') return;
+			outcome.notes.push(
+				`Could not stop the process group: ${error instanceof Error ? error.message : String(error)}. The tool may still be running.`
+			);
 		}
 	}
 }
