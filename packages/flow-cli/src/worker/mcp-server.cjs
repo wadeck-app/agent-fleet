@@ -14,7 +14,7 @@
  * See .claude/docs/flows/host-tools.md.
  */
 
-const crypto = require('crypto');
+const nodeCrypto = require('crypto');
 const net = require('net');
 const readline = require('readline');
 
@@ -333,7 +333,7 @@ function callHostTool(tool, args) {
 			reject(new Error('FLOW_MCP_CALLBACK_PORT not set'));
 			return;
 		}
-		const callId = crypto.randomUUID();
+		const callId = nodeCrypto.randomUUID();
 		let received = '';
 		let settled = false;
 		const settle = (fn, value) => {
