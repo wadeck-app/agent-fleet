@@ -104,6 +104,14 @@ export const WORKER_FEATURE_PROJECT_ID = 'project-id';
  */
 export const WORKER_FEATURE_RUN_EVENTS = 'run-events';
 
+/**
+ * The worker runs the `hostTools` of a model step (`stepConfig.hostTools`): it serves them through the generic MCP server and
+ * executes them on its own host. The daemon hands a step with `hostTools` ONLY to a worker declaring this and fails the step
+ * naming the workers otherwise, because a worker without it would run the model without the tools it was promised. A sandbox
+ * worker does not declare it in slice 1 (the exec wrapper and the harness build their own list).
+ */
+export const WORKER_FEATURE_HOST_TOOLS = 'host-tools';
+
 export type ClientCommand =
 	| {
 			type: 'run';

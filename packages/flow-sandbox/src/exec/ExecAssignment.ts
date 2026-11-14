@@ -55,8 +55,22 @@ export class ExecAssignment {
 	/** {@link toolOf} plus the refusal of what a codex or opencode step cannot do in a sandbox. Throws before anything exists, so the wrapper calls it first. */
 	static checkedToolOf(stepConfig: JsonObject, stepId: string): ModelTool | undefined {
 		const tool = ExecAssignment.toolOf(stepConfig);
+		ExecAssignment.refuseHostTools(stepConfig, stepId);
 		ExecAssignment.refuseWhatTheToolCannotDo(stepConfig, stepId, tool);
 		return tool;
+	}
+
+	/**
+	 * Host tools run on the host worker and are not offered in the sandbox in this version. The daemon does not route such a step
+	 * here (this worker does not declare `host-tools`); this is the second line, so a step that arrives anyway never runs without its tools.
+	 */
+	private static refuseHostTools(stepConfig: JsonObject, stepId: string): void {
+		const value = stepConfig['hostTools'];
+		if (value === undefined || (Array.isArray(value) && value.length === 0)) return;
+		throw new SandboxError(
+			'invalid-argument',
+			`Step "${stepId}" declares hostTools, but hostTools are not available in the sandbox in this version (they run on the host, and a sandbox worker does not offer them). Remove hostTools from the step, or run it on a worker without the "sandbox" label.`
+		);
 	}
 
 	prepare(raw: JsonObject): PreparedAssignment {

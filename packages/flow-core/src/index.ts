@@ -124,6 +124,7 @@ export {
 	tailText,
 } from './show/ExecutionDetail.js';
 export type { ExecutionLookupErrorKind, RenderOptions, ResolvedExecution } from './show/ExecutionDetail.js';
+export type { HostToolLimitsDescriber } from './show/HostToolLines.js';
 export { renderStepIoLines } from './show/StepIoLines.js';
 export {
 	formatInputs,

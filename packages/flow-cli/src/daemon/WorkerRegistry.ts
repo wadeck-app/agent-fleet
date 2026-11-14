@@ -211,6 +211,11 @@ export class WorkerRegistry {
 		return [...this.workers.values()];
 	}
 
+	/** Every live worker, idle or busy, with the connection to reach it. */
+	listConnections(): { ws: WebSocket; worker: RegisteredWorker }[] {
+		return [...this.workers].map(([ws, worker]) => ({ ws, worker }));
+	}
+
 	/**
 	 * Every idle worker with the connection to reach it (see {@link listConnected} for all of them).
 	 */

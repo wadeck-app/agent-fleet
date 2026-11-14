@@ -13,14 +13,23 @@ import {
 	renderVersionLines,
 } from 'flow-core';
 import { ProfileCatalog } from 'flow-engine';
-import type { FlowDefinition } from 'flow-engine/types';
+import type { FlowDefinition, HostTool } from 'flow-engine/types';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { normalizeError } from 'shared-common/utils/getErrorMessage';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { FlowConfigLoader } from '../../config/FlowConfig.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { loadYaml } from '../../utils/loadYaml';
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { HostToolsFindingLines } from '../../validation/HostToolsFindingLines';
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { HostToolsPolicyResolver } from '../../validation/HostToolsPolicyResolver';
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { HostToolLimits } from '../../worker/HostToolLimits';
 import {
 	assertStoredExecutionInProject,
 	exitOnReferenceError,
@@ -30,6 +39,15 @@ import {
 import { describeMissingFlowFile, isFileLikeReference } from './FlowReference';
 import { renderSecretsSummary } from './SecretsSummary';
 
+/** The limits of a host tool as `flow show` prints them; an out-of-range value is shown as the message that names it, never a crash. */
+function describeHostToolLimits(tool: HostTool): string {
+	try {
+		return HostToolLimits.describe(tool);
+	} catch (error) {
+		return `(${normalizeError(error).message})`;
+	}
+}
+
 function isExistingFile(target: string): boolean {
 	try {
 		return fs.statSync(target).isFile();
@@ -38,7 +56,12 @@ function isExistingFile(target: string): boolean {
 	}
 }
 
-function showFlowFile(file: string, opts: { json?: boolean }, versions: DefinitionSnapshotStore): void {
+function showFlowFile(
+	file: string,
+	opts: { json?: boolean },
+	versions: DefinitionSnapshotStore,
+	getConfigDir: () => string
+): void {
 	const raw = loadYaml(file);
 
 	const flow = raw as FlowDefinition;
@@ -54,7 +77,14 @@ function showFlowFile(file: string, opts: { json?: boolean }, versions: Definiti
 		return;
 	}
 
-	console.log(renderFlowSummary(flow, name => ProfileCatalog.find(name)));
+	console.log(renderFlowSummary(flow, name => ProfileCatalog.find(name), describeHostToolLimits));
+	// An invalid user setting stops here with the loader's message; only read for a flow that declares hostTools.
+	const findings = HostToolsFindingLines.of(flow, () =>
+		HostToolsPolicyResolver.of(FlowConfigLoader.load(path.join(getConfigDir(), 'config.yml')))
+	);
+	if (findings.length > 0) {
+		console.log(findings.join('\n') + '\n');
+	}
 	console.log(renderVersionLines(assessFileVersion(versions, flow.id, flow, file)).join('\n') + '\n');
 	const secrets = renderSecretsSummary(flow);
 	if (secrets !== '') {
@@ -115,7 +145,7 @@ export function registerShowCommand(program: Command, getConfigDir: () => string
 		.option('--io', 'Execution only: print the recorded inputs, outputs and stdout/stderr tails of each step')
 		.action((target: string, opts: { json?: boolean; tail?: number; full?: boolean; io?: boolean }) => {
 			if (isExistingFile(target)) {
-				showFlowFile(target, opts, new DefinitionSnapshotStore(definitionsDirOf(getConfigDir())));
+				showFlowFile(target, opts, new DefinitionSnapshotStore(definitionsDirOf(getConfigDir())), getConfigDir);
 				return;
 			}
 			// <project>/<id>: the project part is resolved like -p, and the execution must belong to it.

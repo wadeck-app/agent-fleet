@@ -1,6 +1,7 @@
 import type { FlowDefinition, FlowStep, ModelFlowStep, SubFlowStep, UserInterventionStep } from 'flow-engine/types';
 
 import { UNVERSIONED } from '../definitions/FlowVersion.js';
+import { type HostToolLimitsDescriber, hostToolLines } from './HostToolLines.js';
 import { type ProfileExpander, flowRequirementLines, stepRequirementSuffix } from './RequirementLines.js';
 
 /** Left-aligned column that is never truncated (unlike the history table's fixed-width columns). */
@@ -157,8 +158,13 @@ export function formatWorkspace(workspace: unknown): string {
  * The table `flow show <file>` prints, as one string (leading and trailing blank line included).
  *
  * @param expandProfile what a `profile:` stands for; without it only the profile names are shown
+ * @param describeHostToolLimits the limits that apply to a host tool; without it the tool rows carry none
  */
-export function renderFlowSummary(flow: FlowDefinition, expandProfile?: ProfileExpander): string {
+export function renderFlowSummary(
+	flow: FlowDefinition,
+	expandProfile?: ProfileExpander,
+	describeHostToolLimits?: HostToolLimitsDescriber
+): string {
 	const steps = flow.steps;
 	const out: string[] = [];
 
@@ -217,6 +223,7 @@ export function renderFlowSummary(flow: FlowDefinition, expandProfile?: ProfileE
 	}
 
 	out.push(separator);
+	out.push(...hostToolLines(flow, describeHostToolLimits));
 
 	// --- Footer summary ---
 	const counts: Record<string, number> = {};

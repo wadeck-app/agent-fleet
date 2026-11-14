@@ -106,6 +106,31 @@ describe('ExecAssignment model tools (claude, codex, opencode)', () => {
 		}
 	});
 
+	// Defence in depth: the daemon never routes hostTools to a sandbox worker (no host-tools feature), this refuses it if one arrives anyway.
+	it.each([
+		{ name: 'a claude step', step: { hostTools: [{ id: 'queue-task-show' }] } },
+		{ name: 'a codex step', step: { provider: 'codex', hostTools: [{ id: 'queue-task-show' }] } },
+		{ name: 'an opencode step', step: { provider: 'opencode', hostTools: [{ id: 'queue-task-show' }] } },
+		{ name: 'a step whose hostTools is not a list', step: { hostTools: 'task' } },
+	])('refuses hostTools on $name, naming the step and the fix', ({ step }) => {
+		const error = refusal(() => assignment.prepare(model(step)));
+
+		expect(error.kind).toBe('invalid-argument');
+		expect(error.message).toContain('"s1"');
+		expect(error.message).toContain('hostTools are not available in the sandbox in this version');
+		expect(error.message).toMatch(/Remove hostTools|without the "sandbox" label/);
+	});
+
+	it('refuses hostTools on a script step too (the field is not for it, the sandbox must not carry it)', () => {
+		const error = refusal(() => assignment.prepare(assign({ step: { hostTools: [{ id: 'x' }] } })));
+
+		expect(error.message).toContain('hostTools are not available in the sandbox in this version');
+	});
+
+	it('accepts an empty hostTools list (it asks for nothing)', () => {
+		expect(assignment.prepare(model({ hostTools: [] })).tool).toBe('claude');
+	});
+
 	it('accepts the empty lists, and keeps mcpServers and toolHooks on a claude step (the claude path rewrites its MCP config)', () => {
 		expect(assignment.prepare(model({ provider: 'codex', mcpServers: [], toolHooks: [] })).tool).toBe('codex');
 		expect(assignment.prepare(model({ mcpServers: [{ name: 'x' }], toolHooks: [{ event: 'before' }] })).tool).toBe(

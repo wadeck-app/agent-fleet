@@ -4,7 +4,11 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VERSION } from '../cli/version.js';
-import { WORKER_FEATURE_PROJECT_ID, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol.js';
+import {
+	WORKER_FEATURE_HOST_TOOLS,
+	WORKER_FEATURE_PROJECT_ID,
+	WORKER_FEATURE_SUB_STEP_SESSION_RESUME,
+} from '../ipc/Protocol.js';
 import {
 	buildRegistration,
 	buildStepRunnerConfig,
@@ -139,6 +143,14 @@ describe('buildRegistration', () => {
 		const reg = buildRegistration({ projects: [PROJ], isTty: false, canPrompt: false, pid: 7 });
 
 		expect(reg.features).toContain(WORKER_FEATURE_SUB_STEP_SESSION_RESUME);
+	});
+
+	// The daemon routes a step with hostTools only to a worker declaring this (the local worker serves them since slice 1).
+	it('declares the host-tools feature under its wire name', () => {
+		const reg = buildRegistration({ projects: [PROJ], isTty: false, canPrompt: false, pid: 7 });
+
+		expect(WORKER_FEATURE_HOST_TOOLS).toBe('host-tools');
+		expect(reg.features).toContain(WORKER_FEATURE_HOST_TOOLS);
 	});
 
 	it('serves every project it is given, in order', () => {

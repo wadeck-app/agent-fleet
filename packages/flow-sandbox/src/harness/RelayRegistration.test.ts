@@ -1,3 +1,4 @@
+import { WORKER_FEATURE_HOST_TOOLS } from 'flow-cli/src/ipc/Protocol';
 import { describe, expect, it } from 'vitest';
 
 import { eachRow } from '../testing/EachRow';
@@ -28,6 +29,11 @@ describe('RelayRegistration', () => {
 			attachedProjects: ['C:\\work\\app'],
 			hasUserInterface: false,
 		});
+	});
+
+	// Slice 1: host tools run on the host worker only; the daemon routes a hostTools step by this list, so it must never name them.
+	it('does not declare host-tools (the constant of flow-cli is not in the list)', () => {
+		expect(new RelayRegistration(OPTIONS).ready()['features']).not.toContain(WORKER_FEATURE_HOST_TOOLS);
 	});
 
 	it('returns a new object each time (a caller cannot alter the registration)', () => {

@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+	WORKER_FEATURE_HOST_TOOLS,
 	WORKER_FEATURE_PROJECT_ID,
 	WORKER_FEATURE_SECRETS,
 	WORKER_FEATURE_SUB_STEP_SESSION_RESUME,
@@ -51,6 +52,7 @@ describe('buildForkedWorkerReady', () => {
 			WORKER_FEATURE_SUB_STEP_SESSION_RESUME,
 			WORKER_FEATURE_SECRETS,
 			WORKER_FEATURE_PROJECT_ID,
+			WORKER_FEATURE_HOST_TOOLS,
 		]);
 		expect(ready.shellCapabilities).toEqual([]);
 	});

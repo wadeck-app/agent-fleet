@@ -5,7 +5,11 @@
 
 export type JsonObject = Record<string, unknown>;
 
-/** `WORKER_FEATURE_*` of flow-cli `Protocol.ts`: what the inner worker bundle implements. */
+/**
+ * `WORKER_FEATURE_*` of flow-cli `Protocol.ts`: what the inner worker bundle implements. `host-tools` is deliberately NOT here
+ * (slice 1): the daemon routes a step with `hostTools` only to a worker declaring it, so a sandbox worker never receives one.
+ * Do not copy flow-cli's `WORKER_FEATURES` wholesale.
+ */
 export const WORKER_FEATURES = ['sub-step-session-resume', 'secrets', 'project-id'] as const;
 
 /** `MAX_WORKER_FRAME_BYTES` of flow-cli `WorkerFrameLimit.ts`: the daemon closes the socket on a bigger frame. */

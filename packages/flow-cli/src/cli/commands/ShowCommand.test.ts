@@ -170,6 +170,88 @@ describe('ShowCommand', () => {
 		}
 	});
 
+	describe('host tools of a model step', () => {
+		let dir: string;
+		let configDir: string;
+		beforeEach(() => {
+			dir = fs.mkdtempSync(path.join(os.tmpdir(), 'show-host-tools-'));
+			configDir = path.join(dir, 'config');
+			fs.mkdirSync(configDir);
+		});
+		afterEach(() => {
+			fs.rmSync(dir, { recursive: true, force: true });
+		});
+
+		const writeFlow = (profile?: string): string => {
+			const file = path.join(dir, 'tools.yml');
+			fs.writeFileSync(
+				file,
+				yaml.dump({
+					id: 'tools',
+					version: '1.0.0',
+					name: 'Tools',
+					description: 'd',
+					workspace: 'in-place',
+					...(profile === undefined ? {} : { profile }),
+					steps: [
+						{
+							id: 'triage',
+							name: 'Triage',
+							type: 'model',
+							prompt: 'p',
+							hostTools: [
+								{
+									id: 'queue-task-show',
+									description: 'Show a task.',
+									sideEffect: 'read',
+									command: ['task', 'show', '{id}'],
+									args: { id: { type: 'string', pattern: '^[a-z]+$', required: true } },
+									timeoutSeconds: 12,
+								},
+							],
+						},
+					],
+				})
+			);
+			return file;
+		};
+		const show = (file: string): void => {
+			const program = new Command();
+			program.exitOverride();
+			registerShowCommand(program, () => configDir);
+			program.parse(['node', 'test', 'show', file]);
+		};
+
+		it('lists the tools of the step with the limits that apply, marking the defaults', () => {
+			show(writeFlow());
+
+			expect(logged()).toContain("tools of step 'triage':");
+			expect(logged()).toContain(
+				'queue-task-show [read] task args(id:string) cwd=workspace (default), timeout=12s, output<=65536 bytes (default)'
+			);
+			expect(logged()).not.toContain('HOST_TOOL_UNDER_CONFINED_PROFILE');
+		});
+
+		it('prints the confined-profile finding as a warning with the default mode by default', () => {
+			show(writeFlow('agent'));
+
+			expect(logged()).toContain('warning: ');
+			expect(logged()).toContain('Mode: warning (validation.hostToolsUnderConfinedProfile=warn, default)');
+		});
+
+		it('prints it as an error, naming the setting, when the user config says error', () => {
+			fs.writeFileSync(
+				path.join(configDir, 'config.yml'),
+				yaml.dump({ validation: { hostToolsUnderConfinedProfile: 'error' } })
+			);
+
+			show(writeFlow('agent'));
+
+			expect(logged()).toContain('error: ');
+			expect(logged()).toContain('Mode: error (validation.hostToolsUnderConfinedProfile=error)');
+		});
+	});
+
 	it('output contains haiku model name for step-two', () => {
 		runShow(SIMPLE_FLOW);
 
@@ -437,7 +519,8 @@ describe('ShowCommand qualified execution id', () => {
 		registerShowCommand(program, () => configDir);
 		program.parse(['node', 'test', 'show', target]);
 	};
-	const out = (spy: ReturnType<typeof vi.spyOn>): string => spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+	const out = (spy: ReturnType<typeof vi.spyOn>): string =>
+		spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
 
 	it('shows the execution of <project>/<id>, the id part keeping its prefix rule', () => {
 		show('alpha/qa0');

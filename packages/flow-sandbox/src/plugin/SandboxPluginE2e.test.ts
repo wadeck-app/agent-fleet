@@ -322,6 +322,37 @@ class FlowWorld {
 		return file;
 	}
 
+	/** One model step (id ask1) declaring one host tool, in a flow that requires the sandbox: slice 1 offers host tools only on a local worker. */
+	writeHostToolsFlow(name: string): string {
+		const file = path.join(this.projectDirectory, `${name}.yml`);
+		fs.writeFileSync(
+			file,
+			[
+				`id: ${name}`,
+				"version: '1.0.0'",
+				`name: ${name}`,
+				'description: A model step with a host tool, in the sandbox.',
+				'requires: [sandbox]',
+				`workspace: { provider: pool, dir: '${this.poolDirectory.replaceAll(path.sep, '/')}', prefix: slot-, count: 1 }`,
+				'steps:',
+				'    - id: ask1',
+				'      name: Ask',
+				'      type: model',
+				'      model: claude-sonnet-4-5',
+				'      prompt: show the task',
+				'      hostTools:',
+				'          - id: queue-task-show',
+				'            description: Show a task of the queue by id (read only).',
+				'            sideEffect: read',
+				'            command: [task, show, "{id}", --json]',
+				'            args:',
+				"                id: { type: string, pattern: '^[A-Za-z0-9_-]{1,64}$', required: true }",
+				'',
+			].join('\n')
+		);
+		return file;
+	}
+
 	/** A flow of model steps (ids ask1, ask2, ...) that writes no `requires` and no `profile`: the daemon decides. */
 	writeModelFlow(
 		name: string,
@@ -822,6 +853,22 @@ describe('sandbox plugin, real daemon, sbx mock: a healthy source', () => {
 		expect(`${started.stdout}${started.stderr}`).toMatch(message);
 		expect(`${started.stdout}${started.stderr}`).not.toMatch(/"executionId"/);
 	});
+
+	// The daemon routes a hostTools step only to a worker declaring host-tools (the sandbox wrapper does not): the step fails early, naming the worker and the fix, and no sandbox is created for it.
+	it('fails a model step with hostTools that requires the sandbox, naming the worker and the fix, without creating a sandbox or hanging', async () => {
+		const createsBefore = sandboxesCreated(world.sbxCalls()).length;
+		const startedAt = Date.now();
+
+		const record = await world.run(world.writeHostToolsFlow('host-tools-sandbox'), 60_000);
+
+		const error = record.steps?.['ask1']?.error ?? '';
+		expect(record.status).toBe('failed');
+		expect(error).toMatch(/Step 'ask1' declares hostTools but worker '[^']+' does not support hostTools/);
+		expect(error).toContain('run the step on a local worker');
+		expect(error).toContain('do not offer host tools in the sandbox in this version');
+		expect(sandboxesCreated(world.sbxCalls())).toHaveLength(createsBefore);
+		expect(Date.now() - startedAt).toBeLessThan(BOUND_WAIT_SECONDS * 1000 * 4);
+	}, 120_000);
 
 	it('a flow without requirements never reaches the sandbox source: the step runs on a host worker', async () => {
 		// ROUTING FACT PINNED HERE: if this assertion ever fails, the requirement-only rule of the core changed. Update it together with

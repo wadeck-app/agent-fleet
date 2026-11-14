@@ -2,8 +2,8 @@
 
 A model step declares tools the worker runs on its own host, behind a closed argv. The model gets the capability, never a shell or the host credentials.
 
-> **Status (slice 1, steps 1-3 of the plan `.claude/plans/2026-11-14_generic-tool-provision-mcp.md`):** the field is parsed and validated, the wire protocol and the MCP helper exist, and `WorkerAdapter` now resolves the executables, builds the call service and passes it to `McpServer`. **Routing is not done yet** (step 4: the daemon sending `hostTools` steps only to workers declaring `host-tools`; step 5: end-to-end test). Until then a worker that receives such a step serves it, but nothing guarantees the daemon sends it to the right worker.
-> Slice 1 scope once wired: provider `claude`, local (non-sandbox) worker, `sideEffect: read` only. Codex/opencode and sandbox workers are later slices.
+> **Status (slice 1, steps 1-4 of the plan `.claude/plans/2026-11-14_generic-tool-provision-mcp.md`):** the field is parsed and validated, the wire protocol, the MCP helper and the host-side execution exist, the daemon routes `hostTools` steps only to workers declaring `host-tools`, a sandbox worker refuses them, and `flow show` lists them. **Not done yet** (step 5): the end-to-end run of a claude step on a local worker.
+> Slice 1 scope: provider `claude`, local (non-sandbox) worker, `sideEffect: read` only. Codex/opencode and sandbox workers are later slices.
 
 ## Fields
 
@@ -162,8 +162,30 @@ A step with `hostTools` whose requirements include `fs=confined` (profiles `agen
 
 - Default: warning. Error when the user config `~/.config/flow/config.yml` sets `validation.hostToolsUnderConfinedProfile: error`.
 - The message states which mode applied. A validation run that was not given the setting reports a warning saying so; it never skips the finding.
-- `flow validate` and `flow run` apply the setting (`flow run` refuses at run start in error mode). `flow show` does not print the finding or the tools yet (planned with the routing step).
+- `flow validate` and `flow run` apply the setting (`flow run` refuses at run start in error mode). `flow show <file>` prints the finding with the same mode text (it reads the setting only for a flow that declares `hostTools`; an invalid setting stops it with the loader's message).
 - The daemon passes the project's implicit set (`ImplicitConfinement.implicitSetFor`) at run start, so a flow with no profile of its own is flagged when a declared source serves its project. `flow validate` has no worker knowledge and cannot know it: a hostTools flow that is confined only implicitly is flagged at `flow run`, not at `flow validate`.
+
+## Routing and the `host-tools` feature
+
+`WORKER_FEATURE_HOST_TOOLS = 'host-tools'` (`ipc/Protocol.ts`) is declared by every worker built from `WorkerLaunch.WORKER_FEATURES` (`flow worker`, daemon-forked). The sandbox exec wrapper and the relay harness build their own list (`HarnessMessages.WORKER_FEATURES`) and do NOT declare it in slice 1; a test pins both.
+
+- `stepConfig.hostTools` carries the tools to the worker as written; there is no top-level `assign` field.
+- `StepDispatcher` keeps a step with a non-empty `hostTools` off every idle worker without the feature, before the acceptance plugin (`HostToolRouting`, hard filter).
+- If no idle worker takes it, it fails at once when no connected worker (idle or busy) with the feature could take it AND at least one connected worker without it would have: `Step 'X' declares hostTools but worker 'Y' does not support hostTools. Fix: ...`. All such workers are named; a worker of a declared source (a sandbox) adds that sandbox workers do not offer host tools in this version.
+- Otherwise it waits as any step (capable worker busy, no worker connected: a host worker is forked, a source launches one and that worker is checked on connect).
+- No run-start refusal: the daemon cannot know the features of a worker that is not connected yet, so the failure happens at dispatch.
+- Defence in depth: `ExecAssignment` (sandbox) refuses a step with `hostTools` (`Step "X" declares hostTools, but hostTools are not available in the sandbox in this version ... Remove hostTools from the step, or run it on a worker without the "sandbox" label.`), for every provider.
+
+## `flow show`
+
+`flow show <file>` prints, under the step table, one block per model step with tools. Limits are the ones the worker applies (`HostToolLimits.describe`), `(default)` marking what the tool did not write:
+
+```
+tools of step 'triage':
+  queue-task-show [read] task args(id:string) cwd=workspace (default), timeout=12s, output<=65536 bytes (default)
+```
+
+The confined-profile finding follows, as `warning: ...` or `error: ...` with the mode text. Rendering lives in flow-core (`HostToolLines`, limits describer injected by flow-cli); the execution view does not list tools yet.
 
 ## Injected steps
 

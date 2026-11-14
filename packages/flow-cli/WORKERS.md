@@ -279,22 +279,31 @@ create is closed right after it and cannot ack.
 Only a daemon-forked worker gets more than that, because only there does the daemon own the process:
 a forked pid that never connects is killed after 10s, and its exit is noticed.
 
+## Host tools (`host-tools`)
+
+A step with `hostTools` (see `.claude/docs/flows/host-tools.md`) goes only to a worker that declares the `host-tools` feature: every local worker (`flow worker`, daemon-forked) does, a sandbox worker does not in this version. When every worker that would otherwise take the step lacks it, the step fails at once, not after the bound-step wait:
+
+`Step 'X' declares hostTools but worker 'Y' does not support hostTools. Fix: run the step on a local worker that supports them (update flow-cli on the worker with `flow cli update` and restart it), or remove hostTools from the step.`
+
+A step that finds no worker connected waits as usual (a host worker is forked); a worker that connects later is checked the same way.
+
 ## Host tools under a confined profile
 
-| Key (user `config.yml` only, section `validation`; refused in a project config) | Default | Meaning                                                                                                                         |
-| ------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Key (user `config.yml` only, section `validation`; refused in a project config) | Default | Meaning                                                                                                                       |
+| ------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `hostToolsUnderConfinedProfile`                                                 | `warn`  | `warn` or `error`: how a step with `hostTools` under a confined profile is treated. Any other value or key fails at load time |
 
 ## What the messages mean
 
-| You see                                                                                                     | It means                                                                                           |
-| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `interactive: false (no approval plugin configured…)`                                                       | add `plugins.approval` to the project config (see PLUGINS.md)                                      |
-| `interactive: false (the configured approval plugin needs a terminal…)`                                     | you are not on a TTY; use `plugins.file-approval`                                                  |
-| `[wait] daemon connection closed; waiting to re-register`                                                   | normal with no daemon; it is waiting, not dying                                                    |
-| `Step "x" needs a person to answer it. No connected worker declared a user interface in the 45s it waited.` | no interactive worker appeared; check `flow worker list` shows `interactive=true`                  |
-| `No worker is connected.` followed by declared sources                                                      | nothing live; the sources listed are contacted when a step needs capacity                          |
-| `the worker running this step reported nothing for 1800s, so it is treated as stuck`                        | the step produced no output for that long; raise `queue.stepSilenceLimitSeconds` if that is normal |
+| You see                                                                                                     | It means                                                                                            |
+| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `interactive: false (no approval plugin configured…)`                                                       | add `plugins.approval` to the project config (see PLUGINS.md)                                       |
+| `interactive: false (the configured approval plugin needs a terminal…)`                                     | you are not on a TTY; use `plugins.file-approval`                                                   |
+| `[wait] daemon connection closed; waiting to re-register`                                                   | normal with no daemon; it is waiting, not dying                                                     |
+| `Step "x" needs a person to answer it. No connected worker declared a user interface in the 45s it waited.` | no interactive worker appeared; check `flow worker list` shows `interactive=true`                   |
+| `No worker is connected.` followed by declared sources                                                      | nothing live; the sources listed are contacted when a step needs capacity                           |
+| `the worker running this step reported nothing for 1800s, so it is treated as stuck`                        | the step produced no output for that long; raise `queue.stepSilenceLimitSeconds` if that is normal  |
+| `Step 'x' declares hostTools but worker 'w' does not support hostTools`                                     | the worker lacks the `host-tools` feature (old flow-cli, or a sandbox worker); see Host tools above |
 
 Refusals (a stale credential, an undeclared source, a cap reached) are in the daemon log:
 `flow logs`.

@@ -11,6 +11,7 @@ import type { DaemonSecrets } from './DaemonSecrets.js';
 import { DispatchLookups } from './DispatchLookups.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
+import { HostToolRouting } from './HostToolRouting.js';
 import { ReRunKindTracker } from './ReRunKindTracker.js';
 import type { ReadyStep, ReadyStepQueue } from './ReadyStepQueue.js';
 import { RequirementShortage } from './RequirementShortage.js';
@@ -28,6 +29,8 @@ const MAX_REQUIREMENT_ONLY_WORKERS_NAMED = 5;
 export class StepDispatcher {
 	/** Chooses which live worker a step goes to (S3, S4), after the requirement and requirement-only filters */
 	private readonly router: StepRouter;
+	/** Keeps a step with hostTools off the workers that do not declare the feature, and fails it when only those remain */
+	private readonly hostToolRouting: HostToolRouting;
 	/** Describes a step for routing (labels, shell, project, requirements) */
 	private readonly placements: StepPlacementBuilder;
 	/** Decides the fate of a step with requirements that found no idle worker; absent when the daemon wired no declared guarantees */
@@ -60,6 +63,7 @@ export class StepDispatcher {
 		private readonly routing: BoundStepRouting
 	) {
 		this.router = new StepRouter(undefined, undefined, routing.workerTypes);
+		this.hostToolRouting = new HostToolRouting(this.router);
 		this.placements = new StepPlacementBuilder(executions);
 		this.lookups = new DispatchLookups(routing.workerTypes, logWriter);
 		this.shortage =
@@ -146,7 +150,22 @@ export class StepDispatcher {
 				placement.requires === undefined
 					? undefined
 					: (guaranteesOfPass ??= this.lookups.guaranteeLookup(step.executionContext.executionId));
-			const idleWorker = this.router.select(placement, this.registry.listIdle(), requirementOnly, guarantees);
+			const needsHostTools = HostToolRouting.isRequiredBy(step);
+			const idle = needsHostTools ? HostToolRouting.capable(this.registry.listIdle()) : this.registry.listIdle();
+			const idleWorker = this.router.select(placement, idle, requirementOnly, guarantees);
+			if (idleWorker === undefined && needsHostTools) {
+				const refusal = this.hostToolRouting.refusal(
+					step,
+					placement,
+					this.registry.listConnections(),
+					requirementOnly,
+					guarantees
+				);
+				if (refusal !== undefined) {
+					this.failStep(step.executionContext.executionId, step.stepId, refusal);
+					continue;
+				}
+			}
 			if (idleWorker === undefined && placement.requiresUserInterface && this.failIfNobodyCanAnswer(step)) {
 				continue;
 			}

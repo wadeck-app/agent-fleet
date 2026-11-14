@@ -1,4 +1,4 @@
-import { WORKER_FEATURE_RUN_EVENTS } from 'flow-cli/src/ipc/Protocol';
+import { WORKER_FEATURE_HOST_TOOLS, WORKER_FEATURE_RUN_EVENTS } from 'flow-cli/src/ipc/Protocol';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -257,6 +257,13 @@ describe('ExecWrapper registration', () => {
 		const readies = daemon.ofType('ready');
 		expect(readies).toHaveLength(2);
 		for (const ready of readies) expect(ready['features']).toContain(WORKER_FEATURE_RUN_EVENTS);
+	});
+
+	// Slice 1: the daemon sends a hostTools step only to a worker declaring host-tools; a sandbox must never be one.
+	it('never declares host-tools, not at registration and not after a step', async () => {
+		await run(assign('probe'));
+
+		for (const ready of daemon.ofType('ready')) expect(ready['features']).not.toContain(WORKER_FEATURE_HOST_TOOLS);
 	});
 });
 
