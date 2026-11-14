@@ -91,6 +91,8 @@ describe('McpCallbackConnection protocol v2', () => {
 	let calls: HostToolCallRequest[];
 	let pending: Deferred<HostToolCallReply>;
 	let revoked: boolean;
+	let signals: AbortSignal[];
+	let stop: AbortController;
 
 	const open = (withTools = true): McpCallbackConnection =>
 		new McpCallbackConnection(socket as unknown as net.Socket, {
@@ -111,8 +113,9 @@ describe('McpCallbackConnection protocol v2', () => {
 								{ id: 'big', timeoutSeconds: 10, maxOutputBytes: 1_048_576 },
 							],
 							handler: {
-								call: (request: HostToolCallRequest) => {
+								call: (request: HostToolCallRequest, signal: AbortSignal) => {
 									calls.push(request);
+									signals.push(signal);
 									return pending.promise;
 								},
 							},
@@ -120,6 +123,7 @@ describe('McpCallbackConnection protocol v2', () => {
 						},
 					}
 				: {}),
+			stopSignal: stop.signal,
 		});
 
 	beforeEach(() => {
@@ -129,6 +133,8 @@ describe('McpCallbackConnection protocol v2', () => {
 		calls = [];
 		pending = deferred<HostToolCallReply>();
 		revoked = false;
+		signals = [];
+		stop = new AbortController();
 	});
 
 	afterEach(() => {
@@ -346,5 +352,63 @@ describe('McpCallbackConnection protocol v2', () => {
 		pending.resolve(okReply());
 		await settle();
 		expect(socket.written).toEqual([]);
+	});
+
+	describe('abort of the call in flight', () => {
+		it.each([
+			{
+				name: 'the peer closes the socket',
+				trigger: (): void => void socket.destroy(),
+				reason: 'connection closed',
+			},
+			{
+				name: 'the socket errors then closes',
+				trigger: (): void => {
+					socket.emit('error', new Error('ECONNRESET'));
+					socket.destroy();
+				},
+				reason: 'connection closed',
+			},
+			{ name: 'the server stops', trigger: (): void => stop.abort('step ended'), reason: 'step ended' },
+		])('$name: the handler signal aborts with "$reason", and no reply is written', async ({ trigger, reason }) => {
+			open();
+			socket.feed(callLine());
+			await settle();
+			expect(signals).toHaveLength(1);
+			expect(signals[0]!.aborted).toBe(false);
+			trigger();
+			expect(signals[0]!.aborted).toBe(true);
+			expect(signals[0]!.reason).toBe(reason);
+			// The late result of the handler (it was told to stop) must not be written.
+			pending.resolve(okReply('late'));
+			await settle();
+			expect(socket.written).toEqual([]);
+			expect(socket.destroyed).toBe(true);
+		});
+
+		it('a call that finishes normally leaves its signal untouched, even if the socket closes later', async () => {
+			open();
+			socket.feed(callLine());
+			await settle();
+			pending.resolve(okReply());
+			await settle();
+			expect(socket.replies()).toHaveLength(1);
+			socket.destroy();
+			stop.abort('step ended');
+			expect(signals[0]!.aborted).toBe(false);
+		});
+
+		it('stopping destroys an idle connection and rejects any later line, v1 inject included', () => {
+			open();
+			stop.abort('step ended');
+			expect(socket.destroyed).toBe(true);
+			expect(injected).toEqual([]);
+		});
+
+		it('a connection opened after the server stopped is destroyed at once', () => {
+			stop.abort('step ended');
+			open();
+			expect(socket.destroyed).toBe(true);
+		});
 	});
 });

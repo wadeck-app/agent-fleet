@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { HostToolFixtureDirectory } from '../test-utils/HostToolFixtureDirectory';
-import { observeFor } from '../test-utils/WaitHelpers';
+import { observeFor, waitUntil } from '../test-utils/WaitHelpers';
 import { HostToolExecutableResolver } from './HostToolExecutableResolver';
 import { HostToolExecutor } from './HostToolExecutor';
 import type { HostToolExecutionResult } from './HostToolExecutor';
@@ -26,7 +26,11 @@ describe('HostToolExecutor (real processes)', () => {
 	const resolver = new HostToolExecutableResolver({ environment: process.env });
 	const executor = new HostToolExecutor({ workerEnvironment, resolver });
 
-	const run = (tool: HostTool, values: Record<string, string> = {}): Promise<HostToolExecutionResult> =>
+	const run = (
+		tool: HostTool,
+		values: Record<string, string> = {},
+		signal?: AbortSignal
+	): Promise<HostToolExecutionResult> =>
 		executor.execute({
 			stepId: 'triage',
 			tool,
@@ -34,6 +38,7 @@ describe('HostToolExecutor (real processes)', () => {
 			values,
 			limits: HostToolLimits.resolve(tool),
 			workspaceDir: workspace,
+			...(signal === undefined ? {} : { signal }),
 		});
 
 	const echoed = (result: HostToolExecutionResult): { argv: string[]; env: Record<string, string>; cwd: string } => {
@@ -199,6 +204,72 @@ describe('HostToolExecutor (real processes)', () => {
 			await observeFor(800);
 			expect(fs.statSync(heartbeat).size).toBe(sizeAtReply);
 		}, 20_000);
+	});
+
+	describe('abort ends the in-flight call and its whole tree', () => {
+		const isAlive = (pid: number): boolean => {
+			try {
+				process.kill(pid, 0);
+				return true;
+			} catch {
+				return false;
+			}
+		};
+
+		it.each([['step ended'], ['connection closed']])(
+			'abort (%s) kills the process AND the detached grandchild, and returns promptly',
+			async reason => {
+				const heartbeat = path.join(workspace, `abort-heartbeat-${reason.replace(/ /g, '-')}.txt`);
+				const pidFile = path.join(workspace, `abort-pids-${reason.replace(/ /g, '-')}.txt`);
+				const controller = new AbortController();
+				const running = run(
+					fixtures.tool('sleep.cjs', [heartbeat, pidFile], { timeoutSeconds: 30 }),
+					{},
+					controller.signal
+				);
+				await waitUntil(() => fs.existsSync(pidFile) && fs.existsSync(heartbeat), {
+					timeoutMs: 10_000,
+					failureMessage: 'the fixture never started its grandchild',
+				});
+				const [childPid, grandchildPid] = fs.readFileSync(pidFile, 'utf8').split(',').map(Number) as [
+					number,
+					number,
+				];
+				expect(isAlive(childPid)).toBe(true);
+				expect(isAlive(grandchildPid)).toBe(true);
+
+				const abortedAt = Date.now();
+				controller.abort(reason);
+				const result = await running;
+
+				expect(Date.now() - abortedAt).toBeLessThan(2000);
+				expect(result.aborted).toBe(true);
+				expect(result.reply).toMatchObject({ ok: false, exitCode: null });
+				await waitUntil(() => !isAlive(childPid) && !isAlive(grandchildPid), {
+					timeoutMs: 5000,
+					failureMessage: 'the tool process or its grandchild is still alive after the abort',
+				});
+			},
+			20_000
+		);
+
+		it('a signal already aborted before the call spawns nothing', async () => {
+			// scribble.cjs writes scribble.txt into its working directory when it runs.
+			const controller = new AbortController();
+			controller.abort('step ended');
+			const result = await run(fixtures.tool('scribble.cjs', [], { cwd: 'workspace' }), {}, controller.signal);
+			expect(result.aborted).toBe(true);
+			expect(fs.existsSync(path.join(workspace, 'scribble.txt'))).toBe(false);
+		});
+
+		it('a call that finishes normally is unaffected by a live signal, and detaches its listener', async () => {
+			const controller = new AbortController();
+			const result = await run(fixtures.tool('flood.cjs', ['10']), {}, controller.signal);
+			expect(result.aborted).toBeUndefined();
+			expect(result.reply.ok).toBe(true);
+			// Aborting afterwards must not throw nor touch anything.
+			expect(() => controller.abort('step ended')).not.toThrow();
+		});
 	});
 
 	describe('executable identity is checked before every spawn (F-16)', () => {

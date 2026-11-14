@@ -1,7 +1,7 @@
 import type { HostTool } from 'flow-engine';
 import * as crypto from 'node:crypto';
 
-export type HostToolCallOutcome = 'ok' | 'failed' | 'timed_out' | 'denied' | 'error';
+export type HostToolCallOutcome = 'ok' | 'failed' | 'timed_out' | 'denied' | 'error' | 'aborted';
 
 /** What is known about one call once it is over. Output, environment values and tokens have no field here on purpose. */
 export interface HostToolAuditEntry {

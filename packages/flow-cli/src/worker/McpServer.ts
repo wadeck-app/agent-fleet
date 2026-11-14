@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { InjectedStep } from '../ipc/Protocol';
 import type { HostToolServing, McpCallToolConfig } from './HostToolCallTypes';
-import { DEFAULT_CALL_GRACE_MS } from './HostToolCallTypes';
+import { DEFAULT_CALL_GRACE_MS, HOST_TOOL_ABORT_REASONS } from './HostToolCallTypes';
 import { HostToolLimits } from './HostToolLimits';
 import { DEFAULT_CALLBACK_IDLE_TIMEOUT_MS, McpCallbackConnection } from './McpCallbackConnection';
 
@@ -65,6 +65,8 @@ export class McpServer {
 	/** Issued only when the step declares tools. */
 	private toolToken: string | null = null;
 	private stopped = false;
+	/** Aborted by stop(): every connection aborts its call in flight (process tree killed) and destroys its socket. */
+	private readonly stopController = new AbortController();
 
 	constructor(
 		private readonly executionId: string,
@@ -88,6 +90,8 @@ export class McpServer {
 	async stop(): Promise<void> {
 		// Both bearers die here, even for a connection that is still open.
 		this.stopped = true;
+		// Synchronous: a host tool in flight has its process tree killed before stop() goes on, and its socket is gone.
+		this.stopController.abort(HOST_TOOL_ABORT_REASONS.stepEnded);
 		if (!this.tcpServer) return;
 		return new Promise((resolve, reject) => {
 			const server = this.tcpServer!;
@@ -109,6 +113,7 @@ export class McpServer {
 					executionId: this.executionId,
 					onInjectSteps: this.onInjectSteps,
 					isRevoked: () => this.stopped,
+					stopSignal: this.stopController.signal,
 					...(callTool === null ? {} : { callTool }),
 					idleTimeoutMs: this.options.idleTimeoutMs ?? DEFAULT_CALLBACK_IDLE_TIMEOUT_MS,
 					log: message => process.stderr.write(`[McpServer] ${message}\n`),

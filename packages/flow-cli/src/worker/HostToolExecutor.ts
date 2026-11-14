@@ -34,6 +34,8 @@ export interface HostToolExecution {
 	limits: ResolvedHostToolLimits;
 	/** The run's workspace directory (`cwd: workspace`). */
 	workspaceDir: string;
+	/** Aborts when the step ends or the connection closes: the process tree is ended at once and nothing more runs. */
+	signal?: AbortSignal;
 }
 
 export interface HostToolExecutionResult {
@@ -47,12 +49,16 @@ export interface HostToolExecutionResult {
 	envMissing: string[];
 	/** Why the process did not run or could not start (no tool output in it, safe for the audit log). */
 	problem?: string;
+	/** True when the call was stopped by its signal: its reply is not delivered anywhere. */
+	aborted?: boolean;
 }
 
 interface RawOutcome {
 	exitCode: number | null;
 	signal: string | null;
 	timedOut: boolean;
+	/** Set when the signal ended the call. */
+	aborted?: boolean;
 	stdout: HostToolHeadCapture;
 	stderr: HostToolTailCapture;
 	notes: string[];
@@ -97,6 +103,12 @@ export class HostToolExecutor {
 			problem,
 		});
 
+		const abortedBeforeSpawn = (): HostToolExecutionResult => ({
+			...refuse(`the call was aborted (${String(execution.signal?.reason)}) before the process started`),
+			aborted: true,
+		});
+		if (HostToolExecutor.isAborted(execution.signal)) return abortedBeforeSpawn();
+
 		let argv: string[];
 		try {
 			// Right before the spawn: a path or identity that changed since the run started is refused (F-16).
@@ -113,8 +125,12 @@ export class HostToolExecutor {
 			return refuse(error instanceof Error ? error.message : String(error));
 		}
 
-		const outcome = await this.run(execution, argv, directory.cwd, environment.env);
+		// The directory was prepared asynchronously: the signal may have fired meanwhile, and nothing must be spawned then.
+		const outcome = HostToolExecutor.isAborted(execution.signal)
+			? undefined
+			: await this.run(execution, argv, directory.cwd, environment.env);
 		const removalProblem = await directory.remove();
+		if (outcome === undefined) return abortedBeforeSpawn();
 		if (removalProblem !== undefined) outcome.notes.push(removalProblem);
 		const result = {
 			durationMs: Date.now() - started,
@@ -122,6 +138,21 @@ export class HostToolExecutor {
 			envDenied: environment.denied,
 			envMissing: environment.missing,
 		};
+		if (outcome.aborted === true) {
+			return {
+				...result,
+				aborted: true,
+				reply: {
+					ok: false,
+					text: Utf8Boundary.prefixOfText(
+						`Tool '${tool.id}' was stopped: the call was aborted (${String(execution.signal?.reason)}).`,
+						limits.maxOutputBytes
+					),
+					truncated: false,
+					exitCode: null,
+				},
+			};
+		}
 		if (outcome.startFailure !== undefined) {
 			return {
 				...result,
@@ -222,6 +253,7 @@ export class HostToolExecutor {
 			const settle = (): void => {
 				if (settled) return;
 				settled = true;
+				execution.signal?.removeEventListener('abort', onAbort);
 				clearTimeout(timer);
 				if (deadline !== undefined) clearTimeout(deadline);
 				resolve(outcome);
@@ -239,6 +271,16 @@ export class HostToolExecutor {
 				outcome.signal = signal;
 				settle();
 			});
+			// Sync: the tree is killed before the abort() that triggered this returns; the reply is dropped by the caller.
+			const onAbort = (): void => {
+				if (settled) return;
+				outcome.aborted = true;
+				this.stopTree(child, outcome);
+				child.stdout!.destroy();
+				child.stderr!.destroy();
+				settle();
+			};
+			execution.signal?.addEventListener('abort', onAbort, { once: true });
 			const timer = setTimeout(() => {
 				outcome.timedOut = true;
 				this.stopTree(child, outcome);
@@ -253,6 +295,11 @@ export class HostToolExecutor {
 				}, KILL_GRACE_MS);
 			}, limits.timeoutSeconds * 1000);
 		});
+	}
+
+	/** A function, not an inline read: TypeScript would keep the narrowing of the first check across the awaits. */
+	private static isAborted(signal: AbortSignal | undefined): boolean {
+		return signal?.aborted === true;
 	}
 
 	private stopTree(child: ChildProcess, outcome: RawOutcome): void {

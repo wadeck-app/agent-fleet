@@ -3,7 +3,7 @@ import type * as net from 'node:net';
 
 import type { InjectedStep } from '../ipc/Protocol';
 import type { DeclaredHostTool, HostToolCallReply, McpCallToolConfig } from './HostToolCallTypes';
-import { HOST_TOOL_PROTOCOL_VERSION } from './HostToolCallTypes';
+import { HOST_TOOL_ABORT_REASONS, HOST_TOOL_PROTOCOL_VERSION } from './HostToolCallTypes';
 
 /** Largest accepted line, and therefore the largest amount of unterminated data kept in memory per connection. */
 export const MAX_CALLBACK_LINE_BYTES = 2 * 1024 * 1024;
@@ -24,6 +24,8 @@ export interface McpCallbackConnectionConfig {
 	log: (message: string) => void;
 	/** True once the owning server stopped: both tokens are dead from then on. */
 	isRevoked?: () => boolean;
+	/** Aborts when the owning server stops: the call in flight is aborted and the socket destroyed. */
+	stopSignal?: AbortSignal;
 	/** Present only when the step declares host tools; without it no `call_tool` line can be authorised. */
 	callTool?: McpCallToolConfig;
 }
@@ -81,6 +83,9 @@ export class McpCallbackConnection {
 	/** The tool and call id of the call in flight (null / '' otherwise). */
 	private pendingTool: DeclaredHostTool | null = null;
 	private pendingCallId = '';
+	/** Aborted when the server stops or the socket closes while the call is in flight. */
+	private pendingAbort: AbortController | null = null;
+	private readonly onStop = (): void => this.abortAndDestroy(HOST_TOOL_ABORT_REASONS.stepEnded);
 
 	constructor(
 		private readonly socket: net.Socket,
@@ -94,7 +99,27 @@ export class McpCallbackConnection {
 		});
 		socket.on('close', () => {
 			this.closed = true;
+			config.stopSignal?.removeEventListener('abort', this.onStop);
+			this.abortCall(HOST_TOOL_ABORT_REASONS.connectionClosed);
 		});
+		if (config.stopSignal?.aborted === true) this.onStop();
+		else config.stopSignal?.addEventListener('abort', this.onStop, { once: true });
+	}
+
+	/** The server stopped: the call in flight (if any) is aborted FIRST, so its process tree is ended before the socket goes. */
+	private abortAndDestroy(reason: string): void {
+		this.abortCall(reason);
+		this.closed = true;
+		this.socket.destroy();
+	}
+
+	/** Tells the handler of the call in flight to stop; its late result is dropped (the call counts as answered). */
+	private abortCall(reason: string): void {
+		if (this.callState !== 'inFlight') return;
+		this.callState = 'done';
+		this.pendingTool = null;
+		this.pendingAbort?.abort(reason);
+		this.pendingAbort = null;
 	}
 
 	private handleTimeout(): void {
@@ -246,15 +271,20 @@ export class McpCallbackConnection {
 		this.callState = 'inFlight';
 		this.pendingTool = tool;
 		this.pendingCallId = line.callId;
+		const abort = new AbortController();
+		this.pendingAbort = abort;
 		this.socket.setTimeout(tool.timeoutSeconds * 1000 + callTool.graceMs);
 		new Promise<HostToolCallReply>(resolve => {
 			resolve(
-				callTool.handler.call({
-					executionId: this.config.executionId,
-					callId: line.callId,
-					toolId: line.toolId,
-					args: line.args,
-				})
+				callTool.handler.call(
+					{
+						executionId: this.config.executionId,
+						callId: line.callId,
+						toolId: line.toolId,
+						args: line.args,
+					},
+					abort.signal
+				)
 			);
 		}).then(
 			reply => this.finishCall(reply, tool),
@@ -279,6 +309,7 @@ export class McpCallbackConnection {
 		if (this.callState !== 'inFlight') return;
 		this.callState = 'done';
 		this.pendingTool = null;
+		this.pendingAbort = null;
 		this.socket.setTimeout(this.config.idleTimeoutMs);
 		if (this.closed) return;
 		this.replyAndEnd(this.pendingCallId, tool === null ? reply : this.capReply(reply, tool));

@@ -26,9 +26,16 @@ export interface HostToolCallReply {
 	timedOut?: boolean;
 }
 
+/** Why a call in flight was aborted: carried as the `reason` of the AbortSignal and written in the audit line. */
+export const HOST_TOOL_ABORT_REASONS = { stepEnded: 'step ended', connectionClosed: 'connection closed' } as const;
+
 /** Runs a declared call. Step 3 implements it (argument check with HostToolCallChecker, then the runner). */
 export interface HostToolCallHandler {
-	call(request: HostToolCallRequest): Promise<HostToolCallReply>;
+	/**
+	 * `signal` aborts when the step ends or the connection of the call closes: the handler must then end the process
+	 * tree it started and stop working. Its reply is not written anywhere after that.
+	 */
+	call(request: HostToolCallRequest, signal: AbortSignal): Promise<HostToolCallReply>;
 }
 
 /** What the connection needs to know about a declared tool. */

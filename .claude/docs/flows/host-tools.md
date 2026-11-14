@@ -111,6 +111,7 @@ Path: `McpServer` -> `HostToolCallService` (the `HostToolCallHandler`) -> `HostT
 | argv      | `command[1..]` with `{name}` replaced by the checked value, nothing else: one element per value, no shell, no globbing, no second substitution. An optional argument not given drops its element. |
 | Spawn     | `spawn(absolutePath, argv, {shell: false, windowsHide: true})`, no stdin.                                                                                                                         |
 | Timeout   | At `timeoutSeconds` the whole process tree is killed (`killProcessTree`: `taskkill /T /F` on Windows, descendants on POSIX); reply `ok:false, timedOut:true`.                                     |
+| Abort     | `McpServer.stop()` or a callback socket closing while a call is in flight aborts it: the tree is killed at once, no reply is written, audit `aborted`. See [Abort](#abort-of-a-call-in-flight).   |
 
 ### Executable resolution (F-16)
 
@@ -145,13 +146,22 @@ Changed 2026-11-14: the default was `workspace`, it is now `none`. A tool that n
 | Calls per step | 100, every call counted, refused ones too.                                                                                                                                                                              |
 | Output         | The whole reply text is at most `maxOutputBytes` (the connection drops anything larger). stdout is cut on a UTF-8 boundary and followed by `[output truncated at N bytes]`, `truncated: true`. stderr: last 4096 bytes. |
 
+### Abort of a call in flight
+
+`HostToolCallHandler.call(request, signal)` receives an `AbortSignal` from `McpCallbackConnection`; it aborts with reason `step ended` (`McpServer.stop()`) or `connection closed` (the socket closed or errored while the call ran).
+
+- The executor kills the tool's process tree synchronously in the abort handler, so `stop()` returns promptly (the step teardown no longer waits up to `timeoutSeconds` + 5 s).
+- `stop()` also destroys every callback socket, idle ones included.
+- The call is audited `outcome: aborted`, `reason: "aborted: step ended"` or `"aborted: connection closed"`; the concurrency slot is released; nothing is written to the socket.
+- A call that finishes normally is unaffected.
+
 ### Reply to the model (F-07)
 
 stdout and the stderr tail are DATA inside `<tool-output tool="id" untrusted="true">...</tool-output>`, followed by `exit code: N`. A `</tool-output` inside the output is escaped so it cannot end the block. A non-zero exit, a signal or a timeout is `ok:false` with a first line saying so.
 
 ### Audit (F-17)
 
-One `[host-tool] {json}` line per call, sent as an `info`/`system` log entry of the step through the worker's masked log channel: `stepId, toolId, callId, outcome (ok|failed|timed_out|denied|error), reason, args {name: {sha256, value?}}, exitCode, durationMs, outputBytes, truncated, timedOut, envDenied, envMissing`. A value appears only for an argument declared `log: true` on a call that passed the argument check. Never logged: output content, environment values, tokens, values of denied calls. Argument names from the model are cut to 64 characters, at most 32 names.
+One `[host-tool] {json}` line per call, sent as an `info`/`system` log entry of the step through the worker's masked log channel: `stepId, toolId, callId, outcome (ok|failed|timed_out|denied|error|aborted), reason, args {name: {sha256, value?}}, exitCode, durationMs, outputBytes, truncated, timedOut, envDenied, envMissing`. A value appears only for an argument declared `log: true` on a call that passed the argument check. Never logged: output content, environment values, tokens, values of denied calls. Argument names from the model are cut to 64 characters, at most 32 names.
 
 ## Threat rows (steps 1-3)
 

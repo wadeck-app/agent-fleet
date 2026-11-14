@@ -43,7 +43,10 @@ describe('HostToolStepWiring.prepare', () => {
 		const serving = prepare([tool()], lines)!;
 		expect(serving.stepId).toBe('triage');
 		expect(serving.tools).toHaveLength(1);
-		const reply = await serving.handler.call({ executionId: 'e', callId: 'c', toolId: 'show', args: { nope: 1 } });
+		const reply = await serving.handler.call(
+			{ executionId: 'e', callId: 'c', toolId: 'show', args: { nope: 1 } },
+			new AbortController().signal
+		);
 		expect(reply.ok).toBe(false);
 		expect(lines).toHaveLength(1);
 	});

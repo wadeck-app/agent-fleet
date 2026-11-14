@@ -2,7 +2,7 @@ import type { HostTool } from 'flow-engine';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HostToolFixtureDirectory } from '../test-utils/HostToolFixtureDirectory';
 import { HostToolAuditLog } from './HostToolAuditLog';
@@ -266,6 +266,57 @@ describe('HostToolCallService', () => {
 			expect((await first.call(request('show', {}))).ok).toBe(false);
 			const second = build([tool], { executor: fake.executor, maxCallsPerStep: 1 }).service;
 			expect((await second.call(request('show', {}))).ok).toBe(true);
+		});
+	});
+
+	describe('abort of the call in flight', () => {
+		const tool: HostTool = { id: 'show', description: 'd', sideEffect: 'read', command: [process.execPath] };
+		let fakeCalls: number;
+		beforeEach(() => {
+			fakeCalls = 0;
+		});
+
+		it.each([['step ended'], ['connection closed']])(
+			'%s: hands the signal to the executor, audits "aborted: %s", frees the concurrency slots',
+			async reason => {
+				// The first two calls (the tool's default concurrency) hang until aborted; later ones answer at once.
+				const fake = fakeExecutor(execution =>
+					fakeCalls++ >= 2
+						? Promise.resolve(done())
+						: new Promise(resolve => {
+								execution.signal!.addEventListener('abort', () =>
+									resolve({
+										...done('stopped'),
+										aborted: true,
+										reply: { ...done().reply, ok: false, exitCode: null },
+									})
+								);
+							})
+				);
+				const { service, lines } = build([tool], { executor: fake.executor });
+				const controller = new AbortController();
+				const first = service.call(request('show', {}, 'c-abort-1'), controller.signal);
+				const second = service.call(request('show', {}, 'c-abort-2'), controller.signal);
+				await vi.waitFor(() => expect(fake.calls).toHaveLength(2));
+				expect(fake.calls[0]!.signal).toBe(controller.signal);
+				controller.abort(reason);
+				await Promise.all([first, second]);
+
+				expect(lines).toHaveLength(2);
+				const audit = JSON.parse(lines[0]!.slice(lines[0]!.indexOf('{'))) as Record<string, unknown>;
+				expect(audit).toMatchObject({ outcome: 'aborted', reason: `aborted: ${reason}`, callId: 'c-abort-1' });
+
+				// Both slots are released: the next call runs instead of answering "already running".
+				const next = await service.call(request('show', {}, 'c-next'), new AbortController().signal);
+				expect(next.ok).toBe(true);
+			}
+		);
+
+		it('a call that finishes normally keeps its normal outcome', async () => {
+			const fake = fakeExecutor(async () => done());
+			const { service, lines } = build([tool], { executor: fake.executor });
+			await service.call(request('show', {}), new AbortController().signal);
+			expect(lines[0]).toContain('"outcome":"ok"');
 		});
 	});
 

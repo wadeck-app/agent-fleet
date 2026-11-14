@@ -9,8 +9,12 @@ const SCRIPTS: Readonly<Record<string, string>> = {
 	// Starts a DETACHED grandchild (it survives a plain kill of its parent, even on Windows where a job object would end it) that appends to a heartbeat file, then sleeps forever.
 	'sleep.cjs': `
 const { spawn } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
-spawn(process.execPath, [path.join(__dirname, 'beat.cjs'), process.argv[2]], { stdio: 'ignore', detached: true }).unref();
+const grandchild = spawn(process.execPath, [path.join(__dirname, 'beat.cjs'), process.argv[2]], { stdio: 'ignore', detached: true });
+grandchild.unref();
+// Optional third argument: a file receiving "<own pid>,<grandchild pid>", so a test can prove both are gone.
+if (process.argv[3]) fs.writeFileSync(process.argv[3], process.pid + ',' + grandchild.pid);
 process.stdout.write('started');
 setInterval(() => {}, 1000);
 `,

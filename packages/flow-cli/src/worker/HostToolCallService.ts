@@ -47,7 +47,8 @@ export class HostToolCallService implements HostToolCallHandler {
 		this.maxCalls = options.maxCallsPerStep ?? HostToolLimits.DEFAULTS.maxCallsPerStep;
 	}
 
-	async call(request: HostToolCallRequest): Promise<HostToolCallReply> {
+	/** `signal` omitted: the call is never aborted (direct callers and tests). The connection always passes one. */
+	async call(request: HostToolCallRequest, signal?: AbortSignal): Promise<HostToolCallReply> {
 		const started = Date.now();
 		this.calls += 1;
 		const tool = this.toolsById.get(request.toolId);
@@ -97,12 +98,14 @@ export class HostToolCallService implements HostToolCallHandler {
 				values: check.values,
 				limits,
 				workspaceDir: this.options.workspaceDir,
+				...(signal === undefined ? {} : { signal }),
 			});
 			const reply = result.reply;
+			const reason = result.aborted === true ? `aborted: ${String(signal?.reason)}` : result.problem;
 			this.options.audit.record({
 				...this.baseEntry(request, tool, true),
-				outcome: HostToolCallService.outcomeOf(reply, result.problem),
-				...(result.problem === undefined ? {} : { reason: result.problem }),
+				outcome: result.aborted === true ? 'aborted' : HostToolCallService.outcomeOf(reply, result.problem),
+				...(reason === undefined ? {} : { reason }),
 				exitCode: reply.exitCode,
 				durationMs: result.durationMs,
 				outputBytes: Buffer.byteLength(reply.text, 'utf8'),
