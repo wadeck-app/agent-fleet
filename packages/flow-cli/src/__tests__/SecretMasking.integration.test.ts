@@ -136,8 +136,9 @@ describe('secret masking (end to end)', () => {
 		expectNoSecret('daily log', logText);
 
 		const followed: string[] = [];
-		for (const file of fs.readdirSync(logsDir)) {
-			tailLogFile(path.join(logsDir, file), executionId, 0, (_stepId, message) => followed.push(message));
+		// Only the daily log files: logs/workers is a directory (a directory has a size on Linux, so tailing it throws EISDIR).
+		for (const entry of fs.readdirSync(logsDir, { withFileTypes: true }).filter(candidate => candidate.isFile())) {
+			tailLogFile(path.join(logsDir, entry.name), executionId, 0, (_stepId, message) => followed.push(message));
 		}
 		expect(followed.join('\n')).toContain('plain: [secret:API_TOKEN]');
 		expectNoSecret('flow run follow output', followed.join('\n'));
