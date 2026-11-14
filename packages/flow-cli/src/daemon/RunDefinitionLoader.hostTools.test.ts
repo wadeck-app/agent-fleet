@@ -81,6 +81,35 @@ describe('RunDefinitionLoader - hostTools under a confined profile', () => {
 		expect(JSON.stringify(loaded.ok ? undefined : loaded.response)).toContain(ERROR.description);
 	});
 
+	// The daemon adds the implicit `agent` set to every model step when a source serving the project declares it: a flow with no
+	// profile of its own is then confined too (ImplicitConfinement.implicitSetFor, decided by the caller with the run's project).
+	describe('with the implicit set of the project', () => {
+		const IMPLICIT = ['env=clean', 'fs=confined'];
+
+		it('reports the finding for a flow with no profile when a source serves the project', () => {
+			const file = flowFile(undefined);
+			const loaded = loader(WARN).load({ type: 'run', flowFile: file } as never, file, IMPLICIT);
+
+			expect(loaded.ok).toBe(true);
+			expect(loaded.ok ? JSON.stringify(loaded.warnings) : '').toContain(WARN.description);
+		});
+
+		it('refuses in error mode', () => {
+			const file = flowFile(undefined);
+			const loaded = loader(ERROR).load({ type: 'run', flowFile: file } as never, file, IMPLICIT);
+
+			expect(loaded.ok).toBe(false);
+			expect(JSON.stringify(loaded.ok ? undefined : loaded.response)).toContain(ERROR.description);
+		});
+
+		it('reports nothing when the project is not served (empty implicit set)', () => {
+			const file = flowFile(undefined);
+			const loaded = loader(ERROR).load({ type: 'run', flowFile: file } as never, file, []);
+
+			expect(loaded.ok).toBe(true);
+		});
+	});
+
 	it('reports nothing for a flow without a confined profile, in either mode', () => {
 		for (const policy of [WARN, ERROR]) {
 			const loaded = load(loader(policy), flowFile(undefined));

@@ -69,7 +69,8 @@ A step with `hostTools` whose requirements include `fs=confined` (profiles `agen
 
 - Default: warning. Error when the user config `~/.config/flow/config.yml` sets `validation.hostToolsUnderConfinedProfile: error`.
 - The message states which mode applied. A validation run that was not given the setting reports a warning saying so; it never skips the finding.
-- Wiring the setting into `flow validate` / `flow run` / `flow show` is not done in this step.
+- `flow validate` and `flow run` apply the setting (`flow run` refuses at run start in error mode). `flow show` does not print the finding or the tools yet (planned with the routing step).
+- The daemon passes the project's implicit set (`ImplicitConfinement.implicitSetFor`) at run start, so a flow with no profile of its own is flagged when a declared source serves its project. `flow validate` has no worker knowledge and cannot know it: a hostTools flow that is confined only implicitly is flagged at `flow run`, not at `flow validate`.
 
 ## Injected steps
 

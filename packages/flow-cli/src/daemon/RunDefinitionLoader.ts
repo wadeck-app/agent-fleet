@@ -60,9 +60,15 @@ export class RunDefinitionLoader {
 		private readonly hostToolsPolicy?: HostToolsConfinementPolicy
 	) {}
 
-	load(cmd: RunCommandMessage, flowFile: string): LoadedDefinition {
+	/**
+	 * @param implicitRequires what the daemon adds to every model step of this project (`ImplicitConfinement.implicitSetFor`); `[]` when
+	 *        no declared source covers the project. Only the hostTools confinement finding reads it.
+	 */
+	load(cmd: RunCommandMessage, flowFile: string, implicitRequires: readonly string[] = []): LoadedDefinition {
 		try {
-			return cmd.registered === true ? this.loadRegistered(cmd, flowFile) : this.loadFile(cmd, flowFile);
+			return cmd.registered === true
+				? this.loadRegistered(cmd, flowFile, implicitRequires)
+				: this.loadFile(cmd, flowFile, implicitRequires);
 		} catch (err) {
 			if (err instanceof FlowVersionError) {
 				return refuse(versionRefusalCode(err.kind), getErrorMessage(err));
@@ -94,7 +100,11 @@ export class RunDefinitionLoader {
 		}
 	}
 
-	private loadRegistered(cmd: RunCommandMessage, registryFile: string): LoadedDefinition {
+	private loadRegistered(
+		cmd: RunCommandMessage,
+		registryFile: string,
+		implicitRequires: readonly string[]
+	): LoadedDefinition {
 		if (!cmd.flowId) {
 			return refuse('FLOW_NOT_FOUND', 'A run by flow id needs the flow id (flow run <id>).');
 		}
@@ -103,10 +113,10 @@ export class RunDefinitionLoader {
 			registryFile,
 			requestedVersion: cmd.flowVersion,
 		});
-		return this.validated(resolved);
+		return this.validated(resolved, true, implicitRequires);
 	}
 
-	private loadFile(cmd: RunCommandMessage, flowFile: string): LoadedDefinition {
+	private loadFile(cmd: RunCommandMessage, flowFile: string, implicitRequires: readonly string[]): LoadedDefinition {
 		if (cmd.flowVersion !== undefined) {
 			throw new FlowVersionError(
 				`A version can only be requested for a flow id, not for the file ${flowFile}: a file runs as it is. ` +
@@ -132,7 +142,7 @@ export class RunDefinitionLoader {
 			return refuse('PARSE_ERROR', 'Flow file is empty or not a YAML object');
 		}
 
-		const checked = this.check(flow);
+		const checked = this.check(flow, true, implicitRequires);
 		if (!checked.ok) {
 			return checked;
 		}
@@ -140,19 +150,27 @@ export class RunDefinitionLoader {
 		return { ok: true, resolved, warnings: checked.warnings };
 	}
 
-	private validated(resolved: ResolvedDefinition, checkRequirements = true): LoadedDefinition {
-		const checked = this.check(resolved.flow, checkRequirements);
+	private validated(
+		resolved: ResolvedDefinition,
+		checkRequirements = true,
+		implicitRequires: readonly string[] = []
+	): LoadedDefinition {
+		const checked = this.check(resolved.flow, checkRequirements, implicitRequires);
 		return checked.ok ? { ok: true, resolved, warnings: checked.warnings } : checked;
 	}
 
-	private check(flow: FlowDefinition, checkRequirements = true): Checked {
+	private check(flow: FlowDefinition, checkRequirements = true, implicitRequires: readonly string[] = []): Checked {
 		// The validator annotates the flow it is given (`_autoDiscoveredInputs`). It gets a copy: the hash, the snapshot text and the
 		// definition that runs must all describe the object as written, or a stored snapshot never matches its hash again.
 		const usesRequirements = hasRequirements(flow);
 		const knownGuarantees = checkRequirements && usesRequirements ? this.guarantees?.entries() : undefined;
-		const result = new FlowValidator(undefined, [], knownGuarantees, this.hostToolsPolicy).validate(
-			structuredClone(flow)
-		);
+		const result = new FlowValidator(
+			undefined,
+			[],
+			knownGuarantees,
+			this.hostToolsPolicy,
+			implicitRequires
+		).validate(structuredClone(flow));
 		if (result.valid) {
 			return { ok: true, warnings: surfacedWarningsOf(result.issues) };
 		}

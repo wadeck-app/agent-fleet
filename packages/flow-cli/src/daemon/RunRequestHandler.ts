@@ -248,7 +248,9 @@ export class RunRequestHandler {
 
 		// A registered id is resolved (latest or pinned version) and a flow file is parsed as it is; either way the
 		// result is validated and nothing is written yet (the snapshot is committed once the run is accepted, below).
-		const loaded = this.definitionLoader.load(cmd, flowFile);
+		// The implicit set of this project (empty when no declared source covers it) lets the hostTools confinement finding see a
+		// model step that is confined only implicitly.
+		const loaded = this.definitionLoader.load(cmd, flowFile, this.confinement.implicitSetFor(project.project.id));
 		if (!loaded.ok) {
 			return { response: loaded.response };
 		}

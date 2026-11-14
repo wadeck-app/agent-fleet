@@ -59,7 +59,7 @@ hostTools:
     sideEffect: read             # read | write (required, no default)
     command: [task, show, "{id}", --json]   # argv array ONLY, never a shell string
     args:
-      id: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", required: true }
+      id: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", required: true }   # a value starting with "-" is refused unless the arg sets allowLeadingDash: true
       status: { type: enum, values: [open, done] }   # enum | string+pattern | integer(min,max) | boolean
     cwd: workspace               # optional; workspace | none ; no arbitrary paths in slice 1
     env: [TASK_PROFILE]          # optional; names only; values come from the worker env, never from the model
