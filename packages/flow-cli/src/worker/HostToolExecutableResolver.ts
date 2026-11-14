@@ -37,7 +37,7 @@ const SHELL_SCRIPT_EXTENSIONS = new Set(['.cmd', '.bat']);
  * the residual of F-16 (same user, no new authority).
  *
  * Slice 1 rules: a relative path (`./x`, `bin/x`) is refused; an absolute path is used as given; a bare name is searched
- * in PATH (with PATHEXT on Windows). On Windows `.cmd`/`.bat` are refused: cmd.exe would re-parse the arguments.
+ * in PATH (with PATHEXT on Windows); a relative or empty PATH entry refuses the resolution. On Windows `.cmd`/`.bat` are refused: cmd.exe would re-parse the arguments.
  */
 export class HostToolExecutableResolver {
 	private readonly platform: NodeJS.Platform;
@@ -67,7 +67,7 @@ export class HostToolExecutableResolver {
 			}
 			return this.accept(label, tool.id, command, command);
 		}
-		const searched = this.searchPath();
+		const searched = this.searchPath(label);
 		if (searched.length === 0) {
 			throw new HostToolExecutableError(
 				`${label}: executable '${command}' cannot be searched because PATH is not set for the worker. Fix: set PATH for the worker, or use an absolute path.`
@@ -112,6 +112,11 @@ export class HostToolExecutableResolver {
 	}
 
 	private accept(label: string, toolId: string, command: string, absolutePath: string): ResolvedHostExecutable {
+		if (!path.isAbsolute(absolutePath)) {
+			throw new HostToolExecutableError(
+				`${label}: resolved executable '${absolutePath}' is not an absolute path, which is refused (the spawn never uses a relative path). Fix: use absolute directories in the worker's PATH.`
+			);
+		}
 		if (this.platform === 'win32' && SHELL_SCRIPT_EXTENSIONS.has(path.extname(absolutePath).toLowerCase())) {
 			throw new HostToolExecutableError(
 				`${label}: executable '${absolutePath}' is a ${path.extname(absolutePath)} file, which is refused: cmd.exe would re-parse the arguments. Fix: point command[0] to the real executable (.exe).`
@@ -121,9 +126,28 @@ export class HostToolExecutableResolver {
 		return { toolId, command, absolutePath, size: stat.size, mtimeMs: stat.mtimeMs };
 	}
 
-	private searchPath(): string[] {
+	/**
+	 * @throws when an entry is empty or relative: it would resolve against the worker's current directory, where the
+	 *         model may have planted a file. Refused (not skipped) so the author sees and fixes the worker's PATH.
+	 */
+	private searchPath(label: string): string[] {
 		const entry = Object.entries(this.options.environment).find(([name]) => name.toUpperCase() === 'PATH');
-		return (entry?.[1] ?? '').split(path.delimiter).filter(part => part !== '');
+		const value = entry?.[1] ?? '';
+		if (value === '') return [];
+		const entries = value.split(path.delimiter);
+		for (const part of entries) {
+			if (part === '') {
+				throw new HostToolExecutableError(
+					`${label}: the worker's PATH entry is empty (it means the current directory), which is refused: a file planted there would run. Fix: remove the empty entry (a stray '${path.delimiter}') from the worker's PATH, or use an absolute path for the executable.`
+				);
+			}
+			if (!path.isAbsolute(part)) {
+				throw new HostToolExecutableError(
+					`${label}: the worker's PATH entry '${part}' is relative, which is refused: it resolves against the current directory, where a file planted by the model would run. Fix: use absolute directories in the worker's PATH, or use an absolute path for the executable.`
+				);
+			}
+		}
+		return entries;
 	}
 
 	private candidateNames(command: string): string[] {

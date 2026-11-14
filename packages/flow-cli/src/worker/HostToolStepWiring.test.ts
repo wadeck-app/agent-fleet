@@ -29,7 +29,8 @@ describe('HostToolStepWiring.prepare', () => {
 			stepId: 'triage',
 			hostTools,
 			workspaceDir: workspace,
-			workerEnvironment: process.env,
+			// An absolute-only PATH: the ambient one may hold relative entries, which resolution refuses.
+			workerEnvironment: { ...process.env, PATH: path.dirname(process.execPath) },
 			writeAuditLine: line => lines.push(line),
 		});
 

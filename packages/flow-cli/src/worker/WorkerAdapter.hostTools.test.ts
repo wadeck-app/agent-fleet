@@ -1,3 +1,5 @@
+import * as path from 'node:path';
+
 import type { AssignableStep, ExecutionContext } from '../ipc/Protocol';
 import { WorkerAdapter } from './WorkerAdapter';
 import type { SendMessageFn, StepRunnerFactory } from './WorkerAdapter';
@@ -104,7 +106,8 @@ describe('WorkerAdapter host tools wiring', () => {
 			{ id: 'show', description: 'd', sideEffect: 'read', command: ['not-installed-anywhere-xyz'] },
 		];
 		await expect(
-			new WorkerAdapter(factory).execute(
+			// An absolute-only PATH: the ambient one may hold relative entries, which resolution refuses.
+			new WorkerAdapter(factory, { ...process.env, PATH: path.dirname(process.execPath) }).execute(
 				modelStep({ hostTools }),
 				context,
 				sendMessage as unknown as SendMessageFn

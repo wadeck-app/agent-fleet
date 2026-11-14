@@ -81,6 +81,64 @@ describe('HostToolExecutableResolver', () => {
 		expect(() => resolver.resolve('s', tool('x'))).toThrow(/PATH is not set/);
 	});
 
+	describe('relative or empty PATH entries are refused, never searched (the model can plant a file there)', () => {
+		const originalCwd = process.cwd();
+		afterEach(() => {
+			process.chdir(originalCwd);
+		});
+
+		// A fixture executable of the tool's name planted where a relative entry would resolve (the worker's cwd).
+		const plant = (relativeDirectory: string): string => {
+			const planted = path.join(directory, relativeDirectory);
+			fs.mkdirSync(planted, { recursive: true });
+			fs.writeFileSync(path.join(planted, 'taskcli'), 'PLANTED', { mode: 0o755 });
+			process.chdir(directory);
+			return planted;
+		};
+		const resolverWithPath = (entries: string[]): HostToolExecutableResolver =>
+			new HostToolExecutableResolver({
+				platform: 'linux',
+				environment: { PATH: entries.join(path.delimiter) },
+			});
+
+		it.each([
+			['a dot entry', '.', '.'],
+			['a node_modules/.bin entry', 'node_modules/.bin', 'node_modules/.bin'],
+			['a dot-slash entry', './tools', 'tools'],
+			['an empty entry (current directory)', '', '.'],
+		])(
+			'does not resolve through %s, even before an absolute entry holding the real tool',
+			(_label, entry, where) => {
+				write('taskcli', 'REAL');
+				plant(where);
+				const resolver = resolverWithPath([entry, binDir]);
+				expect(() => resolver.resolve('triage', tool('taskcli'))).toThrow(HostToolExecutableError);
+				expect(() => resolver.resolve('triage', tool('taskcli'))).toThrow(
+					new RegExp(
+						`Step 'triage' tool 'show-task': .*PATH entry ${entry === '' ? 'is empty' : `'${entry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`}.*Fix: `
+					)
+				);
+			}
+		);
+
+		it('refuses when the relative entry comes after the absolute one, too (no silent skip)', () => {
+			plant('.');
+			expect(() => resolverWithPath([binDir, '.']).resolve('s', tool('taskcli'))).toThrow(/PATH entry '\.'/);
+		});
+
+		it('still resolves through absolute PATH entries only', () => {
+			const file = write('taskcli', 'REAL');
+			expect(
+				resolverWithPath([path.join(directory, 'missing'), binDir]).resolve('s', tool('taskcli')).absolutePath
+			).toBe(file);
+		});
+
+		it('an absolute command ignores PATH, so a bad entry does not matter for it', () => {
+			const file = write('taskcli');
+			expect(resolverWithPath(['.']).resolve('s', tool(file)).absolutePath).toBe(file);
+		});
+	});
+
 	it('refuses a directory and (on POSIX) a file that is not executable', () => {
 		fs.mkdirSync(path.join(binDir, 'adir'));
 		expect(() => resolverFor('linux').resolve('s', tool('adir'))).toThrow(/not found/);
