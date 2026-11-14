@@ -13,6 +13,8 @@ interface JsonSchema {
 // mcp-server.cjs is a standalone script (it cannot import the TS packages), so the advertised schema is checked here
 // against the daemon's InjectedStepGuard to make drift fail a test instead of confusing a model.
 const require = createRequire(import.meta.url);
+// The file serves stdin when loaded, whoever loads it (the sandbox forwarder uses require()); this asks for the definition only.
+process.env['FLOW_MCP_SERVER_DEFINITION_ONLY'] = '1';
 const { PROVIDE_STEPS_TOOL } = require('./mcp-server.cjs') as { PROVIDE_STEPS_TOOL: { inputSchema: JsonSchema } };
 
 const inputSchema = PROVIDE_STEPS_TOOL.inputSchema;

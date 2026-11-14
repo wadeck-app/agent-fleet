@@ -387,10 +387,11 @@ function startStdioServer() {
 	});
 }
 
-// Exported for McpServerSchema.test.ts; requiring this file must not attach to stdin.
+// Exported for McpServerSchema.test.ts.
 module.exports = { PROVIDE_STEPS_TOOL };
 
-// Only serve when run as the MCP server (node mcp-server.cjs), not when required.
-if (require.main === module) {
+// This file is also loaded with require() (the sandbox image's mcp-callback-forwarder.cjs does), so `require.main === module`
+// cannot decide whether to serve: it always serves, except when a test asks for the definition only.
+if (process.env.FLOW_MCP_SERVER_DEFINITION_ONLY !== '1') {
 	startStdioServer();
 }
