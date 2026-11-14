@@ -36,10 +36,10 @@ describe('ProjectFlowConfig', () => {
 		return file;
 	}
 
-	it('keeps the project config in the registry, under projects/<id>/flow/config/config.yml', async () => {
+	it('keeps the project config in the registry, under projects/<id>-<slug>/flow/config/config.yml', async () => {
 		const project = await subject('alpha');
 		expect(projectConfigFile(project.registryDir, project.id)).toBe(
-			path.join(project.registryDir, 'projects', project.id, 'flow', 'config', 'config.yml')
+			path.join(project.registryDir, 'projects', `${project.id}-alpha`, 'flow', 'config', 'config.yml')
 		);
 	});
 

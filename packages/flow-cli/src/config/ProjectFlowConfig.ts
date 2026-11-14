@@ -61,7 +61,7 @@ const GLOBAL_ONLY_KEYS = [
 ] as const;
 
 /**
- * The config of one project (`<registry>/projects/<id>/flow/config/config.yml`). `plugins` and `hooks` are `local`: a parent
+ * The config of one project (`<registry>/projects/<id>-<slug>/flow/config/config.yml`). `plugins` and `hooks` are `local`: a parent
  * project must not change the approval or workspace plugin, or the hooks, of a child. The daemon's keys are declared
  * global-only so that one written here is refused with where it belongs rather than ignored.
  */

@@ -244,7 +244,7 @@ describe('the standalone bundle in daemon mode', () => {
 		const projectDir = mkdtempSync(join(tmpdir(), 'flow-bundle-daemon-project-'));
 		const configHome = mkdtempSync(join(tmpdir(), 'flow-bundle-daemon-config-'));
 		// A project is what the registry says: the daemon (XDG_CONFIG_HOME = configHome) only loads this config for a registered folder,
-		// and the config of a registered project lives in the registry too (projects/<id>/flow/config/config.yml).
+		// and the config of a registered project lives in the registry too (projects/<id>-<slug>/flow/config/config.yml).
 		const registryDir = defaultRegistryDir({ XDG_CONFIG_HOME: configHome });
 		const project = await addProject(registryDir, { name: 'bundle-daemon-project', path: projectDir });
 		const projectConfig = projectConfigFile(registryDir, project.id);

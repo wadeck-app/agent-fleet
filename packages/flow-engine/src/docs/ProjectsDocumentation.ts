@@ -20,7 +20,7 @@ export class ProjectsDocumentation {
 			'',
 			'### Project config',
 			'',
-			'Hooks and plugins live in `<registry>/projects/<project id>/flow/config/config.yml` (registry: `$XDG_CONFIG_HOME/project`, else `~/.config/project`; the id is in `project list`), not in the repository. Only `plugins` and `hooks` are allowed there, and they are not inherited from a parent project. A daemon setting (`queue`, `worker`, `autoUpdate`, ...) is refused with the file and key, and belongs in `~/.config/flow/config.yml`; hooks in that global file are refused too. A leftover `<project folder>/.flow/config.yml` is an error giving the `mv` command; flow never reads it or moves it for you.',
+			'Hooks and plugins live in `<registry>/projects/<project id>-<slug>/flow/config/config.yml` (registry: `$XDG_CONFIG_HOME/project`, else `~/.config/project`; the id is in `project list`), not in the repository. Only `plugins` and `hooks` are allowed there, and they are not inherited from a parent project. A daemon setting (`queue`, `worker`, `autoUpdate`, ...) is refused with the file and key, and belongs in `~/.config/flow/config.yml`; hooks in that global file are refused too. A leftover `<project folder>/.flow/config.yml` is an error giving the `mv` command; flow never reads it or moves it for you.',
 			'',
 			'### Workers',
 			'',
