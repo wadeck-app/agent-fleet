@@ -25,8 +25,9 @@ const EXECUTION_ID = process.env.FLOW_EXECUTION_ID || '';
  * - Property descriptions explain what, valid values, constraints, and relationships
  * - `examples` at the `steps` property level follow JSON Schema 2020-12 (array of valid values)
  *   Each example value is a complete, runnable array of steps
- * - `additionalProperties: true` on step items is intentional: the orchestrator accepts
- *   extra fields (e.g. output, log, toolLog, session) and ignores unknown ones gracefully
+ * - Step items advertise `additionalProperties: false` and exactly the keys the daemon accepts
+ *   (flow-engine InjectedStepGuard.ALLOWED_KEYS): the daemon refuses the whole batch on any other key.
+ *   McpServerSchema.test.ts fails when this schema and the guard drift apart.
  * - Error responses from tools/call are actionable text so the LLM can self-correct
  */
 const PROVIDE_STEPS_TOOL = {
@@ -61,7 +62,7 @@ const PROVIDE_STEPS_TOOL = {
 				items: {
 					type: 'object',
 					required: ['id', 'type'],
-					additionalProperties: true,
+					additionalProperties: false,
 					properties: {
 						id: {
 							type: 'string',
@@ -152,6 +153,32 @@ const PROVIDE_STEPS_TOOL = {
 										'If true, resets the iteration counter when the step eventually succeeds.',
 								},
 							},
+						},
+						// Remaining keys the daemon accepts (InjectedStepGuard.ALLOWED_KEYS). Their value shape is
+						// validated by the flow engine, so they are declared without a type.
+						parent: { description: 'ID of the parent step this step belongs to (optional).' },
+						wave: { description: 'Wave this step is scheduled in (optional).' },
+						provider: { description: 'Model provider override for a "model" step (optional).' },
+						retry: { description: 'Retry policy for this step (optional).' },
+						timeout: { description: 'Maximum run time for this step (optional).' },
+						tools: { description: 'Tools the model may use in a "model" step (optional).' },
+						output: { description: 'Output declaration for this step (optional).' },
+						log: { description: 'Log capture setting for this step (optional).' },
+						toolLog: { description: 'Tool-call log setting for this step (optional).' },
+						when: { description: 'Condition under which this step runs (optional).' },
+						requires: { description: 'Requirements this step needs before it runs (optional).' },
+						profile: { description: 'Profile applied to this step (optional).' },
+						steps: {
+							type: 'array',
+							// No $ref: some MCP clients do not resolve one. The daemon applies the same rules to nested steps.
+							items: { type: 'object' },
+							description: 'Nested step definitions; each follows this same step shape (optional).',
+						},
+						subSteps: {
+							type: 'array',
+							// No $ref: some MCP clients do not resolve one. The daemon applies the same rules to nested steps.
+							items: { type: 'object' },
+							description: 'Nested sub-step definitions; each follows this same step shape (optional).',
 						},
 					},
 				},
@@ -339,21 +366,31 @@ async function handle(req) {
 	}
 }
 
-// Read JSON-RPC requests line by line from stdin
-const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-rl.on('line', line => {
-	const trimmed = line.trim();
-	if (!trimmed) return;
-	let req;
-	try {
-		req = JSON.parse(trimmed);
-	} catch {
-		process.stdout.write(
-			JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }) + '\n'
-		);
-		return;
-	}
-	handle(req).catch(err => {
-		process.stderr.write(`[mcp-server] unhandled error: ${String(err)}\n`);
+/** Read JSON-RPC requests line by line from stdin. */
+function startStdioServer() {
+	const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+	rl.on('line', line => {
+		const trimmed = line.trim();
+		if (!trimmed) return;
+		let req;
+		try {
+			req = JSON.parse(trimmed);
+		} catch {
+			process.stdout.write(
+				JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }) + '\n'
+			);
+			return;
+		}
+		handle(req).catch(err => {
+			process.stderr.write(`[mcp-server] unhandled error: ${String(err)}\n`);
+		});
 	});
-});
+}
+
+// Exported for McpServerSchema.test.ts; requiring this file must not attach to stdin.
+module.exports = { PROVIDE_STEPS_TOOL };
+
+// Only serve when run as the MCP server (node mcp-server.cjs), not when required.
+if (require.main === module) {
+	startStdioServer();
+}

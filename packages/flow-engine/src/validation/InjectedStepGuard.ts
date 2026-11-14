@@ -18,6 +18,9 @@ const ALLOWED_TYPES = ['script', 'model'] as const;
  * batch is refused, never stripped or coerced. `host` is handled by InjectedHostMarkerGuard, which owns its message.
  */
 export class InjectedStepGuard {
+	/** Step types an injected step may have; the provideSteps tool schema (flow-cli mcp-server.cjs) must advertise the same. */
+	static readonly ALLOWED_TYPES: readonly string[] = ALLOWED_TYPES;
+
 	static readonly ALLOWED_KEYS: readonly string[] = [
 		'id',
 		'type',

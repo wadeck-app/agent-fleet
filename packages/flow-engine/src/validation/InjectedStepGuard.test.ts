@@ -96,3 +96,9 @@ describe('InjectedStepGuard', () => {
 		expect(message).toMatch(/mcpServers, toolHooks, permission mode, working directory.*flow definition/s);
 	});
 });
+
+describe('InjectedStepGuard.ALLOWED_TYPES', () => {
+	it('is script and model only', () => {
+		expect(InjectedStepGuard.ALLOWED_TYPES).toEqual(['script', 'model']);
+	});
+});
