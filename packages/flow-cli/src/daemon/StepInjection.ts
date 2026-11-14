@@ -1,4 +1,4 @@
-import { InjectedHostMarkerGuard, ReadOnlyWorkspaceRules } from 'flow-engine';
+import { InjectedHostMarkerGuard, InjectedStepGuard, ReadOnlyWorkspaceRules } from 'flow-engine';
 import type { SchedulerStep } from 'flow-engine';
 import type { FlowStep } from 'flow-engine';
 
@@ -39,6 +39,12 @@ export class StepInjection {
 		const hostMarked = InjectedHostMarkerGuard.find(injectedSteps);
 		if (hostMarked.length > 0) {
 			throw new Error(InjectedHostMarkerGuard.refusal(hostMarked));
+		}
+
+		// Only the steps and keys the provideSteps tool advertises: privileged settings belong to the flow definition.
+		const violations = InjectedStepGuard.find(injectedSteps);
+		if (violations.length > 0) {
+			throw new Error(InjectedStepGuard.refusal(violations));
 		}
 
 		const allKnownIds =new Set([...this.executions.knownStepIds(executionId), ...injectedSteps.map(s => s.id)]);

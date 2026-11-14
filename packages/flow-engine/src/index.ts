@@ -18,6 +18,8 @@ export type { ValidationIssue, ValidationResult } from './validation/FlowValidat
 export { ValidationCode } from './validation/ValidationTypes';
 export { InjectedHostMarkerGuard } from './validation/InjectedHostMarkerGuard';
 export type { InjectedHostMarker } from './validation/InjectedHostMarkerGuard';
+export { InjectedStepGuard } from './validation/InjectedStepGuard';
+export type { InjectedStepViolation } from './validation/InjectedStepGuard';
 export type { InterventionHandler, InterventionRequest, InterventionResponse } from './executor/InterventionHandler';
 export { FlowGenerator } from './generation/FlowGenerator';
 export type { FlowGenerationResult, FlowConstraints } from './generation/FlowGenerator';

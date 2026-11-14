@@ -218,3 +218,100 @@ describe('StepInjection -- host marker', () => {
 		expect(scheduler.getStepIds().has('plain')).toBe(true);
 	});
 });
+
+describe('StepInjection -- allowed step shape', () => {
+	const refusedAndNothingRecorded = (
+		steps: Record<string, unknown>[],
+		message: RegExp,
+		stepIds: string[]
+	): void => {
+		const { injection, scheduler, setStepCount, enqueueItems } = setup('wait-all');
+		expect(() => injection.injectSteps(EXECUTION_ID, steps as never)).toThrow(message);
+		for (const id of stepIds) {
+			expect(scheduler.getStepIds().has(id)).toBe(false);
+		}
+		expect(scheduler.getStepCount()).toBe(1);
+		expect(setStepCount).not.toHaveBeenCalled();
+		expect(enqueueItems).not.toHaveBeenCalled();
+	};
+
+	it.each([
+		['mcpServers', {}],
+		['toolHooks', {}],
+		['skipPermissions', true],
+		['permission', 'bypass'],
+		['onCompact', 'x'],
+		['workingDir', '/'],
+		['shell', 'bash'],
+		['secrets', ['TOKEN']],
+		['labels', {}],
+		['flowId', 'other'],
+		['session', 'abc'],
+		['somethingUnknown', 1],
+	])('refuses %s, naming the step and the key, and records nothing', (key, value) => {
+		refusedAndNothingRecorded(
+			[{ id: 'bad', type: 'script', parent: 'impl', script: 'ls', [key]: value }],
+			new RegExp(`'bad'.*\`${key}\`.*may only carry.*flow definition`, 's'),
+			['bad']
+		);
+	});
+
+	it.each([
+		['missing', undefined],
+		['Model', 'Model'],
+		['subflow', 'subflow'],
+		['a number', 7],
+	])('refuses a type that is %s', (_label, type) => {
+		const step: Record<string, unknown> = { id: 'bad', parent: 'impl', script: 'ls' };
+		if (type !== undefined) {
+			step['type'] = type;
+		}
+		refusedAndNothingRecorded([step], /'bad'.*type.*may only carry/s, ['bad']);
+	});
+
+	it('refuses a nested violation with its path, and the whole batch with it', () => {
+		refusedAndNothingRecorded(
+			[
+				{ id: 'clean', type: 'script', parent: 'impl', script: 'ls' },
+				{
+					id: 'outer',
+					type: 'script',
+					parent: 'impl',
+					script: 'ls',
+					subSteps: [{ id: 'deep', type: 'script', script: 'ls', mcpServers: {} }],
+				},
+			],
+			/'deep' \(outer > deep\): key `mcpServers`/,
+			['clean', 'outer', 'deep']
+		);
+	});
+
+	it('still reports host with its own message when both host and another key are present', () => {
+		refusedAndNothingRecorded(
+			[{ id: 'bad', type: 'script', parent: 'impl', script: 'ls', host: true, shell: 'x' }],
+			/injected step\(s\) with `host`/,
+			['bad']
+		);
+	});
+
+	it('accepts skipPermissions: false and the legitimate advertised steps', () => {
+		const { injection, scheduler } = setup('wait-all');
+
+		injection.injectSteps(EXECUTION_ID, [
+			{ id: 's', type: 'script', parent: 'impl', name: 'S', script: 'ls', env: { A: 'b' }, skipPermissions: false },
+			{
+				id: 'm',
+				type: 'model',
+				parent: 'impl',
+				model: 'haiku',
+				prompt: 'p',
+				depends: ['s'],
+				tools: ['read'],
+				onFailure: { goto: 'm', maxIterations: 2 },
+			},
+		]);
+
+		expect(scheduler.getStepIds().has('s')).toBe(true);
+		expect(scheduler.getStepIds().has('m')).toBe(true);
+	});
+});
