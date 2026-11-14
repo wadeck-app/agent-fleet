@@ -4,6 +4,21 @@
 # Base: docker/sandbox-templates:claude-code-docker, pinned by digest (claude, node, docker CLI, user `agent`).
 FROM docker/sandbox-templates:claude-code-docker@sha256:4a94d9144a70df744fd9247e0c365a14cfb97024afab8db7597c8ba3e0637642
 
+# Node 24: the project declares engines node >= 24, the base ships the distribution's Node 22 (apt package `nodejs`, Ubuntu 26.04).
+# The official tarball, version and sha256 pinned here (sha256 from https://nodejs.org/dist/v24.22.3/SHASUMS256.txt, fetched over TLS on
+# 2026-11-14; the signed SHASUMS256.txt.sig was NOT checked), verified before it is unpacked. It goes to /usr/local, which comes before /usr/bin
+# in PATH, so `node`, `npm` and `npx` resolve to it; the distribution package stays (other packages depend on it) and is shadowed.
+# claude is a native binary under ~/.local and does not use Node; codex and opencode are installed below, after this layer.
+ARG NODE_VERSION=24.22.3
+ARG NODE_SHA256=061ec3e3062115705b56b51fa9cc330ab50d34b6969387d4e4b1a50c6809acc2
+USER root
+RUN curl -fsSLo /tmp/node.tar.gz https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz \
+ && echo "${NODE_SHA256}  /tmp/node.tar.gz" | sha256sum -c - \
+ && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 --no-same-owner --exclude=CHANGELOG.md --exclude=LICENSE --exclude=README.md \
+ && rm -f /tmp/node.tar.gz \
+ && test "$(node --version)" = "v${NODE_VERSION}"
+USER agent
+
 # The model CLIs come from the COMMITTED lock (image/package.json + package-lock.json, copied by build-image.mjs into tools/):
 # every transitive dependency is pinned with its integrity hash, and `--ignore-scripts` means no dependency runs a lifecycle
 # script at build time. opencode-ai needs its own postinstall (it replaces bin/opencode.exe by the binary of the platform

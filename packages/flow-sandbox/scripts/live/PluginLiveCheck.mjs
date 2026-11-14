@@ -465,7 +465,7 @@ const toolsOnly = process.env.PLUGIN_TOOLS_ONLY;
 if (toolsOnly !== undefined && !['codex', 'opencode', 'both'].includes(toolsOnly))
 	refuse('PLUGIN_TOOLS_ONLY must be codex, opencode or both.');
 const scenario = process.env.PLUGIN_TOOLS_SCENARIO ?? 'plain';
-if (!['plain', 'resume', 'shell', 'mixed'].includes(scenario)) refuse('PLUGIN_TOOLS_SCENARIO must be plain, resume, shell or mixed.');
+if (!['plain', 'resume', 'shell', 'mixed', 'mcp'].includes(scenario)) refuse('PLUGIN_TOOLS_SCENARIO must be plain, resume, shell, mixed or mcp.');
 if (scenario !== 'plain' && toolsOnly === undefined)
 	refuse('PLUGIN_TOOLS_SCENARIO=' + scenario + ' needs PLUGIN_TOOLS_ONLY=codex|opencode|both.');
 const codexModel = process.env.PLUGIN_CODEX_MODEL ?? 'openai.gpt-5.6-terra';
@@ -1063,11 +1063,16 @@ try {
 	//   shell:  per tool, skipPermissions + a shell command, a `tools` allow-list with bash, and one WITHOUT bash (it must not run it).
 	//   mixed:  a Claude, then an OpenCode, then a Codex step in ONE run (one sandbox, one preparation per tool). With the Claude profile the
 	//           Codex step fails at Bedrock (403 bedrock-mantle): the check accepts exactly that and says so.
+	//   mcp:    ONE Claude model step that calls the engine's provideSteps MCP tool to inject a `type: script` step, in a run confined ONLY by
+	//           the implicit agent set (no flow-level requires/profile): the injected script must run in the SAME sandbox, never on a host worker.
+	//           Needs the image to carry /opt/flow/mcp-callback-forwarder.cjs (use PLUGIN_TOOLS_ONLY=both only to skip the other sections).
 	if (scenario !== 'plain') {
 		const scenarioTools =
 			scenario === 'mixed'
 				? ['claude', 'opencode', 'codex']
-				: ['codex', 'opencode'].filter(candidate => toolsOnly === 'both' || toolsOnly === candidate);
+				: scenario === 'mcp'
+					? ['claude']
+					: ['codex', 'opencode'].filter(candidate => toolsOnly === 'both' || toolsOnly === candidate);
 		const modelOf = tool => (tool === 'claude' ? 'sonnet' : tool === 'codex' ? codexModel : opencodeModel);
 		const modelStepYaml = (tool, id, { depends, extra = '', prompt }) =>
 			`    - id: ${id}
@@ -1092,6 +1097,15 @@ ${extra}${depends ? `      depends:\n          - ${depends}\n` : ''}      prompt
 						depends: `${tool}-first`,
 						extra: '      session:\n          continue: ' + `${tool}-first` + '\n          mode: append\n',
 						prompt: 'What is the project codename I gave you in my previous message? Reply with that single word and nothing else.',
+					})
+				);
+			} else if (scenario === 'mcp') {
+				scenarioSteps.push(
+					modelStepYaml(tool, 'inject', {
+						// Without it claude refuses the MCP tool call in a non-interactive run ("has not been granted permission", seen live).
+						extra: '      skipPermissions: true\n',
+						prompt:
+							'Call the provideSteps tool exactly once with a single step whose id is "from-model", whose name is "From model", whose type is "script" and whose script is: hostname . Use no other key than id, name, type and script (the daemon refuses any other). After the tool call succeeds, reply with the single word DONE.',
 					})
 				);
 			} else if (scenario === 'shell') {
@@ -1190,6 +1204,16 @@ ${scenarioSteps.join('\n')}
 						`${tool}-deny ran the shell although bash is not in tools: ${describeStep(`${tool}-deny`)}`
 					);
 					lines.push(`${tool}: skip ${answerOf(`${tool}-skip`)}, allow ${answerOf(`${tool}-allow`)}, deny ${answerOf(`${tool}-deny`)}`);
+				} else if (scenario === 'mcp') {
+					const injected = record.steps?.['from-model'];
+					check(record.steps?.inject?.status === 'completed', `the model step did not complete: ${describeStep('inject')}`);
+					check(injected?.status === 'completed', `the injected step did not complete (was it injected?): ${JSON.stringify(injected ?? null).slice(0, 400)}`);
+					check(injected?.sourceId === 'sandbox-live', `the injected step ran on source ${injected?.sourceId}, not in the sandbox`);
+					check(
+						/flow-sbx-/.test(textOf(injected)),
+						`the injected script did not print the VM host name (flow-sbx-...): ${JSON.stringify(textOf(injected))}`
+					);
+					lines.push(`inject: ${record.steps?.inject?.status}; from-model: ${injected?.status} on ${injected?.sourceId}, printed ${JSON.stringify(textOf(injected))}`);
 				} else {
 					const stepRecord = record.steps?.[tool];
 					const mantleDenied =
@@ -1213,6 +1237,18 @@ ${scenarioSteps.join('\n')}
 						.some(name => fs.existsSync(path.join(runsDirectory, name, 'sessions', tool))),
 					`no session store of ${tool} on the mount`
 				);
+			}
+			if (failures.length > 0 && scenario === 'mcp') {
+				// What the DAEMON said about the injection (its own log lives in the isolated config directory, not in the daemon's stdout).
+				const logsDirectory = path.join(isolation.configDir, 'logs');
+				const mentions = fs.existsSync(logsDirectory)
+					? fs
+							.readdirSync(logsDirectory)
+							.flatMap(name => fs.readFileSync(path.join(logsDirectory, name), 'utf8').split('\n'))
+							.filter(line => /inject|provideSteps|InjectedStep/i.test(line))
+					: [];
+				evidence['mcp-daemon-log-injection-lines'] = mentions.slice(-20);
+				failures.push(`daemon log lines about injection: ${JSON.stringify(mentions.slice(-6)).slice(0, 1500)}`);
 			}
 			expect(failures.length === 0, `${failures.join(' || ')} | run ${record.status}`);
 			return `${lines.join(' ; ')} ; one sandbox`;
