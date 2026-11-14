@@ -2,7 +2,7 @@
 
 Two extension points are configured per project under `plugins:`: `workspace` (how a task gets a working directory) and `approval` (how a `user_intervention` step reaches a human or script). They are not the only ones: `packages/extension-points/extension-points.json` registers every extension point with its status (for example `worker-type`, see `WORKERS.md`).
 
-`workspace` is required -- the daemon refuses to start without one. `approval` is optional; a worker without one reports `interactive: false` and rejects `user_intervention` steps.
+The daemon starts without a `workspace` section. Every flow must declare its own `workspace:` (a flow without it is refused); a `plugins.workspace` in the config only draws a warning in the daemon log at start (`Daemon.ts`). `approval` is optional; a worker without one reports `interactive: false` and rejects `user_intervention` steps.
 
 ## Workspace plugins
 
