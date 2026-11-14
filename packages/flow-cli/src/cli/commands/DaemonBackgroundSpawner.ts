@@ -31,6 +31,11 @@ import { DAEMON_START_TIMEOUT_ENV, resolveDaemonStartCapMs } from './DaemonStart
  * process is seen alive (it holds its start lock) the wait goes on up to the hard cap of {@link resolveDaemonStartCapMs}
  * (60 s, `FLOW_DAEMON_START_TIMEOUT_MS`). A daemon that is gone is reported at once.
  *
+ * Not on Windows, the daemon's stderr (stdout stays ignored) goes to `<daemonDir>/daemon-start.stderr`, truncated at each
+ * spawn, mode 0o600. When the daemon exits before publishing its port file without recording a start-up error, the last
+ * 1500 characters of that file are appended to the error. If the file cannot be opened the daemon is spawned with
+ * stdio 'ignore' and the daemon log says so; the start does not fail for it.
+ *
  * @returns true when this call started the daemon, false when one was already live.
  * @throws when `FLOW_DAEMON_START_TIMEOUT_MS` is set to something that is not a positive whole number (nothing is spawned).
  */
@@ -81,6 +86,45 @@ interface SpawnedDaemon {
 	lockBefore: string | null;
 }
 
+const DAEMON_START_STDERR_FILE = 'daemon-start.stderr';
+const DAEMON_START_STDERR_TAIL_CHARS = 1500;
+
+/**
+ * Opens (truncating) the file that receives the stderr of the daemon being spawned, or null after logging why it
+ * could not be opened: the start never fails for a diagnostic file.
+ */
+function openDaemonStartStderr(daemonDir: string): number | null {
+	const file = path.join(daemonDir, DAEMON_START_STDERR_FILE);
+	try {
+		const fd = fs.openSync(file, 'w', 0o600);
+		// The mode of open() only applies to a new file; one left by an older version keeps its own.
+		fs.fchmodSync(fd, 0o600);
+		return fd;
+	} catch (error) {
+		writeDaemonLog(
+			path.join(daemonDir, 'logs'),
+			'error',
+			`cannot open ${file} (${error instanceof Error ? error.message : String(error)}): the stderr of the daemon being started is not captured`
+		);
+		return null;
+	}
+}
+
+/** The end of what the spawned daemon wrote to stderr, as a sentence to append to a start failure. */
+function describeDaemonStartStderr(daemonDir: string): string {
+	const file = path.join(daemonDir, DAEMON_START_STDERR_FILE);
+	let content: string;
+	try {
+		content = fs.readFileSync(file, 'utf8').trim();
+	} catch {
+		return `its stderr (${DAEMON_START_STDERR_FILE}) could not be read: ${file}.`;
+	}
+	if (content === '') {
+		return `it wrote nothing to stderr (${file}).`;
+	}
+	return `its stderr (${DAEMON_START_STDERR_FILE}): ${content.slice(-DAEMON_START_STDERR_TAIL_CHARS)}`;
+}
+
 function readStartLock(daemonDir: string): string | null {
 	try {
 		return fs.readFileSync(path.join(daemonDir, DAEMON_START_LOCK_FILE), 'utf8');
@@ -129,7 +173,7 @@ async function waitForDaemon(
 		if (exit !== null) {
 			const how = exit.code !== null ? `exit code ${String(exit.code)}` : `signal ${String(exit.signal)}`;
 			throw new Error(
-				`The daemon process (pid ${String(spawned.directChild?.pid)}) exited (${how}) before publishing its port file ${portFile}, and it recorded no start-up error. ${logsHint}`
+				`The daemon process (pid ${String(spawned.directChild?.pid)}) exited (${how}) before publishing its port file ${portFile}, and it recorded no start-up error. ${logsHint} - ${describeDaemonStartStderr(daemonDir)}`
 			);
 		}
 		// Sticky: the start lock goes away when the daemon is up, or when it ended and cleaned up.
@@ -236,11 +280,16 @@ async function launchDaemon(daemonDir: string, limits: DaemonWaitLimits, deps: D
 		});
 		wscript.unref();
 	} else {
+		const stderrFd = openDaemonStartStderr(daemonDir);
 		// violations-suppress: cli/no-spawn-without-windows-hide this is the non-Windows branch (win32 uses wscript.exe above), where windowsHide has no effect
 		const child = spawn(process.execPath, [resolvedBundle], {
-			stdio: 'ignore',
+			stdio: stderrFd === null ? 'ignore' : ['ignore', 'ignore', stderrFd],
 			env: daemonEnv,
 		});
+		// The child holds its own copy of the descriptor.
+		if (stderrFd !== null) {
+			fs.closeSync(stderrFd);
+		}
 		child.unref();
 		let exit: { code: number | null; signal: NodeJS.Signals | null } | null = null;
 		child.once('exit', (code, signal) => {

@@ -317,6 +317,110 @@ describe('spawnDaemonBackground when the spawned process exits before the daemon
 
 		expect((failure as Error).message).toContain('config is invalid');
 	});
+
+	describe('stderr of the spawned daemon', () => {
+		const stderrFile = () => path.join(dir, 'daemon-start.stderr');
+		const spawnThatExits = (whileRunning: () => void = () => undefined) =>
+			harness.spawn.mockImplementation(() => {
+				const child = fakeChild();
+				whileRunning();
+				void Promise.resolve().then(() => child.emit('exit', 1, null));
+				return child;
+			});
+		const failureOf = (): Promise<Error> =>
+			spawnDaemonBackground(dir, 10_000, { ...fakeClock(), env: {} }).then(
+				() => new Error('the daemon unexpectedly started'),
+				(err: unknown) => err as Error
+			);
+
+		it('goes to daemon-start.stderr (stdout stays ignored), truncated for each spawn', async () => {
+			fs.writeFileSync(stderrFile(), 'left by an earlier start');
+			let stdio: unknown;
+			let contentAtSpawn: string | null = null;
+			harness.spawn.mockImplementation((_cmd: string, _args: string[], options: { stdio: unknown }) => {
+				stdio = options.stdio;
+				contentAtSpawn = fs.readFileSync(stderrFile(), 'utf8');
+				const child = fakeChild();
+				void Promise.resolve().then(() => child.emit('exit', 1, null));
+				return child;
+			});
+
+			await failureOf();
+
+			expect(stdio).toEqual(['ignore', 'ignore', expect.any(Number)]);
+			expect(contentAtSpawn).toBe('');
+		});
+
+		it('is created readable by its owner only', async () => {
+			spawnThatExits();
+
+			await failureOf();
+
+			// POSIX mode bits do not exist on a real Windows (process.platform is faked to 'linux' here).
+			if (platform.value !== 'win32') {
+				expect(fs.statSync(stderrFile()).mode & 0o777).toBe(0o600);
+			}
+		});
+
+		it('appends what the daemon wrote to the exit message', async () => {
+			spawnThatExits(() => fs.writeFileSync(stderrFile(), 'Error: listen EADDRINUSE 127.0.0.1:4000'));
+
+			const failure = await failureOf();
+
+			expect(failure.message).toContain('exit code 1');
+			expect(failure.message).toContain('its stderr (daemon-start.stderr)');
+			expect(failure.message).toContain('Error: listen EADDRINUSE 127.0.0.1:4000');
+		});
+
+		it('keeps only the last 1500 characters of a long stderr', async () => {
+			spawnThatExits(() => fs.writeFileSync(stderrFile(), `HEAD-MARKER${'x'.repeat(5000)}TAIL-MARKER`));
+
+			const failure = await failureOf();
+
+			expect(failure.message).toContain('TAIL-MARKER');
+			expect(failure.message).not.toContain('HEAD-MARKER');
+			expect(failure.message.length).toBeLessThan(2500);
+		});
+
+		it('says it wrote nothing when stderr is empty', async () => {
+			spawnThatExits();
+
+			const failure = await failureOf();
+
+			expect(failure.message).toContain('it wrote nothing to stderr');
+		});
+
+		it('spawns with ignore, logs why, and still starts the daemon when the file cannot be opened', async () => {
+			// A directory in its place: opening it for writing fails on every platform.
+			fs.mkdirSync(stderrFile());
+			let stdio: unknown;
+			harness.spawn.mockImplementation((_cmd: string, _args: string[], options: { stdio: unknown }) => {
+				stdio = options.stdio;
+				void delay(30).then(bringUpDaemon);
+				return fakeChild();
+			});
+
+			await expect(spawnDaemonBackground(dir, 5000)).resolves.toBe(true);
+
+			expect(stdio).toBe('ignore');
+			const logFile = fs.readdirSync(path.join(dir, 'logs')).find(name => name.endsWith('.ndjson'))!;
+			const log = fs.readFileSync(path.join(dir, 'logs', logFile), 'utf8');
+			expect(log).toContain('daemon-start.stderr');
+			expect(log).toContain('cannot');
+		});
+
+		it('does not append the stderr to a recorded start-up error', async () => {
+			spawnThatExits(() => {
+				fs.writeFileSync(stderrFile(), 'noise');
+				recordDaemonStartError(dir, new Error('config is invalid'), {});
+			});
+
+			const failure = await failureOf();
+
+			expect(failure.message).toContain('config is invalid');
+			expect(failure.message).not.toContain('noise');
+		});
+	});
 });
 
 // The launcher script only exists on Windows (elsewhere the bundle is spawned directly).
