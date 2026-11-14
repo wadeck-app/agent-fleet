@@ -105,6 +105,7 @@ The root object that defines a complete flow.
 - **Required**: No
 - **Default**: `{ onSuccess: "review", onFailure: "changes_requested" }`
 - **Description**: Task status to set when flow completes
+- **Not applied by the current daemon**: the field is validated and shown (`flow show`), but nothing in flow-cli applies it (only the legacy worker did). A task status change must be done by whoever starts the run, from the `flow.execution.completed` event.
 - **Example**:
     ```yaml
     statusTransitions:
@@ -1361,6 +1362,8 @@ steps:
 #### 3. Task Metadata
 
 Access task-level metadata fields.
+
+**Not populated by the current daemon**: `task.*` reads the task metadata of the run, which flow-cli always sets to `{}` and which no `flow run` option fills. `${{ task.priority }}` then fails the step with `Property 'priority' not found`. Pass task data as inputs (`flow run -i priority=high`, read as `${{ inputs.priority }}`). The syntax below is the legacy task model.
 
 **Syntax**: `${{ task.metadataKey }}`
 

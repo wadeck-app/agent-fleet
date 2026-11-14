@@ -270,6 +270,7 @@ ${TMPL} inputs.<variableName> }}
 Example: \`${TMPL} inputs.description }}\`
 
 ### Accessing task metadata
+Not populated by the current daemon: \`task.*\` is always empty, so a step using it fails with "Property ... not found". Pass task data as inputs (\`flow run -i priority=high\`, read as \`${TMPL} inputs.priority }}\`).
 \`\`\`
 ${TMPL} task.<property> }}
 ${TMPL} task.metadata.<key> }}
@@ -336,6 +337,7 @@ The \`mode\` / \`gitStrategy\` / \`reusePolicy\` block is refused with a rewrite
 		return `## Section 5: Status Transitions
 
 Configured via the optional \`statusTransitions\` field of a \`FlowDefinition\`.
+Not applied by the current daemon: the field is validated and shown, but nothing changes a task status when a run ends. Whoever starts the run must do it, from the \`flow.execution.completed\` event.
 Defaults: \`onSuccess -> review\`, \`onFailure -> changes_requested\`.
 
 \`\`\`yaml
