@@ -1,4 +1,7 @@
 import { Command } from 'commander';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 import { validateFlowFile } from '../../validation/FlowFileValidator';
 import { registerValidateCommand } from './ValidateCommand';
@@ -28,16 +31,54 @@ describe('ValidateCommand', () => {
 		vi.restoreAllMocks();
 	});
 
+	// Never the real user config: an empty directory (no config.yml) unless the test writes one.
+	let configDirectory: string;
+	beforeEach(() => {
+		configDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-validate-command-'));
+	});
+	afterEach(() => {
+		fs.rmSync(configDirectory, { recursive: true, force: true });
+	});
+
 	const runValidate = (args: string[]): void => {
 		const program = new Command();
 		program.exitOverride();
-		registerValidateCommand(program);
+		registerValidateCommand(program, () => configDirectory);
 		try {
 			program.parse(['node', 'test', 'validate', ...args]);
 		} catch {
 			// process.exit throws -- that is expected
 		}
 	};
+
+	describe('the user setting validation.hostToolsUnderConfinedProfile', () => {
+		it.each([
+			[
+				'absent',
+				undefined,
+				{ mode: 'warn', description: 'warning (validation.hostToolsUnderConfinedProfile=warn, default)' },
+			],
+			['warn', 'warn', { mode: 'warn', description: 'warning (validation.hostToolsUnderConfinedProfile=warn)' }],
+			[
+				'error',
+				'error',
+				{ mode: 'error', description: 'error (validation.hostToolsUnderConfinedProfile=error)' },
+			],
+		] as const)('is read from config.yml (%s) and handed to the validation', (_name, written, expected) => {
+			if (written !== undefined)
+				fs.writeFileSync(
+					path.join(configDirectory, 'config.yml'),
+					`validation:
+  hostToolsUnderConfinedProfile: ${written}
+`
+				);
+			mockValidateFlowFile.mockReturnValue({ exit: 0, version: '1.0.0', warnings: [] });
+
+			runValidate(['/some/flow.yml']);
+
+			expect(mockValidateFlowFile).toHaveBeenLastCalledWith('/some/flow.yml', expect.anything(), expected);
+		});
+	});
 
 	describe('human-readable output (default)', () => {
 		it('prints [ok] Flow is valid and exits 0 for a valid flow', () => {

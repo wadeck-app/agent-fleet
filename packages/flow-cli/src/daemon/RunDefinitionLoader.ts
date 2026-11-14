@@ -1,6 +1,6 @@
 import { FlowCoreError, FlowVersionError } from 'flow-core';
 import type { FlowDefinitionResolver, ResolvedDefinition, VersionChoice } from 'flow-core';
-import { FlowValidator } from 'flow-engine';
+import { FlowValidator, type HostToolsConfinementPolicy } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
@@ -55,7 +55,9 @@ export class RunDefinitionLoader {
 	constructor(
 		private readonly resolver: FlowDefinitionResolver,
 		private readonly logWriter: LogWriter,
-		private readonly guarantees?: { entries(): string[]; unread(): string[] }
+		private readonly guarantees?: { entries(): string[]; unread(): string[] },
+		/** What `validation.hostToolsUnderConfinedProfile` says (warning or refusal for hostTools under a confined profile); absent: the finding says the setting was not consulted. */
+		private readonly hostToolsPolicy?: HostToolsConfinementPolicy
 	) {}
 
 	load(cmd: RunCommandMessage, flowFile: string): LoadedDefinition {
@@ -148,7 +150,9 @@ export class RunDefinitionLoader {
 		// definition that runs must all describe the object as written, or a stored snapshot never matches its hash again.
 		const usesRequirements = hasRequirements(flow);
 		const knownGuarantees = checkRequirements && usesRequirements ? this.guarantees?.entries() : undefined;
-		const result = new FlowValidator(undefined, [], knownGuarantees).validate(structuredClone(flow));
+		const result = new FlowValidator(undefined, [], knownGuarantees, this.hostToolsPolicy).validate(
+			structuredClone(flow)
+		);
 		if (result.valid) {
 			return { ok: true, warnings: surfacedWarningsOf(result.issues) };
 		}

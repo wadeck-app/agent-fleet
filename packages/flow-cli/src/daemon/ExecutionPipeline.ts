@@ -1,6 +1,6 @@
 import type { InteractivityPolicyProvider, WorkspaceProvider } from 'extension-points';
 import type { FlowDefinitionResolver } from 'flow-core';
-import type { FlowPluginOverrides } from 'flow-engine';
+import type { FlowPluginOverrides, HostToolsConfinementPolicy } from 'flow-engine';
 import type { WebSocket } from 'ws';
 
 import type { ExecutionStore } from '../storage/ExecutionStore';
@@ -52,6 +52,7 @@ export interface ExecutionPipelineDependencies {
 	runEndSettings: RunEndSettings;
 	runEndedListener: RunEndedListener | undefined;
 	workerRouting: WorkerTypeRouting;
+	hostToolsPolicy: HostToolsConfinementPolicy;
 	allowAbsolutePaths: boolean;
 	maxInjectedSteps: number;
 	maxStepsPerExecution: number;
@@ -180,7 +181,12 @@ export class ExecutionPipeline {
 		);
 		this.runRequests = new RunRequestHandler(
 			new FlowFileAccessGuard(deps.allowAbsolutePaths),
-			new RunDefinitionLoader(deps.definitionResolver, logWriter, workerRouting.declaredGuarantees),
+			new RunDefinitionLoader(
+				deps.definitionResolver,
+				logWriter,
+				workerRouting.declaredGuarantees,
+				deps.hostToolsPolicy
+			),
 			new RunStepPreparer(deps.daemonDir, logWriter),
 			daemonSecrets,
 			workspaces,

@@ -15,16 +15,17 @@ import { NullFlowEventPublisher } from '../events/NullFlowEventPublisher.js';
 import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { ExecutionStore } from '../storage/ExecutionStore';
 import { LogWriter } from '../storage/LogWriter';
+import { HostToolsPolicyResolver } from '../validation/HostToolsPolicyResolver.js';
 import { CommandHandler } from './CommandHandler';
 import { createDaemonForkWorkers } from './DaemonForkWorkers.js';
 import { buildDaemonHealth } from './DaemonHealth';
 import { DaemonIdleShutdown, IDLE_WATCHDOG_INTERVAL_MS } from './DaemonIdleShutdown.js';
 import { writeDaemonLog } from './DaemonLog.js';
-import { DAEMON_START_LOCK_FILE } from './DaemonStartError.js';
 import type { DaemonRuntime } from './DaemonRuntime.js';
 import { DaemonSecrets } from './DaemonSecrets.js';
 import { DaemonShutdownSequence } from './DaemonShutdownSequence.js';
 import { DaemonSourceContact } from './DaemonSourceContact.js';
+import { DAEMON_START_LOCK_FILE } from './DaemonStartError.js';
 import { DaemonStartupTasks } from './DaemonStartupTasks.js';
 import { DaemonWorkerListener } from './DaemonWorkerListener.js';
 import { DaemonWorkerMessageHandler } from './DaemonWorkerMessageHandler.js';
@@ -361,7 +362,8 @@ async function startOwningDaemon(
 						}),
 						boundStepWaitMs: config.worker.boundStepWaitSeconds * 1000,
 						contactErrors: sourceContact.contactErrors,
-					}
+					},
+					HostToolsPolicyResolver.of(config)
 				);
 				runtime = {
 					commandHandler,

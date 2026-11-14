@@ -19,6 +19,8 @@ const startedHandlers: CommandHandler[] = [];
 type HandlerArguments = ConstructorParameters<typeof CommandHandler>;
 /** Position of `workerRouting`, the last constructor parameter. */
 const ROUTING_INDEX = 19;
+/** Position of `hostToolsPolicy`. */
+const HOST_TOOLS_POLICY_INDEX = 20;
 
 /** No source declares a worker type; a fresh store per handler, nothing shared between tests. */
 export function emptyWorkerRouting(): WorkerTypeRouting {
@@ -47,12 +49,16 @@ let defaultWorkspaceProviders: FixedWorkspaceProviders | undefined;
 
 /** CommandHandler requires every argument; a test names the ones it cares about and gets `undefined` / an empty routing for the rest. */
 export function completeArguments(args: Partial<HandlerArguments>): HandlerArguments {
-	const complete: unknown[] = Array.from({ length: ROUTING_INDEX + 1 }, (_, index) => args[index]);
+	const complete: unknown[] = Array.from({ length: HOST_TOOLS_POLICY_INDEX + 1 }, (_, index) => args[index]);
 	// A test that gives a per-flow resolver is about the real providers (built-ins and config instances): no stub then.
 	if (args[PER_FLOW_RESOLVER_INDEX] === undefined) {
 		complete[WORKSPACE_PROVIDERS_INDEX] ??= defaultWorkspaceProviders;
 	}
 	complete[ROUTING_INDEX] ??= emptyWorkerRouting();
+	complete[HOST_TOOLS_POLICY_INDEX] ??= {
+		mode: 'warn',
+		description: 'warning (validation.hostToolsUnderConfinedProfile=warn, default)',
+	};
 	return complete as HandlerArguments;
 }
 

@@ -1,10 +1,15 @@
 import type { Command } from 'commander';
 import { DefinitionSnapshotStore, definitionsDirOf } from 'flow-core';
+import * as path from 'node:path';
 
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { FlowConfigLoader } from '../../config/FlowConfig.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { flowConfigDir } from '../../config/FlowConfigDir.js';
 // violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
 import { validateFlowFile } from '../../validation/FlowFileValidator';
+// violations-suppress: ts/no-deep-relative no path alias configured for intra-package imports in flow-cli
+import { HostToolsPolicyResolver } from '../../validation/HostToolsPolicyResolver';
 
 export function registerValidateCommand(program: Command, getConfigDir: () => string = flowConfigDir): void {
 	program
@@ -17,7 +22,13 @@ export function registerValidateCommand(program: Command, getConfigDir: () => st
 		.option('--json', 'Output JSON (machine-readable, exit codes 0/1/2/3)')
 		.option('--human', 'Force human-readable output')
 		.action((file: string, options: { json?: boolean; human?: boolean }) => {
-			const result = validateFlowFile(file, new DefinitionSnapshotStore(definitionsDirOf(getConfigDir())));
+			// An invalid user setting stops here with the loader's message (it names the key, the value and the accepted values).
+			const policy = HostToolsPolicyResolver.of(FlowConfigLoader.load(path.join(getConfigDir(), 'config.yml')));
+			const result = validateFlowFile(
+				file,
+				new DefinitionSnapshotStore(definitionsDirOf(getConfigDir())),
+				policy
+			);
 
 			if (options.json && !options.human) {
 				// Machine-readable: Repo B contract

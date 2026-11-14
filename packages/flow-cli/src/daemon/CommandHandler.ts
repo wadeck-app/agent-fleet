@@ -7,7 +7,7 @@ import {
 	executionsDirOf,
 	logsDirOf,
 } from 'flow-core';
-import type { FailureOrigin, FlowPluginOverrides } from 'flow-engine';
+import type { FailureOrigin, FlowPluginOverrides, HostToolsConfinementPolicy } from 'flow-engine';
 import type { StepMeta } from 'flow-engine/types';
 import type { WebSocket } from 'ws';
 
@@ -134,7 +134,9 @@ export class CommandHandler {
 		 * contact information in the failure of a step with requirements. A test that needs no routing
 		 * passes `emptyWorkerRouting()` (CommandHandlerTestHarness).
 		 */
-		workerRouting: WorkerTypeRouting
+		workerRouting: WorkerTypeRouting,
+		/** What `validation.hostToolsUnderConfinedProfile` says, applied when a run starts (a warning, or a refusal in error mode). */
+		hostToolsPolicy: HostToolsConfinementPolicy
 	) {
 		this.executionStore =
 			executionStore ?? new ExecutionStore(executionsDirOf(daemonDir), undefined, daemonSecrets.masks);
@@ -159,6 +161,7 @@ export class CommandHandler {
 			runEndSettings,
 			runEndedListener,
 			workerRouting,
+			hostToolsPolicy,
 			allowAbsolutePaths,
 			maxInjectedSteps,
 			maxStepsPerExecution,

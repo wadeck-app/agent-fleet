@@ -2,7 +2,7 @@
 // file I/O, YAML parsing, and CLI-friendly exit codes.
 import { type DefinitionSnapshotStore, FlowCoreError, assessFileVersion } from 'flow-core';
 import { FlowValidator as EngineFlowValidator, ValidationCode } from 'flow-engine';
-import type { ValidationIssue } from 'flow-engine';
+import type { HostToolsConfinementPolicy, ValidationIssue } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine/types';
 import * as yaml from 'js-yaml';
 import * as fs from 'node:fs';
@@ -66,7 +66,11 @@ function describeRegistry(filePath: string, parsed: object): ValidateResult | un
  * `versions` is where the snapshots of earlier runs live: it lets the validation say what a run would do with the
  * flow's version (refuse a changed content under the same version, run an older version as new...).
  */
-export function validateFlowFile(filePath: string, versions: DefinitionSnapshotStore): ValidateResult {
+export function validateFlowFile(
+	filePath: string,
+	versions: DefinitionSnapshotStore,
+	hostToolsPolicy?: HostToolsConfinementPolicy
+): ValidateResult {
 	if (!fs.existsSync(filePath)) {
 		return { exit: 2, message: describeMissingFlowFile(filePath, process.cwd(), 'Pass an existing .yml file.') };
 	}
@@ -114,7 +118,7 @@ export function validateFlowFile(filePath: string, versions: DefinitionSnapshotS
 		};
 	}
 
-	const validator = new EngineFlowValidator(undefined);
+	const validator = new EngineFlowValidator(undefined, [], undefined, hostToolsPolicy);
 	// The validator annotates the flow it checks (`_autoDiscoveredInputs`): it gets a copy, so the version is assessed on the
 	// file as written, i.e. with the hash a run stores.
 	const result = validator.validate(structuredClone(flow));
