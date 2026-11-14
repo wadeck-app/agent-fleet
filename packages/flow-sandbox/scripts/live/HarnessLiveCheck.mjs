@@ -108,8 +108,10 @@ const environment = {
 	...HostEnvironment.isolate(isolation.env),
 	FLOW_DAEMON_PORT: '0',
 	...(sbxPath ? { SBX_PATH: sbxPath } : {}),
-	// A daemon with nothing to do stops after its idle check (default 30 s): keep it alive for the whole check.
+	// Parked run: the run itself keeps the daemon alive. HARNESS_PARK=0 lets the flow complete and relies on the idle stop (daemon_stopping),
+	// so the variable is set only when parked; the periodic check stays long either way.
 	FLOW_DAEMON_IDLE_CHECK_MS: '600000',
+	...(park ? { FLOW_DAEMON_NO_IDLE_STOP: '1' } : {}),
 	AWS_PROFILE: hostProfile,
 };
 delete environment.SBX_MOCK_PATH;

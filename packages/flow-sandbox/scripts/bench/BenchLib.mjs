@@ -304,7 +304,8 @@ export class BenchEnv {
 			...HostEnvironment.isolate(this.isolation.env),
 			FLOW_DAEMON_PORT: '0',
 			...(sbxPath ? { SBX_PATH: sbxPath } : {}),
-			FLOW_DAEMON_IDLE_CHECK_MS: '600000',
+			// The daemon never stops by itself (no idle stop of any kind): it stops on flow stop, an update or a signal only.
+			FLOW_DAEMON_NO_IDLE_STOP: '1',
 			AWS_PROFILE: options.profile ?? hostProfile,
 			...options.env,
 		};

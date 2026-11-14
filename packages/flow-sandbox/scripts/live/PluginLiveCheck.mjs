@@ -74,7 +74,8 @@ const claimFolder = path.join(poolDirectory, '.flow-pool', 'slot-1.claim');
 const environment = {
 	...HostEnvironment.isolate(isolation.env),
 	FLOW_DAEMON_PORT: '0',
-	FLOW_DAEMON_IDLE_CHECK_MS: '600000',
+	// The daemon never stops by itself (no idle stop of any kind): it stops on flow stop, an update or a signal only.
+	FLOW_DAEMON_NO_IDLE_STOP: '1',
 	AWS_PROFILE: profile,
 	SBX_REAL_PATH: realSbx,
 	SBX_TIMING_LOG: timingLog,

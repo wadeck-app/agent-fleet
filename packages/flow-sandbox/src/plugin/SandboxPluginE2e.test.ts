@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { PluginBundler } from '../PluginBundler';
 import { DaemonIsolationGuard } from '../testing/DaemonIsolationGuard';
@@ -77,6 +77,8 @@ class FlowWorld {
 	readonly env: NodeJS.ProcessEnv;
 	projectId = '';
 	daemon: ChildProcess | undefined;
+	/** The pid of the daemon this world started; a different one later would mean the daemon was replaced. */
+	daemonPid: number | undefined;
 
 	/** @param scrubModelCredentials remove every ANTHROPIC_*, AWS_* and CLAUDE_* variable: a model step routed to a host worker must not be able to call a real model. */
 	constructor(scrubModelCredentials = false) {
@@ -107,8 +109,11 @@ class FlowWorld {
 			),
 			// A variable of the wrapper's environment that no step declares: a host script (host: true) must never see it.
 			FLOW_SANDBOX_E2E_CANARY: CANARY,
-			// A daemon with nothing to do stops after its idle check: keep it for the whole test.
-			FLOW_DAEMON_IDLE_CHECK_MS: '600000',
+			// In the environment of EVERY flow command of the world (a daemon `flow run` starts by itself inherits it from the CLI): the daemon
+			// never stops on idleness (no message-triggered check, no 1 s grace stop, no watchdog), only on `flow stop`, an update or a signal.
+			// A daemon that stops itself between two tests made the next `flow run` start a second one while the first was still shutting down.
+			// Replaces the earlier FLOW_DAEMON_IDLE_CHECK_MS pin, which only moved the watchdog and left the message-triggered stop.
+			FLOW_DAEMON_NO_IDLE_STOP: '1',
 			// The OS picks the daemon port: the user's own daemon (standard range) is never probed or competed with.
 			FLOW_DAEMON_PORT: '0',
 		};
@@ -219,6 +224,7 @@ class FlowWorld {
 			stdio: ['ignore', log, log],
 			windowsHide: true,
 		});
+		this.daemonPid = this.daemon.pid;
 		try {
 			await waitFor('the daemon to publish worker.port', 60_000, () =>
 				fs.existsSync(path.join(this.isolation.configDir, 'worker.port'))
@@ -227,6 +233,26 @@ class FlowWorld {
 			// The daemon log says why it did not come up (for example a configuration it refused).
 			throw new Error(`${String(error)}\ndaemon log:\n${this.log().slice(-3000)}`);
 		}
+		// Proof that the variable reached THIS daemon (a daemon that ignored it would stop itself between tests): its start-up line.
+		try {
+			await waitFor(
+				`the daemon's "${NO_IDLE_STOP_LINE}" line`,
+				15_000,
+				() => this.log().includes(NO_IDLE_STOP_LINE) || this.daemonOwnLogTail().includes(NO_IDLE_STOP_LINE)
+			);
+		} catch (error) {
+			throw new Error(`${String(error)}\n${this.describeDaemon()}`);
+		}
+	}
+
+	/** Throws, naming the pid and showing the daemon's own log, unless the daemon this world started is still the one running. */
+	assertDaemonUntouched(): void {
+		const daemon = this.daemon;
+		if (daemon === undefined) return;
+		if (daemon.pid !== this.daemonPid || daemon.exitCode !== null || daemon.signalCode !== null)
+			throw new Error(
+				`the daemon of the world in ${this.root} (pid ${String(this.daemonPid)}) is no longer running: it stopped by itself or was replaced, although FLOW_DAEMON_NO_IDLE_STOP=1 is set.\n${this.describeDaemon()}`
+			);
 	}
 
 	/**
@@ -570,6 +596,15 @@ function sandboxesCreated(calls: MockSbxCall[]): string[] {
 let artifactRoot: string;
 let artifactDirectory: string;
 const worlds: FlowWorld[] = [];
+
+// Written by the daemon at start when FLOW_DAEMON_NO_IDLE_STOP=1 reached it (flow-cli, ea7b57b0).
+const NO_IDLE_STOP_LINE = 'idle shutdown disabled by FLOW_DAEMON_NO_IDLE_STOP=1';
+
+// After every test: each daemon is still the one its world started. A stop between two tests would otherwise surface only in the next
+// `flow run`, as an unrelated "daemon could not be started".
+afterEach(() => {
+	for (const world of worlds) world.assertDaemonUntouched();
+});
 
 beforeAll(async () => {
 	artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-sandbox-e2e-art-'));
