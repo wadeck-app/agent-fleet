@@ -78,7 +78,16 @@ describe('forked worker shell routing (end to end)', () => {
 		const finalState = await waitForExecution(ctx.daemonDir, response.executionId, 30000);
 		const records = path.join(ctx.daemonDir, 'executions', `${response.executionId}.json`);
 		const logsDir = logsDirOf(ctx.daemonDir);
-		const logs = fs.readdirSync(logsDir).map(file => fs.readFileSync(path.join(logsDir, file), 'utf8'));
+		// The daemon logs and the per-worker output files (logs/workers subdirectory) must both stay free of secrets.
+		const readTree = (dir: string): string[] =>
+			fs
+				.readdirSync(dir, { withFileTypes: true })
+				.flatMap(entry =>
+					entry.isDirectory()
+						? readTree(path.join(dir, entry.name))
+						: [fs.readFileSync(path.join(dir, entry.name), 'utf8')]
+				);
+		const logs = readTree(logsDir);
 		return {
 			status: finalState.status,
 			persisted: [fs.readFileSync(records, 'utf8'), ...logs].join(String.fromCharCode(10)),

@@ -61,10 +61,14 @@ steps:
       exit 1
 `;
 
+// The daemon log files and the per-worker output files (logs/workers subdirectory) are all checked for leaks.
 function readAll(dir: string): string {
 	return fs
-		.readdirSync(dir)
-		.map(file => fs.readFileSync(path.join(dir, file), 'utf8'))
+		.readdirSync(dir, { withFileTypes: true })
+		.map(entry => {
+			const full = path.join(dir, entry.name);
+			return entry.isDirectory() ? readAll(full) : fs.readFileSync(full, 'utf8');
+		})
 		.join('\n');
 }
 
