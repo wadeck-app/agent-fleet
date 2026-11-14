@@ -398,6 +398,10 @@ The wrapper cannot see the flow, so it never claims isolation. At startup it rea
 
 Network, in user-facing words: outbound HTTP(S) from the sandbox is filtered (machine policy plus per-sandbox allow rules; about 195 entries on the balanced preset). Raw TCP to ruleless host ports was observed blocked on sbx 0.51.0; raw TCP to public addresses is unverified. Never describe the sandbox as "network isolated".
 
+### Worker logs (`worker-logs`, class `WorkerLogShipper`)
+
+The exec wrapper declares `worker-logs` in every `ready`. After the daemon answers `worker_logs_enabled`, the wrapper's own stdout/stderr (the exact text of its log lines, nothing added) is sent as `worker_log` (max 16K chars per message, 64K chars/s, `dropped` counts what was cut), so it shows in `/modules/flow/workers`. Output printed before the answer is kept (newest 64K chars) and sent at that point. The constants are declared in `WorkerLogShipper.ts` because flow-cli on this branch predates them.
+
 ### Run end (`run_end`, class `ExecRunEnd`)
 
 The exec wrapper declares the `run-events` feature in every `ready` (the constant of flow-cli `Protocol.ts`; the relay harness does not). The daemon then sends `run_end { executionId, reason }` once per run to a worker that was handed a step of it, and releases the run's workspace when the worker answers `run_end_ack` or its wait expires (`worker.ackTimeoutSeconds`, 30 s by default, 120 s at most). The ack is therefore sent only AFTER the sandbox that mounts the workspace is gone.

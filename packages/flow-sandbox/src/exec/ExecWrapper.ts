@@ -19,6 +19,7 @@ import { ExecAssignment, type PreparedAssignment } from './ExecAssignment';
 import { ExecRunEnd } from './ExecRunEnd';
 import type { ExecPreparedSandbox, ExecSandboxPreparer } from './ExecSandboxPreparer';
 import { READ_ONLY_GUARANTEE, RequiresGuard } from './RequiresGuard';
+import { WORKER_FEATURE_WORKER_LOGS, type WorkerLogShipper } from './WorkerLogShipper';
 
 /** What the engine reports for a step that ran (the shape of flow-cli's `WorkerAdapter.execute` result). */
 export interface StepOutcome {
@@ -67,6 +68,8 @@ export interface ExecWrapperDependencies {
 	 */
 	createHostExecutor: (context: HostExecutorContext) => StepExecutor;
 	log: SandboxLog;
+	/** Ships the wrapper's own output to the daemon once the daemon enabled it (the `worker-logs` feature, see WorkerLogShipper). */
+	workerLogs: Pick<WorkerLogShipper, 'attach' | 'detach'>;
 	createDaemon: (handlers: DaemonHandlers) => DaemonControl;
 	/**
 	 * The RunMounts of a run (workspace, `.meta` next to it). `readOnlyWorkspace` is true when the run requires `fs=readonly-enforced`:
@@ -196,6 +199,10 @@ export class ExecWrapper {
 				return;
 			case 'idle':
 				return;
+			case 'worker_logs_enabled':
+				// Answer to the worker-logs feature of `ready`, once per connection: from now on the wrapper's own output goes to the daemon.
+				this.dependencies.workerLogs.attach(message => this.daemon.send({ ...message }));
+				return;
 			case 'done':
 				this.dependencies.log.warn(
 					'the daemon sent "done" (a shutdown notice meant for daemon-forked workers); ignored, as flow worker does.'
@@ -212,7 +219,7 @@ export class ExecWrapper {
 	private ready(): JsonObject {
 		const ready = this.dependencies.registration.ready();
 		const features = Array.isArray(ready['features']) ? ready['features'] : [];
-		return { ...ready, features: [...features, WORKER_FEATURE_RUN_EVENTS] };
+		return { ...ready, features: [...features, WORKER_FEATURE_RUN_EVENTS, WORKER_FEATURE_WORKER_LOGS] };
 	}
 
 	/** The sandbox of the run is gone: its prepared credentials and mounts are not needed any more. */
@@ -225,6 +232,7 @@ export class ExecWrapper {
 	}
 
 	private async handleDaemonClosed(code: number, reason: string): Promise<void> {
+		this.dependencies.workerLogs.detach();
 		if (this.finished) return;
 		this.dependencies.log.warn(
 			`the connection to the flow daemon closed (code ${code}${reason === '' ? '' : `, ${reason}`}). The run, if any, is interrupted; its sandbox is stopped and kept (leftover list).`

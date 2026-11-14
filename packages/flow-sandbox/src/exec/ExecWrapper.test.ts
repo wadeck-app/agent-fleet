@@ -19,6 +19,7 @@ import { ObservedList } from '../testing/ObservedList';
 import { RecordingPresence } from '../testing/RecordingPresence';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { ExecWrapper, type StepExecutor, type StepExecutorContext } from './ExecWrapper';
+import { WORKER_FEATURE_WORKER_LOGS, type WorkerLogMessage } from './WorkerLogShipper';
 
 class FakeDaemon implements DaemonControl {
 	/** What the wrapper sent, awaitable: `arrivals.waitFor(...)` resolves in the turn of the message that matters. */
@@ -54,6 +55,21 @@ class FakeDaemon implements DaemonControl {
 	}
 }
 
+/** Records what the wrapper asks of its output shipper: attach (with the sender it gave) and detach. */
+class FakeWorkerLogs {
+	readonly attached: ((message: WorkerLogMessage) => void)[] = [];
+	detaches = 0;
+
+	attach(send: (message: WorkerLogMessage) => void): void {
+		this.attached.push(send);
+	}
+
+	detach(): void {
+		this.detaches++;
+	}
+}
+
+let workerLogs: FakeWorkerLogs;
 let root: string;
 let workspace: string;
 let meta: string;
@@ -109,6 +125,7 @@ beforeEach(async () => {
 		}
 	);
 	daemon = new FakeDaemon();
+	workerLogs = new FakeWorkerLogs();
 	prepares = 0;
 	requireGuarantees = true;
 	// The wrapper keeps the list of ITS test: a wrapper shut down by the previous test may still report.
@@ -164,6 +181,7 @@ beforeEach(async () => {
 			},
 		}),
 		log,
+		workerLogs,
 		createDaemon: handlers => {
 			daemon.handlers = handlers;
 			return daemon;
@@ -257,6 +275,32 @@ describe('ExecWrapper registration', () => {
 		const readies = daemon.ofType('ready');
 		expect(readies).toHaveLength(2);
 		for (const ready of readies) expect(ready['features']).toContain(WORKER_FEATURE_RUN_EVENTS);
+	});
+
+	it('declares worker-logs in the registration and after every step', async () => {
+		await run(assign('probe'));
+
+		const readies = daemon.ofType('ready');
+		expect(readies).toHaveLength(2);
+		for (const ready of readies) expect(ready['features']).toContain(WORKER_FEATURE_WORKER_LOGS);
+	});
+
+	it('starts shipping its output when the daemon answers worker_logs_enabled, without calling it an unknown message', () => {
+		expect(workerLogs.attached).toHaveLength(0);
+
+		daemon.handlers?.onMessage({ type: 'worker_logs_enabled' });
+
+		expect(workerLogs.attached).toHaveLength(1);
+		workerLogs.attached[0]?.({ type: 'worker_log', stream: 'stderr', text: 'prepare\n' });
+		expect(daemon.ofType('worker_log')).toEqual([{ type: 'worker_log', stream: 'stderr', text: 'prepare\n' }]);
+		expect(log.text()).not.toContain('unknown daemon message');
+	});
+
+	it('stops shipping when the daemon connection closes', async () => {
+		daemon.handlers?.onClosed(1006, 'gone');
+		await finished.waitForCount(1);
+
+		expect(workerLogs.detaches).toBeGreaterThan(0);
 	});
 
 	// Slice 1: the daemon sends a hostTools step only to a worker declaring host-tools; a sandbox must never be one.
@@ -840,6 +884,7 @@ describe('ExecWrapper failures', () => {
 				throw new Error('must not be reached');
 			},
 			log,
+			workerLogs: new FakeWorkerLogs(),
 			createDaemon: handlers => {
 				daemon.handlers = handlers;
 				return daemon;

@@ -41,6 +41,7 @@ import { StepCommandTranslator } from './StepCommandTranslator';
 import { VmEnvironmentFilter } from './VmEnvironmentFilter';
 import { VmExecutableLookup } from './VmExecutableLookup';
 import { VmFileStager } from './VmFileStager';
+import { WorkerLogShipper } from './WorkerLogShipper';
 
 /** Version string the wrapper reports to the daemon (`flow worker list`). */
 const EXEC_VERSION = 'sandbox-exec-m7';
@@ -59,6 +60,18 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 	);
 	// The launch credential was read into the config: no program started from here on inherits it.
 	delete env['FLOW_WORKER_TOKEN'];
+	// Copies exactly what this process prints (the WrapperLog lines go to stderr) to the daemon, once the daemon enables it.
+	const workerLogs = new WorkerLogShipper({
+		clock: new SystemClock(),
+		scheduler: new SystemScheduler(),
+		// Written to the file descriptor directly: going through the watched stderr would ship the failure report itself.
+		onSendFailure: error =>
+			fs.writeSync(
+				2,
+				`could not ship the wrapper output to the daemon (further failures are not reported, lines are counted as dropped): ${error instanceof Error ? error.message : String(error)}\n`
+			),
+	});
+	workerLogs.install(process.stdout, process.stderr);
 	const log = new WrapperLog('exec', config.logFile);
 	log.info(
 		`starting: wrapper ${config.wrapperId}, source ${config.sourceId}, projects ${config.projectIds.join(',')}, labels ${config.labels.join(',')}, image ${config.image ?? '(agent default)'}`
@@ -215,6 +228,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 				);
 			},
 			log,
+			workerLogs,
 			createDaemon: handlers => new DaemonLink({ url: config.daemonUrl, log, ...handlers }),
 			requireGuarantees: config.requireGuarantees,
 			createMounts: (workspaceDir, workspaceMetaDir, readOnlyWorkspace, resolved) =>
