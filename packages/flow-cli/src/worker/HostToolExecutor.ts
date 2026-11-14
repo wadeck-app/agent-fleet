@@ -1,4 +1,4 @@
-import { type HostTool, killProcessTree } from 'flow-engine';
+import { DefaultProcessLauncher, type HostTool } from 'flow-engine';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -74,7 +74,9 @@ export class HostToolExecutor {
 	private readonly killTree: (pid: number) => void;
 
 	constructor(private readonly options: HostToolExecutorOptions) {
-		this.killTree = options.killProcessTree ?? ((pid: number): void => killProcessTree(pid));
+		// The tree kill goes through the ProcessLauncher seam like every other process end (flow-engine ProcessLauncherSeam guard).
+		this.killTree =
+			options.killProcessTree ?? ((pid: number): void => new DefaultProcessLauncher().killTree(pid, 'SIGKILL'));
 	}
 
 	async execute(execution: HostToolExecution): Promise<HostToolExecutionResult> {

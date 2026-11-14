@@ -9,7 +9,6 @@ export { StepRunner } from './executor/StepRunner';
 export { killAllRunningScripts } from './executor/ScriptProcessSupervisor';
 export { DefaultProcessLauncher } from './processing/DefaultProcessLauncher';
 export type { ProcessLauncher, ProcessSignal } from './processing/ProcessLauncher';
-export { killProcessTree } from './processing/ProcessTreeKiller';
 export type { StepRunnerConfig } from './executor/StepRunner';
 export { RequirementSyntax } from './requirements/RequirementSyntax';
 export { ProfileCatalog } from './requirements/ProfileCatalog';
