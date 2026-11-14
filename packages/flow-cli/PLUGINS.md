@@ -1,42 +1,51 @@
 # flow-cli Plugins
 
-Two extension points are configured per project under `plugins:`: `workspace` (how a task gets a working directory) and `approval` (how a `user_intervention` step reaches a human or script). They are not the only ones: `packages/extension-points/extension-points.json` registers every extension point with its status (for example `worker-type`, see `WORKERS.md`).
+`workspace` (where a run executes, declared by each flow; see below) and `approval` (how a `user_intervention` step reaches a human or script) are the two extension points documented here. They are not the only ones: `packages/extension-points/extension-points.json` registers every extension point with its status.
 
-The daemon starts without a `workspace` section. Every flow must declare its own `workspace:` (a flow without it is refused); a `plugins.workspace` in the config only draws a warning in the daemon log at start (`Daemon.ts`). `approval` is optional; a worker without one reports `interactive: false` and rejects `user_intervention` steps.
+`approval` is optional; a worker without one reports `interactive: false` and rejects `user_intervention` steps.
 
-## Workspace plugins
+## Workspace providers
 
-| Type string                | What it does                                                                   | Required options          |
-| -------------------------- | ------------------------------------------------------------------------------ | ------------------------- |
-| `plugins.none.default`     | Runs every step in the project root; no isolation, no git operations           | --                        |
-| `plugins.worktree.default` | Creates a git worktree per task under `baseDir`; each task gets its own branch | `baseDir` (absolute path) |
+The flow, not the config, chooses where its steps run: every flow declares `workspace:`. Providers, options and rules: `.claude/docs/flows/schema-reference.md` ("Workspace Configuration").
 
-### `plugins.none.default`
-
-Use when steps write directly to the project (build tools, scripts that operate in-place). There is no cleanup: whatever a step writes stays.
+| Provider   | What it does                                          | Options                                |
+| ---------- | ----------------------------------------------------- | -------------------------------------- |
+| `in-place` | Runs in the project folder, shared                    | `dir`                                  |
+| `readonly` | Same folder, flagged read-only (advisory)             | `dir`                                  |
+| `worktree` | A git worktree and branch per run                     | `baseDir` (required), `prefix`         |
+| `pool`     | Claims one free slot of prepared folders              | `dir` + `prefix` + `count`, or `slots`; `requireClean` |
 
 ```yaml
-plugins:
-    workspace:
-        instance:
-            type: plugins.none.default
+workspace: in-place
+workspace: { provider: worktree, baseDir: ../worktrees }
 ```
 
-### `plugins.worktree.default`
+Relative paths resolve against the project folder, never the daemon's working directory.
 
-Use when steps must not interfere with each other or with the working tree. Each task gets a fresh branch checked out in a separate directory under `baseDir`.
+### Named instances
+
+To reuse a provider with fixed options, or to use a third-party one, name an instance in the USER config (`~/.config/flow/config.yml`; `plugins.instances` is refused in a project config) and refer to it by name:
 
 ```yaml
+# ~/.config/flow/config.yml
 plugins:
-    workspace:
-        instance:
+    instances:
+        my-worktree:
             type: plugins.worktree.default
             options:
                 baseDir: /absolute/path/to/worktrees
-                prefix: task- # optional, prepended to branch names
 ```
 
-`baseDir` must be absolute; a relative path would resolve against the daemon's working directory, not the project root.
+```yaml
+# in the flow
+workspace: my-worktree
+```
+
+A name that is neither built in nor an instance is refused with the list of built-in providers. A sensitive option (token, password...) must be `${ENV_VAR}`; a literal is refused.
+
+### Deprecated: `plugins.workspace`
+
+`plugins.workspace` in the config is no longer a default for flows: the daemon logs a warning at start and ignores it. In a flow that has no `workspace:`, a `plugins.workspace` section is still served, with a deprecation warning. Migrate to `workspace:` (see `schema-reference.md`, "Removed and deprecated").
 
 ## Approval plugins
 
@@ -90,7 +99,7 @@ plugins:
 
 The daemon reads the project config in the registry (`<registry>/projects/<project id>/flow/config/config.yml`) of the registered project; `.flow/config.yml` in the repository is an error that gives the `mv` command. In a project config, `plugins` accepts only `workspace`, `tasks`, `secrets`, `approval` (`instances` belongs in `~/.config/flow/config.yml`), and any other key is refused with the file and key. Plugins declared in the config of the folder the daemon was launched from apply only if that folder is a registered project; an unregistered launch folder whose config declares `plugins:` is an error. A worker serves its own project (`FLOW_PROJECT`, else the registered project containing its cwd) plus the ones named by `--project` (see `WORKERS.md`).
 
-Third-party plugins resolve from `node_modules`; built-in plugins (`none`, `cli-approval`, `file-approval`, `worktree`) are bundled inside the CLI and need no install.
+Third-party plugins resolve from `node_modules`; built-in plugins (`in-place`, `readonly`, `worktree`, `pool`, `cli-approval`, `file-approval`, `none`) are bundled inside the CLI and need no install.
 
 ## Manifest `sensitiveFields` is not applied
 

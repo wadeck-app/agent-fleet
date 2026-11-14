@@ -1600,6 +1600,18 @@ steps:
 
 ---
 
+## The daemon does not start
+
+`flow run` and `flow start` print the cause the daemon recorded, then point to `flow logs`. When the daemon process dies before it publishes its port without recording a cause (not on Windows), the error ends with the last 1500 characters of its stderr, kept in `daemon-start.stderr` in the flow config directory (`~/.config/flow/`), truncated at each start.
+
+| Message | Meaning and action |
+| ------- | ------------------ |
+| `Daemon did not start within <N>ms ... no daemon process was seen` | Nothing took the start lock in 10 s. Run `FLOW_DAEMON_MODE=1 flow` in the foreground to see why. |
+| `... the daemon process is still running (pid N) but has not published its port file` | A slow start (loaded machine). The wait goes on up to 60 s; raise it with `FLOW_DAEMON_START_TIMEOUT_MS=<positive whole number of ms>` (any other value is refused). |
+| `The daemon process (pid N) exited (exit code C) before publishing its port file` | Read the stderr appended to the message, then `flow logs`. |
+
+Test setups that must keep their own daemon alive set `FLOW_DAEMON_NO_IDLE_STOP=1` (the idle stop is then off; `flow stop`, an update or a signal still stop it; any other value is refused at daemon start).
+
 ## Additional Resources
 
 - **[Quick Start Guide](./quick-start-guide.md)** - Create your first flow
