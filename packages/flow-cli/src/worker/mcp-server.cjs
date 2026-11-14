@@ -6,15 +6,31 @@
  * Claude sends requests to stdin; this server writes responses to stdout.
  *
  * When provideSteps is called, the steps are forwarded to WorkerAdapter
- * via a TCP callback connection on FLOW_MCP_CALLBACK_PORT.
+ * via a TCP callback connection on FLOW_MCP_CALLBACK_PORT (protocol v1, no reply).
+ *
+ * The step's host tools (hostTools) are advertised from FLOW_MCP_TOOLS (JSON array of
+ * { name, description, inputSchema, timeoutSeconds }; never a command) and called over the same port with
+ * protocol v2: one { v: 2, kind: 'call_tool', ... } line, one reply line, using the separate bearer FLOW_MCP_TOOL_TOKEN.
+ * See .claude/docs/flows/host-tools.md.
  */
 
+const crypto = require('crypto');
 const net = require('net');
 const readline = require('readline');
 
 const CALLBACK_PORT = parseInt(process.env.FLOW_MCP_CALLBACK_PORT || '0', 10);
 const CALLBACK_TOKEN = process.env.FLOW_MCP_CALLBACK_TOKEN || '';
+const TOOL_TOKEN = process.env.FLOW_MCP_TOOL_TOKEN || '';
 const EXECUTION_ID = process.env.FLOW_EXECUTION_ID || '';
+
+/** Largest reply line read from the host; same cap as the host's MAX_CALLBACK_LINE_BYTES. */
+const MAX_REPLY_LINE_BYTES = 2 * 1024 * 1024;
+/** The helper waits this much beyond the tool's timeoutSeconds (the host answers at +5 s). The env override is a test seam. */
+const HELPER_TIMEOUT_MARGIN_MS = Number(process.env.FLOW_MCP_HELPER_TIMEOUT_MARGIN_MS || '10000');
+const MAX_HOST_TOOLS = 16;
+
+/** The step's host tools, set when the server starts; empty when the step declares none. */
+let hostTools = [];
 
 /**
  * provideSteps tool definition.
@@ -260,6 +276,169 @@ function forwardSteps(steps) {
 	});
 }
 
+/**
+ * Parse FLOW_MCP_TOOLS. Throws an Error with an actionable message when it is malformed: the server must not start
+ * with a tool list it cannot trust (no fallback to "no tools").
+ */
+function loadHostTools(raw, toolToken) {
+	if (!raw) return [];
+	let parsed;
+	try {
+		parsed = JSON.parse(raw);
+	} catch (err) {
+		throw new Error(`FLOW_MCP_TOOLS is not valid JSON (${err.message}). The flow host sets it; update flow-cli.`);
+	}
+	if (!Array.isArray(parsed) || parsed.length > MAX_HOST_TOOLS) {
+		throw new Error(`FLOW_MCP_TOOLS must be an array of at most ${MAX_HOST_TOOLS} tools.`);
+	}
+	const seen = new Set();
+	for (const tool of parsed) {
+		const valid =
+			tool !== null &&
+			typeof tool === 'object' &&
+			typeof tool.name === 'string' &&
+			typeof tool.description === 'string' &&
+			tool.inputSchema !== null &&
+			typeof tool.inputSchema === 'object' &&
+			typeof tool.timeoutSeconds === 'number' &&
+			tool.timeoutSeconds > 0;
+		if (!valid) {
+			throw new Error(
+				'FLOW_MCP_TOOLS has an entry without name, description, inputSchema and a positive timeoutSeconds.'
+			);
+		}
+		if (tool.name === PROVIDE_STEPS_TOOL.name || seen.has(tool.name)) {
+			throw new Error(`FLOW_MCP_TOOLS declares the tool name '${tool.name}' twice or reserves it.`);
+		}
+		seen.add(tool.name);
+	}
+	if (parsed.length > 0 && !toolToken) {
+		throw new Error(
+			'FLOW_MCP_TOOLS is set but FLOW_MCP_TOOL_TOKEN is not: the host did not issue a bearer for the tools.'
+		);
+	}
+	return parsed;
+}
+
+const HOST_TOO_OLD =
+	'The flow host closed the connection without answering: host too old for host tools (or this execution has already ended). Fix: update flow-cli on the host that runs this flow.';
+
+/**
+ * Call a host tool: one v2 line out, one reply line in, on a fresh connection.
+ * Resolves with the parsed reply { ok, text, ... }; rejects with an Error whose message is meant for the model.
+ */
+function callHostTool(tool, args) {
+	return new Promise((resolve, reject) => {
+		if (!CALLBACK_PORT) {
+			reject(new Error('FLOW_MCP_CALLBACK_PORT not set'));
+			return;
+		}
+		const callId = crypto.randomUUID();
+		let received = '';
+		let settled = false;
+		const settle = (fn, value) => {
+			if (settled) return;
+			settled = true;
+			socket.destroy();
+			fn(value);
+		};
+		const socket = net.createConnection(CALLBACK_PORT, '127.0.0.1', () => {
+			socket.write(
+				JSON.stringify({
+					v: 2,
+					kind: 'call_tool',
+					token: TOOL_TOKEN,
+					executionId: EXECUTION_ID,
+					callId,
+					toolId: tool.name,
+					args,
+				}) + '\n'
+			);
+		});
+		socket.on('data', chunk => {
+			received += chunk.toString('utf8');
+			const newline = received.indexOf('\n');
+			if (newline === -1) {
+				if (received.length > MAX_REPLY_LINE_BYTES) {
+					settle(reject, new Error('The flow host sent a reply larger than the protocol allows.'));
+				}
+				return;
+			}
+			let reply;
+			try {
+				reply = JSON.parse(received.slice(0, newline));
+			} catch {
+				settle(reject, new Error('The flow host sent a reply that is not valid JSON.'));
+				return;
+			}
+			if (
+				reply === null ||
+				typeof reply !== 'object' ||
+				reply.v !== 2 ||
+				typeof reply.ok !== 'boolean' ||
+				typeof reply.text !== 'string'
+			) {
+				settle(reject, new Error('The flow host sent an unexpected reply (not protocol v2).'));
+				return;
+			}
+			// callId '' is the host's answer to a message it did not understand.
+			if (reply.callId !== callId && reply.callId !== '') {
+				settle(reject, new Error('The flow host answered a different call.'));
+				return;
+			}
+			settle(resolve, reply);
+		});
+		socket.on('error', err => {
+			// A reset right after the request is how an old host refuses a line it does not know.
+			if (err.code === 'ECONNRESET') settle(reject, new Error(HOST_TOO_OLD));
+			else
+				settle(
+					reject,
+					new Error(`cannot reach the flow host callback (${err.message}); the execution may have ended`)
+				);
+		});
+		socket.on('close', () => settle(reject, new Error(HOST_TOO_OLD)));
+		socket.setTimeout(tool.timeoutSeconds * 1000 + HELPER_TIMEOUT_MARGIN_MS, () => {
+			settle(
+				reject,
+				new Error(
+					`the flow host did not answer within ${tool.timeoutSeconds} s + ${HELPER_TIMEOUT_MARGIN_MS / 1000} s`
+				)
+			);
+		});
+	});
+}
+
+/** tools/call for one of the step's host tools. */
+async function callHostToolAndRespond(id, tool, rawArgs) {
+	if (rawArgs === null || typeof rawArgs !== 'object' || Array.isArray(rawArgs)) {
+		respond(id, {
+			content: [
+				{
+					type: 'text',
+					text: `Error: the arguments of '${tool.name}' must be a JSON object. See the tool's input schema.`,
+				},
+			],
+			isError: true,
+		});
+		return;
+	}
+	try {
+		const reply = await callHostTool(tool, rawArgs);
+		respond(id, { content: [{ type: 'text', text: reply.text }], ...(reply.ok ? {} : { isError: true }) });
+	} catch (err) {
+		respond(id, {
+			content: [{ type: 'text', text: `Host tool '${tool.name}' failed: ${err.message}` }],
+			isError: true,
+		});
+	}
+}
+
+/** The tools/list entry of a host tool: exactly what the model may see. */
+function advertise(tool) {
+	return { name: tool.name, description: tool.description, inputSchema: tool.inputSchema };
+}
+
 /** Validate that each step has required fields for its type. Returns an error string or null. */
 function validateSteps(steps) {
 	for (const step of steps) {
@@ -304,13 +483,19 @@ async function handle(req) {
 			break;
 
 		case 'tools/list':
-			respond(id, { tools: [PROVIDE_STEPS_TOOL] });
+			respond(id, { tools: [PROVIDE_STEPS_TOOL, ...hostTools.map(advertise)] });
 			break;
 
 		case 'tools/call': {
 			const params = req.params || {};
 			if (params.name !== 'provideSteps') {
-				respondError(id, -32601, `Unknown tool: ${params.name}. Available tools: provideSteps`);
+				const hostTool = hostTools.find(candidate => candidate.name === params.name);
+				if (hostTool === undefined) {
+					const available = ['provideSteps', ...hostTools.map(candidate => candidate.name)].join(', ');
+					respondError(id, -32601, `Unknown tool: ${params.name}. Available tools: ${available}`);
+					break;
+				}
+				await callHostToolAndRespond(id, hostTool, params.arguments === undefined ? {} : params.arguments);
 				break;
 			}
 			const args = params.arguments || {};
@@ -368,6 +553,12 @@ async function handle(req) {
 
 /** Read JSON-RPC requests line by line from stdin. */
 function startStdioServer() {
+	try {
+		hostTools = loadHostTools(process.env.FLOW_MCP_TOOLS, TOOL_TOKEN);
+	} catch (err) {
+		process.stderr.write(`[mcp-server] ${err.message}\n`);
+		process.exit(1);
+	}
 	const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
 	rl.on('line', line => {
 		const trimmed = line.trim();

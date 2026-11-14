@@ -233,6 +233,46 @@ describe('the path from the sandbox to the engine: forwarder, unmodified mcp-ser
 		expect(engine.injected.items[0]).toEqual(STEPS);
 	});
 
+	it('relays a host tool call (callback protocol v2) and its reply byte for byte, without a forwarder change', async () => {
+		const calls: unknown[] = [];
+		const server = new McpServer('run-1', () => Promise.resolve(), {
+			hostTools: {
+				stepId: 'triage',
+				tools: [
+					{
+						id: 'show',
+						description: 'Show a thing.',
+						sideEffect: 'read',
+						command: ['never-sent-to-the-vm', '{id}'],
+						args: { id: { type: 'string', pattern: '^[a-z]+$', required: true } },
+					},
+				],
+				handler: {
+					call: request => {
+						calls.push(request);
+						return Promise.resolve({ ok: true, text: 'shown', truncated: false, exitCode: 0 });
+					},
+				},
+			},
+		});
+		servers.push(server);
+		const { port, mcpServer } = await server.start();
+		const session = startMcp(installImageFiles(), {
+			FLOW_MCP_UPSTREAM_HOST: '127.0.0.1',
+			FLOW_MCP_UPSTREAM_PORT: String(port),
+			FLOW_MCP_CALLBACK_TOKEN: mcpServer.env?.['FLOW_MCP_CALLBACK_TOKEN'] ?? '',
+			FLOW_MCP_TOOL_TOKEN: mcpServer.env?.['FLOW_MCP_TOOL_TOKEN'] ?? '',
+			FLOW_MCP_TOOLS: mcpServer.env?.['FLOW_MCP_TOOLS'] ?? '',
+			FLOW_EXECUTION_ID: 'run-1',
+		});
+		await session.request('initialize', {});
+		const result = (await session.request('tools/call', { name: 'show', arguments: { id: 'abc' } })) as {
+			result: { content: { text: string }[]; isError?: boolean };
+		};
+		expect(result.result).toEqual({ content: [{ type: 'text', text: 'shown' }] });
+		expect(calls).toMatchObject([{ executionId: 'run-1', toolId: 'show', args: { id: 'abc' } }]);
+	});
+
 	it('does not carry a forged token or execution id: the engine drops the connection and injects nothing', async () => {
 		const engine = await startEngineServer('run-1');
 		// The forwarder dials this relay, which dials the engine and reports each connection the ENGINE side closed.

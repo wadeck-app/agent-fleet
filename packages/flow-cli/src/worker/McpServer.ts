@@ -1,8 +1,12 @@
+import { HostToolModelView, HostToolSchemaLimits } from 'flow-engine';
 import * as crypto from 'node:crypto';
 import * as net from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 import type { InjectedStep } from '../ipc/Protocol';
+import type { HostToolServing, McpCallToolConfig } from './HostToolCallTypes';
+import { DEFAULT_CALL_GRACE_MS } from './HostToolCallTypes';
+import { HostToolLimits } from './HostToolLimits';
 import { DEFAULT_CALLBACK_IDLE_TIMEOUT_MS, McpCallbackConnection } from './McpCallbackConnection';
 
 export interface McpServerConfig {
@@ -19,6 +23,18 @@ export interface McpServerOptions {
 	idleTimeoutMs?: number;
 	/** Overrides the concurrent connection cap. */
 	maxConnections?: number;
+	/** The host tools of the step. Without tools (absent or empty) no `call_tool` bearer is issued at all. */
+	hostTools?: HostToolServing;
+	/** Overrides the grace added to a tool's `timeoutSeconds` for the per-call timer (tests use a short one). */
+	callGraceMs?: number;
+}
+
+/** The host tools of a step do not fit what may be handed to the MCP helper; the step cannot start. */
+export class HostToolSetTooLargeError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'HostToolSetTooLargeError';
+	}
 }
 
 /** Path to the CJS stdio MCP server script, resolved relative to this module. */
@@ -46,6 +62,9 @@ const MCP_SERVER_CJS = fileURLToPath(new URL('./mcp-server.cjs', import.meta.url
 export class McpServer {
 	private tcpServer: net.Server | null = null;
 	private callbackToken = '';
+	/** Issued only when the step declares tools. */
+	private toolToken: string | null = null;
+	private stopped = false;
 
 	constructor(
 		private readonly executionId: string,
@@ -58,13 +77,17 @@ export class McpServer {
 	 * Returns the port and the McpServerConfig to pass to StepRunner as mcpServers.
 	 */
 	async start(): Promise<{ port: number; mcpServer: McpServerConfig }> {
-		this.callbackToken = crypto.randomUUID().replace(/-/g, '');
+		this.assertToolsFit();
+		this.callbackToken = McpServer.newToken();
+		this.toolToken = this.declaredTools().length > 0 ? McpServer.newToken() : null;
 		const callbackPort = await this.startTcpServer();
 		const mcpServer = this.buildMcpServerConfig(callbackPort);
 		return { port: callbackPort, mcpServer };
 	}
 
 	async stop(): Promise<void> {
+		// Both bearers die here, even for a connection that is still open.
+		this.stopped = true;
 		if (!this.tcpServer) return;
 		return new Promise((resolve, reject) => {
 			const server = this.tcpServer!;
@@ -78,12 +101,15 @@ export class McpServer {
 
 	/** Start a TCP server that receives step payloads from mcp-server.cjs. */
 	private startTcpServer(): Promise<number> {
+		const callTool = this.callToolConfig();
 		return new Promise((resolve, reject) => {
 			const server = net.createServer(socket => {
 				new McpCallbackConnection(socket, {
 					token: this.callbackToken,
 					executionId: this.executionId,
 					onInjectSteps: this.onInjectSteps,
+					isRevoked: () => this.stopped,
+					...(callTool === null ? {} : { callTool }),
 					idleTimeoutMs: this.options.idleTimeoutMs ?? DEFAULT_CALLBACK_IDLE_TIMEOUT_MS,
 					log: message => process.stderr.write(`[McpServer] ${message}\n`),
 				});
@@ -111,7 +137,59 @@ export class McpServer {
 				FLOW_MCP_CALLBACK_PORT: String(callbackPort),
 				FLOW_MCP_CALLBACK_TOKEN: this.callbackToken,
 				FLOW_EXECUTION_ID: this.executionId,
+				...this.hostToolEnv(),
 			},
 		};
+	}
+
+	private static newToken(): string {
+		return crypto.randomUUID().replace(/-/g, '');
+	}
+
+	private declaredTools(): HostToolServing['tools'] {
+		return this.options.hostTools?.tools ?? [];
+	}
+
+	/** The one mechanism by which the helper learns the tools: what the model sees plus each timeout, never the command. */
+	private hostToolEnv(): Record<string, string> {
+		const tools = this.declaredTools();
+		if (tools.length === 0 || this.toolToken === null) return {};
+		const entries = tools.map(tool => ({
+			...HostToolModelView.describe(tool),
+			timeoutSeconds: HostToolLimits.resolve(tool).timeoutSeconds,
+		}));
+		return { FLOW_MCP_TOOLS: JSON.stringify(entries), FLOW_MCP_TOOL_TOKEN: this.toolToken };
+	}
+
+	private callToolConfig(): McpCallToolConfig | null {
+		const serving = this.options.hostTools;
+		if (serving === undefined || this.toolToken === null) return null;
+		return {
+			toolToken: this.toolToken,
+			declared: serving.tools.map(tool => {
+				const limits = HostToolLimits.resolve(tool);
+				return { id: tool.id, timeoutSeconds: limits.timeoutSeconds, maxOutputBytes: limits.maxOutputBytes };
+			}),
+			handler: serving.handler,
+			graceMs: this.options.callGraceMs ?? DEFAULT_CALL_GRACE_MS,
+		};
+	}
+
+	/** No fallback: a set the helper cannot be given makes the step fail at run start. */
+	private assertToolsFit(): void {
+		const serving = this.options.hostTools;
+		if (serving === undefined || serving.tools.length === 0) return;
+		const label = `Step '${serving.stepId}'`;
+		if (serving.tools.length > HostToolSchemaLimits.MAX_TOOLS_PER_STEP) {
+			throw new HostToolSetTooLargeError(
+				`${label}: ${serving.tools.length} tools declared, the limit is ${HostToolSchemaLimits.MAX_TOOLS_PER_STEP}. Fix: declare fewer host tools.`
+			);
+		}
+		const bytes = HostToolModelView.byteLength(serving.tools);
+		if (bytes > HostToolSchemaLimits.MAX_DESCRIPTION_SET_BYTES) {
+			throw new HostToolSetTooLargeError(
+				`${label}: host tools description is ${bytes} bytes, the limit is ${HostToolSchemaLimits.MAX_DESCRIPTION_SET_BYTES}. Fix: shorten descriptions or declare fewer tools.`
+			);
+		}
 	}
 }
