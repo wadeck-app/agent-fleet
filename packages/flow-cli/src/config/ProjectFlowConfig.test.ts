@@ -111,6 +111,15 @@ describe('ProjectFlowConfig', () => {
 		expect((failure as ConfigSchemaError).key).toBe('worker');
 	});
 
+	it('refuses the global-only validation section in the project config, like plugins.instances', async () => {
+		const project = await subject('alpha');
+		const file = writeProjectConfig(project, 'validation:\n  hostToolsUnderConfinedProfile: error\n');
+
+		expect(() => loadProjectConfig(project)).toThrow(file);
+		expect(() => loadProjectConfig(project)).toThrow("'validation'");
+		expect(() => loadProjectConfig(project)).toThrow('global config');
+	});
+
 	it('refuses an unknown key, naming the file, the key and the keys that exist', async () => {
 		const project = await subject('alpha');
 		const file = writeProjectConfig(project, 'hookz: {}\n');

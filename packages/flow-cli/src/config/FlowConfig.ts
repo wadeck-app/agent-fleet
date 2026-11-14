@@ -19,6 +19,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { HOST_TOOLS_MODES, type HostToolsMode } from './HostToolsMode.js';
+
 /** The config file the daemon used to read, kept only to warn that it no longer does. */
 const LEGACY_CONFIG_FILE = '.flow-config.yaml';
 
@@ -152,6 +154,15 @@ export interface FlowConfigData {
 		/** Path to the opencode config used for OpenAI-on-Bedrock models. Default: undefined. */
 		configOpenai: string | undefined;
 	};
+	validation: {
+		/**
+		 * What a step declaring `hostTools` under a confined profile gets: `warn` (reported) or `error` (refused).
+		 * Default: undefined, read as `warn` through `resolveHostToolsMode` (HostToolsMode.ts).
+		 *
+		 * Global-only: a project must not relax or tighten the check for the others.
+		 */
+		hostToolsUnderConfinedProfile: HostToolsMode | undefined;
+	};
 }
 
 /**
@@ -175,6 +186,9 @@ const MAX_ACK_TIMEOUT_SECONDS = 120;
 const MIN_BOUND_STEP_WAIT_SECONDS = 1;
 const MAX_BOUND_STEP_WAIT_SECONDS = 600;
 
+/** Keys accepted under `validation`. */
+const VALIDATION_KEYS: readonly string[] = ['hostToolsUnderConfinedProfile'];
+
 // Keep FlowConfig as a type alias for backward compatibility with callers using `type FlowConfig`.
 export type FlowConfig = FlowConfigData;
 
@@ -197,6 +211,7 @@ export class FlowConfigLoader {
 		},
 		workspace: { retainDays: 30, maxWorkspaces: 50 },
 		opencode: { configAnthropic: undefined, configOpenai: undefined },
+		validation: { hostToolsUnderConfinedProfile: undefined },
 	};
 
 	/**
@@ -257,6 +272,8 @@ export class FlowConfigLoader {
 				security: { ...FlowConfigLoader.DEFAULT.security, ...loaded?.security },
 				limits: { ...FlowConfigLoader.DEFAULT.limits, ...loaded?.limits },
 				workspace: { ...FlowConfigLoader.DEFAULT.workspace, ...loaded?.workspace },
+				// Taken as written (not spread): a scalar here must reach assertValidationSettings, not be turned into keys.
+				validation: loaded?.validation === undefined ? FlowConfigLoader.DEFAULT.validation : loaded.validation,
 				opencode: {
 					...FlowConfigLoader.DEFAULT.opencode,
 					...loaded?.opencode,
@@ -274,7 +291,34 @@ export class FlowConfigLoader {
 		}
 		// Outside the try: a value out of range is not a parse problem to fall back from, it is a mistake to report.
 		FlowConfigLoader.assertWorkerRunEndSettings(merged, configFile);
+		FlowConfigLoader.assertValidationSettings(merged, configFile);
 		return merged;
+	}
+
+	/**
+	 * @throws Error naming the key, the value and the accepted ones: an unrecognised mode must not fall back to `warn`,
+	 *         the user who wrote `error` (or a typo of it) believes the check is strict.
+	 */
+	private static assertValidationSettings(config: FlowConfigData, configFile: string): void {
+		const section: unknown = config.validation;
+		if (typeof section !== 'object' || section === null || Array.isArray(section)) {
+			throw new Error(
+				`validation in "${configFile}" must be a mapping (accepted keys: ${VALIDATION_KEYS.join(', ')}), got ${JSON.stringify(section)}. Fix or remove the key.`
+			);
+		}
+		for (const key of Object.keys(section)) {
+			if (!VALIDATION_KEYS.includes(key)) {
+				throw new Error(
+					`validation.${key} in "${configFile}" is not a known setting (accepted keys: ${VALIDATION_KEYS.join(', ')}). Fix or remove the key.`
+				);
+			}
+		}
+		const mode = config.validation.hostToolsUnderConfinedProfile;
+		if (mode !== undefined && !HOST_TOOLS_MODES.includes(mode)) {
+			throw new Error(
+				`validation.hostToolsUnderConfinedProfile in "${configFile}" must be one of ${HOST_TOOLS_MODES.join(' | ')}, got ${JSON.stringify(mode)}. Fix or remove the key (default: warn).`
+			);
+		}
 	}
 
 	/**

@@ -146,6 +146,42 @@ describe('FlowConfigLoader.load', () => {
 		});
 	});
 
+	describe('validation.hostToolsUnderConfinedProfile', () => {
+		it('is absent by default (the accessor then answers warn)', () => {
+			const config = FlowConfigLoader.load(path.join(tmpDir, 'nonexistent.yaml'));
+			expect(config.validation.hostToolsUnderConfinedProfile).toBeUndefined();
+		});
+
+		it('stays absent when the file does not mention validation', () => {
+			const file = writeConfig('cfg.yaml', 'logs:\n  retainDays: 7\n');
+			expect(FlowConfigLoader.load(file).validation.hostToolsUnderConfinedProfile).toBeUndefined();
+		});
+
+		it.each(['warn', 'error'])('accepts %s', value => {
+			const file = writeConfig('cfg.yaml', `validation:\n  hostToolsUnderConfinedProfile: ${value}\n`);
+			expect(FlowConfigLoader.load(file).validation.hostToolsUnderConfinedProfile).toBe(value);
+		});
+
+		it.each(['strict', '"Warn"', '3', 'true', '""'])('refuses %s, naming the key, the value and the accepted values', value => {
+			const file = writeConfig('bad.yaml', `validation:\n  hostToolsUnderConfinedProfile: ${value}\n`);
+			expect(() => FlowConfigLoader.load(file)).toThrow(
+				/validation\.hostToolsUnderConfinedProfile.*bad\.yaml.*warn \| error, got /s
+			);
+		});
+
+		it('refuses an unknown key under validation, listing the accepted keys', () => {
+			const file = writeConfig('bad.yaml', 'validation:\n  hostToolsUnderConfinedProfil: warn\n');
+			expect(() => FlowConfigLoader.load(file)).toThrow(
+				/validation\.hostToolsUnderConfinedProfil.*bad\.yaml.*hostToolsUnderConfinedProfile/s
+			);
+		});
+
+		it('refuses a validation section that is not a mapping', () => {
+			const file = writeConfig('bad.yaml', 'validation: warn\n');
+			expect(() => FlowConfigLoader.load(file)).toThrow(/validation.*bad\.yaml.*mapping/s);
+		});
+	});
+
 	it('overrides logs.retainDays', () => {
 		const file = writeConfig('cfg.yaml', 'logs:\n  retainDays: 7\n');
 		expect(FlowConfigLoader.load(file).logs.retainDays).toBe(7);

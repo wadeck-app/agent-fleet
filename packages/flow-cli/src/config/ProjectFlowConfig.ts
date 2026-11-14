@@ -57,6 +57,7 @@ const GLOBAL_ONLY_KEYS = [
 	'limits',
 	'workspace',
 	'opencode',
+	'validation',
 ] as const;
 
 /**

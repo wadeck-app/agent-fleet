@@ -279,6 +279,12 @@ create is closed right after it and cannot ack.
 Only a daemon-forked worker gets more than that, because only there does the daemon own the process:
 a forked pid that never connects is killed after 10s, and its exit is noticed.
 
+## Host tools under a confined profile
+
+| Key (user `config.yml` only, section `validation`; refused in a project config) | Default | Meaning                                                                                                                         |
+| ------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `hostToolsUnderConfinedProfile`                                                 | `warn`  | `warn` or `error`: how a step with `hostTools` under a confined profile is treated. Any other value or key fails at load time |
+
 ## What the messages mean
 
 | You see                                                                                                     | It means                                                                                           |
