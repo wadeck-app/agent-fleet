@@ -100,6 +100,57 @@ describe('HostToolStepWiring.prepare', () => {
 		});
 	});
 
+	describe('relative or empty PATH entries are ignored and reported once per step', () => {
+		const nodeName = path.basename(process.execPath);
+		const bareNodeTool = (id: string): HostTool => tool({ id, command: [nodeName] });
+		const withPath = (entries: string[], hostTools: HostTool[], lines: string[]) =>
+			HostToolStepWiring.prepare({
+				stepId: 'triage',
+				hostTools,
+				workspaceDir: workspace,
+				workerEnvironment: { ...process.env, PATH: entries.join(path.delimiter) },
+				writeAuditLine: line => lines.push(line),
+			});
+		const notices = (lines: string[]): string[] => lines.filter(line => line.includes('ignored'));
+		const absoluteEntry = path.dirname(process.execPath);
+
+		it('writes ONE sanitised, length-capped line for several bare-name tools, then resolves normally', () => {
+			const lines: string[] = [];
+			const long = 'x'.repeat(500);
+			const serving = withPath(
+				['C', absoluteEntry, 'C\u001b[31m', long, ''],
+				[bareNodeTool('one'), bareNodeTool('two')],
+				lines
+			);
+			expect(serving).toBeDefined();
+			const found = notices(lines);
+			expect(found).toHaveLength(1);
+			expect(found[0]).toMatch(/^\[host-tool\] NOTICE Step 'triage': .*'C'/);
+			expect(found[0]).toContain('C?[31m');
+			expect(found[0]).not.toContain('\u001b');
+			expect(found[0]).not.toContain('x'.repeat(100));
+			expect(found[0]).toContain('(empty)');
+			expect(found[0]).toMatch(/Fix: /);
+			expect(lines).toEqual(found);
+		});
+
+		it.each([
+			['an absolute command', () => [tool()], ['C', absoluteEntry]],
+			['no ignored entry', () => [bareNodeTool('one')], [absoluteEntry]],
+		])('writes no line for %s', (_label, makeTools, entries) => {
+			const lines: string[] = [];
+			withPath(entries, makeTools(), lines);
+			expect(lines).toEqual([]);
+		});
+
+		it('keeps the named not-found error for a command that is nowhere, and still logs the ignored entries first', () => {
+			const lines: string[] = [];
+			const attempt = (): unknown => withPath(['C', absoluteEntry], [tool({ command: ['nope-xyz'] })], lines);
+			expect(attempt).toThrow(/Step 'triage' tool 'show': executable 'nope-xyz' was not found/);
+			expect(notices(lines)).toHaveLength(1);
+		});
+	});
+
 	it.each([['FLOW_WORKER_TOKEN'], ['flow_mcp_tool_token']])(
 		'fails loudly when a tool declares the forbidden env name %s',
 		name => {

@@ -81,7 +81,7 @@ describe('HostToolExecutableResolver', () => {
 		expect(() => resolver.resolve('s', tool('x'))).toThrow(/PATH is not set/);
 	});
 
-	describe('relative or empty PATH entries are refused, never searched (the model can plant a file there)', () => {
+	describe('relative or empty PATH entries are ignored, never searched (the model can plant a file there)', () => {
 		const originalCwd = process.cwd();
 		afterEach(() => {
 			process.chdir(originalCwd);
@@ -101,29 +101,58 @@ describe('HostToolExecutableResolver', () => {
 				environment: { PATH: entries.join(path.delimiter) },
 			});
 
-		it.each([
+		const relativeEntries = [
 			['a dot entry', '.', '.'],
 			['a node_modules/.bin entry', 'node_modules/.bin', 'node_modules/.bin'],
 			['a dot-slash entry', './tools', 'tools'],
 			['an empty entry (current directory)', '', '.'],
-		])(
-			'does not resolve through %s, even before an absolute entry holding the real tool',
+			['a literal C entry (Git Bash PATH)', 'C', 'C'],
+		] as const;
+
+		it.each(relativeEntries)(
+			'ignores %s even before an absolute entry holding the real tool: the planted file does not run',
 			(_label, entry, where) => {
-				write('taskcli', 'REAL');
+				const real = write('taskcli', 'REAL');
 				plant(where);
-				const resolver = resolverWithPath([entry, binDir]);
-				expect(() => resolver.resolve('triage', tool('taskcli'))).toThrow(HostToolExecutableError);
-				expect(() => resolver.resolve('triage', tool('taskcli'))).toThrow(
-					new RegExp(
-						`Step 'triage' tool 'show-task': .*PATH entry ${entry === '' ? 'is empty' : `'${entry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`}.*Fix: `
-					)
-				);
+				const resolved = resolverWithPath([entry, binDir]).resolve('triage', tool('taskcli'));
+				expect(resolved.absolutePath).toBe(real);
+				expect(resolved.size).toBe(4);
 			}
 		);
 
-		it('refuses when the relative entry comes after the absolute one, too (no silent skip)', () => {
+		it.each(relativeEntries)(
+			'refuses a command found only through %s, naming the entry and the fix',
+			(_label, entry, where) => {
+				plant(where);
+				const resolver = resolverWithPath([entry, path.join(directory, 'missing')]);
+				const expected = `Step 'triage' tool 'show-task': command 'taskcli' resolves only through relative PATH entry '${entry}'; use an absolute command (set command[0] to its absolute path) or add its directory to PATH as an absolute entry.`;
+				expect(() => resolver.resolve('triage', tool('taskcli'))).toThrow(HostToolExecutableError);
+				expect(() => resolver.resolve('triage', tool('taskcli'))).toThrow(expected);
+			}
+		);
+
+		it('refuses when the relative entry comes after the absolute one that lacks the tool', () => {
 			plant('.');
-			expect(() => resolverWithPath([binDir, '.']).resolve('s', tool('taskcli'))).toThrow(/PATH entry '\.'/);
+			expect(() => resolverWithPath([binDir, '.']).resolve('s', tool('taskcli'))).toThrow(
+				/resolves only through relative PATH entry '\.'/
+			);
+		});
+
+		it('resolves normally with literal C entries and a trailing empty entry, and reports the ignored entries', () => {
+			const real = write('taskcli', 'REAL');
+			const resolver = resolverWithPath(['C', binDir, 'C', '']);
+			expect(resolver.resolve('s', tool('taskcli')).absolutePath).toBe(real);
+			expect(resolver.ignoredPathEntries()).toEqual(['C', 'C', '']);
+		});
+
+		it('reports no ignored entry for an absolute-only PATH', () => {
+			expect(resolverWithPath([binDir]).ignoredPathEntries()).toEqual([]);
+		});
+
+		it('says in the not-found error that relative entries were ignored', () => {
+			expect(() => resolverWithPath(['C', binDir]).resolve('triage', tool('nope'))).toThrow(
+				/not found on PATH.*Ignored relative or empty PATH entries: 'C'/
+			);
 		});
 
 		it('still resolves through absolute PATH entries only', () => {

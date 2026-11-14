@@ -8,6 +8,8 @@ import { HostToolExecutableResolver } from './HostToolExecutableResolver';
 import { HostToolExecutor } from './HostToolExecutor';
 import { HostToolWorkspaceExecutableWarning } from './HostToolWorkspaceExecutableWarning';
 
+const MAX_REPORTED_ENTRIES = 16;
+
 export interface HostToolStepWiringOptions {
 	stepId: string;
 	/** `hostTools` of the step as the daemon assigned it. */
@@ -41,6 +43,11 @@ export class HostToolStepWiring {
 			}
 		}
 		const resolver = new HostToolExecutableResolver({ environment: options.workerEnvironment });
+		// Not an error: a PATH such as Git Bash's may hold relative entries. They are never searched; say so once.
+		const ignored = resolver.ignoredPathEntries();
+		if (ignored.length > 0 && tools.some(tool => HostToolStepWiring.isBareName(tool.command[0]))) {
+			options.writeAuditLine(HostToolStepWiring.ignoredEntriesLine(options.stepId, ignored));
+		}
 		const executables = resolver.resolveAll(options.stepId, tools);
 		// A warning, not a refusal: the model can write the workspace, so an executable inside it could be replaced.
 		for (const warning of HostToolWorkspaceExecutableWarning.find({
@@ -59,5 +66,15 @@ export class HostToolStepWiring {
 			workspaceDir: options.workspaceDir,
 		});
 		return { stepId: options.stepId, tools, handler };
+	}
+
+	private static isBareName(command: string | undefined): boolean {
+		return command !== undefined && command !== '' && !/[\\/]/.test(command);
+	}
+
+	private static ignoredEntriesLine(stepId: string, ignored: readonly string[]): string {
+		const shown = HostToolExecutableResolver.describe(ignored.slice(0, MAX_REPORTED_ENTRIES));
+		const more = ignored.length > MAX_REPORTED_ENTRIES ? ` and ${ignored.length - MAX_REPORTED_ENTRIES} more` : '';
+		return `[host-tool] NOTICE Step '${stepId}': ignored ${ignored.length} relative or empty PATH entries when resolving host tools: ${shown}${more}. They are never searched (a file planted there would run). Fix: use absolute entries in the worker's PATH to silence this.`;
 	}
 }

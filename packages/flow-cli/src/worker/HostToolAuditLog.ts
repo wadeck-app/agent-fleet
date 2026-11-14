@@ -91,7 +91,7 @@ export class HostToolAuditLog {
 	 * CR, LF and tab become the two characters `\r`, `\n`, `\t`; any other control character becomes `?`. The cut comes
 	 * AFTER the replacement, on a whole replacement, so no escape is split.
 	 */
-	private static clean(text: string, maxLength: number): string {
+	static clean(text: string, maxLength: number): string {
 		let cleaned = '';
 		for (const character of text) {
 			const replacement = isControlCharacter(character) ? (VISIBLE_ESCAPES[character] ?? '?') : character;
