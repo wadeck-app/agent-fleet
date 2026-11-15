@@ -19,6 +19,7 @@ import { ObservedList } from '../testing/ObservedList';
 import { RecordingPresence } from '../testing/RecordingPresence';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { ExecWrapper, type StepExecutor, type StepExecutorContext } from './ExecWrapper';
+import { WORKER_FEATURE_RUN_HOLD } from './RunHoldAnnouncer';
 import { WORKER_FEATURE_WORKER_LOGS, type WorkerLogMessage } from './WorkerLogShipper';
 
 class FakeDaemon implements DaemonControl {
@@ -998,5 +999,102 @@ describe('ExecWrapper daemon connection', () => {
 		daemon.handlers?.onMessage({ type: 'run_started' });
 		expect(log.text()).toMatch(/sent "done"/);
 		expect(log.text()).toMatch(/unknown daemon message of type "run_started"/);
+	});
+});
+
+// The daemon's `run-hold` protocol: the worker says which run its sandbox is kept for, so no step of another run is offered to it.
+describe('ExecWrapper run-hold', () => {
+	const holds = (): unknown[] => daemon.ofType('worker_hold').map(message => message['executionId']);
+	const enable = (): void => daemon.handlers?.onMessage({ type: 'worker_hold_enabled' });
+
+	it('declares run-hold in the registration and after every step', async () => {
+		enable();
+		await run(assign('probe'));
+
+		const readies = daemon.ofType('ready');
+		expect(readies).toHaveLength(2);
+		for (const ready of readies) expect(ready['features']).toContain(WORKER_FEATURE_RUN_HOLD);
+	});
+
+	it('sends the hold BEFORE the ready that follows the step (the daemon dispatches on ready)', async () => {
+		enable();
+		await run(assign('probe'));
+
+		expect(daemon.types()).toEqual(['ready', 'step_started', 'log', 'step_completed', 'worker_hold', 'ready']);
+		expect(daemon.ofType('worker_hold')).toEqual([{ type: 'worker_hold', executionId: 'run1' }]);
+		expect(log.text()).not.toContain('unknown daemon message');
+	});
+
+	it('sends nothing before worker_hold_enabled (an old daemon rejects the unknown type), then announces the run held at that point', async () => {
+		await run(assign('probe'));
+		expect(daemon.ofType('worker_hold')).toEqual([]);
+
+		enable();
+
+		expect(holds()).toEqual(['run1']);
+	});
+
+	it('sends nothing at all on an old daemon that never enables it, whatever happens to the run', async () => {
+		await run(assign('probe'));
+		daemon.handlers?.onMessage({ type: 'run_end', executionId: 'run1', reason: 'completed' });
+		await daemon.arrivals.waitFor(() => daemon.ofType('run_end_ack').length > 0);
+
+		expect(daemon.ofType('worker_hold')).toEqual([]);
+	});
+
+	it('does not repeat the hold after the next step of the same run', async () => {
+		enable();
+		await run(assign('probe'));
+		await run(assign('second'));
+
+		expect(holds()).toEqual(['run1']);
+	});
+
+	it('releases the hold (executionId null) after a successful endRun, before the run_end_ack', async () => {
+		enable();
+		await run(assign('probe'));
+		daemon.handlers?.onMessage({ type: 'run_end', executionId: 'run1', reason: 'completed' });
+		await daemon.arrivals.waitFor(() => daemon.ofType('run_end_ack').length > 0);
+
+		expect(holds()).toEqual(['run1', null]);
+		expect(daemon.types().slice(-2)).toEqual(['worker_hold', 'run_end_ack']);
+	});
+
+	it('keeps the hold when the removal fails (the sandbox still exists, no ack either)', async () => {
+		enable();
+		await run(assign('probe'));
+		runtime.failNext('remove', new SandboxError('command-failed', 'sbx rm failed'), { times: 2 });
+		daemon.handlers?.onMessage({ type: 'run_end', executionId: 'run1', reason: 'completed' });
+		await log.waitForText('leftover remove');
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		expect(holds()).toEqual(['run1']);
+		expect(runtime.has('flow-sbx-x1-run1')).toBe(true);
+	});
+
+	it('keeps the hold when the daemon is stopping (the sandbox is stopped and kept)', async () => {
+		enable();
+		await run(assign('probe'));
+		daemon.handlers?.onMessage({ type: 'run_end', executionId: 'run1', reason: 'daemon_stopping' });
+		await daemon.arrivals.waitFor(() => daemon.ofType('run_end_ack').length > 0);
+
+		expect(holds()).toEqual(['run1']);
+	});
+
+	it('announces again on a new connection (worker_hold_enabled once more) while the run is still held', async () => {
+		enable();
+		await run(assign('probe'));
+		expect(holds()).toEqual(['run1']);
+
+		enable();
+
+		expect(holds()).toEqual(['run1', 'run1']);
+	});
+
+	it('sends no hold for a step that created no sandbox (host script step)', async () => {
+		enable();
+		await run(assign('probe', { host: { top: true, config: true } }));
+
+		expect(daemon.ofType('worker_hold')).toEqual([]);
 	});
 });

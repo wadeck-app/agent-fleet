@@ -19,6 +19,7 @@ import { ExecAssignment, type PreparedAssignment } from './ExecAssignment';
 import { ExecRunEnd } from './ExecRunEnd';
 import type { ExecPreparedSandbox, ExecSandboxPreparer } from './ExecSandboxPreparer';
 import { READ_ONLY_GUARANTEE, RequiresGuard } from './RequiresGuard';
+import { RunHoldAnnouncer, WORKER_FEATURE_RUN_HOLD } from './RunHoldAnnouncer';
 import { WORKER_FEATURE_WORKER_LOGS, type WorkerLogShipper } from './WorkerLogShipper';
 
 /** What the engine reports for a step that ran (the shape of flow-cli's `WorkerAdapter.execute` result). */
@@ -124,6 +125,7 @@ export class ExecWrapper {
 	private readonly guard: InsideMessageGuard;
 	private readonly reporter: DaemonReporter;
 	private readonly runEnd: ExecRunEnd;
+	private readonly runHold: RunHoldAnnouncer;
 	/** The output names the active step declares: the only ones a too-large result never loses. */
 	private declared: ReadonlySet<string> = new Set();
 	private mounts: { executionId: string; mounts: RunMounts } | undefined;
@@ -143,6 +145,10 @@ export class ExecWrapper {
 			},
 		});
 		this.reporter = new DaemonReporter(this.daemon, dependencies.log);
+		this.runHold = new RunHoldAnnouncer({
+			heldRun: () => dependencies.lifecycle.current()?.executionId,
+			send: message => this.daemon.send(message),
+		});
 		this.runEnd = new ExecRunEnd({
 			lifecycle: dependencies.lifecycle,
 			log: dependencies.log,
@@ -203,6 +209,10 @@ export class ExecWrapper {
 				// Answer to the worker-logs feature of `ready`, once per connection: from now on the wrapper's own output goes to the daemon.
 				this.dependencies.workerLogs.attach(message => this.daemon.send({ ...message }));
 				return;
+			case 'worker_hold_enabled':
+				// Answer to the run-hold feature of `ready`, once per connection: from now on the run held is announced (see RunHoldAnnouncer).
+				this.runHold.enable();
+				return;
 			case 'done':
 				this.dependencies.log.warn(
 					'the daemon sent "done" (a shutdown notice meant for daemon-forked workers); ignored, as flow worker does.'
@@ -219,12 +229,17 @@ export class ExecWrapper {
 	private ready(): JsonObject {
 		const ready = this.dependencies.registration.ready();
 		const features = Array.isArray(ready['features']) ? ready['features'] : [];
-		return { ...ready, features: [...features, WORKER_FEATURE_RUN_EVENTS, WORKER_FEATURE_WORKER_LOGS] };
+		return {
+			...ready,
+			features: [...features, WORKER_FEATURE_RUN_EVENTS, WORKER_FEATURE_WORKER_LOGS, WORKER_FEATURE_RUN_HOLD],
+		};
 	}
 
 	/** The sandbox of the run is gone: its prepared credentials and mounts are not needed any more. */
 	private async forgetRun(executionId: string, sandbox: string | undefined): Promise<void> {
 		if (this.mounts?.executionId === executionId) this.mounts = undefined;
+		// Only called after a successful removal (ExecRunEnd): the release goes out before the run_end_ack.
+		this.runHold.sync();
 		const prepared = this.prepared;
 		if (prepared === undefined || prepared.sandbox !== sandbox) return;
 		this.prepared = undefined;
@@ -233,6 +248,7 @@ export class ExecWrapper {
 
 	private async handleDaemonClosed(code: number, reason: string): Promise<void> {
 		this.dependencies.workerLogs.detach();
+		this.runHold.disable();
 		if (this.finished) return;
 		this.dependencies.log.warn(
 			`the connection to the flow daemon closed (code ${code}${reason === '' ? '' : `, ${reason}`}). The run, if any, is interrupted; its sandbox is stopped and kept (leftover list).`
@@ -322,6 +338,8 @@ export class ExecWrapper {
 			log.warn(`step "${ids.stepId}" failed in the exec wrapper: ${describeError(error)}`);
 		} finally {
 			// Announced after the sandbox work is over, so the next assign never meets a busy lifecycle.
+			// The hold first: the daemon dispatches on `ready`, so it must already know which run this worker keeps its sandbox for.
+			this.runHold.sync();
 			this.reporter.send(this.ready());
 		}
 	}

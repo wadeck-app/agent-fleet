@@ -402,6 +402,10 @@ Network, in user-facing words: outbound HTTP(S) from the sandbox is filtered (ma
 
 The exec wrapper declares `worker-logs` in every `ready`. After the daemon answers `worker_logs_enabled`, the wrapper's own stdout/stderr (the exact text of its log lines, nothing added) is sent as `worker_log` (max 16K chars per message, 64K chars/s, `dropped` counts what was cut), so it shows in `/modules/flow/workers`. Output printed before the answer is kept (newest 64K chars) and sent at that point. The constants are declared in `WorkerLogShipper.ts` because flow-cli on this branch predates them.
 
+### Run hold (`run-hold`, class `RunHoldAnnouncer`)
+
+The exec wrapper declares `run-hold` in every `ready`. After the daemon answers `worker_hold_enabled` (once per connection; nothing is sent before, an older daemon would reject it), it sends `worker_hold { executionId }` for the run whose sandbox it keeps, before the `ready` that follows the step, and `executionId: null` after a successful removal (before the `run_end_ack`). A failed removal or a stopped-and-kept sandbox (`daemon_stopping`) keeps the hold. The relay harness does not declare it. The constant is declared in `RunHoldAnnouncer.ts` because flow-cli on this branch predates it.
+
 ### Run end (`run_end`, class `ExecRunEnd`)
 
 The exec wrapper declares the `run-events` feature in every `ready` (the constant of flow-cli `Protocol.ts`; the relay harness does not). The daemon then sends `run_end { executionId, reason }` once per run to a worker that was handed a step of it, and releases the run's workspace when the worker answers `run_end_ack` or its wait expires (`worker.ackTimeoutSeconds`, 30 s by default, 120 s at most). The ack is therefore sent only AFTER the sandbox that mounts the workspace is gone.
