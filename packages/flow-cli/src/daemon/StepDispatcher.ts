@@ -145,7 +145,14 @@ export class StepDispatcher {
 					? undefined
 					: (guaranteesOfPass ??= this.lookups.guaranteeLookup(step.executionContext.executionId));
 			const needsHostTools = HostToolRouting.isRequiredBy(step);
-			const idle = needsHostTools ? HostToolRouting.capable(this.registry.listIdle()) : this.registry.listIdle();
+			// Before the router, so no routing plugin can widen the set: a worker held by another run is not offered, the
+			// step waits for it like for a busy one (see RequirementShortage for a step with requirements).
+			const offerable = this.registry
+				.listIdle()
+				.filter(
+					({ worker }) => worker.heldBy === undefined || worker.heldBy === step.executionContext.executionId
+				);
+			const idle = needsHostTools ? HostToolRouting.capable(offerable) : offerable;
 			const idleWorker = this.router.select(placement, idle, requirementOnly, guarantees);
 			if (idleWorker === undefined && needsHostTools) {
 				const refusal = this.hostToolRouting.refusal(
@@ -371,6 +378,7 @@ export class StepDispatcher {
 			placement,
 			connected: this.registry.listConnected(),
 			guaranteesOf,
+			isHoldStale: worker => worker.heldBy !== undefined && !this.executions.isActive(worker.heldBy),
 		});
 		if (decision.action === 'fail') {
 			this.failStep(executionId, step.stepId, decision.reason);

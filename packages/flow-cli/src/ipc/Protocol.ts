@@ -120,6 +120,14 @@ export const WORKER_FEATURE_HOST_TOOLS = 'host-tools';
  */
 export const WORKER_FEATURE_WORKER_LOGS = 'worker-logs';
 
+/**
+ * The worker keeps a resource (a sandbox) alive across the steps of ONE run and says so with `worker_hold`, so the daemon
+ * hands it no step of another run until the hold ends. It sends `worker_hold` only after the daemon answered
+ * `worker_hold_enabled` (an older daemon never does, and would reject the unknown message type). The worker must send
+ * `worker_hold` BEFORE the `ready` that follows the step that started the hold: the daemon dispatches on `ready`.
+ */
+export const WORKER_FEATURE_RUN_HOLD = 'run-hold';
+
 /** Most characters of one `worker_log` text; the worker splits larger chunks. Far below the frame limit. */
 export const WORKER_LOG_CHUNK_MAX_CHARS = 16 * 1024;
 
@@ -265,7 +273,12 @@ export type DaemonToWorker =
 	 * Answer to a `ready` that declared {@link WORKER_FEATURE_WORKER_LOGS}, sent once per connection to a worker the daemon
 	 * did not fork: from now on the worker may send `worker_log`. Never sent to a worker that did not declare the feature.
 	 */
-	| { type: 'worker_logs_enabled' };
+	| { type: 'worker_logs_enabled' }
+	/**
+	 * Answer to a `ready` that declared {@link WORKER_FEATURE_RUN_HOLD}, sent once per connection: from now on the worker may
+	 * send `worker_hold`. Never sent to a worker that did not declare the feature.
+	 */
+	| { type: 'worker_hold_enabled' };
 
 /**
  * A relay that supplies workers, connected to the daemon (D#17, D#19).
@@ -503,7 +516,14 @@ export type WorkerToDaemon =
 	 * several lines; the daemon cuts lines, masks secrets and caps the volume. `dropped` counts the characters of output the
 	 * worker threw away before this one (its own rate cap), so the log can say so instead of hiding a gap.
 	 */
-	| { type: 'worker_log'; stream: 'stdout' | 'stderr'; text: string; dropped?: number };
+	| { type: 'worker_log'; stream: 'stdout' | 'stderr'; text: string; dropped?: number }
+	/**
+	 * The worker now holds a resource for the run `executionId` (steps of other runs must not be handed to it), or no longer
+	 * does (`null`). Only sent after `worker_hold_enabled`; before it, or from a worker that did not declare
+	 * {@link WORKER_FEATURE_RUN_HOLD}, the daemon ignores it with a log line. Not bound to an assignment: it concerns the worker.
+	 * Send it before the `ready` that follows the step. The hold survives later `ready` messages until a `null`.
+	 */
+	| { type: 'worker_hold'; executionId: string | null };
 
 /**
  * A worker-to-daemon message about the step currently being executed, before its

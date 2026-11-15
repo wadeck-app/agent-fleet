@@ -21,4 +21,6 @@ export interface WorkerSummary {
 	ephemeral: boolean;
 	/** Shells this worker can actually run, probed at launch (see WorkerLaunch.probeShellCapabilities). */
 	shellCapabilities?: ('bash' | 'cmd' | 'pwsh')[];
+	/** The execution this worker holds a resource for: it takes no step of another run meanwhile. Absent: no hold, or a daemon that predates it. */
+	heldBy?: string;
 }

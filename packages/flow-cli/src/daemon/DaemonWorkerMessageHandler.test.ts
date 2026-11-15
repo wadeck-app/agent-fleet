@@ -288,10 +288,11 @@ describe('DaemonWorkerMessageHandler -- results cut or refused by the worker for
 
 describe('DaemonWorkerMessageHandler -- run_end_ack', () => {
 	it('hands the acknowledgement to the command handler with the connection it came from', () => {
-		const commandHandler = { onRunEndAck: vi.fn(), verifyAssignment: vi.fn() };
+		const commandHandler = { onRunEndAck: vi.fn(), verifyAssignment: vi.fn(), tryDispatch: vi.fn() };
+		const workerRegistry = { describe: vi.fn() };
 		const handler = new DaemonWorkerMessageHandler(
 			'/logs',
-			() => ({ commandHandler }) as unknown as DaemonRuntime,
+			() => ({ commandHandler, workerRegistry }) as unknown as DaemonRuntime,
 			() => {}
 		);
 
@@ -412,7 +413,7 @@ describe('DaemonWorkerMessageHandler -- the log of a worker the daemon did not f
 describe('DaemonWorkerMessageHandler -- a message the daemon cannot handle never takes it down', () => {
 	function makeSurvivingHandler(registered: { workerId: string } | undefined, onStepStarted?: () => void) {
 		const logsDir = createTempDirectory('dwmh-unhandled-');
-		const commandHandler = { onStepStarted: onStepStarted ?? vi.fn(), onRunEndAck: vi.fn() };
+		const commandHandler = { onStepStarted: onStepStarted ?? vi.fn(), onRunEndAck: vi.fn(), tryDispatch: vi.fn() };
 		const workerRegistry = { describe: vi.fn().mockReturnValue(registered) };
 		const handler = new DaemonWorkerMessageHandler(
 			logsDir,

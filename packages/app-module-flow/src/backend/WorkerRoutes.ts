@@ -94,6 +94,7 @@ export function registerWorkerRoutes(ctx: ModuleContext, service: FlowQueryServi
 					{
 						workerId: worker?.workerId ?? key,
 						state: worker?.state ?? 'exited',
+						heldBy: worker?.heldBy ?? '',
 						pid: worker?.pid ?? (origin === 'started by the daemon' ? Number(key) : ''),
 						version: worker?.version ?? '',
 						sourceId: worker?.sourceId ?? '',

@@ -27,6 +27,7 @@ sections:
             rows: $sources.worker.summary
             columns:
                 - { key: 'state', label: 'State', nowrap: true, badge: { idle: default, busy: info, exited: warning } }
+                - { key: 'heldBy', label: 'Held by run', truncate: true, mono: true }
                 - { key: 'pid', label: 'PID', nowrap: true, mono: true }
                 - { key: 'version', label: 'Version', nowrap: true, mono: true }
                 - { key: 'sourceId', label: 'Source', truncate: true }

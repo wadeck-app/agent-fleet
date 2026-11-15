@@ -16,6 +16,11 @@ export interface ShortageInputs {
 	/** Every connected worker, idle or busy. */
 	connected: RegisteredWorker[];
 	guaranteesOf: GuaranteeLookup;
+	/**
+	 * True when the worker is held by a run that is no longer active: such a worker will not free up by itself, so it does
+	 * not count as serving (the step must not wait for it forever). Absent: no hold is ever stale.
+	 */
+	isHoldStale?: (worker: RegisteredWorker) => boolean;
 }
 
 export type ShortageDecision = { action: 'wait'; sources: ReadonlySet<string> } | { action: 'fail'; reason: string };
@@ -47,7 +52,9 @@ export class RequirementShortage {
 		const { executionId, placement } = inputs;
 		const required = placement.requires ?? [];
 
-		const serving = inputs.connected.filter(worker => this.serves(placement, worker, inputs));
+		const serving = inputs.connected.filter(
+			worker => this.serves(placement, worker, inputs) && inputs.isHoldStale?.(worker) !== true
+		);
 		if (serving.length > 0) {
 			this.wait.decideRequirement({
 				executionId,
@@ -82,7 +89,27 @@ export class RequirementShortage {
 			closest: () => this.closestSentences(inputs),
 			contactErrorsSince: this.contactErrors.sinceFor(eligible),
 		});
-		return decision.action === 'fail' ? decision : { action: 'wait', sources: new Set(eligible) };
+		return decision.action === 'fail'
+			? { action: 'fail', reason: `${decision.reason}${this.describeStaleHolds(inputs)}` }
+			: { action: 'wait', sources: new Set(eligible) };
+	}
+
+	/** Names the workers that would have served the step but are held by a run that is over; empty when there are none. */
+	private describeStaleHolds(inputs: ShortageInputs): string {
+		const stale = inputs.connected.filter(
+			worker => this.serves(inputs.placement, worker, inputs) && inputs.isHoldStale?.(worker) === true
+		);
+		if (stale.length === 0) {
+			return '';
+		}
+		const named = stale
+			.slice(0, MAX_NAMED)
+			.map(
+				worker =>
+					`worker ${worker.workerId} is held by run ${worker.heldBy ?? 'unknown'}, which is no longer active`
+			)
+			.join('; ');
+		return ` Also: ${named}, and a hold nobody releases keeps it from taking this step. Fix: restart that worker (it re-registers with no hold), or run "flow worker list" to see which workers are held.`;
 	}
 
 	/** The step is handed to a worker: forget its wait. */

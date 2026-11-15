@@ -1,6 +1,6 @@
 import type { WebSocket } from 'ws';
 
-import type { SourceReady, WorkerToDaemon } from '../ipc/Protocol';
+import { type SourceReady, WORKER_FEATURE_RUN_HOLD, type WorkerToDaemon } from '../ipc/Protocol';
 import { writeDaemonLog } from './DaemonLog.js';
 import type { DaemonRuntime } from './DaemonRuntime.js';
 import { injectedStepState } from './InjectedStepState.js';
@@ -26,6 +26,8 @@ function errorSummary(err: unknown): string {
 export class DaemonWorkerMessageHandler {
 	/** Workers already warned about for reporting a failure without metrics: once each, not once per failure. */
 	private readonly warnedWithoutMetrics = new WeakSet<WebSocket>();
+	/** Connections told `worker_hold_enabled`: only these may send `worker_hold`. */
+	private readonly holdEnabled = new WeakSet<WebSocket>();
 
 	constructor(
 		private readonly logsDir: string,
@@ -95,6 +97,7 @@ export class DaemonWorkerMessageHandler {
 					break;
 				}
 				this.openWorkerLog(ws);
+				this.enableHold(ws);
 				commandHandler.tryDispatch();
 				this.checkShutdown();
 				break;
@@ -140,7 +143,19 @@ export class DaemonWorkerMessageHandler {
 				break;
 			}
 			case 'run_end_ack': {
-				this.runtime().commandHandler.onRunEndAck(ws, message.executionId);
+				const { commandHandler, workerRegistry } = this.runtime();
+				commandHandler.onRunEndAck(ws, message.executionId);
+				// Belt and braces: a worker that held for this run and acknowledged its end holds nothing for it any more.
+				if (workerRegistry.describe(ws)?.heldBy === message.executionId) {
+					workerRegistry.setHold(ws, null);
+					this.workerLogs?.note(ws, `hold for execution ${message.executionId} released (run_end_ack)`);
+				}
+				// A step of another run may have been waiting for this worker.
+				commandHandler.tryDispatch();
+				break;
+			}
+			case 'worker_hold': {
+				this.handleWorkerHold(ws, message);
 				break;
 			}
 			default: {
@@ -187,6 +202,51 @@ export class DaemonWorkerMessageHandler {
 		const registered = workerRegistry.describe(ws);
 		if (registered !== undefined && this.workerLogs.open(ws, registered)) {
 			workerRegistry.send(ws, { type: 'worker_logs_enabled' });
+		}
+	}
+
+	/** Tells a worker declaring {@link WORKER_FEATURE_RUN_HOLD} that it may send `worker_hold` (once per connection). */
+	private enableHold(ws: WebSocket): void {
+		const { workerRegistry } = this.runtime();
+		if (
+			this.holdEnabled.has(ws) ||
+			workerRegistry.describe(ws)?.features.includes(WORKER_FEATURE_RUN_HOLD) !== true
+		) {
+			return;
+		}
+		this.holdEnabled.add(ws);
+		workerRegistry.send(ws, { type: 'worker_hold_enabled' });
+	}
+
+	private reportIgnored(line: string): void {
+		process.stderr.write(`[daemon] ${line}\n`);
+		writeDaemonLog(this.logsDir, 'error', line);
+	}
+
+	/** Applies a hold, or its end. Ignored (with a log line, never a throw) from a worker that was not told it may send one. */
+	private handleWorkerHold(ws: WebSocket, message: Extract<WorkerToDaemon, { type: 'worker_hold' }>): void {
+		const { workerRegistry, commandHandler } = this.runtime();
+		const sender = this.describeSender(ws);
+		if (!this.holdEnabled.has(ws)) {
+			this.reportIgnored(
+				`Worker ${sender} sent worker_hold without having been enabled (it did not declare '${WORKER_FEATURE_RUN_HOLD}', or it sent it before the daemon's worker_hold_enabled); ignored`
+			);
+			return;
+		}
+		const { executionId } = message;
+		if (executionId !== null && (typeof executionId !== 'string' || executionId === '')) {
+			this.reportIgnored(
+				`Worker ${sender} sent a malformed worker_hold (executionId must be a non-empty string or null); ignored`
+			);
+			return;
+		}
+		if (!workerRegistry.setHold(ws, executionId)) {
+			this.reportIgnored(`Worker ${sender} sent worker_hold but is not registered; ignored`);
+			return;
+		}
+		this.workerLogs?.note(ws, executionId === null ? 'hold released' : `holding for execution ${executionId}`);
+		if (executionId === null) {
+			commandHandler.tryDispatch();
 		}
 	}
 

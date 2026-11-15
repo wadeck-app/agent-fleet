@@ -31,7 +31,8 @@ export function formatWorkerLine(w: WorkerSummary): string {
 	const labels = w.labels.length > 0 ? w.labels.join(',') : '-';
 	const shells = w.shellCapabilities && w.shellCapabilities.length > 0 ? w.shellCapabilities.join(',') : '-';
 	const origin = w.ephemeral ? 'daemon-forked' : (w.sourceId ?? 'external');
-	return `${w.workerId}\t${w.state}\tpid=${String(w.pid)}\tversion=${w.version ?? '-'}\t${origin}\tlabels=${labels}\tshells=${shells}\tinteractive=${String(w.hasUserInterface)}`;
+	const state = w.heldBy === undefined ? w.state : `${w.state} (held by run ${w.heldBy})`;
+	return `${w.workerId}\t${state}\tpid=${String(w.pid)}\tversion=${w.version ?? '-'}\t${origin}\tlabels=${labels}\tshells=${shells}\tinteractive=${String(w.hasUserInterface)}`;
 }
 
 /**

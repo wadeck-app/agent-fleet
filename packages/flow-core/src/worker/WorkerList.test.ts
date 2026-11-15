@@ -37,6 +37,12 @@ describe('formatWorkerLine', () => {
 		);
 	});
 
+	it('shows the run holding the worker next to its state', () => {
+		expect(formatWorkerLine(worker({ heldBy: 'run-1' }))).toBe(
+			'w1\tidle (held by run run-1)\tpid=10\tversion=-\texternal\tlabels=-\tshells=-\tinteractive=false'
+		);
+	});
+
 	it('prints version, labels, shells, source and interactivity', () => {
 		const line = formatWorkerLine(
 			worker({

@@ -49,6 +49,11 @@ export interface RegisteredWorker {
 	 * killing it on idle is exactly what made the core deliverable unusable (D#48).
 	 */
 	ephemeral: boolean;
+	/**
+	 * The execution this worker holds a resource for (`worker_hold`): steps of other runs are not handed to it. Kept across
+	 * the `ready` of the same connection; cleared on `worker_hold` null, on the `run_end_ack` of that run and when the worker goes.
+	 */
+	heldBy?: string;
 }
 
 /**
@@ -106,7 +111,21 @@ export class WorkerRegistry {
 			hasUserInterface: registration.hasUserInterface ?? false,
 			shellCapabilities: registration.shellCapabilities ?? [],
 			features: registration.features ?? [],
+			// Not what the worker says on each `ready`: a hold lasts across steps.
+			...(existing?.heldBy !== undefined && { heldBy: existing.heldBy }),
 		});
+	}
+
+	/** Records (or, with null, ends) the hold of a registered worker. @returns false when the worker is not registered. */
+	setHold(ws: WebSocket, executionId: string | null): boolean {
+		const worker = this.workers.get(ws);
+		if (worker === undefined) return false;
+		if (executionId === null) {
+			delete worker.heldBy;
+		} else {
+			worker.heldBy = executionId;
+		}
+		return true;
 	}
 
 	remove(ws: WebSocket): void {
@@ -127,6 +146,7 @@ export class WorkerRegistry {
 			hasUserInterface: worker.hasUserInterface,
 			ephemeral: worker.ephemeral,
 			shellCapabilities: worker.shellCapabilities,
+			...(worker.heldBy !== undefined ? { heldBy: worker.heldBy } : {}),
 		}));
 	}
 

@@ -134,6 +134,9 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 		case 'done':
 			ws.close();
 			break;
+		case 'worker_hold_enabled':
+			// Only sent to a worker declaring `run-hold`, which this one never does: nothing to do.
+			break;
 		case 'worker_logs_enabled':
 			// Never sent to a worker the daemon forked (its process output is captured by the daemon): nothing to do.
 			break;
