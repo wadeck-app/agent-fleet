@@ -54,7 +54,7 @@ async function build(boundStepWaitMs = 1_000) {
 	const workers: ReturnType<typeof workerOf>[] = [];
 	const sent: { workerId: string; executionId: string; stepId: string }[] = [];
 	const registry = {
-		listIdle: () => workers,
+		listIdle: () => workers.filter(entry => entry.worker.state === 'idle'),
 		listConnected: () => workers.map(entry => entry.worker),
 		summarize: () => [],
 		describe: (ws: WebSocket) => ({ workerId: (ws as unknown as { workerId: string }).workerId, features: [] }),
@@ -168,6 +168,34 @@ describe('StepDispatcher - worker held by a run', () => {
 		expect(sent).toEqual([]);
 		expect(failed).toEqual([]);
 		expect(wait.size).toBe(0);
+	});
+
+	// Decision D5: the serving worker is held, so the source is asked for another one (its maxWorkers is the ceiling).
+	it('asks the source of the serving worker for another one when a step with requires waits for a held worker', async () => {
+		const { dispatcher, executions, enqueue, workers, cover } = await build();
+		executions.bindRequirements('run-2', { run: ['fs=confined'], steps: {} });
+		workers.push(workerOf('w1', 'run-1'));
+		enqueue('run-2', 's2');
+
+		dispatcher.tryDispatch();
+
+		// Nothing is demand for a host worker (0), the sbx source is named.
+		expect(cover).toHaveBeenLastCalledWith(0, new Set(['sbx']));
+	});
+
+	it('asks the source for another worker when the serving worker is busy (not idle) too', async () => {
+		const { dispatcher, executions, enqueue, workers, cover, sent } = await build();
+		executions.bindRequirements('run-2', { run: ['fs=confined'], steps: {} });
+		const busy = workerOf('w1');
+		busy.worker.state = 'busy';
+		// Connected, but not in the idle list.
+		workers.push(busy);
+		enqueue('run-2', 's2');
+
+		dispatcher.tryDispatch();
+
+		expect(sent).toEqual([]);
+		expect(cover).toHaveBeenLastCalledWith(0, new Set(['sbx']));
 	});
 
 	it('fails a step with requires after the bound when the hold is stale (run-1 is over), naming worker and run', async () => {

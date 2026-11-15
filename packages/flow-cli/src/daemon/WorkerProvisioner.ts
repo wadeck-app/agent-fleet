@@ -66,6 +66,20 @@ export class WorkerProvisioner {
 		}
 	}
 
+	/** Workers of a declared source connected now (a worker still starting is not one yet). */
+	connectedWorkersOf(sourceId: string): number {
+		return this.registry.countForSource(sourceId);
+	}
+
+	/**
+	 * Whether the source may still have one more worker connected: the same cap `admitExternalWorker` enforces, read before
+	 * asking, so a source at its cap is not asked to start a worker that would be refused on arrival.
+	 */
+	hasRoomForWorkerOf(sourceId: string): boolean {
+		const source = this.sources.find(sourceId);
+		return source === undefined || this.registry.countForSource(sourceId) < source.maxWorkers;
+	}
+
 	canProvision(): boolean {
 		return this.committedCount < this.concurrencyLimit;
 	}

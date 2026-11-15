@@ -108,7 +108,7 @@ describe('RequirementShortage - workspace kinds', () => {
 
 		expect(shortage.assess(inputs('pool', [worker('w1', 'poolbox')]))).toEqual({
 			action: 'wait',
-			sources: new Set(),
+			sources: new Set(['poolbox']),
 		});
 	});
 });

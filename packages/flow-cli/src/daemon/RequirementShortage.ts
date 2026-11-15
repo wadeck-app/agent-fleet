@@ -63,7 +63,9 @@ export class RequirementShortage {
 				connectedServing: serving.length,
 				closest: () => [],
 			});
-			return { action: 'wait', sources: new Set() };
+			// No clock (the worker exists), but the sources are still named: a busy or held worker is no reason to leave
+			// the source's maxWorkers unused, the caller asks for another worker up to that cap (decision D5).
+			return { action: 'wait', sources: new Set(this.eligibleSources(placement, required)) };
 		}
 
 		const providers = this.declared.providersOfAll(required);
@@ -92,6 +94,11 @@ export class RequirementShortage {
 		return decision.action === 'fail'
 			? { action: 'fail', reason: `${decision.reason}${this.describeStaleHolds(inputs)}` }
 			: { action: 'wait', sources: new Set(eligible) };
+	}
+
+	/** The declared sources that provide every required guarantee and accept the workspace kind of the step's run. */
+	private eligibleSources(placement: StepPlacement, required: string[]): string[] {
+		return this.declared.providersOfAll(required).filter(sourceId => this.acceptsWorkspace(placement, sourceId));
 	}
 
 	/** Names the workers that would have served the step but are held by a run that is over; empty when there are none. */

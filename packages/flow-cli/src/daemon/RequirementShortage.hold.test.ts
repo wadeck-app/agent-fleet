@@ -80,6 +80,28 @@ describe('RequirementShortage - held workers', () => {
 		expect(wait.size).toBe(0);
 	});
 
+	// Decision D5: a busy or held worker is no reason to leave the source's maxWorkers unused.
+	it('names the eligible sources while waiting for a serving worker, still with no clock', async () => {
+		const { shortage, wait } = await build();
+
+		const decision = shortage.assess(inputs('e1', []));
+
+		expect(decision).toEqual({ action: 'wait', sources: new Set(['sbx']) });
+		expect(wait.size).toBe(0);
+	});
+
+	it('names no source when none provides the requirements', async () => {
+		const { shortage, wait } = await build();
+		const unprovided = inputs('e1', []);
+		unprovided.placement = { ...unprovided.placement, requires: ['fs=confined', 'net=none'] };
+		unprovided.guaranteesOf = () => ['fs=confined', 'net=none'];
+
+		const decision = shortage.assess(unprovided);
+
+		expect(decision).toEqual({ action: 'wait', sources: new Set() });
+		expect(wait.size).toBe(0);
+	});
+
 	it('does not wait forever for a worker held by a run that is over: fails after the bound naming the worker and run', async () => {
 		const { shortage, wait, clock } = await build();
 

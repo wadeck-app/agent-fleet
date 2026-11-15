@@ -4,9 +4,15 @@ import { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
 
 function build(plan: { fork: number } = { fork: 1 }) {
+	// Per source: how many workers are connected, and how many it may have.
+	const connected = new Map<string, number>();
+	const maxWorkers = new Map<string, number>();
 	const provisioner = {
 		planProvisioning: vi.fn().mockReturnValue(plan),
 		provision: vi.fn().mockResolvedValue(undefined),
+		connectedWorkersOf: (sourceId: string) => connected.get(sourceId) ?? 0,
+		hasRoomForWorkerOf: (sourceId: string) =>
+			(connected.get(sourceId) ?? 0) < (maxWorkers.get(sourceId) ?? Infinity),
 	};
 	const rerunDispatch = vi.fn();
 	const requestFromDeclaredSources = vi.fn();
@@ -15,7 +21,7 @@ function build(plan: { fork: number } = { fork: 1 }) {
 		rerunDispatch,
 		requestFromDeclaredSources
 	);
-	return { coverage, provisioner, rerunDispatch, requestFromDeclaredSources };
+	return { coverage, provisioner, rerunDispatch, requestFromDeclaredSources, connected, maxWorkers };
 }
 
 describe('UnmetDemandCoverage - steps nothing could take', () => {
@@ -79,6 +85,54 @@ describe('UnmetDemandCoverage - steps nothing could take', () => {
 				['b'],
 				['a'],
 			]);
+		});
+
+		// Decision D5: a busy source grows up to its maxWorkers, one worker per ask.
+		it('asks again once the previous ask produced a connected worker, and never on a pass where nothing changed', () => {
+			const { coverage, requestFromDeclaredSources, connected, maxWorkers } = build();
+			maxWorkers.set('sbx', 3);
+			connected.set('sbx', 1);
+
+			coverage.cover(0, new Set(['sbx']));
+			// Passes while the worker is still starting: same count, no new ask.
+			coverage.cover(0, new Set(['sbx']));
+			coverage.cover(0, new Set(['sbx']));
+			expect(requestFromDeclaredSources).toHaveBeenCalledTimes(1);
+
+			connected.set('sbx', 2);
+			coverage.cover(0, new Set(['sbx']));
+			coverage.cover(0, new Set(['sbx']));
+			expect(requestFromDeclaredSources).toHaveBeenCalledTimes(2);
+
+			// At its cap: not asked any more, however many passes.
+			connected.set('sbx', 3);
+			coverage.cover(0, new Set(['sbx']));
+			coverage.cover(0, new Set(['sbx']));
+			expect(requestFromDeclaredSources).toHaveBeenCalledTimes(2);
+		});
+
+		it('does not ask a source already at its maxWorkers (no launch that would be refused on arrival)', () => {
+			const { coverage, requestFromDeclaredSources, connected, maxWorkers } = build();
+			maxWorkers.set('sbx', 1);
+			connected.set('sbx', 1);
+
+			coverage.cover(0, new Set(['sbx', 'other']));
+
+			expect(requestFromDeclaredSources).toHaveBeenCalledTimes(1);
+			expect(requestFromDeclaredSources).toHaveBeenCalledWith(new Set(['other']));
+		});
+
+		it('asks again when room opens after the source was at its cap and a step still waits', () => {
+			const { coverage, requestFromDeclaredSources, connected, maxWorkers } = build();
+			maxWorkers.set('sbx', 1);
+			connected.set('sbx', 1);
+			coverage.cover(0, new Set(['sbx']));
+			expect(requestFromDeclaredSources).not.toHaveBeenCalled();
+
+			connected.set('sbx', 0);
+			coverage.cover(0, new Set(['sbx']));
+
+			expect(requestFromDeclaredSources).toHaveBeenCalledWith(new Set(['sbx']));
 		});
 
 		it('does not keep a demand re-check running for them', () => {

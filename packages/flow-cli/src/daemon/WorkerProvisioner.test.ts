@@ -118,6 +118,42 @@ function sourceCaps(caps: Record<string, number>, labels: Record<string, string[
 	};
 }
 
+describe('WorkerProvisioner - room left in a source (decision D5)', () => {
+	function withConnected(cap: number, connected: number) {
+		const registry = new WorkerRegistry();
+		const provisioner = makeProvisioner(
+			5,
+			registry,
+			fakeSource({ hasSpawned: () => false }),
+			allowAll(),
+			sourceCaps({ sbx: cap })
+		);
+		for (let pid = 1; pid <= connected; pid++) {
+			provisioner.registerWorker(fakeWorker(), { pid, sourceId: 'sbx', authToken: 't', features: MODERN });
+		}
+		return provisioner;
+	}
+
+	it('has room while fewer workers than maxWorkers are connected, and counts them', () => {
+		const provisioner = withConnected(3, 2);
+
+		expect(provisioner.connectedWorkersOf('sbx')).toBe(2);
+		expect(provisioner.hasRoomForWorkerOf('sbx')).toBe(true);
+	});
+
+	it('has no room at maxWorkers: the same cap that refuses a worker on arrival', () => {
+		const provisioner = withConnected(2, 2);
+
+		expect(provisioner.hasRoomForWorkerOf('sbx')).toBe(false);
+	});
+
+	it('does not block a source it cannot find (the ask itself reports an unknown source)', () => {
+		const provisioner = withConnected(1, 1);
+
+		expect(provisioner.hasRoomForWorkerOf('unknown')).toBe(true);
+	});
+});
+
 describe('WorkerProvisioner - source labels (D#30)', () => {
 	// Labels are declared once on the source and every worker from it carries them. Without
 	// this, `flow worker source add gpu-box --labels gpu` has no effect on routing at all and

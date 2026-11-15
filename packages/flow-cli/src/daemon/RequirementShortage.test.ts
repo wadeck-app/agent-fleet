@@ -72,12 +72,12 @@ function inputs(overrides: Partial<ShortageInputs> = {}, requires: string[] = ['
 }
 
 describe('RequirementShortage', () => {
-	it('waits with no clock while a worker that meets the requirements is connected (it is busy)', async () => {
+	it('waits with no clock while a worker that meets the requirements is connected (it is busy): the source is still named, to ask for another one', async () => {
 		const { shortage, wait } = await build({ sbx: ['fs=confined'] });
 
 		expect(shortage.assess(inputs({ connected: [worker('w1', 'sbx')] }))).toEqual({
 			action: 'wait',
-			sources: new Set(),
+			sources: new Set(['sbx']),
 		});
 		expect(wait.size).toBe(0);
 	});
@@ -167,7 +167,7 @@ describe('RequirementShortage', () => {
 
 		const decision = shortage.assess(inputs({ connected: [worker('w1', 'sbx')] }));
 
-		expect(decision).toEqual({ action: 'wait', sources: new Set() });
+		expect(decision).toEqual({ action: 'wait', sources: new Set(['sbx']) });
 		expect(wait.size).toBe(0);
 	});
 });

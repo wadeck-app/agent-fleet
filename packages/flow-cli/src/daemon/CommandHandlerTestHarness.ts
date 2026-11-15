@@ -118,6 +118,9 @@ export function createMockWorkerPool() {
 		canProvision: vi.fn().mockReturnValue(false),
 		planProvisioning: vi.fn().mockReturnValue({ fork: 0 }),
 		provision: vi.fn().mockResolvedValue(undefined),
+		// Per-source room (decision D5): no source is at its cap and none has a connected worker, unless a test says so.
+		connectedWorkersOf: vi.fn().mockReturnValue(0),
+		hasRoomForWorkerOf: vi.fn().mockReturnValue(true),
 		registerWorker: vi.fn().mockReturnValue(true),
 	};
 	return pool;

@@ -25,8 +25,11 @@ const DEMAND_RECHECK_MS = 250;
 export class UnmetDemandCoverage {
 	/** When the current episode of unserved demand began, for the S8 wait (D#25) */
 	private unmetDemandSince: number | undefined;
-	/** Sources asked for a worker because a step waits for a requirement they can provide, while that step keeps waiting */
-	private readonly requestedRequirementSources = new Set<string>();
+	/**
+	 * Sources asked for a worker because a step waits for a requirement they can provide, while that step keeps waiting,
+	 * with how many of their workers were connected when asked.
+	 */
+	private readonly requestedRequirementSources = new Map<string, number>();
 	/** Pending re-run of dispatch while S8 waits; nothing else would trigger one */
 	private demandRecheck: ReturnType<typeof setTimeout> | undefined;
 	/** Delay and stderr line for a dispatch pass of the re-check that threw. */
@@ -50,17 +53,25 @@ export class UnmetDemandCoverage {
 	 * @param unmetDemand steps nothing could run that a host worker could: the only ones worth forking for.
 	 * @param requirementSources ids of the declared sources that can provide what unplaced steps require. Not counted in
 	 *        `unmetDemand` (a host worker guarantees nothing): nothing is planned or forked for them, only these sources
-	 *        are asked, once while the steps wait, and the deadline is the dispatcher's, not a re-check's.
+	 *        are asked (once per connected-worker count while the steps wait, never when at their maxWorkers), and the deadline is the dispatcher's, not a re-check's.
 	 */
 	cover(unmetDemand: number, requirementSources: ReadonlySet<string> = new Set()): void {
-		const newSources = new Set([...requirementSources].filter(id => !this.requestedRequirementSources.has(id)));
-		for (const id of [...this.requestedRequirementSources]) {
-			if (!requirementSources.has(id)) {
+		// A source at its maxWorkers is not asked: the worker would be refused on arrival (one refusal line, one wasted launch).
+		const askable = new Set([...requirementSources].filter(id => this.provisioner.hasRoomForWorkerOf(id)));
+		// A source is asked again only once its previous ask has produced a connected worker (the count moved) and a step
+		// still waits: a worker still starting is not counted, so the same ask is never repeated on every dispatch pass.
+		const newSources = new Set(
+			[...askable].filter(
+				id => this.requestedRequirementSources.get(id) !== this.provisioner.connectedWorkersOf(id)
+			)
+		);
+		for (const id of [...this.requestedRequirementSources.keys()]) {
+			if (!askable.has(id)) {
 				this.requestedRequirementSources.delete(id);
 			}
 		}
 		for (const id of newSources) {
-			this.requestedRequirementSources.add(id);
+			this.requestedRequirementSources.set(id, this.provisioner.connectedWorkersOf(id));
 		}
 		if (newSources.size > 0) {
 			this.requestFromDeclaredSources?.(newSources);
