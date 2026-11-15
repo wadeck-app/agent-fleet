@@ -1,11 +1,10 @@
+import { WORKER_FEATURE_RUN_HOLD } from 'flow-cli/src/ipc/Protocol';
+
 import type { JsonObject } from '../harness/HarnessMessages';
 
-/**
- * The `run-hold` protocol of the flow daemon (flow-cli `Protocol.ts`: `WORKER_FEATURE_RUN_HOLD`, messages
- * `worker_hold_enabled` and `worker_hold`). This branch's copy of flow-cli predates it, so the value is declared here;
- * replace it with the import once flow-cli on this branch has it.
- */
-export const WORKER_FEATURE_RUN_HOLD = 'run-hold';
+// The `run-hold` protocol of the flow daemon (messages `worker_hold_enabled` and `worker_hold`) is defined in flow-cli
+// `Protocol.ts`.
+export { WORKER_FEATURE_RUN_HOLD };
 
 export interface RunHoldAnnouncerOptions {
 	/** The run the wrapper currently keeps a sandbox for (`SandboxLifecycle.current()?.executionId`): the single source of truth. */
