@@ -4,6 +4,7 @@ import { ConfigDir } from '@wadeck-app/shared-cli/ConfigDir';
 import { FLOW_CONFIG_DIR_NAME, FlowQueryService } from 'flow-core';
 
 import { registerGraphRoutes } from './GraphRoutes.js';
+import { registerHealthRoutes } from './HealthRoutes.js';
 
 /**
  * backendEntryPath target of the packaged manifest: app-core calls this once at module load.
@@ -11,5 +12,7 @@ import { registerGraphRoutes } from './GraphRoutes.js';
  */
 export default function (ctx: ModuleContext): void {
 	// Same location as the flow CLI and daemon (ConfigDir.get(FLOW_CONFIG_DIR_NAME), XDG_CONFIG_HOME honoured), resolved once.
-	registerGraphRoutes(ctx, FlowQueryService.forConfigDir(ConfigDir.get(FLOW_CONFIG_DIR_NAME)));
+	const service = FlowQueryService.forConfigDir(ConfigDir.get(FLOW_CONFIG_DIR_NAME));
+	registerGraphRoutes(ctx, service);
+	registerHealthRoutes(ctx, service);
 }

@@ -12,6 +12,7 @@ import {
 import { registerExecutionLogRoutes } from './ExecutionLogRoutes.js';
 import { registerExecutionRoutes } from './ExecutionRoutes.js';
 import { registerExecutionWidgetRoutes } from './ExecutionWidgetRoutes.js';
+import { registerHealthRoutes } from './HealthRoutes.js';
 import { registerLogRoutes } from './LogRoutes.js';
 import { registerPluginRoutes } from './PluginRoutes.js';
 import { registerProjectRelatedRoutes } from './ProjectRelatedRoutes.js';
@@ -36,6 +37,7 @@ export default function (ctx: ModuleContext): void {
 	registerExecutionWidgetRoutes(ctx, service);
 	registerWorkerRoutes(ctx, service);
 	registerLogRoutes(ctx, service);
+	registerHealthRoutes(ctx, service);
 	registerPluginRoutes(ctx, service);
 	// Read per request, like the project names above: the registry is shared with the project CLI.
 	registerProjectRelatedRoutes(ctx, service, createRegistryProjectFinderFromEnv(process.env));
