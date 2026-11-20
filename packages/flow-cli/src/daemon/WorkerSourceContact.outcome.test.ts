@@ -40,6 +40,36 @@ describe('contactDeclaredSources - the outcome of each ask', () => {
 	});
 });
 
+describe('contactDeclaredSources - a source that starts nothing', () => {
+	function pluginSource(answer: unknown) {
+		const workerTypes = {
+			get: vi.fn().mockResolvedValue({ source: { obtainWorker: vi.fn().mockResolvedValue(answer) } }),
+		};
+		return { workerTypes: workerTypes as never, entries: [entry('sbx', 'sandbox', {})].map(e => ({ ...e, plugin: 'p' })) };
+	}
+
+	it('reports a source that answered launched: false', async () => {
+		const onNothingStarted = vi.fn();
+		const { workerTypes, entries } = pluginSource({ launched: false });
+
+		await contactDeclaredSources(entries, 'ws://x', () => {}, { workerTypes, onNothingStarted });
+
+		expect(onNothingStarted).toHaveBeenCalledExactlyOnceWith('sbx');
+	});
+
+	it.each([[{ launched: true }], [undefined], [{}], [{ launched: 'no' }]])(
+		'reports nothing for the answer %j (only the exact boolean false means nothing started)',
+		async answer => {
+			const onNothingStarted = vi.fn();
+			const { workerTypes, entries } = pluginSource(answer);
+
+			await contactDeclaredSources(entries, 'ws://x', () => {}, { workerTypes, onNothingStarted });
+
+			expect(onNothingStarted).not.toHaveBeenCalled();
+		}
+	);
+});
+
 describe('DaemonSourceContact - keeps the last contact error of each source', () => {
 	function contact(entries: ReturnType<typeof entry>[]) {
 		const sources = {

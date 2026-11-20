@@ -81,6 +81,13 @@ export class DaemonSourceContact {
 				// dispatcher names only the sources that can serve the step it waits for.
 				skipRequirementOnly: sourceIds === undefined,
 				contactOutcome: this.contactErrors,
+				onNothingStarted: (sourceId: string) => {
+					writeDaemonLog(
+						this.logsDir,
+						'info',
+						`worker source "${sourceId}" was asked for a worker and started none (it answered launched: false, usually because a worker of it is already running). If the source is declared with --max-workers above 1, check that its worker type can run several workers; otherwise declare one source per worker.`
+					);
+				},
 			}
 		).catch((err: unknown) => {
 			process.stderr.write(`[daemon] contacting worker sources failed: ${getErrorMessage(err)}\n`);

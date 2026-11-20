@@ -45,6 +45,12 @@ export interface SourceProviderDependencies {
 	 * capacity). A source whose build fails is not asked either.
 	 */
 	skipRequirementOnly?: boolean;
+	/**
+	 * Told when a source answered an ask with `{ launched: false }` (no worker started, for example because one is already
+	 * running). Without it that answer leaves no trace, and a source declared with `maxWorkers` above what its plugin can
+	 * run looks like a daemon that never asks.
+	 */
+	onNothingStarted?: (sourceId: string) => void;
 }
 
 /**
@@ -167,12 +173,16 @@ export async function contactDeclaredSources(
 				if (provider === undefined) {
 					return;
 				}
-				await provider.obtainWorker({
+				const result = await provider.obtainWorker({
 					daemonEndpoint,
 					sourceId: entry.sourceId,
 					projects: [],
 				});
 				dependencies.contactOutcome?.succeeded(entry.sourceId);
+				// Only the exact boolean false is "nothing started" (the contract of WorkerObtainResult).
+				if (typeof result === 'object' && result !== null && result.launched === false) {
+					dependencies.onNothingStarted?.(entry.sourceId);
+				}
 			} catch (err) {
 				// Read once, for the report and the daemon log only: the outcome sink gets the fact of the failure, never the text.
 				const message = messageOf(err);
