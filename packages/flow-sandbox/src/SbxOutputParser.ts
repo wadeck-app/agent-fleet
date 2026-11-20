@@ -14,6 +14,12 @@ function excerpt(text: string): string {
 	return trimmed.length > 200 ? `${trimmed.slice(0, 200)}...` : trimmed;
 }
 
+/** The end of an output: where a truncated or polluted output shows, which its first characters never do. */
+function tailExcerpt(text: string): string {
+	const trimmed = text.trim();
+	return trimmed.length > 200 ? `...${trimmed.slice(-200)}` : trimmed;
+}
+
 /**
  * Turns sbx output into typed values. Anything unexpected is a SandboxError('output-unparsable') that
  * names the command and quotes the output: sbx is 0.x and its JSON shapes have changed before, so a
@@ -143,6 +149,8 @@ export class SbxOutputParser {
 			throw new SandboxError(
 				'output-unparsable',
 				`\`${command}\` did not print valid JSON: "${excerpt(output)}". ` +
+					`The parser said: ${error instanceof Error ? error.message : String(error)}. ` +
+					`The output has ${output.length} characters and ends with: "${tailExcerpt(output)}". ` +
 					'sbx may have failed halfway or its output format changed; run the command by hand to see why.',
 				{ cause: error }
 			);

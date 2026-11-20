@@ -256,3 +256,19 @@ describe('SbxOutputParser.parseSettings', () => {
 		);
 	});
 });
+
+describe('SbxOutputParser output that is not valid JSON', () => {
+	it('tells where the parser stopped, how long the output was and how it ends, not only how it starts', () => {
+		const rules = Array.from({ length: 40 }, (_, index) => ({ id: `rule-${index}`, resource_type: 'network' }));
+		const complete = JSON.stringify({ rules }, undefined, 2);
+		const cut = `${complete.slice(0, 3000)}\n[garbage in the middle]\n${complete.slice(3000)}`;
+
+		const error = failure(() => parser.parseNetworkPolicy(cut));
+
+		expect(error.message).toContain('did not print valid JSON');
+		expect(error.message).toContain(`${cut.length} characters`);
+		expect(error.message).toMatch(/position \d+/);
+		expect(error.message).toContain('ends with:');
+		expect(error.message).toContain('"resource_type": "network"');
+	});
+});
