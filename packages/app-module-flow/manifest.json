@@ -1,5 +1,6 @@
 {
 	"id": "flow",
+	"optionalRequires": { "project": "*" },
 	"dslLib": {
 		"shared": {
 			"react": "^19",

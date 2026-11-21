@@ -23,6 +23,7 @@ const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf
 	version?: unknown;
 	backendEntryPath?: unknown;
 	requires?: unknown;
+	optionalRequires?: Record<string, string>;
 	dslLib?: { shared?: Record<string, string> };
 	expose?: { slots?: Record<string, { accepts: string[] }> };
 	extensionPoints: {
@@ -174,6 +175,11 @@ describe('manifest.json (source manifest of the app-core-cli layout)', () => {
 		});
 
 		it('requires no other module: flow works with no contributor installed', () => {
+			expect(manifest.requires).toBeUndefined();
+		});
+
+		it('declares the project module as an optional dependency: the project page asks only the modules that declare it', () => {
+			expect(manifest.optionalRequires).toEqual({ project: '*' });
 			expect(manifest.requires).toBeUndefined();
 		});
 
