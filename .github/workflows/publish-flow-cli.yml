@@ -74,6 +74,10 @@ jobs:
                     (cd "packages/$pkg" && npm pkg set version="${{ steps.version.outputs.version }}")
                   done
 
+            # The generator (ci/scripts/generate-platform-packages.sh) writes no `engines`; the bundles target node24.
+            - name: Declare the Node minimum of the main package
+              run: (cd packages/flow-cli-dist && npm pkg set engines.node=">=24")
+
             - name: Upload artifacts
               uses: actions/upload-artifact@v4
               with:

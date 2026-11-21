@@ -48,7 +48,7 @@ const sharedBanner = { js: `const __importMetaUrl = require('node:url').pathToFi
 const common = {
 	bundle: true,
 	platform: 'node',
-	target: 'node22',
+	target: 'node24',
 	format: 'cjs',
 	external: [],
 	supported: { 'top-level-await': false },
