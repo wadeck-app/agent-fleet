@@ -61,13 +61,19 @@ export function registerHealthRoutes(
 				}
 				return { ok: true };
 			}),
+			// Only the folder is listed: `service.listExecutions` reads and parses every execution file synchronously (seconds
+			// with a thousand runs), which blocks the app-core process and made the first call exceed the check timeout.
 			runCheck('executions-store', timeoutMs, () => {
+				const { executionsDir } = service.directories;
 				try {
-					service.listExecutions({ limit: 1 });
+					readdirSync(executionsDir);
 				} catch (err) {
+					if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+						return { ok: true, detail: 'no execution yet' };
+					}
 					return {
 						ok: false,
-						detail: `Cannot read the executions in ${service.directories.executionsDir}: ${errorMessage(err)}`,
+						detail: `Cannot read the executions in ${executionsDir}: ${errorMessage(err)}`,
 					};
 				}
 				return { ok: true };

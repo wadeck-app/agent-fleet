@@ -45,7 +45,11 @@ describe('GET /health', () => {
 		expect(status).toBe(200);
 		expect((body as { ok: boolean }).ok).toBe(true);
 		expect(checkOf(body, 'config-dir')).toEqual({ name: 'config-dir', ok: true });
-		expect(checkOf(body, 'executions-store')).toEqual({ name: 'executions-store', ok: true });
+		expect(checkOf(body, 'executions-store')).toEqual({
+			name: 'executions-store',
+			ok: true,
+			detail: 'no execution yet',
+		});
 		expect(checkOf(body, 'logs-dir')).toEqual({ name: 'logs-dir', ok: true, detail: 'no log yet' });
 		expect(checkOf(body, 'daemon')).toEqual({
 			name: 'daemon',
@@ -86,21 +90,29 @@ describe('GET /health', () => {
 		expect((body as { ok: boolean }).ok).toBe(false);
 	});
 
-	it('fails the executions check with the error text when the store cannot be read', async () => {
-		const service = {
-			directories: { configDir: fixture.configDir, executionsDir: '/x/executions' },
-		} as FlowQueryService;
-		Object.assign(service, {
-			listExecutions: vi.fn(() => {
-				throw new Error('EACCES: permission denied');
-			}),
-			listWorkers: vi.fn().mockResolvedValue({ daemon: { running: false } }),
-		});
+	it('is ok, without detail, with an existing executions folder', async () => {
+		const service = FlowQueryService.forConfigDir(fixture.configDir);
+		mkdirSync(service.directories.executionsDir, { recursive: true });
+		const { body } = await callRoute(routesFor(service), 'GET /health');
+		expect(checkOf(body, 'executions-store')).toEqual({ name: 'executions-store', ok: true });
+	});
+
+	it('does not read the executions: listing the folder is enough (reading them all took seconds and froze the server)', async () => {
+		const service = FlowQueryService.forConfigDir(fixture.configDir);
+		const listExecutions = vi.spyOn(service, 'listExecutions');
+		await callRoute(routesFor(service), 'GET /health');
+		expect(listExecutions).not.toHaveBeenCalled();
+	});
+
+	it('fails the executions check naming the path and the error text when the folder cannot be read', async () => {
+		const service = FlowQueryService.forConfigDir(fixture.configDir);
+		writeFileSync(service.directories.executionsDir, 'SECRET-CONTENT');
 		const { body } = await callRoute(routesFor(service), 'GET /health');
 		const check = checkOf(body, 'executions-store');
 		expect(check.ok).toBe(false);
-		expect(check.detail).toContain('/x/executions');
-		expect(check.detail).toContain('EACCES: permission denied');
+		expect(check.detail).toContain(service.directories.executionsDir);
+		expect(check.detail).toContain('ENOTDIR');
+		expect(check.detail).not.toContain('SECRET-CONTENT');
 		expect((body as { ok: boolean }).ok).toBe(false);
 	});
 
