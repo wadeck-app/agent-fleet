@@ -147,7 +147,14 @@ beforeEach(() => {
 	scrollIntoView.mockReset();
 	Element.prototype.scrollIntoView = scrollIntoView;
 });
+
 afterEach(() => localStorage.clear());
+// The scrolls of log lines and sections only: the A/B dock (dsl-ui AbRow) also scrolls its selected option into view.
+function logScrolls(): unknown[] {
+	return scrollIntoView.mock.contexts.filter(
+		context => context instanceof Element && context.closest('[data-log-step]') !== null
+	);
+}
 
 // The defaults other than the dimension under test, so a test reads one dimension at a time.
 const BASE = { identity: 'plain', grouping: 'flat', navigation: 'none', time: 'offset', density: 'comfortable' };
@@ -424,14 +431,14 @@ describe('LogStream navigation', () => {
 	it('rail: a click on a step of the page scrolls to it', () => {
 		show({}, { ...BASE, navigation: 'rail' });
 		fireEvent.click(screen.getByRole('button', { name: 'child, running, 1 line' }));
-		expect(scrollIntoView).toHaveBeenCalledTimes(1);
+		expect(logScrolls()).toHaveLength(1);
 		expect(screen.getByTestId('location').textContent).toBe('/logs');
 	});
 
 	it('rail: a click on a step absent from the page filters the log to it', () => {
 		show({}, { ...BASE, navigation: 'rail' });
 		fireEvent.click(screen.getByRole('button', { name: 'later, pending, 0 lines' }));
-		expect(scrollIntoView).not.toHaveBeenCalled();
+		expect(logScrolls()).toHaveLength(0);
 		expect(screen.getByTestId('location').textContent).toBe('/logs?step=later');
 	});
 
@@ -440,7 +447,7 @@ describe('LogStream navigation', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }));
 		fireEvent.click(screen.getByRole('button', { name: 'child, running, 1 line' }));
 		expect(screen.getByText('child warns')).toBeInTheDocument();
-		expect(scrollIntoView).toHaveBeenCalledTimes(1);
+		expect(logScrolls()).toHaveLength(1);
 	});
 });
 
