@@ -19,6 +19,11 @@
  * PLUGIN_KEEP=1 keeps the isolated directory (project, pool, daemon log) and prints its path; on any failure the FULL daemon log is copied next to the
  * results file (`<results>.daemon.log`) and its tail is printed. A source that cannot be built or loaded makes every wait fail AT ONCE with the daemon
  * log lines that say why (no 120 s step wait, no 90 s `sbx rm` wait for a run that never started).
+ * PLUGIN_TOOLS_ONLY=codex|opencode|both and PLUGIN_TOOLS_SCENARIO=resume|shell|mixed|mcp|hook run the tool sections only (see the comment above
+ * the scenarios). The source declares one profile alias PER TOOL it runs (profiles=codex=<PLUGIN_PROFILE>, see profileOption below).
+ * Hook scenario (real codex through Bedrock, needs an image of this checkout): SBX_LIVE=1 PLUGIN_TOOLS_ONLY=codex PLUGIN_TOOLS_SCENARIO=hook
+ * PLUGIN_PROFILE=<the Codex profile> [PLUGIN_CODEX_MODEL=<id>] [PLUGIN_IMAGE=<image>] node --import tsx packages/flow-sandbox/scripts/live/PluginLiveCheck.mjs
+ * PLUGIN_HOOK_CONTROL=1 (hook scenario only) runs the same step WITHOUT toolHooks: the commit must then happen (proves the probe can commit at all).
  * Exit code: 0 all assertions passed, 1 one failed, 2 refused to run.
  */
 import { addProject } from '@wadeck-app/project-sdk';
@@ -465,7 +470,26 @@ const toolsOnly = process.env.PLUGIN_TOOLS_ONLY;
 if (toolsOnly !== undefined && !['codex', 'opencode', 'both'].includes(toolsOnly))
 	refuse('PLUGIN_TOOLS_ONLY must be codex, opencode or both.');
 const scenario = process.env.PLUGIN_TOOLS_SCENARIO ?? 'plain';
-if (!['plain', 'resume', 'shell', 'mixed', 'mcp'].includes(scenario)) refuse('PLUGIN_TOOLS_SCENARIO must be plain, resume, shell, mixed or mcp.');
+if (!['plain', 'resume', 'shell', 'mixed', 'mcp', 'hook'].includes(scenario))
+	refuse('PLUGIN_TOOLS_SCENARIO must be plain, resume, shell, mixed, mcp or hook.');
+if (scenario === 'hook' && toolsOnly !== 'codex')
+	refuse(
+		'PLUGIN_TOOLS_SCENARIO=hook needs PLUGIN_TOOLS_ONLY=codex (tool hooks are supported on codex steps in a sandbox only).'
+	);
+const hookControl = process.env.PLUGIN_HOOK_CONTROL === '1';
+if (hookControl && scenario !== 'hook') refuse('PLUGIN_HOOK_CONTROL=1 only applies to PLUGIN_TOOLS_SCENARIO=hook.');
+// One alias per tool the check runs (the alias is the tool name, all backed by PLUGIN_PROFILE): a tool without an alias fails its step.
+const toolsRun =
+	scenario === 'mixed'
+		? ['claude', 'opencode', 'codex']
+		: scenario === 'mcp'
+			? ['claude']
+			: toolsOnly === undefined
+				? ['claude', 'opencode']
+				: toolsOnly === 'both'
+					? ['codex', 'opencode']
+					: [toolsOnly];
+const profileOption = toolsRun.map(tool => `${tool}=${profile}`).join(',');
 if (scenario !== 'plain' && toolsOnly === undefined)
 	refuse('PLUGIN_TOOLS_SCENARIO=' + scenario + ' needs PLUGIN_TOOLS_ONLY=codex|opencode|both.');
 const codexModel = process.env.PLUGIN_CODEX_MODEL ?? 'openai.gpt-5.6-terra';
@@ -549,7 +573,7 @@ try {
 			'--option',
 			`region=${region}`,
 			'--option',
-			`profiles=claude=${profile}`,
+			`profiles=${profileOption}`,
 			'--option',
 			`image=${image}`,
 			'--option',
@@ -1057,6 +1081,178 @@ try {
 			'NOTE  the codex step is not part of a full run (its models need another profile): PLUGIN_TOOLS_ONLY=codex PLUGIN_PROFILE=<the Codex profile>'
 		);
 	}
+	// PLUGIN_TOOLS_SCENARIO=hook (PLUGIN_TOOLS_ONLY=codex): ONE codex step in the sandbox with a deny toolHook on `git commit`; the step asks the model to run
+	// `git commit --allow-empty -m probe` in a git repository that this check initialised in the pool slot (one commit) BEFORE the run.
+	// Asserted: the step completed, the model made a tool call, codex reported "Command blocked by PreToolUse hook" (with the reason), HEAD and the commit
+	// count of the slot are unchanged (checked on the HOST). PLUGIN_HOOK_CONTROL=1: same step without toolHooks, the commit must happen.
+	if (scenario === 'hook') {
+		const hookReason = 'git commit is denied in this sandbox';
+		const hookCommand = 'git commit --allow-empty -m probe';
+		const slotDirectory = path.join(poolDirectory, 'slot-1');
+		const git = (...args) =>
+			execFileSync('git', ['-C', slotDirectory, ...args], {
+				encoding: 'utf8',
+				timeout: 30_000,
+				windowsHide: true,
+			}).trim();
+		const hookFlow = path.join(projectDirectory, `plugin-live-hook${hookControl ? '-control' : ''}.yml`);
+		// @formatter:off
+		const toolHooksYaml = hookControl
+			? ''
+			: `      toolHooks:
+          - timing: before
+            action:
+                type: deny
+                reason: '${hookReason}'
+                toolPattern: 'bash'
+                argsContains: 'git commit'
+`;
+		fs.writeFileSync(
+			hookFlow,
+			`id: plugin-live-hook
+version: '1.0.0'
+name: Plugin live check, codex tool hook
+description: One codex step that runs git commit, with a deny tool hook (unless PLUGIN_HOOK_CONTROL=1).
+
+workspace: { provider: pool, dir: '${poolDirectory.replaceAll('\\', '/')}', prefix: slot-, count: 1 }
+
+steps:
+    - id: hook
+      name: git commit under a deny hook
+      type: model
+      provider: codex
+      model: ${codexModel}
+      skipPermissions: true
+${toolHooksYaml}      prompt: |
+          In your current working directory (a git repository), run exactly this command with your shell tool: ${hookCommand}
+          Do NOT try any other way around a block: if the command is refused or blocked, do not retry it, do not use another tool, do not edit any file and do not change any git setting.
+          Then reply with ONE line saying whether the command ran or was blocked, quoting any block message verbatim.
+      output:
+          answer:
+              type: string
+              from: last_message
+`
+		);
+		// @formatter:on
+		await step(
+			`scenario hook (codex${hookControl ? ', CONTROL without toolHooks' : ''}): real Bedrock, one run, git commit ${hookControl ? 'must run' : 'must be blocked'}`,
+			async () => {
+				// The engine's own validation of the generated flow (loud on a refused shape).
+				const validated = flow(['validate', hookFlow]);
+				expect(
+					validated.status === 0,
+					`flow validate refused ${hookFlow}: ${validated.stdout}${validated.stderr}`
+				);
+				// The repository the step commits into: one commit, a local identity (so that a commit that runs would succeed), no signing.
+				git('init', '-q');
+				git('config', 'user.name', 'Hook Probe');
+				git('config', 'user.email', 'hook-probe@example.invalid');
+				git('config', 'commit.gpgsign', 'false');
+				git('commit', '-q', '--allow-empty', '-m', 'initial');
+				const headBefore = git('rev-parse', 'HEAD');
+				const countBefore = Number(git('rev-list', '--count', 'HEAD'));
+				expect(countBefore === 1, `the probe repository should hold one commit, it holds ${countBefore}`);
+				const creationsBefore = timings().filter(entry => entry.words[0] === 'create').length;
+				const started = flow(['run', hookFlow, '--json']);
+				const match = /"executionId"\s*:\s*"([^"]+)"/.exec(started.stdout);
+				expect(match !== null, `no executionId from flow run: ${started.stdout}${started.stderr}`);
+				const executionId = match[1];
+				evidence.executionId = executionId;
+				console.log(`      execution id: ${executionId}`);
+				const record = await waitFor(`execution ${executionId} to settle`, 600_000, () => {
+					const shown = flow(['show', executionId, '--json']);
+					if (shown.status !== 0) return undefined;
+					const parsed = JSON.parse(shown.stdout);
+					return ['completed', 'failed', 'cancelled'].includes(parsed.status) ? parsed : undefined;
+				});
+				const stepRecord = record.steps?.hook;
+				const finalText = String(stepRecord?.io?.outputs?.response?.text ?? stepRecord?.io?.stdout?.text ?? '');
+				const stderrText = String(stepRecord?.io?.stderr?.text ?? '');
+				const stdoutText = String(stepRecord?.io?.stdout?.text ?? '');
+				console.log(`      final text of the step: ${JSON.stringify(finalText)}`);
+				const headAfter = fs.existsSync(path.join(slotDirectory, '.git'))
+					? git('rev-parse', 'HEAD')
+					: undefined;
+				const countAfter = headAfter === undefined ? undefined : Number(git('rev-list', '--count', 'HEAD'));
+				// Where the codex block message is visible in the record, if anywhere.
+				const blockPattern = /Command blocked by PreToolUse hook/i;
+				const blockSeenIn = [
+					['stderr', stderrText],
+					['stdout', stdoutText],
+					['final text', finalText],
+					['whole step record', JSON.stringify(stepRecord ?? {})],
+				]
+					.filter(([, text]) => blockPattern.test(text))
+					.map(([name]) => name);
+				const reasonSeen = JSON.stringify(stepRecord ?? {}).includes(hookReason);
+				evidence['scenario-hook'] = {
+					control: hookControl,
+					executionId,
+					status: stepRecord?.status,
+					finalText,
+					toolCalls: stepRecord?.meta?.tool_calls,
+					headBefore,
+					headAfter,
+					countBefore,
+					countAfter,
+					blockSeenIn,
+					reasonSeen,
+					stderrTail: stderrText.slice(-1500),
+				};
+				const failures = [];
+				const check = (condition, message) => {
+					if (!condition) failures.push(message);
+				};
+				check(
+					record.status === 'completed' && stepRecord?.status === 'completed',
+					`the step did not complete (run ${record.status}, step ${stepRecord?.status}): ${stepRecord?.error ?? ''} | stderr tail ${stderrText.slice(-600)}`
+				);
+				check(
+					stepRecord?.sourceId === 'sandbox-live',
+					`the step was served by ${stepRecord?.sourceId}, not the sandbox`
+				);
+				check(
+					(stepRecord?.meta?.tool_calls?.total ?? 0) >= 1,
+					`the model made no tool call (tool_calls ${JSON.stringify(stepRecord?.meta?.tool_calls ?? null)}): the hook was never exercised, so an unchanged HEAD proves nothing`
+				);
+				check(
+					headAfter !== undefined,
+					'the .git of the probe repository is gone from the slot after the run: HEAD cannot be compared'
+				);
+				if (hookControl) {
+					check(
+						headAfter !== undefined && headAfter !== headBefore && countAfter === countBefore + 1,
+						`CONTROL: the commit did not happen without the hook (HEAD ${headBefore} -> ${headAfter}, commits ${countBefore} -> ${countAfter}): the probe cannot tell a block from another failure`
+					);
+				} else {
+					check(
+						headAfter === headBefore,
+						`HEAD changed (${headBefore} -> ${headAfter}): the commit ran although the hook denies it`
+					);
+					check(
+						countAfter === countBefore,
+						`the commit count changed (${countBefore} -> ${countAfter}): the commit ran`
+					);
+					check(
+						blockSeenIn.length > 0,
+						`no "Command blocked by PreToolUse hook" text anywhere in the step record (the workspace is unchanged, which alone does not prove the hook acted): stderr tail ${stderrText.slice(-600)}`
+					);
+					check(reasonSeen, `the deny reason "${hookReason}" appears nowhere in the step record`);
+				}
+				const creations = timings().filter(entry => entry.words[0] === 'create').length - creationsBefore;
+				check(creations === 1, `${creations} sandboxes were created for the run, expected 1`);
+				expect(failures.length === 0, `${failures.join(' || ')} | execution ${executionId}`);
+				return `execution ${executionId}; HEAD ${headBefore.slice(0, 8)} -> ${headAfter?.slice(0, 8)}, commits ${countBefore} -> ${countAfter}; block text seen in: ${blockSeenIn.join(', ') || 'nowhere'}; final text ${JSON.stringify(finalText)}`;
+			}
+		);
+		await step('the hook sandbox is removed too', async () => {
+			await sleep(1500);
+			const remaining = (await new SbxCliRuntime({ env: { ...process.env, SBX_PATH: realSbx } }).list()).filter(
+				entry => entry.name.startsWith('flow-sbx-') && !sandboxesBefore.has(entry.name)
+			);
+			expect(remaining.length === 0, `sandboxes left: ${remaining.map(entry => entry.name).join(', ')}`);
+		});
+	}
 	// PLUGIN_TOOLS_SCENARIO=resume|shell|mixed (with PLUGIN_TOOLS_ONLY=codex|opencode|both; `mixed` also runs a Claude step, always with
 	// the profile given): what the plain prompt above does not show.
 	//   resume: per tool, a second step with `session: continue` must recall a word of the first (same sandbox, store on the .meta mount).
@@ -1066,7 +1262,7 @@ try {
 	//   mcp:    ONE Claude model step that calls the engine's provideSteps MCP tool to inject a `type: script` step, in a run confined ONLY by
 	//           the implicit agent set (no flow-level requires/profile): the injected script must run in the SAME sandbox, never on a host worker.
 	//           Needs the image to carry /opt/flow/mcp-callback-forwarder.cjs (use PLUGIN_TOOLS_ONLY=both only to skip the other sections).
-	if (scenario !== 'plain') {
+	if (scenario !== 'plain' && scenario !== 'hook') {
 		const scenarioTools =
 			scenario === 'mixed'
 				? ['claude', 'opencode', 'codex']
@@ -1104,19 +1300,18 @@ ${extra}${depends ? `      depends:\n          - ${depends}\n` : ''}      prompt
 					modelStepYaml(tool, 'inject', {
 						// Without it claude refuses the MCP tool call in a non-interactive run ("has not been granted permission", seen live).
 						extra: '      skipPermissions: true\n',
-						prompt:
-							'Call the provideSteps tool exactly once with a single step whose id is "from-model", whose name is "From model", whose type is "script" and whose script is: hostname . Use no other key than id, name, type and script (the daemon refuses any other). After the tool call succeeds, reply with the single word DONE.',
+						prompt: 'Call the provideSteps tool exactly once with a single step whose id is "from-model", whose name is "From model", whose type is "script" and whose script is: hostname . Use no other key than id, name, type and script (the daemon refuses any other). After the tool call succeeds, reply with the single word DONE.',
 					})
 				);
 			} else if (scenario === 'shell') {
-				const command = 'Run this exact shell command with your shell tool: echo flow$((6*7))ok-$(hostname) . Then reply with its exact output and nothing else.';
+				const command =
+					'Run this exact shell command with your shell tool: echo flow$((6*7))ok-$(hostname) . Then reply with its exact output and nothing else.';
 				scenarioSteps.push(
 					modelStepYaml(tool, `${tool}-skip`, { extra: '      skipPermissions: true\n', prompt: command }),
 					modelStepYaml(tool, `${tool}-allow`, { extra: '      tools: [bash, read]\n', prompt: command }),
 					modelStepYaml(tool, `${tool}-deny`, {
 						extra: '      tools: [read]\n',
-						prompt:
-							'Try to run this exact shell command with a shell tool: echo flow$((6*7))ok-$(hostname) . If you have no shell tool, reply with the single word NOSHELL and nothing else; otherwise reply with the output.',
+						prompt: 'Try to run this exact shell command with a shell tool: echo flow$((6*7))ok-$(hostname) . If you have no shell tool, reply with the single word NOSHELL and nothing else; otherwise reply with the output.',
 					})
 				);
 			} else {
@@ -1181,7 +1376,8 @@ ${scenarioSteps.join('\n')}
 						`${tool}-second did not recall PINEAPPLE: ${describeStep(`${tool}-second`)}`
 					);
 					check(
-						record.steps?.[`${tool}-first`]?.meta?.session_id === record.steps?.[`${tool}-second`]?.meta?.session_id,
+						record.steps?.[`${tool}-first`]?.meta?.session_id ===
+							record.steps?.[`${tool}-second`]?.meta?.session_id,
 						`${tool}: the second step did not continue the session of the first`
 					);
 					lines.push(
@@ -1203,17 +1399,30 @@ ${scenarioSteps.join('\n')}
 						!/flow42ok/.test(answerOf(`${tool}-deny`)),
 						`${tool}-deny ran the shell although bash is not in tools: ${describeStep(`${tool}-deny`)}`
 					);
-					lines.push(`${tool}: skip ${answerOf(`${tool}-skip`)}, allow ${answerOf(`${tool}-allow`)}, deny ${answerOf(`${tool}-deny`)}`);
+					lines.push(
+						`${tool}: skip ${answerOf(`${tool}-skip`)}, allow ${answerOf(`${tool}-allow`)}, deny ${answerOf(`${tool}-deny`)}`
+					);
 				} else if (scenario === 'mcp') {
 					const injected = record.steps?.['from-model'];
-					check(record.steps?.inject?.status === 'completed', `the model step did not complete: ${describeStep('inject')}`);
-					check(injected?.status === 'completed', `the injected step did not complete (was it injected?): ${JSON.stringify(injected ?? null).slice(0, 400)}`);
-					check(injected?.sourceId === 'sandbox-live', `the injected step ran on source ${injected?.sourceId}, not in the sandbox`);
+					check(
+						record.steps?.inject?.status === 'completed',
+						`the model step did not complete: ${describeStep('inject')}`
+					);
+					check(
+						injected?.status === 'completed',
+						`the injected step did not complete (was it injected?): ${JSON.stringify(injected ?? null).slice(0, 400)}`
+					);
+					check(
+						injected?.sourceId === 'sandbox-live',
+						`the injected step ran on source ${injected?.sourceId}, not in the sandbox`
+					);
 					check(
 						/flow-sbx-/.test(textOf(injected)),
 						`the injected script did not print the VM host name (flow-sbx-...): ${JSON.stringify(textOf(injected))}`
 					);
-					lines.push(`inject: ${record.steps?.inject?.status}; from-model: ${injected?.status} on ${injected?.sourceId}, printed ${JSON.stringify(textOf(injected))}`);
+					lines.push(
+						`inject: ${record.steps?.inject?.status}; from-model: ${injected?.status} on ${injected?.sourceId}, printed ${JSON.stringify(textOf(injected))}`
+					);
 				} else {
 					const stepRecord = record.steps?.[tool];
 					const mantleDenied =
