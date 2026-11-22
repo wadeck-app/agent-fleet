@@ -1,3 +1,4 @@
+import { PlacementCatalog } from '../requirements/PlacementCatalog';
 import { ProfileCatalog } from '../requirements/ProfileCatalog';
 import { RequirementSyntax } from '../requirements/RequirementSyntax';
 import type { FlowDefinition, FlowStep } from '../types';
@@ -23,14 +24,73 @@ export class RequirementValidator {
 		private readonly knownGuarantees?: readonly string[]
 	) {}
 
+	/** The flow's `placements` as written, kept by {@link validateFlow} for the steps that follow. */
+	private placements: unknown;
+
 	validateFlow(flow: FlowDefinition): void {
+		this.placements = flow.placements;
 		this.validate(flow.requires, `Flow '${flow.id}'`, { field: 'requires' });
 		this.validateProfile(flow.profile, `Flow '${flow.id}'`, { field: 'profile' });
+		this.validatePlacements(flow.placements, `Flow '${flow.id}'`);
+		this.validatePlacementName(flow.placement, `Flow '${flow.id}'`, { field: 'placement' });
 	}
 
 	validateStep(step: FlowStep): void {
 		this.validate(step.requires, `Step '${step.id}'`, { stepId: step.id, field: 'requires' });
 		this.validateProfile(step.profile, `Step '${step.id}'`, { stepId: step.id, field: 'profile' });
+		this.validatePlacementName(step.placement, `Step '${step.id}'`, { stepId: step.id, field: 'placement' });
+	}
+
+	/** `placements` must be a non-empty map of non-empty requirement lists; the entries follow the `requires` rules. */
+	private validatePlacements(placements: unknown, where: string): void {
+		if (placements === undefined) {
+			return;
+		}
+		const suggestion =
+			'Write placements: { main: ["sandbox"], linux: ["os=linux"] }: a name and a non-empty list of requirements each.';
+		if (!PlacementCatalog.isMap(placements) || Object.keys(placements).length === 0) {
+			this.report(
+				ValidationCode.INVALID_TYPE,
+				`${where}: placements must be a non-empty map of name to requirements list, got ${JSON.stringify(placements)}`,
+				{ field: 'placements' },
+				suggestion
+			);
+			return;
+		}
+		for (const [name, entries] of Object.entries(placements)) {
+			const location = { field: `placements.${name}` };
+			try {
+				PlacementCatalog.assertShape(name, entries, where);
+			} catch (error) {
+				this.report(ValidationCode.INVALID_TYPE, (error as Error).message, location, suggestion);
+				continue;
+			}
+			this.validate(entries, `${where}: placement '${name}'`, location);
+		}
+	}
+
+	/** A `placement` must be one string naming a declared placement; a near miss gets a did-you-mean. */
+	private validatePlacementName(name: unknown, where: string, location: ValidationIssue['location']): void {
+		if (name === undefined) {
+			return;
+		}
+		try {
+			PlacementCatalog.expand(this.placements, name, where);
+		} catch (error) {
+			const declared = PlacementCatalog.names(this.placements);
+			// A declared name whose own list is malformed is already reported by validatePlacements.
+			if (typeof name === 'string' && declared.includes(name)) {
+				return;
+			}
+			this.report(
+				typeof name === 'string' ? ValidationCode.INVALID_VALUE : ValidationCode.INVALID_TYPE,
+				(error as Error).message,
+				location,
+				declared.length === 0
+					? 'Declare it first: placements: { <name>: ["sandbox"] } at flow level.'
+					: `Write placement: <name> with one of: ${declared.join(', ')}.`
+			);
+		}
 	}
 
 	/**

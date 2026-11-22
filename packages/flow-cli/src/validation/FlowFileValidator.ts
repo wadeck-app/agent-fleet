@@ -155,12 +155,20 @@ export function validateFlowFile(
 }
 
 const REQUIREMENTS_RUN_START_NOTE =
-	'Profile names and the syntax of requires were checked. Whether a worker source provides the guarantees (requires:, profile:) is only known to the daemon: it is checked when the run starts.';
+	'Profile and placement names and the syntax of requires were checked. Whether a worker source provides the guarantees (requires:, profile:, placements:) is only known to the daemon: it is checked when the run starts.';
 
 /** Whether the flow or a step declares `requires` or `profile`. */
 function usesRequirements(flow: FlowDefinition): boolean {
-	const declares = (target: { requires?: unknown; profile?: unknown }): boolean =>
-		target.requires !== undefined || target.profile !== undefined;
+	const declares = (target: {
+		requires?: unknown;
+		profile?: unknown;
+		placement?: unknown;
+		placements?: unknown;
+	}): boolean =>
+		target.requires !== undefined ||
+		target.profile !== undefined ||
+		target.placement !== undefined ||
+		target.placements !== undefined;
 	return declares(flow) || (Array.isArray(flow.steps) && flow.steps.some(step => declares(step)));
 }
 

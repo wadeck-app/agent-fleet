@@ -1,5 +1,5 @@
 import type { RunRequirementsRecord } from 'flow-core';
-import { ProfileCatalog, RequirementSyntax } from 'flow-engine';
+import { PlacementCatalog, ProfileCatalog, RequirementSyntax } from 'flow-engine';
 import type { FlowDefinition } from 'flow-engine';
 
 import { normaliseStepRequirements } from './RequirementMatcher.js';
@@ -9,6 +9,9 @@ import { normaliseStepRequirements } from './RequirementMatcher.js';
  * flow-level `profile` merged into each declared step's own (`requires` and `profile`). The result is recorded in the
  * execution record and used for every placement of the run, so editing the definition afterwards (or resuming) never
  * changes what a running execution requires.
+ *
+ * Placements: a declared step gets its own `placement` (else the flow's default `placement`) added to the flow `requires`/`profile`;
+ * the step's placement REPLACES the default, it never adds to it. `run` (what an injected step inherits) holds the default.
  *
  * @param implicit what the daemon adds to every model step on top of what the flow wrote (the `agent` profile when a worker
  *        source guaranteeing it is configured, see {@link ImplicitConfinement}); absent: nothing is added. Declared script steps never get it; steps injected later do (see {@link requirementsForStep}).
@@ -21,16 +24,21 @@ export function resolveRunRequirements(
 	implicit: readonly string[] = []
 ): RunRequirementsRecord | undefined {
 	const flowWhere = `Flow "${flow.id}"`;
-	const run = [
-		...new Set([
-			...RequirementSyntax.normalise(flow.requires, flowWhere),
-			...(flow.profile === undefined ? [] : ProfileCatalog.expand(flow.profile, flowWhere)),
-		]),
-	].sort();
+	const base = [
+		...RequirementSyntax.normalise(flow.requires, flowWhere),
+		...(flow.profile === undefined ? [] : ProfileCatalog.expand(flow.profile, flowWhere)),
+	];
+	const placementOf = (name: unknown, where: string): string[] =>
+		name === undefined ? [] : PlacementCatalog.expand(flow.placements, name, where);
+	const run = [...new Set([...base, ...placementOf(flow.placement, flowWhere)])].sort();
 	const implicitSteps: string[] = [];
 	const steps = Object.fromEntries(
 		flow.steps.map(step => {
-			const declared = normaliseStepRequirements(run, step.requires, step.id, step.profile);
+			// The step's placement replaces the flow's default one: start from the flow set without the default.
+			const placed = [
+				...new Set([...base, ...placementOf(step.placement ?? flow.placement, `Step "${step.id}"`)]),
+			].sort();
+			const declared = normaliseStepRequirements(placed, step.requires, step.id, step.profile);
 			if (step.type !== MODEL_STEP_TYPE || implicit.length === 0) {
 				return [step.id, declared];
 			}

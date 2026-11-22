@@ -575,6 +575,13 @@ export interface BaseFlowStep {
 	 */
 	profile?: string;
 
+	/**
+	 * Name of one of the flow's {@link FlowDefinition.placements}: its requirements are added to this step's, and REPLACE
+	 * the flow-level default {@link FlowDefinition.placement} for this step (the only way to drop a default). An unknown
+	 * name fails validation.
+	 */
+	placement?: string;
+
 	/** Conditional execution expression (evaluated to boolean) */
 	when?: string;
 
@@ -1068,6 +1075,18 @@ export interface FlowDefinition {
 	 * accepts the run.
 	 */
 	profile?: string;
+
+	/**
+	 * Named placements: each name maps to a list of requirements (same syntax as `requires`, AND). A step picks one with
+	 * `placement: <name>`. Must not be empty; each list must not be empty.
+	 */
+	placements?: Record<string, string[]>;
+
+	/**
+	 * Default placement of every step (injected ones included): a name of {@link placements}. A step's own `placement`
+	 * replaces it for that step; flow `requires`/`profile` stay added either way.
+	 */
+	placement?: string;
 
 	/** Default working directory for script steps. Step-level workingDir takes precedence. */
 	workingDir?: string;

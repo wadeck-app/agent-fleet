@@ -88,6 +88,37 @@ describe('validateFlowFile - note on the run-start check', () => {
 	});
 });
 
+describe('validateFlowFile - placements', () => {
+	it('accepts declared placements, a default and a step override offline, with the run-start note', () => {
+		const result = validateFlowFile(
+			flowWith(
+				{ placements: { main: ['sandbox'], linux: ['os=linux'] }, placement: 'main' },
+				{ placement: 'linux' }
+			),
+			store
+		);
+
+		if (result.exit !== 0) throw new Error(`Expected exit 0, got ${JSON.stringify(result)}`);
+		expect(result.notes).toHaveLength(1);
+	});
+
+	it('refuses an unknown step placement with a did-you-mean in the printed message', () => {
+		const result = validateFlowFile(flowWith({ placements: { main: ['sandbox'] } }, { placement: 'mian' }), store);
+
+		if (result.exit !== 1) throw new Error(`Expected exit 1, got ${JSON.stringify(result)}`);
+		expect(result.errors).toHaveLength(1);
+		expect(result.errors[0]!.message).toContain('Did you mean "main"?');
+	});
+
+	it('refuses an empty placements map and an empty placement', () => {
+		for (const placements of [{}, { main: [] }]) {
+			const result = validateFlowFile(flowWith({ placements }), store);
+			if (result.exit !== 1) throw new Error(`Expected exit 1, got ${JSON.stringify(result)}`);
+			expect(result.errors).toHaveLength(1);
+		}
+	});
+});
+
 describe('validateFlowFile - the removed workerType', () => {
 	it('refuses workerType: sandbox with the whole migration in the printed message', () => {
 		const result = validateFlowFile(flowWith({ workerType: 'sandbox' }), store);

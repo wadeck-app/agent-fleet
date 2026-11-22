@@ -195,6 +195,26 @@ A profile is a named set of requirements, built into the code (`ProfileCatalog` 
 - **Refused at run start when only other projects are served.** What the flow itself declares (`requires:`, `profile:`, flow or step; never the implicit set above) must be guaranteed by a source that serves the project of the run. If declared sources guarantee a set but every one has a `projects` option that excludes the project, the run is refused with `REQUIREMENT_NOT_SERVED_FOR_PROJECT`, naming the requirements (and profile), the project id, the sources and the projects they serve, and the fix (declare a source with `--option projects=<id>`, or remove the requirement). A source without `projects` is unrestricted and unchanged. Not refused while a declared source is unread (its manifest could not be read: it may be the one).
 - **No configuration override yet.** Built-ins only. When `config.yml` overrides are added, the rule is that a config may only TIGHTEN a built-in (the override must contain every requirement of the built-in).
 
+### Placements (`placements:` / `placement:`)
+
+```yaml
+placements: { main: [sandbox], linux: [os=linux] } # flow level: name -> requirements (same syntax as requires)
+placement: main # flow level default, every step incl. injected ones
+steps:
+    - { id: build, placement: linux, ... } # REPLACES the default for this step
+```
+
+A placement is a named `requires` list (`PlacementCatalog` in flow-engine). It is only sugar for requirements: the daemon adds it to the step's set when the run is accepted, so hard filter, run start check and unmet-at-run-time apply unchanged.
+
+- **Replace, not add.** A step's `placement` replaces the flow default for that step; flow `requires`/`profile` and the step's own `requires`/`profile` are still added. This is the only way to drop a flow-level default.
+- **Injected steps** inherit the default placement (it is in the recorded `run` set). They cannot carry `placement` (refused like other unlisted keys).
+- **Offline checks** (`flow validate`): `placements` must be a non-empty map, each list non-empty and valid; an unknown name, at flow or step level, is an error with `Did you mean`.
+- **Limits.** Not recorded by name and not shown by `flow show` (only the expanded requirements are). The run-start project check also asks for the default placement at run level, even when every step overrides it.
+
+### Stickiness (S1)
+
+Among the idle workers the built-in distribution ranks, the one that served the previous step of the same run moves first inside its group (registered before forked still wins). Soft: it never waits for a busy worker and never changes eligibility; a custom distribution plugin keeps its own order. A worker holding the run's sandbox is still pinned by the hold (D4).
+
 ## Three rules that explain most surprises
 
 1. **Declared is not available** (D#4). A declared source with nothing attached is intent, not

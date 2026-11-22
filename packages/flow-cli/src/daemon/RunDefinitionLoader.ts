@@ -197,10 +197,16 @@ function hasRequirements(flow: FlowDefinition): boolean {
 	return (
 		flow.requires !== undefined ||
 		flow.profile !== undefined ||
+		flow.placement !== undefined ||
+		flow.placements !== undefined ||
 		(Array.isArray(steps) &&
 			steps.some(step => {
-				const declared = step as { requires?: unknown; profile?: unknown } | null;
-				return declared?.requires !== undefined || declared?.profile !== undefined;
+				const declared = step as { requires?: unknown; profile?: unknown; placement?: unknown } | null;
+				return (
+					declared?.requires !== undefined ||
+					declared?.profile !== undefined ||
+					declared?.placement !== undefined
+				);
 			}))
 	);
 }
