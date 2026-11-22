@@ -11,6 +11,7 @@ import {
 } from '../processing/CompactHook';
 import { buildContextLimitEnv, haikuContextLimitWarning, validateContextLimit } from '../processing/ContextLimit';
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
+import { CodexSessionModelReader } from '../processing/CodexSessionModelReader';
 import { ModelPriceTable, PRICES_AS_OF } from '../processing/ModelPriceTable';
 import type { OutputExtractor } from '../processing/OutputExtractor';
 import type { ProcessLauncher } from '../processing/ProcessLauncher';
@@ -61,6 +62,11 @@ export interface ModelStepConfig {
 	 * ended (default {@link DEFAULT_RESULT_GRACE_MS}). Only read by the claude launcher.
 	 */
 	resultGraceMs?: number;
+	/**
+	 * Finds the model codex used from its session file, for a codex step that names no model. Defaults to the real
+	 * codex home; tests inject one on a temporary folder.
+	 */
+	codexSessionModelReader?: CodexSessionModelReader;
 }
 
 const MODEL_PRICE_TABLE = new ModelPriceTable();
@@ -83,9 +89,14 @@ interface CodexUsageCapture {
  */
 function estimateCodexCost(
 	model: string | undefined,
-	usage: CodexUsageCapture
+	usage: CodexUsageCapture,
+	/** Why the model could not be read from the codex session file; appended to the unknown reason. */
+	modelDiscoveryFailure?: string
 ): Pick<ModelStepMeta['cost'], 'usd' | 'estimated' | 'pricesAsOf' | 'unknownReason'> {
-	const unknown = (unknownReason: string): { usd: number; unknownReason: string } => ({ usd: 0, unknownReason });
+	const unknown = (unknownReason: string): { usd: number; unknownReason: string } => ({
+		usd: 0,
+		unknownReason: modelDiscoveryFailure === undefined ? unknownReason : `${unknownReason}; ${modelDiscoveryFailure}`,
+	});
 	if (model === undefined || model === '') {
 		return unknown(
 			`codex reports no cost and model unknown (the step sets no model, so codex uses the default of its own config) is not in the price table of ${PRICES_AS_OF}`
@@ -502,8 +513,16 @@ export async function executeModelStep(
 
 	const buildModelMeta = (endReason: AttemptEndReason): ModelStepMeta => {
 		const observed = metrics?.snapshot();
+		// A codex step naming no model runs the default of its own config: ask its session file which one it was
+		const discovered =
+			actualProvider === 'codex' && (effectiveModel === undefined || effectiveModel === '') && capturedSessionId !== ''
+				? (config.codexSessionModelReader ?? new CodexSessionModelReader()).read(capturedSessionId)
+				: undefined;
+		const modelForCost = discovered !== undefined && 'model' in discovered ? discovered.model : effectiveModel;
+		const discoveryFailure =
+			discovered !== undefined && 'unknownReason' in discovered ? discovered.unknownReason : undefined;
 		return {
-			model: effectiveModel ?? '',
+			model: modelForCost ?? '',
 			provider: actualProvider,
 			session_id: capturedSessionId,
 			session_file: capturedSessionFile,
@@ -518,14 +537,18 @@ export async function executeModelStep(
 				reported: capturedCostReported,
 				// codex reports no cost: price its usage when the model is known, else say why it is unknown
 				...(actualProvider === 'codex'
-					? estimateCodexCost(effectiveModel, {
-							seen: capturedUsageSeen,
-							inconsistent: capturedUsageInconsistent,
-							uncachedInputTokens: capturedInputTokens,
-							cacheReadTokens: capturedCacheReadTokens,
-							cacheWriteTokens: capturedCacheWriteTokens,
-							outputTokens: capturedOutputTokens,
-						})
+					? estimateCodexCost(
+							modelForCost,
+							{
+								seen: capturedUsageSeen,
+								inconsistent: capturedUsageInconsistent,
+								uncachedInputTokens: capturedInputTokens,
+								cacheReadTokens: capturedCacheReadTokens,
+								cacheWriteTokens: capturedCacheWriteTokens,
+								outputTokens: capturedOutputTokens,
+							},
+							discoveryFailure
+						)
 					: {}),
 			},
 			...(observed?.turns !== undefined && { turns: observed.turns }),

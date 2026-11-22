@@ -2,7 +2,13 @@
  * What a model attempt reports about itself: turns, tool calls, written files, end reason, and whether a
  * cost was actually reported. Hand-written ModelProvider emitting stream events -- no real CLI launch.
  */
-import { describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { CodexSessionModelReader } from '../processing/CodexSessionModelReader';
 
 import type { LaunchOptions, ModelBackgroundResult, ModelProvider } from '../processing/ModelProvider';
 import { OutputExtractor } from '../processing/OutputExtractor';
@@ -65,14 +71,15 @@ function scriptedProvider(events: StreamJsonEvent[], result: Partial<ModelBackgr
 
 async function run(
 	provider: ModelProvider,
-	step: ModelFlowStep = makeStep()
+	step: ModelFlowStep = makeStep(),
+	codexSessionModelReader?: CodexSessionModelReader
 ): Promise<{ trace: StepTrace; meta: ModelStepMeta }> {
 	const trace = await executeModelStep(
 		step,
 		'/workspace',
 		{ inputs: {}, stepOutputs: new Map() } as never,
 		makeTrace(step),
-		{ interactive: false, provider },
+		{ interactive: false, provider, ...(codexSessionModelReader && { codexSessionModelReader }) },
 		{ templateRenderer: new TemplateRenderer(), outputExtractor: new OutputExtractor() }
 	);
 	return { trace, meta: trace.meta as ModelStepMeta };
@@ -283,15 +290,85 @@ describe('ModelStepExecutor -- codex cost estimate', () => {
 		);
 	});
 
-	it('leaves the usd unknown when the step sets no model (codex then uses the default of its own config)', async () => {
-		const { meta } = await run(
-			scriptedProvider([init, codexResult(firstTurnUsage)]),
-			makeStep({ provider: 'codex', model: undefined })
-		);
+	describe('step without model', () => {
+		const homes: string[] = [];
+		afterEach(() => {
+			for (const home of homes.splice(0)) fs.rmSync(home, { recursive: true, force: true });
+		});
+		const emptyHome = (): CodexSessionModelReader => {
+			const home = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-home-'));
+			homes.push(home);
+			return new CodexSessionModelReader(home);
+		};
+		const homeWithSession = (model: string): CodexSessionModelReader => {
+			const home = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-home-'));
+			homes.push(home);
+			const day = path.join(home, 'sessions', '2026', '11', '22');
+			fs.mkdirSync(day, { recursive: true });
+			const line = JSON.stringify({ timestamp: 't', ordinal: 1, type: 'turn_context', payload: { model } });
+			fs.writeFileSync(path.join(day, 'rollout-2026-11-22T11-29-37-s1.jsonl'), line + '\n');
+			return new CodexSessionModelReader(home);
+		};
 
-		expect(meta.cost.estimated).toBeUndefined();
-		expect(meta.cost.unknownReason).toContain('model unknown');
-		expect(meta.cost.unknownReason).toContain('2026-11-08');
+		it('estimates with the model codex recorded in its session file, and records it as the step model', async () => {
+			const { meta } = await run(
+				scriptedProvider([init, codexResult(firstTurnUsage)]),
+				makeStep({ provider: 'codex', model: undefined }),
+				homeWithSession('openai.gpt-5.6-luna')
+			);
+
+			expect(meta.model).toBe('openai.gpt-5.6-luna');
+			expect(meta.cost.estimated).toBe(true);
+			expect(meta.cost.usd).toBeCloseTo(0.00257389, 12);
+			expect(meta.cost.unknownReason).toBeUndefined();
+		});
+
+		it('stays unknown, with the reader reason appended, when the session file cannot be read', async () => {
+			const { meta } = await run(
+				scriptedProvider([init, codexResult(firstTurnUsage)]),
+				makeStep({ provider: 'codex', model: undefined }),
+				emptyHome()
+			);
+
+			expect(meta.model).toBe('');
+			expect(meta.cost.estimated).toBeUndefined();
+			expect(meta.cost.usd).toBe(0);
+			expect(meta.cost.unknownReason).toContain('model unknown');
+			expect(meta.cost.unknownReason).toContain('2026-11-08');
+			expect(meta.cost.unknownReason).toContain("no codex session file 'rollout-*-s1.jsonl'");
+		});
+
+		it('stays unknown when the recorded model is not in the price table', async () => {
+			const { meta } = await run(
+				scriptedProvider([init, codexResult(firstTurnUsage)]),
+				makeStep({ provider: 'codex', model: undefined }),
+				homeWithSession('openai.gpt-9')
+			);
+
+			expect(meta.model).toBe('openai.gpt-9');
+			expect(meta.cost.estimated).toBeUndefined();
+			expect(meta.cost.unknownReason).toContain("model 'openai.gpt-9' is not in the price table");
+		});
+
+		it('does not read the session file when the step names a model', async () => {
+			const reader = { read: () => { throw new Error('must not be called'); } } as unknown as CodexSessionModelReader;
+			const { meta } = await run(
+				scriptedProvider([init, codexResult(firstTurnUsage)]),
+				makeStep({ provider: 'codex', model: 'openai.gpt-5.6-luna' }),
+				reader
+			);
+			expect(meta.cost.estimated).toBe(true);
+		});
+
+		it('does not read the session file when no thread id was captured', async () => {
+			const reader = { read: () => { throw new Error('must not be called'); } } as unknown as CodexSessionModelReader;
+			const { meta } = await run(
+				scriptedProvider([codexResult(firstTurnUsage)]),
+				makeStep({ provider: 'codex', model: undefined }),
+				reader
+			);
+			expect(meta.cost.unknownReason).toContain('model unknown');
+		});
 	});
 
 	it('leaves the usd unknown, never 0 priced, when the attempt ended without any usage', async () => {
