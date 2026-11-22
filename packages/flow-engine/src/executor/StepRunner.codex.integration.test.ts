@@ -516,7 +516,10 @@ describe.skipIf(!shouldRunIntegration())('Codex real vs mock compatibility', () 
 				const final = events.find(e => e.type === 'result');
 				expect(String(final?.data['result']).toLowerCase()).toContain('ok');
 				const usage = (final?.data['modelUsage'] as Record<string, Record<string, number>>)['codex']!;
-				expect(usage['inputTokens']).toBeGreaterThan(0);
+				// inputTokens is the uncached part only: the whole input is the three figures together
+				expect(usage['inputTokens']! + usage['cacheReadTokens']! + usage['cacheWriteTokens']!).toBeGreaterThan(
+					0
+				);
 				expect(usage['outputTokens']).toBeGreaterThan(0);
 				passed.add('provider against real codex');
 			} finally {

@@ -152,6 +152,83 @@ describe('FlowEventMapper over ExecutionStore transitions', () => {
 			expect(failed).toMatchObject({ stepTotalCostComplete: false, endReason: 'timeout' });
 		});
 
+		const codexEstimated = (usd: number) =>
+			model(0, {
+				provider: 'codex',
+				model: 'openai.gpt-5.6-luna',
+				cost: {
+					input_tokens: 42,
+					output_tokens: 5,
+					cache_read_tokens: 0,
+					cache_write_tokens: 9302,
+					usd,
+					reported: false,
+					estimated: true,
+					pricesAsOf: '2026-11-08',
+				},
+			});
+
+		it('puts the run total on execution.completed, summed from the step totals, flagged exact when nothing is estimated', () => {
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markStepCompleted(EXEC_ID, 'a', model(0.25));
+			store.markStepRunning(EXEC_ID, 'b');
+			store.markStepCompleted(EXEC_ID, 'b', model(0.5, { session_id: 'sess-2' }));
+			store.markExecutionCompleted(EXEC_ID);
+
+			const execution = publisher.events.find(e => e.event === 'flow.execution.completed')!.payload;
+			expect(execution.totalCostUsd).toBeCloseTo(0.75, 10);
+			expect(execution).toMatchObject({ totalCostComplete: true, totalCostEstimated: false });
+		});
+
+		it('flags the run total as an estimate when a codex step is priced locally, on step and execution events', () => {
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markStepCompleted(EXEC_ID, 'a', model(0.25));
+			store.markStepRunning(EXEC_ID, 'b');
+			store.markStepCompleted(EXEC_ID, 'b', codexEstimated(0.00257389));
+			store.markExecutionCompleted(EXEC_ID);
+
+			const codexStep = publisher.events.filter(e => e.event === 'flow.step.completed')[1]!.payload;
+			expect(codexStep.stepTotalCostUsd).toBeCloseTo(0.00257389, 12);
+			expect(codexStep.stepTotalCostEstimated).toBe(true);
+			const execution = publisher.events.find(e => e.event === 'flow.execution.completed')!.payload;
+			expect(execution.totalCostUsd).toBeCloseTo(0.25257389, 10);
+			expect(execution).toMatchObject({ totalCostComplete: true, totalCostEstimated: true });
+		});
+
+		it('puts the run total on execution.failed too, a lower bound when an attempt cost is unknown, and omits the usd when nothing is known', () => {
+			const unreported = model(0, {
+				cost: {
+					input_tokens: 0,
+					output_tokens: 0,
+					cache_read_tokens: 0,
+					cache_write_tokens: 0,
+					usd: 0,
+					reported: false,
+				},
+			});
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markStepFailed(EXEC_ID, 'a', 'killed', undefined, undefined, undefined, { meta: unreported });
+			store.markExecutionFailed(EXEC_ID);
+
+			const execution = publisher.events.find(e => e.event === 'flow.execution.failed')!.payload;
+			expect(execution).not.toHaveProperty('totalCostUsd');
+			expect(execution).toMatchObject({ totalCostComplete: false, totalCostEstimated: false });
+		});
+
+		it('adds no run total to execution.started, nor to a run without any model cost', () => {
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markStepCompleted(EXEC_ID, 'a');
+			store.markExecutionCompleted(EXEC_ID);
+
+			const started = publisher.events.find(e => e.event === 'flow.execution.started')!.payload;
+			const completed = publisher.events.find(e => e.event === 'flow.execution.completed')!.payload;
+			for (const payload of [started, completed]) {
+				expect(payload).not.toHaveProperty('totalCostUsd');
+				expect(payload).not.toHaveProperty('totalCostComplete');
+				expect(payload).not.toHaveProperty('totalCostEstimated');
+			}
+		});
+
 		it('adds no cost field for a step without model cost (script step)', () => {
 			store.markStepRunning(EXEC_ID, 'a');
 			store.markStepCompleted(EXEC_ID, 'a');

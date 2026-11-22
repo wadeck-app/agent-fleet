@@ -1,5 +1,11 @@
 import type { AttemptRecord, StepState } from '../execution/ExecutionState.js';
-import { type AttemptCost, formatStepCost, sumStepCosts, summarizeStepCost } from '../execution/StepCost.js';
+import {
+	type AttemptCost,
+	estimateNote,
+	formatStepCost,
+	sumStepCosts,
+	summarizeStepCost,
+} from '../execution/StepCost.js';
 import { formatDuration, formatModelCost } from '../history/ExecutionFormat.js';
 
 // The cost and attempt lines of a step, shared by `flow show` and `flow history --id` so both print the same figures.
@@ -16,9 +22,10 @@ function costPart(cost: AttemptCost | undefined): string[] {
 	if (cost?.notApplicable === true) {
 		return [];
 	}
-	return [
-		cost?.usd !== undefined ? `$${cost.usd.toFixed(4)}` : `cost unknown (${cost?.unknownReason ?? 'not recorded'})`,
-	];
+	if (cost?.usd === undefined) {
+		return [`cost unknown (${cost?.unknownReason ?? 'not recorded'})`];
+	}
+	return [cost.estimated === true ? `~$${cost.usd.toFixed(4)} (${estimateNote(cost)})` : `$${cost.usd.toFixed(4)}`];
 }
 
 function attemptLine(entry: AttemptRecord, cost: AttemptCost | undefined, indent: string): string {

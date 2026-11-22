@@ -224,3 +224,101 @@ describe('ModelStepExecutor -- attempt rejected before launch', () => {
 		expect(meta.tool_calls).toBeUndefined();
 	});
 });
+
+describe('ModelStepExecutor -- codex cost estimate', () => {
+	// What CodexEventParser emits for the real first turn: input 9344 - 0 cached - 9302 cache write = 42 uncached
+	const codexResult = (modelUsage: Record<string, unknown>): StreamJsonEvent => ({
+		type: 'result',
+		subtype: 'result',
+		data: { result: 'done', cost_usd: 0, duration_ms: 5, modelUsage },
+	});
+	const firstTurnUsage = {
+		codex: { inputTokens: 42, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 9302 },
+	};
+
+	it('estimates the usd from the usage when the model is in the price table, without calling it reported', async () => {
+		const { meta } = await run(
+			scriptedProvider([init, codexResult(firstTurnUsage)]),
+			makeStep({ provider: 'codex', model: 'openai.gpt-5.6-luna' })
+		);
+
+		expect(meta.cost.reported).toBe(false);
+		expect(meta.cost.estimated).toBe(true);
+		expect(meta.cost.pricesAsOf).toBe('2026-11-08');
+		// 42 * 0.22 + 9302 * 0.275 + 5 * 1.32 = 2573.89 per million
+		expect(meta.cost.usd).toBeCloseTo(0.00257389, 12);
+		expect(meta.cost.unknownReason).toBeUndefined();
+		expect(meta.cost.input_tokens).toBe(42);
+		expect(meta.cost.cache_write_tokens).toBe(9302);
+	});
+
+	it('resolves the family alias to the id of the price table when the caller passes it', async () => {
+		const step = makeStep({ provider: 'codex', model: 'luna' });
+		const trace = await executeModelStep(
+			step,
+			'/workspace',
+			{ inputs: {}, stepOutputs: new Map() } as never,
+			makeTrace(step),
+			{
+				interactive: false,
+				provider: scriptedProvider([init, codexResult(firstTurnUsage)]),
+				resolvedModel: 'openai.gpt-5.6-luna',
+			},
+			{ templateRenderer: new TemplateRenderer(), outputExtractor: new OutputExtractor() }
+		);
+		expect((trace.meta as ModelStepMeta).cost.estimated).toBe(true);
+		expect((trace.meta as ModelStepMeta).model).toBe('openai.gpt-5.6-luna');
+	});
+
+	it('leaves the usd unknown with the reason when the model is not in the table', async () => {
+		const { meta } = await run(
+			scriptedProvider([init, codexResult(firstTurnUsage)]),
+			makeStep({ provider: 'codex', model: 'openai.gpt-9' })
+		);
+
+		expect(meta.cost.estimated).toBeUndefined();
+		expect(meta.cost.reported).toBe(false);
+		expect(meta.cost.unknownReason).toBe(
+			"codex reports no cost and model 'openai.gpt-9' is not in the price table of 2026-11-08"
+		);
+	});
+
+	it('leaves the usd unknown when the step sets no model (codex then uses the default of its own config)', async () => {
+		const { meta } = await run(
+			scriptedProvider([init, codexResult(firstTurnUsage)]),
+			makeStep({ provider: 'codex', model: undefined })
+		);
+
+		expect(meta.cost.estimated).toBeUndefined();
+		expect(meta.cost.unknownReason).toContain('model unknown');
+		expect(meta.cost.unknownReason).toContain('2026-11-08');
+	});
+
+	it('leaves the usd unknown, never 0 priced, when the attempt ended without any usage', async () => {
+		const { meta } = await run(
+			scriptedProvider([init, codexResult({})]),
+			makeStep({ provider: 'codex', model: 'openai.gpt-5.6-luna' })
+		);
+
+		expect(meta.cost.estimated).toBeUndefined();
+		expect(meta.cost.unknownReason).toContain('no token usage');
+	});
+
+	it('leaves the usd unknown when the codex usage was flagged inconsistent', async () => {
+		const { meta } = await run(
+			scriptedProvider([init, codexResult({ codex: { ...firstTurnUsage.codex, usageInconsistent: true } })]),
+			makeStep({ provider: 'codex', model: 'openai.gpt-5.6-luna' })
+		);
+
+		expect(meta.cost.estimated).toBeUndefined();
+		expect(meta.cost.unknownReason).toContain('inconsistent');
+	});
+
+	it('never estimates a cost for a provider that reports its own', async () => {
+		const { meta } = await run(scriptedProvider([init, resultEvent()]), makeStep({ provider: 'claude' }));
+
+		expect(meta.cost.reported).toBe(true);
+		expect(meta.cost.estimated).toBeUndefined();
+		expect(meta.cost.unknownReason).toBeUndefined();
+	});
+});

@@ -1,5 +1,7 @@
 import type { StepMeta } from 'flow-engine/types';
 
+import { estimateNote } from '../execution/StepCost.js';
+
 /** Largest duration still written as seconds with one decimal: 59.95s would round to "60.0s". */
 const SECONDS_FORMAT_LIMIT_MS = 59950;
 
@@ -49,13 +51,20 @@ export function formatModelCost(meta: StepMeta | undefined, costText?: string): 
 			cache_read_tokens: number;
 			cache_write_tokens: number;
 			usd: number;
+			estimated?: true;
+			pricesAsOf?: string;
 		};
 	};
 	const cacheTokens = (cost.cache_read_tokens ?? 0) + (cost.cache_write_tokens ?? 0);
 	// Cache tokens are an ADDITIONAL volume on top of "in" tokens, not already counted there --
 	// surfacing them separately avoids misreading "in" as the total processed input.
 	const cacheSuffix = cacheTokens > 0 ? ` + ${cacheTokens} cache` : '';
-	return `cost: ${costText ?? `$${cost.usd.toFixed(4)}`} (${cost.input_tokens} in / ${cost.output_tokens} out${cacheSuffix} tokens, ${meta.duration_ms}ms)`;
+	// Without a computed text, an estimate must still not read as an exact figure
+	const rawCost =
+		cost.estimated === true
+			? `~$${cost.usd.toFixed(4)} (${estimateNote({ pricesAsOf: cost.pricesAsOf })})`
+			: `$${cost.usd.toFixed(4)}`;
+	return `cost: ${costText ?? rawCost} (${cost.input_tokens} in / ${cost.output_tokens} out${cacheSuffix} tokens, ${meta.duration_ms}ms)`;
 }
 
 /** Fixed-width column: truncates when longer, right-pads with spaces otherwise. */

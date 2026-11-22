@@ -36,6 +36,14 @@ export interface FlowEventPayload {
 	stepTotalCostUsd?: number;
 	/** False when the cost of some attempt of the step is unknown. */
 	stepTotalCostComplete?: boolean;
+	/** True when the step cost includes an estimate priced locally from the token usage (codex reports none). */
+	stepTotalCostEstimated?: boolean;
+	/** Execution events that ended: cost of the whole run (sum of the step totals); a lower bound when `totalCostComplete` is false; absent when unknown. */
+	totalCostUsd?: number;
+	/** False when the cost of some attempt of the run is unknown. Absent when no step has a model cost. */
+	totalCostComplete?: boolean;
+	/** True when `totalCostUsd` includes an estimate priced locally from the token usage. Absent when no step has a model cost. */
+	totalCostEstimated?: boolean;
 	turns?: number;
 	toolCalls?: number;
 	endReason?: string;

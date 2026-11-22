@@ -91,6 +91,15 @@ export interface AttemptRecord {
 	/** Provider session id from the attempt's meta; attempts sharing it share a cumulative cost. Absent when none was reported or on older entries. */
 	sessionId?: string;
 	usd?: number;
+	/**
+	 * True when `usd` is an ESTIMATE from the token usage and a local price table (codex reports no cost), not a
+	 * provider report. Present only with `usd`.
+	 */
+	estimated?: true;
+	/** Date of the price table behind an estimated `usd`. Present exactly when `estimated` is. */
+	pricesAsOf?: string;
+	/** Why `usd` is absent, when the worker said (e.g. codex: the model is not in the price table). */
+	usdUnknownReason?: string;
 	tokens?: { input: number; output: number; cacheRead: number; cacheWrite: number };
 	turns?: number;
 	/** Total tool calls seen. */

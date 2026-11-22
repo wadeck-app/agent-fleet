@@ -76,6 +76,40 @@ describe('flow-daemon contract: step cost', () => {
 		expect(FlowExecutionDetailSchema.parse(newer)).toEqual(newer);
 	});
 
+	it('keeps the estimate flag and price date of a step, its attempts and the execution total', () => {
+		const step = {
+			...OLD_STEP,
+			costUsd: 0.0028,
+			costComplete: true,
+			costEstimated: true,
+			costPricesAsOf: '2026-11-08',
+			costLabel: '~$0.0028 (estimated, prices of 2026-11-08)',
+			attemptHistory: [
+				{
+					n: 1,
+					origin: 'first',
+					outcome: 'completed',
+					endReason: 'completed',
+					duration: '30.0s',
+					durationMs: 30000,
+					costUsd: 0.0028,
+					costEstimated: true,
+					costPricesAsOf: '2026-11-08',
+				},
+			],
+		};
+		expect(FlowStepSchema.parse(step)).toEqual(step);
+		const detail = {
+			...SUMMARY,
+			steps: [step],
+			totalCostUsd: 0.0028,
+			totalCostComplete: true,
+			totalCostEstimated: true,
+			totalCostPricesAsOf: '2026-11-08',
+		};
+		expect(FlowExecutionDetailSchema.parse(detail)).toEqual(detail);
+	});
+
 	it('keeps the recorded flow version of an execution and its note, and still accepts a record without them', () => {
 		const versioned = {
 			...SUMMARY,

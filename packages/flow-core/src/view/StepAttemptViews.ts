@@ -11,6 +11,10 @@ export interface StepAttemptView {
 	duration: string;
 	durationMs: number;
 	costUsd?: number;
+	/** True when `costUsd` is an estimate (priced locally from the usage), not a provider report. */
+	costEstimated?: true;
+	/** Date of the price table behind an estimated `costUsd`. */
+	costPricesAsOf?: string;
 	/** Why `costUsd` is absent. */
 	costUnknownReason?: string;
 	/** True for an attempt of a non-model step (script, ...): cost does not apply, so it is neither a value nor unknown. */
@@ -38,6 +42,10 @@ export function toStepAttemptViews(step: StepState, costs: StepCostSummary): Ste
 			duration: formatDuration(entry.startedAt, entry.endedAt),
 			durationMs: entry.durationMs,
 			...(cost?.usd !== undefined ? { costUsd: cost.usd } : {}),
+			...(cost?.usd !== undefined && cost.estimated === true ? { costEstimated: true as const } : {}),
+			...(cost?.usd !== undefined && cost.estimated === true && cost.pricesAsOf !== undefined
+				? { costPricesAsOf: cost.pricesAsOf }
+				: {}),
 			...(cost?.unknownReason !== undefined ? { costUnknownReason: cost.unknownReason } : {}),
 			...(cost?.notApplicable === true ? { costNotApplicable: true as const } : {}),
 			...(cost?.tokens !== undefined ? { tokens: cost.tokens } : {}),

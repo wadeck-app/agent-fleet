@@ -14,7 +14,15 @@
  *     error { message }                                          (non-fatal diagnostics; codex still exits 0)
  *   error { message }                                            (intermediate, e.g. "Reconnecting... 1/5")
  *
- * Real codex reports no cost, so cost stays 0. Other item types that exist in codex but were not
+ * Real codex reports no cost, so cost_usd stays 0 here and the caller must not read it as a measurement (the
+ * executor estimates it from the usage with ModelPriceTable). Usage semantics, measured on codex-cli 0.171.0:
+ *   - `usage` of a resumed run (`codex exec resume`) is CUMULATIVE for the thread, like a claude session: a later
+ *     turn.completed REPLACES the earlier one (never added), so the result carries the latest cumulative figures;
+ *   - `input_tokens` INCLUDES `cached_input_tokens` and `cache_write_input_tokens`. The result event reports
+ *     `inputTokens` as the UNCACHED part (input - cached - cacheWrite), like claude and opencode do, plus
+ *     `cacheReadTokens` / `cacheWriteTokens`;
+ *   - `output_tokens` is assumed to include `reasoning_output_tokens` (unverified: reasoning was 0 in the captures).
+ * Other item types that exist in codex but were not
  * captured (reasoning, web_search, todo_list, ...) are reported once as "unrecognized" rather than
  * guessed at.
  */
@@ -26,13 +34,21 @@ function asString(value: unknown, fallback = ''): string {
 	return typeof value === 'string' ? value : fallback;
 }
 
+interface CodexUsage {
+	inputTokens: number;
+	cachedInputTokens: number;
+	cacheWriteInputTokens: number;
+	outputTokens: number;
+	reasoningOutputTokens: number | undefined;
+}
+
 export class CodexEventParser {
 	private lineBuffer = '';
 	private sessionId = '';
 	private initFired = false;
 	private responseText = '';
-	private inputTokens = 0;
-	private outputTokens = 0;
+	/** Usage of the latest turn.completed (cumulative for the thread); undefined while none usable was seen. */
+	private usage: CodexUsage | undefined;
 	private readonly failureMessages: string[] = [];
 	private readonly warnedUnknown = new Set<string>();
 
@@ -71,10 +87,11 @@ export class CodexEventParser {
 			subtype: 'result',
 			data: {
 				result: this.responseText,
-				// codex reports no cost
+				// codex reports no cost: this 0 is a placeholder, not a measurement
 				cost_usd: 0,
 				duration_ms: durationMs,
-				modelUsage: { codex: { inputTokens: this.inputTokens, outputTokens: this.outputTokens } },
+				// Empty when no usable usage was seen: the figures are then unknown, not zero
+				modelUsage: this.usage === undefined ? {} : { codex: this.usageForResult(this.usage) },
 			},
 		});
 	}
@@ -85,6 +102,62 @@ export class CodexEventParser {
 	 */
 	public failureSummary(): string {
 		return this.failureMessages.map(m => `codex: ${m}`).join('\n');
+	}
+
+	private usageForResult(usage: CodexUsage): Record<string, unknown> {
+		const uncached = usage.inputTokens - usage.cachedInputTokens - usage.cacheWriteInputTokens;
+		const reasoning =
+			usage.reasoningOutputTokens === undefined ? {} : { reasoningTokens: usage.reasoningOutputTokens };
+		if (uncached < 0) {
+			console.warn(
+				`[CodexModelProvider] codex usage is inconsistent: input_tokens ${usage.inputTokens} is below cached ${usage.cachedInputTokens} + cache write ${usage.cacheWriteInputTokens}; its cost cannot be estimated`
+			);
+			return {
+				inputTokens: 0,
+				outputTokens: usage.outputTokens,
+				cacheReadTokens: usage.cachedInputTokens,
+				cacheWriteTokens: usage.cacheWriteInputTokens,
+				usageInconsistent: true,
+				...reasoning,
+			};
+		}
+		return {
+			inputTokens: uncached,
+			outputTokens: usage.outputTokens,
+			cacheReadTokens: usage.cachedInputTokens,
+			cacheWriteTokens: usage.cacheWriteInputTokens,
+			...reasoning,
+		};
+	}
+
+	/** The usage of a turn.completed, or undefined (with one warning) when a required field is not a number. */
+	private readUsage(raw: Record<string, unknown> | undefined): CodexUsage | undefined {
+		const input = raw?.['input_tokens'];
+		const cached = raw?.['cached_input_tokens'];
+		const cacheWrite = raw?.['cache_write_input_tokens'];
+		const output = raw?.['output_tokens'];
+		const reasoning = raw?.['reasoning_output_tokens'];
+		if (
+			typeof input !== 'number' ||
+			typeof cached !== 'number' ||
+			typeof cacheWrite !== 'number' ||
+			typeof output !== 'number'
+		) {
+			if (!this.warnedUnknown.has('usage')) {
+				this.warnedUnknown.add('usage');
+				console.warn(
+					'[CodexModelProvider] codex turn.completed usage lacks a numeric input_tokens, cached_input_tokens, cache_write_input_tokens or output_tokens: its tokens and cost are unknown -- the codex JSONL schema may have changed'
+				);
+			}
+			return undefined;
+		}
+		return {
+			inputTokens: input,
+			cachedInputTokens: cached,
+			cacheWriteInputTokens: cacheWrite,
+			outputTokens: output,
+			reasoningOutputTokens: typeof reasoning === 'number' ? reasoning : undefined,
+		};
 	}
 
 	private warnUnknown(kind: string): void {
@@ -133,9 +206,11 @@ export class CodexEventParser {
 				this.processCompletedItem(isRecord(raw['item']) ? raw['item'] : undefined);
 				break;
 			case 'turn.completed': {
-				const usage = isRecord(raw['usage']) ? raw['usage'] : undefined;
-				this.inputTokens += typeof usage?.['input_tokens'] === 'number' ? usage['input_tokens'] : 0;
-				this.outputTokens += typeof usage?.['output_tokens'] === 'number' ? usage['output_tokens'] : 0;
+				// Cumulative for the thread: the latest usable turn replaces the earlier ones
+				const usage = this.readUsage(isRecord(raw['usage']) ? raw['usage'] : undefined);
+				if (usage !== undefined) {
+					this.usage = usage;
+				}
 				break;
 			}
 			case 'error':

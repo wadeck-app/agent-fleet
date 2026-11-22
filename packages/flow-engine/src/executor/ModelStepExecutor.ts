@@ -11,6 +11,7 @@ import {
 } from '../processing/CompactHook';
 import { buildContextLimitEnv, haikuContextLimitWarning, validateContextLimit } from '../processing/ContextLimit';
 import type { McpServer, ModelProvider } from '../processing/ModelProvider';
+import { ModelPriceTable, PRICES_AS_OF } from '../processing/ModelPriceTable';
 import type { OutputExtractor } from '../processing/OutputExtractor';
 import type { ProcessLauncher } from '../processing/ProcessLauncher';
 import { StepMetricsCollector } from '../processing/StepMetricsCollector';
@@ -60,6 +61,55 @@ export interface ModelStepConfig {
 	 * ended (default {@link DEFAULT_RESULT_GRACE_MS}). Only read by the claude launcher.
 	 */
 	resultGraceMs?: number;
+}
+
+const MODEL_PRICE_TABLE = new ModelPriceTable();
+
+interface CodexUsageCapture {
+	/** A result event carried usage; false for a process killed before its result. */
+	seen: boolean;
+	inconsistent: boolean;
+	uncachedInputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
+	outputTokens: number;
+}
+
+/**
+ * Codex reports no cost, so its usd is an ESTIMATE from the usage and the local price table, or unknown with a reason.
+ * The model id is the one the step names (`model:`, family aliases resolved); it is undefined when the step names none,
+ * because codex then uses the default of its own config.toml, which flow does not read. `reported` stays false: an
+ * estimate is not a provider report.
+ */
+function estimateCodexCost(
+	model: string | undefined,
+	usage: CodexUsageCapture
+): Pick<ModelStepMeta['cost'], 'usd' | 'estimated' | 'pricesAsOf' | 'unknownReason'> {
+	const unknown = (unknownReason: string): { usd: number; unknownReason: string } => ({ usd: 0, unknownReason });
+	if (model === undefined || model === '') {
+		return unknown(
+			`codex reports no cost and model unknown (the step sets no model, so codex uses the default of its own config) is not in the price table of ${PRICES_AS_OF}`
+		);
+	}
+	if (!MODEL_PRICE_TABLE.has(model)) {
+		return unknown(`codex reports no cost and model '${model}' is not in the price table of ${PRICES_AS_OF}`);
+	}
+	if (!usage.seen) {
+		return unknown('codex reports no cost and no token usage was received for this attempt (process ended early)');
+	}
+	if (usage.inconsistent) {
+		return unknown('codex reports no cost and its token usage is inconsistent (cache tokens above the input)');
+	}
+	const estimate = MODEL_PRICE_TABLE.estimate(model, {
+		inputTokens: usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens,
+		cachedInputTokens: usage.cacheReadTokens,
+		cacheWriteInputTokens: usage.cacheWriteTokens,
+		outputTokens: usage.outputTokens,
+	});
+	if ('unknownReason' in estimate) {
+		return unknown(`codex reports no cost and ${estimate.unknownReason}`);
+	}
+	return { usd: estimate.usd, estimated: true, pricesAsOf: estimate.pricesAsOf };
 }
 
 /** The step's `timeout` fired; told apart from any other failure so the attempt is recorded as a timeout. */
@@ -249,6 +299,10 @@ export async function executeModelStep(
 	let capturedOutputTokens = 0;
 	let capturedCacheReadTokens = 0;
 	let capturedCacheWriteTokens = 0;
+	// True once a result event carried a usage entry: without one the token figures are placeholders (killed process).
+	let capturedUsageSeen = false;
+	// True when the provider flagged its own usage as not adding up (codex: cache above input).
+	let capturedUsageInconsistent = false;
 	// Time from launch to the first assistant content; undefined until one is seen.
 	let capturedTtftMs: number | undefined;
 	// True when the provider's own result event flags the turn as an error (e.g. Claude's
@@ -410,6 +464,8 @@ export async function executeModelStep(
 											cacheCreationInputTokens?: number;
 											cacheReadTokens?: number;
 											cacheWriteTokens?: number;
+											// Codex only: its input/cache figures do not add up
+											usageInconsistent?: boolean;
 										}
 								  >
 								| undefined;
@@ -421,8 +477,11 @@ export async function executeModelStep(
 							capturedOutputTokens = 0;
 							capturedCacheReadTokens = 0;
 							capturedCacheWriteTokens = 0;
+							capturedUsageSeen = usage !== undefined && Object.keys(usage).length > 0;
+							capturedUsageInconsistent = false;
 							if (usage) {
 								for (const u of Object.values(usage)) {
+									capturedUsageInconsistent ||= u.usageInconsistent === true;
 									capturedInputTokens += u.inputTokens ?? 0;
 									capturedOutputTokens += u.outputTokens ?? 0;
 									capturedCacheReadTokens += u.cacheReadInputTokens ?? u.cacheReadTokens ?? 0;
@@ -457,6 +516,17 @@ export async function executeModelStep(
 				cache_write_tokens: capturedCacheWriteTokens,
 				usd: capturedCostUsd,
 				reported: capturedCostReported,
+				// codex reports no cost: price its usage when the model is known, else say why it is unknown
+				...(actualProvider === 'codex'
+					? estimateCodexCost(effectiveModel, {
+							seen: capturedUsageSeen,
+							inconsistent: capturedUsageInconsistent,
+							uncachedInputTokens: capturedInputTokens,
+							cacheReadTokens: capturedCacheReadTokens,
+							cacheWriteTokens: capturedCacheWriteTokens,
+							outputTokens: capturedOutputTokens,
+						})
+					: {}),
 			},
 			...(observed?.turns !== undefined && { turns: observed.turns }),
 			...(observed !== undefined && { tool_calls: observed.toolCalls }),

@@ -146,6 +146,56 @@ describe('ExecutionStore attemptLog', () => {
 		expect(entry.toolCalls).toBe(9);
 	});
 
+	it('records an estimated cost (codex) with the estimate flag and the price date, not as a provider report', () => {
+		store.markStepRunning(EXEC_ID, 'a');
+		store.markStepCompleted(EXEC_ID, 'a', {
+			...modelMeta({
+				provider: 'codex',
+				model: 'openai.gpt-5.6-luna',
+				cost: {
+					input_tokens: 42,
+					output_tokens: 5,
+					cache_read_tokens: 0,
+					cache_write_tokens: 9302,
+					usd: 0.00257389,
+					reported: false,
+					estimated: true,
+					pricesAsOf: '2026-11-08',
+				},
+			}),
+		});
+
+		const entry = stepOf().attemptLog![0]!;
+		expect(entry).toMatchObject({ usd: 0.00257389, estimated: true, pricesAsOf: '2026-11-08', provider: 'codex' });
+		expect(entry.tokens).toEqual({ input: 42, output: 5, cacheRead: 0, cacheWrite: 9302 });
+		expect('usdUnknownReason' in entry).toBe(false);
+	});
+
+	it('keeps the reason the worker gave when the cost is unknown, and no usd', () => {
+		const reason = "codex reports no cost and model 'x' is not in the price table of 2026-11-08";
+		store.markStepRunning(EXEC_ID, 'a');
+		store.markStepCompleted(EXEC_ID, 'a', {
+			...modelMeta({
+				provider: 'codex',
+				cost: {
+					input_tokens: 42,
+					output_tokens: 5,
+					cache_read_tokens: 0,
+					cache_write_tokens: 9302,
+					usd: 0,
+					reported: false,
+					unknownReason: reason,
+				},
+			}),
+		});
+
+		const entry = stepOf().attemptLog![0]!;
+		expect('usd' in entry).toBe(false);
+		expect('estimated' in entry).toBe(false);
+		expect(entry.usdUnknownReason).toBe(reason);
+		expect(entry.tokens).toBeDefined();
+	});
+
 	it('reads a meta written before cost.reported existed as reported', () => {
 		store.markStepRunning(EXEC_ID, 'a');
 		const old = modelMeta();

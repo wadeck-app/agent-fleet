@@ -66,7 +66,11 @@ export interface StepView {
 	lastAttemptCostUsd?: number;
 	/** False when some attempt cost is unknown: `costUsd` is then a lower bound or absent. Absent for a step without model cost. */
 	costComplete?: boolean;
-	/** Ready-to-print cost: `$0.0075`, `$2.7900+ (2 attempts unknown)`, `unknown`. Never `$0` for an unknown cost. */
+	/** True when `costUsd` includes an estimated attempt (codex: priced locally from the usage), so it is not an exact figure. */
+	costEstimated?: true;
+	/** Date of the price table behind an estimated `costUsd`. */
+	costPricesAsOf?: string;
+	/** Ready-to-print cost: `$0.0075`, `$2.7900+ (2 attempts unknown)`, `~$0.0123 (estimated, prices of 2026-11-08)`, `unknown`. Never `$0` for an unknown cost. */
 	costLabel?: string;
 	/** Settled attempts, oldest first; absent on records written before attempts were logged. */
 	attemptHistory?: StepAttemptView[];
@@ -83,6 +87,10 @@ export interface ExecutionDetailView extends ExecutionSummary {
 	totalCostUsd?: number;
 	/** False when some attempt cost of the run is unknown. Absent when no step has a model cost. */
 	totalCostComplete?: boolean;
+	/** True when `totalCostUsd` includes an estimated step cost, so it is not an exact figure. */
+	totalCostEstimated?: true;
+	/** Oldest price table date behind an estimated `totalCostUsd`. */
+	totalCostPricesAsOf?: string;
 	/** Ready-to-print total, same wording as {@link StepView.costLabel}. */
 	totalCostLabel?: string;
 	/** How the version was chosen and which definition ran (or that it was not recorded). */
@@ -142,6 +150,10 @@ function toStepView(stepId: string, step: StepState): StepView {
 		...(cost.totalUsd !== undefined ? { costUsd: cost.totalUsd } : {}),
 		...(cost.lastAttemptUsd !== undefined ? { lastAttemptCostUsd: cost.lastAttemptUsd } : {}),
 		...(label !== undefined ? { costComplete: cost.complete, costLabel: label } : {}),
+		...(cost.totalUsd !== undefined && cost.estimated === true ? { costEstimated: true as const } : {}),
+		...(cost.totalUsd !== undefined && cost.estimated === true && cost.pricesAsOf !== undefined
+			? { costPricesAsOf: cost.pricesAsOf }
+			: {}),
 		...(attemptHistory !== undefined ? { attemptHistory } : {}),
 		...(step.sourceId !== undefined ? { sourceId: step.sourceId } : {}),
 		...(step.workerId !== undefined ? { workerId: step.workerId } : {}),
@@ -165,6 +177,10 @@ export function toExecutionDetail(
 		steps,
 		...(total.totalUsd !== undefined ? { totalCostUsd: total.totalUsd } : {}),
 		...(totalLabel !== undefined ? { totalCostComplete: total.complete, totalCostLabel: totalLabel } : {}),
+		...(total.totalUsd !== undefined && total.estimated === true ? { totalCostEstimated: true as const } : {}),
+		...(total.totalUsd !== undefined && total.estimated === true && total.pricesAsOf !== undefined
+			? { totalCostPricesAsOf: total.pricesAsOf }
+			: {}),
 		versionNote: versionNoteOf(record),
 		text,
 	};

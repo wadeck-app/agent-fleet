@@ -1,4 +1,4 @@
-import { formatStepCost, summarizeStepCost } from 'flow-core';
+import { formatStepCost, sumStepCosts, summarizeStepCost } from 'flow-core';
 
 import type { ExecutionState, StepState } from '../ipc/Protocol';
 import type { ExecutionTransition, ExecutionTransitionListener } from '../storage/ExecutionTransition';
@@ -105,6 +105,20 @@ export class FlowEventMapper implements ExecutionTransitionListener {
 			...(state.projectRoot === undefined ? {} : { projectRoot: state.projectRoot }),
 			...(state.projectId === undefined ? {} : { projectId: state.projectId }),
 			...(error === undefined ? {} : { error }),
+			...(status === 'running' ? {} : this.runCostFields(state)),
+		};
+	}
+
+	/** Cost of the whole run, from the same step summaries `flow show` totals; nothing when no step has a model cost. */
+	private runCostFields(state: ExecutionState): Partial<FlowEventPayload> {
+		const total = sumStepCosts(Object.values(state.steps).map(step => summarizeStepCost(step)));
+		if (formatStepCost(total) === undefined) {
+			return {};
+		}
+		return {
+			...(total.totalUsd === undefined ? {} : { totalCostUsd: total.totalUsd }),
+			totalCostComplete: total.complete,
+			totalCostEstimated: total.estimated === true,
 		};
 	}
 
@@ -137,6 +151,7 @@ export class FlowEventMapper implements ExecutionTransitionListener {
 			...(summary.lastAttemptUsd === undefined ? {} : { costUsd: summary.lastAttemptUsd }),
 			...(summary.totalUsd === undefined ? {} : { stepTotalCostUsd: summary.totalUsd }),
 			stepTotalCostComplete: summary.complete,
+			stepTotalCostEstimated: summary.estimated === true,
 			...(last?.turns === undefined ? {} : { turns: last.turns }),
 			...(last?.toolCalls === undefined ? {} : { toolCalls: last.toolCalls }),
 			...(last === undefined ? {} : { endReason: last.endReason }),

@@ -1236,6 +1236,15 @@ export interface ModelStepMeta extends StepMetaBase {
 		 * which stay read as reported.
 		 */
 		reported?: boolean;
+		/**
+		 * True when `usd` is an ESTIMATE computed from the token usage and a local price table (codex, which reports no
+		 * cost), not a provider report: `reported` stays false. Absent for a reported or an unknown cost.
+		 */
+		estimated?: true;
+		/** Date of the price table behind an estimated `usd`. Present exactly when `estimated` is. */
+		pricesAsOf?: string;
+		/** Why `usd` is unknown, when it is (`reported` false and not `estimated`) and the reason is known. */
+		unknownReason?: string;
 	};
 	/**
 	 * Model turns of this attempt. Absent when the provider does not report them (codex: one turn is the

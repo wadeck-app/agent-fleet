@@ -93,6 +93,33 @@ describe('renderStepCostLines', () => {
 		expect(renderStepCostLines({ status: 'completed', meta: { duration_ms: 1, exit_code: 0 } }, '')).toEqual([]);
 	});
 
+	it('marks an estimated cost (codex) as an estimate in the attempt lines, the step cost and the total', () => {
+		const step: StepState = {
+			status: 'completed',
+			attempts: 2,
+			attemptLog: [
+				entry(1, {
+					provider: 'codex',
+					sessionId: 'thread-1',
+					usd: 0.00257389,
+					estimated: true,
+					pricesAsOf: '2026-11-08',
+				}),
+				entry(2, {
+					provider: 'codex',
+					sessionId: 'thread-1',
+					usd: 0.0028,
+					estimated: true,
+					pricesAsOf: '2026-11-08',
+				}),
+			],
+		};
+		const lines = renderStepCostLines(step, '');
+		expect(lines[0]).toContain('~$0.0026 (estimated, prices of 2026-11-08)');
+		expect(lines[2]).toBe('cost: ~$0.0028 (estimated, prices of 2026-11-08) over 2 attempts');
+		expect(renderTotalCostLine([step], '')).toBe('Total cost: ~$0.0028 (estimated, prices of 2026-11-08)');
+	});
+
 	it('never prints an unknown single-attempt cost as $0', () => {
 		const step: StepState = {
 			status: 'failed',

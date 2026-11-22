@@ -376,7 +376,16 @@ describe('CodexModelProvider', () => {
 			expect(events[3]['data']).toMatchObject({
 				result: 'hello-content',
 				cost_usd: 0,
-				modelUsage: { codex: { inputTokens: 21405, outputTokens: 111 } },
+				// inputTokens is the UNCACHED part: 21405 - 10583 cached - 10738 cache write
+				modelUsage: {
+					codex: {
+						inputTokens: 84,
+						outputTokens: 111,
+						cacheReadTokens: 10583,
+						cacheWriteTokens: 10738,
+						reasoningTokens: 42,
+					},
+				},
 			});
 			// The non-fatal config warning item is surfaced, not swallowed.
 			expect(warn).toHaveBeenCalledWith(expect.stringContaining('ignoring 1 unrecognized configuration'));

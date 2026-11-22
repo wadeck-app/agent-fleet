@@ -102,6 +102,10 @@ export const FlowStepAttemptSchema = z.object({
 	duration: z.string(),
 	durationMs: z.number(),
 	costUsd: z.number().optional(),
+	/** True when `costUsd` is an estimate priced locally from the token usage (codex reports no cost), not a provider report. */
+	costEstimated: z.boolean().optional(),
+	/** Date of the price table behind an estimated cost. */
+	costPricesAsOf: z.string().optional(),
 	costUnknownReason: z.string().optional(),
 	/** True for an attempt of a non-model step (script, ...): cost does not apply. */
 	costNotApplicable: z.boolean().optional(),
@@ -135,7 +139,11 @@ export const FlowStepSchema = z.object({
 	lastAttemptCostUsd: z.number().optional(),
 	/** False when the cost of some attempt is unknown; absent for a step without model cost. */
 	costComplete: z.boolean().optional(),
-	/** Ready to print: `$0.0075`, `$2.7900+ (2 attempts unknown)`, `unknown`. */
+	/** True when `costUsd` includes an estimate (codex, priced locally from the usage): not an exact figure. Absent otherwise. */
+	costEstimated: z.boolean().optional(),
+	/** Date of the price table behind an estimated cost. */
+	costPricesAsOf: z.string().optional(),
+	/** Ready to print: `$0.0075`, `$2.7900+ (2 attempts unknown)`, `~$0.0123 (estimated, prices of 2026-11-08)`, `unknown`. */
 	costLabel: z.string().optional(),
 	/** Absent on records written before attempts were logged. */
 	attemptHistory: z.array(FlowStepAttemptSchema).optional(),
@@ -153,6 +161,10 @@ export const FlowExecutionDetailSchema = FlowExecutionSummarySchema.extend({
 	/** Sum of the step totals (a lower bound when totalCostComplete is false). */
 	totalCostUsd: z.number().optional(),
 	totalCostComplete: z.boolean().optional(),
+	/** True when `totalCostUsd` includes an estimate: not an exact figure. Absent otherwise. */
+	totalCostEstimated: z.boolean().optional(),
+	/** Oldest price table date behind an estimated total. */
+	totalCostPricesAsOf: z.string().optional(),
 	/** Ready to print, same wording as a step's costLabel. */
 	totalCostLabel: z.string().optional(),
 	/** The text `flow show` prints (failed steps carry the tail of their output). */

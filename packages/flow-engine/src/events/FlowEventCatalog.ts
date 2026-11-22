@@ -55,6 +55,27 @@ const PROPERTIES = {
 		type: 'boolean',
 		description: 'Step events that ended: false when the cost of some attempt of the step is unknown',
 	},
+	stepTotalCostEstimated: {
+		type: 'boolean',
+		description:
+			'Step events that ended: true when the step cost (costUsd, stepTotalCostUsd) includes an estimate priced locally from the token usage (codex reports no cost), not a provider report',
+	},
+	totalCostUsd: {
+		type: 'number',
+		minimum: 0,
+		description:
+			'Execution events that ended: cost in USD of the whole run (sum of the step totals); a lower bound when totalCostComplete is false; absent when nothing is known (never 0)',
+	},
+	totalCostComplete: {
+		type: 'boolean',
+		description:
+			'Execution events that ended: false when the cost of some attempt of the run is unknown; absent when no step has a model cost',
+	},
+	totalCostEstimated: {
+		type: 'boolean',
+		description:
+			'Execution events that ended: true when totalCostUsd includes an estimate priced locally from the token usage (codex reports no cost), not a provider report; absent when no step has a model cost',
+	},
 	turns: {
 		type: 'integer',
 		minimum: 0,
@@ -110,6 +131,9 @@ const EXECUTION_FINISHED_OPTIONAL: PropertyName[] = [
 	'durationMs',
 	'projectRoot',
 	'projectId',
+	'totalCostUsd',
+	'totalCostComplete',
+	'totalCostEstimated',
 ];
 const STEP_OPTIONAL: PropertyName[] = ['startedAt', 'projectRoot', 'projectId'];
 const STEP_FINISHED_OPTIONAL: PropertyName[] = [
@@ -121,6 +145,7 @@ const STEP_FINISHED_OPTIONAL: PropertyName[] = [
 	'costUsd',
 	'stepTotalCostUsd',
 	'stepTotalCostComplete',
+	'stepTotalCostEstimated',
 	'turns',
 	'toolCalls',
 	'endReason',
@@ -162,6 +187,9 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			durationMs: 252500,
 			projectRoot: PROJECT,
 			projectId: PROJECT_ID,
+			totalCostUsd: 0.1032,
+			totalCostComplete: true,
+			totalCostEstimated: false,
 		},
 		correlationKey: EXECUTION_KEY,
 		terminal: true,
@@ -181,6 +209,9 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			durationMs: 252500,
 			projectRoot: PROJECT,
 			projectId: PROJECT_ID,
+			totalCostUsd: 0.0599,
+			totalCostComplete: true,
+			totalCostEstimated: false,
 			error: 'Step "build" failed: exit code 1',
 		},
 		correlationKey: EXECUTION_KEY,
@@ -222,6 +253,7 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			costUsd: 0.0412,
 			stepTotalCostUsd: 0.0412,
 			stepTotalCostComplete: true,
+			stepTotalCostEstimated: false,
 			turns: 6,
 			toolCalls: 14,
 			endReason: 'completed',
@@ -253,6 +285,7 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 			costUsd: 0.0187,
 			stepTotalCostUsd: 0.0599,
 			stepTotalCostComplete: true,
+			stepTotalCostEstimated: false,
 			turns: 4,
 			toolCalls: 9,
 			endReason: 'exit_nonzero',

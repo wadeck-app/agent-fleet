@@ -103,6 +103,15 @@ export class AttemptLedger {
 		const reported = cost.reported !== false;
 		if (reported) {
 			entry.usd = cost.usd;
+		} else if (cost.estimated === true) {
+			// An estimate (codex, priced locally) is kept apart from a report: flagged, never plain
+			entry.usd = cost.usd;
+			entry.estimated = true;
+			if (cost.pricesAsOf !== undefined) {
+				entry.pricesAsOf = cost.pricesAsOf;
+			}
+		} else if (cost.unknownReason !== undefined) {
+			entry.usdUnknownReason = cost.unknownReason;
 		}
 		const tokensTotal = cost.input_tokens + cost.output_tokens + cost.cache_read_tokens + cost.cache_write_tokens;
 		// codex reports tokens but no cost; a killed process reports neither (its zeros are placeholders)

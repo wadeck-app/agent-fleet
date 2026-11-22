@@ -79,6 +79,7 @@ export {
 	type StepCostBasis,
 	type StepCostInput,
 	type StepCostSummary,
+	estimateNote,
 	formatStepCost,
 	sumStepCosts,
 	summarizeStepCost,
