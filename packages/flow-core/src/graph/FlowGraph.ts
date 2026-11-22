@@ -76,5 +76,7 @@ export interface FlowGraphResult {
 		completedAt: string | null;
 		/** Present only while the run is queued because its workspace pool has no free slot (see ExecutionState.workspaceWait). */
 		workspaceWait?: { since: string; message: string };
+		/** Present only while the run is paused (`flow pause`; its status stays `running`): since when and why. */
+		paused?: { since: string; reason?: string };
 	};
 }

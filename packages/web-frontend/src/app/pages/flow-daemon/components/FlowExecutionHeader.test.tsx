@@ -53,6 +53,33 @@ describe('FlowExecutionHeader total cost field', () => {
 	});
 });
 
+describe('FlowExecutionHeader paused run', () => {
+	it('badges the run paused and says why and how to resume it', () => {
+		render(
+			<FlowExecutionHeader
+				execution={buildExecutionDetail({
+					executionId: 'exec-paused',
+					status: 'running',
+					completedAt: null,
+					paused: { since: '2026-11-22T10:00:00.000Z', reason: 'budget exceeded' },
+				})}
+			/>
+		);
+
+		expect(screen.getByText('paused')).toHaveAttribute('data-variant', 'warning');
+		expect(screen.queryByText('running')).not.toBeInTheDocument();
+		expect(screen.getByText(/Reason: budget exceeded\./)).toBeInTheDocument();
+		expect(screen.getByText('flow unpause exec-paused')).toBeInTheDocument();
+	});
+
+	it('shows no pause line for a run that is not paused', () => {
+		render(<FlowExecutionHeader execution={buildExecutionDetail({ status: 'running', completedAt: null })} />);
+
+		expect(screen.getByText('running')).toBeInTheDocument();
+		expect(screen.queryByText(/Paused since/)).not.toBeInTheDocument();
+	});
+});
+
 describe('FlowExecutionHeader project field', () => {
 	it('shows the project label and exposes the root as tooltip when both exist', () => {
 		const field = renderProjectValue({

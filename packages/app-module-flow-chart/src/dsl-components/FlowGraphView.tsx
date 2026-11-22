@@ -4,6 +4,7 @@ import { Badge } from '@wadeck-app/dsl-ui';
 import { Background, ReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { FlowGraphResult } from 'flow-core';
 import {
+	PAUSED_LABEL,
 	WAITING_FOR_WORKSPACE_LABEL,
 	buildGraphTree,
 	defaultCollapsedIds,
@@ -162,8 +163,18 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 							<span>{mode.title}</span>
 							{execution && (
 								<Badge
-									label={execution.workspaceWait ? WAITING_FOR_WORKSPACE_LABEL : execution.status}
-									variant={execution.workspaceWait ? 'warning' : executionBadge(execution.status)}
+									label={
+										execution.paused
+											? PAUSED_LABEL
+											: execution.workspaceWait
+												? WAITING_FOR_WORKSPACE_LABEL
+												: execution.status
+									}
+									variant={
+										execution.paused || execution.workspaceWait
+											? 'warning'
+											: executionBadge(execution.status)
+									}
 								/>
 							)}
 						</p>
@@ -176,6 +187,14 @@ export function FlowGraphView({ result, refreshError }: { result: FlowGraphResul
 				<div role="alert" className={WARNING_BANNER_CLASS}>
 					The chart could not be refreshed: {refreshError} The last known state is shown; it is retried every
 					few seconds.
+				</div>
+			)}
+
+			{execution?.paused && (
+				<div role="status" aria-label="Run paused" className={WARNING_BANNER_CLASS}>
+					Paused: no new step starts, the steps already running finish.
+					{execution.paused.reason !== undefined && ` Reason: ${execution.paused.reason}.`} Resume with: flow
+					unpause {execution.executionId}
 				</div>
 			)}
 

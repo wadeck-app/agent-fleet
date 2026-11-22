@@ -59,6 +59,7 @@ describe('runStatusVariant', () => {
 		['ok', 'success'],
 		['FAILED', 'danger'],
 		['running', 'info'],
+		['paused', 'warning'],
 		['waiting', 'default'],
 		['waiting ws', 'warning'],
 		['retry', 'warning'],
@@ -70,7 +71,7 @@ describe('runStatusVariant', () => {
 
 	it('refuses a status it does not know, listing the known ones', () => {
 		expect(() => runStatusVariant('exploded')).toThrow(
-			/"exploded".*ok, FAILED, running, waiting, waiting ws, retry/
+			/"exploded".*ok, FAILED, running, paused, waiting, waiting ws, retry/
 		);
 	});
 });

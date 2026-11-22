@@ -13,6 +13,7 @@ describe('countByStatus', () => {
 		expect(counts).toEqual({
 			total: 3,
 			waitingForWorkspace: 0,
+			paused: 0,
 			queued: 0,
 			running: 0,
 			completed: 2,
@@ -53,5 +54,16 @@ describe('countByStatus waiting for a workspace', () => {
 			makeExec({ executionId: 'b', status: 'queued' }),
 		]);
 		expect(counts).toMatchObject({ total: 2, queued: 2, waitingForWorkspace: 1 });
+	});
+});
+
+describe('countByStatus paused', () => {
+	it('keeps counting a paused run as running and tells how many of them are paused', () => {
+		const paused = { since: '2026-11-22T10:00:00.000Z' };
+		const counts = countByStatus([
+			makeExec({ executionId: 'a', status: 'running', paused }),
+			makeExec({ executionId: 'b', status: 'running' }),
+		]);
+		expect(counts).toMatchObject({ total: 2, running: 2, paused: 1 });
 	});
 });

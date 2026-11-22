@@ -72,6 +72,17 @@ describe('filterExecutions', () => {
 		expect(filterExecutions(runs, { status: 'completed' }).items.map(e => e.executionId)).toEqual(['r1', 'r2']);
 	});
 
+	it('filters the pseudo status "paused": the runs carrying paused, which "running" lists too', () => {
+		const paused = { since: '2026-11-22T10:00:00.000Z' };
+		const runs = [
+			makeExec({ executionId: 'p1', status: 'running', paused }),
+			makeExec({ executionId: 'p2', status: 'running' }),
+			makeExec({ executionId: 'p3', status: 'failed' }),
+		];
+		expect(filterExecutions(runs, { status: 'paused' }).items.map(e => e.executionId)).toEqual(['p1']);
+		expect(filterExecutions(runs, { status: 'running' }).items.map(e => e.executionId)).toEqual(['p1', 'p2']);
+	});
+
 	it('rejects a non-integer or negative limit/offset with an actionable error', () => {
 		expect(() => filterExecutions(execs, { limit: Number.NaN })).toThrow(/limit/);
 		expect(() => filterExecutions(execs, { offset: -1 })).toThrow(/offset/);

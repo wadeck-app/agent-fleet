@@ -95,6 +95,14 @@ sections:
                 - $type: flow:MarkdownText
                   text: $sources.execution.workspaceWaitText
 
+          # A paused run says since when, why and how to resume (flow unpause); '' = it is not paused, nothing shown.
+          - $type: Section
+            $if: $sources.execution.pausedText
+            title: Paused
+            items:
+                - $type: flow:MarkdownText
+                  text: $sources.execution.pausedText
+
           - $type: DataTable
             rows: $sources.execution.timing
             columns:

@@ -97,6 +97,21 @@ describe('FlowQueryService.getFlowGraph', () => {
 		expect(service.getFlowGraph({ executionId: 'plain123' }).execution).not.toHaveProperty('workspaceWait');
 	});
 
+	it('by execution id: tells since when and why a run is paused, nothing for one that is not', () => {
+		writeExec('paus1234', { status: 'running', paused: { since: '2026-08-16T12:00:00.000Z', reason: 'budget' } });
+		writeExec('noreason', { status: 'running', paused: { since: '2026-08-16T12:00:00.000Z' } });
+		writeExec('plain456', { status: 'running' });
+
+		expect(service.getFlowGraph({ executionId: 'paus1234' }).execution?.paused).toEqual({
+			since: '2026-08-16T12:00:00.000Z',
+			reason: 'budget',
+		});
+		expect(service.getFlowGraph({ executionId: 'noreason' }).execution?.paused).toEqual({
+			since: '2026-08-16T12:00:00.000Z',
+		});
+		expect(service.getFlowGraph({ executionId: 'plain456' }).execution).not.toHaveProperty('paused');
+	});
+
 	it('by execution id prefix', () => {
 		writeExec('abc12345', {});
 

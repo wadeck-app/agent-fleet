@@ -94,7 +94,7 @@ export {
 	skipReasonOf,
 } from './execution/StepSkip.js';
 export { createRemoteDaemonClient, isUnknownCommandError, outdatedDaemonMessage } from './daemon/RemoteDaemonClient.js';
-export { DEFAULT_HISTORY_LIMIT, RECOVERED_STATUS, filterExecutions } from './history/ExecutionFilter.js';
+export { DEFAULT_HISTORY_LIMIT, PAUSED_STATUS, RECOVERED_STATUS, filterExecutions } from './history/ExecutionFilter.js';
 export type { ExecutionFilterOptions, FilteredExecutions } from './history/ExecutionFilter.js';
 export {
 	createRegistryProjectLookup,
@@ -237,6 +237,7 @@ export {
 	isRecoveredStep,
 	recoveredStepHint,
 	retryHint,
+	pausedRunHint,
 	runStatusHint,
 	skippedHint,
 	stepStatusHint,

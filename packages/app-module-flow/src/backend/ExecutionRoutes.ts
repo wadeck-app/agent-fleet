@@ -5,6 +5,7 @@ import {
 	type ExecutionStatus,
 	type FlowQueryService,
 	InvalidQueryError,
+	PAUSED_STATUS,
 	type QueryParams,
 	RECOVERED_STATUS,
 	definitionsDirOf,
@@ -30,7 +31,8 @@ export const MAX_EXECUTIONS_LIMIT = 500;
 export const MAX_TAIL_CHARS = 1_000_000;
 
 // Typed against ExecutionStatus so a status added to flow-core fails the build here instead of being refused at runtime.
-// "recovered" is not a status: it filters the completed runs that saw an error (see filterExecutions).
+// "recovered" and "paused" are not statuses: they filter the completed runs that saw an error and the runs carrying
+// `paused` (stored as running), see filterExecutions.
 const EXECUTION_STATUSES = [
 	'queued',
 	'running',
@@ -38,7 +40,7 @@ const EXECUTION_STATUSES = [
 	'failed',
 	're-queued',
 ] as const satisfies readonly ExecutionStatus[];
-const ACCEPTED_STATUS_FILTERS: readonly string[] = [...EXECUTION_STATUSES, RECOVERED_STATUS];
+const ACCEPTED_STATUS_FILTERS: readonly string[] = [...EXECUTION_STATUSES, PAUSED_STATUS, RECOVERED_STATUS];
 
 function readStatus(query: QueryParams): string | undefined {
 	const status = optionalString(query, 'status');

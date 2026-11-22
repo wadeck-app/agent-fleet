@@ -24,7 +24,7 @@ export function FlowExecutionHeader({ execution }: FlowExecutionHeaderProps) {
 				<span className="font-mono text-xs">{execution.executionId}</span>
 			</HeaderField>
 			<HeaderField label="Status">
-				<FlowExecutionStatusBadge status={execution.status} />
+				<FlowExecutionStatusBadge status={execution.status} paused={execution.paused} />
 			</HeaderField>
 			<HeaderField label="Duration">{execution.duration}</HeaderField>
 			<HeaderField label="Started">{formatTimestamp(execution.startedAt)}</HeaderField>
@@ -53,6 +53,18 @@ export function FlowExecutionHeader({ execution }: FlowExecutionHeaderProps) {
 			<HeaderField label="Current steps">
 				{execution.currentSteps.length === 0 ? '-' : execution.currentSteps.join(', ')}
 			</HeaderField>
+			{execution.paused !== undefined && (
+				<div className="flex flex-col gap-0.5 sm:col-span-2 lg:col-span-4">
+					<dt className="text-xs text-muted-foreground">
+						Paused since {formatTimestamp(execution.paused.since)}
+					</dt>
+					<dd className="text-sm break-words whitespace-pre-wrap">
+						No new step starts, the steps already running finish.
+						{execution.paused.reason !== undefined && ` Reason: ${execution.paused.reason}.`} Resume with:{' '}
+						<span className="font-mono text-xs">flow unpause {execution.executionId}</span>
+					</dd>
+				</div>
+			)}
 			{execution.lastError !== undefined && execution.lastError !== '' && (
 				<div className="flex flex-col gap-0.5 sm:col-span-2 lg:col-span-4">
 					<dt className="flex items-center gap-2 text-xs text-muted-foreground">

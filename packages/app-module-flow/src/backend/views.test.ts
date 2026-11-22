@@ -218,7 +218,7 @@ describe('executions page', () => {
 
 describe('executions page filters (real controls bound to the URL, not links)', () => {
 	// The status values GET /executions accepts: the statuses plus "recovered" (completed after an error).
-	const ACCEPTED_STATUSES = ['queued', 'running', 'completed', 'failed', 're-queued', 'recovered'];
+	const ACCEPTED_STATUSES = ['queued', 'running', 'completed', 'failed', 're-queued', 'paused', 'recovered'];
 
 	it('has a flow search box and a status select in every variant, each back to page 1 when changed', () => {
 		for (const { variant, document } of alternativesOf('executions-page.yaml')) {
@@ -671,6 +671,9 @@ describe('executions page layout', () => {
 		// A run waiting for a workspace has its own word, coloured apart from the ordinary queued one.
 		expect(badge[statusTag('queued', true)]).toBe('warning');
 		expect(badge[statusTag('queued')]).toBe('default');
+		// A paused run (stored as running) has its own word too, coloured apart from the live one.
+		expect(badge[statusTag('running', false, true)]).toBe('warning');
+		expect(badge[statusTag('running')]).toBe('info');
 	});
 
 	it('truncates the flow name of the flows summary', () => {
@@ -696,6 +699,14 @@ describe('execution detail page', () => {
 		)!;
 		expect(section['$if']).toBe('$sources.execution.workspaceWaitText');
 		expect(JSON.stringify(section['items'])).toContain('$sources.execution.workspaceWaitText');
+	});
+
+	it('shows since when, why and how to resume a paused run in its own section, only when the route sends it', () => {
+		const section = collectNodes(initialView('execution-detail-page.yaml'), 'Section').find(
+			node => node['title'] === 'Paused'
+		)!;
+		expect(section['$if']).toBe('$sources.execution.pausedText');
+		expect(JSON.stringify(section['items'])).toContain('$sources.execution.pausedText');
 	});
 
 	it('orders the header buttons [contributed links] [contributed actions] (the own Logs button is now a tab)', () => {

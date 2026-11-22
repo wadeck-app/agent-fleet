@@ -97,6 +97,24 @@ describe('GET /related/project/:projectId', () => {
 		});
 	});
 
+	it('says paused for a paused run (stored as running) and still counts it as active', async () => {
+		fixture.addExecution({
+			executionId: 'p1',
+			flowId: 'build',
+			status: 'running',
+			completedAt: null,
+			projectId: PROJECT,
+			startedAt: '2026-10-30T10:00:00.000Z',
+			paused: { since: '2026-10-30T10:05:00.000Z' },
+		});
+
+		const { body } = await call(PROJECT);
+		expect(body).toMatchObject({
+			count: 1,
+			items: [{ label: 'build', subtitle: 'paused - 2026-10-30T10:00:00.000Z' }],
+		});
+	});
+
 	it('keeps the 10 latest runs but counts the active ones beyond them', async () => {
 		for (let n = 0; n < 12; n++) {
 			fixture.addExecution({

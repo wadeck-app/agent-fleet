@@ -186,3 +186,15 @@ describe('computeRunPath of a run waiting for a workspace', () => {
 		});
 	});
 });
+
+describe('computeRunPath of a paused run', () => {
+	it('says the pending steps wait because the run is paused, and keeps a running step running', () => {
+		const paused = { ...RUNNING_AT_IMPLEMENT, paused: { since: '2026-11-22T10:00:00.000Z' } };
+		const path = computeRunPath(BUILD_FLOW, paused);
+		expect(path['test']).toMatchObject({
+			outcome: 'waiting',
+			reason: `Not started: the run is paused, no new step starts (resume with: flow unpause ${paused.executionId}).`,
+		});
+		expect(path['implement']).toMatchObject({ outcome: 'running' });
+	});
+});

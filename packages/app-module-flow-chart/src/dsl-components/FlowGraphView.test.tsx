@@ -69,6 +69,45 @@ describe('FlowGraphView run waiting for a workspace', () => {
 	});
 });
 
+describe('FlowGraphView paused run', () => {
+	afterEach(cleanup);
+
+	it('badges the run as paused and says why and how to resume, instead of a bare running', () => {
+		renderView(
+			executionResult({
+				execution: {
+					executionId: 'exec1',
+					status: 'running',
+					startedAt: '2026-08-16T12:00:00.000Z',
+					completedAt: null,
+					paused: { since: '2026-08-16T12:05:00.000Z', reason: 'budget exceeded' },
+				},
+			})
+		);
+		expect(screen.getByText('paused')).toBeTruthy();
+		expect(screen.queryByText('running')).toBeNull();
+		const banner = screen.getByRole('status', { name: 'Run paused' }).textContent ?? '';
+		expect(banner).toContain('no new step starts');
+		expect(banner).toContain('Reason: budget exceeded.');
+		expect(banner).toContain('flow unpause exec1');
+	});
+
+	it('shows the plain running badge and no banner for a run that is not paused', () => {
+		renderView(
+			executionResult({
+				execution: {
+					executionId: 'exec1',
+					status: 'running',
+					startedAt: '2026-08-16T12:00:00.000Z',
+					completedAt: null,
+				},
+			})
+		);
+		expect(screen.getByText('running')).toBeTruthy();
+		expect(screen.queryByRole('status', { name: 'Run paused' })).toBeNull();
+	});
+});
+
 describe('FlowGraphView', () => {
 	it('says in the header which definition a run is drawn from', () => {
 		renderView(executionResult());

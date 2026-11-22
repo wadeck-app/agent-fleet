@@ -15,4 +15,7 @@ export const Completed: Story = { args: { status: 'completed' } };
 export const Failed: Story = { args: { status: 'failed' } };
 export const Running: Story = { args: { status: 'running' } };
 export const Queued: Story = { args: { status: 'queued' } };
+export const Paused: Story = {
+	args: { status: 'running', paused: { since: '2026-11-22T10:00:00.000Z', reason: 'budget exceeded' } },
+};
 export const ReQueued: Story = { args: { status: 're-queued' } };

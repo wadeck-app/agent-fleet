@@ -27,6 +27,8 @@ const STATUS_VARIANTS: Record<string, RunStatusVariant> = {
 	ok: 'success',
 	FAILED: 'danger',
 	running: 'info',
+	// A paused run (stored as running) starts nothing until someone resumes it: a warning, not a live run.
+	paused: 'warning',
 	waiting: 'default',
 	// A run queued for lack of a free workspace: stalled until someone releases a slot, so it is a warning, not a plain wait.
 	'waiting ws': 'warning',

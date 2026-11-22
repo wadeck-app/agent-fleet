@@ -29,12 +29,24 @@ export interface RecoverableRun {
 	lastErrorRecovered: boolean;
 	/** Present while the run waits for a workspace (see ExecutionSummary.workspaceWait). */
 	workspaceWait?: { message: string };
+	/** Present while the run is paused (see ExecutionSummary.paused). */
+	paused?: { reason?: string };
+}
+
+/** What a paused run means, with the reason when `flow pause --reason` gave one. */
+export function pausedRunHint(paused: { reason?: string }): string {
+	const reason = paused.reason === undefined ? '' : ` Reason: ${paused.reason}.`;
+	return `Paused: no new step starts, the steps already running finish.${reason} Resume with: flow unpause <execution id>.`;
 }
 
 /**
- * The hint of a run status label: why a run waits for a workspace, or that it completed after an error; absent otherwise.
+ * The hint of a run status label: that a run is paused, why a run waits for a workspace, or that it completed after an
+ * error; absent otherwise.
  */
 export function runStatusHint(run: RecoverableRun): string | undefined {
+	if (run.paused !== undefined) {
+		return pausedRunHint(run.paused);
+	}
 	if (run.workspaceWait !== undefined) {
 		return run.workspaceWait.message;
 	}

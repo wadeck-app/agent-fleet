@@ -9,6 +9,10 @@ export const DIGEST_ROWS = 5;
 /** What the dashboard card shows about the runs, from one read of the executions. All times are ISO 8601. */
 export interface RunDigest {
 	total: number;
+	/**
+	 * Runs stored as `running`, paused ones included (a paused run is not finished, and the tile links to `?status=running`:
+	 * its count must equal that list). The latest-runs rows say `paused` for them (see latestRuns).
+	 */
 	running: number;
 	failed: number;
 	/** Finished runs of the last days, newest first: the view buckets them per day in the viewer's time zone. */

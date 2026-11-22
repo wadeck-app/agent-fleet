@@ -76,6 +76,8 @@ sections:
                             - { value: completed, label: OK }
                             - { value: failed, label: Failed }
                             - { value: running, label: Running }
+                            # "paused" is a pseudo status (a paused run is stored as running): "Running" lists it too.
+                            - { value: paused, label: Paused }
                             - { value: queued, label: Waiting }
                             - { value: recovered, label: Recovered }
                       # Slot "flow:executions-project-header" (built-in link-like types only): shows the project the list is
@@ -131,6 +133,7 @@ sections:
                                 ok: success,
                                 FAILED: danger,
                                 running: info,
+                                paused: warning,
                                 waiting: default,
                                 'waiting ws': warning,
                                 retry: warning,

@@ -3,11 +3,13 @@ import {
 	type ExecutionStatus,
 	type ExecutionSummary,
 	type FlowSummary,
+	PAUSED_LABEL,
 	SKIPPED_LABEL,
 	type StepRetryPolicy,
 	type StepView,
 	WAITING_FOR_WORKSPACE_LABEL,
 	executionLogsPath,
+	formatStartedUtc,
 	isRecoveredStep,
 	outcomeLabel,
 	requireTimestamp,
@@ -34,6 +36,26 @@ const STATUS_VARIANTS: Record<ExecutionStatus, BadgeVariant> = {
 };
 // @formatter:on
 
+/** The text with every markdown punctuation escaped and its line breaks flattened, so a user-typed reason shows as typed. */
+function escapeMarkdown(text: string): string {
+	return text.replace(/\s*\r?\n\s*/g, ' ').replace(/[\\`*_{}[\]()#+\-.!|<>~&]/g, '\\$&');
+}
+
+/**
+ * What the detail page says about a paused run, as markdown for flow:MarkdownText: since when, what it means, the reason
+ * (typed by whoever ran `flow pause`, so escaped) and how to resume. '' when the run is not paused.
+ */
+function pausedTextOf(detail: ExecutionDetailView): string {
+	if (detail.paused === undefined) {
+		return '';
+	}
+	const reason = detail.paused.reason === undefined ? '' : `\n\nReason: ${escapeMarkdown(detail.paused.reason)}`;
+	return (
+		`Paused since ${formatStartedUtc(detail.paused.since)}: no new step starts, the steps already running finish.${reason}` +
+		`\n\nResume with \`flow unpause ${detail.executionId}\`.`
+	);
+}
+
 /**
  * A history row plus the short ASCII status the table shows as it is ("ok, recovered") and the links of the run
  * (logsHref: a DSL string cannot be concatenated, so the path is built here from flow-core's contract). The flow name and the
@@ -44,9 +66,10 @@ export function toExecutionRow(summary: ExecutionSummary) {
 	return {
 		...summary,
 		startedAt: requireTimestamp(summary.startedAt),
-		statusLabel: outcomeLabel(statusTag(summary.status, summary.waitingForWorkspace === true), {
-			recovered: summary.lastErrorRecovered,
-		}),
+		statusLabel: outcomeLabel(
+			statusTag(summary.status, summary.waitingForWorkspace === true, summary.paused !== undefined),
+			{ recovered: summary.lastErrorRecovered }
+		),
 		// The tooltip of the status cell (DataTable `title: '{statusHint}'`); '' = none, a blank title is not shown.
 		statusHint: runStatusHint(summary) ?? '',
 		logsHref: executionLogsPath(summary.executionId),
@@ -96,6 +119,7 @@ export function toExecutionDetailRow(
 	}
 	const statusHint = runStatusHint(detail) ?? '';
 	const waiting = detail.waitingForWorkspace === true;
+	const paused = detail.paused !== undefined;
 	return {
 		...detail,
 		// A Badge has no tooltip: the page wraps it in a Tooltip when hasStatusHint, and shows it bare when lacksStatusHint
@@ -116,14 +140,19 @@ export function toExecutionDetailRow(
 		],
 		// A recovered error is not a success to read past: the badge says it and turns to warning.
 		// A run that waits for a workspace is stored as queued: the badge says what it waits for and turns to warning.
-		statusText: waiting
-			? WAITING_FOR_WORKSPACE_LABEL
-			: detail.lastErrorRecovered
-				? 'completed, recovered an error'
-				: detail.status,
-		statusVariant: waiting || detail.lastErrorRecovered ? 'warning' : statusVariant,
+		// A paused run is stored as running: the badge says paused, like the CLI, and turns to warning.
+		statusText: paused
+			? PAUSED_LABEL
+			: waiting
+				? WAITING_FOR_WORKSPACE_LABEL
+				: detail.lastErrorRecovered
+					? 'completed, recovered an error'
+					: detail.status,
+		statusVariant: paused || waiting || detail.lastErrorRecovered ? 'warning' : statusVariant,
 		// The reason as visible text (the page shows it under the header when not empty; '' = the run does not wait).
 		workspaceWaitText: detail.workspaceWait?.message ?? '',
+		// Since when and why the run is paused, as visible text (shown under the header when not empty; '' = not paused).
+		pausedText: pausedTextOf(detail),
 		logsHref: executionLogsPath(detail.executionId),
 		steps: detail.steps.map(step => toStepRow(step, policies?.[step.stepId])),
 	};

@@ -8,8 +8,7 @@ import { formatStartedUtc } from '../history/ExecutionFormat.js';
 
 type PausedFields = Pick<ExecutionState, 'executionId' | 'status' | 'paused'>;
 
-/** Wording of a paused run, for detail pages, `flow show` and narrow table cells alike. */
-export const PAUSED_LABEL = 'paused';
+export { PAUSED_LABEL } from './PausedLabels.js';
 
 /** True for a `running` (or still `queued`: accepted, nothing dispatched yet) run that carries `paused` (the field is removed on resume and when the run ends). */
 export function isPaused(record: Pick<ExecutionState, 'status' | 'paused'>): boolean {

@@ -1,10 +1,13 @@
 import type { ExecutionState, ExecutionStatus } from '../execution/ExecutionState.js';
+import { isPaused } from '../view/PausedText.js';
 import { isWaitingForWorkspace } from '../view/WorkspaceWaitText.js';
 
 export type StatusCounts = Record<ExecutionStatus, number> & {
 	total: number;
 	/** Of the `queued` ones, how many wait for a workspace (they are counted in `queued` too, not apart). */
 	waitingForWorkspace: number;
+	/** Of the `running` (or `queued`) ones, how many are paused (they stay counted in their status, not apart). */
+	paused: number;
 };
 
 // Typed against ExecutionStatus so a status added to the model fails the build here instead of being miscounted.
@@ -24,6 +27,7 @@ export function countByStatus(execs: readonly ExecutionState[], flow?: string): 
 	const counts: StatusCounts = {
 		total: 0,
 		waitingForWorkspace: 0,
+		paused: 0,
 		queued: 0,
 		running: 0,
 		completed: 0,
@@ -43,6 +47,9 @@ export function countByStatus(execs: readonly ExecutionState[], flow?: string): 
 		counts.total += 1;
 		if (isWaitingForWorkspace(exec)) {
 			counts.waitingForWorkspace += 1;
+		}
+		if (isPaused(exec)) {
+			counts.paused += 1;
 		}
 	}
 	return counts;

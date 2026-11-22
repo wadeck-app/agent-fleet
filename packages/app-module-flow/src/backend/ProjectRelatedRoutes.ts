@@ -1,5 +1,11 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
-import { type ExecutionStatus, type FlowQueryService, type ProjectFinder, executionPagePath } from 'flow-core';
+import {
+	type ExecutionStatus,
+	type FlowQueryService,
+	PAUSED_LABEL,
+	type ProjectFinder,
+	executionPagePath,
+} from 'flow-core';
 
 import { replyWithError } from './ErrorReply.js';
 import { invalidProjectIdMessage, isProjectId } from './ProjectIdQuery.js';
@@ -60,7 +66,7 @@ export function registerProjectRelatedRoutes(
 				countLabel: RELATED_COUNT_LABEL,
 				items: items.slice(0, RELATED_ITEMS_LIMIT).map(item => ({
 					label: item.flowId,
-					subtitle: `${item.status} - ${item.startedAt}`,
+					subtitle: `${item.paused === undefined ? item.status : PAUSED_LABEL} - ${item.startedAt}`,
 					url: executionPagePath(item.executionId),
 				})),
 				moreUrl: `/modules/flow/executions?project=${projectId}`,

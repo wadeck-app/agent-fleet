@@ -35,7 +35,7 @@ const columns: TableColumn<FlowExecutionSummary>[] = [
 	{
 		key: 'status',
 		label: 'Status',
-		render: execution => <FlowExecutionStatusBadge status={execution.status} />,
+		render: execution => <FlowExecutionStatusBadge status={execution.status} paused={execution.paused} />,
 	},
 	{
 		key: 'startedAt',

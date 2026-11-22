@@ -3,6 +3,7 @@ import {
 	type ExecutionSummary,
 	RECOVERED_RUN_HINT,
 	type StepView,
+	pausedRunHint,
 	retryHint,
 } from 'flow-core';
 import { describe, expect, it } from 'vitest';
@@ -242,5 +243,55 @@ describe('a run that waits for a workspace', () => {
 		const row = toExecutionDetailRow(QUEUED, undefined);
 		expect(row.statusText).toBe('queued');
 		expect(row.workspaceWaitText).toBe('');
+	});
+});
+
+describe('a paused run', () => {
+	const PAUSED = {
+		executionId: 'paus0000',
+		flowId: 'f',
+		status: 'running',
+		startedAt: '2026-01-01T00:00:00.000Z',
+		completedAt: null,
+		lastErrorRecovered: false,
+		paused: { since: '2026-01-01T10:00:00.000Z', reason: 'budget *exceeded*\nask Bob' },
+		steps: [],
+	} as unknown as ExecutionDetailView;
+	const RUNNING = { ...PAUSED, paused: undefined } as ExecutionDetailView;
+
+	it('shows the paused word with the meaning as the tooltip, apart from a running run', () => {
+		const row = toExecutionRow(PAUSED as unknown as ExecutionSummary);
+		expect(row.statusLabel).toBe('paused');
+		expect(row.statusHint).toBe(pausedRunHint(PAUSED.paused!));
+		expect(row.statusHint).toContain('budget *exceeded*');
+		const running = toExecutionRow(RUNNING as unknown as ExecutionSummary);
+		expect(running.statusLabel).toBe('running');
+		expect(running.statusHint).toBe('');
+	});
+
+	it('words the detail badge paused, in warning, and sends since, reason and the resume command as escaped text', () => {
+		const row = toExecutionDetailRow(PAUSED, undefined);
+		expect(row.statusText).toBe('paused');
+		expect(row.statusVariant).toBe('warning');
+		expect(row.hasStatusHint).toBe(true);
+		expect(row.pausedText).toContain('Paused since 2026-01-01 10:00:00 UTC');
+		// The reason is typed by a person: markdown characters are escaped and the line break flattened.
+		expect(row.pausedText).toContain('Reason: budget \\*exceeded\\* ask Bob');
+		expect(row.pausedText).toContain('`flow unpause paus0000`');
+	});
+
+	it('keeps the running wording and sends no paused text for a run that is not paused', () => {
+		const row = toExecutionDetailRow(RUNNING, undefined);
+		expect(row.statusText).toBe('running');
+		expect(row.statusVariant).toBe('info');
+		expect(row.pausedText).toBe('');
+	});
+
+	it('omits the reason line when the pause has none', () => {
+		const row = toExecutionDetailRow(
+			{ ...PAUSED, paused: { since: '2026-01-01T10:00:00.000Z' } } as ExecutionDetailView,
+			undefined
+		);
+		expect(row.pausedText).not.toContain('Reason');
 	});
 });

@@ -1,12 +1,13 @@
 import { InvalidQueryError } from '../errors.js';
 import type { ExecutionState } from '../execution/ExecutionState.js';
+import { isPaused } from '../view/PausedText.js';
 
 export interface ExecutionFilterOptions {
 	/** Max page size (default 20). Ignored when `id` is set. */
 	limit?: number;
 	/** Rows skipped before the page (default 0). Ignored when `id` is set. */
 	offset?: number;
-	/** An execution status, or "recovered" (a completed run that saw an error: its status is "completed" and it has a lastError). */
+	/** An execution status, "paused" (see PAUSED_STATUS), or "recovered" (a completed run that saw an error: its status is "completed" and it has a lastError). */
 	status?: string;
 	/** Exact flow id. */
 	flow?: string;
@@ -29,6 +30,12 @@ export const DEFAULT_HISTORY_LIMIT = 20;
 /** The status filter value for runs that completed after an error (same rule as ExecutionSummary.lastErrorRecovered). */
 export const RECOVERED_STATUS = 'recovered';
 
+/**
+ * The status filter value for paused runs. Not a status either: a paused run is stored as `running` (or `queued`) plus
+ * `paused`, and `status=running` still lists it (the dashboard number of running runs counts it).
+ */
+export const PAUSED_STATUS = 'paused';
+
 function assertNonNegativeInteger(name: string, value: number): void {
 	if (!Number.isInteger(value) || value < 0) {
 		throw new InvalidQueryError(`Invalid ${name} '${String(value)}': expected a non-negative integer.`);
@@ -48,6 +55,8 @@ export function filterExecutions(execs: ExecutionState[], opts: ExecutionFilterO
 	let filtered = execs;
 	if (opts.status === RECOVERED_STATUS) {
 		filtered = filtered.filter(e => e.status === 'completed' && e.lastError !== undefined);
+	} else if (opts.status === PAUSED_STATUS) {
+		filtered = filtered.filter(e => isPaused(e));
 	} else if (opts.status) {
 		filtered = filtered.filter(e => e.status === opts.status);
 	}

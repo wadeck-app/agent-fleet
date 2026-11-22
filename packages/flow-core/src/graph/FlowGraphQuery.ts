@@ -4,6 +4,7 @@ import { DefinitionSnapshotStore } from '../definitions/DefinitionSnapshotStore.
 import { FlowCoreError } from '../errors.js';
 import { loadExecutions } from '../history/ExecutionLoader.js';
 import { resolveExecution } from '../show/ExecutionDetail.js';
+import { isPaused } from '../view/PausedText.js';
 import { isWaitingForWorkspace } from '../view/WorkspaceWaitText.js';
 import { FlowDefinitionError, loadFlowDefinition, parseFlowDefinition } from './FlowDefinitionLoader.js';
 import type { FlowGraphResult, FlowGraphTarget } from './FlowGraph.js';
@@ -49,6 +50,14 @@ export function queryFlowGraph(
 				completedAt: record.completedAt,
 				...(isWaitingForWorkspace(record)
 					? { workspaceWait: { since: record.workspaceWait!.since, message: record.workspaceWait!.message } }
+					: {}),
+				...(isPaused(record)
+					? {
+							paused: {
+								since: record.paused!.since,
+								...(record.paused!.reason === undefined ? {} : { reason: record.paused!.reason }),
+							},
+						}
 					: {}),
 			},
 		};

@@ -43,6 +43,15 @@ describe('runStatusHint', () => {
 			})
 		).toBe('all 2 slots claimed');
 	});
+
+	it('explains a paused run, with its reason when it has one', () => {
+		expect(runStatusHint({ status: 'running', lastErrorRecovered: false, paused: {} })).toBe(
+			'Paused: no new step starts, the steps already running finish. Resume with: flow unpause <execution id>.'
+		);
+		expect(runStatusHint({ status: 'running', lastErrorRecovered: false, paused: { reason: 'budget' } })).toContain(
+			'Reason: budget.'
+		);
+	});
 });
 
 describe('isRecoveredStep', () => {

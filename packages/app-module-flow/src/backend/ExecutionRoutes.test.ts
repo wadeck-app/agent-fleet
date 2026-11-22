@@ -195,6 +195,31 @@ describe('GET /executions', () => {
 		expect(await emptyMessage({ status: 'failed' })).toBe('No execution matches the filters');
 	});
 
+	it('lists a paused run as paused (a run stored as running), under status=paused and still under status=running', async () => {
+		fixture.addExecution({
+			executionId: 'paus1',
+			status: 'running',
+			completedAt: null,
+			paused: { since: '2026-11-22T10:00:00.000Z', reason: 'budget' },
+		});
+		fixture.addExecution({ executionId: 'live1', status: 'running', completedAt: null });
+		const ids = async (status: string) =>
+			(
+				(await callRoute(routes, 'GET /executions', { query: { status } })).body as {
+					items: { executionId: string }[];
+				}
+			).items
+				.map(i => i.executionId)
+				.sort();
+		expect(await ids('paused')).toEqual(['paus1']);
+		expect(await ids('running')).toEqual(['live1', 'paus1']);
+		const { body } = await callRoute(routes, 'GET /executions', { query: { status: 'paused' } });
+		expect((body as { items: Record<string, unknown>[] }).items[0]).toMatchObject({
+			statusLabel: 'paused',
+			paused: { since: '2026-11-22T10:00:00.000Z', reason: 'budget' },
+		});
+	});
+
 	it('looks an id prefix up (a lookup, not a page)', async () => {
 		fixture.addExecution({ executionId: 'abcd1' });
 		fixture.addExecution({ executionId: 'zzzz9' });
@@ -208,7 +233,7 @@ describe('GET /executions', () => {
 		[{ offset: '-1' }, "'offset' must be an integer >= 0, got '-1'."],
 		[
 			{ status: 'exploded' },
-			"'status' must be one of queued, running, completed, failed, re-queued, recovered, got 'exploded'.",
+			"'status' must be one of queued, running, completed, failed, re-queued, paused, recovered, got 'exploded'.",
 		],
 		[{ flow: ['a', 'b'] }, "'flow' must be given once, got 2 values."],
 		[{ flowContains: ['a', 'b'] }, "'flowContains' must be given once, got 2 values."],
