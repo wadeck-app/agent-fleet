@@ -98,6 +98,11 @@ export class ProfileAliases {
 		return alias;
 	}
 
+	/** Throws with the fix when the step could not be prepared: a model step's tool, or (undefined, a script) the first tool of a script-first sandbox. */
+	requireFor(tool: ModelTool | undefined): void {
+		this.aliasFor(tool ?? this.firstTool());
+	}
+
 	/** The tool a sandbox is prepared for when its first step is a script: claude when it can, else the first tool with an alias. */
 	firstTool(): ModelTool {
 		if (this.shared !== undefined) return 'claude';

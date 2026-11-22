@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HostEnvironment } from '../HostEnvironment';
 import { ImageReference } from '../ImageReference';
 import { MODEL_TOOLS } from '../ModelTool';
+import { PROFILE_ALIAS_PATTERN } from '../ProfileAlias';
 import { ProfileAliases } from '../ProfileAliases';
 import { SANDBOX_WORKSPACE_KINDS } from '../SandboxableWorkspace';
 import { SANDBOX_GUARANTEES } from '../exec/RequiresGuard';
@@ -54,6 +55,7 @@ interface PluginModule {
 		parseOptions(raw: unknown): Record<string, unknown>;
 		wrapperId(sourceId: string): string;
 		MODEL_TOOL_NAMES: readonly string[];
+		PROFILE_ALIAS_PATTERN_SOURCE: string;
 		wrapperArguments(parsed: Record<string, unknown>, sourceId: string): string[];
 		setSpawn(implementation: unknown): void;
 	};
@@ -793,6 +795,11 @@ describe('sandbox plugin: the profiles option', () => {
 				'claude=a,work=b',
 				'claude=a,claude=b',
 				'codex=a,gemini=b',
+				'my.alias=a',
+				'claude.x=a',
+				'_work=a',
+				`${'a'.repeat(64)}=a`,
+				`${'a'.repeat(65)}=a`,
 			].map(profiles => ({ profiles })),
 			({ profiles }) => {
 				let accepted = true;
@@ -809,6 +816,22 @@ describe('sandbox plugin: the profiles option', () => {
 				}
 				expect(accepted, profiles).toBe(packageAccepts);
 			}
+		);
+	});
+});
+
+describe('sandbox plugin: the alias rule is the package rule', () => {
+	it('uses the very pattern of the package (plugin.config.js cannot import it, so the source of the expression is compared)', async () => {
+		const plugin = await load();
+
+		expect(plugin.internals.PROFILE_ALIAS_PATTERN_SOURCE).toBe(PROFILE_ALIAS_PATTERN.source);
+	});
+
+	it('refuses a dotted alias at declaration, naming the allowed characters', async () => {
+		const plugin = await load();
+
+		expect(() => plugin.internals.parseOptions({ ...GOOD, profiles: 'my.alias=a' })).toThrow(
+			/alias "my\.alias".*1 to 64 letters, digits, "_" or "-"/
 		);
 	});
 });

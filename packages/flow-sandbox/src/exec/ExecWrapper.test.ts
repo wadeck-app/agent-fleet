@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FakeClock } from '../FakeClock';
 import { FakeSandboxRuntime } from '../FakeSandboxRuntime';
 import { FakeScheduler } from '../FakeScheduler';
+import { ProfileAliases } from '../ProfileAliases';
 import { RunMounts } from '../RunMounts';
 import { SandboxCapacity } from '../SandboxCapacity';
 import { SandboxError } from '../SandboxError';
@@ -82,6 +83,8 @@ let lifecycle: SandboxLifecycle;
 let daemon: FakeDaemon;
 let wrapper: ExecWrapper;
 let prepares: number;
+/** The profile aliases the fake preparer checks a step against (all three tools unless a test narrows it). */
+let sourceProfiles: ProfileAliases;
 let executorContexts: StepExecutorContext[];
 /** The read-only flag the wrapper passed to `createMounts`, one entry per call. */
 let mountRequests: boolean[];
@@ -128,6 +131,7 @@ beforeEach(async () => {
 	daemon = new FakeDaemon();
 	workerLogs = new FakeWorkerLogs();
 	prepares = 0;
+	sourceProfiles = ProfileAliases.parse(['claude=a', 'codex=b', 'opencode=c']);
 	requireGuarantees = true;
 	// The wrapper keeps the list of ITS test: a wrapper shut down by the previous test may still report.
 	const ownFinished = new ObservedList<true>();
@@ -153,6 +157,7 @@ beforeEach(async () => {
 		}),
 		lifecycle,
 		preparer: {
+			requireAlias: tool => sourceProfiles.requireFor(tool),
 			prepare: () => {
 				prepares += 1;
 				return Promise.resolve({
@@ -644,6 +649,7 @@ describe('ExecWrapper model tools (claude, codex, opencode)', () => {
 		const prepared: (string | undefined)[] = [];
 		const ensured: string[] = [];
 		(wrapper as unknown as { dependencies: { preparer: unknown } }).dependencies.preparer = {
+			requireAlias: () => undefined,
 			prepare: (_sandbox: string, _mounts: unknown, tool: string | undefined) => {
 				prepared.push(tool);
 				return Promise.resolve({
@@ -662,6 +668,54 @@ describe('ExecWrapper model tools (claude, codex, opencode)', () => {
 
 		expect(prepared).toEqual(['codex']);
 		expect(ensured).toEqual(['codex', 'opencode']);
+	});
+});
+
+describe('ExecWrapper refuses a tool without a profile alias before any sandbox exists', () => {
+	const codexMessage = (): JsonObject => {
+		const message = assign('ask', { type: 'model' });
+		Object.assign(message['stepConfig'] as JsonObject, { prompt: 'hi', provider: 'codex' });
+		return message;
+	};
+	const failureText = (): string => String(daemon.ofType('step_failed')[0]?.['error']);
+
+	it('fails a codex step of a claude-only source with the fix, creates no sandbox, and still serves a following claude step', async () => {
+		sourceProfiles = ProfileAliases.parse(['claude=a']);
+
+		await run(codexMessage());
+
+		expect(runtime.callsTo('create')).toHaveLength(0);
+		expect(prepares).toBe(0);
+		expect(daemon.ofType('step_failed')).toHaveLength(1);
+		expect(failureText()).toContain(
+			'codex step but no codex alias: add codex=<profile> to the profiles option of this source'
+		);
+
+		await run(assign('next'));
+
+		expect(runtime.callsTo('create')).toHaveLength(1);
+		expect(daemon.ofType('step_completed')).toHaveLength(1);
+	});
+
+	it('fails a codex step arriving for the sandbox the run already has, before the step runs in it', async () => {
+		sourceProfiles = ProfileAliases.parse(['claude=a']);
+		await run(assign('first'));
+		const executed = executorCalls.length;
+
+		await run(codexMessage());
+
+		expect(runtime.callsTo('create')).toHaveLength(1);
+		expect(executorCalls).toHaveLength(executed);
+		expect(failureText()).toContain('codex step but no codex alias');
+	});
+
+	it('does not refuse a script step: its sandbox is prepared for the first tool that has an alias', async () => {
+		sourceProfiles = ProfileAliases.parse(['codex=b']);
+
+		await run(assign('probe'));
+
+		expect(daemon.ofType('step_failed')).toHaveLength(0);
+		expect(runtime.callsTo('create')).toHaveLength(1);
 	});
 });
 
@@ -879,7 +933,10 @@ describe('ExecWrapper failures', () => {
 					presence: new RecordingPresence(),
 				}
 			),
-			preparer: { prepare: () => Promise.reject(new Error('credential endpoint refused')) },
+			preparer: {
+				requireAlias: () => undefined,
+				prepare: () => Promise.reject(new Error('credential endpoint refused')),
+			},
 			createExecutor: () => Promise.reject(new Error('must not be reached')),
 			createHostExecutor: () => {
 				throw new Error('must not be reached');

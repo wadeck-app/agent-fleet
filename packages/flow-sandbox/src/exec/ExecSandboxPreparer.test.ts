@@ -230,6 +230,15 @@ describe('ExecSandboxPreparer with one alias per tool', () => {
 		expect(fs.existsSync(path.join(root, 'ws.meta', 'sessions', 'codex', 'config.toml'))).toBe(false);
 	});
 
+	it('requireAlias refuses a tool without an alias before anything is touched, and accepts one that has it or a script', () => {
+		expect(() => preparer({}, claudeOnly).requireAlias('codex')).toThrow(
+			'codex step but no codex alias: add codex=<profile> to the profiles option of this source'
+		);
+		expect(() => preparer({}, claudeOnly).requireAlias('claude')).not.toThrow();
+		expect(() => preparer({}, codexOnly).requireAlias(undefined)).not.toThrow();
+		expect(runtime.callsTo('exec')).toHaveLength(0);
+	});
+
 	it('refuses to prepare for a first tool without an alias, leaving nothing attached', async () => {
 		await expect(preparer({}, claudeOnly).prepare(SANDBOX, mounts, 'opencode')).rejects.toThrow(
 			'opencode step but no opencode alias'

@@ -105,6 +105,18 @@ describe('ProfileAliases', () => {
 		expect(ProfileAliases.parse(['codex=b']).firstTool()).toBe('codex');
 	});
 
+	it('requireFor checks the tool of a model step, and a script step against the first tool, throwing the fix of aliasFor', () => {
+		const claudeOnly = ProfileAliases.parse(['claude=a']);
+
+		expect(() => claudeOnly.requireFor('claude')).not.toThrow();
+		expect(() => claudeOnly.requireFor(undefined)).not.toThrow();
+		expect(() => ProfileAliases.parse(['codex=b']).requireFor(undefined)).not.toThrow();
+		expect(failure(() => claudeOnly.requireFor('codex')).message).toBe(
+			failure(() => claudeOnly.aliasFor('codex')).message
+		);
+		expect(() => ProfileAliases.parse(['work=a']).requireFor('opencode')).not.toThrow();
+	});
+
 	it('describes itself without any host profile name', () => {
 		expect(ProfileAliases.parse(['claude=secret-host', 'codex=other-host']).describe()).toBe(
 			'per-tool aliases: claude, codex'

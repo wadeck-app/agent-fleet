@@ -42,6 +42,8 @@ const EXAMPLES = {
 };
 /** The model CLIs a step can run (src/ModelTool.ts: a test keeps the two lists equal). */
 const MODEL_TOOL_NAMES = ['claude', 'codex', 'opencode'];
+/** A profile alias (src/ProfileAlias.ts PROFILE_ALIAS_PATTERN: a test keeps the two expressions equal). */
+const PROFILE_ALIAS_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const REQUIRED = ['projects', 'region', 'profiles'];
 const MAX_VALUE_LENGTH = 512;
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
@@ -149,7 +151,7 @@ function parseOptions(raw) {
 	// alias=host profile; the entry is split at the FIRST "=", so a host profile may contain "=". A comma separates entries,
 	// so a profile name with a comma cannot be written: it is refused, never cut.
 	// The alias is the TOOL NAME (claude, codex, opencode): each tool uses its own. One lone entry whose alias is not a tool name keeps
-	// the older meaning (it applies to every tool). Same rules as src/ProfileAliases.ts (a test keeps them equal).
+	// the older meaning (it applies to every tool). Same rules as src/ProfileAliases.ts (a test keeps them equal), alias characters included.
 	const entries = list('profiles', raw.profiles);
 	const bad = entries.find(entry => entry.indexOf('=') < 1 || entry.endsWith('='));
 	if (bad !== undefined) {
@@ -163,10 +165,16 @@ function parseOptions(raw) {
 		hostProfile: entry.slice(entry.indexOf('=') + 1),
 	}));
 	for (const { alias, hostProfile } of profiles) {
-		if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(alias) || /[\0\r\n]/.test(hostProfile)) {
+		if (!PROFILE_ALIAS_PATTERN.test(alias)) {
 			throw optionError(
 				'profiles',
-				`has an alias or a profile with characters that are not allowed ("${alias}=${hostProfile}")`
+				`has the alias "${alias}" which is not valid: use 1 to 64 letters, digits, "_" or "-" (the alias travels in a URL and in the AWS config of the VM; a dot is not allowed)`
+			);
+		}
+		if (/[\0\r\n]/.test(hostProfile)) {
+			throw optionError(
+				'profiles',
+				`has a profile with characters that are not allowed ("${alias}=${hostProfile}")`
 			);
 		}
 	}
@@ -595,6 +603,7 @@ export const internals = {
 	wrapperId,
 	wrapperArguments,
 	MODEL_TOOL_NAMES,
+	PROFILE_ALIAS_PATTERN_SOURCE: PROFILE_ALIAS_PATTERN.source,
 	setSpawn(implementation) {
 		spawnProcess = implementation ?? spawn;
 	},

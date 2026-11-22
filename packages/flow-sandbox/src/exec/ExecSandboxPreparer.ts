@@ -58,6 +58,11 @@ export interface ExecPreparedSandbox {
 export class ExecSandboxPreparer {
 	constructor(private readonly options: ExecSandboxPreparerOptions) {}
 
+	/** Throws with the fix when the source has no alias for the tool of a step; the wrapper calls it before any sandbox is created or used. */
+	requireAlias(tool: ModelTool | undefined): void {
+		this.options.profiles.requireFor(tool);
+	}
+
 	async prepare(sandbox: string, mounts: RunMounts, requestedTool?: ModelTool): Promise<ExecPreparedSandbox> {
 		const { options } = this;
 		// A script-first sandbox is prepared for the first tool the source has an alias for; a tool without one fails here, before anything is attached.

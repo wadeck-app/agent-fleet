@@ -60,7 +60,7 @@ export interface HostExecutorContext {
 export interface ExecWrapperDependencies {
 	registration: RelayRegistration;
 	lifecycle: SandboxLifecycle;
-	preparer: Pick<ExecSandboxPreparer, 'prepare'>;
+	preparer: Pick<ExecSandboxPreparer, 'prepare' | 'requireAlias'>;
 	/** Builds the engine for one step: a StepRunner with the sandbox launcher injected. May await (executable lookup). */
 	createExecutor: (context: StepExecutorContext) => Promise<StepExecutor>;
 	/**
@@ -276,6 +276,8 @@ export class ExecWrapper {
 				isJsonObject(raw['stepConfig']) ? raw['stepConfig'] : {},
 				ids.stepId
 			);
+			// Still before anything exists: a tool the source has no alias for must not cost a sandbox (a later step of a run with a sandbox included).
+			this.dependencies.preparer.requireAlias(tool);
 			const onHost = this.placement(raw, ids.stepId) === 'host';
 			const wantsReadOnly = RequiresGuard.wantsReadOnly(raw['requires']);
 			if (onHost && wantsReadOnly) {
