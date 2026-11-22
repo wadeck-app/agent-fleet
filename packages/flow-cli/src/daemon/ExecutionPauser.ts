@@ -4,6 +4,7 @@ import type { DaemonResponse } from '../ipc/Protocol';
 import type { ExecutionStore } from '../storage/ExecutionStore';
 import type { LogWriter } from '../storage/LogWriter';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
+import type { PausedRunSnapshots } from './PausedRunSnapshots.js';
 
 /** Longest `--reason` accepted: it is stored, shown by `flow show` and published (first line) with the event. */
 export const MAX_PAUSE_REASON_CHARS = 500;
@@ -13,6 +14,8 @@ export interface ExecutionPauserParts {
 	executions: Pick<ExecutionRegistry, 'isActive' | 'resumable' | 'pause' | 'unpause' | 'isPaused'>;
 	store: Pick<ExecutionStore, 'exists' | 'read' | 'markExecutionPaused' | 'markExecutionUnpaused'>;
 	logWriter: Pick<LogWriter, 'writeExecution'>;
+	/** The restart snapshot of a paused run (see `PausedRunSnapshots`). */
+	snapshots: Pick<PausedRunSnapshots, 'persist' | 'remove'>;
 	/** Hands out the steps held back while the run was paused. */
 	tryDispatch: () => void;
 }
@@ -26,8 +29,10 @@ type ReasonCheck = { ok: true; reason: string | undefined } | { ok: false; refus
  * record, like `workspaceWait`), the workers and the workspace stay held. The dispatcher leaves the ready steps of a paused
  * run in the queue (`StepDispatcher`), so an unpause hands each out exactly once.
  *
- * The pause lives in the daemon's memory like the run itself: a daemon restart ends a paused run as it ends any other
- * (see `InterruptedExecutionReconciler`), it never leaves a paused record behind.
+ * A restart snapshot of the paused run is written (and kept up to date by `PausedRunSnapshots`), so that a daemon restart restores
+ * the run, still paused (see `PausedRunRestorer`). A run that cannot be snapshotted (its workspace provider cannot take the
+ * workspace back, its state is too large) is paused all the same, and the answer and the log say it will not survive a restart:
+ * the reconciler then ends it as failed, as it ends any run.
  */
 export class ExecutionPauser {
 	constructor(private readonly parts: ExecutionPauserParts) {}
@@ -86,11 +91,22 @@ export class ExecutionPauser {
 			`Execution paused by the user (flow pause)${why}. Running steps finish; no new step starts until: flow unpause ${executionId}`,
 			'warning'
 		);
+		// After the pause is in force: the queue and the scheduler cannot change before the snapshot is taken (one synchronous block).
+		const persisted = this.parts.snapshots.persist(executionId);
+		if (!persisted.ok) {
+			this.parts.logWriter.writeExecution(
+				executionId,
+				`This paused execution will NOT survive a daemon restart: ${persisted.reason}. A restart would end it as failed.`,
+				'warning'
+			);
+		}
 		return {
 			type: 'execution_paused',
 			executionId,
 			since: written.paused!.since,
 			...(checked.reason === undefined ? {} : { reason: checked.reason }),
+			restartSafe: persisted.ok,
+			...(persisted.ok ? {} : { restartNote: persisted.reason }),
 		};
 	}
 
@@ -122,6 +138,8 @@ export class ExecutionPauser {
 
 		const written = store.markExecutionUnpaused(executionId);
 		executions.unpause(executionId);
+		// A running run is not persisted: from here a restart ends it as failed, like any running run.
+		this.parts.snapshots.remove(executionId);
 		this.parts.logWriter.writeExecution(executionId, 'Execution resumed by the user (flow unpause)', 'info');
 		this.parts.tryDispatch();
 		return { type: 'execution_unpaused', executionId, pausedMs: written.pausedMs ?? 0 };

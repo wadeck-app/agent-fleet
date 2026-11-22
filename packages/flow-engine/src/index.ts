@@ -62,6 +62,8 @@ export type {
 	SubStepStrategy,
 	SubStepStrategyContext,
 } from './orchestration/FlowScheduler';
+export { SCHEDULER_SNAPSHOT_VERSION } from './orchestration/SchedulerSnapshotCodec';
+export type { SchedulerSnapshot } from './orchestration/SchedulerSnapshotCodec';
 export { RestartOnFirstFailure, WaitAll } from './orchestration/FlowScheduler.subStepStrategies';
 export { TemplateRenderer } from './processing/TemplateRenderer';
 export { DEFAULT_STEP_RECORD_LIMITS } from './record/StepRecordLimits';

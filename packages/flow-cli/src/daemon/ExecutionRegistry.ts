@@ -40,6 +40,8 @@ export class ExecutionRegistry {
 	private readonly requirements = new Map<string, RunRequirementsRecord>();
 	/** Workspace provider kind of each run (the flow's `workspace:`), read per placement so injected steps carry it too. */
 	private readonly workspaceKinds = new Map<string, string>();
+	/** The run command each execution was accepted with (without `requestId`): what a restart snapshot of a paused run needs. */
+	private readonly runCommands = new Map<string, Record<string, unknown>>();
 	/**
 	 * Executions kept alive (not cleaned up) after a `user_intervention` step timed out
 	 * unanswered, so a later `flow resume` can re-dispatch exactly that step.
@@ -68,6 +70,7 @@ export class ExecutionRegistry {
 		this.projects.delete(executionId);
 		this.requirements.delete(executionId);
 		this.workspaceKinds.delete(executionId);
+		this.runCommands.delete(executionId);
 		this.pausedExecutions.delete(executionId);
 		this.activeCount--;
 	}
@@ -141,6 +144,15 @@ export class ExecutionRegistry {
 	/** Holds the workspace provider kind of the execution's flow (see `FlowWorkspaceKind`). */
 	bindWorkspaceKind(executionId: string, kind: string): void {
 		this.workspaceKinds.set(executionId, kind);
+	}
+
+	/** Holds the run command of the execution, for the restart snapshot of a paused run. */
+	bindRunCommand(executionId: string, run: Record<string, unknown>): void {
+		this.runCommands.set(executionId, run);
+	}
+
+	runCommandOf(executionId: string): Record<string, unknown> | undefined {
+		return this.runCommands.get(executionId);
 	}
 
 	/** The workspace provider kind of the execution, or undefined when it could not be determined. */

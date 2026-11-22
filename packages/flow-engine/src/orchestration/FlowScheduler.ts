@@ -2,6 +2,8 @@ import { RestartOnFirstFailure, WaitAll, Waves } from './FlowScheduler.subStepSt
 import type { SubStepAction, SubStepStrategy, SubStepStrategyContext } from './FlowScheduler.subStepStrategies';
 import { GotoLoop } from './GotoLoop';
 import { ReadyStepCollector } from './ReadyStepCollector';
+import { SchedulerSnapshotCodec } from './SchedulerSnapshotCodec';
+import type { SchedulerSnapshot } from './SchedulerSnapshotCodec';
 import { SchedulerState } from './SchedulerState';
 import type {
 	FailureOrigin,
@@ -258,6 +260,36 @@ export class FlowScheduler {
 	 */
 	unacknowledge(stepId: string): void {
 		this.state.inFlightSteps.delete(stepId);
+	}
+
+	/** Everything this scheduler knows, as plain JSON (see {@link SchedulerSnapshot}). Read-only: nothing changes. */
+	snapshot(): SchedulerSnapshot {
+		return SchedulerSnapshotCodec.capture(this.state, this.context);
+	}
+
+	/**
+	 * Loads a {@link snapshot} into this never-started scheduler, as if it had run up to that point.
+	 * Instead of start(): the completed steps stay completed, nothing is re-run.
+	 *
+	 * The steps that were in flight when the snapshot was taken (their worker is gone) are NOT in flight any more: they are
+	 * returned as ready items, and the caller queues them. The steps that were ready but not yet dispatched are not known to
+	 * the scheduler (the consumer's queue holds them): the caller restores them.
+	 *
+	 * @throws Error naming the damaged field or the unsupported version; discard the scheduler then
+	 */
+	restore(snapshot: unknown): ReadyItem[] {
+		SchedulerSnapshotCodec.apply(this.state, this.context, snapshot);
+		const lost = [...this.state.inFlightSteps];
+		this.state.inFlightSteps.clear();
+		return lost.map(stepId => {
+			const step = this.state.steps.get(stepId);
+			if (step === undefined) {
+				throw new Error(
+					`FlowScheduler snapshot is invalid: in-flight step "${stepId}" is not one of its steps.`
+				);
+			}
+			return { stepId, step };
+		});
 	}
 
 	/** Total number of steps registered (including injected). */

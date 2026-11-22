@@ -1,5 +1,6 @@
-import type { WorkspaceHandle, WorkspaceProvider, WorkspaceRequest } from 'extension-points';
+import type { WorkspaceAdoptRequest, WorkspaceHandle, WorkspaceProvider, WorkspaceRequest } from 'extension-points';
 import { resolveWorkspaceFolder } from 'extension-points';
+import * as fs from 'node:fs';
 
 import { GitFolderProbe } from './GitFolderProbe';
 import { runMetaDirFor } from './RunMetaDir';
@@ -39,6 +40,27 @@ export class SharedFolderWorkspaceProvider implements WorkspaceProvider {
 			readOnly: this.kind === 'readonly',
 			...(notes.length === 0 ? {} : { notes }),
 		};
+	}
+
+	async adopt(request: WorkspaceAdoptRequest): Promise<WorkspaceHandle> {
+		const { handle, executionId } = request;
+		if (handle.id !== `${this.kind}:${executionId}`) {
+			throw new Error(
+				`The workspace "${handle.id}" was not given by the "${this.kind}" provider to execution ${executionId}: it is not taken back.`
+			);
+		}
+		let isFolder: boolean;
+		try {
+			isFolder = (await fs.promises.stat(handle.path)).isDirectory();
+		} catch {
+			isFolder = false;
+		}
+		if (!isFolder) {
+			throw new Error(
+				`The workspace folder "${handle.path}" of the paused execution ${executionId} no longer exists (or is not a folder): the run cannot continue in it. Re-run the flow.`
+			);
+		}
+		return handle;
 	}
 
 	async release(_handle: WorkspaceHandle): Promise<void> {

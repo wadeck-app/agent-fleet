@@ -2,6 +2,25 @@ export interface WorkspaceProvider {
 	allocate(request: WorkspaceRequest): Promise<WorkspaceHandle>;
 	/** Idempotent: releasing a handle twice must not fail. */
 	release(handle: WorkspaceHandle): Promise<void>;
+	/**
+	 * OPTIONAL. Takes back a workspace this provider allocated for a run that was paused when the daemon restarted, so the run
+	 * can continue in it. Called once per restored run, before any other run is accepted; the handle is the one `allocate`
+	 * returned. Return the handle to use (normally the same one) after making `release` work for it again.
+	 *
+	 * Reject, with a message that says what to do, when the workspace cannot be taken back safely (the folder is gone, the
+	 * slot is held by another run): the run is then failed, never continued in a workspace somebody else may use.
+	 * A provider without `adopt` cannot keep a paused run across a daemon restart: `flow pause` says so.
+	 */
+	adopt?(request: WorkspaceAdoptRequest): Promise<WorkspaceHandle>;
+}
+
+export interface WorkspaceAdoptRequest {
+	executionId: string;
+	/** Absolute folder of the project the run belongs to. */
+	projectDir: string;
+	flow: { id: string; version: string };
+	/** The handle `allocate` returned before the restart (without its `notes`). */
+	handle: WorkspaceHandle;
 }
 
 export interface WorkspaceRequest {

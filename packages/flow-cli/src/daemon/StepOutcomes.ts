@@ -10,6 +10,7 @@ import type { DaemonSecrets } from './DaemonSecrets.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import type { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
+import type { PausedRunSnapshots } from './PausedRunSnapshots.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
 import type { RunEndCoordinator } from './RunEndCoordinator.js';
 import { describeConditionError } from './SchedulerConditionError.js';
@@ -45,7 +46,9 @@ export class StepOutcomes {
 		private readonly tryDispatch: () => void,
 		private readonly onExecutionEnded: (executionId: string) => void,
 		/** Tells the workers that served a run that it ended; absent means nobody is ever told. */
-		private readonly runEnd?: RunEndCoordinator
+		private readonly runEnd?: RunEndCoordinator,
+		/** Rewrites the restart snapshot of a paused run when a step ends while it is paused. */
+		private readonly pausedSnapshots?: Pick<PausedRunSnapshots, 'refresh'>
 	) {}
 
 	/** Called by Daemon when a worker reports step_completed. */
@@ -129,6 +132,8 @@ export class StepOutcomes {
 		} catch (error) {
 			this.endExecutionOnEngineError(executionId, stepId, error);
 		}
+		// A step that ends while the run is paused changes what a restart must restore (its outputs, the steps now queued).
+		this.pausedSnapshots?.refresh(executionId);
 	}
 
 	private endExecutionOnEngineError(executionId: string, settledStepId: string, error: unknown): void {
@@ -228,6 +233,7 @@ export class StepOutcomes {
 		});
 		this.logWriter.writeExecution(executionId, `Step ${stepId} failed: ${reason}`, 'error');
 		this.settleFailure(executionId, stepId, reason, 'engine');
+		this.pausedSnapshots?.refresh(executionId);
 		this.hooks.dispatch(executionId, 'onStepFailed', { executionId, stepId, error: reason });
 	}
 

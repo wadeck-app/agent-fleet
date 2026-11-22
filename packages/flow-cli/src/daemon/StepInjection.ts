@@ -5,6 +5,7 @@ import type { FlowStep } from 'flow-engine';
 import type { InjectedStep } from '../ipc/Protocol';
 import type { DaemonSecrets } from './DaemonSecrets.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
+import type { PausedRunSnapshots } from './PausedRunSnapshots.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
 
 export const DEFAULT_MAX_INJECTED_STEPS = 20;
@@ -17,7 +18,9 @@ export class StepInjection {
 		private readonly queue: ReadyStepQueue,
 		private readonly daemonSecrets: DaemonSecrets,
 		private readonly maxInjectedSteps: number,
-		private readonly maxStepsPerExecution: number
+		private readonly maxStepsPerExecution: number,
+		/** Rewrites the restart snapshot of a paused run when a step is injected while it is paused. */
+		private readonly pausedSnapshots?: Pick<PausedRunSnapshots, 'refresh'>
 	) {}
 
 	/** Called by Daemon for inject_steps messages. */
@@ -47,7 +50,7 @@ export class StepInjection {
 			throw new Error(InjectedStepGuard.refusal(violations));
 		}
 
-		const allKnownIds =new Set([...this.executions.knownStepIds(executionId), ...injectedSteps.map(s => s.id)]);
+		const allKnownIds = new Set([...this.executions.knownStepIds(executionId), ...injectedSteps.map(s => s.id)]);
 
 		const readOnly = this.executions.context(executionId)?.workspaceReadOnly === true;
 
@@ -111,5 +114,6 @@ export class StepInjection {
 			: stepsToInject;
 		const newReady = scheduler.inject(narrowed as SchedulerStep[]);
 		this.queue.enqueueItems(newReady, context);
+		this.pausedSnapshots?.refresh(executionId);
 	}
 }

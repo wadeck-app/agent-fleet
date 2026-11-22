@@ -153,3 +153,75 @@ describe('WorktreeWorkspaceProvider - mocked git calls', () => {
 		await expect(provider.release(handle)).rejects.toThrow(/git remove failed/);
 	});
 });
+
+describe('WorktreeWorkspaceProvider - adopt (a paused run after a daemon restart)', () => {
+	const adoptRequest = (executionId: string, path: string) => ({
+		executionId,
+		projectDir,
+		flow: { id: 'f', version: '1.0.0' },
+		handle: { path, id: `worktree:${path}` },
+	});
+
+	it('takes back a worktree that exists and that git lists, so release works again', async () => {
+		const path = join(tmp, 'test-exec1');
+		mkdirSync(path, { recursive: true });
+		const gitCalls: string[][] = [];
+		const provider = createWorktreeProvider({
+			baseDir: tmp,
+			prefix: 'test-',
+			_execGit: async args => {
+				gitCalls.push(args);
+			},
+			_gitOutput: async () =>
+				`worktree ${projectDir}\nHEAD abc\n\nworktree ${path.split('\\').join('/')}\nHEAD def\n`,
+		});
+
+		const handle = await provider.adopt!(adoptRequest('exec1', path));
+		await provider.release(handle);
+
+		expect(handle.path).toBe(path);
+		expect(gitCalls.some(args => args.includes('remove'))).toBe(true);
+	});
+
+	it('refuses a worktree folder that was removed, with what to do', async () => {
+		const provider = createWorktreeProvider({ baseDir: tmp, prefix: 'test-', _gitOutput: async () => '' });
+		await expect(provider.adopt!(adoptRequest('exec1', join(tmp, 'test-exec1')))).rejects.toThrow(
+			/no longer exists.*Re-run the flow/
+		);
+	});
+
+	it('refuses a folder that git no longer lists as a worktree', async () => {
+		const path = join(tmp, 'test-exec1');
+		mkdirSync(path, { recursive: true });
+		const provider = createWorktreeProvider({
+			baseDir: tmp,
+			prefix: 'test-',
+			_gitOutput: async () => `worktree ${projectDir}\n`,
+		});
+		await expect(provider.adopt!(adoptRequest('exec1', path))).rejects.toThrow(/no longer lists it as a worktree/);
+	});
+
+	it('refuses a handle that is not the worktree of this run', async () => {
+		const other = join(tmp, 'test-other');
+		mkdirSync(other, { recursive: true });
+		const provider = createWorktreeProvider({ baseDir: tmp, prefix: 'test-', _gitOutput: async () => '' });
+		await expect(provider.adopt!(adoptRequest('exec1', other))).rejects.toThrow(
+			/not the one this provider creates/
+		);
+	});
+
+	it('refuses when git cannot be asked', async () => {
+		const path = join(tmp, 'test-exec1');
+		mkdirSync(path, { recursive: true });
+		const provider = createWorktreeProvider({
+			baseDir: tmp,
+			prefix: 'test-',
+			_gitOutput: async () => {
+				throw new Error('git is gone');
+			},
+		});
+		await expect(provider.adopt!(adoptRequest('exec1', path))).rejects.toThrow(
+			/git worktree list failed.*git is gone/
+		);
+	});
+});

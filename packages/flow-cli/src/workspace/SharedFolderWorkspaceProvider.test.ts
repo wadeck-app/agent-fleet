@@ -120,6 +120,44 @@ describe('SharedFolderWorkspaceProvider', () => {
 		});
 	});
 
+	describe('adopt (a paused run after a daemon restart)', () => {
+		const adoptRequest = (kind: 'in-place' | 'readonly', executionId: string, folder: string) => ({
+			executionId,
+			projectDir: project,
+			flow: { id: 'f', version: '1.0.0' },
+			handle: { path: folder, id: `${kind}:${executionId}`, metaDir: runMetaDirFor(project, executionId) },
+		});
+
+		it.each(['in-place', 'readonly'] as const)(
+			'%s takes back the same handle while the folder exists',
+			async kind => {
+				const provider = new SharedFolderWorkspaceProvider(kind, {}, probe);
+				const handle = await provider.allocate(request('abcd1234'));
+
+				const adopted = await provider.adopt(adoptRequest(kind, 'abcd1234', handle.path));
+
+				expect(adopted.path).toBe(handle.path);
+				expect(adopted.id).toBe(handle.id);
+			}
+		);
+
+		it('refuses a folder that was removed, saying to re-run the flow', async () => {
+			const provider = new SharedFolderWorkspaceProvider('in-place', {}, probe);
+
+			await expect(provider.adopt(adoptRequest('in-place', 'abcd1234', path.join(root, 'gone')))).rejects.toThrow(
+				/no longer exists.*Re-run the flow/
+			);
+		});
+
+		it('refuses a handle another provider gave', async () => {
+			const provider = new SharedFolderWorkspaceProvider('in-place', {}, probe);
+
+			await expect(provider.adopt(adoptRequest('readonly', 'abcd1234', project))).rejects.toThrow(
+				/not given by the "in-place" provider/
+			);
+		});
+	});
+
 	it('refuses a provider name other than in-place or readonly', () => {
 		expect(() => new SharedFolderWorkspaceProvider('pool' as never, {}, probe)).toThrow(/in-place|readonly/);
 	});

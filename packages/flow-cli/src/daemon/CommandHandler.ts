@@ -191,6 +191,17 @@ export class CommandHandler {
 		}
 	}
 
+	/**
+	 * Restores, still paused, the runs that were paused (and persisted) when the previous daemon stopped (the store lists them after
+	 * `reconcileInterruptedExecutions`, which keeps them). One after the other; a run that cannot be restored ends as failed with
+	 * the reason. Call it before {@link resumeWaitingExecutions}: a pool slot a paused run holds must not go to a waiting one.
+	 */
+	async restorePausedExecutions(hooksFor: (project: RunProject) => HookDispatcher | undefined): Promise<void> {
+		for (const executionId of this.executionStore.pausedExecutionIdsAtStart()) {
+			await this.pipeline.pausedRestorer.restore(executionId, hooksFor);
+		}
+	}
+
 	/** See {@link SchedulerIdleState.isQueueEmpty}. */
 	isQueueEmpty(): boolean {
 		return this.pipeline.idleState.isQueueEmpty();

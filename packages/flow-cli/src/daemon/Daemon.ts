@@ -35,6 +35,7 @@ import { LaunchTokenIssuer } from './LaunchTokenIssuer.js';
 import { findLiveDaemon } from './LiveDaemonProbe.js';
 import { RelayRegistry } from './RelayRegistry.js';
 import { runEndSettingsOf } from './RunEndCoordinator.js';
+import type { RunProject } from './RunProjectResolver.js';
 import { SharedTokenAuthenticator } from './SharedTokenAuthenticator.js';
 import { removeStaleDaemonFiles } from './StaleDaemonFiles.js';
 import { type StartDaemonOptions, assertValidStartDaemonOptions } from './StartDaemonOptions.js';
@@ -392,11 +393,12 @@ async function startOwningDaemon(
 				};
 
 				// The runs that waited for a workspace when the previous daemon stopped were left alone by the reconcile above.
-				startupTasks.resumeWaitingExecutions(
-					executionStore,
-					commandHandler,
-					project => new HookDispatcher(loadFlowHooks(project.project))
-				);
+				// The paused runs first: the pool slot one holds must not go to a waiting run that starts again.
+				const hooksFor = (project: RunProject): HookDispatcher | undefined =>
+					new HookDispatcher(loadFlowHooks(project.project));
+				void startupTasks.restorePausedExecutions(executionStore, commandHandler, hooksFor).then(() => {
+					startupTasks.resumeWaitingExecutions(executionStore, commandHandler, hooksFor);
+				});
 
 				// Nothing else would notice a wedged worker: it keeps its socket open and answers
 				// pings, so only the absence of output over time says anything. Swept rather than

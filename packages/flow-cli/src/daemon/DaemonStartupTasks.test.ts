@@ -123,4 +123,55 @@ describe('DaemonStartupTasks', () => {
 			);
 		});
 	});
+
+	describe('restorePausedExecutions', () => {
+		it('restores the paused runs the reconcile kept and says how many in the daemon log', async () => {
+			const restore = vi.fn(() => Promise.resolve());
+			const store = { pausedExecutionIdsAtStart: () => ['aaaa1111'] } as unknown as ExecutionStore;
+			const hooksFor = () => undefined;
+
+			await new DaemonStartupTasks('logs', publisher).restorePausedExecutions(
+				store,
+				{ restorePausedExecutions: restore },
+				hooksFor
+			);
+
+			expect(restore).toHaveBeenCalledWith(hooksFor);
+			expect(writeDaemonLog).toHaveBeenCalledWith(
+				'logs',
+				'info',
+				expect.stringContaining('1 paused execution(s) were kept')
+			);
+		});
+
+		it('does nothing when no run was paused', async () => {
+			const restore = vi.fn(() => Promise.resolve());
+			const store = { pausedExecutionIdsAtStart: () => [] } as unknown as ExecutionStore;
+
+			await new DaemonStartupTasks('logs', publisher).restorePausedExecutions(
+				store,
+				{ restorePausedExecutions: restore },
+				() => undefined
+			);
+
+			expect(restore).not.toHaveBeenCalled();
+			expect(writeDaemonLog).not.toHaveBeenCalled();
+		});
+
+		it('logs a failure as an error that names the consequence, and resolves so the waiting runs still start', async () => {
+			const store = { pausedExecutionIdsAtStart: () => ['aaaa1111'] } as unknown as ExecutionStore;
+
+			await new DaemonStartupTasks('logs', publisher).restorePausedExecutions(
+				store,
+				{ restorePausedExecutions: () => Promise.reject(new Error('boom')) },
+				() => undefined
+			);
+
+			expect(writeDaemonLog).toHaveBeenCalledWith(
+				'logs',
+				'error',
+				expect.stringContaining('could not restore the paused executions: Error: boom')
+			);
+		});
+	});
 });

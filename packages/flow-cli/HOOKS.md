@@ -32,22 +32,22 @@ All hooks are **fire-and-forget**: if a hook fails (non-zero exit, connection re
 
 Separately from hooks, the flow daemon publishes lifecycle events to the queue, so agents can `queue wait` instead of polling `flow status`. Nothing to configure; `flow docs` (Section 9: Events) is the reference for names, payload and commands.
 
-| Event                      | Fires when                                               |
-| -------------------------- | -------------------------------------------------------- |
-| `flow.execution.started`   | First step of an execution is dispatched                 |
-| `flow.execution.completed` | Every step completed                                     |
-| `flow.execution.failed`    | Execution failed for good (`flow cancel`: `error` is `cancelled by user`) |
+| Event                      | Fires when                                                                        |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| `flow.execution.started`   | First step of an execution is dispatched                                          |
+| `flow.execution.completed` | Every step completed                                                              |
+| `flow.execution.failed`    | Execution failed for good (`flow cancel`: `error` is `cancelled by user`)         |
 | `flow.execution.paused`    | `flow pause`: no new step dispatched, running steps finish (`pausedAt`, `reason`) |
-| `flow.execution.resumed`   | `flow unpause`: queued steps dispatched again (`pausedAt`, `resumedAt`) |
-| `flow.step.started`        | A step attempt starts (retry: again, with `attempt` + 1) |
-| `flow.step.completed`      | A step attempt completed                                 |
-| `flow.step.failed`         | A step attempt failed                                    |
+| `flow.execution.resumed`   | `flow unpause`: queued steps dispatched again (`pausedAt`, `resumedAt`)           |
+| `flow.step.started`        | A step attempt starts (retry: again, with `attempt` + 1)                          |
+| `flow.step.completed`      | A step attempt completed                                                          |
+| `flow.step.failed`         | A step attempt failed                                                             |
 
 - The daemon needs the `queue` CLI on its PATH; the SDK starts the queue daemon when it is stopped.
 - `FLOW_QUEUE_EVENTS=0` in the daemon environment switches events off. The daemon log states at start whether events are enabled, unavailable (with the fix) or disabled.
 - Publishing is best effort and never affects a run. Payloads hold ids, status, timings and the first line of the masked error, plus on ended step events the cost figures (`costUsd` of this attempt, `stepTotalCostUsd`, `stepTotalCostComplete`, `turns`, `toolCalls`, `endReason`; cost fields are absent, never 0, when unknown); never inputs, env values or outputs.
 - Cost: `flow.execution.completed|failed` also carry the run total (`totalCostUsd`, `totalCostComplete`, `totalCostEstimated`); a total with unknown parts is a lower bound (`totalCostComplete: false`). Codex reports no cost: its usd is an ESTIMATE from the built-in price table (`ModelPriceTable.ts`, prices dated `PRICES_AS_OF`, flagged `*Estimated: true` and printed `~$x (estimated, prices of <date>)`); a codex step that names no `model:` (codex then uses its own config default) has an unknown cost. OpenCode and claude report their own usd.
-- Pause: the run keeps its status; a daemon restart does not keep a paused run (it ends as failed, interrupted). `flow unpause` is unrelated to `flow resume`, which reopens a failed run.
+- Pause: the run keeps its status. A paused run survives a daemon restart: it is restored still paused (no event is published for the restore), steps that were running are queued again as a new attempt, and `flow unpause` continues it (`flow.execution.resumed`). A pause the daemon cannot persist (a workspace provider without `adopt()`, a state over 32 MiB) prints a warning and the run ends as failed at a restart (`flow.execution.failed`, interrupted). `flow unpause` is unrelated to `flow resume`, which reopens a failed run.
 - Source of the mapping: `src/events/FlowEventMapper.ts`, fed by `ExecutionStore` transitions (one place, so no event is published twice).
 
 ---

@@ -22,6 +22,14 @@ export type AllocatedWorkspace =
 	  }
 	| { ok: false; response: DaemonResponse };
 
+/** The part of a provider's handle a restart snapshot keeps (its notes are for the log of the first allocation only). */
+export interface SavedWorkspaceHandle {
+	path: string;
+	id: string;
+	metaDir?: string;
+	readOnly?: boolean;
+}
+
 /** A run that has no workspace yet because the provider has none free: the allocation goes on in the background. */
 export interface WorkspaceWaiting {
 	/** Why it waits, as the provider first said it. */
@@ -217,6 +225,81 @@ export class ExecutionWorkspaces {
 			readOnly: handle.readOnly === true,
 			...(owned ? { pluginMetaDir: workspaceMetaDir } : {}),
 		};
+	}
+
+	/**
+	 * What a restart snapshot of a paused run needs of its workspace: the handle the provider gave, or why the provider could
+	 * not take it back after a daemon restart (it has no `adopt`). Undefined when the execution holds no workspace here.
+	 */
+	restartInfo(
+		executionId: string
+	):
+		| { handle: SavedWorkspaceHandle; adoptable: true }
+		| { handle: SavedWorkspaceHandle; adoptable: false; blocker: string }
+		| undefined {
+		const entry = this.pluginHandles.get(executionId);
+		if (entry === undefined) {
+			return undefined;
+		}
+		const { path, id, metaDir, readOnly } = entry.handle;
+		const handle: SavedWorkspaceHandle = {
+			path,
+			id,
+			...(metaDir === undefined ? {} : { metaDir }),
+			...(readOnly === undefined ? {} : { readOnly }),
+		};
+		return typeof entry.provider.adopt === 'function'
+			? { handle, adoptable: true }
+			: {
+					handle,
+					adoptable: false,
+					blocker: `its workspace provider (workspace "${id}") cannot take a workspace back after a daemon restart (it has no adopt() method; the built-in in-place, readonly, pool and worktree providers have one)`,
+				};
+	}
+
+	/**
+	 * After a daemon restart: takes back the workspace a paused run held, through the provider its flow declares, and registers it
+	 * for the release exactly as an allocation does. A refusal says why; nothing stays registered then.
+	 */
+	async adopt(
+		flow: FlowDefinition,
+		executionId: string,
+		projectDir: string,
+		saved: SavedWorkspaceHandle
+	): Promise<AllocatedWorkspace> {
+		let provider: WorkspaceProvider;
+		try {
+			({ provider } = await this.providers.providerFor(flow));
+		} catch (err) {
+			return this.adoptRefusal(
+				executionId,
+				`the workspace provider cannot be loaded: ${redactGitText(normalizeError(err).message)}`
+			);
+		}
+		if (typeof provider.adopt !== 'function') {
+			return this.adoptRefusal(
+				executionId,
+				`its workspace provider cannot take a workspace back after a daemon restart (no adopt() method)`
+			);
+		}
+		let handle: WorkspaceHandle;
+		try {
+			handle = await provider.adopt({
+				executionId,
+				projectDir,
+				flow: { id: flow.id, version: flow.version },
+				handle: { ...saved },
+			});
+		} catch (err) {
+			return this.adoptRefusal(executionId, redactGitText(normalizeError(err).message));
+		}
+		return this.finishAllocation(provider, executionId, handle);
+	}
+
+	private adoptRefusal(executionId: string, why: string): AllocatedWorkspace {
+		const message = `The workspace of the paused execution ${executionId} cannot be taken back after the daemon restart: ${why}`;
+		this.logWriter.writeExecution('__workspace', `WORKSPACE_ADOPT_FAILED: ${message}`, 'error');
+		return { ok: false, response: { type: 'error', code: 'WORKSPACE_ADOPT_FAILED', message } };
 	}
 
 	/** `.meta` directories of the plugin workspaces in use now (owned or not): the record pruner must not delete them. */

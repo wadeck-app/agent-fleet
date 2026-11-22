@@ -427,6 +427,9 @@ export class RunRequestHandler {
 			// Also kept in memory: routing consults it per dispatch, and a worker the daemon
 			// did not create only serves the projects it declared (D#9).
 			this.executions.setProject(executionId, { projectId, projectRoot });
+			// Kept for the restart snapshot of a paused run (`requestId` only serves the idempotency of this request).
+			const { requestId: _requestId, ...runCommand } = cmd;
+			this.executions.bindRunCommand(executionId, runCommand as unknown as Record<string, unknown>);
 			// Same for the requirements: read per placement from the execution, so a step injected later inherits them.
 			if (accepted.requirements !== undefined) {
 				this.executions.bindRequirements(executionId, accepted.requirements);

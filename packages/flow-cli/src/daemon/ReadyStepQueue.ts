@@ -36,6 +36,11 @@ export class ReadyStepQueue {
 		this.steps.unshift(...steps);
 	}
 
+	/** Ids of the steps of an execution waiting in the queue, in queue order. */
+	stepIdsOf(executionId: string): string[] {
+		return this.steps.filter(step => step.executionContext.executionId === executionId).map(step => step.stepId);
+	}
+
 	/** Drops every queued step of an execution. */
 	purge(executionId: string): void {
 		for (let i = this.steps.length - 1; i >= 0; i--) {

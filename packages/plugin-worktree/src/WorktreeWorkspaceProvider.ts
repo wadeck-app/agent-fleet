@@ -1,4 +1,4 @@
-import type { WorkspaceHandle, WorkspaceProvider, WorkspaceRequest } from 'extension-points';
+import type { WorkspaceAdoptRequest, WorkspaceHandle, WorkspaceProvider, WorkspaceRequest } from 'extension-points';
 import {
 	hardenedGit,
 	validateBaseDir,
@@ -32,6 +32,15 @@ async function defaultGitOutput(args: string[], cwd: string): Promise<string> {
 	const { execa } = await import('execa');
 	const git = hardenedGit(args, { reading: true });
 	return (await execa('git', git.args, { cwd, env: git.env })).stdout;
+}
+
+/** Paths as git prints them (forward slashes) and as the OS gives them compare equal; Windows paths ignore case. */
+function samePath(a: string, b: string): boolean {
+	const normalize = (p: string): string => {
+		const slashed = resolve(p).replace(/\\/g, '/');
+		return process.platform === 'win32' ? slashed.toLowerCase() : slashed;
+	};
+	return normalize(a) === normalize(b);
 }
 
 /** Credentials in a URL (`https://user:token@host`) must not reach a message. */
@@ -138,6 +147,45 @@ export function createWorktreeProvider(options: WorktreeOptions): WorkspaceProvi
 				path: worktreePath,
 				id: `worktree:${worktreePath}`,
 			};
+		},
+
+		async adopt(request: WorkspaceAdoptRequest): Promise<WorkspaceHandle> {
+			const worktreePath = request.handle.path;
+			// The path of a worktree is a function of the run: a handle that names another one is not ours to take back.
+			const expected = join(
+				resolve(request.projectDir, options.baseDir),
+				`${options.prefix ?? ''}${request.executionId}`
+			);
+			if (samePath(worktreePath, expected) === false) {
+				throw new Error(
+					`The worktree "${worktreePath}" is not the one this provider creates for execution ${request.executionId} ("${expected}"): it is not taken back.`
+				);
+			}
+			if (!existsSync(worktreePath)) {
+				throw new Error(
+					`The worktree "${worktreePath}" of the paused execution ${request.executionId} no longer exists: it was removed while the daemon was stopped, so the run cannot continue. Re-run the flow.`
+				);
+			}
+			let listing: string;
+			try {
+				listing = await gitOutput(['worktree', 'list', '--porcelain'], request.projectDir);
+			} catch (error) {
+				throw new Error(
+					`Cannot check that git still knows the worktree "${worktreePath}" (git worktree list failed in "${request.projectDir}": ${redact(error instanceof Error ? error.message : String(error))}). Fix the repository, then re-run the flow.`
+				);
+			}
+			const known = listing
+				.split(/\r?\n/)
+				.filter(line => line.startsWith('worktree '))
+				.some(line => samePath(line.slice('worktree '.length), worktreePath));
+			if (!known) {
+				throw new Error(
+					`The folder "${worktreePath}" exists but git no longer lists it as a worktree of "${request.projectDir}" (it was pruned or replaced): it is not taken back. Re-run the flow.`
+				);
+			}
+			projectByPath.set(worktreePath, request.projectDir);
+			released.delete(worktreePath);
+			return request.handle;
 		},
 
 		async release(handle: WorkspaceHandle): Promise<void> {

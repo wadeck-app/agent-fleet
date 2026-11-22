@@ -5,6 +5,7 @@ import * as path from 'node:path';
 
 import type { ExecutionState } from '../ipc/Protocol';
 import { InterruptedExecutionReconciler, type ReconcilerHost } from './InterruptedExecutionReconciler';
+import { PAUSED_SNAPSHOT_SUFFIX, type PausedRunSnapshot, PausedRunSnapshotStore } from './PausedRunSnapshotStore';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -48,6 +49,7 @@ describe('InterruptedExecutionReconciler -- work bound at daemon start', () => {
 			},
 			notify: () => undefined,
 			mask: (_id, text) => text,
+			pausedSnapshots: new PausedRunSnapshotStore(dir, { maskDeep: (_id, value) => value }),
 		};
 	});
 
@@ -141,6 +143,97 @@ describe('InterruptedExecutionReconciler -- work bound at daemon start', () => {
 			instance.reconcile();
 
 			expect(instance.waitingExecutionIds()).toEqual([]);
+		});
+	});
+
+	describe('paused executions', () => {
+		const snapshot = (): PausedRunSnapshot => ({
+			run: {},
+			scheduler: {} as never,
+			queued: [],
+			context: { stepOutputs: {}, stepMeta: {} },
+			stepCount: 1,
+			workspace: { path: '/w', id: 'in-place:x' },
+		});
+
+		function writePaused(id: string): void {
+			writeRecord(id, 'running', 0);
+			const filePath = path.join(dir, `${id}.json`);
+			const state = JSON.parse(fs.readFileSync(filePath, 'utf8')) as ExecutionState;
+			state.paused = { since: '2026-11-22T10:00:00.000Z', reason: 'waiting for the review' };
+			state.steps = { s1: { status: 'pending' } };
+			fs.writeFileSync(filePath, JSON.stringify(state), 'utf8');
+		}
+
+		const snapshots = (): PausedRunSnapshotStore => host.pausedSnapshots as PausedRunSnapshotStore;
+
+		it('keeps a paused execution that has a usable restart snapshot and reports it to be restored', () => {
+			writePaused('paus0001');
+			snapshots().write('paus0001', snapshot());
+			const instance = reconciler();
+
+			expect(instance.reconcile()).toBe(0);
+
+			expect(instance.pausedExecutionIds()).toEqual(['paus0001']);
+			const record = JSON.parse(fs.readFileSync(path.join(dir, 'paus0001.json'), 'utf8')) as ExecutionState;
+			expect(record.status).toBe('running');
+			expect(record.paused).toBeDefined();
+		});
+
+		it('refreshes the file time of a kept paused record, so the next start still reads it', () => {
+			writePaused('paus0001');
+			snapshots().write('paus0001', snapshot());
+			const filePath = path.join(dir, 'paus0001.json');
+			const old = new Date(Date.now() - 3 * DAY_MS);
+			fs.utimesSync(filePath, old, old);
+
+			reconciler().reconcile();
+
+			expect(Date.now() - fs.statSync(filePath).mtimeMs).toBeLessThan(60_000);
+		});
+
+		it('fails a paused execution with no snapshot, saying why and how to re-run it', () => {
+			writePaused('paus0001');
+			const instance = reconciler();
+
+			expect(instance.reconcile()).toBe(1);
+
+			expect(instance.pausedExecutionIds()).toEqual([]);
+			const record = JSON.parse(fs.readFileSync(path.join(dir, 'paus0001.json'), 'utf8')) as ExecutionState;
+			expect(record.lastError).toContain('paused (since 2026-11-22T10:00:00.000Z: waiting for the review)');
+			expect(record.lastError).toMatch(/could not be restored: the restart snapshot .*does not exist/);
+			expect(record.lastError).toContain('flow run flows/a.yaml');
+			expect(record.paused).toBeUndefined();
+		});
+
+		it('fails a paused execution whose snapshot is of an unknown version, and removes the snapshot', () => {
+			writePaused('paus0001');
+			const file = snapshots().fileOf('paus0001');
+			fs.writeFileSync(file, JSON.stringify({ version: 99, executionId: 'paus0001', payload: {} }));
+
+			expect(reconciler().reconcile()).toBe(1);
+
+			const record = JSON.parse(fs.readFileSync(path.join(dir, 'paus0001.json'), 'utf8')) as ExecutionState;
+			expect(record.lastError).toMatch(/has version 99, this daemon reads version 1/);
+			expect(fs.existsSync(file)).toBe(false);
+		});
+
+		it('fails a paused execution whose snapshot is corrupt', () => {
+			writePaused('paus0001');
+			fs.writeFileSync(snapshots().fileOf('paus0001'), '{ not json');
+
+			expect(reconciler().reconcile()).toBe(1);
+
+			const record = JSON.parse(fs.readFileSync(path.join(dir, 'paus0001.json'), 'utf8')) as ExecutionState;
+			expect(record.lastError).toMatch(/is not valid JSON/);
+		});
+
+		it('leaves no snapshot file listed as a record', () => {
+			writePaused('paus0001');
+			snapshots().write('paus0001', snapshot());
+
+			expect(fs.readdirSync(dir).filter(name => name.endsWith('.json'))).toEqual(['paus0001.json']);
+			expect(fs.existsSync(path.join(dir, `paus0001${PAUSED_SNAPSHOT_SUFFIX}`))).toBe(true);
 		});
 	});
 });

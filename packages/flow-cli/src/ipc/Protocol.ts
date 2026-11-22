@@ -226,7 +226,16 @@ export type DaemonResponse =
 	/** `alreadyCancelled`: the execution had been cancelled before this command, nothing was changed. */
 	| { type: 'execution_cancelled'; executionId: string; alreadyCancelled: boolean }
 	/** `flow pause`: `since` is when the pause was recorded. */
-	| { type: 'execution_paused'; executionId: string; since: string; reason?: string }
+	| {
+			type: 'execution_paused';
+			executionId: string;
+			since: string;
+			reason?: string;
+			/** True when the paused run is restored (still paused) after a daemon restart. Absent from a daemon older than this field. */
+			restartSafe?: boolean;
+			/** Why the run does not survive a daemon restart; present when `restartSafe` is false. */
+			restartNote?: string;
+	  }
 	/** `flow unpause`: `pausedMs` is the total time the run has spent paused. */
 	| { type: 'execution_unpaused'; executionId: string; pausedMs: number }
 	/** `detail` refines `code` when one code covers several causes (PROJECT_RESOLUTION_FAILED: NO_PROJECT_IN_SCOPE, PROJECT_NOT_FOUND, ...). */

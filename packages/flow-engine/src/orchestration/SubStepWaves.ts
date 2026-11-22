@@ -1,6 +1,12 @@
 import type { SchedulerStep } from './SchedulerTypes';
 import { WAVES_SUB_STEP_STRATEGY } from './SubStepStrategyNames';
 
+/** The wave bookkeeping as plain data, for a scheduler snapshot. */
+export interface WavesExport {
+	waveOf: Record<string, number>;
+	currentWave: Record<string, number>;
+}
+
 /**
  * Wave bookkeeping for parents using `subStepStrategy: waves`.
  *
@@ -21,6 +27,22 @@ export class SubStepWaves {
 		private readonly steps: Map<string, SchedulerStep>,
 		private readonly pendingDeps: Map<string, Set<string>>
 	) {}
+
+	exportState(): WavesExport {
+		return { waveOf: Object.fromEntries(this.waveOf), currentWave: Object.fromEntries(this.currentWave) };
+	}
+
+	/** Replaces the wave bookkeeping (a scheduler restore). The hold tokens live in pendingDeps, which the snapshot restores. */
+	importState(state: WavesExport): void {
+		this.waveOf.clear();
+		this.currentWave.clear();
+		for (const [id, wave] of Object.entries(state.waveOf)) {
+			this.waveOf.set(id, wave);
+		}
+		for (const [id, wave] of Object.entries(state.currentWave)) {
+			this.currentWave.set(id, wave);
+		}
+	}
 
 	isWavesParent(parentId: string): boolean {
 		return this.steps.get(parentId)?.subStepStrategy === WAVES_SUB_STEP_STRATEGY;

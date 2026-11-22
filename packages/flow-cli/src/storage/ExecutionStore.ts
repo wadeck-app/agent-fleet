@@ -10,6 +10,7 @@ import { AttemptLedger } from './AttemptLedger';
 import { ExecutionPruner } from './ExecutionPruner';
 import type { ExecutionTransition, ExecutionTransitionListener } from './ExecutionTransition';
 import { InterruptedExecutionReconciler } from './InterruptedExecutionReconciler';
+import { PausedRunSnapshotStore } from './PausedRunSnapshotStore';
 import { failRunningSteps } from './RunningStepsFailer';
 import { StepIoRecorder } from './StepIoRecorder';
 import { startStepEntry } from './StepStartEntry';
@@ -43,6 +44,9 @@ export class ExecutionStore {
 	/** Steps reopened by `markExecutionResumed` whose next start is a `resume`. Resume only exists within one daemon process. */
 	private readonly resumedSteps = new Set<string>();
 	private waitingAtStart: string[] = [];
+	private pausedAtStart: string[] = [];
+	/** The restart snapshots of paused runs, next to the records (see PausedRunSnapshotStore). */
+	readonly pausedSnapshots: PausedRunSnapshotStore;
 
 	constructor(
 		private readonly executionsDir: string,
@@ -55,6 +59,7 @@ export class ExecutionStore {
 		recorder?: StepIoRecorder
 	) {
 		this.recorder = recorder ?? new StepIoRecorder((executionId, text) => masks.mask(executionId, text));
+		this.pausedSnapshots = new PausedRunSnapshotStore(executionsDir, masks);
 	}
 
 	/** `activePluginMetaDirs`: `.meta` directories of executions running now, never deleted. */
@@ -308,6 +313,47 @@ export class ExecutionStore {
 		return state;
 	}
 
+	/**
+	 * A daemon restart restored a paused run: the steps that were running have lost their worker. Each one still recorded
+	 * `running` has its open attempt settled as `abandoned` / `worker_lost` and goes back to `pending`; its next start is a new
+	 * attempt (origin `resume`). A step the record no longer shows running is left alone (a second restart before the unpause).
+	 *
+	 * @returns the steps that were put back
+	 */
+	markStepsRequeuedAfterRestart(executionId: string, stepIds: string[], reason: string): string[] {
+		const state = this.read(executionId);
+		const endedAt = new Date().toISOString();
+		const requeued: string[] = [];
+		for (const stepId of stepIds) {
+			const step = state.steps[stepId];
+			if (step?.status !== 'running') {
+				continue;
+			}
+			const ranMs =
+				step.startedAt === undefined
+					? 0
+					: Math.max(0, new Date(endedAt).getTime() - new Date(step.startedAt).getTime());
+			AttemptLedger.settle(
+				state,
+				stepId,
+				{ outcome: 'abandoned', endReason: 'worker_lost', error: this.masks.mask(executionId, reason) },
+				endedAt
+			);
+			step.priorAttemptsMs = (step.priorAttemptsMs ?? 0) + ranMs;
+			step.status = 'pending';
+			delete step.startedAt;
+			delete step.completedAt;
+			delete step.error;
+			state.currentSteps = state.currentSteps.filter(id => id !== stepId);
+			this.resumedSteps.add(`${executionId}/${stepId}`);
+			requeued.push(stepId);
+		}
+		if (requeued.length > 0) {
+			this.write(state);
+		}
+		return requeued;
+	}
+
 	markExecutionCompleted(executionId: string): ExecutionState {
 		return this.finishExecution(executionId, 'completed');
 	}
@@ -346,6 +392,8 @@ export class ExecutionStore {
 	}
 
 	private finishExecution(executionId: string, status: 'completed' | 'failed'): ExecutionState {
+		// The run is over: nothing will ever restore it, and a snapshot left behind would be a stale copy of a finished run.
+		this.pausedSnapshots.remove(executionId);
 		const { paused, ...current } = this.read(executionId);
 		const completedAt = new Date().toISOString();
 		const finished: ExecutionState = {
@@ -388,10 +436,23 @@ export class ExecutionStore {
 			write: state => this.write(state),
 			notify: transition => this.notify(transition),
 			mask: (id, text) => this.masks.mask(id, text),
+			pausedSnapshots: this.pausedSnapshots,
 		});
 		const count = reconciler.reconcile();
 		this.waitingAtStart = reconciler.waitingExecutionIds();
+		this.pausedAtStart = reconciler.pausedExecutionIds();
 		return count;
+	}
+
+	/**
+	 * The executions the last {@link reconcileInterruptedExecutions} found paused with a usable restart snapshot, oldest first:
+	 * they are not failed, the daemon restores them (paused) at start.
+	 */
+	pausedExecutionIdsAtStart(): string[] {
+		return this.pausedAtStart
+			.map(id => this.read(id))
+			.sort((a, b) => a.startedAt.localeCompare(b.startedAt) || a.executionId.localeCompare(b.executionId))
+			.map(state => state.executionId);
 	}
 
 	/**

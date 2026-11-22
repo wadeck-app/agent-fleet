@@ -357,4 +357,86 @@ describe('PoolWorkspaceProvider', () => {
 
 		expect(handle.path).toBe(path.join(pool, 'ws-2'));
 	});
+
+	describe('adopt (a paused run after a daemon restart)', () => {
+		const claimDir = (): string => path.join(pool, '.flow-pool', 'ws-1.claim');
+
+		function writeClaim(executionId: string, daemonId: string, pid: number): void {
+			fs.mkdirSync(claimDir(), { recursive: true });
+			fs.writeFileSync(
+				path.join(claimDir(), 'claim.json'),
+				JSON.stringify({ executionId, flowId: 'flow-x', pid, daemonId, claimedAt: 'before the restart' })
+			);
+		}
+
+		const adoptRequest = (executionId: string, slot = path.join(pool, 'ws-1')) => ({
+			executionId,
+			projectDir: project,
+			flow: { id: 'flow-x', version: '1.0.0' },
+			handle: {
+				path: slot,
+				id: `pool:${path.basename(slot)}:${executionId}`,
+				metaDir: runMetaDirFor(project, executionId),
+			},
+		});
+
+		it('retakes the stale claim of the dead daemon for the same run, and release gives the slot back', async () => {
+			const provider = make(1);
+			writeClaim('aaaa1111', 'daemon-before-restart', 555);
+
+			const handle = await provider.adopt(adoptRequest('aaaa1111'));
+
+			expect(handle.path).toBe(path.join(pool, 'ws-1'));
+			const claim = JSON.parse(fs.readFileSync(path.join(claimDir(), 'claim.json'), 'utf8')) as {
+				daemonId: string;
+			};
+			expect(claim.daemonId).toBe('daemon-A');
+			// Held again: another run waits instead of taking it
+			const other = provider.allocate(request('bbbb2222'));
+			expect(await settled(other)).toBe('pending');
+			await provider.release(handle);
+			expect((await other).path).toBe(path.join(pool, 'ws-1'));
+		});
+
+		it('refuses when the slot is held by another live run', async () => {
+			const provider = make(1);
+			alive.add(555);
+			writeClaim('cccc3333', 'daemon-B', 555);
+
+			await expect(provider.adopt(adoptRequest('aaaa1111'))).rejects.toThrow(
+				/held by execution cccc3333.*run is failed/s
+			);
+		});
+
+		it('refuses when the stale claim belongs to another run (the slot was given away)', async () => {
+			const provider = make(1);
+			writeClaim('cccc3333', 'daemon-before-restart', 555);
+
+			await expect(provider.adopt(adoptRequest('aaaa1111'))).rejects.toThrow(
+				/stale claim belongs to execution cccc3333/
+			);
+		});
+
+		it('refuses when the claim is gone: another run may have used the slot', async () => {
+			const provider = make(1);
+
+			await expect(provider.adopt(adoptRequest('aaaa1111'))).rejects.toThrow(/its claim is gone/);
+		});
+
+		it('refuses a folder that is not a slot of the pool', async () => {
+			const provider = make(1);
+
+			await expect(provider.adopt(adoptRequest('aaaa1111', path.join(pool, 'elsewhere')))).rejects.toThrow(
+				/not a slot of the pool any more/
+			);
+		});
+
+		it('is a no-op for a slot this process already holds', async () => {
+			const provider = make(1);
+			const handle = await provider.allocate(request('aaaa1111'));
+
+			await expect(provider.adopt(adoptRequest('aaaa1111'))).resolves.toEqual(adoptRequest('aaaa1111').handle);
+			await provider.release(handle);
+		});
+	});
 });

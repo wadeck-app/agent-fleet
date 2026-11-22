@@ -1,4 +1,4 @@
-import type { WorkspaceHandle, WorkspaceProvider, WorkspaceRequest } from 'extension-points';
+import type { WorkspaceAdoptRequest, WorkspaceHandle, WorkspaceProvider, WorkspaceRequest } from 'extension-points';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
@@ -126,6 +126,71 @@ export class PoolWorkspaceProvider implements WorkspaceProvider {
 			}
 			void this.pump();
 		});
+	}
+
+	/**
+	 * Takes back the slot of a run that was paused when the daemon restarted. The claim the dead daemon left is stale: it is
+	 * retaken only when it is still the claim of this very run. A slot that is free (its claim was recovered and released by
+	 * another run in the meantime), held, or recovered from another run may have been used since: it is refused.
+	 */
+	adopt(request: WorkspaceAdoptRequest): Promise<WorkspaceHandle> {
+		const { handle, executionId } = request;
+		if (this.held.has(handle.id)) {
+			return Promise.resolve(handle);
+		}
+		let slots: string[];
+		try {
+			slots = this.options.slotsFor(request.projectDir);
+		} catch (error) {
+			return Promise.reject(error as Error);
+		}
+		const slot = slots.find(candidate => path.resolve(candidate) === path.resolve(handle.path));
+		if (slot === undefined || handle.id !== `pool:${path.basename(slot)}:${executionId}`) {
+			return Promise.reject(
+				new Error(
+					`"${handle.path}" is not a slot of the pool any more (slots: ${slots.join(', ')}): the pool options changed while the daemon was stopped. Re-run the flow.`
+				)
+			);
+		}
+		const refuse = (why: string): Promise<WorkspaceHandle> =>
+			Promise.reject(
+				new Error(
+					`Pool slot "${slot}" cannot be taken back for the paused execution ${executionId}: ${why} Its content may have changed since the pause, so the run is failed. Re-run the flow.`
+				)
+			);
+		const inspection = this.claims.inspect(slot);
+		if (inspection.state === 'free') {
+			return refuse(
+				'its claim is gone (another run took the slot over and released it, or the claim was removed).'
+			);
+		}
+		if (inspection.state === 'held') {
+			const holder = inspection.holder;
+			return refuse(
+				holder === undefined
+					? 'it is being claimed by another run.'
+					: `it is held by execution ${holder.executionId} (flow ${holder.flowId}, since ${holder.claimedAt}).`
+			);
+		}
+		if (inspection.recovery.executionId !== executionId) {
+			return refuse(
+				`its stale claim belongs to ${inspection.recovery.executionId === undefined ? 'a run that never finished claiming it' : `execution ${inspection.recovery.executionId}`}, not to this run.`
+			);
+		}
+		const owner: ClaimOwner = {
+			executionId,
+			flowId: request.flow.id,
+			daemonId: this.deps.daemonId,
+			pid: this.deps.ownPid,
+		};
+		this.deps.onLocalExecutionStart(executionId);
+		const result = this.claims.tryClaim(slot, owner);
+		if (!result.claimed) {
+			this.deps.onLocalExecutionEnd(executionId);
+			return refuse('another run claimed it just now.');
+		}
+		this.held.set(handle.id, { slot, executionId });
+		return Promise.resolve(handle);
 	}
 
 	async release(handle: WorkspaceHandle): Promise<void> {

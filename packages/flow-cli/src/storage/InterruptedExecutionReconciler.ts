@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 import type { ExecutionState } from '../ipc/Protocol';
 import type { ExecutionTransition } from './ExecutionTransition';
+import type { PausedRunSnapshotStore } from './PausedRunSnapshotStore';
 import { failRunningSteps } from './RunningStepsFailer';
 
 /** What the reconciler needs from the store that owns the records. */
@@ -12,6 +13,8 @@ export interface ReconcilerHost {
 	write(state: ExecutionState): ExecutionState;
 	notify(transition: ExecutionTransition): void;
 	mask(executionId: string, text: string): string;
+	/** The restart snapshots of paused runs: a paused run with a usable one is kept, any other is failed. */
+	pausedSnapshots: Pick<PausedRunSnapshotStore, 'read' | 'remove'>;
 }
 
 /** Written in the executions directory (never `.json`, so no record listing sees it): when the last reconcile began. */
@@ -28,11 +31,15 @@ const MTIME_SLACK_MS = 60_000;
  * Bounded work: a record is only ever left `queued`/`running` by a daemon that wrote it after the previous
  * reconcile began (that one examined every record, and a settled record is not reopened without being rewritten).
  * A record that waits for a workspace is neither interrupted nor skipped: it is reported (waitingExecutionIds) and touched.
+ * A record that is paused AND has a usable restart snapshot (see PausedRunSnapshotStore) is neither failed: it is reported
+ * (pausedExecutionIds) and touched, and the daemon restores it (PausedRunRestorer). A paused record without a usable snapshot is
+ * failed with the reason the snapshot is not usable.
  * So once a checkpoint exists, a record whose mtime is older than it is skipped unread: with a thousand
  * records, opening them all cost seconds before the daemon could answer. No checkpoint: every record is read.
  */
 export class InterruptedExecutionReconciler {
 	private waiting: string[] = [];
+	private paused: string[] = [];
 
 	constructor(
 		private readonly executionsDir: string,
@@ -44,9 +51,15 @@ export class InterruptedExecutionReconciler {
 		return [...this.waiting];
 	}
 
+	/** The paused executions the last {@link reconcile} kept: they have a usable restart snapshot and are restored, not failed. */
+	pausedExecutionIds(): string[] {
+		return [...this.paused];
+	}
+
 	/** An unreadable record is reported on stderr and skipped. Returns how many were reconciled. */
 	reconcile(): number {
 		this.waiting = [];
+		this.paused = [];
 		let names: string[];
 		try {
 			names = fs.readdirSync(this.executionsDir).filter(name => name.endsWith('.json'));
@@ -73,6 +86,19 @@ export class InterruptedExecutionReconciler {
 					// the next start (whose checkpoint is later than this one) does not skip the record unread.
 					this.touch(name);
 					this.waiting.push(current.executionId);
+					continue;
+				}
+				if (current.paused !== undefined) {
+					const snapshot = this.host.pausedSnapshots.read(current.executionId);
+					if (snapshot.ok) {
+						// Paused with a restart snapshot: the daemon restores it (paused). Touched like a waiting run, so the next
+						// start (whose checkpoint is later than this one) reads the record again if the restore did not end it.
+						this.touch(name);
+						this.paused.push(current.executionId);
+						continue;
+					}
+					this.interrupt(current, snapshot.reason);
+					reconciled++;
 					continue;
 				}
 				this.interrupt(current);
@@ -142,13 +168,15 @@ export class InterruptedExecutionReconciler {
 		}
 	}
 
-	private interrupt(current: ExecutionState): void {
+	/** @param notRestorable Why a paused run could not be kept (its restart snapshot is missing or unusable). */
+	private interrupt(current: ExecutionState, notRestorable?: string): void {
 		const { paused, ...record } = current;
-		// A paused run is not kept either: the daemon holds a run in memory only, so nothing could dispatch its remaining steps.
+		// A snapshot of a run that ends here (or one left by a crash before the pause was recorded) is never used again.
+		this.host.pausedSnapshots.remove(current.executionId);
 		const reason =
 			paused === undefined
 				? `interrupted: the daemon restarted while this execution was running; re-run it with flow run ${current.flowFile}`
-				: `interrupted: the daemon restarted while this execution was paused (since ${paused.since}${paused.reason === undefined ? '' : `: ${paused.reason}`}); a paused execution is not kept across a daemon restart, re-run it with flow run ${current.flowFile}`;
+				: `interrupted: the daemon restarted while this execution was paused (since ${paused.since}${paused.reason === undefined ? '' : `: ${paused.reason}`}); it could not be restored: ${notRestorable ?? 'no restart snapshot'}. Pausing a run whose workspace provider cannot be taken back, or whose state is too large, does not survive a restart (the pause said so); re-run it with flow run ${current.flowFile}`;
 		const completedAt = new Date().toISOString();
 		const steps = failRunningSteps(current, reason, text => this.host.mask(current.executionId, text));
 		for (const [id, step] of Object.entries(steps)) {

@@ -55,6 +55,38 @@ export class DaemonStartupTasks {
 	}
 
 	/**
+	 * Restores, still paused, the runs that were paused with a restart snapshot when the previous daemon stopped (the reconcile
+	 * kept them). Resolves once each is restored or ended as failed; a failure is logged, never silent. Done BEFORE the waiting
+	 * runs start again: a pool slot a paused run holds must not go to a waiting one.
+	 */
+	async restorePausedExecutions(
+		executionStore: Pick<ExecutionStore, 'pausedExecutionIdsAtStart'>,
+		commandHandler: {
+			restorePausedExecutions(hooksFor: (project: RunProject) => HookDispatcher | undefined): Promise<void>;
+		},
+		hooksFor: (project: RunProject) => HookDispatcher | undefined
+	): Promise<void> {
+		const paused = executionStore.pausedExecutionIdsAtStart();
+		if (paused.length === 0) {
+			return;
+		}
+		writeDaemonLog(
+			this.logsDir,
+			'info',
+			`${String(paused.length)} paused execution(s) were kept when the previous daemon stopped: restoring them (they stay paused; continue each with flow unpause)`
+		);
+		try {
+			await commandHandler.restorePausedExecutions(hooksFor);
+		} catch (err: unknown) {
+			writeDaemonLog(
+				this.logsDir,
+				'error',
+				`The daemon could not restore the paused executions: ${getErrorMessage(err)}. They stay recorded as running; inspect them with flow history.`
+			);
+		}
+	}
+
+	/**
 	 * Starts again the runs that were waiting for a workspace when the previous daemon stopped (they were left alone by
 	 * the reconcile). Fire-and-forget like the other start-up work: each is either started or waiting again when this
 	 * ends, and a failure is logged, never silent.

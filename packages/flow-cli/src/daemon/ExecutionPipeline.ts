@@ -16,9 +16,12 @@ import { ExecutionPauser } from './ExecutionPauser.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
 import { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
+import { PausedRunRestorer } from './PausedRunRestorer.js';
+import { PausedRunSnapshots } from './PausedRunSnapshots.js';
 import type { ReadyStepQueue } from './ReadyStepQueue.js';
 import { RunDefinitionLoader } from './RunDefinitionLoader.js';
 import { RunEndCoordinator, type RunEndSettings, type RunEndedListener } from './RunEndCoordinator.js';
+import { RunProjectResolver } from './RunProjectResolver.js';
 import { RunRequestHandler } from './RunRequestHandler.js';
 import { RunStepPreparer } from './RunStepPreparer.js';
 import { SchedulerIdleState } from './SchedulerIdleState.js';
@@ -81,6 +84,8 @@ export class ExecutionPipeline {
 	readonly pauser: ExecutionPauser;
 	readonly injection: StepInjection;
 	readonly runRequests: RunRequestHandler;
+	/** Restores, after a daemon restart, the runs that were paused and persisted. */
+	readonly pausedRestorer: PausedRunRestorer;
 	/** Text added to the failure of a step lost with a disconnecting worker; set only during that disconnect. */
 	private disconnectDetails: ((executionId: string, stepId: string) => string | undefined) | undefined;
 
@@ -139,6 +144,13 @@ export class ExecutionPipeline {
 			logWriter,
 			deps.workspaceProviders ?? new WorkspaceProviders(deps.resolvePerFlowWorkspaceProvider)
 		);
+		const pausedSnapshots = new PausedRunSnapshots({
+			executions,
+			queue,
+			workspaces,
+			store: executionStore.pausedSnapshots,
+			logWriter,
+		});
 		this.outcomes = new StepOutcomes(
 			executions,
 			queue,
@@ -151,8 +163,10 @@ export class ExecutionPipeline {
 			executionId => {
 				this.supervisor.forgetExecution(executionId);
 				this.dispatcher.forgetExecution(executionId);
+				pausedSnapshots.forget(executionId);
 			},
-			this.runEnd
+			this.runEnd,
+			pausedSnapshots
 		);
 		this.canceller = new ExecutionCanceller({
 			executions,
@@ -172,6 +186,7 @@ export class ExecutionPipeline {
 			executions,
 			store: executionStore,
 			logWriter,
+			snapshots: pausedSnapshots,
 			tryDispatch: () => this.tryDispatch(),
 		});
 		this.injection = new StepInjection(
@@ -179,7 +194,8 @@ export class ExecutionPipeline {
 			queue,
 			daemonSecrets,
 			deps.maxInjectedSteps,
-			deps.maxStepsPerExecution
+			deps.maxStepsPerExecution,
+			pausedSnapshots
 		);
 		this.waitSupervisor = new WorkspaceWaitSupervisor(
 			this.waitingRuns,
@@ -187,14 +203,28 @@ export class ExecutionPipeline {
 			logWriter,
 			(executionId, reason) => workspaces.release(executionId, reason)
 		);
+		const definitionLoader = new RunDefinitionLoader(
+			deps.definitionResolver,
+			logWriter,
+			workerRouting.declaredGuarantees,
+			deps.hostToolsPolicy
+		);
+		const projectResolver = new RunProjectResolver();
+		this.pausedRestorer = new PausedRunRestorer({
+			definitionLoader,
+			projectResolver,
+			daemonSecrets,
+			workspaces,
+			executions,
+			queue,
+			hooks,
+			store: executionStore,
+			logWriter,
+			snapshots: pausedSnapshots,
+		});
 		this.runRequests = new RunRequestHandler(
 			new FlowFileAccessGuard(deps.allowAbsolutePaths),
-			new RunDefinitionLoader(
-				deps.definitionResolver,
-				logWriter,
-				workerRouting.declaredGuarantees,
-				deps.hostToolsPolicy
-			),
+			definitionLoader,
 			new RunStepPreparer(deps.daemonDir, logWriter),
 			daemonSecrets,
 			workspaces,
@@ -205,7 +235,7 @@ export class ExecutionPipeline {
 			logWriter,
 			() => this.tryDispatch(),
 			this.waitSupervisor,
-			undefined,
+			projectResolver,
 			undefined,
 			workerRouting.declaredGuarantees
 		);

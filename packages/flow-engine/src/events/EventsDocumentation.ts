@@ -35,7 +35,7 @@ export class EventsDocumentation {
 			'- Needs the `queue` CLI on the PATH of the flow daemon; the queue daemon is started on demand if stopped. The daemon log (`flow logs`) states at start whether events are enabled or unavailable, and whether the queue accepted the event declaration.',
 			'- `FLOW_QUEUE_EVENTS=0` in the flow daemon environment switches events off (nothing is published or declared).',
 			'- Delivery is best effort: a failure to publish never affects a run.',
-			'- `flow pause <id> [--reason <text>]` stops dispatching new steps of a running execution (running steps finish) and fires `flow.execution.paused`; `flow unpause <id>` fires `flow.execution.resumed`. A factory that watches the cost in the step events can pause a run, a human unpauses it. A daemon restart does not keep a paused run (it is marked failed).',
+			'- `flow pause <id> [--reason <text>]` stops dispatching new steps of a running execution (running steps finish) and fires `flow.execution.paused`; `flow unpause <id>` fires `flow.execution.resumed`. A factory that watches the cost in the step events can pause a run, a human unpauses it. A paused run survives a daemon restart (restored still paused, no event for the restore; steps that were running are run again as a new attempt; `flow unpause` continues it); `flow pause` warns when it cannot (a workspace provider that cannot take its workspace back, a state over 32 MiB): that run is marked failed at a restart.',
 			'- In `subscribers.yml`, `flow.>` matches all flow events and `flow.step.*` all step events (`flow.*` matches nothing).',
 		].join('\n');
 	}
