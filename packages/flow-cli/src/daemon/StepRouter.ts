@@ -165,6 +165,9 @@ export class StepRouter {
 	 * @param guaranteesOf what the workers' sources guarantee, when the caller already has the answer. Only read for a step
 	 *        that requires something.
 	 *
+	 * @param preferredWorkerId the worker that served the previous step of the same run, when there is one. Soft stickiness:
+	 *        it only reorders the candidates that already passed every filter and S4 (see {@link preferPreviousWorker}).
+	 *
 	 * A step that requires nothing is first stripped of the workers of requirement-only sources (they serve only steps whose
 	 * requirements they guarantee) -- before S4 and S3, which can neither widen the set back nor be consulted about the others.
 	 */
@@ -172,7 +175,8 @@ export class StepRouter {
 		step: StepPlacement,
 		allCandidates: RoutingCandidate[],
 		isRequirementOnly?: RequirementOnlyLookup,
-		guaranteesOf?: GuaranteeLookup
+		guaranteesOf?: GuaranteeLookup,
+		preferredWorkerId?: string
 	): WebSocket | undefined {
 		// Both are hard filters, before S4 and S3: the guarantees of the source, then the workspace kinds it accepts.
 		const candidates = this.workspaceKinds.filter(
@@ -186,7 +190,10 @@ export class StepRouter {
 			return undefined;
 		}
 
-		const ordered = this.orderSafely(eligible.map(candidate => candidate.worker));
+		const ordered = this.preferPreviousWorker(
+			this.orderSafely(eligible.map(candidate => candidate.worker)),
+			preferredWorkerId
+		);
 		const first = ordered[0];
 		// The provider is author-written, so an id it returns is not guaranteed to be one
 		// we offered; an unknown one is dropped rather than trusted.
@@ -316,6 +323,32 @@ export class StepRouter {
 			);
 			return false;
 		}
+	}
+
+	/**
+	 * Soft stickiness: moves the worker that served the previous step of the run to the front of ITS OWN group (registered or
+	 * forked), after S3 has ordered. So it outranks the up-to-date-version preference and the first-registered tie-break,
+	 * never the registered-before-forked rule, and it cannot add a candidate (the worker must already be in the ordered set,
+	 * i.e. eligible and idle) nor make a step wait.
+	 *
+	 * Applied only on top of the built-in distribution: the public S3 contract carries no run information, and a
+	 * distribution plugin owns the whole order it returns, so it is left untouched.
+	 */
+	private preferPreviousWorker(ordered: WorkerCandidate[], preferredWorkerId: string | undefined): WorkerCandidate[] {
+		if (preferredWorkerId === undefined || !(this.distribution instanceof DefaultStepDistribution)) {
+			return ordered;
+		}
+		const preferredIndex = ordered.findIndex(worker => worker.workerId === preferredWorkerId);
+		if (preferredIndex === -1) {
+			return ordered;
+		}
+		const preferred = ordered[preferredIndex]!;
+		const groupStart = ordered.findIndex(worker => worker.ephemeral === preferred.ephemeral);
+		return [
+			...ordered.slice(0, groupStart),
+			preferred,
+			...ordered.slice(groupStart).filter(worker => worker !== preferred),
+		];
 	}
 
 	/**

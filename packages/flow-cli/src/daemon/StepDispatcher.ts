@@ -12,6 +12,7 @@ import { DispatchLookups } from './DispatchLookups.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import { HostToolRouting } from './HostToolRouting.js';
+import { RunWorkerAffinity } from './RunWorkerAffinity.js';
 import { ReRunKindTracker } from './ReRunKindTracker.js';
 import type { ReadyStep, ReadyStepQueue } from './ReadyStepQueue.js';
 import { RequirementOnlyHint } from './RequirementOnlyHint.js';
@@ -39,6 +40,8 @@ export class StepDispatcher {
 	private readonly requirementOnlyHint: RequirementOnlyHint;
 	/** Tells a retry from another re-run when a step starts again, for the attempt history */
 	private readonly reRunKinds = new ReRunKindTracker();
+	/** Which worker served the latest step of each run, so the next step prefers it (soft stickiness) */
+	private readonly workerAffinity = new RunWorkerAffinity();
 	/** When each interactive step started waiting, so an S9 policy can bound its own wait */
 	private readonly interactiveWaitSince = new Map<string, number>();
 
@@ -82,6 +85,7 @@ export class StepDispatcher {
 	forgetExecution(executionId: string): void {
 		this.routing.wait.forgetExecution(executionId);
 		this.lookups.forgetExecution(executionId);
+		this.workerAffinity.forgetExecution(executionId);
 		this.requirementOnlyHint.forgetExecution(executionId);
 		for (const key of this.interactiveWaitSince.keys()) {
 			if (key.startsWith(`${executionId}:`)) {
@@ -153,7 +157,13 @@ export class StepDispatcher {
 					({ worker }) => worker.heldBy === undefined || worker.heldBy === step.executionContext.executionId
 				);
 			const idle = needsHostTools ? HostToolRouting.capable(offerable) : offerable;
-			const idleWorker = this.router.select(placement, idle, requirementOnly, guarantees);
+			const idleWorker = this.router.select(
+				placement,
+				idle,
+				requirementOnly,
+				guarantees,
+				this.workerAffinity.preferredWorkerOf(step.executionContext.executionId)
+			);
 			if (idleWorker === undefined && needsHostTools) {
 				const refusal = this.hostToolRouting.refusal(
 					step,
@@ -253,6 +263,9 @@ export class StepDispatcher {
 		// Provenance recorded at dispatch: this is the only moment both the source
 		// and the worker identity are known (T-06).
 		const worker = this.registry.describe(idleWorker);
+		if (worker !== undefined) {
+			this.workerAffinity.record(step.executionContext.executionId, worker.workerId);
+		}
 		this.executionStore.markStepRunning(
 			step.executionContext.executionId,
 			step.stepId,
