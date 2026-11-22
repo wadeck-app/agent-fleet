@@ -24,6 +24,7 @@ function resolveJsToTs(): Plugin {
 // These files execute dist-bundle/, built once by the globalSetup of the `bundling` project (a rebuild per file
 // rewrote dist/ and deleted bundles under the other file and under the unit tests).
 const BUNDLING_TESTS = [
+	'src/__tests__/BundleMcpHelper.integration.test.ts',
 	'src/__tests__/CliSmoke.integration.test.ts',
 	'src/__tests__/DaemonChildEnvironment.integration.test.ts',
 	'src/__tests__/DaemonSingleton.integration.test.ts',

@@ -66,7 +66,8 @@ export async function startBundledDaemon(options: BundledDaemonOptions = {}): Pr
 	}
 	const flowBundle = join(bundleDir, 'flow.cjs');
 	const workerBundle = join(bundleDir, 'worker.cjs');
-	for (const bundle of [flowBundle, workerBundle]) {
+	const mcpHelper = join(bundleDir, 'mcp-server.cjs');
+	for (const bundle of [flowBundle, workerBundle, mcpHelper]) {
 		if (!existsSync(bundle)) {
 			throw new Error(
 				`The standalone bundle is missing at "${bundle}". It is built once by the bundling project global setup (src/test-utils/BundleGlobalSetup.ts); run the test through vitest.`
@@ -80,6 +81,7 @@ export async function startBundledDaemon(options: BundledDaemonOptions = {}): Pr
 	mkdirSync(join(projectDir, '.flow'), { recursive: true });
 	copyFileSync(flowBundle, join(installDir, 'flow.cjs'));
 	copyFileSync(workerBundle, join(installDir, 'worker.cjs'));
+	copyFileSync(mcpHelper, join(installDir, 'mcp-server.cjs'));
 	// A run is refused unless its folder is a registered project; the registry is the private one of this config home.
 	await addProject(defaultRegistryDir({ XDG_CONFIG_HOME: configHome }), { name: 'leak-probe', path: projectDir });
 	// A flow or worker process of this directory that outlives the test is a leak, whoever its parent is.

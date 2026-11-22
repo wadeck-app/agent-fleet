@@ -13,6 +13,8 @@ chmod +x packages/flow-cli-linux-x64/flow
 cp packages/flow-cli/dist-bundle/flow.cjs          packages/flow-cli-dist/flow.cjs
 cp packages/flow-cli/dist-bundle/worker.cjs        packages/flow-cli-dist/worker.cjs
 cp packages/flow-cli/dist-bundle/flow-updater.cjs  packages/flow-cli-dist/flow-updater.cjs
+# The worker launches it for every model step and resolves it next to worker.cjs.
+cp packages/flow-cli/dist-bundle/mcp-server.cjs    packages/flow-cli-dist/mcp-server.cjs
 # The packaged app-modules (manifest.json, backend, views) the daemon registers with app-core.
 # Folder names must match src/daemon/AppModules.ts.
 cp -r packages/flow-cli/dist-bundle/app-module                packages/flow-cli-dist/app-module

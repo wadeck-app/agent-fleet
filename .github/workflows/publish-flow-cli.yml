@@ -59,7 +59,7 @@ jobs:
                   BUNDLE_VERSION: ${{ steps.version.outputs.version }}
 
             - name: Generate platform package directories
-              run: bash ci/scripts/generate-platform-packages.sh flow:worker.cjs:app-module/:app-module-flow-chart/
+              run: bash ci/scripts/generate-platform-packages.sh flow:worker.cjs:mcp-server.cjs:app-module/:app-module-flow-chart/
               env:
                   PLATFORMS: win32-x64,darwin-arm64,linux-x64
                   # Pins the optionalDependencies of the main package to this exact version (the range >=0.0.0-0 does not match a prerelease).

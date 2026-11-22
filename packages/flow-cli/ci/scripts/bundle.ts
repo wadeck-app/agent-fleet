@@ -5,7 +5,7 @@
  */
 import { build } from 'esbuild';
 import { execSync } from 'node:child_process';
-import { cpSync, existsSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, rmSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,6 +97,15 @@ await Promise.all([
 		logLevel: 'warning',
 	}),
 ]);
+
+// The MCP helper the worker launches for every model step (src/worker/McpServer.ts resolves it NEXT TO worker.cjs).
+// It is plain CommonJS that esbuild never sees, so it is copied as is; without it codex (which requires the "flow"
+// MCP server) fails every step with "handshaking with MCP server failed".
+const mcpServerSource = path.join(root, 'src/worker/mcp-server.cjs');
+if (!existsSync(mcpServerSource)) {
+	throw new Error(`${mcpServerSource} does not exist: the worker cannot start its MCP helper without it.`);
+}
+copyFileSync(mcpServerSource, path.join(root, 'dist-bundle/mcp-server.cjs'));
 
 // Each app-module is built by its own package: `npm run bundle` there runs `app-core-cli package` (backend bundle,
 // JSON views, packaged manifest stamped with this build's version). The CLI only copies the resulting dist-module/

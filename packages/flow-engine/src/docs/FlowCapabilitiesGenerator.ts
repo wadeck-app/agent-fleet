@@ -87,7 +87,7 @@ prompt: |
 
 Key fields:
 - \`model\` (string, optional) -- model identifier for the chosen provider (e.g. \`claude-3-5-haiku\`, \`anthropic/claude-3-5-sonnet\`)
-- \`provider\` (string, optional) -- AI CLI provider: \`claude\` (default) or \`opencode\`
+- \`provider\` (string, optional) -- AI CLI provider: \`claude\` (default), \`opencode\` or \`codex\`
 - \`prompt\` (string, required) -- prompt template with \`${TMPL} }}\` variable interpolation
 - \`contextLimit\` (integer >= 30000, optional, claude only) -- tokens at which Claude auto-compacts the context; approximate upper bound. Rejected with \`session.mode: compact\` or an explicit \`CLAUDE_CODE_AUTO_COMPACT_WINDOW\`
 - \`subStepFeedbackPrompt\` (string, optional) -- wrapper for the message delivering failed sub-step feedback into this step's resumed session when it is re-run because a \`parent:\` sub-step failed (the \`prompt\` is not re-sent then). Must reference the sub-step feedback template variable; defaults to a built-in wrapper
