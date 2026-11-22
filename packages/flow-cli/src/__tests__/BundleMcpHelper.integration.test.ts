@@ -12,6 +12,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { createIsolatedCliEnv } from '../test-utils/IsolatedCliEnv';
+
 const agentFleetRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 const distBundle = resolve(agentFleetRoot, 'packages/flow-cli/dist-bundle');
 
@@ -22,8 +24,12 @@ describe('bundle layout: the MCP helper of the worker', () => {
 	});
 
 	it('answers the MCP initialize handshake from the bundle directory', async () => {
+		// Isolated env like every test that spawns a bundle (IsolatedCliEnvUsage.test.ts enforces it).
+		const isolation = createIsolatedCliEnv({
+			extra: { FLOW_MCP_CALLBACK_PORT: '1', FLOW_MCP_CALLBACK_TOKEN: 'test' },
+		});
 		const child = spawn(process.execPath, [resolve(distBundle, 'mcp-server.cjs')], {
-			env: { PATH: process.env['PATH'] ?? '', FLOW_MCP_CALLBACK_PORT: '1', FLOW_MCP_CALLBACK_TOKEN: 'test' },
+			env: isolation.env,
 			stdio: ['pipe', 'pipe', 'pipe'],
 			windowsHide: true,
 		});
@@ -52,6 +58,7 @@ describe('bundle layout: the MCP helper of the worker', () => {
 			});
 		} finally {
 			child.kill();
+			isolation.cleanup();
 		}
 	});
 
