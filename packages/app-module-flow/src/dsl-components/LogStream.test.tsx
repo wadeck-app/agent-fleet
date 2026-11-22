@@ -280,8 +280,9 @@ describe('LogStream time', () => {
 	});
 
 	it('says in a caption what the time column is', () => {
+		// The A/B dock also carries a "Time since the run started" hint (sr-only, new dsl-ui AbRow): match the caption exactly.
 		show({}, { ...BASE, time: 'offset' });
-		expect(screen.getByText(/since the run started/i)).toBeInTheDocument();
+		expect(screen.getByText('Time column: time since the run started.')).toBeInTheDocument();
 	});
 });
 
