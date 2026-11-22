@@ -1211,10 +1211,14 @@ ${toolHooksYaml}      prompt: |
 					stepRecord?.sourceId === 'sandbox-live',
 					`the step was served by ${stepRecord?.sourceId}, not the sandbox`
 				);
-				check(
-					(stepRecord?.meta?.tool_calls?.total ?? 0) >= 1,
-					`the model made no tool call (tool_calls ${JSON.stringify(stepRecord?.meta?.tool_calls ?? null)}): the hook was never exercised, so an unchanged HEAD proves nothing`
-				);
+				// A call the hook denies is not counted in meta.tool_calls (measured 2026-11-22: total 0 although codex logged the block), so in the hook
+				// run the proof that a call was attempted is the block text asserted below; the counter only applies to the control run.
+				if (hookControl) {
+					check(
+						(stepRecord?.meta?.tool_calls?.total ?? 0) >= 1,
+						`the model made no tool call (tool_calls ${JSON.stringify(stepRecord?.meta?.tool_calls ?? null)}): the control run proves nothing`
+					);
+				}
 				check(
 					headAfter !== undefined,
 					'the .git of the probe repository is gone from the slot after the run: HEAD cannot be compared'
