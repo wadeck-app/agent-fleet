@@ -1,0 +1,9 @@
+{
+	"name": "flow-sandbox-image-browser",
+	"version": "0.0.0",
+	"private": true,
+	"description": "The agent-browser CLI installed in the sandbox image (Dockerfile, from tag m9). Pinned here and in package-lock.json, installed with npm ci --ignore-scripts. Separate from ../package.json so that adding it does not invalidate the cached layer of the model CLIs. NOT a workspace of the monorepo.",
+	"dependencies": {
+		"agent-browser": "0.41.0"
+	}
+}

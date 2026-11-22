@@ -56,6 +56,11 @@ mkdirSync(path.join(context, 'tools'));
 for (const file of ['package.json', 'package-lock.json']) {
 	cpSync(path.join(imageDirectory, file), path.join(context, 'tools', file));
 }
+// The pinned agent-browser CLI (Dockerfile, from m9: npm ci --ignore-scripts from this lock).
+mkdirSync(path.join(context, 'browser'));
+for (const file of ['package.json', 'package-lock.json']) {
+	cpSync(path.join(imageDirectory, 'browser', file), path.join(context, 'browser', file));
+}
 // Source-controlled file of the image (the others in opt-flow are build output of BuildInnerBundles.mjs); needed from flow-sandbox:m7.
 cpSync(
 	path.join(imageDirectory, 'mcp-callback-forwarder.cjs'),
