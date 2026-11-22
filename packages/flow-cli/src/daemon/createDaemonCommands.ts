@@ -45,6 +45,24 @@ export function createDaemonCommands(
 			}
 			return runtime().commandHandler.handleCancel(cmd);
 		},
+		// Holds back the new steps of one running execution (running steps finish); `unpause` releases it.
+		pause: (payload: unknown): unknown => {
+			const cmd = payload as Extract<ClientCommand, { type: 'pause' }>;
+			if (typeof cmd.executionId !== 'string' || cmd.executionId.trim() === '') {
+				throw new Error('pause requires a non-empty "executionId".');
+			}
+			if (cmd.reason !== undefined && typeof cmd.reason !== 'string') {
+				throw new Error('pause requires "reason" to be a string when given.');
+			}
+			return runtime().commandHandler.handlePause(cmd);
+		},
+		unpause: (payload: unknown): unknown => {
+			const cmd = payload as Extract<ClientCommand, { type: 'unpause' }>;
+			if (typeof cmd.executionId !== 'string' || cmd.executionId.trim() === '') {
+				throw new Error('unpause requires a non-empty "executionId".');
+			}
+			return runtime().commandHandler.handleUnpause(cmd);
+		},
 		// Live connections only: a declared source with nothing connected is not
 		// capacity, and reporting it as available would suggest a step could reach it (D#4).
 		workers: (): unknown => runtime().workerRegistry.summarize(),

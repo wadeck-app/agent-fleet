@@ -5,6 +5,7 @@ import { countSkippedSteps, skipReasonOf } from '../execution/StepSkip.js';
 import { formatDuration } from '../history/ExecutionFormat.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import type { ResolvedExecution } from '../show/ExecutionDetail.js';
+import { isPaused } from './PausedText.js';
 import { type StepAttemptView, toStepAttemptViews } from './StepAttemptViews.js';
 import { isWaitingForWorkspace } from './WorkspaceWaitText.js';
 
@@ -36,6 +37,8 @@ export interface ExecutionSummary {
 	waitingForWorkspace?: true;
 	/** Since when and why it waits; present exactly when `waitingForWorkspace` is. */
 	workspaceWait?: { since: string; message: string };
+	/** Since when and why the run is paused (`flow pause`); present only while it is. The status stays `running`. */
+	paused?: { since: string; reason?: string };
 	stepCount: number;
 	failedStepCount: number;
 	/** Steps that did not run (stored as `completed`; see StepSkip). Counted in `stepCount`, apart from the ones that ran. */
@@ -122,6 +125,14 @@ export function toExecutionSummary(record: ExecutionState, projectLookup?: Proje
 					waitingForWorkspace: true as const,
 					// The `run` request of the wait is not sent: it is the daemon's restart copy, not display data.
 					workspaceWait: { since: record.workspaceWait!.since, message: record.workspaceWait!.message },
+				}
+			: {}),
+		...(isPaused(record)
+			? {
+					paused: {
+						since: record.paused!.since,
+						...(record.paused!.reason === undefined ? {} : { reason: record.paused!.reason }),
+					},
 				}
 			: {}),
 		stepCount: steps.length,

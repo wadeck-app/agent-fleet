@@ -71,6 +71,7 @@ export type {
 	StepIoRecord,
 	StepState,
 	StepStatus,
+	PausedState,
 	WorkspaceWait,
 } from './execution/ExecutionState.js';
 export {
@@ -248,6 +249,7 @@ export {
 	statusLabelOf,
 	workspaceWaitLines,
 } from './view/WorkspaceWaitText.js';
+export { PAUSED_LABEL, isPaused, pausedLines } from './view/PausedText.js';
 export {
 	MAX_COUNTED_RETRIES,
 	NO_RETRY_LEFT,

@@ -3,6 +3,7 @@ import type { ExecutionState } from '../execution/ExecutionState.js';
 import { SKIPPED_LABEL, skipReasonOf } from '../execution/StepSkip.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { renderStepCostLines, renderTotalCostLine } from '../show/StepCostLines.js';
+import { pausedLines } from '../view/PausedText.js';
 import {
 	WAITING_FOR_WORKSPACE_TAG,
 	isWaitingForWorkspace,
@@ -33,6 +34,7 @@ export function renderDetailView(exec: ExecutionState, projectLookup?: ProjectLo
 	lines.push(`File:      ${exec.flowFile}`);
 	lines.push(`Status:    ${statusLabelOf(exec)}`);
 	lines.push(...workspaceWaitLines(exec));
+	lines.push(...pausedLines(exec));
 	lines.push(`Started:   ${formatStartedUtc(exec.startedAt)}`);
 	if (exec.completedAt) {
 		lines.push(`Completed: ${formatStartedUtc(exec.completedAt)}`);
@@ -148,7 +150,7 @@ export function buildHistoryTable(
 			padTruncate(e.executionId, COL_ID) +
 				padTruncate(e.flowId, COL_FLOW) +
 				padTruncate(versionColumnOf(e), COL_VERSION) +
-				padTruncate(isWaitingForWorkspace(e) ? WAITING_FOR_WORKSPACE_TAG : e.status, COL_STATUS) +
+				padTruncate(isWaitingForWorkspace(e) ? WAITING_FOR_WORKSPACE_TAG : statusLabelOf(e), COL_STATUS) +
 				padTruncate(formatStarted(e.startedAt), COL_STARTED) +
 				runDurationOf(e)
 		);

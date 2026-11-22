@@ -12,6 +12,7 @@ import type { DaemonSecrets } from './DaemonSecrets.js';
 import { DefaultInteractivityPolicy } from './DefaultInteractivityPolicy.js';
 import { ExecutionCanceller } from './ExecutionCanceller.js';
 import type { ExecutionHooks } from './ExecutionHooks.js';
+import { ExecutionPauser } from './ExecutionPauser.js';
 import type { ExecutionRegistry } from './ExecutionRegistry.js';
 import { ExecutionWorkspaces } from './ExecutionWorkspaces.js';
 import { FlowFileAccessGuard } from './FlowFileAccessGuard.js';
@@ -61,7 +62,7 @@ export interface ExecutionPipelineDependencies {
 /**
  * The collaborators that run an execution once it is accepted, wired to each other: what workers hold
  * (`WorkerAssignmentSupervisor`), what a step's end means (`StepOutcomes`), handing ready steps out
- * (`StepDispatcher`), covering unmet demand, the end of a run, cancelling, injected steps and accepting a run.
+ * (`StepDispatcher`), covering unmet demand, the end of a run, cancelling, pausing, injected steps and accepting a run.
  *
  * Built in one place because they reference each other (an outcome re-dispatches, a dispatch failure fails a step, a
  * cleanup forgets an execution in two of them); `CommandHandler` keeps the state they share and the public surface.
@@ -77,6 +78,7 @@ export class ExecutionPipeline {
 	readonly dispatcher: StepDispatcher;
 	readonly outcomes: StepOutcomes;
 	readonly canceller: ExecutionCanceller;
+	readonly pauser: ExecutionPauser;
 	readonly injection: StepInjection;
 	readonly runRequests: RunRequestHandler;
 	/** Text added to the failure of a step lost with a disconnecting worker; set only during that disconnect. */
@@ -164,6 +166,12 @@ export class ExecutionPipeline {
 			disconnectWorker: worker => registry.disconnect(worker),
 			endExecution: (executionId, reason, priorError) =>
 				this.outcomes.cleanupExecution(executionId, reason, priorError),
+			tryDispatch: () => this.tryDispatch(),
+		});
+		this.pauser = new ExecutionPauser({
+			executions,
+			store: executionStore,
+			logWriter,
 			tryDispatch: () => this.tryDispatch(),
 		});
 		this.injection = new StepInjection(

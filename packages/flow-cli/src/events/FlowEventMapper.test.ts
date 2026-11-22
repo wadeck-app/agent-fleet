@@ -418,3 +418,106 @@ describe('FlowEventMapper projectId', () => {
 		}
 	});
 });
+
+describe('FlowEventMapper pause and unpause', () => {
+	let dir: string;
+	let publisher: RecordingFlowEventPublisher;
+	let masks: ExecutionMasks;
+	let store: ExecutionStore;
+
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-events-pause-'));
+		publisher = new RecordingFlowEventPublisher();
+		masks = new ExecutionMasks();
+		store = new ExecutionStore(
+			dir,
+			30,
+			masks,
+			new FlowEventMapper(publisher, err => {
+				throw err;
+			})
+		);
+		store.create({
+			executionId: EXEC_ID,
+			flowFile: 'f.yml',
+			flowId: 'my-flow',
+			stepIds: ['a', 'b'],
+			projectRoot: '/work/project',
+		});
+	});
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true });
+	});
+
+	describe('pause and unpause', () => {
+		it('publishes flow.execution.paused with status paused, pausedAt and the first line of the reason', () => {
+			store.markExecutionPaused(EXEC_ID, 'budget exceeded: 5.02 USD\nmore detail');
+
+			expect(publisher.names()).toEqual(['flow.execution.paused']);
+			const payload = publisher.events[0]!.payload;
+			expect(payload).toMatchObject({
+				executionId: EXEC_ID,
+				flowId: 'my-flow',
+				status: 'paused',
+				reason: 'budget exceeded: 5.02 USD',
+				pausedAt: store.read(EXEC_ID).paused!.since,
+			});
+			expect(payload).not.toHaveProperty('completedAt');
+		});
+
+		it('omits the reason when none was given', () => {
+			store.markExecutionPaused(EXEC_ID);
+
+			expect(publisher.events[0]!.payload).not.toHaveProperty('reason');
+		});
+
+		it('masks a declared secret in the reason before it reaches the queue', () => {
+			masks.register(EXEC_ID, [{ name: 'T', value: TOKEN }] as never);
+			store.markExecutionPaused(EXEC_ID, `token ${TOKEN} leaked`);
+
+			expect(JSON.stringify(publisher.events)).not.toContain(TOKEN);
+		});
+
+		it('publishes flow.execution.resumed with both timestamps, and records the paused time', () => {
+			store.markExecutionPaused(EXEC_ID, 'why');
+			const pausedAt = store.read(EXEC_ID).paused!.since;
+			store.markExecutionUnpaused(EXEC_ID);
+
+			expect(publisher.names()).toEqual(['flow.execution.paused', 'flow.execution.resumed']);
+			expect(publisher.events[1]!.payload).toMatchObject({ status: 'running', pausedAt });
+			expect(publisher.events[1]!.payload.resumedAt).toBeDefined();
+			const record = store.read(EXEC_ID);
+			expect(record.paused).toBeUndefined();
+			expect(record.pausedMs).toBeGreaterThanOrEqual(0);
+		});
+
+		it('refuses to record an unpause for a run that is not paused, instead of publishing a false event', () => {
+			expect(() => store.markExecutionUnpaused(EXEC_ID)).toThrow(/not paused/);
+			expect(publisher.events).toEqual([]);
+		});
+
+		it('drops the paused flag when the run ends while paused and keeps the time it was paused', () => {
+			store.markExecutionPaused(EXEC_ID, 'why');
+			store.markExecutionFailed(EXEC_ID);
+
+			const record = store.read(EXEC_ID);
+			expect(record.paused).toBeUndefined();
+			expect(record.pausedMs).toBeGreaterThanOrEqual(0);
+			expect(publisher.names()).toEqual(['flow.execution.paused', 'flow.execution.failed']);
+		});
+
+		it('a daemon restart ends a paused run as failed (interrupted), naming the pause, and clears the flag', () => {
+			store.markStepRunning(EXEC_ID, 'a');
+			store.markExecutionPaused(EXEC_ID, 'budget exceeded');
+
+			expect(store.reconcileInterruptedExecutions()).toBe(1);
+
+			const record = store.read(EXEC_ID);
+			expect(record.status).toBe('failed');
+			expect(record.paused).toBeUndefined();
+			expect(record.lastError).toContain('paused');
+			expect(record.lastError).toContain('budget exceeded');
+		});
+	});
+});

@@ -3,6 +3,8 @@ export const FLOW_EVENT_NAMES = [
 	'flow.execution.started',
 	'flow.execution.completed',
 	'flow.execution.failed',
+	'flow.execution.paused',
+	'flow.execution.resumed',
 	'flow.step.started',
 	'flow.step.completed',
 	'flow.step.failed',
@@ -19,7 +21,7 @@ export interface FlowEventPayload {
 	flowId: string;
 	/** Step events only. */
 	stepId?: string;
-	status: 'running' | 'completed' | 'failed';
+	status: 'running' | 'completed' | 'failed' | 'paused';
 	/** Step events only: 1 for the first run of the step, +1 per retry or relaunch. */
 	attempt?: number;
 	startedAt?: string;
@@ -47,6 +49,12 @@ export interface FlowEventPayload {
 	turns?: number;
 	toolCalls?: number;
 	endReason?: string;
+	/** Pause and resume events: when the run was paused (ISO). */
+	pausedAt?: string;
+	/** Resume events only: when the run was resumed (ISO). */
+	resumedAt?: string;
+	/** Pause events only: first line of the pause reason, truncated; absent when none was given. */
+	reason?: string;
 }
 
 export type FlowEventsStatus =

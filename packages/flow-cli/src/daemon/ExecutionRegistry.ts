@@ -45,6 +45,8 @@ export class ExecutionRegistry {
 	 * unanswered, so a later `flow resume` can re-dispatch exactly that step.
 	 */
 	private readonly resumables = new Map<string, { stepId: string }>();
+	/** Executions paused with `flow pause`: the dispatcher hands out none of their steps (the record's `paused` is what is shown). */
+	private readonly pausedExecutions = new Set<string>();
 	private activeCount = 0;
 
 	/** Registers a started execution. */
@@ -66,6 +68,7 @@ export class ExecutionRegistry {
 		this.projects.delete(executionId);
 		this.requirements.delete(executionId);
 		this.workspaceKinds.delete(executionId);
+		this.pausedExecutions.delete(executionId);
 		this.activeCount--;
 	}
 
@@ -84,6 +87,19 @@ export class ExecutionRegistry {
 
 	activeExecutionCount(): number {
 		return this.activeCount;
+	}
+
+	/** Stops handing out the steps of an execution until {@link unpause}. */
+	pause(executionId: string): void {
+		this.pausedExecutions.add(executionId);
+	}
+
+	unpause(executionId: string): void {
+		this.pausedExecutions.delete(executionId);
+	}
+
+	isPaused(executionId: string): boolean {
+		return this.pausedExecutions.has(executionId);
 	}
 
 	stepType(executionId: string, stepId: string): AssignableStep['type'] | undefined {

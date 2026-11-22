@@ -1,5 +1,6 @@
 import type { ExecutionState } from '../execution/ExecutionState.js';
 import { requireTimestamp, statusTag } from '../view/CellText.js';
+import { isPaused } from '../view/PausedText.js';
 import { isWaitingForWorkspace } from '../view/WorkspaceWaitText.js';
 
 export interface LatestRunRow {
@@ -15,7 +16,7 @@ export function latestRuns(runs: readonly ExecutionState[], limit: number): Late
 	return runs.slice(0, limit).map(run => ({
 		executionId: run.executionId,
 		flowId: run.flowId,
-		statusLabel: statusTag(run.status, isWaitingForWorkspace(run)),
+		statusLabel: statusTag(run.status, isWaitingForWorkspace(run), isPaused(run)),
 		startedAt: requireTimestamp(run.startedAt),
 	}));
 }

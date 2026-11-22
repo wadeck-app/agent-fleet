@@ -230,6 +230,14 @@ export interface ExecutionState {
 	 */
 	workspaceWait?: WorkspaceWait;
 	/**
+	 * Present ONLY while the run is paused (`flow pause`): the run stays `running`, no new step is dispatched and the steps
+	 * already running finish. Removed on `flow unpause` and when the run ends. Additive: absent on every older record.
+	 * A daemon restart does not keep a paused run: the daemon holds a run in memory only, so the reconciler marks it failed.
+	 */
+	paused?: PausedState;
+	/** Total time the run spent paused, added on each `flow unpause`. Additive: absent when it was never unpaused. */
+	pausedMs?: number;
+	/**
 	 * How long the run waited for a workspace before it started (additive: absent on a run that did not wait). The wait is not
 	 * part of the run: `startedAt` of a run that waited is the moment it got its workspace.
 	 */
@@ -241,6 +249,14 @@ export interface ExecutionState {
 	 * records and on a run that requires nothing.
 	 */
 	requirements?: RunRequirementsRecord;
+}
+
+/** A paused run; see {@link ExecutionState.paused}. */
+export interface PausedState {
+	/** ISO time of the pause. */
+	since: string;
+	/** Why, as given to `flow pause --reason`; absent when none was given. */
+	reason?: string;
 }
 
 /** A run that waits for a workspace. */

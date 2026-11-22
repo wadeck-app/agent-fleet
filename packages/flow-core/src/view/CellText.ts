@@ -1,5 +1,6 @@
 import type { ExecutionStatus, StepStatus } from '../execution/ExecutionState.js';
 import { formatStarted } from '../history/ExecutionFormat.js';
+import { PAUSED_LABEL } from './PausedText.js';
 import { WAITING_FOR_WORKSPACE_TAG } from './WorkspaceWaitText.js';
 
 /**
@@ -28,7 +29,16 @@ const STEP_STATUS_TAGS: Record<StepStatus, string> = {
 // @formatter:on
 
 /** "ok", "FAILED"...: one short word that tells the outcome of a run where a table cell is narrow. */
-export function statusTag(status: string, waitingForWorkspace = false): string {
+export function statusTag(status: string, waitingForWorkspace = false, paused = false): string {
+	if (paused) {
+		// The flag only makes sense on a live run (see ExecutionState.paused): anything else is a corrupt record.
+		if (status !== 'running' && status !== 'queued') {
+			throw new Error(
+				`A paused run must be 'running' or 'queued', got '${status}': corrupt execution file? Remove its 'paused' or fix the status.`
+			);
+		}
+		return PAUSED_LABEL;
+	}
 	if (waitingForWorkspace) {
 		// The flag only makes sense on a queued run (see ExecutionState.workspaceWait): anything else is a corrupt record.
 		if (status !== 'queued') {

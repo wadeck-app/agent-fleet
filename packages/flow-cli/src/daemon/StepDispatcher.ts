@@ -128,6 +128,13 @@ export class StepDispatcher {
 				continue;
 			}
 
+			// `flow pause`: the step keeps its place in the queue, untouched and not counted as demand (no worker is asked for
+			// it, no requirement wait starts); `flow unpause` dispatches again, so nothing is lost or handed out twice.
+			if (this.executions.isPaused(step.executionContext.executionId)) {
+				unplaced.push(step);
+				continue;
+			}
+
 			let placement: StepPlacement;
 			try {
 				placement = this.placements.describe(step);

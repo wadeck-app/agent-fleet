@@ -20,6 +20,7 @@ import { describeCommandLine } from './CommandLineLog';
 import { consumeDaemonModeFlag } from './DaemonModeFlag';
 import { FLOW_BUNDLE_NAME } from './FlowBundleName.js';
 import { registerCancelCommand } from './commands/CancelCommand';
+import { registerPauseCommand, registerUnpauseCommand } from './commands/PauseCommand';
 import { withVersionFlagAlias } from './VersionFlagAlias.js';
 import { buildCliCommand } from './commands/CliCommand.js';
 import { formatCliError } from './commands/CliErrorOutput';
@@ -190,6 +191,8 @@ async function main(): Promise<void> {
 	registerRunCommand(program);
 	registerResumeCommand(program);
 	registerCancelCommand(program);
+	registerPauseCommand(program);
+	registerUnpauseCommand(program);
 	registerHistoryCommand(program);
 	registerVersionsCommand(program);
 	registerWorkerCommand(registerWorkerSourceCommand(program));

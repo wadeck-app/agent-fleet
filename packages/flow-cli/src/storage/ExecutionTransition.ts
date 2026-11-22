@@ -8,6 +8,10 @@ export type ExecutionTransition =
 	| { kind: 'execution-started'; state: ExecutionState }
 	| { kind: 'execution-completed'; state: ExecutionState }
 	| { kind: 'execution-failed'; state: ExecutionState }
+	/** `flow pause`: `state.paused` holds the pause. */
+	| { kind: 'execution-paused'; state: ExecutionState }
+	/** `flow unpause`: the pause is gone from `state`, so it carries when it began and when it ended. */
+	| { kind: 'execution-unpaused'; state: ExecutionState; pausedAt: string; resumedAt: string }
 	| { kind: 'step-started'; state: ExecutionState; stepId: string }
 	| { kind: 'step-completed'; state: ExecutionState; stepId: string }
 	| { kind: 'step-failed'; state: ExecutionState; stepId: string };

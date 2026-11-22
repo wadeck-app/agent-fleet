@@ -80,6 +80,8 @@ export const FlowExecutionSummarySchema = z.object({
 	flowVersion: z.string().optional(),
 	/** `flowVersion`, or `-` when not recorded: the text of a table cell. */
 	versionLabel: z.string().optional(),
+	/** Present only while the run is paused (`flow pause`; its status stays `running`): since when and why. */
+	paused: z.object({ since: z.string(), reason: z.string().optional() }).optional(),
 	stepCount: z.number(),
 	failedStepCount: z.number(),
 	/** Steps that did not run (stored as completed); optional: older daemons do not send it. */

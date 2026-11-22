@@ -207,12 +207,14 @@ describe('FlowCapabilitiesGenerator - secrets', () => {
 		expect(result).toContain('secret');
 	});
 
-	it('has an Events section listing the six queue events, the payload and ready-to-use waits', () => {
+	it('has an Events section listing the eight queue events, the payload and ready-to-use waits', () => {
 		expect(result).toContain('## Section 9: Events');
 		for (const name of [
 			'flow.execution.started',
 			'flow.execution.completed',
 			'flow.execution.failed',
+			'flow.execution.paused',
+			'flow.execution.resumed',
 			'flow.step.started',
 			'flow.step.completed',
 			'flow.step.failed',

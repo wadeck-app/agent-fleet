@@ -11,13 +11,15 @@ const MAX_SCHEMA_BYTES = 64 * 1024;
 const MAX_EXAMPLE_BYTES = 16 * 1024;
 
 describe('FLOW_EVENT_CATALOG', () => {
-	it('declares the six lifecycle events under the "flow" source, names unique', () => {
+	it('declares the eight lifecycle events under the "flow" source, names unique', () => {
 		expect(FLOW_EVENT_SOURCE).toBe('flow');
 		const names = FLOW_EVENT_CATALOG.map(event => event.name);
 		expect(names).toEqual([
 			'flow.execution.started',
 			'flow.execution.completed',
 			'flow.execution.failed',
+			'flow.execution.paused',
+			'flow.execution.resumed',
 			'flow.step.started',
 			'flow.step.completed',
 			'flow.step.failed',
@@ -63,6 +65,9 @@ describe('FLOW_EVENT_CATALOG', () => {
 		expect(byName['flow.step.failed']).toMatchObject({ terminal: false, outcome: 'failure' });
 		expect(byName['flow.execution.started']).toMatchObject({ terminal: false });
 		expect(byName['flow.step.started']).toMatchObject({ terminal: false });
+		// A pause is not an ending: the run continues on resume, or ends later by its own steps.
+		expect(byName['flow.execution.paused']).toMatchObject({ terminal: false, outcome: 'info' });
+		expect(byName['flow.execution.resumed']).toMatchObject({ terminal: false, outcome: 'info' });
 	});
 
 	it('tells in the descriptions about retries, skipped steps, resume and user_intervention', () => {
@@ -119,6 +124,8 @@ describe('FLOW_EVENT_CATALOG step cost fields', () => {
 			'flow.execution.started',
 			'flow.execution.completed',
 			'flow.execution.failed',
+			'flow.execution.paused',
+			'flow.execution.resumed',
 		]) {
 			const schema = FLOW_EVENT_CATALOG.find(candidate => candidate.name === name)!.schema as {
 				properties: Record<string, unknown>;

@@ -194,6 +194,20 @@ export type ClientCommand =
 			 * daemon refuses an execution of another project instead of cancelling it.
 			 */
 			projectId?: string;
+	  }
+	| {
+			type: 'pause';
+			executionId: string;
+			/** Why, as typed after `--reason`; stored with the pause and published (first line) with the event. */
+			reason?: string;
+			/** Same meaning as for `cancel`. */
+			projectId?: string;
+	  }
+	| {
+			type: 'unpause';
+			executionId: string;
+			/** Same meaning as for `cancel`. */
+			projectId?: string;
 	  };
 
 /**
@@ -211,6 +225,10 @@ export type DaemonResponse =
 	| { type: 'execution_resumed'; executionId: string; stepId: string }
 	/** `alreadyCancelled`: the execution had been cancelled before this command, nothing was changed. */
 	| { type: 'execution_cancelled'; executionId: string; alreadyCancelled: boolean }
+	/** `flow pause`: `since` is when the pause was recorded. */
+	| { type: 'execution_paused'; executionId: string; since: string; reason?: string }
+	/** `flow unpause`: `pausedMs` is the total time the run has spent paused. */
+	| { type: 'execution_unpaused'; executionId: string; pausedMs: number }
 	/** `detail` refines `code` when one code covers several causes (PROJECT_RESOLUTION_FAILED: NO_PROJECT_IN_SCOPE, PROJECT_NOT_FOUND, ...). */
 	| { type: 'error'; message: string; code: string; detail?: string };
 

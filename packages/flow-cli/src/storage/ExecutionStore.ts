@@ -316,17 +316,55 @@ export class ExecutionStore {
 		return this.finishExecution(executionId, 'failed');
 	}
 
-	private finishExecution(executionId: string, status: 'completed' | 'failed'): ExecutionState {
+	/**
+	 * Records `flow pause`: the run keeps its status and gets `paused` (since now, with the reason). The caller checked that
+	 * the run is live and not paused already; publishes the paused transition.
+	 */
+	markExecutionPaused(executionId: string, reason?: string): ExecutionState {
 		const current = this.read(executionId);
+		const paused = { since: new Date().toISOString(), ...(reason === undefined ? {} : { reason }) };
+		const written = this.write({ ...current, paused });
+		this.notify({ kind: 'execution-paused', state: written });
+		return written;
+	}
+
+	/**
+	 * Records `flow unpause`: removes `paused` and adds the time spent paused to `pausedMs`. Throws when the record is not
+	 * paused: the caller owns that check, so a silent no-op here would hide a bug in it.
+	 */
+	markExecutionUnpaused(executionId: string): ExecutionState {
+		const current = this.read(executionId);
+		if (current.paused === undefined) {
+			throw new Error(`Execution ${executionId} is not paused: cannot record an unpause.`);
+		}
+		const resumedAt = new Date().toISOString();
+		const pausedFor = Math.max(0, new Date(resumedAt).getTime() - new Date(current.paused.since).getTime());
+		const { paused, ...rest } = current;
+		const written = this.write({ ...rest, pausedMs: (current.pausedMs ?? 0) + pausedFor });
+		this.notify({ kind: 'execution-unpaused', state: written, pausedAt: paused.since, resumedAt });
+		return written;
+	}
+
+	private finishExecution(executionId: string, status: 'completed' | 'failed'): ExecutionState {
+		const { paused, ...current } = this.read(executionId);
+		const completedAt = new Date().toISOString();
 		const finished: ExecutionState = {
 			...current,
 			status,
-			completedAt: new Date().toISOString(),
+			completedAt,
 			currentSteps: [],
 			steps: this.withRunningStepsFailed(
 				current,
 				current.lastError ?? 'the execution ended while this step was still running'
 			),
+			// A run that ends while paused (its running steps finished, or it was cancelled) stops being paused: keep the time it was.
+			...(paused === undefined
+				? {}
+				: {
+						pausedMs:
+							(current.pausedMs ?? 0) +
+							Math.max(0, new Date(completedAt).getTime() - new Date(paused.since).getTime()),
+					}),
 		};
 		const written = this.write(finished);
 		if (current.status !== status) {

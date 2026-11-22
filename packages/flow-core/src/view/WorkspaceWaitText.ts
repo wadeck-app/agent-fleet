@@ -1,5 +1,6 @@
 import type { ExecutionState } from '../execution/ExecutionState.js';
 import { formatDuration, formatStartedUtc } from '../history/ExecutionFormat.js';
+import { PAUSED_LABEL, isPaused } from './PausedText.js';
 import { WAITING_FOR_WORKSPACE_LABEL, WAITING_FOR_WORKSPACE_TAG } from './WorkspaceWaitLabels.js';
 
 export { WAITING_FOR_WORKSPACE_LABEL, WAITING_FOR_WORKSPACE_TAG };
@@ -9,7 +10,7 @@ export { WAITING_FOR_WORKSPACE_LABEL, WAITING_FOR_WORKSPACE_TAG };
  * Every place that prints a status words it the same way through here, so it is never read as an ordinary queued run.
  */
 
-type WaitFields = Pick<ExecutionState, 'status' | 'workspaceWait'>;
+type WaitFields = Pick<ExecutionState, 'status' | 'workspaceWait' | 'paused'>;
 
 /** True for a `queued` run that carries `workspaceWait` (the field is removed when the run starts, fails or is cancelled). */
 export function isWaitingForWorkspace(record: WaitFields): boolean {
@@ -18,6 +19,9 @@ export function isWaitingForWorkspace(record: WaitFields): boolean {
 
 /** The stored status, or {@link WAITING_FOR_WORKSPACE_LABEL} for a run that waits for a workspace. */
 export function statusLabelOf(record: WaitFields): string {
+	if (isPaused(record)) {
+		return PAUSED_LABEL;
+	}
 	return isWaitingForWorkspace(record) ? WAITING_FOR_WORKSPACE_LABEL : record.status;
 }
 

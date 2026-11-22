@@ -72,6 +72,17 @@ export class FlowEventMapper implements ExecutionTransitionListener {
 				};
 			case 'execution-failed':
 				return { event: 'flow.execution.failed', payload: this.executionPayload(transition.state, 'failed') };
+			case 'execution-paused':
+				return { event: 'flow.execution.paused', payload: this.pausedPayload(transition.state) };
+			case 'execution-unpaused':
+				return {
+					event: 'flow.execution.resumed',
+					payload: {
+						...this.executionPayload(transition.state, 'running'),
+						pausedAt: transition.pausedAt,
+						resumedAt: transition.resumedAt,
+					},
+				};
 			case 'step-started':
 				return {
 					event: 'flow.step.started',
@@ -94,18 +105,32 @@ export class FlowEventMapper implements ExecutionTransitionListener {
 		}
 	}
 
+	private pausedPayload(state: ExecutionState): FlowEventPayload {
+		if (state.paused === undefined) {
+			throw new Error(`Execution ${state.executionId} was announced as paused but its record has no 'paused'.`);
+		}
+		const reason = firstLineOf(state.paused.reason, MAX_ERROR_CHARS);
+		return {
+			...this.executionPayload(state, 'paused'),
+			pausedAt: state.paused.since,
+			...(reason === undefined ? {} : { reason }),
+		};
+	}
+
 	private executionPayload(state: ExecutionState, status: EventStatus): FlowEventPayload {
 		const error = status === 'failed' ? firstLineOf(state.lastError, MAX_ERROR_CHARS) : undefined;
+		// Not ended: no end time, duration or run total yet.
+		const live = status === 'running' || status === 'paused';
 		return {
 			executionId: state.executionId,
 			flowId: state.flowId,
 			status,
 			startedAt: state.startedAt,
-			...(status === 'running' ? {} : finishedFields(state.startedAt, state.completedAt)),
+			...(live ? {} : finishedFields(state.startedAt, state.completedAt)),
 			...(state.projectRoot === undefined ? {} : { projectRoot: state.projectRoot }),
 			...(state.projectId === undefined ? {} : { projectId: state.projectId }),
 			...(error === undefined ? {} : { error }),
-			...(status === 'running' ? {} : this.runCostFields(state)),
+			...(live ? {} : this.runCostFields(state)),
 		};
 	}
 

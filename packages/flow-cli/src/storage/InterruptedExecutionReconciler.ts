@@ -143,7 +143,12 @@ export class InterruptedExecutionReconciler {
 	}
 
 	private interrupt(current: ExecutionState): void {
-		const reason = `interrupted: the daemon restarted while this execution was running; re-run it with flow run ${current.flowFile}`;
+		const { paused, ...record } = current;
+		// A paused run is not kept either: the daemon holds a run in memory only, so nothing could dispatch its remaining steps.
+		const reason =
+			paused === undefined
+				? `interrupted: the daemon restarted while this execution was running; re-run it with flow run ${current.flowFile}`
+				: `interrupted: the daemon restarted while this execution was paused (since ${paused.since}${paused.reason === undefined ? '' : `: ${paused.reason}`}); a paused execution is not kept across a daemon restart, re-run it with flow run ${current.flowFile}`;
 		const completedAt = new Date().toISOString();
 		const steps = failRunningSteps(current, reason, text => this.host.mask(current.executionId, text));
 		for (const [id, step] of Object.entries(steps)) {
@@ -152,7 +157,7 @@ export class InterruptedExecutionReconciler {
 			}
 		}
 		const written = this.host.write({
-			...current,
+			...record,
 			status: 'failed',
 			completedAt,
 			currentSteps: [],

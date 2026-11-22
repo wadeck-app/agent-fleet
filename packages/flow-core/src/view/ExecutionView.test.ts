@@ -390,3 +390,15 @@ describe('toExecutionSummary waiting for a workspace', () => {
 		expect(summary).not.toHaveProperty('workspaceWait');
 	});
 });
+
+describe('toExecutionSummary paused', () => {
+	it('exposes since and the reason of a paused run; the status stays running', () => {
+		const paused = { since: '2026-11-22T10:00:00.000Z', reason: 'budget exceeded' };
+		const summary = toExecutionSummary(record({ status: 'running', completedAt: null, paused }));
+		expect(summary).toMatchObject({ status: 'running', paused });
+	});
+
+	it('adds nothing to a run that is not paused', () => {
+		expect(toExecutionSummary(record({ status: 'running', completedAt: null }))).not.toHaveProperty('paused');
+	});
+});

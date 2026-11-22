@@ -329,6 +329,16 @@ export class CommandHandler {
 		return this.pipeline.canceller.cancel(cmd.executionId, cmd.projectId);
 	}
 
+	/** Holds back the new steps of one running execution; see {@link ExecutionPauser}. */
+	handlePause(cmd: Extract<ClientCommand, { type: 'pause' }>): DaemonResponse {
+		return this.pipeline.pauser.pause(cmd.executionId, cmd.reason, cmd.projectId);
+	}
+
+	/** Releases a paused execution; see {@link ExecutionPauser}. */
+	handleUnpause(cmd: Extract<ClientCommand, { type: 'unpause' }>): DaemonResponse {
+		return this.pipeline.pauser.unpause(cmd.executionId, cmd.projectId);
+	}
+
 	/** Called by Daemon for inject_steps messages. */
 	injectSteps(executionId: string, injectedSteps: InjectedStep[]): void {
 		this.pipeline.injection.injectSteps(executionId, injectedSteps);

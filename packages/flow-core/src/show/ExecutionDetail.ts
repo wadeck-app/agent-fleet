@@ -10,6 +10,7 @@ import { SKIPPED_LABEL, skipReasonOf } from '../execution/StepSkip.js';
 import { formatDuration, formatStartedUtc } from '../history/ExecutionFormat.js';
 import { type ProjectLookup, projectLabelOf } from '../project/ProjectLabel.js';
 import { RECOVERED_RUN_HINT } from '../view/OutcomeHints.js';
+import { isPaused, pausedLines } from '../view/PausedText.js';
 import { isWaitingForWorkspace, statusLabelOf, workspaceWaitLines } from '../view/WorkspaceWaitText.js';
 import { executionRequirementLines, stepRecordedRequirementLines } from './RequirementLines.js';
 import { renderStepCostLines, renderTotalCostLine } from './StepCostLines.js';
@@ -151,6 +152,7 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	lines.push(`File:      ${record.flowFile}`);
 	lines.push(`Status:    ${statusLabelOf(record)}`);
 	lines.push(...workspaceWaitLines(record));
+	lines.push(...pausedLines(record));
 	lines.push(`Started:   ${formatStartedUtc(record.startedAt)}`);
 	if (record.completedAt) {
 		lines.push(`Completed: ${formatStartedUtc(record.completedAt)}`);
@@ -172,6 +174,12 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 		lines.push('');
 		lines.push(
 			'Note: execution has not started: it waits for a free workspace and has done no work (all steps are pending).'
+		);
+	} else if (isPaused(record)) {
+		lines.push('');
+		lines.push(
+			'Note: execution is paused: no new step starts, the steps already running finish. Resume with: flow unpause ' +
+				record.executionId
 		);
 	} else if (record.status === 'running' || record.status === 'queued') {
 		lines.push('');

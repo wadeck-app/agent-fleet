@@ -96,12 +96,26 @@ const PROPERTIES = {
 		maxLength: 200,
 		description: 'Failed events only: first line of the (secret-masked) error, at most 200 characters',
 	},
+	pausedAt: {
+		type: 'string',
+		description: 'Pause and resume events: ISO timestamp of the pause (`flow pause`)',
+	},
+	resumedAt: {
+		type: 'string',
+		description: 'Resume events only: ISO timestamp of the resume (`flow unpause`)',
+	},
+	reason: {
+		type: 'string',
+		maxLength: 200,
+		description:
+			'Pause events only: first line of the text given to `flow pause --reason` (secret-masked), at most 200 characters; absent when none was given',
+	},
 } as const;
 
 type PropertyName = keyof typeof PROPERTIES;
 
 function payloadSchema(
-	status: 'running' | 'completed' | 'failed',
+	status: 'running' | 'completed' | 'failed' | 'paused',
 	required: PropertyName[],
 	optional: PropertyName[]
 ): Record<string, unknown> {
@@ -110,7 +124,7 @@ function payloadSchema(
 		type: 'object',
 		properties: {
 			...Object.fromEntries(names.map(name => [name, PROPERTIES[name]])),
-			status: { enum: [status], description: '`running`, `completed` or `failed`' },
+			status: { enum: [status], description: '`running`, `paused`, `completed` or `failed`' },
 		},
 		required: [...required, 'status'],
 		additionalProperties: false,
@@ -119,6 +133,8 @@ function payloadSchema(
 
 const EXECUTION_STARTED_AT = '2026-10-24T09:00:00.000Z';
 const EXECUTION_ENDED_AT = '2026-10-24T09:04:12.500Z';
+const EXECUTION_PAUSED_AT = '2026-10-24T09:02:00.000Z';
+const EXECUTION_RESUMED_AT = '2026-10-24T09:03:10.000Z';
 const STEP_STARTED_AT = '2026-10-24T09:00:03.000Z';
 const STEP_ENDED_AT = '2026-10-24T09:01:30.250Z';
 const PROJECT = '/work/my-project';
@@ -217,6 +233,44 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 		correlationKey: EXECUTION_KEY,
 		terminal: true,
 		outcome: 'failure',
+	},
+	{
+		name: 'flow.execution.paused',
+		description:
+			'`flow pause` paused a running execution: no new step is dispatched, steps already running finish, the run stays running in its record. Fires once per pause (not for a refused pause). It continues on flow.execution.resumed, or ends (completed or failed) while paused.',
+		schema: payloadSchema('paused', ['executionId', 'flowId'], [...EXECUTION_OPTIONAL, 'pausedAt', 'reason']),
+		example: {
+			executionId: 'exec-1a2b3c',
+			flowId: 'review-pr',
+			status: 'paused',
+			startedAt: EXECUTION_STARTED_AT,
+			projectRoot: PROJECT,
+			projectId: PROJECT_ID,
+			pausedAt: EXECUTION_PAUSED_AT,
+			reason: 'budget exceeded: 5.02 USD of 5 USD',
+		},
+		correlationKey: EXECUTION_KEY,
+		terminal: false,
+		outcome: 'info',
+	},
+	{
+		name: 'flow.execution.resumed',
+		description:
+			'`flow unpause` resumed a paused execution: its queued steps are dispatched again. Fires once per resume. Unrelated to `flow resume`, which reopens a failed execution and fires no event of its own.',
+		schema: payloadSchema('running', ['executionId', 'flowId'], [...EXECUTION_OPTIONAL, 'pausedAt', 'resumedAt']),
+		example: {
+			executionId: 'exec-1a2b3c',
+			flowId: 'review-pr',
+			status: 'running',
+			startedAt: EXECUTION_STARTED_AT,
+			projectRoot: PROJECT,
+			projectId: PROJECT_ID,
+			pausedAt: EXECUTION_PAUSED_AT,
+			resumedAt: EXECUTION_RESUMED_AT,
+		},
+		correlationKey: EXECUTION_KEY,
+		terminal: false,
+		outcome: 'info',
 	},
 	{
 		name: 'flow.step.started',
