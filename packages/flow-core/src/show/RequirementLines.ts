@@ -18,6 +18,9 @@ export function flowRequirementLines(flow: FlowDefinition, expand?: ProfileExpan
 	if (flow.profile !== undefined) {
 		lines.push(`profile:   ${String(flow.profile)}`);
 	}
+	if (flow.placement !== undefined) {
+		lines.push(`placement: ${String(flow.placement)}`);
+	}
 	if (Array.isArray(flow.requires) && flow.requires.length > 0) {
 		lines.push(`requires:  ${flow.requires.join(', ')}`);
 	}
@@ -46,10 +49,11 @@ export function flowRequirementLines(flow: FlowDefinition, expand?: ProfileExpan
  */
 export function stepRequirementSuffix(step: FlowStep): string {
 	const profile = step.profile === undefined ? '' : `  profile:${String(step.profile)}`;
+	const placement = step.placement === undefined ? '' : `  placement:${String(step.placement)}`;
 	const requires =
 		Array.isArray(step.requires) && step.requires.length > 0 ? `  requires:${step.requires.join(',')}` : '';
 	const host = step.type === 'script' && step.host === true ? '  host:true' : '';
-	return `${profile}${requires}${host}`;
+	return `${placement}${profile}${requires}${host}`;
 }
 
 /** `Profile:` and `Requires:` lines of `flow show <execution>`: the profile name and the run set that is enforced. */
@@ -61,11 +65,18 @@ export function executionRequirementLines(recorded: RunRequirementsRecord | unde
 	if (recorded.profiles?.run !== undefined) {
 		lines.push(`Profile:   ${recorded.profiles.run}`);
 	}
+	if (recorded.placements?.run !== undefined) {
+		lines.push(`Placement: ${recorded.placements.run}`);
+	}
 	if (recorded.run.length > 0) {
 		lines.push(`Requires:  ${recorded.run.join(', ')}`);
 	}
 	// Only when a declared step received it: a record that only carries the set for steps injected later shows as before.
-	if (recorded.implicit !== undefined && recorded.implicit.requires.length > 0 && recorded.implicit.steps.length > 0) {
+	if (
+		recorded.implicit !== undefined &&
+		recorded.implicit.requires.length > 0 &&
+		recorded.implicit.steps.length > 0
+	) {
 		lines.push(`Requires:  ${recorded.implicit.requires.join(', ')} ${IMPLICIT_NOTE}`);
 	}
 	return lines;
@@ -82,6 +93,11 @@ export function stepRecordedRequirementLines(
 		return [];
 	}
 	const lines: string[] = [];
+	// The step's own placement, else the flow default it inherits.
+	const placement = recorded.placements?.steps[stepId] ?? recorded.placements?.run;
+	if (placement !== undefined) {
+		lines.push(`${indent}placement: ${placement}`);
+	}
 	const profile = recorded.profiles?.steps[stepId];
 	if (profile !== undefined) {
 		lines.push(`${indent}profile: ${profile}`);

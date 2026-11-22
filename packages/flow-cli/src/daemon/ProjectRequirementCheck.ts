@@ -30,7 +30,9 @@ export class ProjectRequirementCheck {
 			return undefined;
 		}
 		const sets: { subject: string; required: string[]; profile: string | undefined }[] = [
-			{ subject: `Flow "${flowId}"`, required: requirements.run, profile: requirements.profiles?.run },
+			...(this.defaultPlacementUnused(requirements)
+				? []
+				: [{ subject: `Flow "${flowId}"`, required: requirements.run, profile: requirements.profiles?.run }]),
 			...Object.entries(requirements.steps).map(([stepId, required]) => ({
 				subject: `Step "${stepId}" of flow "${flowId}"`,
 				required,
@@ -50,6 +52,21 @@ export class ProjectRequirementCheck {
 			}
 		}
 		return undefined;
+	}
+
+	/**
+	 * True when the flow names a default placement but every declared step names its own: the run-level set (which holds the
+	 * default's requirements) then applies to no declared step, so asking for it would refuse a run for requirements nothing
+	 * uses. A record without placements (no placement declared, or written before they existed) is never concerned. Steps
+	 * injected later are not known when the run starts.
+	 */
+	private defaultPlacementUnused(requirements: RunRequirementsRecord): boolean {
+		const placements = requirements.placements;
+		if (placements?.run === undefined) {
+			return false;
+		}
+		const stepIds = Object.keys(requirements.steps);
+		return stepIds.length > 0 && stepIds.every(stepId => placements.steps[stepId] !== undefined);
 	}
 
 	private refusal(

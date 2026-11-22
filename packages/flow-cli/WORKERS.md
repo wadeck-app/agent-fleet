@@ -209,7 +209,8 @@ A placement is a named `requires` list (`PlacementCatalog` in flow-engine). It i
 - **Replace, not add.** A step's `placement` replaces the flow default for that step; flow `requires`/`profile` and the step's own `requires`/`profile` are still added. This is the only way to drop a flow-level default.
 - **Injected steps** inherit the default placement (it is in the recorded `run` set). They cannot carry `placement` (refused like other unlisted keys).
 - **Offline checks** (`flow validate`): `placements` must be a non-empty map, each list non-empty and valid; an unknown name, at flow or step level, is an error with `Did you mean`.
-- **Limits.** Not recorded by name and not shown by `flow show` (only the expanded requirements are). The run-start project check also asks for the default placement at run level, even when every step overrides it.
+- **Recorded by name.** The record keeps `placements: { run?, steps }` (the default and each step's own name; display and run-start check only, the enforced sets stay in `requirements`). `flow show <file>` prints `placement:` in the header and `placement:<name>` on a step row; `flow show <execution>` prints `Placement:` and, per declared step, `placement: <name>` (own, else the inherited default). Records without the field show as before.
+- **Run-start project check.** The default's requirements are asked for only if at least one declared step uses the default; when every step overrides it they are skipped. Steps injected later are not known at run start.
 
 ### Stickiness (S1)
 

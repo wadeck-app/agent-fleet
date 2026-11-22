@@ -98,4 +98,38 @@ describe('ProjectRequirementCheck', () => {
 		expect(message).toContain('Flow "flow"');
 		expect(message).not.toContain('Step "c"');
 	});
+
+	describe('default placement', () => {
+		// Only `isolated` is served for p1; the default `main` (os=linux) is guaranteed by a source of another project.
+		const sources = {
+			main: { guarantees: ['os=linux'], projects: ['p2'] },
+			isolated: { guarantees: ['sandbox'], projects: ['p1'] },
+		};
+
+		it('does not ask for the default placement when every step overrides it', () => {
+			const overridden = record({
+				run: ['os=linux'],
+				steps: { a: ['sandbox'], b: ['sandbox'] },
+				placements: { run: 'main', steps: { a: 'isolated', b: 'isolated' } },
+			});
+
+			expect(check(sources).check('flow', 'p1', overridden)).toBeUndefined();
+		});
+
+		it('still asks for it when at least one step uses it', () => {
+			const used = record({
+				run: ['os=linux'],
+				steps: { a: ['sandbox'], b: ['os=linux'] },
+				placements: { run: 'main', steps: { a: 'isolated' } },
+			});
+
+			expect(check(sources).check('flow', 'p1', used)).toContain('requires os=linux');
+		});
+
+		it('is unchanged for a record without placements (old record, or a flow that declares none)', () => {
+			const old = record({ run: ['os=linux'], steps: { a: ['sandbox'], b: ['sandbox'] } });
+
+			expect(check(sources).check('flow', 'p1', old)).toContain('Flow "flow" requires os=linux');
+		});
+	});
 });

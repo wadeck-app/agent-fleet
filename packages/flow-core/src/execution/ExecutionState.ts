@@ -294,6 +294,18 @@ export interface RunRequirementsRecord {
 		steps: Record<string, string>;
 	};
 	/**
+	 * The `placement:` names declared, for display and for the run-start check only: the `run` and `steps` sets above already
+	 * contain their expansion and are what is enforced. `run` is the flow default (what an injected step inherits), `steps`
+	 * the placement each declared step names ITSELF (a step absent from it uses `run`). Absent when no placement was declared
+	 * (and on records written before placements existed).
+	 */
+	placements?: {
+		/** Flow-level default placement. */
+		run?: string;
+		/** Own placement of each declared step that names one. */
+		steps: Record<string, string>;
+	};
+	/**
 	 * Present when the daemon added requirements to model steps that the flow did not write (implicit confinement: a worker
 	 * source guaranteeing the `agent` profile was configured when the run was accepted). The entries are ALREADY in the
 	 * `steps` sets above and are what is enforced; this only says which ones were implicit, so the confinement of a run can be

@@ -57,6 +57,18 @@ export function resolveRunRequirements(
 		flow.profile === undefined && Object.keys(stepProfiles).length === 0
 			? {}
 			: { profiles: { ...(flow.profile === undefined ? {} : { run: flow.profile }), steps: stepProfiles } };
+	const stepPlacements = Object.fromEntries(
+		flow.steps.flatMap(step => (step.placement === undefined ? [] : [[step.id, step.placement] as const]))
+	);
+	const placements =
+		flow.placement === undefined && Object.keys(stepPlacements).length === 0
+			? {}
+			: {
+					placements: {
+						...(flow.placement === undefined ? {} : { run: flow.placement }),
+						steps: stepPlacements,
+					},
+				};
 	// Recorded as soon as the flow has a model step (the only kind that can inject steps), even when every one of them already
 	// requires the set: a step injected later inherits it from this record. A flow without model step records nothing.
 	const implicitRecord =
@@ -64,7 +76,7 @@ export function resolveRunRequirements(
 			? { implicit: { requires: [...new Set(implicit)].sort(), steps: implicitSteps } }
 			: {};
 	const required = run.length > 0 || Object.values(steps).some(entries => entries.length > 0);
-	return required ? { run, steps, ...profiles, ...implicitRecord } : undefined;
+	return required ? { run, steps, ...profiles, ...placements, ...implicitRecord } : undefined;
 }
 
 /** The step type of a model step: the only one the implicit confinement applies to. */

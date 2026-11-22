@@ -136,6 +136,39 @@ describe('stepRecordedRequirementLines', () => {
 	});
 });
 
+describe('placement names', () => {
+	const recorded: RunRequirementsRecord = {
+		run: ['sandbox'],
+		steps: { dflt: ['sandbox'], own: ['os=linux'] },
+		placements: { run: 'main', steps: { own: 'linux' } },
+	};
+
+	it('shows the flow default on the run header', () => {
+		expect(executionRequirementLines(recorded)).toEqual(['Placement: main', 'Requires:  sandbox']);
+	});
+
+	it('shows the step own placement, or the default it inherits, even when its set equals the run set', () => {
+		expect(stepRecordedRequirementLines(recorded, 'own', '  ')).toEqual([
+			'  placement: linux',
+			'  requires: os=linux',
+		]);
+		expect(stepRecordedRequirementLines(recorded, 'dflt', '  ')).toEqual(['  placement: main']);
+	});
+
+	it('shows nothing about placement for an old record without the field, nor for an injected step', () => {
+		const old: RunRequirementsRecord = { run: ['sandbox'], steps: { a: ['sandbox'], b: ['gpu'] } };
+
+		expect(executionRequirementLines(old)).toEqual(['Requires:  sandbox']);
+		expect(stepRecordedRequirementLines(old, 'b', '  ')).toEqual(['  requires: gpu']);
+		expect(stepRecordedRequirementLines(recorded, 'injected', '  ')).toEqual([]);
+	});
+
+	it('shows the names in `flow show <file>` (header and step suffix)', () => {
+		expect(flowRequirementLines(flowOf({ placement: 'main' }))).toEqual(['placement: main']);
+		expect(stepRequirementSuffix(stepOf({ placement: 'linux' }))).toBe('  placement:linux');
+	});
+});
+
 describe('implicit confinement of model steps in the record', () => {
 	const recorded: RunRequirementsRecord = {
 		run: [],
@@ -164,7 +197,10 @@ describe('implicit confinement of model steps in the record', () => {
 	});
 
 	it('prints no header line when the implicit set reached no declared step (output unchanged for such runs)', () => {
-		const untouched: RunRequirementsRecord = { ...recorded, implicit: { requires: recorded.implicit?.requires ?? [], steps: [] } };
+		const untouched: RunRequirementsRecord = {
+			...recorded,
+			implicit: { requires: recorded.implicit?.requires ?? [], steps: [] },
+		};
 
 		expect(executionRequirementLines(untouched)).toEqual([]);
 	});

@@ -22,7 +22,11 @@ describe('resolveRunRequirements - placements', () => {
 		const resolved = resolveRunRequirements(
 			flow({ placements: PLACEMENTS, placement: 'main' }, [script('a'), script('b', { requires: ['x=1'] })])
 		);
-		expect(resolved).toEqual({ run: ['sandbox'], steps: { a: ['sandbox'], b: ['sandbox', 'x=1'] } });
+		expect(resolved).toEqual({
+			run: ['sandbox'],
+			steps: { a: ['sandbox'], b: ['sandbox', 'x=1'] },
+			placements: { run: 'main', steps: {} },
+		});
 	});
 
 	it('a step placement REPLACES the default (the G2 override), flow requires stay added', () => {
@@ -35,6 +39,7 @@ describe('resolveRunRequirements - placements', () => {
 		expect(resolved).toEqual({
 			run: ['fs=confined', 'sandbox'],
 			steps: { a: ['fs=confined', 'sandbox'], b: ['fs=confined', 'os=linux'] },
+			placements: { run: 'main', steps: { b: 'linux' } },
 		});
 	});
 
@@ -42,7 +47,11 @@ describe('resolveRunRequirements - placements', () => {
 		const resolved = resolveRunRequirements(
 			flow({ placements: PLACEMENTS }, [script('a'), script('b', { placement: 'linux' })])
 		);
-		expect(resolved).toEqual({ run: [], steps: { a: [], b: ['os=linux'] } });
+		expect(resolved).toEqual({
+			run: [],
+			steps: { a: [], b: ['os=linux'] },
+			placements: { steps: { b: 'linux' } },
+		});
 	});
 
 	it('an injected step inherits the default placement and nothing else', () => {
@@ -51,6 +60,18 @@ describe('resolveRunRequirements - placements', () => {
 		);
 		expect(requirementsForStep(recorded, 'injected', undefined)).toEqual(['sandbox']);
 		expect(requirementsForStep(recorded, 'a', undefined)).toEqual(['os=linux']);
+	});
+
+	it('records the placement names: the flow default and each step own', () => {
+		const resolved = resolveRunRequirements(
+			flow({ placements: PLACEMENTS, placement: 'main' }, [script('a'), script('b', { placement: 'linux' })])
+		);
+		expect(resolved?.placements).toEqual({ run: 'main', steps: { b: 'linux' } });
+	});
+
+	it('records no placements for a flow that declares none', () => {
+		const resolved = resolveRunRequirements(flow({ requires: ['sandbox'] }, [script('a')]));
+		expect(resolved).not.toHaveProperty('placements');
 	});
 
 	it('fails naming the step when its placement is unknown (guard for a path that skipped the validator)', () => {
