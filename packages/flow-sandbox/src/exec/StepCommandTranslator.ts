@@ -36,6 +36,18 @@ export interface TranslatedCommand {
 
 // Positional arguments only: nothing of the step is spliced into this text.
 const CLEANUP_SCRIPT = 'n=$1; shift; files=("${@:1:n}"); shift "$n"; "$@"; rc=$?; rm -f -- "${files[@]}"; exit $rc';
+const PRE_TOOL_USE_HOOK_EXAMPLE =
+	'hooks.PreToolUse=[{ matcher = "*", hooks = [{ type = "command", command = "node \\"<path>\\" pre", timeout = 30 }] }]';
+/** Groups: the text before the script path, the path (no quote, no backslash: the engine writes forward slashes), the text after it. */
+const PRE_TOOL_USE_HOOK =
+	/^(hooks\.PreToolUse=\[\{ matcher = "\*", hooks = \[\{ type = "command", command = "node \\")([^"\\]+)(\\" pre", timeout = 30 \}\] \}\]$)/;
+
+/** A codex setting under `hooks` (the engine's key is `hooks.<Event>`): the value of `-c`, `hooks` alone or `hooks.*`. */
+function isHooksSetting(argument: string): boolean {
+	const key = argument.slice(0, Math.max(argument.indexOf('='), 0));
+	return key === 'hooks' || key.startsWith('hooks.');
+}
+
 /** Shells a `shell:` spawn option may name (resolved by the VM's own PATH). */
 const SHELLS_IN_VM = new Set(['bash', 'sh']);
 const REFUSED_PROGRAMS = new Map<string, string>([
@@ -55,6 +67,8 @@ const REFUSED_PROGRAMS = new Map<string, string>([
  *   depends on the host: on Windows any `C:\\x` path (a drive letter cannot be a VM path); on a POSIX host a path looks like a
  *   VM path, so only an absolute path under the mounts or under a known host directory (the temp directory, the home
  *   directory: `hostDirectories`) is a host path, and any other absolute path is assumed to be a VM path and passed through;
+ * - the codex setting `-c hooks.PreToolUse=...` names the hook script INSIDE its value: the script is copied into the VM and only the
+ *   path is replaced (any other shape, and any other `hooks.*` setting, is refused);
  * - `cwd` must be inside the two mounts (RunMounts, links rejected);
  * - the environment loses the host-only variables (VmEnvironmentFilter).
  */
@@ -85,7 +99,12 @@ export class StepCommandTranslator {
 		const mcpCallbackPorts: number[] = [];
 		const staged: string[] = [];
 		const args: string[] = [];
-		for (const argument of program.args) {
+		for (const [index, argument] of program.args.entries()) {
+			// The value of a codex `-c hooks.*=...` pair names a host script INSIDE the value: it is not a whole-argument path.
+			if (program.args[index - 1] === '-c' && isHooksSetting(argument)) {
+				args.push(await this.codexHookSetting(request.sandbox, argument, staged));
+				continue;
+			}
 			args.push(await this.argument(request.sandbox, argument, mcpCallbackPorts, staged));
 		}
 		const filtered = this.options.environment.filter(request.env, this.options.declaredEnvironmentNames);
@@ -179,6 +198,45 @@ export class StepCommandTranslator {
 				`argument "${argument}" looks like a host path that is not mounted in the sandbox (the sandbox sees only the run's workspace and .meta). If it is a file, put it under the workspace and pass that path. If it is a literal value, not a file, do not pass it as a command-line argument: write it in the script text, which is never inspected. (${error.message})`
 			);
 		}
+	}
+
+	/**
+	 * `hooks.PreToolUse=[{ matcher = "*", hooks = [{ type = "command", command = "node \"<host path>/hook.cjs\" pre", timeout = 30 }] }]`
+	 * (CodexConfigBuilder.hookOverride; the engine writes the path with forward slashes): the script is copied into the VM and only the path is
+	 * replaced, the rest of the value stays as is. Any other `hooks.*` setting (PostToolUse, SessionStart...) and any value that is not exactly
+	 * this shape is refused: a host path is never passed through and never guessed.
+	 */
+	private async codexHookSetting(sandbox: string, setting: string, staged: string[]): Promise<string> {
+		const key = setting.slice(0, setting.indexOf('='));
+		if (key !== 'hooks.PreToolUse') {
+			throw new SandboxError(
+				'invalid-argument',
+				`The codex setting "${key}" cannot be passed into the sandbox: only deny hooks that act before a tool call are supported on codex steps in a sandbox (hooks.PreToolUse). Remove the log/after hook or run the step on a worker without the "sandbox" label.`
+			);
+		}
+		const match = PRE_TOOL_USE_HOOK.exec(setting);
+		if (match === null) {
+			throw new SandboxError(
+				'invalid-argument',
+				`The codex setting hooks.PreToolUse is not the shape the engine writes (\`${PRE_TOOL_USE_HOOK_EXAMPLE}\`), so the host path of the hook script in it cannot be replaced safely: ${JSON.stringify(setting)}. Run this step on a worker without the "sandbox" label, and report the engine change.`
+			);
+		}
+		const [, before, hostPath, after] = match as unknown as [string, string, string, string];
+		if (!this.options.stager.isStageable(hostPath)) {
+			throw new SandboxError(
+				'path-outside-mounts',
+				`The codex setting hooks.PreToolUse names "${hostPath}", which is not a hook script the engine generates (<temp>/codex-run-<uuid>/hook.cjs), so it is not copied into the sandbox and the hook would not run. Run this step on a worker without the "sandbox" label.`
+			);
+		}
+		const copy = await this.options.stager.stage(sandbox, hostPath);
+		if (copy.kind !== 'codex-hook') {
+			throw new SandboxError(
+				'invalid-argument',
+				`The codex setting hooks.PreToolUse names "${hostPath}", which is staged as a ${copy.kind}, not as a codex hook script.`
+			);
+		}
+		staged.push(copy.vmPath);
+		return `${before}${copy.vmPath}${after}`;
 	}
 
 	/**

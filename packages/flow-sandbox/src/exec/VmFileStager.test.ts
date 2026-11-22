@@ -170,3 +170,100 @@ describe('VmFileStager refusals', () => {
 		);
 	});
 });
+
+describe('VmFileStager codex hook script', () => {
+	const RUN = 'codex-run-3f2b8c1e-9d4a-4b6e-8a1c-0e5d7f9a2b34';
+
+	function writeHook(directory = RUN, name = 'hook.cjs', content = "'use strict';\n"): string {
+		const dir = path.join(hostTemp, directory);
+		fs.mkdirSync(dir, { recursive: true });
+		const file = path.join(dir, name);
+		fs.writeFileSync(file, content);
+		return file;
+	}
+
+	it('stages exactly <temp>/codex-run-<uuid>/hook.cjs, under its own name in /tmp/flow-staged', async () => {
+		const file = writeHook(RUN, 'hook.cjs', "process.stdout.write('deny');\n");
+
+		expect(stager.isStageable(file)).toBe(true);
+		const staged = await stager.stage('box', file);
+
+		expect(staged.kind).toBe('codex-hook');
+		expect(staged.vmPath).toMatch(/^\/tmp\/flow-staged\/[0-9a-f]{16}-hook\.cjs$/);
+		expect(received[0]?.stdin).toBe("process.stdout.write('deny');\n");
+		expect(received[0]?.command.at(-1)).toBe(staged.vmPath);
+	});
+
+	it.each([
+		['another file name in a codex-run directory (hook.log is never copied)', RUN, 'hook.log'],
+		['another extension', RUN, 'hook.js'],
+		['a name that only ends like the hook', RUN, 'other-hook.cjs'],
+		['a directory that is not codex-run-<uuid>', 'codex-run-', 'hook.cjs'],
+		['a directory with a non-uuid suffix', 'codex-run-../x', 'hook.cjs'],
+		['an unrelated directory', 'notes', 'hook.cjs'],
+	])('refuses %s', async (_name, directory, name) => {
+		let file: string;
+		try {
+			file = writeHook(directory, name);
+		} catch {
+			return; // the directory name is not creatable on this machine: nothing to test
+		}
+
+		expect(stager.isStageable(file)).toBe(false);
+		await failure(stager.stage('box', file));
+		expect(received).toHaveLength(0);
+	});
+
+	it('refuses hook.cjs directly in the temp directory, and a codex-run directory nested deeper', async () => {
+		const direct = write('hook.cjs', 'x');
+		const nested = writeHook(path.join('sub', RUN));
+
+		expect(stager.isStageable(direct)).toBe(false);
+		expect(stager.isStageable(nested)).toBe(false);
+	});
+
+	it('refuses a codex-run directory in another location than the temp directory', () => {
+		const elsewhere = path.join(root, 'elsewhere', RUN);
+		fs.mkdirSync(elsewhere, { recursive: true });
+		const file = path.join(elsewhere, 'hook.cjs');
+		fs.writeFileSync(file, 'x');
+
+		expect(stager.isStageable(file)).toBe(false);
+	});
+
+	it('refuses hook.cjs when it is a link', async () => {
+		const target = write('secret.txt', 'host secret');
+		fs.mkdirSync(path.join(hostTemp, RUN));
+		try {
+			fs.symlinkSync(target, path.join(hostTemp, RUN, 'hook.cjs'));
+		} catch {
+			return; // symlinks need a privilege on Windows: nothing to test on this machine
+		}
+
+		const error = await failure(stager.stage('box', path.join(hostTemp, RUN, 'hook.cjs')));
+
+		expect(error.message).toMatch(/link or not a regular file/);
+		expect(received).toHaveLength(0);
+	});
+
+	it('refuses a codex-run directory that is a link', async () => {
+		const real = path.join(root, 'real-dir');
+		fs.mkdirSync(real);
+		fs.writeFileSync(path.join(real, 'hook.cjs'), 'x');
+		try {
+			fs.symlinkSync(real, path.join(hostTemp, RUN), 'junction');
+		} catch {
+			return; // no link possible on this machine: nothing to test
+		}
+
+		expect(stager.isStageable(path.join(hostTemp, RUN, 'hook.cjs'))).toBe(false);
+	});
+
+	it('refuses a hook script above the size limit', async () => {
+		const file = writeHook(RUN, 'hook.cjs', 'x'.repeat(8 * 1024 * 1024 + 1));
+
+		const error = await failure(stager.stage('box', file));
+
+		expect(error.message).toMatch(/above the .* limit/);
+	});
+});

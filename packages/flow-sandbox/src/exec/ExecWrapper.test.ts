@@ -645,6 +645,31 @@ describe('ExecWrapper model tools (claude, codex, opencode)', () => {
 		);
 	});
 
+	it('lets a codex step with a deny hook before a tool call reach the executor, and refuses a log hook BEFORE any sandbox is created, saying what is supported', async () => {
+		await run(
+			modelStep('codex', {
+				toolHooks: [{ timing: 'before', action: { type: 'deny', reason: 'no rm', toolPattern: 'bash' } }],
+			})
+		);
+
+		expect(executorContexts.map(context => context.tool)).toEqual(['codex']);
+		expect(daemon.ofType('step_failed')).toHaveLength(0);
+
+		await run(
+			modelStep('codex', {
+				toolHooks: [
+					{ timing: 'before', action: { type: 'deny', reason: 'no rm' } },
+					{ timing: 'before', action: { type: 'log' } },
+				],
+			})
+		);
+
+		expect(executorContexts).toHaveLength(1);
+		expect(daemon.ofType('step_failed')[0]?.['error']).toMatch(
+			/"ask"[\s\S]*codex[\s\S]*only deny hooks that act before a tool call are supported on codex steps in a sandbox/
+		);
+	});
+
 	it('prepares the sandbox for the tool of the first step and for a later tool when it comes', async () => {
 		const prepared: (string | undefined)[] = [];
 		const ensured: string[] = [];

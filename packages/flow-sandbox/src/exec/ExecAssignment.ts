@@ -116,8 +116,12 @@ export class ExecAssignment {
 	}
 
 	/**
-	 * A codex or opencode step in the sandbox is a plain prompt. The MCP servers and the tool hooks of such a step name host programs and host files
-	 * (the engine writes the hooks as scripts in the host temp directory), which the VM does not have: refused, not half-supported.
+	 * A codex or opencode step in the sandbox is a plain prompt, with one exception: a codex step may carry deny hooks that act before a tool call.
+	 * MCP servers name host programs and host paths, which the VM does not have: refused, not half-supported. So are the tool hooks of opencode.
+	 * For codex the engine writes the hook as a script in the host temp directory (`codex-run-<uuid>/hook.cjs`) and names it in a
+	 * `-c hooks.PreToolUse=...` argument; VmFileStager copies the script into the VM and StepCommandTranslator rewrites the path.
+	 * Only what that script does without the host is accepted: a deny rule before the call (a log rule writes a host file, an after rule needs
+	 * the PostToolUse event). Any other shape is refused, never ignored.
 	 */
 	private static refuseWhatTheToolCannotDo(
 		stepConfig: JsonObject,
@@ -125,15 +129,34 @@ export class ExecAssignment {
 		tool: ModelTool | undefined
 	): void {
 		if (tool === undefined || tool === 'claude') return;
-		for (const field of ['mcpServers', 'toolHooks']) {
-			const value = stepConfig[field];
-			if (Array.isArray(value) && value.length > 0) {
-				throw new SandboxError(
-					'invalid-argument',
-					`Step "${stepId}" is a ${tool} step with "${field}": in a sandbox a ${tool} step is a plain prompt, because ${field === 'mcpServers' ? 'an MCP server names a host program and host paths' : 'a tool hook is a script the engine writes on the host'} that the VM does not have. Remove it, or run the step on a worker without the "sandbox" label.`
-				);
-			}
+		const servers = stepConfig['mcpServers'];
+		if (Array.isArray(servers) && servers.length > 0) {
+			throw new SandboxError(
+				'invalid-argument',
+				`Step "${stepId}" is a ${tool} step with "mcpServers": in a sandbox a ${tool} step is a plain prompt, because an MCP server names a host program and host paths that the VM does not have. Remove it, or run the step on a worker without the "sandbox" label.`
+			);
 		}
+		const hooks = stepConfig['toolHooks'];
+		if (!Array.isArray(hooks) || hooks.length === 0) return;
+		if (tool !== 'codex') {
+			throw new SandboxError(
+				'invalid-argument',
+				`Step "${stepId}" is a ${tool} step with "toolHooks": in a sandbox only a codex step may carry tool hooks (deny hooks before a tool call); a ${tool} hook is a script the engine writes on the host that the VM does not have. Remove it, or run the step on a worker without the "sandbox" label.`
+			);
+		}
+		if (!hooks.every(ExecAssignment.isDenyBeforeHook)) {
+			throw new SandboxError(
+				'invalid-argument',
+				`Step "${stepId}" is a codex step with a "toolHooks" entry the sandbox cannot run: only deny hooks that act before a tool call are supported on codex steps in a sandbox; remove the log/after hook or run the step on a worker without the "sandbox" label.`
+			);
+		}
+	}
+
+	/** The one hook shape the engine turns into a self-contained codex script: `{ timing: 'before', action: { type: 'deny', reason } }` (ToolHook in flow-engine). */
+	private static isDenyBeforeHook(hook: unknown): boolean {
+		if (!isJsonObject(hook) || hook['timing'] !== 'before') return false;
+		const action = hook['action'];
+		return isJsonObject(action) && action['type'] === 'deny' && typeof action['reason'] === 'string';
 	}
 
 	private declaredNames(step: JsonObject): ReadonlySet<string> {

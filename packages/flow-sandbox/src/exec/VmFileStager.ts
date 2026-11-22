@@ -7,7 +7,7 @@ import type { SandboxLog } from '../SandboxLog';
 import type { SandboxRuntime } from '../SandboxRuntime';
 import { McpConfigRewriter } from './McpConfigRewriter';
 
-export type StagedFileKind = 'script' | 'mcp-config' | 'settings';
+export type StagedFileKind = 'script' | 'mcp-config' | 'settings' | 'codex-hook';
 
 export interface StagedFile {
 	/** Path of the copy inside the VM. */
@@ -35,6 +35,10 @@ const KNOWN_PREFIXES: ReadonlyArray<{ prefix: string; kind: StagedFileKind; exte
 	{ prefix: 'claude-settings-', kind: 'settings', extensions: ['.json'] },
 ];
 
+/** The directory the engine makes for a codex step's hook script (directly in the host temp directory) and the one file of it that is copied. */
+const CODEX_RUN_DIRECTORY = /^codex-run-[0-9A-Fa-f][0-9A-Fa-f-]{7,63}$/;
+const CODEX_HOOK_FILE = 'hook.cjs';
+
 const MAX_STAGED_BYTES = 8 * 1024 * 1024;
 
 /**
@@ -44,13 +48,13 @@ const MAX_STAGED_BYTES = 8 * 1024 * 1024;
  * and the argument is replaced.
  *
  * Only files with the names the engine generates (see KNOWN_PREFIXES), directly in the host temp directory, regular
- * files and not links, are staged. Any other host file is refused: a step argument must not be a way to copy an
+ * files and not links, are staged; plus the one hook script of a codex step, `codex-run-<uuid>/hook.cjs` (the directory directly in the host
+ * temp directory and not a link, the file regular and not a link; `hook.log` of that directory is never copied). Any other host file is refused: a step argument must not be a way to copy an
  * arbitrary host file into the VM.
  *
  * Limits: removing the copies is the caller's job (StepCommandTranslator wraps the command so the same `exec` deletes them
- * when the process ends; if the VM is stopped to end the process they stay until the sandbox is removed). `codex` and
- * `opencode` write other temp files (hooks, run directories): refused here, so those tools are not supported by the exec
- * variant yet.
+ * when the process ends; if the VM is stopped to end the process they stay until the sandbox is removed). The other temp files of
+ * `codex` and `opencode` (an opencode run directory, a codex log hook) are refused here.
  */
 export class VmFileStager {
 	private readonly rewriter: McpConfigRewriter;
@@ -71,7 +75,7 @@ export class VmFileStager {
 		if (kind === undefined) {
 			throw new SandboxError(
 				'path-outside-mounts',
-				`The host file "${hostPath}" is not one of the files the engine generates for a step (${KNOWN_PREFIXES.map(known => `${known.prefix}*`).join(', ')} in ${this.options.hostTempDirectory}), so it is not copied into the sandbox. Codex and OpenCode steps are not supported by the exec variant yet.`
+				`The host file "${hostPath}" is not one of the files the engine generates for a step (${[...KNOWN_PREFIXES.map(known => `${known.prefix}*`), `codex-run-<uuid>/${CODEX_HOOK_FILE}`].join(', ')} in ${this.options.hostTempDirectory}), so it is not copied into the sandbox. Of a codex step only the deny-hook script is copied; OpenCode files are not.`
 			);
 		}
 		const content = this.readRegularFile(hostPath);
@@ -106,6 +110,7 @@ export class VmFileStager {
 	private classify(hostPath: string): StagedFileKind | undefined {
 		const flavor = this.options.platform === 'win32' ? path.win32 : path.posix;
 		const name = flavor.basename(hostPath);
+		if (name === CODEX_HOOK_FILE) return this.classifyCodexHook(hostPath, flavor);
 		const known = KNOWN_PREFIXES.find(
 			candidate => name.startsWith(candidate.prefix) && candidate.extensions.includes(flavor.extname(name))
 		);
@@ -113,6 +118,19 @@ export class VmFileStager {
 		const parent = this.canonical(flavor.dirname(hostPath));
 		const expected = this.canonical(this.options.hostTempDirectory);
 		return parent !== undefined && parent === expected ? known.kind : undefined;
+	}
+
+	private classifyCodexHook(hostPath: string, flavor: path.PlatformPath): StagedFileKind | undefined {
+		const directory = flavor.dirname(hostPath);
+		if (!CODEX_RUN_DIRECTORY.test(flavor.basename(directory))) return undefined;
+		const parent = this.canonical(flavor.dirname(directory));
+		if (parent === undefined || parent !== this.canonical(this.options.hostTempDirectory)) return undefined;
+		try {
+			// lstat: a link in place of the directory is refused, not followed.
+			return fs.lstatSync(directory).isDirectory() ? 'codex-hook' : undefined;
+		} catch {
+			return undefined;
+		}
 	}
 
 	private canonical(directory: string): string | undefined {

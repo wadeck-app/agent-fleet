@@ -106,6 +106,48 @@ describe('ExecAssignment model tools (claude, codex, opencode)', () => {
 		}
 	});
 
+	const denyBefore = {
+		timing: 'before',
+		action: { type: 'deny', reason: 'no rm', toolPattern: 'bash', argsContains: 'rm' },
+	};
+
+	it('accepts deny hooks that act before a tool call on a codex step (the engine writes the script, the wrapper copies it into the VM)', () => {
+		expect(assignment.prepare(model({ provider: 'codex', toolHooks: [denyBefore] })).tool).toBe('codex');
+		expect(
+			assignment.prepare(
+				model({
+					provider: 'codex',
+					toolHooks: [denyBefore, { timing: 'before', action: { type: 'deny', reason: 'all' } }],
+				})
+			).tool
+		).toBe('codex');
+	});
+
+	it.each([
+		['a log hook', { timing: 'before', action: { type: 'log' } }],
+		['an after-phase deny hook', { timing: 'after', action: { type: 'deny', reason: 'x' } }],
+		['an after-phase log hook', { timing: 'after', action: { type: 'log' } }],
+		['an unknown action type', { timing: 'before', action: { type: 'rewrite' } }],
+		['an unknown timing', { timing: 'during', action: { type: 'deny', reason: 'x' } }],
+		['a hook without action', { timing: 'before' }],
+		['a hook that is not an object', 'deny'],
+		['a deny hook without a reason', { timing: 'before', action: { type: 'deny' } }],
+	])('refuses %s on a codex step, saying what is supported', (_name, hook) => {
+		const error = refusal(() => assignment.prepare(model({ provider: 'codex', toolHooks: [denyBefore, hook] })));
+
+		expect(error.kind).toBe('invalid-argument');
+		expect(error.message).toContain('"s1"');
+		expect(error.message).toContain(
+			'only deny hooks that act before a tool call are supported on codex steps in a sandbox; remove the log/after hook or run the step on a worker without the "sandbox" label'
+		);
+	});
+
+	it('refuses a deny-before hook on an opencode step (only codex has a hook the wrapper can copy)', () => {
+		const error = refusal(() => assignment.prepare(model({ provider: 'opencode', toolHooks: [denyBefore] })));
+
+		expect(error.message).toMatch(/opencode[\s\S]*toolHooks[\s\S]*Remove it/);
+	});
+
 	// Defence in depth: the daemon never routes hostTools to a sandbox worker (no host-tools feature), this refuses it if one arrives anyway.
 	it.each([
 		{ name: 'a claude step', step: { hostTools: [{ id: 'queue-task-show' }] } },
