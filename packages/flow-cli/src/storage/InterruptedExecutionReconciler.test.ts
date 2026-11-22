@@ -204,6 +204,24 @@ describe('InterruptedExecutionReconciler -- work bound at daemon start', () => {
 			expect(record.lastError).toMatch(/could not be restored: the restart snapshot .*does not exist/);
 			expect(record.lastError).toContain('flow run flows/a.yaml');
 			expect(record.paused).toBeUndefined();
+			// The same reason is on the run (lastError) and on the steps it settled as not run
+			expect(record.steps['s1']?.skippedReason).toBe(`not run (${record.lastError})`);
+			// A missing file: the causes flow pause announced are named as possible ones, not as the one
+			expect(record.lastError).toContain(
+				'is paused without a snapshot (flow pause said so); otherwise the file was deleted'
+			);
+		});
+
+		it('does not claim that flow pause announced anything when the snapshot file exists but is unusable', () => {
+			writePaused('paus0001');
+			fs.writeFileSync(snapshots().fileOf('paus0001'), '{ not json');
+
+			reconciler().reconcile();
+
+			const record = JSON.parse(fs.readFileSync(path.join(dir, 'paus0001.json'), 'utf8')) as ExecutionState;
+			expect(record.lastError).toContain('this is not a limit announced by flow pause');
+			expect(record.lastError).not.toContain('(flow pause said so)');
+			expect(record.lastError).not.toContain('too large');
 		});
 
 		it('fails a paused execution whose snapshot is of an unknown version, and removes the snapshot', () => {

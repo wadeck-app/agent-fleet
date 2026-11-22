@@ -59,6 +59,8 @@ export class WorkerAssignmentSupervisor {
 	 * finished long ago.
 	 */
 	private readonly served = new Map<string, Set<WebSocket>>();
+	/** Set when the daemon starts stopping: the workers that leave from then on leave because of the stop, not because they died. */
+	private daemonStopping = false;
 	/** Callers waiting for some workers to hold nothing of an execution; checked whenever an assignment goes away. */
 	private readonly settleWaiters = new Set<{
 		executionId: string;
@@ -85,6 +87,15 @@ export class WorkerAssignmentSupervisor {
 		private readonly now: () => number = Date.now
 	) {
 		this.stalledSteps = new StalledStepWatch(stalledStepLimitMs);
+	}
+
+	/**
+	 * The daemon is stopping (graceful stop, idle stop, update restart): its workers are about to be closed. A started step of a PAUSED
+	 * run that loses its worker from now on is left as it is, because the restart snapshot of that run is what the next daemon restores
+	 * (the step is re-queued as a new attempt there). Failing it would end the run and delete the snapshot.
+	 */
+	markDaemonStopping(): void {
+		this.daemonStopping = true;
 	}
 
 	/** Records an assignment about to be sent to `worker`, keeping its payload for a possible re-dispatch (D#62). */
@@ -354,6 +365,16 @@ export class WorkerAssignmentSupervisor {
 			const step = this.dispatched.get(assignmentId);
 			this.dispatched.delete(assignmentId);
 			this.toolActivity.delete(assignmentId);
+
+			if (started && this.daemonStopping && this.executions.isPaused(executionId)) {
+				// The restart snapshot of this paused run restores it; the next daemon queues the step again as a new attempt.
+				this.logWriter.writeExecution(
+					executionId,
+					`Step ${stepId} lost its worker because the daemon is stopping; the run is paused, so it is kept and the step is queued again as a new attempt when the daemon restarts (it may already have had an effect).`,
+					'warning'
+				);
+				continue;
+			}
 
 			if (started) {
 				// It may already have changed something: an engine failure, so neither we nor the

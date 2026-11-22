@@ -97,7 +97,7 @@ export class InterruptedExecutionReconciler {
 						this.paused.push(current.executionId);
 						continue;
 					}
-					this.interrupt(current, snapshot.reason);
+					this.interrupt(current, snapshot);
 					reconciled++;
 					continue;
 				}
@@ -168,15 +168,26 @@ export class InterruptedExecutionReconciler {
 		}
 	}
 
+	/**
+	 * What can explain that a paused run has no usable restart snapshot, stated per cause: a missing file has several
+	 * possible origins (two of them announced by `flow pause`), an unusable file is not one of those.
+	 */
+	private causeOfMissingSnapshot(notRestorable: { missing: boolean } | undefined): string {
+		if (notRestorable === undefined || notRestorable.missing) {
+			return 'A run whose workspace provider cannot be taken back, or whose state is too large, is paused without a snapshot (flow pause said so); otherwise the file was deleted, or the daemon stopped before it was written';
+		}
+		return 'The file exists but cannot be used (see above), so it was damaged or changed after it was written, or it comes from another flow version; this is not a limit announced by flow pause';
+	}
+
 	/** @param notRestorable Why a paused run could not be kept (its restart snapshot is missing or unusable). */
-	private interrupt(current: ExecutionState, notRestorable?: string): void {
+	private interrupt(current: ExecutionState, notRestorable?: { missing: boolean; reason: string }): void {
 		const { paused, ...record } = current;
 		// A snapshot of a run that ends here (or one left by a crash before the pause was recorded) is never used again.
 		this.host.pausedSnapshots.remove(current.executionId);
 		const reason =
 			paused === undefined
 				? `interrupted: the daemon restarted while this execution was running; re-run it with flow run ${current.flowFile}`
-				: `interrupted: the daemon restarted while this execution was paused (since ${paused.since}${paused.reason === undefined ? '' : `: ${paused.reason}`}); it could not be restored: ${notRestorable ?? 'no restart snapshot'}. Pausing a run whose workspace provider cannot be taken back, or whose state is too large, does not survive a restart (the pause said so); re-run it with flow run ${current.flowFile}`;
+				: `interrupted: the daemon restarted while this execution was paused (since ${paused.since}${paused.reason === undefined ? '' : `: ${paused.reason}`}); it could not be restored: ${notRestorable?.reason ?? 'no restart snapshot'}. ${this.causeOfMissingSnapshot(notRestorable)}; re-run it with flow run ${current.flowFile}`;
 		const completedAt = new Date().toISOString();
 		const steps = failRunningSteps(current, reason, text => this.host.mask(current.executionId, text));
 		for (const [id, step] of Object.entries(steps)) {

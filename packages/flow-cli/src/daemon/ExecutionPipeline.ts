@@ -241,6 +241,16 @@ export class ExecutionPipeline {
 		);
 	}
 
+	/**
+	 * The daemon starts stopping: from now on a worker that disconnects does not fail the steps of a paused run (see
+	 * {@link WorkerAssignmentSupervisor.markDaemonStopping}), then the workers of the runs in progress are told. Idempotent.
+	 */
+	announceDaemonStop(): Promise<void> {
+		// Before anything is sent or closed, so the disconnects that follow already see it.
+		this.supervisor.markDaemonStopping();
+		return this.runEnd.announceDaemonStop();
+	}
+
 	/** Hands out as many queued steps as current capacity allows; see {@link StepDispatcher.tryDispatch}. */
 	tryDispatch(): void {
 		this.dispatcher.tryDispatch();

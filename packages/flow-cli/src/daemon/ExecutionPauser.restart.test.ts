@@ -248,6 +248,89 @@ describe('a paused run survives a daemon restart', () => {
 		expect(assignmentsOf(newWorker, 's1')).toBe(0);
 	});
 
+	/** The worker confirms it began the step (that is what makes its loss a failure instead of a re-dispatch). */
+	function markStarted(daemon: Daemon, ws: FakeSocket, executionId: string, stepId: string): void {
+		const sent = ws.send.mock.calls
+			.map(call => JSON.parse(String(call[0])) as { type: string; stepId?: string; assignmentId?: string })
+			.find(message => message.type === 'assign' && message.stepId === stepId);
+		if (sent?.assignmentId === undefined) {
+			throw new Error(`no assignment of ${stepId} was written to the worker`);
+		}
+		daemon.messages.handleMessage(ws, {
+			type: 'step_started',
+			assignmentId: sent.assignmentId,
+			executionId,
+			stepId,
+		} as never);
+	}
+
+	/** What `shutDownWorkers` does on a graceful stop, in its order: announce, then the sockets close and the daemon sees each worker leave. */
+	function gracefulStop(daemon: Daemon, workers: FakeSocket[]): void {
+		void daemon.handler.announceDaemonStop();
+		for (const ws of workers) {
+			daemon.handler.handleWorkerDisconnect(ws);
+			daemon.registry.remove(ws);
+		}
+	}
+
+	it('a graceful daemon stop with a step running in a paused run keeps the run and its snapshot: the step is a new attempt after the restart', async () => {
+		const before = boot();
+		const oldWorker = connect(before);
+		const id = await start(before, CHAIN_FLOW);
+		complete(before, oldWorker, id, 's1');
+		markStarted(before, oldWorker, id, 's2');
+		pause(before, id, 'graceful');
+		expect(fs.existsSync(snapshotFile(id))).toBe(true);
+
+		// The workers are closed by the stop: the step is lost with its worker
+		gracefulStop(before, [oldWorker]);
+
+		// Still paused and running in the record, snapshot untouched
+		expect(before.store.read(id)).toMatchObject({ status: 'running', paused: { reason: 'graceful' } });
+		expect(fs.existsSync(snapshotFile(id))).toBe(true);
+
+		const after = await restart(before);
+
+		const restored = after.store.read(id);
+		expect(restored).toMatchObject({ status: 'running', paused: { reason: 'graceful' } });
+		expect(restored.steps['s2']?.status).toBe('pending');
+		expect(restored.steps['s2']?.attemptLog).toMatchObject([
+			{ n: 1, outcome: 'abandoned', endReason: 'worker_lost' },
+		]);
+		const newWorker = connect(after);
+		unpause(after, id);
+		expect(assignmentsOf(newWorker, 's2')).toBe(1);
+		expect(after.store.read(id).steps['s2']).toMatchObject({ status: 'running', attempts: 2 });
+		complete(after, newWorker, id, 's2');
+		complete(after, newWorker, id, 's3');
+		expect(after.store.read(id).status).toBe('completed');
+	});
+
+	it('a graceful daemon stop still fails a run that is NOT paused (it is interrupted, as before)', async () => {
+		const before = boot();
+		const oldWorker = connect(before);
+		const id = await start(before, CHAIN_FLOW);
+		markStarted(before, oldWorker, id, 's1');
+
+		gracefulStop(before, [oldWorker]);
+
+		expect(before.store.read(id).status).toBe('failed');
+		expect(before.store.read(id).steps['s1']?.error).toMatch(/worker running this step disconnected/);
+	});
+
+	it('a worker that dies while its run is paused and the daemon is NOT stopping still fails the step', async () => {
+		const before = boot();
+		const oldWorker = connect(before);
+		const id = await start(before, CHAIN_FLOW);
+		markStarted(before, oldWorker, id, 's1');
+		pause(before, id);
+
+		before.handler.handleWorkerDisconnect(oldWorker);
+
+		expect(before.store.read(id).status).toBe('failed');
+		expect(fs.existsSync(snapshotFile(id))).toBe(false);
+	});
+
 	it('keeps a step that finished while paused: it is not re-run, and the step it released is dispatched once', async () => {
 		const before = boot();
 		const oldWorker = connect(before);

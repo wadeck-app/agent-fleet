@@ -311,7 +311,7 @@ export class CommandHandler {
 
 	/** Tells the workers of every run in progress that the daemon is stopping; see {@link RunEndCoordinator.announceDaemonStop}. */
 	announceDaemonStop(): Promise<void> {
-		return this.pipeline.runEnd.announceDaemonStop();
+		return this.pipeline.announceDaemonStop();
 	}
 
 	/** Called by Daemon when a worker reports step_completed. */
