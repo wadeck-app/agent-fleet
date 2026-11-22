@@ -17,6 +17,17 @@ function parse(argv: string[] = BASE, env: NodeJS.ProcessEnv = ENV) {
 }
 
 describe('HarnessConfigParser', () => {
+	it('reads --profile entries into ProfileAliases (one per tool, repeatable)', () => {
+		expect(parse().profiles.hostProfiles()).toEqual({ claude: 'my-profile' });
+		const several = parse([...BASE, '--profile', 'codex=other', '--profile', 'opencode=third']);
+		expect(several.profiles.hostProfiles()).toEqual({ claude: 'my-profile', codex: 'other', opencode: 'third' });
+	});
+
+	it('refuses a repeated alias and a mix of tool names and other aliases, with the usage', () => {
+		expect(() => parse([...BASE, '--profile', 'claude=other'])).toThrow(/twice[\s\S]*Usage/);
+		expect(() => parse([...BASE, '--profile', 'work=other'])).toThrow(/"work"[\s\S]*Usage/);
+	});
+
 	it('reads the daemon variables and applies the documented defaults', () => {
 		expect(parse()).toMatchObject({
 			daemonUrl: 'ws://127.0.0.1:4101',
@@ -25,8 +36,6 @@ describe('HarnessConfigParser', () => {
 			wrapperId: 'harness',
 			projectIds: ['ab12cd34'],
 			labels: ['sandbox'],
-			profileAlias: 'claude',
-			hostProfile: 'my-profile',
 			region: 'us-east-1',
 			agent: 'claude',
 			image: undefined,

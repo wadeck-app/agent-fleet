@@ -1,4 +1,5 @@
 import { describeError } from '../ErrorText';
+import type { ProfileAliases } from '../ProfileAliases';
 import type { SandboxLog } from '../SandboxLog';
 import { SandboxOptionsParser } from '../SandboxOptionsParser';
 import type { PrerequisiteReport } from '../SbxPrerequisiteCheck';
@@ -31,8 +32,7 @@ export interface PreflightConfig {
 	memory: string;
 	idleStopMinutes: number;
 	maxConcurrentSandboxes: number;
-	profileAlias: string;
-	hostProfile: string;
+	profiles: ProfileAliases;
 	extraAllowedHosts: readonly string[];
 	acceptSshAgentForwarding: boolean;
 }
@@ -54,11 +54,19 @@ export class WrapperPreflight {
 			memory: config.memory,
 			maxConcurrentSandboxes: config.maxConcurrentSandboxes,
 			idleStopMinutes: config.idleStopMinutes,
-			profiles: { [config.profileAlias]: config.hostProfile },
+			profiles: config.profiles.hostProfiles(),
 			extraAllowedHosts: [...config.extraAllowedHosts],
 			...(config.image === undefined ? {} : { image: config.image }),
 			acceptSshAgentForwarding: config.acceptSshAgentForwarding,
 		});
+
+		// A lone alias that is not a tool name applies to every tool: said once, so the person who meant one tool sees it.
+		const shared = config.profiles.sharedAlias();
+		if (shared !== undefined) {
+			log.info(
+				`profiles: the single alias "${shared}" applies to every tool (claude, codex and opencode steps all use it). To give each tool its own profile, name the aliases after the tools: profiles=claude=<host profile>,codex=<host profile>.`
+			);
+		}
 
 		const report = await prerequisites();
 		for (const finding of report.findings) {

@@ -206,7 +206,7 @@ class FlowWorld {
 			'--option',
 			'region=us-east-1',
 			'--option',
-			'profiles=claude=mock-profile',
+			'profiles=claude=mock-profile,codex=mock-profile,opencode=mock-profile',
 			'--option',
 			`sbxPath=${sbxPath}`,
 			'--option',

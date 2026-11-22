@@ -6,6 +6,7 @@ import { CredentialGlueInstaller } from '../CredentialGlueInstaller';
 import { describeError } from '../ErrorText';
 import type { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import type { ModelTool } from '../ModelTool';
+import type { ProfileAliases } from '../ProfileAliases';
 import type { RunMounts } from '../RunMounts';
 import { SandboxCredentialAccess } from '../SandboxCredentialAccess';
 import type { SandboxLog } from '../SandboxLog';
@@ -22,8 +23,8 @@ export interface ExecSandboxPreparerOptions {
 	platform: NodeJS.Platform;
 	/** Host directory for the private secret files; outside every mount. */
 	secretsDirectory: string;
-	/** The profile alias the model steps use (the host profile behind it is the endpoint's `profiles`). */
-	profileAlias: string;
+	/** The alias of each model tool (the host profiles behind them are the endpoint's `profiles`: it must expose all of them). */
+	profiles: ProfileAliases;
 	region: string;
 	extraAllowedHosts?: readonly string[];
 	/** Further environment for CLAUDE model steps, for example `ANTHROPIC_DEFAULT_SONNET_MODEL`. */
@@ -49,7 +50,7 @@ export interface ExecPreparedSandbox {
  * sandbox's own environment, which already carries them (the relay variant needed VmProxyEnvironment only because the flow
  * worker isolates the environment of the model CLI it starts).
  *
- * Per tool (a step's `provider`): claude gets the Bedrock environment (profile alias, region, `CLAUDE_CODE_USE_BEDROCK`, config
+ * Per tool (a step's `provider`): claude gets the Bedrock environment (its profile alias, region, `CLAUDE_CODE_USE_BEDROCK`, config
  * file, store); codex gets `CODEX_HOME` on the mount with a `config.toml` that selects the Bedrock provider (the engine passes
  * the model with `-m`); opencode gets the AWS profile and region and `XDG_DATA_HOME` on the mount. A tool's hosts are opened
  * only when a step of that tool is first served. Script steps get nothing: no credential reaches a script's environment.
@@ -57,8 +58,11 @@ export interface ExecPreparedSandbox {
 export class ExecSandboxPreparer {
 	constructor(private readonly options: ExecSandboxPreparerOptions) {}
 
-	async prepare(sandbox: string, mounts: RunMounts, firstTool: ModelTool = 'claude'): Promise<ExecPreparedSandbox> {
+	async prepare(sandbox: string, mounts: RunMounts, requestedTool?: ModelTool): Promise<ExecPreparedSandbox> {
 		const { options } = this;
+		// A script-first sandbox is prepared for the first tool the source has an alias for; a tool without one fails here, before anything is attached.
+		const firstTool = requestedTool ?? options.profiles.firstTool();
+		options.profiles.aliasFor(firstTool);
 		const rules = new SandboxNetworkRules(options.runtime, options.log);
 		const access = await new SandboxCredentialAccess({
 			runtime: options.runtime,
@@ -70,7 +74,7 @@ export class ExecSandboxPreparer {
 			log: options.log,
 		}).attach({
 			sandbox,
-			aliases: [options.profileAlias],
+			aliases: options.profiles.aliasNames(),
 			region: options.region,
 			tools: [firstTool],
 			...(options.extraAllowedHosts === undefined ? {} : { extraAllowedHosts: options.extraAllowedHosts }),
@@ -80,12 +84,13 @@ export class ExecSandboxPreparer {
 		const environments = new Map<ModelTool, Readonly<Record<string, string>>>();
 		const openHosts = new Set(rules.resourcesFor(this.rulesRequest(sandbox, firstTool)));
 		const prepareTool = (tool: ModelTool): Readonly<Record<string, string>> => {
+			const alias = options.profiles.aliasFor(tool);
 			const store = stores.prepare(tool);
 			switch (tool) {
 				case 'claude':
 					return {
 						...access.env,
-						AWS_PROFILE: options.profileAlias,
+						AWS_PROFILE: alias,
 						CLAUDE_CODE_USE_BEDROCK: '1',
 						...store.env,
 						...(options.modelEnvironment ?? {}),
@@ -94,7 +99,7 @@ export class ExecSandboxPreparer {
 					fs.writeFileSync(
 						path.join(store.hostDirectory, 'config.toml'),
 						CodexBedrockSettings.configToml({
-							profileAlias: options.profileAlias,
+							profileAlias: alias,
 							region: options.region,
 							disablePlugins: true,
 						}),
@@ -102,7 +107,7 @@ export class ExecSandboxPreparer {
 					);
 					return { ...access.env, ...store.env };
 				case 'opencode':
-					return { ...access.env, AWS_PROFILE: options.profileAlias, ...store.env };
+					return { ...access.env, AWS_PROFILE: alias, ...store.env };
 				default:
 					throw new Error(`No environment is defined for model tool "${String(tool)}".`);
 			}
@@ -136,6 +141,8 @@ export class ExecSandboxPreparer {
 		return {
 			ensureTool: async tool => {
 				if (environments.has(tool)) return;
+				// Before any network rule: a tool without an alias must leave the sandbox as it was.
+				options.profiles.aliasFor(tool);
 				const needed = rules
 					.resourcesFor(this.rulesRequest(sandbox, tool))
 					.filter(host => !openHosts.has(host));

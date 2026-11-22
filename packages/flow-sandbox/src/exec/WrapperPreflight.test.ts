@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { ProfileAliases } from '../ProfileAliases';
 import type { PrerequisiteReport } from '../SbxPrerequisiteCheck';
 import { eachRow } from '../testing/EachRow';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
@@ -26,8 +27,7 @@ const CONFIG = {
 	memory: '2g',
 	idleStopMinutes: 5,
 	maxConcurrentSandboxes: 4,
-	profileAlias: 'claude',
-	hostProfile: 'p',
+	profiles: ProfileAliases.parse(['claude=p']),
 	extraAllowedHosts: [] as string[],
 	acceptSshAgentForwarding: false,
 };
@@ -123,6 +123,26 @@ describe('WrapperPreflight (what "flow-sandbox preflight" checks before a worker
 				else await expect(preflight.run(config)).rejects.toThrow(outcome);
 			}
 		));
+
+	it('says once, as info, that a lone alias which is not a tool name applies to every tool', async () => {
+		const log = new RecordingSandboxLog();
+		const preflight = new WrapperPreflight({
+			prerequisites: () => Promise.resolve(OK),
+			templateListing: () => Promise.resolve(LISTING),
+			log,
+		});
+
+		await preflight.run({ ...CONFIG, profiles: ProfileAliases.parse(['work=secret-host']) });
+		await preflight.run({ ...CONFIG, profiles: ProfileAliases.parse(['claude=p', 'codex=q']) });
+
+		const lines = log
+			.text()
+			.split('\n')
+			.filter(line => line.includes('every tool'));
+		expect(lines).toHaveLength(1);
+		expect(lines[0]).toContain('"work"');
+		expect(log.text()).not.toContain('secret-host');
+	});
 
 	it('only warns when the template list itself cannot be read (best effort), saying why', async () => {
 		const log = new RecordingSandboxLog();

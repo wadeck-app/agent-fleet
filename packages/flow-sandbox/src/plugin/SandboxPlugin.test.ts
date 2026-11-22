@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HostEnvironment } from '../HostEnvironment';
 import { ImageReference } from '../ImageReference';
+import { MODEL_TOOLS } from '../ModelTool';
+import { ProfileAliases } from '../ProfileAliases';
 import { SANDBOX_WORKSPACE_KINDS } from '../SandboxableWorkspace';
 import { SANDBOX_GUARANTEES } from '../exec/RequiresGuard';
 import { eachRow } from '../testing/EachRow';
@@ -51,6 +53,7 @@ interface PluginModule {
 	internals: {
 		parseOptions(raw: unknown): Record<string, unknown>;
 		wrapperId(sourceId: string): string;
+		MODEL_TOOL_NAMES: readonly string[];
 		wrapperArguments(parsed: Record<string, unknown>, sourceId: string): string[];
 		setSpawn(implementation: unknown): void;
 	};
@@ -280,9 +283,15 @@ describe('sandbox plugin: options are flat strings and parsed strictly', () => {
 					example: 'profiles=claude=my-sso-profile',
 				},
 				{
-					label: 'two profile aliases (the exec wrapper serves one in v1)',
-					options: { ...GOOD, profiles: 'a=x,b=y' },
-					fragment: 'exactly one',
+					label: 'several profile aliases that are not all tool names',
+					options: { ...GOOD, profiles: 'claude=x,work=y' },
+					fragment: 'must all be tool names',
+					example: 'profiles=claude=my-sso-profile',
+				},
+				{
+					label: 'the same profile alias twice',
+					options: { ...GOOD, profiles: 'claude=x,claude=y' },
+					fragment: 'twice',
 					example: 'profiles=claude=my-sso-profile',
 				},
 				{
@@ -749,6 +758,58 @@ describe('sandbox plugin: dispose', () => {
 
 		await expect(instance.source.obtainWorker(request())).rejects.toThrow('disposed');
 		expect(launches()).toHaveLength(1);
+	});
+});
+
+describe('sandbox plugin: the profiles option', () => {
+	it('turns one entry per tool into one --profile flag per entry, in the order written', async () => {
+		const plugin = await load();
+
+		const argv = plugin.internals.wrapperArguments(
+			plugin.internals.parseOptions({ ...GOOD, profiles: 'claude=a,codex=b=c,opencode=d' }),
+			'sandbox-1'
+		);
+
+		const flags = argv.flatMap((value, index) => (value === '--profile' ? [argv[index + 1]] : []));
+		expect(flags).toEqual(['claude=a', 'codex=b=c', 'opencode=d']);
+	});
+
+	it('keeps a lone alias that is not a tool name (it applies to every tool)', async () => {
+		const plugin = await load();
+
+		expect(() => plugin.internals.parseOptions({ ...GOOD, profiles: 'work=a' })).not.toThrow();
+	});
+
+	it('names the tools of the package, and accepts or refuses a declaration exactly like ProfileAliases (each case)', async () => {
+		const plugin = await load();
+		expect([...plugin.internals.MODEL_TOOL_NAMES]).toEqual([...MODEL_TOOLS]);
+
+		await eachRow(
+			[
+				'claude=a',
+				'work=a',
+				'claude=a,codex=b',
+				'claude=a,codex=b,opencode=c',
+				'claude=a,work=b',
+				'claude=a,claude=b',
+				'codex=a,gemini=b',
+			].map(profiles => ({ profiles })),
+			({ profiles }) => {
+				let accepted = true;
+				try {
+					plugin.internals.parseOptions({ ...GOOD, profiles });
+				} catch {
+					accepted = false;
+				}
+				let packageAccepts = true;
+				try {
+					ProfileAliases.parse(profiles.split(','));
+				} catch {
+					packageAccepts = false;
+				}
+				expect(accepted, profiles).toBe(packageAccepts);
+			}
+		);
 	});
 });
 

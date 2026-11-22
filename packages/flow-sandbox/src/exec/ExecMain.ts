@@ -119,7 +119,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 			source: new AwsCredentialExporter({
 				commandRunner: new EnvironmentCommandRunner(new NodeCommandRunner(), config.awsEnvironment),
 			}),
-			profiles: { [config.profileAlias]: config.hostProfile },
+			profiles: config.profiles.hostProfiles(),
 			log,
 			wallClock: () => new Date(),
 		});
@@ -168,7 +168,7 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 				log,
 				platform: process.platform,
 				secretsDirectory,
-				profileAlias: config.profileAlias,
+				profiles: config.profiles,
 				region: config.region,
 				modelEnvironment: config.modelEnvironment,
 				extraAllowedHosts: config.extraAllowedHosts,

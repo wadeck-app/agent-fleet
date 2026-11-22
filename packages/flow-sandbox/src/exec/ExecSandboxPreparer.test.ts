@@ -7,6 +7,7 @@ import type { AwsProcessCredentials } from '../AwsCredentialExporter';
 import { FakeClock } from '../FakeClock';
 import { FakeSandboxRuntime } from '../FakeSandboxRuntime';
 import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
+import { ProfileAliases } from '../ProfileAliases';
 import { RunMounts } from '../RunMounts';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { ExecSandboxPreparer } from './ExecSandboxPreparer';
@@ -34,7 +35,7 @@ beforeEach(async () => {
 	});
 	endpoint = new HostCredentialEndpoint({
 		source: { export: () => Promise.resolve(DOCUMENT) },
-		profiles: { claude: 'host-profile' },
+		profiles: { claude: 'host-profile', codex: 'host-codex', opencode: 'host-opencode' },
 		log,
 		wallClock: () => new Date(),
 	});
@@ -52,14 +53,19 @@ afterEach(async () => {
 	fs.rmSync(root, { recursive: true, force: true });
 });
 
-function preparer(modelEnvironment: Record<string, string> = {}): ExecSandboxPreparer {
+const ALL_TOOLS = ProfileAliases.parse(['claude=host-profile', 'codex=host-codex', 'opencode=host-opencode']);
+
+function preparer(
+	modelEnvironment: Record<string, string> = {},
+	profiles: ProfileAliases = ALL_TOOLS
+): ExecSandboxPreparer {
 	return new ExecSandboxPreparer({
 		runtime,
 		endpoint,
 		log,
 		platform: process.platform,
 		secretsDirectory: path.join(root, 'secrets'),
-		profileAlias: 'claude',
+		profiles,
 		region: 'us-east-1',
 		modelEnvironment,
 	});
@@ -97,7 +103,7 @@ describe('ExecSandboxPreparer for codex and opencode (plain prompt steps)', () =
 		const config = fs.readFileSync(path.join(root, 'ws.meta', 'sessions', 'codex', 'config.toml'), 'utf8');
 		expect(config).toContain('model_provider = "amazon-bedrock"');
 		expect(config).toMatch(
-			/\[model_providers\.amazon-bedrock\.aws\][\s\S]*profile = "claude"[\s\S]*region = "us-east-1"/
+			/\[model_providers\.amazon-bedrock\.aws\][\s\S]*profile = "codex"[\s\S]*region = "us-east-1"/
 		);
 		expect(config).toMatch(/\[features\][\s\S]*plugins = false/);
 		expect(JSON.stringify(env)).not.toMatch(/ASIAEXAMPLE|example-secret/);
@@ -108,7 +114,7 @@ describe('ExecSandboxPreparer for codex and opencode (plain prompt steps)', () =
 
 		expect([...runtime.state(SANDBOX).networkRules].sort()).toEqual([`localhost:${endpoint.port}`, bedrock].sort());
 		const env = prepared.envFor('model', 'opencode');
-		expect(env).toMatchObject({ AWS_PROFILE: 'claude', AWS_REGION: 'us-east-1' });
+		expect(env).toMatchObject({ AWS_PROFILE: 'opencode', AWS_REGION: 'us-east-1' });
 		expect(env['XDG_DATA_HOME']).toMatch(/sessions\/opencode$/);
 		expect(fs.existsSync(path.join(root, 'ws.meta', 'sessions', 'opencode'))).toBe(true);
 		expect(Object.keys(env).filter(name => /^CLAUDE|^ANTHROPIC/.test(name))).toEqual([]);
@@ -181,5 +187,63 @@ describe('ExecSandboxPreparer', () => {
 		const prepared = await preparer().prepare(SANDBOX, mounts);
 		await prepared.detach();
 		expect(runtime.state(SANDBOX).networkRules.has('bedrock-runtime.us-east-1.amazonaws.com:443')).toBe(false);
+	});
+});
+
+describe('ExecSandboxPreparer with one alias per tool', () => {
+	const claudeOnly = ProfileAliases.parse(['claude=host-profile']);
+	const codexOnly = ProfileAliases.parse(['codex=host-codex']);
+
+	function allCalls(): string {
+		return JSON.stringify(runtime.callsTo('exec').map(call => call.request));
+	}
+
+	it('exposes every alias in the VM config of ONE credential access and gives each tool its own alias', async () => {
+		const prepared = await preparer().prepare(SANDBOX, mounts);
+		await prepared.ensureTool('codex');
+		await prepared.ensureTool('opencode');
+
+		const written = allCalls();
+		expect(written).toContain('[profile claude]');
+		expect(written).toContain('[profile codex]');
+		expect(written).toContain('[profile opencode]');
+		expect(prepared.envFor('model', 'claude')['AWS_PROFILE']).toBe('claude');
+		expect(prepared.envFor('model', 'opencode')['AWS_PROFILE']).toBe('opencode');
+		// Never the host profile names, never a credential.
+		expect(written).not.toMatch(/host-profile|host-codex|host-opencode/);
+		expect(JSON.stringify(prepared.envFor('model', 'codex'))).not.toMatch(/host-codex|ASIAEXAMPLE|example-secret/);
+		expect(fs.readFileSync(path.join(root, 'ws.meta', 'sessions', 'codex', 'config.toml'), 'utf8')).toContain(
+			'profile = "codex"'
+		);
+	});
+
+	it('refuses a codex step on a claude-only source with the fix, before any network rule is added, and does not use the claude alias', async () => {
+		const prepared = await preparer({}, claudeOnly).prepare(SANDBOX, mounts);
+		const rulesBefore = runtime.callsTo('allowNetwork').length;
+
+		await expect(prepared.ensureTool('codex')).rejects.toThrow(
+			'codex step but no codex alias: add codex=<profile> to the profiles option of this source'
+		);
+
+		expect(runtime.callsTo('allowNetwork')).toHaveLength(rulesBefore);
+		expect(() => prepared.envFor('model', 'codex')).toThrow(/not prepared for codex/);
+		expect(fs.existsSync(path.join(root, 'ws.meta', 'sessions', 'codex', 'config.toml'))).toBe(false);
+	});
+
+	it('refuses to prepare for a first tool without an alias, leaving nothing attached', async () => {
+		await expect(preparer({}, claudeOnly).prepare(SANDBOX, mounts, 'opencode')).rejects.toThrow(
+			'opencode step but no opencode alias'
+		);
+
+		expect(runtime.state(SANDBOX).networkRules.size).toBe(0);
+		expect([...runtime.state(SANDBOX).secrets.values()]).toEqual([]);
+	});
+
+	it('prepares a script-first sandbox for the first tool that has an alias, not for claude', async () => {
+		const prepared = await preparer({}, codexOnly).prepare(SANDBOX, mounts);
+
+		expect(runtime.state(SANDBOX).networkRules.has('bedrock-mantle.us-east-1.api.aws:443')).toBe(true);
+		expect(fs.existsSync(path.join(root, 'ws.meta', 'sessions', 'claude'))).toBe(false);
+		expect(prepared.envFor('model', 'codex')['CODEX_HOME']).toMatch(/sessions\/codex$/);
 	});
 });

@@ -4,6 +4,7 @@ import { CredentialGlueInstaller } from '../CredentialGlueInstaller';
 import { describeError } from '../ErrorText';
 import type { HostCredentialEndpoint } from '../HostCredentialEndpoint';
 import { PrivateSecretFile } from '../PrivateSecretFile';
+import type { ProfileAliases } from '../ProfileAliases';
 import type { RunMounts } from '../RunMounts';
 import { SandboxCredentialAccess } from '../SandboxCredentialAccess';
 import type { SandboxLog } from '../SandboxLog';
@@ -25,8 +26,8 @@ export interface CredentialedSandboxPreparerOptions {
 	platform: NodeJS.Platform;
 	/** Host directory for the private secret files; outside every mount. */
 	secretsDirectory: string;
-	/** The profile alias the model steps use (the host profile behind it is the endpoint's `profiles`). */
-	profileAlias: string;
+	/** The aliases (the relay runs claude only: its alias is used; the endpoint's `profiles` must expose all of them). */
+	profiles: ProfileAliases;
 	region: string;
 	/** Extra `host:port` rules for this sandbox. */
 	extraAllowedHosts?: readonly string[];
@@ -51,6 +52,8 @@ export class CredentialedSandboxPreparer implements SandboxPreparer {
 
 	async prepare(sandbox: string, mounts: RunMounts, bridgePort: number): Promise<PreparedSandbox> {
 		const { options } = this;
+		// The relay runs claude only: a source without a claude alias fails here, before anything is attached.
+		const claudeAlias = options.profiles.aliasFor('claude');
 		const access = await new SandboxCredentialAccess({
 			runtime: options.runtime,
 			endpoint: options.endpoint,
@@ -61,7 +64,7 @@ export class CredentialedSandboxPreparer implements SandboxPreparer {
 			log: options.log,
 		}).attach({
 			sandbox,
-			aliases: [options.profileAlias],
+			aliases: options.profiles.aliasNames(),
 			region: options.region,
 			tools: ['claude'],
 			bridgePort,
@@ -124,7 +127,7 @@ export class CredentialedSandboxPreparer implements SandboxPreparer {
 		const modelEnvironment: Record<string, string> = {
 			...proxyEnvironment,
 			...access.env,
-			AWS_PROFILE: options.profileAlias,
+			AWS_PROFILE: claudeAlias,
 			CLAUDE_CODE_USE_BEDROCK: '1',
 			...store.env,
 			...(options.modelEnvironment ?? {}),

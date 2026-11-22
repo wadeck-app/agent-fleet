@@ -7,6 +7,7 @@ import type { AwsProcessCredentials } from '../AwsCredentialExporter';
 import { FakeClock } from '../FakeClock';
 import { FakeSandboxRuntime } from '../FakeSandboxRuntime';
 import { HostCredentialEndpoint } from '../HostCredentialEndpoint';
+import { ProfileAliases } from '../ProfileAliases';
 import { RunMounts } from '../RunMounts';
 import { SandboxError } from '../SandboxError';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
@@ -84,7 +85,7 @@ function preparer(modelEnvironment: Record<string, string> = {}): CredentialedSa
 		log,
 		platform: process.platform,
 		secretsDirectory: secrets,
-		profileAlias: 'claude',
+		profiles: ProfileAliases.parse(['claude=host-profile']),
 		region: 'us-east-1',
 		modelEnvironment,
 	});

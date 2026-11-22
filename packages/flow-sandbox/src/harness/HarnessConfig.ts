@@ -5,6 +5,7 @@ import { HostEnvironment } from '../HostEnvironment';
 import { ImageReference } from '../ImageReference';
 import { NetworkResourceRule } from '../NetworkResourceRule';
 import { PresenceDirectory } from '../PresenceDirectory';
+import { ProfileAliases } from '../ProfileAliases';
 import { RunSandboxName } from '../RunSandboxName';
 import { SandboxError } from '../SandboxError';
 import { MAX_IDLE_STOP_MINUTES, SANDBOX_OPTION_DEFAULTS } from '../SandboxOptionsParser';
@@ -19,8 +20,8 @@ export interface HarnessConfig {
 	projectPaths: string[];
 	/** Labels advertised to the daemon; always contains `sandbox`. */
 	labels: string[];
-	profileAlias: string;
-	hostProfile: string;
+	/** `--profile alias=host profile`, repeatable: the alias of each model tool and the host profile behind it. */
+	profiles: ProfileAliases;
 	region: string;
 	agent: string;
 	image: string | undefined;
@@ -48,7 +49,7 @@ function usage(script: string): string {
 	return [
 		`Usage: node --import tsx packages/flow-sandbox/scripts/${script}`,
 		'  --project-id <id> [--project-id <id> ...]   registry id(s) of the project(s) served (see `project list`)',
-		'  --profile <alias>=<host aws profile>        for example claude=my-sso-profile',
+		'  --profile <alias>=<host aws profile>        for example claude=my-sso-profile; repeat it for one alias per tool (claude=..., codex=..., opencode=...)',
 		'  --region <aws region>                       for example us-east-1',
 		'  [--wrapper-id <1-12 [a-z0-9]>] [--labels a,b] [--image <tag>] [--pull always|missing|never] [--agent <kind>]',
 		'  [--cpus <n>] [--memory <2g>] [--idle-minutes <n>] [--max-sandboxes <n>] [--presence-dir <dir>] [--log-file <file>]',
@@ -108,7 +109,7 @@ export class HarnessConfigParser {
 					'project-id': { type: 'string', multiple: true },
 					'project-path': { type: 'string', multiple: true },
 					labels: { type: 'string' },
-					profile: { type: 'string' },
+					profile: { type: 'string', multiple: true },
 					region: { type: 'string' },
 					agent: { type: 'string' },
 					image: { type: 'string' },
@@ -137,13 +138,16 @@ export class HarnessConfigParser {
 		if (projectIds.length === 0)
 			fail('--project-id is required: the daemon only routes a step to a worker attached to its project.');
 
-		const profile = values['profile'] as string | undefined;
-		const separator = profile?.indexOf('=') ?? -1;
-		if (profile === undefined || separator < 1 || separator === profile.length - 1) {
+		const profileEntries = (values['profile'] as string[] | undefined) ?? [];
+		if (profileEntries.length === 0) {
 			fail('--profile <alias>=<host aws profile> is required, for example --profile claude=my-sso-profile.');
 		}
-		const profileAlias = (profile as string).slice(0, separator);
-		const hostProfile = (profile as string).slice(separator + 1);
+		let profiles: ProfileAliases;
+		try {
+			profiles = ProfileAliases.parse(profileEntries);
+		} catch (error) {
+			return fail(`--profile: ${error instanceof Error ? error.message : String(error)}`);
+		}
 
 		const region = values['region'] as string | undefined;
 		if (region === undefined)
@@ -203,8 +207,7 @@ export class HarnessConfigParser {
 			projectIds,
 			projectPaths: (values['project-path'] as string[] | undefined) ?? [],
 			labels,
-			profileAlias,
-			hostProfile,
+			profiles,
 			region: region as string,
 			agent: (values['agent'] as string | undefined) ?? 'claude',
 			image: image,

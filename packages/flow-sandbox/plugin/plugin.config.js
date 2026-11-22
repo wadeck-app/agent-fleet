@@ -28,7 +28,8 @@ const STDERR_TAIL_CHARACTERS = 4000;
 const EXAMPLES = {
 	projects: 'projects=ab12cd34,ef56ab78 (registry ids, see `flow project list`)',
 	region: 'region=us-east-1',
-	profiles: 'profiles=claude=my-sso-profile',
+	profiles:
+		'profiles=claude=my-sso-profile,codex=my-sso-profile (the alias is the tool name: claude, codex, opencode)',
 	image: 'image=flow-sandbox:m7',
 	pull: 'pull=never',
 	cpus: 'cpus=2',
@@ -39,6 +40,8 @@ const EXAMPLES = {
 	acceptSshAgentForwarding: 'acceptSshAgentForwarding=true',
 	sbxPath: 'sbxPath=C:\\Users\\me\\AppData\\Local\\DockerSandboxes\\bin\\sbx.exe',
 };
+/** The model CLIs a step can run (src/ModelTool.ts: a test keeps the two lists equal). */
+const MODEL_TOOL_NAMES = ['claude', 'codex', 'opencode'];
 const REQUIRED = ['projects', 'region', 'profiles'];
 const MAX_VALUE_LENGTH = 512;
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
@@ -145,6 +148,8 @@ function parseOptions(raw) {
 
 	// alias=host profile; the entry is split at the FIRST "=", so a host profile may contain "=". A comma separates entries,
 	// so a profile name with a comma cannot be written: it is refused, never cut.
+	// The alias is the TOOL NAME (claude, codex, opencode): each tool uses its own. One lone entry whose alias is not a tool name keeps
+	// the older meaning (it applies to every tool). Same rules as src/ProfileAliases.ts (a test keeps them equal).
 	const entries = list('profiles', raw.profiles);
 	const bad = entries.find(entry => entry.indexOf('=') < 1 || entry.endsWith('='));
 	if (bad !== undefined) {
@@ -153,23 +158,34 @@ function parseOptions(raw) {
 			`has the entry "${bad}" which is not alias=profile (a comma separates entries, so a profile name cannot contain one)`
 		);
 	}
-	if (entries.length !== 1) {
+	const profiles = entries.map(entry => ({
+		alias: entry.slice(0, entry.indexOf('=')),
+		hostProfile: entry.slice(entry.indexOf('=') + 1),
+	}));
+	for (const { alias, hostProfile } of profiles) {
+		if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(alias) || /[\0\r\n]/.test(hostProfile)) {
+			throw optionError(
+				'profiles',
+				`has an alias or a profile with characters that are not allowed ("${alias}=${hostProfile}")`
+			);
+		}
+	}
+	const duplicate = profiles.find(
+		(entry, index) => profiles.findIndex(other => other.alias === entry.alias) !== index
+	);
+	if (duplicate !== undefined) {
+		throw optionError('profiles', `names the alias "${duplicate.alias}" twice (one alias per tool)`);
+	}
+	const notTools = profiles.filter(({ alias }) => !MODEL_TOOL_NAMES.includes(alias));
+	if (profiles.length > 1 && notTools.length > 0) {
 		throw optionError(
 			'profiles',
-			'must name exactly one alias in this version (the exec wrapper serves one profile alias)'
+			`has several entries, so the aliases must all be tool names (${MODEL_TOOL_NAMES.join(', ')}) because each tool uses the alias of its own name; "${notTools[0].alias}" is not one. Name the aliases after the tools, or keep one single entry to give every tool the same profile`
 		);
 	}
-	const separator = entries[0].indexOf('=');
-	const profileAlias = entries[0].slice(0, separator);
-	const hostProfile = entries[0].slice(separator + 1);
-	if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(profileAlias) || /[\0\r\n]/.test(hostProfile)) {
-		throw optionError(
-			'profiles',
-			`has an alias or a profile with characters that are not allowed ("${entries[0]}")`
-		);
-	}
+	const profileEntries = profiles.map(({ alias, hostProfile }) => `${alias}=${hostProfile}`);
 
-	const parsed = { projects, region: raw.region, profileAlias, hostProfile, extraAllowedHosts: [] };
+	const parsed = { projects, region: raw.region, profileEntries, extraAllowedHosts: [] };
 	if (raw.image !== undefined) {
 		if (/\s/.test(raw.image)) throw optionError('image', 'must not contain whitespace');
 		if (raw.image.startsWith('-'))
@@ -253,7 +269,8 @@ function wrapperId(sourceId) {
 function wrapperArguments(parsed, sourceId) {
 	const argv = ['--wrapper-id', wrapperId(sourceId)];
 	for (const id of parsed.projects) argv.push('--project-id', id);
-	argv.push('--profile', `${parsed.profileAlias}=${parsed.hostProfile}`, '--region', parsed.region);
+	for (const entry of parsed.profileEntries) argv.push('--profile', entry);
+	argv.push('--region', parsed.region);
 	const pairs = [
 		['--image', parsed.image],
 		['--pull', parsed.pull],
@@ -577,6 +594,7 @@ export const internals = {
 	parseOptions,
 	wrapperId,
 	wrapperArguments,
+	MODEL_TOOL_NAMES,
 	setSpawn(implementation) {
 		spawnProcess = implementation ?? spawn;
 	},
