@@ -146,6 +146,39 @@ describe('FlowConfigLoader.load', () => {
 		});
 	});
 
+	describe.each([
+		['readinessAckSeconds', 3, 1, 60, 61],
+		['readinessAnswerSeconds', 60, 1, 60, 61],
+		['notReadyMaxWaitSeconds', 900, 1, 7200, 7201],
+	])('worker.%s', (key, fallback, min, max, tooHigh) => {
+		it(`defaults to ${String(fallback)} seconds`, () => {
+			const { worker } = FlowConfigLoader.load(path.join(tmpDir, 'nonexistent.yaml'));
+			expect((worker as unknown as Record<string, number>)[key]).toBe(fallback);
+		});
+
+		it(`accepts the bounds ${String(min)} and ${String(max)}`, () => {
+			const low = writeConfig('lo.yaml', `worker:\n  ${key}: ${String(min)}\n`);
+			const high = writeConfig('hi.yaml', `worker:\n  ${key}: ${String(max)}\n`);
+			expect((FlowConfigLoader.load(low).worker as unknown as Record<string, number>)[key]).toBe(min);
+			expect((FlowConfigLoader.load(high).worker as unknown as Record<string, number>)[key]).toBe(max);
+		});
+
+		it.each([0, 0.5, tooHigh, -3])('refuses %s with the allowed range, the file and the default', value => {
+			const file = writeConfig('bad.yaml', `worker:\n  ${key}: ${String(value)}\n`);
+			expect(() => FlowConfigLoader.load(file)).toThrow(
+				new RegExp(
+					`worker\\.${key}.*bad\\.yaml.*between ${String(min)} and ${String(max)}.*default: ${String(fallback)}`,
+					's'
+				)
+			);
+		});
+
+		it('refuses a non-number', () => {
+			const file = writeConfig('bad.yaml', `worker:\n  ${key}: soon\n`);
+			expect(() => FlowConfigLoader.load(file)).toThrow(new RegExp(`worker\\.${key}`));
+		});
+	});
+
 	describe('validation.hostToolsUnderConfinedProfile', () => {
 		it('is absent by default (the accessor then answers warn)', () => {
 			const config = FlowConfigLoader.load(path.join(tmpDir, 'nonexistent.yaml'));
@@ -162,12 +195,15 @@ describe('FlowConfigLoader.load', () => {
 			expect(FlowConfigLoader.load(file).validation.hostToolsUnderConfinedProfile).toBe(value);
 		});
 
-		it.each(['strict', '"Warn"', '3', 'true', '""'])('refuses %s, naming the key, the value and the accepted values', value => {
-			const file = writeConfig('bad.yaml', `validation:\n  hostToolsUnderConfinedProfile: ${value}\n`);
-			expect(() => FlowConfigLoader.load(file)).toThrow(
-				/validation\.hostToolsUnderConfinedProfile.*bad\.yaml.*warn \| error, got /s
-			);
-		});
+		it.each(['strict', '"Warn"', '3', 'true', '""'])(
+			'refuses %s, naming the key, the value and the accepted values',
+			value => {
+				const file = writeConfig('bad.yaml', `validation:\n  hostToolsUnderConfinedProfile: ${value}\n`);
+				expect(() => FlowConfigLoader.load(file)).toThrow(
+					/validation\.hostToolsUnderConfinedProfile.*bad\.yaml.*warn \| error, got /s
+				);
+			}
+		);
 
 		it('refuses an unknown key under validation, listing the accepted keys', () => {
 			const file = writeConfig('bad.yaml', 'validation:\n  hostToolsUnderConfinedProfil: warn\n');

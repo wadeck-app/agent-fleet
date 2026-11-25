@@ -8,6 +8,7 @@ export const FLOW_EVENT_NAMES = [
 	'flow.step.started',
 	'flow.step.completed',
 	'flow.step.failed',
+	'flow.step.deferred',
 ] as const;
 
 export type FlowEventName = (typeof FLOW_EVENT_NAMES)[number];
@@ -21,7 +22,7 @@ export interface FlowEventPayload {
 	flowId: string;
 	/** Step events only. */
 	stepId?: string;
-	status: 'running' | 'completed' | 'failed' | 'paused';
+	status: 'running' | 'completed' | 'failed' | 'paused' | 'deferred';
 	/** Step events only: 1 for the first run of the step, +1 per retry or relaunch. */
 	attempt?: number;
 	startedAt?: string;
@@ -53,8 +54,16 @@ export interface FlowEventPayload {
 	pausedAt?: string;
 	/** Resume events only: when the run was resumed (ISO). */
 	resumedAt?: string;
-	/** Pause events only: first line of the pause reason, truncated; absent when none was given. */
+	/** Pause events: first line of the pause reason, truncated; absent when none was given. Deferred events: the worker's reason code. */
 	reason?: string;
+	/** Deferred events only: human text of the worker (first line, masked, truncated). */
+	message?: string;
+	/** Deferred events only: `ack` (the worker did not acknowledge in time), `answer` (acknowledged, no verdict in time) or `worker` (it said not ready). */
+	phase?: 'ack' | 'answer' | 'worker';
+	/** Deferred events only: seconds until the daemon asks the worker again. */
+	retryAfterSeconds?: number;
+	/** Deferred events only: declared source of the worker that was asked, when known. */
+	workerSource?: string;
 }
 
 export type FlowEventsStatus =

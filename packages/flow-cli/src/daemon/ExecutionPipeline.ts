@@ -138,6 +138,7 @@ export class ExecutionPipeline {
 				wait: new BoundStepWait(workerRouting.boundStepWaitMs, Date.now, () => this.tryDispatch()),
 				contactErrors: workerRouting.contactErrors,
 				declaredGuarantees: workerRouting.declaredGuarantees,
+				...(workerRouting.readiness === undefined ? {} : { readiness: workerRouting.readiness }),
 			}
 		);
 		const workspaces = new ExecutionWorkspaces(
@@ -268,6 +269,7 @@ export class ExecutionPipeline {
 	): void {
 		this.disconnectDetails = describeLostStep;
 		this.runEnd.workerGone(worker);
+		this.dispatcher.workerGone(worker);
 		try {
 			this.supervisor.handleWorkerDisconnect(worker);
 		} finally {

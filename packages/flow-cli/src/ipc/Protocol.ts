@@ -128,6 +128,20 @@ export const WORKER_FEATURE_WORKER_LOGS = 'worker-logs';
  */
 export const WORKER_FEATURE_RUN_HOLD = 'run-hold';
 
+/**
+ * The daemon asks the worker `readiness_request` ("can you take this step now?") BEFORE it assigns the step to it. Only workers
+ * declaring this feature are asked; a worker that does not is always ready and sees no change on the wire.
+ *
+ * Three distinct timers apply, each with its own daemon config key (see WORKERS.md):
+ * - the alive ack: the worker answers `readiness_alive` at once (`worker.readinessAckSeconds`);
+ * - the readiness answer: then `readiness_answer`, `ready` or `not_ready` (`worker.readinessAnswerSeconds`, at most 60);
+ * - the bounded wait of a step kept queued while not ready (`worker.notReadyMaxWaitSeconds`), after which the step fails.
+ *
+ * There is no `readiness_enabled` message (unlike `worker_logs_enabled`/`worker_hold_enabled`): the worker only ever sends in
+ * reply to a question, and only a daemon that knows the feature asks it, so an older daemon is never sent an unknown message.
+ */
+export const WORKER_FEATURE_READINESS = 'readiness';
+
 /** Most characters of one `worker_log` text; the worker splits larger chunks. Far below the frame limit. */
 export const WORKER_LOG_CHUNK_MAX_CHARS = 16 * 1024;
 
@@ -305,7 +319,34 @@ export type DaemonToWorker =
 	 * Answer to a `ready` that declared {@link WORKER_FEATURE_RUN_HOLD}, sent once per connection: from now on the worker may
 	 * send `worker_hold`. Never sent to a worker that did not declare the feature.
 	 */
-	| { type: 'worker_hold_enabled' };
+	| { type: 'worker_hold_enabled' }
+	/**
+	 * "Can you take this step now?" Sent only to a worker declaring {@link WORKER_FEATURE_READINESS}, before the step is assigned.
+	 * The worker answers `readiness_alive` at once, then `readiness_answer`. Nothing is reserved on the worker side: the worker
+	 * is simply not handed another step until the exchange ends.
+	 */
+	| {
+			type: 'readiness_request';
+			/** Correlates `readiness_alive` and `readiness_answer` with this question; echo it. */
+			requestId: string;
+			executionId: string;
+			stepId: string;
+			/** The model provider of the step; absent for a script or user_intervention step, so the worker checks only what the step uses. */
+			tool?: 'claude' | 'codex' | 'opencode';
+	  };
+
+/** What a worker answers to a `readiness_request` once it has acknowledged it. */
+export type ReadinessAnswer =
+	| { result: 'ready' }
+	| {
+			result: 'not_ready';
+			/** Short kebab-case code chosen by the worker (e.g. `sso-expired`); the daemon does not enumerate codes. */
+			reason: string;
+			/** Human text, shown verbatim (secret-masked) in the execution log, the event and the final failure. */
+			message: string;
+			/** Seconds before the daemon asks again (clamped to 5 s .. `worker.notReadyMaxWaitSeconds`). */
+			retryAfter: number;
+	  };
 
 /**
  * A relay that supplies workers, connected to the daemon (D#17, D#19).
@@ -550,7 +591,14 @@ export type WorkerToDaemon =
 	 * {@link WORKER_FEATURE_RUN_HOLD}, the daemon ignores it with a log line. Not bound to an assignment: it concerns the worker.
 	 * Send it before the `ready` that follows the step. The hold survives later `ready` messages until a `null`.
 	 */
-	| { type: 'worker_hold'; executionId: string | null };
+	| { type: 'worker_hold'; executionId: string | null }
+	/** Phase 1 of the answer to `readiness_request`: the worker is alive and checking. Sent at once, before any check. */
+	| { type: 'readiness_alive'; requestId: string }
+	/**
+	 * Phase 2: the verdict. Accepted without a preceding `readiness_alive` only when it arrives within the ack deadline; a
+	 * verdict after its deadline, or for an ask the daemon gave up on, is ignored.
+	 */
+	| ({ type: 'readiness_answer'; requestId: string } & ReadinessAnswer);
 
 /**
  * A worker-to-daemon message about the step currently being executed, before its

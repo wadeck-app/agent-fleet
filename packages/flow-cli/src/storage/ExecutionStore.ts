@@ -8,7 +8,7 @@ import { ExecutionMasks } from '../secrets/ExecutionMasks';
 import { AtomicRecordWriter } from './AtomicRecordWriter';
 import { AttemptLedger } from './AttemptLedger';
 import { ExecutionPruner } from './ExecutionPruner';
-import type { ExecutionTransition, ExecutionTransitionListener } from './ExecutionTransition';
+import type { ExecutionTransition, ExecutionTransitionListener, StepDeferral } from './ExecutionTransition';
 import { InterruptedExecutionReconciler } from './InterruptedExecutionReconciler';
 import { PausedRunSnapshotStore } from './PausedRunSnapshotStore';
 import { failRunningSteps } from './RunningStepsFailer';
@@ -185,6 +185,14 @@ export class ExecutionStore {
 		}
 		this.notify({ kind: 'step-started', state: written, stepId });
 		return state;
+	}
+
+	/**
+	 * Announces that a queued step is kept back by a worker that is not ready (`flow.step.deferred`). Writes nothing: the step
+	 * is still queued, so its record does not change.
+	 */
+	notifyStepDeferred(executionId: string, stepId: string, deferral: StepDeferral): void {
+		this.notify({ kind: 'step-deferred', state: this.read(executionId), stepId, deferral });
 	}
 
 	markStepCompleted(executionId: string, stepId: string, meta?: StepMeta, result?: StepResultIo): ExecutionState {

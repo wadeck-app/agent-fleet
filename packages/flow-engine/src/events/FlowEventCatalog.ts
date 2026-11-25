@@ -108,14 +108,34 @@ const PROPERTIES = {
 		type: 'string',
 		maxLength: 200,
 		description:
-			'Pause events only: first line of the text given to `flow pause --reason` (secret-masked), at most 200 characters; absent when none was given',
+			'Pause events: first line of the text given to `flow pause --reason` (secret-masked), at most 200 characters; absent when none was given. Deferred events: the reason code chosen by the worker (e.g. sso-expired) or by the daemon (worker-unresponsive, no-readiness-answer-in-time)',
+	},
+	message: {
+		type: 'string',
+		maxLength: 200,
+		description:
+			'Deferred events only: first line of the worker human text (secret-masked), at most 200 characters; the same text is in the execution log and in the final failure',
+	},
+	phase: {
+		enum: ['ack', 'answer', 'worker'],
+		description:
+			'Deferred events only: which part of the readiness question produced it: ack = no readiness_alive within worker.readinessAckSeconds, answer = acknowledged but no verdict within worker.readinessAnswerSeconds, worker = the worker itself said not_ready. Unrelated to worker.notReadyMaxWaitSeconds, the bound of the whole wait',
+	},
+	retryAfterSeconds: {
+		type: 'integer',
+		minimum: 1,
+		description: 'Deferred events only: seconds until the daemon asks the worker again',
+	},
+	workerSource: {
+		type: 'string',
+		description: 'Deferred events only: declared source of the worker that was asked, when known',
 	},
 } as const;
 
 type PropertyName = keyof typeof PROPERTIES;
 
 function payloadSchema(
-	status: 'running' | 'completed' | 'failed' | 'paused',
+	status: 'running' | 'completed' | 'failed' | 'paused' | 'deferred',
 	required: PropertyName[],
 	optional: PropertyName[]
 ): Record<string, unknown> {
@@ -124,7 +144,7 @@ function payloadSchema(
 		type: 'object',
 		properties: {
 			...Object.fromEntries(names.map(name => [name, PROPERTIES[name]])),
-			status: { enum: [status], description: '`running`, `paused`, `completed` or `failed`' },
+			status: { enum: [status], description: '`running`, `paused`, `deferred`, `completed` or `failed`' },
 		},
 		required: [...required, 'status'],
 		additionalProperties: false,
@@ -350,5 +370,32 @@ export const FLOW_EVENT_CATALOG: readonly FlowEventDefinition[] = [
 		correlationKey: STEP_KEY,
 		terminal: false,
 		outcome: 'failure',
+	},
+	{
+		name: 'flow.step.deferred',
+		description:
+			'A queued step is kept back because the worker it was to go to is not ready (only workers declaring `readiness` are asked). Fires once when the step first gets deferred, and again only if the reason changes, not on every re-ask. The step stays queued and fails after worker.notReadyMaxWaitSeconds (flow.step.failed). Continues on flow.step.started.',
+		schema: payloadSchema(
+			'deferred',
+			['executionId', 'flowId', 'stepId', 'attempt', 'reason', 'phase', 'retryAfterSeconds'],
+			['message', 'workerSource', 'projectRoot', 'projectId']
+		),
+		example: {
+			executionId: 'exec-1a2b3c',
+			flowId: 'review-pr',
+			stepId: 'build',
+			status: 'deferred',
+			attempt: 1,
+			reason: 'sso-expired',
+			message: 'The cloud SSO session expired; run the login on the worker host',
+			phase: 'worker',
+			retryAfterSeconds: 30,
+			workerSource: 'sandbox',
+			projectRoot: PROJECT,
+			projectId: PROJECT_ID,
+		},
+		correlationKey: STEP_KEY,
+		terminal: false,
+		outcome: 'info',
 	},
 ];

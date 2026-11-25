@@ -134,6 +134,13 @@ async function handleMessage(message: DaemonToWorker): Promise<void> {
 		case 'done':
 			ws.close();
 			break;
+		case 'readiness_request':
+			// Only sent to a worker declaring `readiness`, which this one never does: reaching it is a daemon bug, and not
+			// answering is right -- it did not claim to take part.
+			process.stderr.write(
+				`[worker] ignoring readiness_request for ${message.executionId}/${message.stepId}: this worker does not declare readiness\n`
+			);
+			break;
 		case 'worker_hold_enabled':
 			// Only sent to a worker declaring `run-hold`, which this one never does: nothing to do.
 			break;

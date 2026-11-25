@@ -2,6 +2,7 @@ import type { DeclaredGuarantees } from './DeclaredGuarantees.js';
 import { type RequirementWaitRequest, describeRequirementFailure } from './RequirementWaitFailure.js';
 import { RetryBackoff } from './RetryBackoff.js';
 import type { SourceContactErrors } from './SourceContactErrors.js';
+import type { ReadinessSettings } from './WorkerReadiness.js';
 import type { WorkerTypeCatalog } from './WorkerTypeCatalog.js';
 
 /** What the dispatcher needs to place the steps of a run, and to say why a step with requirements could not be placed. */
@@ -18,6 +19,8 @@ export interface BoundStepRouting {
 	 */
 	declaredGuarantees?: Pick<DeclaredGuarantees, 'entries' | 'providersOfAll' | 'shortfalls' | 'unread'> &
 		Partial<Pick<DeclaredGuarantees, 'workspacesOf' | 'acceptsWorkspace'>>;
+	/** The timers of the optional readiness question (`worker.readiness*`, `worker.notReadyMaxWaitSeconds`). Absent: the defaults. */
+	readiness?: ReadinessSettings;
 }
 
 /** What the daemon needs to route steps with requirements: where guarantees come from, and how long a missing worker is waited for. */
@@ -26,6 +29,8 @@ export interface WorkerTypeRouting {
 	workerTypes: Pick<WorkerTypeCatalog, 'requirementOnlyLookup'> & Partial<Pick<WorkerTypeCatalog, 'guaranteeLookup'>>;
 	/** `worker.boundStepWaitSeconds`, in milliseconds. */
 	boundStepWaitMs: number;
+	/** The timers of the optional readiness question; absent: the defaults. */
+	readiness?: ReadinessSettings;
 	/** Where the last contact error of each source is kept, to say why no worker came. */
 	contactErrors: Pick<SourceContactErrors, 'sinceFor'>;
 	/** What the declared sources may provide: read at run start (which requirements exist) and at dispatch. */

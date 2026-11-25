@@ -11,7 +11,7 @@ const MAX_SCHEMA_BYTES = 64 * 1024;
 const MAX_EXAMPLE_BYTES = 16 * 1024;
 
 describe('FLOW_EVENT_CATALOG', () => {
-	it('declares the eight lifecycle events under the "flow" source, names unique', () => {
+	it('declares the nine lifecycle events under the "flow" source, names unique', () => {
 		expect(FLOW_EVENT_SOURCE).toBe('flow');
 		const names = FLOW_EVENT_CATALOG.map(event => event.name);
 		expect(names).toEqual([
@@ -23,6 +23,7 @@ describe('FLOW_EVENT_CATALOG', () => {
 			'flow.step.started',
 			'flow.step.completed',
 			'flow.step.failed',
+			'flow.step.deferred',
 		]);
 		expect(new Set(names).size).toBe(names.length);
 		expect(FLOW_EVENT_CATALOG.length).toBeLessThanOrEqual(MAX_EVENTS);

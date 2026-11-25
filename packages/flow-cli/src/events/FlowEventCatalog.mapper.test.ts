@@ -44,6 +44,13 @@ describe('flow event catalog vs what the mapper publishes', () => {
 	it('accepts the payload of every transition, retries and long errors included', () => {
 		store.markExecutionPaused(EXEC_ID, 'budget exceeded\nsecond line');
 		store.markExecutionUnpaused(EXEC_ID);
+		store.notifyStepDeferred(EXEC_ID, 'a', {
+			reason: 'sso-expired',
+			message: `the SSO session expired\nsecond line ${'y'.repeat(400)}`,
+			phase: 'worker',
+			retryAfterSeconds: 30,
+			workerSource: 'sandbox',
+		});
 		store.markStepRunning(EXEC_ID, 'a');
 		store.markStepFailed(EXEC_ID, 'a', `first line ${'x'.repeat(400)}\nsecond line`);
 		store.markStepRunning(EXEC_ID, 'a');

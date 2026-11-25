@@ -5,6 +5,7 @@ import type { WebSocket } from 'ws';
 
 import { WORKER_FEATURE_SECRETS, WORKER_FEATURE_SUB_STEP_SESSION_RESUME } from '../ipc/Protocol';
 import type { ExecutionStore } from '../storage/ExecutionStore';
+import type { StepDeferral } from '../storage/ExecutionTransition';
 import type { LogWriter } from '../storage/LogWriter';
 import type { BoundStepRouting } from './BoundStepWait.js';
 import type { DaemonSecrets } from './DaemonSecrets.js';
@@ -21,6 +22,13 @@ import { StepPlacementBuilder } from './StepPlacementBuilder.js';
 import { StepRouter } from './StepRouter.js';
 import type { UnmetDemandCoverage } from './UnmetDemandCoverage.js';
 import type { WorkerAssignmentSupervisor } from './WorkerAssignmentSupervisor.js';
+import {
+	DEFAULT_READINESS_SETTINGS,
+	type DeferralReport,
+	type ReadinessMessageOutcome,
+	WorkerReadiness,
+	keyOfStep,
+} from './WorkerReadiness.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 import type { GuaranteeLookup, RequirementOnlyLookup } from './WorkerTypeCatalog.js';
 
@@ -44,6 +52,8 @@ export class StepDispatcher {
 	private readonly workerAffinity = new RunWorkerAffinity();
 	/** When each interactive step started waiting, so an S9 policy can bound its own wait */
 	private readonly interactiveWaitSince = new Map<string, number>();
+	/** The optional "are you ready?" question asked of a worker before a step is assigned to it */
+	private readonly readiness: WorkerReadiness;
 
 	/**
 	 * @param failStep Fails a step the daemon itself decided cannot proceed.
@@ -74,15 +84,38 @@ export class StepDispatcher {
 			routing.declaredGuarantees === undefined
 				? undefined
 				: new RequirementShortage(this.router, routing.declaredGuarantees, routing.wait, routing.contactErrors);
+		this.readiness = new WorkerReadiness(
+			registry,
+			routing.readiness ?? DEFAULT_READINESS_SETTINGS,
+			() => this.tryDispatch(),
+			report => this.reportDeferred(report)
+		);
 	}
 
-	/** Drops the timers of the steps waiting for a worker that meets their requirements, for the daemon stop. */
+	/** Drops the timers of the steps waiting for a worker that meets their requirements or that is ready, for the daemon stop. */
 	stop(): void {
 		this.routing.wait.stop();
+		this.readiness.stop();
+	}
+
+	/** Cancels the readiness question open on a worker that disconnected, and forgets its verdict and retry times. */
+	workerGone(worker: WebSocket): void {
+		this.readiness.workerGone(worker);
+	}
+
+	/** `readiness_alive` from a worker; see {@link WorkerReadiness.handleAlive}. */
+	onReadinessAlive(worker: WebSocket, requestId: string): ReadinessMessageOutcome {
+		return this.readiness.handleAlive(worker, requestId);
+	}
+
+	/** `readiness_answer` from a worker; see {@link WorkerReadiness.handleAnswer}. */
+	onReadinessAnswer(worker: WebSocket, requestId: string, answer: unknown): ReadinessMessageOutcome {
+		return this.readiness.handleAnswer(worker, requestId, answer);
 	}
 
 	/** Forgets the waits of an execution that is over. */
 	forgetExecution(executionId: string): void {
+		this.readiness.forgetExecution(executionId);
 		this.routing.wait.forgetExecution(executionId);
 		this.lookups.forgetExecution(executionId);
 		this.workerAffinity.forgetExecution(executionId);
@@ -116,6 +149,7 @@ export class StepDispatcher {
 
 		while (this.queue.length > 0) {
 			const step = this.queue.shift()!;
+			const stepKey = keyOfStep(step);
 
 			// Purging happens once, when the run fails; a step re-queued later (a worker lost
 			// after the cleanup) must not be handed out for an execution that no longer exists.
@@ -125,13 +159,25 @@ export class StepDispatcher {
 					`Step ${step.stepId} dropped from the queue: its execution is already over`,
 					'info'
 				);
+				this.readiness.clearStep(stepKey);
 				continue;
 			}
 
 			// `flow pause`: the step keeps its place in the queue, untouched and not counted as demand (no worker is asked for
-			// it, no requirement wait starts); `flow unpause` dispatches again, so nothing is lost or handed out twice.
+			// it, no requirement wait starts); `flow unpause` dispatches again, so nothing is lost or handed out twice. A
+			// readiness question or deferral of the step is dropped: the pause does not count in its bounded wait.
 			if (this.executions.isPaused(step.executionContext.executionId)) {
+				this.readiness.clearStep(stepKey);
 				unplaced.push(step);
+				continue;
+			}
+
+			// The step stayed queued for the whole bounded wait of a worker that is not ready: it fails, with the last reason.
+			const notReadyFailure = this.readiness.expiredFailure(step, text =>
+				this.daemonSecrets.masks.mask(step.executionContext.executionId, text)
+			);
+			if (notReadyFailure !== undefined) {
+				this.failStep(step.executionContext.executionId, step.stepId, notReadyFailure);
 				continue;
 			}
 
@@ -158,10 +204,19 @@ export class StepDispatcher {
 			const needsHostTools = HostToolRouting.isRequiredBy(step);
 			// Before the router, so no routing plugin can widen the set: a worker held by another run is not offered, the
 			// step waits for it like for a busy one (see RequirementShortage for a step with requirements).
+			// A worker with an open readiness question, or holding the `ready` of another step, is not offered either; one that
+			// said not ready to this step is not offered before its retry time. A worker that said `ready` to this step is
+			// the only one offered to it, so the assignment goes where the answer came from.
+			const verdictWorker = this.readiness.verdictWorkerOf(stepKey);
 			const offerable = this.registry
 				.listIdle()
 				.filter(
 					({ worker }) => worker.heldBy === undefined || worker.heldBy === step.executionContext.executionId
+				)
+				.filter(({ ws }) =>
+					verdictWorker === undefined
+						? !this.readiness.isReserved(ws, stepKey) && !this.readiness.isBlocked(ws, stepKey)
+						: ws === verdictWorker
 				);
 			const idle = needsHostTools ? HostToolRouting.capable(offerable) : offerable;
 			const idleWorker = this.router.select(
@@ -171,6 +226,12 @@ export class StepDispatcher {
 				guarantees,
 				this.workerAffinity.preferredWorkerOf(step.executionContext.executionId)
 			);
+			// No worker is free for it, but one is being asked about it or said not ready until later: the step waits for
+			// that. It is neither unmet demand (no worker is provisioned for it) nor a requirement shortage.
+			if (idleWorker === undefined && this.readiness.isHeld(stepKey)) {
+				unplaced.push(step);
+				continue;
+			}
 			if (idleWorker === undefined && needsHostTools) {
 				const refusal = this.hostToolRouting.refusal(
 					step,
@@ -200,6 +261,13 @@ export class StepDispatcher {
 				if (placement.requires !== undefined) {
 					this.routing.wait.clearRequirement(step.executionContext.executionId, step.stepId);
 				}
+				// A worker taking part in readiness is asked first: the step stays queued until it says `ready`.
+				if (this.readiness.consult(idleWorker, step, this.toolOf(step)) === 'wait') {
+					unplaced.push(step);
+					continue;
+				}
+				// Handed out: its other questions, verdicts and deferral are over.
+				this.readiness.clearStep(stepKey);
 				this.dispatchTo(idleWorker, step, placement.requires);
 			} else {
 				if (requirementOnly !== undefined) {
@@ -215,8 +283,31 @@ export class StepDispatcher {
 			}
 		}
 
+		// A `ready` this pass did not use (step paused, over, or no longer routable to that worker) must not hold its worker.
+		this.readiness.endPass();
 		this.queue.unshift(...unplaced);
 		this.demand.cover(unplacedForHost, waitingForSources);
+	}
+
+	/** The model provider a step uses, for the readiness question; absent for a script or user_intervention step. */
+	private toolOf(step: ReadyStep): 'claude' | 'codex' | 'opencode' | undefined {
+		return step.stepConfig.type === 'model' ? (step.stepConfig.provider ?? 'claude') : undefined;
+	}
+
+	/** Says, in the execution log and as one `flow.step.deferred` event, that a worker is not ready for a queued step. */
+	private reportDeferred({ executionId, stepId, workerId, deferral, maxWaitSeconds }: DeferralReport): void {
+		const mask = (text: string): string => this.daemonSecrets.masks.mask(executionId, text);
+		const masked: StepDeferral = { ...deferral, reason: mask(deferral.reason), message: mask(deferral.message) };
+		const who =
+			deferral.phase === 'worker'
+				? `worker ${workerId} said not ready`
+				: `worker ${workerId} did not answer the readiness question (${deferral.phase === 'ack' ? 'alive ack' : 'readiness answer'} deadline)`;
+		this.logWriter.writeExecution(
+			executionId,
+			`Step ${stepId} stays queued: ${who}: ${masked.reason} -- ${masked.message}. Asking again in ${String(deferral.retryAfterSeconds)}s; the step fails after ${String(maxWaitSeconds)}s of waiting (worker.notReadyMaxWaitSeconds).`,
+			'warning'
+		);
+		this.executionStore.notifyStepDeferred(executionId, stepId, masked);
 	}
 
 	private dispatchTo(idleWorker: WebSocket, step: ReadyStep, requires: string[] | undefined): void {

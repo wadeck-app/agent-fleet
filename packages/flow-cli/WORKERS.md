@@ -301,6 +301,48 @@ create is closed right after it and cannot ack.
 Only a daemon-forked worker gets more than that, because only there does the daemon own the process:
 a forked pid that never connects is killed after 10s, and its exit is noticed.
 
+## Asking a worker if it is ready (`readiness`)
+
+Optional. A worker that declares `readiness` in `ready.features` is asked, BEFORE a step is assigned to it, whether it can take the step. A worker that does not declare it is always ready and sees no change. There is no `readiness_enabled` message: the worker only ever replies to a question.
+
+Daemon to worker:
+
+```json
+{
+	"type": "readiness_request",
+	"requestId": "<uuid>",
+	"executionId": "...",
+	"stepId": "...",
+	"tool": "claude|codex|opencode"
+}
+```
+
+`tool` is absent for a script or `user_intervention` step: check only what the step uses.
+
+Worker to daemon, two phases, same `requestId`:
+
+```json
+{ "type": "readiness_alive", "requestId": "<uuid>" }
+{ "type": "readiness_answer", "requestId": "<uuid>", "result": "ready" }
+{ "type": "readiness_answer", "requestId": "<uuid>", "result": "not_ready", "reason": "sso-expired", "message": "Cloud SSO session expired; run the login on this host", "retryAfter": 30 }
+```
+
+- `readiness_alive` at once, before any check. `reason` is a short kebab-case code you choose (the daemon does not enumerate codes). `message` is shown verbatim (secret-masked) in the execution log, the `flow.step.deferred` event and the final failure.
+- Answer `not_ready` immediately; never block until the step would fail. The daemon asks again after `retryAfter` seconds (clamped to 5 s .. `notReadyMaxWaitSeconds`; missing or invalid = 30 s).
+- A malformed answer counts as `not_ready` (`invalid-readiness-answer`), never as `ready`. An answer arriving after its deadline, or for a question the daemon dropped (the step went to another worker), is ignored (logged once per connection).
+- While a question is open the worker is not given another step. Other idle workers may take the step meanwhile; then the question is dropped.
+- A `ready` is a one-shot offer: the daemon assigns the step in the same pass. A worker that is already ready sends `alive` and `ready` back to back.
+
+Three distinct timers (daemon `config.yml`, section `worker`):
+
+| Key                      | Default | Meaning                                                                                                                                                             |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `readinessAckSeconds`    | `3`     | 1 to 60. Time to send `readiness_alive`. Missed: `not_ready`, reason `worker-unresponsive` (event `phase: ack`). A verdict without ack is accepted within this time |
+| `readinessAnswerSeconds` | `60`    | 1 to 60 (hard cap). Time from the ack to the verdict. Missed: `not_ready`, reason `no-readiness-answer-in-time` (`phase: answer`)                                   |
+| `notReadyMaxWaitSeconds` | `900`   | 1 to 7200. How long a step stays queued while not ready, counted from its first deferral. Then it FAILS with the last reason                                        |
+
+A not-ready worker is skipped for that step until its retry time; other workers may take it. `flow.step.deferred` (see `flow docs` section 9) fires once per step and again only when the reason changes; `phase` is `ack`, `answer` or `worker` (the worker itself said not ready).
+
 ## Host tools (`host-tools`)
 
 A step with `hostTools` (see `.claude/docs/flows/host-tools.md`) goes only to a worker that declares the `host-tools` feature: every local worker (`flow worker`, daemon-forked) does, a sandbox worker does not in this version. When every worker that would otherwise take the step lacks it, the step fails at once, not after the bound-step wait:

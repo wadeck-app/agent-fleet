@@ -26,6 +26,7 @@ import type { RunProject } from './RunProjectResolver.js';
 import { DEFAULT_MAX_INJECTED_STEPS, DEFAULT_MAX_STEPS_PER_EXECUTION } from './StepInjection.js';
 import { DEFAULT_STEP_SILENCE_LIMIT_MS } from './WorkerAssignmentSupervisor.js';
 import type { WorkerProvisioner } from './WorkerProvisioner.js';
+import type { ReadinessMessageOutcome } from './WorkerReadiness.js';
 import type { WorkerRegistry } from './WorkerRegistry.js';
 
 export { DEFAULT_STEP_SILENCE_LIMIT_MS, MAX_REDISPATCHES } from './WorkerAssignmentSupervisor.js';
@@ -307,6 +308,16 @@ export class CommandHandler {
 	/** A worker answered `run_end`; see {@link RunEndCoordinator.handleAck}. */
 	onRunEndAck(worker: WebSocket, executionId: string): void {
 		this.pipeline.runEnd.handleAck(worker, executionId);
+	}
+
+	/** A worker acknowledged a `readiness_request`; see `WorkerReadiness.handleAlive`. */
+	onReadinessAlive(worker: WebSocket, requestId: string): ReadinessMessageOutcome {
+		return this.pipeline.dispatcher.onReadinessAlive(worker, requestId);
+	}
+
+	/** A worker sent the verdict of a `readiness_request`; see `WorkerReadiness.handleAnswer`. */
+	onReadinessAnswer(worker: WebSocket, requestId: string, answer: unknown): ReadinessMessageOutcome {
+		return this.pipeline.dispatcher.onReadinessAnswer(worker, requestId, answer);
 	}
 
 	/** Tells the workers of every run in progress that the daemon is stopping; see {@link RunEndCoordinator.announceDaemonStop}. */

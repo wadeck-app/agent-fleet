@@ -1,7 +1,7 @@
 import { formatStepCost, sumStepCosts, summarizeStepCost } from 'flow-core';
 
 import type { ExecutionState, StepState } from '../ipc/Protocol';
-import type { ExecutionTransition, ExecutionTransitionListener } from '../storage/ExecutionTransition';
+import type { ExecutionTransition, ExecutionTransitionListener, StepDeferral } from '../storage/ExecutionTransition';
 import type { FlowEventName, FlowEventPayload, FlowEventPublisher } from './FlowEventPublisher';
 
 /** Longest error text published, ellipsis included. */
@@ -98,11 +98,36 @@ export class FlowEventMapper implements ExecutionTransitionListener {
 					event: 'flow.step.failed',
 					payload: this.stepPayload(transition.state, transition.stepId, 'failed'),
 				};
+			case 'step-deferred':
+				return {
+					event: 'flow.step.deferred',
+					payload: this.deferredPayload(transition.state, transition.stepId, transition.deferral),
+				};
 			default: {
 				const unreachable: never = transition;
 				throw new Error(`Unknown execution transition: ${JSON.stringify(unreachable)}`);
 			}
 		}
+	}
+
+	private deferredPayload(state: ExecutionState, stepId: string, deferral: StepDeferral): FlowEventPayload {
+		const reason = firstLineOf(deferral.reason, MAX_ERROR_CHARS);
+		const message = firstLineOf(deferral.message, MAX_ERROR_CHARS);
+		return {
+			executionId: state.executionId,
+			flowId: state.flowId,
+			stepId,
+			status: 'deferred',
+			// The attempt that is waiting to start: the record counts the attempts already started.
+			attempt: (state.steps[stepId]?.attempts ?? 0) + 1,
+			...(state.projectRoot === undefined ? {} : { projectRoot: state.projectRoot }),
+			...(state.projectId === undefined ? {} : { projectId: state.projectId }),
+			reason: reason ?? deferral.phase,
+			...(message === undefined ? {} : { message }),
+			phase: deferral.phase,
+			retryAfterSeconds: deferral.retryAfterSeconds,
+			...(deferral.workerSource === undefined ? {} : { workerSource: deferral.workerSource }),
+		};
 	}
 
 	private pausedPayload(state: ExecutionState): FlowEventPayload {

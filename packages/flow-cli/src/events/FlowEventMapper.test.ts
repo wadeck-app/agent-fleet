@@ -521,3 +521,64 @@ describe('FlowEventMapper pause and unpause', () => {
 		});
 	});
 });
+
+describe('FlowEventMapper step deferred', () => {
+	let dir: string;
+	let publisher: RecordingFlowEventPublisher;
+	let store: ExecutionStore;
+
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-events-deferred-'));
+		publisher = new RecordingFlowEventPublisher();
+		store = new ExecutionStore(
+			dir,
+			30,
+			new ExecutionMasks(),
+			new FlowEventMapper(publisher, err => {
+				throw err;
+			})
+		);
+		store.create({
+			executionId: EXEC_ID,
+			flowFile: 'f.yml',
+			flowId: 'my-flow',
+			stepIds: ['a'],
+			projectRoot: '/work/project',
+		});
+	});
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true });
+	});
+
+	it('publishes flow.step.deferred with reason, message, phase, retry and worker source, for the attempt that waits', () => {
+		store.notifyStepDeferred(EXEC_ID, 'a', {
+			reason: 'sso-expired',
+			message: 'The SSO session expired\nsecond line',
+			phase: 'worker',
+			retryAfterSeconds: 30,
+			workerSource: 'sandbox',
+		});
+
+		expect(publisher.names()).toEqual(['flow.step.deferred']);
+		expect(publisher.events[0]!.payload).toEqual({
+			executionId: EXEC_ID,
+			flowId: 'my-flow',
+			stepId: 'a',
+			status: 'deferred',
+			attempt: 1,
+			projectRoot: '/work/project',
+			reason: 'sso-expired',
+			message: 'The SSO session expired',
+			phase: 'worker',
+			retryAfterSeconds: 30,
+			workerSource: 'sandbox',
+		});
+	});
+
+	it('writes nothing to the record: the step is still queued', () => {
+		const before = JSON.stringify(store.read(EXEC_ID));
+		store.notifyStepDeferred(EXEC_ID, 'a', { reason: 'r', message: 'm', phase: 'ack', retryAfterSeconds: 5 });
+		expect(JSON.stringify(store.read(EXEC_ID))).toBe(before);
+	});
+});

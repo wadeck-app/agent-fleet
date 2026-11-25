@@ -376,6 +376,11 @@ async function startOwningDaemon(
 							writeDaemonLog(logsDir, 'error', message);
 						}),
 						boundStepWaitMs: config.worker.boundStepWaitSeconds * 1000,
+						readiness: {
+							ackMs: config.worker.readinessAckSeconds * 1000,
+							answerMs: config.worker.readinessAnswerSeconds * 1000,
+							notReadyMaxWaitMs: config.worker.notReadyMaxWaitSeconds * 1000,
+						},
 						contactErrors: sourceContact.contactErrors,
 					},
 					HostToolsPolicyResolver.of(config)

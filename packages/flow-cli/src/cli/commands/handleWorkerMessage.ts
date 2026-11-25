@@ -115,6 +115,12 @@ export async function handleWorkerMessage(
 				`[warn] received run_end for execution ${message.executionId} although this worker does not declare run-events; ignoring it. Please report this.`
 			);
 			break;
+		case 'readiness_request':
+			// Only sent to workers declaring `readiness`, which this one never does: say so, and do not answer.
+			console.error(
+				`[warn] received readiness_request for step ${message.stepId} although this worker does not declare readiness; ignoring it. Please report this.`
+			);
+			break;
 		case 'worker_hold_enabled':
 			// Only sent to a worker declaring `run-hold`, which this one never does: nothing to do.
 			break;

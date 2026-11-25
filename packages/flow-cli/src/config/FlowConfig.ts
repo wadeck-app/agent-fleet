@@ -40,6 +40,9 @@ const COMPARED_SETTINGS: { path: string; read: (config: FlowConfigData) => unkno
 	{ path: 'worker.runEventsEnabled', read: config => config.worker.runEventsEnabled },
 	{ path: 'worker.ackTimeoutSeconds', read: config => config.worker.ackTimeoutSeconds },
 	{ path: 'worker.boundStepWaitSeconds', read: config => config.worker.boundStepWaitSeconds },
+	{ path: 'worker.readinessAckSeconds', read: config => config.worker.readinessAckSeconds },
+	{ path: 'worker.readinessAnswerSeconds', read: config => config.worker.readinessAnswerSeconds },
+	{ path: 'worker.notReadyMaxWaitSeconds', read: config => config.worker.notReadyMaxWaitSeconds },
 	{ path: 'security.allowAbsolutePaths', read: config => config.security.allowAbsolutePaths },
 	{ path: 'limits.maxInjectedSteps', read: config => config.limits.maxInjectedSteps },
 	{ path: 'limits.maxStepsPerExecution', read: config => config.limits.maxStepsPerExecution },
@@ -123,6 +126,22 @@ export interface FlowConfigData {
 		 * requirements shows up. The clock only runs while no such worker is connected: a busy one is a queue to wait in.
 		 */
 		boundStepWaitSeconds: number;
+		/**
+		 * Readiness question, phase 1 (`readiness` workers only): how long, in seconds, a worker has to acknowledge it with
+		 * `readiness_alive`. No ack = the worker is unresponsive, treated as not ready (`worker-unresponsive`). Default: 3.
+		 * Must be between 1 and 60. Not the same timer as `readinessAnswerSeconds` nor `notReadyMaxWaitSeconds`.
+		 */
+		readinessAckSeconds: number;
+		/**
+		 * Readiness question, phase 2: how long, in seconds, an acknowledged worker has to send its verdict (`ready` or
+		 * `not_ready`). No verdict = not ready (`no-readiness-answer-in-time`). Default: 60. Must be between 1 and 60 (hard cap).
+		 */
+		readinessAnswerSeconds: number;
+		/**
+		 * How long, in seconds, a step is kept queued while the worker it was to go to is not ready, before it is FAILED with
+		 * the last reason. Default: 900. Must be between 1 and 7200. The worker is asked again after its own `retryAfter`.
+		 */
+		notReadyMaxWaitSeconds: number;
 	};
 	security: {
 		/** Allow flow files outside cwd / home directory. Default: false. */
@@ -186,6 +205,18 @@ const MAX_ACK_TIMEOUT_SECONDS = 120;
 const MIN_BOUND_STEP_WAIT_SECONDS = 1;
 const MAX_BOUND_STEP_WAIT_SECONDS = 600;
 
+/** Range of `worker.readinessAckSeconds`: the worker only has to say it is alive. */
+const MIN_READINESS_ACK_SECONDS = 1;
+const MAX_READINESS_ACK_SECONDS = 60;
+
+/** Range of `worker.readinessAnswerSeconds`: the cap is hard, a longer check belongs in the worker's own not_ready + retryAfter. */
+const MIN_READINESS_ANSWER_SECONDS = 1;
+const MAX_READINESS_ANSWER_SECONDS = 60;
+
+/** Range of `worker.notReadyMaxWaitSeconds`. */
+const MIN_NOT_READY_MAX_WAIT_SECONDS = 1;
+const MAX_NOT_READY_MAX_WAIT_SECONDS = 7200;
+
 /** Keys accepted under `validation`. */
 const VALIDATION_KEYS: readonly string[] = ['hostToolsUnderConfinedProfile'];
 
@@ -203,6 +234,9 @@ export class FlowConfigLoader {
 			runEventsEnabled: true,
 			ackTimeoutSeconds: 30,
 			boundStepWaitSeconds: 120,
+			readinessAckSeconds: 3,
+			readinessAnswerSeconds: 60,
+			notReadyMaxWaitSeconds: 900,
 		},
 		security: { allowAbsolutePaths: false },
 		limits: {
@@ -351,6 +385,36 @@ export class FlowConfigLoader {
 		) {
 			throw new Error(
 				`worker.boundStepWaitSeconds in "${configFile}" must be a whole number of seconds between ${String(MIN_BOUND_STEP_WAIT_SECONDS)} and ${String(MAX_BOUND_STEP_WAIT_SECONDS)}, got ${JSON.stringify(boundStepWaitSeconds)}. Fix or remove the key (default: 120).`
+			);
+		}
+		const { readinessAckSeconds, readinessAnswerSeconds, notReadyMaxWaitSeconds } = config.worker;
+		FlowConfigLoader.assertWholeSeconds('readinessAckSeconds', readinessAckSeconds, configFile, [
+			MIN_READINESS_ACK_SECONDS,
+			MAX_READINESS_ACK_SECONDS,
+			3,
+		]);
+		FlowConfigLoader.assertWholeSeconds('readinessAnswerSeconds', readinessAnswerSeconds, configFile, [
+			MIN_READINESS_ANSWER_SECONDS,
+			MAX_READINESS_ANSWER_SECONDS,
+			60,
+		]);
+		FlowConfigLoader.assertWholeSeconds('notReadyMaxWaitSeconds', notReadyMaxWaitSeconds, configFile, [
+			MIN_NOT_READY_MAX_WAIT_SECONDS,
+			MAX_NOT_READY_MAX_WAIT_SECONDS,
+			900,
+		]);
+	}
+
+	/** @throws Error naming the key, the file, the range and the default when `value` is not a whole number of seconds in `[min, max]`. */
+	private static assertWholeSeconds(
+		key: string,
+		value: unknown,
+		configFile: string,
+		[min, max, fallback]: [number, number, number]
+	): void {
+		if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+			throw new Error(
+				`worker.${key} in "${configFile}" must be a whole number of seconds between ${String(min)} and ${String(max)}, got ${JSON.stringify(value)}. Fix or remove the key (default: ${String(fallback)}).`
 			);
 		}
 	}

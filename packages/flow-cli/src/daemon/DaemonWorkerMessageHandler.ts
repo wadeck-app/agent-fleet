@@ -28,6 +28,8 @@ export class DaemonWorkerMessageHandler {
 	private readonly warnedWithoutMetrics = new WeakSet<WebSocket>();
 	/** Connections told `worker_hold_enabled`: only these may send `worker_hold`. */
 	private readonly holdEnabled = new WeakSet<WebSocket>();
+	/** Connections already told that a readiness message of theirs matched no open question. */
+	private readonly lateReadinessReported = new WeakSet<WebSocket>();
 
 	constructor(
 		private readonly logsDir: string,
@@ -158,6 +160,19 @@ export class DaemonWorkerMessageHandler {
 				this.handleWorkerHold(ws, message);
 				break;
 			}
+			case 'readiness_alive': {
+				if (this.runtime().commandHandler.onReadinessAlive(ws, message.requestId) === 'ignored') {
+					this.noteIgnoredReadinessMessage(ws, 'readiness_alive');
+				}
+				break;
+			}
+			case 'readiness_answer': {
+				const { type: _type, requestId, ...answer } = message;
+				if (this.runtime().commandHandler.onReadinessAnswer(ws, requestId, answer) === 'ignored') {
+					this.noteIgnoredReadinessMessage(ws, 'readiness_answer');
+				}
+				break;
+			}
 			default: {
 				const _exhaustive: never = message;
 				// Only the type: the rest of the message can hold secrets and ends up in the daemon log.
@@ -216,6 +231,20 @@ export class DaemonWorkerMessageHandler {
 		}
 		this.holdEnabled.add(ws);
 		workerRegistry.send(ws, { type: 'worker_hold_enabled' });
+	}
+
+	/**
+	 * A readiness message matching no open question: it came after its deadline, or after the step went to another worker, or it
+	 * is not the sender's. Safe to ignore; said once per connection so a worker that is always late is told once, not per ask.
+	 */
+	private noteIgnoredReadinessMessage(ws: WebSocket, type: string): void {
+		if (this.lateReadinessReported.has(ws)) {
+			return;
+		}
+		this.lateReadinessReported.add(ws);
+		this.reportIgnored(
+			`Worker ${this.describeSender(ws)} sent ${type} for a readiness question that is no longer open (answered after its deadline, cancelled because the step went elsewhere, or unknown); ignored. Further ones from this connection are ignored silently. Deadlines: worker.readinessAckSeconds (alive ack) and worker.readinessAnswerSeconds (answer).`
+		);
 	}
 
 	private reportIgnored(line: string): void {
