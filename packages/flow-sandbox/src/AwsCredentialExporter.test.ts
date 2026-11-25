@@ -41,6 +41,15 @@ describe('AwsCredentialExporter', () => {
 		expect(custom.requests[0]?.command).toBe('C:\\tools\\aws.exe');
 	});
 
+	it('uses the per-call time limit instead of the default one, and the default when none is given', async () => {
+		const outcome = { exitCode: 0, stdout: JSON.stringify(DOCUMENT), stderr: '' };
+		const runner = new ScriptedCommandRunner([outcome], outcome);
+		const exporter = exporterFor(runner);
+		await exporter.export('p', { timeoutMs: 1500 });
+		await exporter.export('p');
+		expect(runner.requests.map(request => request.timeoutMs)).toEqual([1500, 1234]);
+	});
+
 	it('forwards only the documented fields and accepts credentials without a session token', async () => {
 		const runner = new ScriptedCommandRunner([
 			{

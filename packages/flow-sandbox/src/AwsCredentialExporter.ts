@@ -36,10 +36,16 @@ export interface AwsProcessCredentials {
 	Expiration?: string;
 }
 
+/** Per-call options of {@link CredentialSource.export}. */
+export interface CredentialExportOptions {
+	/** Time limit of this call (the `aws` child is killed when it takes longer); default: the limit of the source. */
+	timeoutMs?: number;
+}
+
 /** Where the credentials of a host profile come from. The endpoint depends on this, not on the AWS CLI. */
 export interface CredentialSource {
 	/** Short-lived credentials of the host profile, or an AwsCredentialError. */
-	export(hostProfile: string): Promise<AwsProcessCredentials>;
+	export(hostProfile: string, options?: CredentialExportOptions): Promise<AwsProcessCredentials>;
 }
 
 export interface AwsCredentialExporterOptions {
@@ -68,20 +74,23 @@ export class AwsCredentialExporter implements CredentialSource {
 		this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 	}
 
-	async export(hostProfile: string): Promise<AwsProcessCredentials> {
-		const result = await this.run(hostProfile);
+	async export(hostProfile: string, options?: CredentialExportOptions): Promise<AwsProcessCredentials> {
+		const result = await this.run(hostProfile, options?.timeoutMs ?? this.timeoutMs);
 		if (result.exitCode !== 0) {
 			throw this.failure(hostProfile, result.stderr);
 		}
 		return this.parse(hostProfile, result.stdout);
 	}
 
-	private async run(hostProfile: string): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+	private async run(
+		hostProfile: string,
+		timeoutMs: number
+	): Promise<{ exitCode: number; stdout: string; stderr: string }> {
 		try {
 			return await this.options.commandRunner.run({
 				command: this.awsCommand,
 				args: ['configure', 'export-credentials', '--profile', hostProfile, '--format', 'process'],
-				timeoutMs: this.timeoutMs,
+				timeoutMs,
 			});
 		} catch (error) {
 			if (error instanceof SandboxError && error.kind === 'binary-missing') {
@@ -94,7 +103,7 @@ export class AwsCredentialExporter implements CredentialSource {
 			if (error instanceof SandboxError && error.kind === 'timeout') {
 				throw new AwsCredentialError(
 					'timeout',
-					`"aws configure export-credentials --profile ${hostProfile}" did not finish within ${this.timeoutMs} ms. If a browser window or device-code prompt is waiting, run "aws sso login --profile ${hostProfile}" in a terminal and retry.`,
+					`"aws configure export-credentials --profile ${hostProfile}" did not finish within ${timeoutMs} ms. If a browser window or device-code prompt is waiting, run "aws sso login --profile ${hostProfile}" in a terminal and retry.`,
 					{ cause: error }
 				);
 			}
