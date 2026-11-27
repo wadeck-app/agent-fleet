@@ -35,6 +35,7 @@ import { FlowSourceLookup } from './FlowSourceLookup';
 import { HostScriptEnvironment } from './HostScriptEnvironment';
 import { HostScriptLauncher } from './HostScriptLauncher';
 import { McpCallbackRules } from './McpCallbackRules';
+import { ProfileReadinessCheck } from './ProfileReadinessCheck';
 import { RoutingPreflight } from './RoutingPreflight';
 import { SbxProcessLauncher } from './SbxProcessLauncher';
 import { StepCommandTranslator } from './StepCommandTranslator';
@@ -115,10 +116,12 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 		cleanup.add('remove the secrets directory', () =>
 			fs.rmSync(secretsDirectory, { recursive: true, force: true })
 		);
+		// One exporter for the credential endpoint and the readiness check.
+		const credentialSource = new AwsCredentialExporter({
+			commandRunner: new EnvironmentCommandRunner(new NodeCommandRunner(), config.awsEnvironment),
+		});
 		const endpoint = new HostCredentialEndpoint({
-			source: new AwsCredentialExporter({
-				commandRunner: new EnvironmentCommandRunner(new NodeCommandRunner(), config.awsEnvironment),
-			}),
+			source: credentialSource,
 			profiles: config.profiles.hostProfiles(),
 			log,
 			wallClock: () => new Date(),
@@ -229,6 +232,13 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 			},
 			log,
 			workerLogs,
+			readinessCheck: new ProfileReadinessCheck({
+				aliases: config.profiles,
+				credentialSource,
+				clock: new SystemClock(),
+				scheduler: new SystemScheduler(),
+				log: line => log.info(line),
+			}),
 			createDaemon: handlers => new DaemonLink({ url: config.daemonUrl, log, ...handlers }),
 			requireGuarantees: config.requireGuarantees,
 			createMounts: (workspaceDir, workspaceMetaDir, readOnlyWorkspace, resolved) =>

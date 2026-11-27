@@ -20,6 +20,8 @@ import { ObservedList } from '../testing/ObservedList';
 import { RecordingPresence } from '../testing/RecordingPresence';
 import { RecordingSandboxLog } from '../testing/RecordingSandboxLog';
 import { ExecWrapper, type StepExecutor, type StepExecutorContext } from './ExecWrapper';
+import type { ReadinessAnswer } from './ProfileReadinessCheck';
+import { WORKER_FEATURE_READINESS } from './ReadinessResponder';
 import { WORKER_FEATURE_RUN_HOLD } from './RunHoldAnnouncer';
 import { WORKER_FEATURE_WORKER_LOGS, type WorkerLogMessage } from './WorkerLogShipper';
 
@@ -72,6 +74,9 @@ class FakeWorkerLogs {
 }
 
 let workerLogs: FakeWorkerLogs;
+/** The answer the fake readiness check gives, and the requests it saw. */
+let readinessAnswer: () => Promise<ReadinessAnswer>;
+let readinessRequests: { tool?: string }[];
 let root: string;
 let workspace: string;
 let meta: string;
@@ -130,6 +135,8 @@ beforeEach(async () => {
 	);
 	daemon = new FakeDaemon();
 	workerLogs = new FakeWorkerLogs();
+	readinessAnswer = () => Promise.resolve({ ready: true });
+	readinessRequests = [];
 	prepares = 0;
 	sourceProfiles = ProfileAliases.parse(['claude=a', 'codex=b', 'opencode=c']);
 	requireGuarantees = true;
@@ -188,6 +195,12 @@ beforeEach(async () => {
 		}),
 		log,
 		workerLogs,
+		readinessCheck: {
+			check: request => {
+				readinessRequests.push(request);
+				return readinessAnswer();
+			},
+		},
 		createDaemon: handlers => {
 			daemon.handlers = handlers;
 			return daemon;
@@ -968,6 +981,7 @@ describe('ExecWrapper failures', () => {
 			},
 			log,
 			workerLogs: new FakeWorkerLogs(),
+			readinessCheck: { check: () => Promise.resolve({ ready: true }) },
 			createDaemon: handlers => {
 				daemon.handlers = handlers;
 				return daemon;
@@ -1178,5 +1192,34 @@ describe('ExecWrapper run-hold', () => {
 		await run(assign('probe', { host: { top: true, config: true } }));
 
 		expect(daemon.ofType('worker_hold')).toEqual([]);
+	});
+});
+
+// The daemon's `readiness` protocol: "are you ready for this step?" before the step is assigned (see ReadinessResponder).
+describe('ExecWrapper readiness', () => {
+	it('declares readiness in the registration and after every step', async () => {
+		await run(assign('probe'));
+
+		const readies = daemon.ofType('ready');
+		expect(readies).toHaveLength(2);
+		for (const ready of readies) expect(ready['features']).toContain(WORKER_FEATURE_READINESS);
+	});
+
+	it('answers a readiness_request with alive then the answer, and does not call it an unknown message', async () => {
+		daemon.handlers?.onMessage({
+			type: 'readiness_request',
+			requestId: 'q1',
+			executionId: 'run1',
+			stepId: 's',
+			tool: 'claude',
+		});
+		await daemon.arrivals.waitFor(messages => messages.some(message => message['type'] === 'readiness_answer'));
+
+		expect(daemon.received.slice(1)).toEqual([
+			{ type: 'readiness_alive', requestId: 'q1' },
+			{ type: 'readiness_answer', requestId: 'q1', result: 'ready' },
+		]);
+		expect(readinessRequests).toEqual([{ tool: 'claude' }]);
+		expect(log.text()).not.toContain('unknown daemon message');
 	});
 });

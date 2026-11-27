@@ -18,6 +18,8 @@ import { ReturnedPaths } from '../harness/ReturnedPaths';
 import { ExecAssignment, type PreparedAssignment } from './ExecAssignment';
 import { ExecRunEnd } from './ExecRunEnd';
 import type { ExecPreparedSandbox, ExecSandboxPreparer } from './ExecSandboxPreparer';
+import type { ProfileReadinessCheck } from './ProfileReadinessCheck';
+import { ReadinessResponder, WORKER_FEATURE_READINESS } from './ReadinessResponder';
 import { READ_ONLY_GUARANTEE, RequiresGuard } from './RequiresGuard';
 import { RunHoldAnnouncer, WORKER_FEATURE_RUN_HOLD } from './RunHoldAnnouncer';
 import { WORKER_FEATURE_WORKER_LOGS, type WorkerLogShipper } from './WorkerLogShipper';
@@ -71,6 +73,8 @@ export interface ExecWrapperDependencies {
 	log: SandboxLog;
 	/** Ships the wrapper's own output to the daemon once the daemon enabled it (the `worker-logs` feature, see WorkerLogShipper). */
 	workerLogs: Pick<WorkerLogShipper, 'attach' | 'detach'>;
+	/** Answers the daemon's readiness questions (the `readiness` feature, see ReadinessResponder). */
+	readinessCheck: Pick<ProfileReadinessCheck, 'check'>;
 	createDaemon: (handlers: DaemonHandlers) => DaemonControl;
 	/**
 	 * The RunMounts of a run (workspace, `.meta` next to it). `readOnlyWorkspace` is true when the run requires `fs=readonly-enforced`:
@@ -126,6 +130,7 @@ export class ExecWrapper {
 	private readonly reporter: DaemonReporter;
 	private readonly runEnd: ExecRunEnd;
 	private readonly runHold: RunHoldAnnouncer;
+	private readonly readiness: ReadinessResponder;
 	/** The output names the active step declares: the only ones a too-large result never loses. */
 	private declared: ReadonlySet<string> = new Set();
 	private mounts: { executionId: string; mounts: RunMounts } | undefined;
@@ -148,6 +153,11 @@ export class ExecWrapper {
 		this.runHold = new RunHoldAnnouncer({
 			heldRun: () => dependencies.lifecycle.current()?.executionId,
 			send: message => this.daemon.send(message),
+		});
+		this.readiness = new ReadinessResponder({
+			check: dependencies.readinessCheck,
+			send: message => this.daemon.send(message),
+			log: dependencies.log,
 		});
 		this.runEnd = new ExecRunEnd({
 			lifecycle: dependencies.lifecycle,
@@ -213,6 +223,10 @@ export class ExecWrapper {
 				// Answer to the run-hold feature of `ready`, once per connection: from now on the run held is announced (see RunHoldAnnouncer).
 				this.runHold.enable();
 				return;
+			case 'readiness_request':
+				// Never rejects; the alive message goes out before the check starts (see ReadinessResponder).
+				void this.readiness.handle(message);
+				return;
 			case 'done':
 				this.dependencies.log.warn(
 					'the daemon sent "done" (a shutdown notice meant for daemon-forked workers); ignored, as flow worker does.'
@@ -231,7 +245,13 @@ export class ExecWrapper {
 		const features = Array.isArray(ready['features']) ? ready['features'] : [];
 		return {
 			...ready,
-			features: [...features, WORKER_FEATURE_RUN_EVENTS, WORKER_FEATURE_WORKER_LOGS, WORKER_FEATURE_RUN_HOLD],
+			features: [
+				...features,
+				WORKER_FEATURE_RUN_EVENTS,
+				WORKER_FEATURE_WORKER_LOGS,
+				WORKER_FEATURE_RUN_HOLD,
+				WORKER_FEATURE_READINESS,
+			],
 		};
 	}
 

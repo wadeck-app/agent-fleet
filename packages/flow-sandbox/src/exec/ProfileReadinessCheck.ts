@@ -21,7 +21,7 @@ export interface ProfileReadinessCheckOptions {
 /**
  * "Are you ready for this step?": a model step is ready when the credentials of its tool's host profile resolve
  * (`aws configure export-credentials`, through the injected source). Check only: nothing is renewed and no login
- * is started, the wrapper never logs in by itself. Not wired to any protocol message yet.
+ * is started, the wrapper never logs in by itself.
  *
  * - A script step (no tool) is ready without any AWS call.
  * - A tool without alias makes `ProfileAliases.aliasFor` throw a SandboxError; it propagates unchanged (that
