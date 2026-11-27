@@ -30,6 +30,7 @@ import { registerCostCommand } from './commands/CostCommand';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
 import { registerPluginsCommand } from './commands/PluginsCommand';
+import { registerPruneCommand } from './commands/PruneCommand';
 import { registerResumeCommand } from './commands/ResumeCommand';
 import { registerRunCommand } from './commands/RunCommand';
 import { registerShowCommand } from './commands/ShowCommand';
@@ -68,7 +69,7 @@ Environment variables:
   FLOW_DAEMON_NO_IDLE_STOP  Internal - set to "1" to keep the daemon alive when idle, for tests that must not depend on the idle stop
 
 Daemon-required commands: run, start, stop, status
-Standalone commands:      show, validate, history, cost, versions, docs, logs, cli`;
+Standalone commands:      show, validate, history, cost, prune, versions, docs, logs, cli`;
 
 const DAEMON_DIR = flowConfigDir();
 
@@ -196,6 +197,7 @@ async function main(): Promise<void> {
 	registerUnpauseCommand(program);
 	registerHistoryCommand(program);
 	registerCostCommand(program);
+	registerPruneCommand(program);
 	registerVersionsCommand(program);
 	registerWorkerCommand(registerWorkerSourceCommand(program));
 	registerPluginsCommand(program);

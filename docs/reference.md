@@ -64,6 +64,7 @@ flow cli update                         # manual update
 | `flow show`        | Inspect a past execution                                     |
 | `flow history`     | List recent executions (times are UTC)                       |
 | `flow cost`        | Cost of past executions (`--by flow\|input:<name>`, `--since`, `--json`) |
+| `flow prune`       | Delete finished execution records (`--flow`, `--status`, `--before`, `--dry-run`, `--yes`, `--json`) |
 | `flow resume <id>` | Re-dispatch a timed-out, unanswered `user_intervention` step |
 | `flow cancel <id>` | Cancel one queued/running execution; the daemon keeps running |
 | `flow docs`        | Show flow YAML documentation                                 |

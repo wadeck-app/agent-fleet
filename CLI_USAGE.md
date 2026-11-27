@@ -26,12 +26,21 @@ flow works inside a **registered project** only. Register each folder that holds
 
 The project is resolved, in order, from `-p/--project <name|alias|id>`, then `FLOW_PROJECT`, then the registered folder containing the current directory (deepest wins). There is no fallback: an unknown reference or an unregistered directory is an error that lists the registered projects and the `project add` command to run, and a run outside any registered project is refused (also `flow run <file>` from an unregistered folder).
 
-- `-p/--project` exists on `flow run`, `flow versions`, `flow history` and `flow cost` (a filter, applied only when `-p`/`FLOW_PROJECT` is given). `flow show`, `flow validate`, `flow logs` take none.
+- `-p/--project` exists on `flow run`, `flow versions`, `flow history`, `flow cost` and `flow prune` (a filter, applied only when `-p`/`FLOW_PROJECT` is given). `flow show`, `flow validate`, `flow logs` take none.
 - Flows are read from `<project folder>/.flow/flows.yml` (+ `flows-custom.yml`); hooks and plugins from the project config in the registry (`<registry>/projects/<project id>/flow/config/config.yml`; registry = `$XDG_CONFIG_HOME/project`, else `~/.config/project`). Only `plugins` and `hooks` are allowed there (an unknown or daemon-only key is an error naming the file); `.flow/config.yml` left in the repository is an error giving the `mv` command that moves it.
 - The daemon serves every project and re-reads the registry on each request. If the CLI and the daemon use different registries (different `XDG_CONFIG_HOME`), the run is refused with `PROJECT_REGISTRY_MISMATCH`.
 - A daemon that dies while starting (e.g. the `.flow/config.yml` error above) records why in the daemon log and in `<flow config dir>/daemon-start-error.json` (cleared by the next successful start). `flow run` and `flow start` print that cause and exit 3; other daemon commands print the real error (no stack unless `FLOW_DEBUG=1`) and `daemon not running (flow start)` when the daemon is closing or absent.
 - Workers: `flow worker --project <name|alias|id>` (repeatable) or `FLOW_WORKER_PROJECTS` attach to registered projects; a folder path is refused. See `packages/flow-cli/WORKERS.md`.
 - Executions record `projectId`; `flow show <execution-id>` prints `Project: name (id)`.
+
+## flow prune
+
+`flow prune` deletes execution records (probe runs) so they leave `flow history` and `flow cost`. At least one of `-p`, `--flow <id>` (repeatable), `--status`, `--before <ISO date>` is required. Without `--yes` (or with `--dry-run`) it only lists what it would delete.
+
+- Only `completed` and `failed` runs are deleted; queued, running, re-queued and paused runs are `refused` (exit 0, unless `--status` asked for unfinished runs only: exit 1).
+- Deleted with a record: its `<id>.paused-snapshot` and the plugin `.meta` folder it names. Kept: daemon logs, `<project>/.flow/runs/<id>.meta`.
+- Safe with the daemon running: records are plain files read on demand, no index or cache.
+- `--json`: `{ schema: 1, dryRun, deleted | wouldDelete: [{executionId, flowId, status, startedAt}], refused: [{executionId, reason}] }`.
 
 ## Starting the stack
 
