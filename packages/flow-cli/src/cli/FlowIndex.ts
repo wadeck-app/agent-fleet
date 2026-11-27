@@ -26,6 +26,7 @@ import { buildCliCommand } from './commands/CliCommand.js';
 import { formatCliError } from './commands/CliErrorOutput';
 import { describeCliFailure } from './commands/CliFailureText';
 import { printDaemonPid, runStatusCommand, runStopCommand } from './commands/DaemonLifecycleCommands';
+import { registerCostCommand } from './commands/CostCommand';
 import { registerDocsCommand } from './commands/DocsCommand';
 import { registerHistoryCommand } from './commands/HistoryCommand';
 import { registerPluginsCommand } from './commands/PluginsCommand';
@@ -67,7 +68,7 @@ Environment variables:
   FLOW_DAEMON_NO_IDLE_STOP  Internal - set to "1" to keep the daemon alive when idle, for tests that must not depend on the idle stop
 
 Daemon-required commands: run, start, stop, status
-Standalone commands:      show, validate, history, versions, docs, logs, cli`;
+Standalone commands:      show, validate, history, cost, versions, docs, logs, cli`;
 
 const DAEMON_DIR = flowConfigDir();
 
@@ -194,6 +195,7 @@ async function main(): Promise<void> {
 	registerPauseCommand(program);
 	registerUnpauseCommand(program);
 	registerHistoryCommand(program);
+	registerCostCommand(program);
 	registerVersionsCommand(program);
 	registerWorkerCommand(registerWorkerSourceCommand(program));
 	registerPluginsCommand(program);
