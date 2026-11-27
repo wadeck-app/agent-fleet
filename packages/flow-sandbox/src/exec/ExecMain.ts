@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { AwsCliStub } from '../AwsCliStub';
 import { AwsCredentialExporter } from '../AwsCredentialExporter';
 import { CleanupStack } from '../CleanupStack';
 import { CrashGuard } from '../CrashGuard';
@@ -117,7 +118,10 @@ export async function runExecWrapper(argv: readonly string[], env: NodeJS.Proces
 			fs.rmSync(secretsDirectory, { recursive: true, force: true })
 		);
 		// One exporter for the credential endpoint and the readiness check.
+		// TEST ONLY: FLOW_SANDBOX_AWS_STUB replaces the AWS CLI by a node script (loud warning, see AwsCliStub).
+		const awsStub = AwsCliStub.fromEnvironment(env, process.execPath, message => log.warn(message));
 		const credentialSource = new AwsCredentialExporter({
+			...awsStub,
 			commandRunner: new EnvironmentCommandRunner(new NodeCommandRunner(), config.awsEnvironment),
 		});
 		const endpoint = new HostCredentialEndpoint({

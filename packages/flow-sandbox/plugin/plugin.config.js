@@ -7,9 +7,11 @@
 //   flow worker source add <id> --provider sandbox --plugin sandbox.exec --plugins-dir <dist-plugin> --option projects=<ids> ...
 // (README, "Plugin"). A flow asks for it with `requires: [sandbox]` (or `profile: untrusted-code`); declaring guarantees makes the source requirement-only in the core.
 //
-// Two environment variables exist for TESTS ONLY, read from the daemon's own environment:
+// Three environment variables exist for TESTS ONLY, read from the daemon's own environment:
 //   FLOW_SANDBOX_PLUGIN_WRAPPER     path of a script that stands in for wrapper.cjs
 //   FLOW_SANDBOX_PLUGIN_DISPOSE_MS  total bound of dispose() instead of 25 s
+//   FLOW_SANDBOX_AWS_STUB           absolute path of a node script that stands in for the `aws` CLI inside the wrapper (forwarded to it by INHERITED;
+//                                   the wrapper logs a WARNING, and refuses a path that is not an existing file)
 // FLOW_SANDBOX_PRESENCE_DIR (the wrapper's own setting) is honoured when looking for a wrapper that is already alive.
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

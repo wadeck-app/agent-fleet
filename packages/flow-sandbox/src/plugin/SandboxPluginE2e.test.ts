@@ -41,6 +41,10 @@ const flowIndex = path.join(repositoryRoot, 'packages', 'flow-cli', 'src', 'cli'
 const tsxUrl = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href;
 const CANNED = 'canned-output-of-the-mock';
 const CANARY = 'canary-of-the-wrapper-environment';
+/** The TEST-ONLY stand-in for `aws` (answers mock-profile, expired-sso, and a missing profile for anything else): without it the readiness check would run the real AWS CLI. */
+const AWS_STUB = fileURLToPath(new URL('./aws-stub.mjs', import.meta.url));
+/** What the stub prints for mock-profile: must never appear in any log. */
+const FAKE_SECRET = 'fake-secret-access-key-of-the-aws-stub';
 const BOUND_WAIT_SECONDS = 6;
 /** `flow stop` of one world and the wait for its daemon process to leave: the two bounds of {@link FlowWorld.stop}. */
 const STOP_COMMAND_BOUND_MS = 30_000;
@@ -80,8 +84,10 @@ class FlowWorld {
 	/** The pid of the daemon this world started; a different one later would mean the daemon was replaced. */
 	daemonPid: number | undefined;
 
-	/** @param scrubModelCredentials remove every ANTHROPIC_*, AWS_* and CLAUDE_* variable: a model step routed to a host worker must not be able to call a real model. */
-	constructor(scrubModelCredentials = false) {
+	/**
+	 * @param notReadyMaxWaitSeconds `worker.notReadyMaxWaitSeconds` of the daemon (the daemon default is 900 s), for a test that waits for it
+	 * @param scrubModelCredentials remove every ANTHROPIC_*, AWS_* and CLAUDE_* variable: a model step routed to a host worker must not be able to call a real model. */
+	constructor(scrubModelCredentials = false, notReadyMaxWaitSeconds?: number) {
 		fs.mkdirSync(this.projectDirectory, { recursive: true });
 		fs.mkdirSync(this.mockState, { recursive: true });
 		fs.mkdirSync(path.join(this.poolDirectory, 'slot-1'), { recursive: true });
@@ -109,6 +115,8 @@ class FlowWorld {
 			),
 			// A variable of the wrapper's environment that no step declares: a host script (host: true) must never see it.
 			FLOW_SANDBOX_E2E_CANARY: CANARY,
+			// The wrapper's readiness check must not run the developer's real AWS CLI (it would answer not ready for mock-profile and defer every model step).
+			FLOW_SANDBOX_AWS_STUB: AWS_STUB,
 			// In the environment of EVERY flow command of the world (a daemon `flow run` starts by itself inherits it from the CLI): the daemon
 			// never stops on idleness (no message-triggered check, no 1 s grace stop, no watchdog), only on `flow stop`, an update or a signal.
 			// A daemon that stops itself between two tests made the next `flow run` start a second one while the first was still shutting down.
@@ -126,7 +134,7 @@ class FlowWorld {
 		DaemonIsolationGuard.assert({ env: this.env, isolatedRoot: this.root });
 		fs.writeFileSync(
 			path.join(this.isolation.configDir, 'config.yml'),
-			`worker:\n  boundStepWaitSeconds: ${BOUND_WAIT_SECONDS}\n`
+			`worker:\n  boundStepWaitSeconds: ${BOUND_WAIT_SECONDS}\n${notReadyMaxWaitSeconds === undefined ? '' : `  notReadyMaxWaitSeconds: ${notReadyMaxWaitSeconds}\n`}`
 		);
 	}
 
@@ -188,7 +196,8 @@ class FlowWorld {
 		sourceId: string,
 		pluginsDirectory: string,
 		sbxPath: string,
-		projects: string = this.projectId
+		projects: string = this.projectId,
+		profiles = 'claude=mock-profile,codex=mock-profile,opencode=mock-profile'
 	): void {
 		const declared = this.flow([
 			'worker',
@@ -206,7 +215,7 @@ class FlowWorld {
 			'--option',
 			'region=us-east-1',
 			'--option',
-			'profiles=claude=mock-profile,codex=mock-profile,opencode=mock-profile',
+			`profiles=${profiles}`,
 			'--option',
 			`sbxPath=${sbxPath}`,
 			'--option',
@@ -541,6 +550,17 @@ class FlowWorld {
 			.split('\n')
 			.filter(line => line !== '')
 			.map(line => JSON.parse(line) as MockSbxCall);
+	}
+
+	/** The lines the daemon wrote to the execution log of one execution (its own logs directory, ndjson). */
+	executionLog(executionId: string): string[] {
+		const directory = path.join(this.isolation.configDir, 'logs');
+		if (!fs.existsSync(directory)) return [];
+		return fs
+			.readdirSync(directory)
+			.filter(name => name.endsWith('.ndjson'))
+			.flatMap(name => fs.readFileSync(path.join(directory, name), 'utf8').split('\n'))
+			.filter(line => line.includes(`[${executionId}|__execution]`));
 	}
 
 	log(): string {
@@ -1176,6 +1196,38 @@ describe('sandbox plugin, real daemon: model steps on a daemon WITHOUT the sandb
 
 		expect(shown.requirements?.implicit).toBeUndefined();
 	});
+});
+
+describe('sandbox plugin, real daemon, sbx mock: readiness of the host profile (aws stub)', () => {
+	const world = new FlowWorld(true, 6);
+	worlds.push(world);
+
+	beforeAll(async () => {
+		await world.registerProject();
+		world.declareSource('sandbox-sso', artifactDirectory, MOCK_SBX_PATH, world.projectId, 'claude=expired-sso');
+		await world.startDaemon();
+	}, 150_000);
+
+	// The whole chain: model step -> daemon asks (readiness_request) -> wrapper checks the host profile through the stub -> not_ready sso-expired
+	// -> the step stays queued (flow.step.deferred) -> after worker.notReadyMaxWaitSeconds the step fails with the last reason. No sandbox exists.
+	it('defers a model step whose host profile has an expired SSO session, then fails it with the aws sso login command, without creating a sandbox', async () => {
+		const started = Date.now();
+
+		const executionId = world.start(world.writeModelFlow('sso-expired', 1));
+		const record = await world.settle(executionId, 60_000);
+
+		const step = record.steps?.['ask1'];
+		expect(record.status, JSON.stringify(record.steps)).toBe('failed');
+		expect(step?.error).toContain('aws sso login --profile expired-sso');
+		expect(step?.error).toContain('sso-expired');
+		expect(step?.error).toContain('worker.notReadyMaxWaitSeconds = 6s');
+		const deferred = world.executionLog(executionId).filter(line => line.includes('stays queued'));
+		expect(deferred.length, world.log().slice(-2000)).toBeGreaterThan(0);
+		expect(deferred[0]).toContain('sso-expired');
+		expect(Date.now() - started).toBeLessThan(45_000);
+		expect(sandboxesCreated(world.sbxCalls())).toEqual([]);
+		expect(world.log() + world.executionLog(executionId).join('\n')).not.toContain(FAKE_SECRET);
+	}, 90_000);
 });
 
 describe('sandbox plugin, real daemon, sbx mock: a source that cannot start', () => {

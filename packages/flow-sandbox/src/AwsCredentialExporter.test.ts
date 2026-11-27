@@ -41,6 +41,43 @@ describe('AwsCredentialExporter', () => {
 		expect(custom.requests[0]?.command).toBe('C:\\tools\\aws.exe');
 	});
 
+	it('puts the fixed leading arguments before the aws arguments (a script run by an interpreter), and none by default', async () => {
+		const outcome = { exitCode: 0, stdout: JSON.stringify(DOCUMENT), stderr: '' };
+		const prefixed = new ScriptedCommandRunner([outcome]);
+		await new AwsCredentialExporter({
+			commandRunner: prefixed,
+			awsCommand: 'node',
+			awsPrefixArguments: ['C:\\stubs\\aws-stub.mjs'],
+			timeoutMs: 1234,
+		}).export('p');
+		expect(prefixed.requests).toEqual([
+			{
+				command: 'node',
+				args: [
+					'C:\\stubs\\aws-stub.mjs',
+					'configure',
+					'export-credentials',
+					'--profile',
+					'p',
+					'--format',
+					'process',
+				],
+				timeoutMs: 1234,
+			},
+		]);
+
+		const plain = new ScriptedCommandRunner([outcome]);
+		await new AwsCredentialExporter({ commandRunner: plain, awsPrefixArguments: [] }).export('p');
+		expect(plain.requests[0]?.args).toEqual([
+			'configure',
+			'export-credentials',
+			'--profile',
+			'p',
+			'--format',
+			'process',
+		]);
+	});
+
 	it('uses the per-call time limit instead of the default one, and the default when none is given', async () => {
 		const outcome = { exitCode: 0, stdout: JSON.stringify(DOCUMENT), stderr: '' };
 		const runner = new ScriptedCommandRunner([outcome], outcome);

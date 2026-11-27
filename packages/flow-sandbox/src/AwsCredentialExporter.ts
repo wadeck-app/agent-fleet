@@ -52,6 +52,11 @@ export interface AwsCredentialExporterOptions {
 	commandRunner: CommandRunner;
 	/** The AWS CLI executable. Default `aws`. */
 	awsCommand?: string;
+	/**
+	 * Fixed arguments placed before the `configure export-credentials ...` ones. Default none. Only for a stand-in run through an
+	 * interpreter (`awsCommand` = node, this = [script]); see `FLOW_SANDBOX_AWS_STUB`.
+	 */
+	awsPrefixArguments?: readonly string[];
 	/** Time limit of one `aws` call. Default 30 s (an SSO refresh can be slow). */
 	timeoutMs?: number;
 }
@@ -89,7 +94,15 @@ export class AwsCredentialExporter implements CredentialSource {
 		try {
 			return await this.options.commandRunner.run({
 				command: this.awsCommand,
-				args: ['configure', 'export-credentials', '--profile', hostProfile, '--format', 'process'],
+				args: [
+					...(this.options.awsPrefixArguments ?? []),
+					'configure',
+					'export-credentials',
+					'--profile',
+					hostProfile,
+					'--format',
+					'process',
+				],
 				timeoutMs,
 			});
 		} catch (error) {
