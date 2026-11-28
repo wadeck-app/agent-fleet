@@ -164,6 +164,10 @@ export class PausedRunRestorer {
 				hooks.register(executionId, dispatcher);
 			}
 			executions.pause(executionId);
+			// The provider decides the folder after adopt(): the record names the one the run really uses now.
+			if (state.workspaceDir !== adopted.workspaceDir) {
+				store.update(executionId, { workspaceDir: adopted.workspaceDir });
+			}
 
 			const waiting: ReadyItem[] = snapshot.queued.map(stepId => ({
 				stepId,

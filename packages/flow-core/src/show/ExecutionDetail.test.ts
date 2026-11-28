@@ -469,6 +469,11 @@ describe('ExecutionDetail origin line', () => {
 	it('prints nothing about an origin for a record without one (older records)', () => {
 		expect(render(baseRecord)).not.toContain('Started from');
 	});
+
+	it('prints "Workspace:" with the host directory when the record has one, nothing for an older record', () => {
+		expect(render({ ...baseRecord, workspaceDir: '/pool/ws-1' })).toContain('Workspace: /pool/ws-1');
+		expect(render(baseRecord)).not.toContain('Workspace:');
+	});
 });
 
 describe('renderExecutionDetail skipped steps', () => {

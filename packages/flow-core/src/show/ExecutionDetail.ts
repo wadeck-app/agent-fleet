@@ -148,6 +148,9 @@ export function renderExecutionDetail({ record, filePath }: ResolvedExecution, o
 	if (record.origin !== undefined) {
 		lines.push(`Started from: ${formatOrigin(record.origin)}`);
 	}
+	if (record.workspaceDir !== undefined) {
+		lines.push(`Workspace: ${record.workspaceDir}`);
+	}
 	lines.push(`Version:   ${versionDetailLineOf(record)}`);
 	lines.push(`File:      ${record.flowFile}`);
 	lines.push(`Status:    ${statusLabelOf(record)}`);

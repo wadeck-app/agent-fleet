@@ -124,6 +124,8 @@ describe('RunRequestHandler -- a run waits for a workspace', () => {
 
 		expect(handler.hasWaitingRuns()).toBe(false);
 		expect(record(executionId).workspaceWait).toBeUndefined();
+		// The record names the host folder of the pool slot the run uses.
+		expect(record(executionId).workspaceDir).toBe(path.join(poolDir, 'ws-1'));
 		handler.tryDispatch();
 		expect(assigns().map(assign => assign.executionContext.workspaceDir)).toEqual([path.join(poolDir, 'ws-1')]);
 	});
@@ -141,6 +143,8 @@ describe('RunRequestHandler -- a run waits for a workspace', () => {
 		expect(waiting.workspaceWait?.run).toMatchObject({ type: 'run', cwd: tmpDir });
 		expect(waiting.workspaceWait?.run).not.toHaveProperty('requestId');
 		expect(waiting.steps['only']!.status).toBe('pending');
+		// No workspace yet: nothing to snapshot, so no path is claimed.
+		expect(waiting).not.toHaveProperty('workspaceDir');
 		expect(handler.hasWaitingRuns()).toBe(true);
 		// Only the run that has its slot counts as an active execution (no scheduler for the waiting one).
 		handler.tryDispatch();
@@ -164,6 +168,8 @@ describe('RunRequestHandler -- a run waits for a workspace', () => {
 			expect(assigns().some(assign => assign.executionContext.executionId === second)).toBe(true)
 		);
 		expect(record(second).workspaceWait).toBeUndefined();
+		// The waiting run gets its folder in the record when it gets its slot.
+		expect(record(second).workspaceDir).toBe(path.join(poolDir, 'ws-1'));
 		expect(
 			assigns().find(assign => assign.executionContext.executionId === second)!.executionContext.workspaceDir
 		).toBe(path.join(poolDir, 'ws-1'));

@@ -33,6 +33,8 @@ export interface ExecutionSummary {
 	flowVersion?: string;
 	/** `flowVersion`, or `-` when it was not recorded: the text of a table cell. */
 	versionLabel: string;
+	/** Host directory of the run's workspace (see `ExecutionState.workspaceDir`); absent while it waits for one and on older records. */
+	workspaceDir?: string;
 	/** True while the run is `queued` because its workspace pool has no free slot (it has done no work). Absent otherwise. */
 	waitingForWorkspace?: true;
 	/** Since when and why it waits; present exactly when `waitingForWorkspace` is. */
@@ -120,6 +122,7 @@ export function toExecutionSummary(record: ExecutionState, projectLookup?: Proje
 		...(projectLabel !== undefined ? { projectLabel } : {}),
 		...(record.flowVersion !== undefined ? { flowVersion: record.flowVersion } : {}),
 		versionLabel: versionColumnOf(record),
+		...(record.workspaceDir !== undefined ? { workspaceDir: record.workspaceDir } : {}),
 		...(isWaitingForWorkspace(record)
 			? {
 					waitingForWorkspace: true as const,

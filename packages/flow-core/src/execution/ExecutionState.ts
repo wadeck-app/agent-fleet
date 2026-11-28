@@ -224,6 +224,13 @@ export interface ExecutionState {
 	 */
 	pluginMetaDir?: string;
 	/**
+	 * HOST directory of the workspace the run uses (pool slot clone, worktree, in-place project folder, shared folder...), as
+	 * the provider returned it: what an external tool snapshots before cancelling a run. Written when the run gets its workspace
+	 * (so absent while it waits for one, `workspaceWait`), and replaced by the path `adopt()` returns after a daemon restart.
+	 * Additive: absent on older records. For a run placed on a sandbox worker it is still the host directory the daemon allocated.
+	 */
+	workspaceDir?: string;
+	/**
 	 * Present ONLY while the run waits for a workspace (a pool with no free slot): the run is `queued`, has done no work,
 	 * and the daemon starts it when a slot is free, also after a daemon restart. Removed when the run starts, fails or is
 	 * cancelled. Additive: absent on every older record and on a run that did not wait.

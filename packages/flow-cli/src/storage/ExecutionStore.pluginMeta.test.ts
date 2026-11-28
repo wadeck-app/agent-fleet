@@ -52,6 +52,24 @@ describe('ExecutionStore pluginMetaDir', () => {
 		expect(store.read('cccccccc').steps['s']?.status).toBe('running');
 	});
 
+	it('persists workspaceDir when given, keeps it through later updates, and omits the key otherwise (older records)', () => {
+		store.create({
+			executionId: 'eeeeeeee',
+			flowFile: 'f.yml',
+			flowId: 'f',
+			stepIds: ['s'],
+			workspaceDir: '/x/ws',
+		});
+		store.create({ executionId: 'ffffffff', flowFile: 'f.yml', flowId: 'f', stepIds: ['s'] });
+
+		store.markStepRunning('eeeeeeee', 's');
+		store.update('eeeeeeee', { lastError: 'x' });
+		store.markExecutionFailed('eeeeeeee');
+
+		expect(store.read('eeeeeeee').workspaceDir).toBe('/x/ws');
+		expect('workspaceDir' in store.read('ffffffff')).toBe(false);
+	});
+
 	it('keeps pluginMetaDir through later updates of the record', () => {
 		store.create({
 			executionId: 'dddddddd',

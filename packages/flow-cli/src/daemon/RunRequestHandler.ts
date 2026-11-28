@@ -380,11 +380,16 @@ export class RunRequestHandler {
 			}
 			// `requestId` only serves the idempotency of the request that was just answered.
 			const { requestId: _requestId, ...run } = cmd;
-			this.createRecord(accepted, executionId, undefined, {
-				since: new Date().toISOString(),
-				message: waiting.message,
-				run: run as unknown as Record<string, unknown>,
-			});
+			this.createRecord(
+				accepted,
+				executionId,
+				{},
+				{
+					since: new Date().toISOString(),
+					message: waiting.message,
+					run: run as unknown as Record<string, unknown>,
+				}
+			);
 		}
 		this.logWriter.writeExecution(executionId, waiting.message, 'warning');
 		this.waitSupervisor.watch(executionId, waiting, workspace => {
@@ -446,6 +451,7 @@ export class RunRequestHandler {
 				const now = new Date();
 				this.executionStore.update(executionId, {
 					...(pluginMetaDir === undefined ? {} : { pluginMetaDir }),
+					workspaceDir,
 					workspaceWait: undefined,
 					startedAt: now.toISOString(),
 					...(since === undefined
@@ -458,7 +464,7 @@ export class RunRequestHandler {
 				for (const warning of resolved.warnings) {
 					this.logWriter.writeExecution(executionId, warning, 'warning');
 				}
-				this.createRecord(accepted, executionId, pluginMetaDir, undefined);
+				this.createRecord(accepted, executionId, { workspaceDir, pluginMetaDir }, undefined);
 			}
 		} catch (err) {
 			// Execution setup failed after workspace was allocated - release before propagating
@@ -516,7 +522,7 @@ export class RunRequestHandler {
 	private createRecord(
 		accepted: AcceptedRun,
 		executionId: string,
-		pluginMetaDir: string | undefined,
+		workspace: { workspaceDir?: string; pluginMetaDir?: string },
 		workspaceWait: ReturnType<ExecutionStore['read']>['workspaceWait']
 	): void {
 		const { flow, resolved, flowFile, projectId, projectRoot, cmd } = accepted;
@@ -531,7 +537,8 @@ export class RunRequestHandler {
 			projectId,
 			projectRoot,
 			...(cmd.origin === undefined ? {} : { origin: cmd.origin }),
-			pluginMetaDir,
+			pluginMetaDir: workspace.pluginMetaDir,
+			...(workspace.workspaceDir === undefined ? {} : { workspaceDir: workspace.workspaceDir }),
 			...(workspaceWait === undefined ? {} : { workspaceWait }),
 			// Beside the definition, not in it: the snapshot and its hash describe the flow as written.
 			...(accepted.requirements === undefined ? {} : { requirements: accepted.requirements }),

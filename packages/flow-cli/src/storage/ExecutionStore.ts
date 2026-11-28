@@ -87,6 +87,8 @@ export class ExecutionStore {
 		origin?: ExecutionState['origin'];
 		/** `.meta` of a plugin workspace the daemon created for this run; deleted with the record once it expires. */
 		pluginMetaDir?: string;
+		/** Host directory of the run's workspace; see `ExecutionState.workspaceDir`. Absent for a run that waits for one. */
+		workspaceDir?: string;
 		/** Set when the run waits for a workspace at the time it is recorded; see `ExecutionState.workspaceWait`. */
 		workspaceWait?: ExecutionState['workspaceWait'];
 		/** Which definition ran: version, content hash, snapshot and how the version was chosen. Written once, never changed. */
@@ -111,6 +113,7 @@ export class ExecutionStore {
 			...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
 			...(params.origin !== undefined ? { origin: params.origin } : {}),
 			...(params.pluginMetaDir !== undefined ? { pluginMetaDir: params.pluginMetaDir } : {}),
+			...(params.workspaceDir !== undefined ? { workspaceDir: params.workspaceDir } : {}),
 			...(params.workspaceWait !== undefined ? { workspaceWait: params.workspaceWait } : {}),
 			...params.definition,
 			...(params.requirements !== undefined ? { requirements: params.requirements } : {}),

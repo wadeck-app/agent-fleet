@@ -273,6 +273,28 @@ describe('a paused run survives a daemon restart', () => {
 		}
 	}
 
+	it('keeps the workspace directory of the record through the restart, and records the one adopt() returns when it differs', async () => {
+		const before = boot();
+		connect(before);
+		const id = await start(before, CHAIN_FLOW);
+		const allocated = path.join(tmpDir, 'plugin-ws');
+		expect(before.store.read(id).workspaceDir).toBe(allocated);
+		pause(before, id);
+
+		const same = await restart(before);
+
+		expect(same.store.read(id).workspaceDir).toBe(allocated);
+		pause(same, id);
+		const moved = path.join(tmpDir, 'plugin-ws-moved');
+		provider.adopt!.mockImplementation(async (request: { handle: object }) => ({ ...request.handle, path: moved }));
+		// A second restart (the restored run persisted a snapshot again), now with a provider that hands back another folder.
+		const after = await restart(same);
+
+		const stored = after.store.read(id);
+		expect(stored.lastError).toBeUndefined();
+		expect(stored.workspaceDir).toBe(moved);
+	});
+
 	it('a graceful daemon stop with a step running in a paused run keeps the run and its snapshot: the step is a new attempt after the restart', async () => {
 		const before = boot();
 		const oldWorker = connect(before);

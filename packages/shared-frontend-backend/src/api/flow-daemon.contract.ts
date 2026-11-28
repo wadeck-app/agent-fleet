@@ -80,6 +80,8 @@ export const FlowExecutionSummarySchema = z.object({
 	flowVersion: z.string().optional(),
 	/** `flowVersion`, or `-` when not recorded: the text of a table cell. */
 	versionLabel: z.string().optional(),
+	/** Host directory of the run's workspace; absent while it waits for one and on older runs. */
+	workspaceDir: z.string().optional(),
 	/** Present only while the run is paused (`flow pause`; its status stays `running`): since when and why. */
 	paused: z.object({ since: z.string(), reason: z.string().optional() }).optional(),
 	stepCount: z.number(),

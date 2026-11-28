@@ -179,6 +179,26 @@ describe('RunRequestHandler -- read-only workspace', () => {
 		expect(first!.stepConfig.prompt).toContain('look around');
 		expect(first!.stepConfig.prompt).toContain('this workspace is shared and read-only');
 		expect(first!.stepConfig.env).toMatchObject({ GIT_OPTIONAL_LOCKS: '0' });
+		// The record names the shared folder (the project folder for `readonly`) as the workspace.
+		expect(store.create).toHaveBeenCalledWith(
+			expect.objectContaining({ workspaceDir: first!.executionContext['workspaceDir'] })
+		);
+		expect(first!.executionContext['workspaceDir']).toEqual(expect.any(String));
+	});
+
+	it('records the project folder as the workspace of an "in-place" run', async () => {
+		pool.getIdle.mockReturnValue({});
+		const flowFile = writeFlow('in-place', NARROWABLE_STEPS);
+
+		const response = await handler.handleRun({ type: 'run', flowFile, cwd: tmpDir } as never);
+
+		expect(response.type).toBe('execution_started');
+		handler.tryDispatch();
+		const [first] = assignsSent();
+		expect(first!.executionContext['workspaceDir']).toEqual(expect.any(String));
+		expect(store.create).toHaveBeenCalledWith(
+			expect.objectContaining({ workspaceDir: first!.executionContext['workspaceDir'] })
+		);
 	});
 
 	it('gives the script step of a read-only workspace GIT_OPTIONAL_LOCKS=0 and leaves its command alone', async () => {
